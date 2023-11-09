@@ -78,62 +78,33 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
         return meta;
     }
 
-    /**
-     * Creates a {@link DataChangeEvent} instance that describes the insert event.
-     *
-     * @param tableId table id.
-     * @param after record data after change.
-     * @return instance of insert event.
-     */
+    /** Creates a {@link DataChangeEvent} instance that describes the insert event. */
     public static DataChangeEvent insertEvent(TableId tableId, RecordData after) {
         return new DataChangeEvent(tableId, null, after, OperationType.INSERT, null);
     }
 
     /**
      * Creates a {@link DataChangeEvent} instance that describes the insert event with meta info.
-     *
-     * @param tableId table id.
-     * @param after record data after change.
-     * @param meta meta info.
-     * @return instance of insert event.
      */
     public static DataChangeEvent insertEvent(
             TableId tableId, RecordData after, Map<String, String> meta) {
         return new DataChangeEvent(tableId, null, after, OperationType.INSERT, meta);
     }
 
-    /**
-     * Creates a {@link DataChangeEvent} instance that describes the delete event.
-     *
-     * @param tableId table id.
-     * @param before record data before change.
-     * @return instance of delete event.
-     */
+    /** Creates a {@link DataChangeEvent} instance that describes the delete event. */
     public static DataChangeEvent deleteEvent(TableId tableId, RecordData before) {
         return new DataChangeEvent(tableId, before, null, OperationType.DELETE, null);
     }
 
     /**
      * Creates a {@link DataChangeEvent} instance that describes the delete event with meta info.
-     *
-     * @param tableId table id.
-     * @param before record data before change.
-     * @param meta meta info.
-     * @return instance of delete event.
      */
     public static DataChangeEvent deleteEvent(
             TableId tableId, RecordData before, Map<String, String> meta) {
         return new DataChangeEvent(tableId, before, null, OperationType.DELETE, meta);
     }
 
-    /**
-     * Creates a {@link DataChangeEvent} instance that describes the update event.
-     *
-     * @param tableId table id.
-     * @param before record data before change.
-     * @param after record data after change.
-     * @return instance of update event.
-     */
+    /** Creates a {@link DataChangeEvent} instance that describes the update event. */
     public static DataChangeEvent updateEvent(
             TableId tableId, RecordData before, RecordData after) {
         return new DataChangeEvent(tableId, before, after, OperationType.UPDATE, null);
@@ -141,36 +112,19 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
 
     /**
      * Creates a {@link DataChangeEvent} instance that describes the update event with meta info.
-     *
-     * @param tableId table id.
-     * @param before record data before change.
-     * @param after record data after change.
-     * @param meta meta info.
-     * @return instance of update event.
      */
     public static DataChangeEvent updateEvent(
             TableId tableId, RecordData before, RecordData after, Map<String, String> meta) {
         return new DataChangeEvent(tableId, before, after, OperationType.UPDATE, meta);
     }
 
-    /**
-     * Creates a {@link DataChangeEvent} instance that describes the replace event.
-     *
-     * @param tableId table id.
-     * @param after record data after change.
-     * @return instance of replace event.
-     */
+    /** Creates a {@link DataChangeEvent} instance that describes the replace event. */
     public static DataChangeEvent replaceEvent(TableId tableId, RecordData after) {
         return new DataChangeEvent(tableId, null, after, OperationType.REPLACE, null);
     }
 
     /**
      * Creates a {@link DataChangeEvent} instance that describes the replace event with meta info.
-     *
-     * @param tableId table id.
-     * @param after record data after change.
-     * @param meta meta info.
-     * @return instance of replace event.
      */
     public static DataChangeEvent replaceEvent(
             TableId tableId, RecordData after, Map<String, String> meta) {
