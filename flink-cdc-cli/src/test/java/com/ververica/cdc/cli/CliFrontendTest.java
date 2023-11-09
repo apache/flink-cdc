@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.cli;
 
-import org.apache.flink.shaded.guava30.com.google.common.io.Resources;
+import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 
 import com.ververica.cdc.cli.utils.FlinkEnvironmentUtils;
 import com.ververica.cdc.composer.PipelineComposer;
