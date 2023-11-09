@@ -14,6 +14,8 @@
 #  See the License for the specific language governing permissions and
 # limitations under the License.
 ################################################################################
+STAGE_CORE="core"
+STAGE_PIPELINE_CONNECTORS="pipeline_connectors"
 STAGE_MYSQL="mysql"
 STAGE_POSTGRES="postgres"
 STAGE_ORACLE="oracle"
@@ -25,6 +27,15 @@ STAGE_DB2="db2"
 STAGE_VITESS="vitess"
 STAGE_E2E="e2e"
 STAGE_MISC="misc"
+
+MODULES_CORE="\
+flink-cdc-cli,\
+flink-cdc-common,\
+flink-cdc-composer,\
+flink-cdc-runtime"
+
+MODULES_PIPELINE_CONNECTORS="\
+flink-cdc-connect/flink-cdc-pipeline-connectors"
 
 MODULES_MYSQL="\
 flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\
@@ -63,12 +74,19 @@ flink-cdc-connect/flink-cdc-source-connectors/flink-connector-vitess-cdc,\
 flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-vitess-cdc"
 
 MODULES_E2E="\
+flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests,\
 flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 
 function get_compile_modules_for_stage() {
     local stage=$1
 
     case ${stage} in
+        (${STAGE_CORE})
+            echo "-pl $MODULES_CORE -am"
+        ;;
+        (${STAGE_PIPELINE_CONNECTORS})
+            echo "-pl $MODULES_PIPELINE_CONNECTORS -am"
+        ;;
         (${STAGE_MYSQL})
             echo "-pl $MODULES_MYSQL -am"
         ;;
@@ -112,6 +130,8 @@ function get_compile_modules_for_stage() {
 function get_test_modules_for_stage() {
     local stage=$1
 
+    local modules_core=$MODULES_CORE
+    local modules_pipeline_connectors=$MODULES_PIPELINE_CONNECTORS
     local modules_mysql=$MODULES_MYSQL
     local modules_postgres=$MODULES_POSTGRES
     local modules_oracle=$MODULES_ORACLE
@@ -135,6 +155,12 @@ function get_test_modules_for_stage() {
     local modules_misc="$negated_mysql,$negated_postgres,$negated_oracle,$negated_mongodb,$negated_sqlserver,$negated_tidb,$negated_oceanbase,$negated_db2,$negated_vitess,$negated_e2e"
 
     case ${stage} in
+        (${STAGE_CORE})
+            echo "-pl $modules_core"
+        ;;
+        (${STAGE_PIPELINE_CONNECTORS})
+            echo "-pl $modules_pipeline_connectors"
+        ;;
         (${STAGE_MYSQL})
             echo "-pl $modules_mysql"
         ;;
