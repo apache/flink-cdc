@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
 import com.github.shyiko.mysql.binlog.event.TableMapEventMetadata;
@@ -91,6 +92,8 @@ public class TableMapEventMetadataDeserializer {
                     break;
                 case ENUM_AND_SET_COLUMN_CHARSET:
                     result.setEnumAndSetColumnCharsets(readIntegers(inputStream));
+                    result.setVisibility(readBooleanList(inputStream, nColumns));
+                    break;
                 case VISIBILITY:
                     result.setVisibility(readBooleanList(inputStream, nColumns));
                     break;
