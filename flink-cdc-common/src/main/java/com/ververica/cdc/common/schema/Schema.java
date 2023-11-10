@@ -156,7 +156,7 @@ public class Schema implements Serializable {
     @PublicEvolving
     public static final class Builder {
 
-        private final List<Column> columns;
+        private List<Column> columns;
         private List<String> primaryKeys = new ArrayList<>();
         private Map<String, String> options = new HashMap<>();
         private @Nullable String comment;
@@ -293,6 +293,12 @@ public class Schema implements Serializable {
         /** Declares table comment. */
         public Builder comment(String comment) {
             this.comment = comment;
+            return this;
+        }
+
+        /** Set new columns. */
+        public Builder setColumns(List<Column> columns) {
+            this.columns = columns;
             return this;
         }
 
