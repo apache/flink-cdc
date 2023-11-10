@@ -22,8 +22,14 @@ import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
+import com.ververica.cdc.common.event.AddColumnEvent;
+import com.ververica.cdc.common.event.AlterColumnTypeEvent;
+import com.ververica.cdc.common.event.CreateTableEvent;
+import com.ververica.cdc.common.event.DropColumnEvent;
+import com.ververica.cdc.common.event.RenameColumnEvent;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
+import com.ververica.cdc.common.serializer.EnumSerializer;
 
 import java.io.IOException;
 
@@ -33,6 +39,9 @@ public final class SchemaChangeEventSerializer extends TypeSerializer<SchemaChan
 
     /** Sharable instance of the TableIdSerializer. */
     public static final SchemaChangeEventSerializer INSTANCE = new SchemaChangeEventSerializer();
+
+    private final EnumSerializer<SchemaChangeEventClass> enumSerializer =
+            new EnumSerializer<>(SchemaChangeEventClass.class);
 
     @Override
     public boolean isImmutableType() {
@@ -65,12 +74,46 @@ public final class SchemaChangeEventSerializer extends TypeSerializer<SchemaChan
     }
 
     @Override
-    public void serialize(SchemaChangeEvent record, DataOutputView target) throws IOException {}
+    public void serialize(SchemaChangeEvent record, DataOutputView target) throws IOException {
+        if (record instanceof AlterColumnTypeEvent) {
+            enumSerializer.serialize(SchemaChangeEventClass.ALTER_COLUMN_TYPE, target);
+            AlterColumnTypeEventSerializer.INSTANCE.serialize(
+                    (AlterColumnTypeEvent) record, target);
+        } else if (record instanceof CreateTableEvent) {
+            enumSerializer.serialize(SchemaChangeEventClass.CREATE_TABLE, target);
+            CreateTableEventSerializer.INSTANCE.serialize((CreateTableEvent) record, target);
+        } else if (record instanceof RenameColumnEvent) {
+            enumSerializer.serialize(SchemaChangeEventClass.RENAME_COLUMN, target);
+            RenameColumnEventSerializer.INSTANCE.serialize((RenameColumnEvent) record, target);
+        } else if (record instanceof AddColumnEvent) {
+            enumSerializer.serialize(SchemaChangeEventClass.ADD_COLUMN, target);
+            AddColumnEventSerializer.INSTANCE.serialize((AddColumnEvent) record, target);
+        } else if (record instanceof DropColumnEvent) {
+            enumSerializer.serialize(SchemaChangeEventClass.DROP_COLUMN, target);
+            DropColumnEventSerializer.INSTANCE.serialize((DropColumnEvent) record, target);
+        } else {
+            throw new IllegalArgumentException("Unknown schema change event: " + record);
+        }
+    }
 
     @Override
     public SchemaChangeEvent deserialize(DataInputView source) throws IOException {
-        // TODO
-        return () -> TableId.tableId("unknown", "unknown", "unknown");
+        SchemaChangeEventClass schemaChangeEventClass = enumSerializer.deserialize(source);
+        switch (schemaChangeEventClass) {
+            case ADD_COLUMN:
+                return AddColumnEventSerializer.INSTANCE.deserialize(source);
+            case DROP_COLUMN:
+                return DropColumnEventSerializer.INSTANCE.deserialize(source);
+            case CREATE_TABLE:
+                return CreateTableEventSerializer.INSTANCE.deserialize(source);
+            case RENAME_COLUMN:
+                return RenameColumnEventSerializer.INSTANCE.deserialize(source);
+            case ALTER_COLUMN_TYPE:
+                return AlterColumnTypeEventSerializer.INSTANCE.deserialize(source);
+            default:
+                throw new IllegalArgumentException(
+                        "Unknown schema change event class: " + schemaChangeEventClass);
+        }
     }
 
     @Override
