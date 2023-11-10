@@ -26,10 +26,10 @@ under the License.
     <artifactId>flink-cdc-source-e2e-tests</artifactId>
 
     <properties>
-        <flink-1.14>1.14.4</flink-1.14>
-        <flink-1.15>1.15.2</flink-1.15>
-        <flink-1.16>1.16.0</flink-1.16>
-        <flink-1.17>1.17.0</flink-1.17>
+        <flink-1.14>1.14.6</flink-1.14>
+        <flink-1.15>1.15.4</flink-1.15>
+        <flink-1.16>1.16.2</flink-1.16>
+        <flink-1.17>1.17.1</flink-1.17>
         <flink-1.18>1.18.0</flink-1.18>
         <jdbc.version-1.17>3.1.1-1.17</jdbc.version-1.17>
         <jdbc.version-1.18>3.1.1-1.17</jdbc.version-1.18>
