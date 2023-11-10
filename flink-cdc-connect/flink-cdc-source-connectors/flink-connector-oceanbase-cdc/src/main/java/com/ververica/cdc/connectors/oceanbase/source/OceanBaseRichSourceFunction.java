@@ -295,7 +295,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     protected void readChangeRecords() throws InterruptedException, TimeoutException {
         if (resolvedTimestamp > 0) {
             obReaderConfig.updateCheckpoint(Long.toString(resolvedTimestamp));
-            LOG.info("Read change events from timestamp: {}", resolvedTimestamp);
+            LOG.info("Restore from timestamp: {}", resolvedTimestamp);
         }
 
         logProxyClient =
@@ -363,12 +363,17 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                     }
                 });
 
+        LOG.info(
+                "Try to start LogProxyClient with client id: {}, config: {}",
+                logProxyClientConf.getClientId(),
+                obReaderConfig);
         logProxyClient.start();
-        LOG.info("LogProxyClient started");
+
         if (!latch.await(connectTimeout.getSeconds(), TimeUnit.SECONDS)) {
-            throw new TimeoutException("Timeout to receive messages in RecordListener");
+            throw new TimeoutException(
+                    "Timeout to receive log messages in LogProxyClient.RecordListener");
         }
-        LOG.info("LogProxyClient packet processing started");
+        LOG.info("LogProxyClient started successfully");
 
         logProxyClient.join();
     }
