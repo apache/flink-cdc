@@ -16,10 +16,9 @@
 
 package com.ververica.cdc.cli.utils;
 
-import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.ConfigOptions;
-import org.apache.flink.configuration.Configuration;
-
+import com.ververica.cdc.common.configuration.ConfigOption;
+import com.ververica.cdc.common.configuration.ConfigOptions;
+import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.composer.flink.FlinkPipelineComposer;
 
 import java.nio.file.Path;
