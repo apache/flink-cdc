@@ -21,49 +21,45 @@ import com.ververica.cdc.composer.utils.factory.DataSinkFactory1;
 import com.ververica.cdc.composer.utils.factory.DataSourceFactory1;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Test for {@link FactoryDiscoveryUtils}. */
 class FactoryDiscoveryUtilsTest {
 
     @Test
     void getFactoryByIdentifier() {
+        assertThat(
+                        FactoryDiscoveryUtils.getFactoryByIdentifier(
+                                "data-source-factory-1", Factory.class))
+                .isInstanceOf(DataSourceFactory1.class);
 
-        assertEquals(
-                DataSourceFactory1.class,
-                FactoryDiscoveryUtils.getFactoryByIdentifier("data-source-factory-1", Factory.class)
-                        .getClass());
-
-        assertEquals(
-                DataSinkFactory1.class,
-                FactoryDiscoveryUtils.getFactoryByIdentifier("data-sink-factory-1", Factory.class)
-                        .getClass());
+        assertThat(
+                        FactoryDiscoveryUtils.getFactoryByIdentifier(
+                                "data-sink-factory-1", Factory.class))
+                .isInstanceOf(DataSinkFactory1.class);
 
         assertThatThrownBy(
                         () ->
                                 FactoryDiscoveryUtils.getFactoryByIdentifier(
                                         "data-sink-factory-3", Factory.class))
-                .satisfies(
-                        e ->
-                                assertEquals(
-                                        e.getMessage(),
-                                        "No factory found in the classpath.\n"
-                                                + "\n"
-                                                + "Available factory classes are:\n"
-                                                + "\n"
-                                                + "com.ververica.cdc.composer.utils.factory.DataSinkFactory1\n"
-                                                + "com.ververica.cdc.composer.utils.factory.DataSinkFactory2\n"
-                                                + "com.ververica.cdc.composer.utils.factory.DataSourceFactory1\n"
-                                                + "com.ververica.cdc.composer.utils.factory.DataSourceFactory2"));
+                .hasMessage(
+                        "No factory found in the classpath.\n"
+                                + "\n"
+                                + "Available factory classes are:\n"
+                                + "\n"
+                                + "com.ververica.cdc.composer.utils.factory.DataSinkFactory1\n"
+                                + "com.ververica.cdc.composer.utils.factory.DataSinkFactory2\n"
+                                + "com.ververica.cdc.composer.utils.factory.DataSourceFactory1\n"
+                                + "com.ververica.cdc.composer.utils.factory.DataSourceFactory2");
     }
 
     @Test
     void getJarPathByIdentifier() {
-        assertTrue(
-                FactoryDiscoveryUtils.getJarPathByIdentifier("data-source-factory-1", Factory.class)
-                        .getPath()
-                        .endsWith("/flink-cdc" + "-composer/target/test-classes/"));
+        assertThat(
+                        FactoryDiscoveryUtils.getJarPathByIdentifier(
+                                        "data-source-factory-1", Factory.class)
+                                .getPath())
+                .endsWith("/flink-cdc" + "-composer/target/test-classes/");
     }
 }
