@@ -30,10 +30,10 @@ import java.util.stream.Collectors;
 
 /**
  * Data type of a sequence of fields. A field consists of a field name, field type, and an optional
- * description. The most specific type of a row of a table is a row type. In this case, each column
- * of the row corresponds to the field of the row type that has the same ordinal position as the
- * column. Compared to the SQL standard, an optional field description simplifies the handling with
- * complex structures.
+ * description. The most specific type of a record of a table is a record type. In this case, each
+ * column of the record corresponds to the field of the record type that has the same ordinal
+ * position as the column. Compared to the SQL standard, an optional field description simplifies
+ * the handling with complex structures.
  */
 @PublicEvolving
 public final class RowType extends DataType {
@@ -64,6 +64,10 @@ public final class RowType extends DataType {
 
     public List<String> getFieldNames() {
         return fields.stream().map(DataField::getName).collect(Collectors.toList());
+    }
+
+    public List<DataType> getFieldTypes() {
+        return fields.stream().map(DataField::getType).collect(Collectors.toList());
     }
 
     public DataType getTypeAt(int i) {

@@ -14,16 +14,36 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.common.event;
+package com.ververica.cdc.common.data;
 
 import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.util.StringUtils;
 
+import com.ververica.cdc.common.event.OperationType;
+import com.ververica.cdc.common.types.ArrayType;
+import com.ververica.cdc.common.types.MapType;
+import com.ververica.cdc.common.types.RowType;
+
+import java.io.Serializable;
 import java.util.Arrays;
 
-/** Class {@code GenericRecordData} describes the data of changed record in the external system. */
+/**
+ * An internal data structure representing data of {@link RowType} and other (possibly nested)
+ * structured types such as {@link MapType}, {@link ArrayType}.
+ *
+ * <p>{@link GenericRecordData} is a generic implementation of {@link RecordData} which is backed by
+ * an array of Java {@link Object}. A {@link GenericRecordData} can have an arbitrary number of
+ * fields of different types. The fields in a row can be accessed by position (0-based) using either
+ * the generic {@link #getField(int)} or type-specific getters (such as {@link #getInt(int)}). A
+ * field can be updated by the generic {@link #setField(int, Object)}.
+ *
+ * <p>Note: All fields of this data structure must be internal data structures. See {@link
+ * RecordData} for more information about internal data structures.
+ *
+ * <p>The fields in {@link GenericRecordData} can be null for representing nullability.
+ */
 @PublicEvolving
-public final class GenericRecordData implements RecordData {
+public final class GenericRecordData implements RecordData, Serializable {
 
     /** The array to store the actual internal format values. */
     private final Object[] fields;
@@ -113,13 +133,48 @@ public final class GenericRecordData implements RecordData {
     }
 
     @Override
-    public String getString(int pos) {
-        return (String) this.fields[pos];
+    public byte[] getBinary(int pos) {
+        return (byte[]) this.fields[pos];
     }
 
     @Override
-    public byte[] getBinary(int pos) {
-        return (byte[]) this.fields[pos];
+    public StringData getString(int pos) {
+        return (StringData) this.fields[pos];
+    }
+
+    @Override
+    public DecimalData getDecimal(int pos, int precision, int scale) {
+        return (DecimalData) this.fields[pos];
+    }
+
+    @Override
+    public TimestampData getTimestamp(int pos, int precision) {
+        return (TimestampData) this.fields[pos];
+    }
+
+    @Override
+    public ZonedTimestampData getZonedTimestamp(int pos, int precision) {
+        return (ZonedTimestampData) this.fields[pos];
+    }
+
+    @Override
+    public LocalZonedTimestampData getLocalZonedTimestampData(int pos, int precision) {
+        return (LocalZonedTimestampData) this.fields[pos];
+    }
+
+    @Override
+    public ArrayData getArray(int pos) {
+        return (ArrayData) this.fields[pos];
+    }
+
+    @Override
+    public MapData getMap(int pos) {
+        return (MapData) this.fields[pos];
+    }
+
+    @Override
+    public RecordData getRow(int pos, int numFields) {
+        return (RecordData) this.fields[pos];
     }
 
     @Override
@@ -153,14 +208,12 @@ public final class GenericRecordData implements RecordData {
         return sb.toString();
     }
 
-    // ----------------------------------------------------------------------------------------
-    // Utilities
-    // ----------------------------------------------------------------------------------------
+    // ------------------------------------------------------------------------------------------
+    // Constructor Utilities
+    // ------------------------------------------------------------------------------------------
 
     /**
      * Creates an instance of {@link GenericRecordData} with given field values.
-     *
-     * <p>By default, the record describes a {@link OperationType#INSERT} in a changelog.
      *
      * <p>Note: All fields of the record must be internal data structures.
      */

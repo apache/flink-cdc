@@ -19,6 +19,7 @@ package com.ververica.cdc.common.types;
 import org.apache.flink.annotation.PublicEvolving;
 
 import java.util.Arrays;
+import java.util.OptionalInt;
 
 /**
  * A {@link DataType} can be used to declare input and/or output types of operations. This class *
@@ -413,9 +414,82 @@ public class DataTypes {
      * <p>This is shortcut for {@link #ROW(DataField...)} where the field names will be generated
      * using {@code f0, f1, f2, ...}.
      *
-     * <p>Note: Flink CDC currently doesn't support defining nested row in columns.
+     * <p>Note: Flink CDC currently doesn't support defining nested record in columns.
      */
     public static RowType ROW(DataType... fieldTypes) {
         return RowType.builder().fields(fieldTypes).build();
+    }
+
+    public static OptionalInt getPrecision(DataType dataType) {
+        return dataType.accept(PRECISION_EXTRACTOR);
+    }
+
+    public static OptionalInt getLength(DataType dataType) {
+        return dataType.accept(LENGTH_EXTRACTOR);
+    }
+
+    private static final PrecisionExtractor PRECISION_EXTRACTOR = new PrecisionExtractor();
+
+    private static final LengthExtractor LENGTH_EXTRACTOR = new LengthExtractor();
+
+    private static class PrecisionExtractor extends DataTypeDefaultVisitor<OptionalInt> {
+
+        @Override
+        public OptionalInt visit(DecimalType decimalType) {
+            return OptionalInt.of(decimalType.getPrecision());
+        }
+
+        @Override
+        public OptionalInt visit(TimeType timeType) {
+            return OptionalInt.of(timeType.getPrecision());
+        }
+
+        @Override
+        public OptionalInt visit(TimestampType timestampType) {
+            return OptionalInt.of(timestampType.getPrecision());
+        }
+
+        @Override
+        public OptionalInt visit(LocalZonedTimestampType localZonedTimestampType) {
+            return OptionalInt.of(localZonedTimestampType.getPrecision());
+        }
+
+        @Override
+        public OptionalInt visit(ZonedTimestampType zonedTimestampType) {
+            return OptionalInt.of(zonedTimestampType.getPrecision());
+        }
+
+        @Override
+        protected OptionalInt defaultMethod(DataType dataType) {
+            return OptionalInt.empty();
+        }
+    }
+
+    private static class LengthExtractor extends DataTypeDefaultVisitor<OptionalInt> {
+
+        @Override
+        public OptionalInt visit(CharType charType) {
+            return OptionalInt.of(charType.getLength());
+        }
+
+        @Override
+        public OptionalInt visit(VarCharType varCharType) {
+            return OptionalInt.of(varCharType.getLength());
+        }
+
+        @Override
+        public OptionalInt visit(BinaryType binaryType) {
+            return OptionalInt.of(binaryType.getLength());
+        }
+
+        @Override
+        public OptionalInt visit(VarBinaryType varBinaryType) {
+            return OptionalInt.of(varBinaryType.getLength());
+        }
+
+        @Override
+        protected OptionalInt defaultMethod(DataType dataType) {
+            return OptionalInt.empty();
+        }
     }
 }
