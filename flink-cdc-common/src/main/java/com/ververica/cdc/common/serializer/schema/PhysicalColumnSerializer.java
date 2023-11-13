@@ -35,17 +35,10 @@ public class PhysicalColumnSerializer extends TypeSerializer<PhysicalColumn> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
-    public static final PhysicalColumnSerializer INSTANCE =
-            new PhysicalColumnSerializer(StringSerializer.INSTANCE, DataTypeSerializer.INSTANCE);
+    public static final PhysicalColumnSerializer INSTANCE = new PhysicalColumnSerializer();
 
-    private final DataTypeSerializer dataTypeSerializer;
-    private final StringSerializer stringSerializer;
-
-    public PhysicalColumnSerializer(
-            StringSerializer stringSerializer, DataTypeSerializer dataTypeSerializer) {
-        this.dataTypeSerializer = dataTypeSerializer;
-        this.stringSerializer = stringSerializer;
-    }
+    private final DataTypeSerializer dataTypeSerializer = DataTypeSerializer.INSTANCE;
+    private final StringSerializer stringSerializer = StringSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {
@@ -54,7 +47,7 @@ public class PhysicalColumnSerializer extends TypeSerializer<PhysicalColumn> {
 
     @Override
     public TypeSerializer<PhysicalColumn> duplicate() {
-        return new PhysicalColumnSerializer(StringSerializer.INSTANCE, DataTypeSerializer.INSTANCE);
+        return new PhysicalColumnSerializer();
     }
 
     @Override
@@ -124,10 +117,7 @@ public class PhysicalColumnSerializer extends TypeSerializer<PhysicalColumn> {
             extends SimpleTypeSerializerSnapshot<PhysicalColumn> {
 
         public PhysicalColumnSerializerSnapshot() {
-            super(
-                    () ->
-                            new PhysicalColumnSerializer(
-                                    StringSerializer.INSTANCE, DataTypeSerializer.INSTANCE));
+            super(PhysicalColumnSerializer::new);
         }
     }
 }

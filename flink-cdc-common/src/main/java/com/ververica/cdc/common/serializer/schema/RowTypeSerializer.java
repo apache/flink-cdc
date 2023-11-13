@@ -34,14 +34,10 @@ public class RowTypeSerializer extends TypeSerializer<RowType> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
-    public static final RowTypeSerializer INSTANCE =
-            new RowTypeSerializer(new ListSerializer<>(DataFieldSerializer.INSTANCE));
+    public static final RowTypeSerializer INSTANCE = new RowTypeSerializer();
 
-    private final ListSerializer<DataField> fieldsSerializer;
-
-    public RowTypeSerializer(ListSerializer<DataField> fieldsSerializer) {
-        this.fieldsSerializer = fieldsSerializer;
-    }
+    private final ListSerializer<DataField> fieldsSerializer =
+            new ListSerializer<>(DataFieldSerializer.INSTANCE);
 
     @Override
     public boolean isImmutableType() {
@@ -50,7 +46,7 @@ public class RowTypeSerializer extends TypeSerializer<RowType> {
 
     @Override
     public TypeSerializer<RowType> duplicate() {
-        return new RowTypeSerializer(new ListSerializer<>(DataFieldSerializer.INSTANCE));
+        return new RowTypeSerializer();
     }
 
     @Override
@@ -116,7 +112,7 @@ public class RowTypeSerializer extends TypeSerializer<RowType> {
             extends SimpleTypeSerializerSnapshot<RowType> {
 
         public RowTypeSerializerSnapshot() {
-            super(() -> new RowTypeSerializer(new ListSerializer<>(DataFieldSerializer.INSTANCE)));
+            super(RowTypeSerializer::new);
         }
     }
 }

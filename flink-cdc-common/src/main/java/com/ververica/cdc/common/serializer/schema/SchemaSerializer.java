@@ -35,28 +35,15 @@ public class SchemaSerializer extends TypeSerializer<Schema> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
-    public static final SchemaSerializer INSTANCE =
-            new SchemaSerializer(
-                    new ListSerializer<>(ColumnSerializer.INSTANCE),
-                    new ListSerializer<>(StringSerializer.INSTANCE),
-                    new MapSerializer<>(StringSerializer.INSTANCE, StringSerializer.INSTANCE),
-                    StringSerializer.INSTANCE);
+    public static final SchemaSerializer INSTANCE = new SchemaSerializer();
 
-    private final ListSerializer<Column> columnsSerializer;
-    private final ListSerializer<String> primaryKeysSerializer;
-    private final MapSerializer<String, String> optionsSerializer;
-    private final StringSerializer stringSerializer;
-
-    public SchemaSerializer(
-            ListSerializer<Column> columnsSerializer,
-            ListSerializer<String> primaryKeysSerializer,
-            MapSerializer<String, String> optionsSerializer,
-            StringSerializer stringSerializer) {
-        this.columnsSerializer = columnsSerializer;
-        this.primaryKeysSerializer = primaryKeysSerializer;
-        this.optionsSerializer = optionsSerializer;
-        this.stringSerializer = stringSerializer;
-    }
+    private final ListSerializer<Column> columnsSerializer =
+            new ListSerializer<>(ColumnSerializer.INSTANCE);
+    private final ListSerializer<String> primaryKeysSerializer =
+            new ListSerializer<>(StringSerializer.INSTANCE);
+    private final MapSerializer<String, String> optionsSerializer =
+            new MapSerializer<>(StringSerializer.INSTANCE, StringSerializer.INSTANCE);
+    private final StringSerializer stringSerializer = StringSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {
@@ -65,11 +52,7 @@ public class SchemaSerializer extends TypeSerializer<Schema> {
 
     @Override
     public TypeSerializer<Schema> duplicate() {
-        return new SchemaSerializer(
-                new ListSerializer<>(ColumnSerializer.INSTANCE),
-                new ListSerializer<>(StringSerializer.INSTANCE),
-                new MapSerializer<>(StringSerializer.INSTANCE, StringSerializer.INSTANCE),
-                StringSerializer.INSTANCE);
+        return new SchemaSerializer();
     }
 
     @Override
@@ -141,14 +124,7 @@ public class SchemaSerializer extends TypeSerializer<Schema> {
             extends SimpleTypeSerializerSnapshot<Schema> {
 
         public SchemaSerializerSnapshot() {
-            super(
-                    () ->
-                            new SchemaSerializer(
-                                    new ListSerializer<>(ColumnSerializer.INSTANCE),
-                                    new ListSerializer<>(StringSerializer.INSTANCE),
-                                    new MapSerializer<>(
-                                            StringSerializer.INSTANCE, StringSerializer.INSTANCE),
-                                    StringSerializer.INSTANCE));
+            super(SchemaSerializer::new);
         }
     }
 }

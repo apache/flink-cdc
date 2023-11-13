@@ -26,7 +26,6 @@ import com.ververica.cdc.common.event.ChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 /** TODO: A {@link TypeSerializer} for {@link ChangeEvent}. */
 public final class ChangeEventSerializer extends TypeSerializer<ChangeEvent> {
@@ -112,23 +111,7 @@ public final class ChangeEventSerializer extends TypeSerializer<ChangeEvent> {
     }
 
     enum ChangeEventClass {
-        TEST1(1);
-
-        private final int index;
-
-        ChangeEventClass(int index) {
-            this.index = index;
-        }
-
-        public int getIndex() {
-            return index;
-        }
-
-        public static ChangeEventClass get(int index) {
-            return Arrays.stream(ChangeEventClass.values())
-                    .filter(e -> e.getIndex() == index)
-                    .findFirst()
-                    .orElse(null);
-        }
+        DATA_CHANGE_EVENT,
+        SCHEME_CHANGE_EVENT
     }
 }

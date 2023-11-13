@@ -35,17 +35,10 @@ public class MetadataColumnSerializer extends TypeSerializer<MetadataColumn> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
-    public static final MetadataColumnSerializer INSTANCE =
-            new MetadataColumnSerializer(StringSerializer.INSTANCE, DataTypeSerializer.INSTANCE);
+    public static final MetadataColumnSerializer INSTANCE = new MetadataColumnSerializer();
 
-    private final DataTypeSerializer dataTypeSerializer;
-    private final StringSerializer stringSerializer;
-
-    public MetadataColumnSerializer(
-            StringSerializer stringSerializer, DataTypeSerializer dataTypeSerializer) {
-        this.dataTypeSerializer = dataTypeSerializer;
-        this.stringSerializer = stringSerializer;
-    }
+    private final DataTypeSerializer dataTypeSerializer = DataTypeSerializer.INSTANCE;
+    private final StringSerializer stringSerializer = StringSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {
@@ -54,7 +47,7 @@ public class MetadataColumnSerializer extends TypeSerializer<MetadataColumn> {
 
     @Override
     public TypeSerializer<MetadataColumn> duplicate() {
-        return new MetadataColumnSerializer(StringSerializer.INSTANCE, DataTypeSerializer.INSTANCE);
+        return new MetadataColumnSerializer();
     }
 
     @Override
@@ -126,10 +119,7 @@ public class MetadataColumnSerializer extends TypeSerializer<MetadataColumn> {
             extends SimpleTypeSerializerSnapshot<MetadataColumn> {
 
         public MetadataColumnSerializerSnapshot() {
-            super(
-                    () ->
-                            new MetadataColumnSerializer(
-                                    StringSerializer.INSTANCE, DataTypeSerializer.INSTANCE));
+            super(MetadataColumnSerializer::new);
         }
     }
 }

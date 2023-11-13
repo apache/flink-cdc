@@ -38,24 +38,14 @@ public class ColumnSerializer extends TypeSerializer<Column> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
-    public static final ColumnSerializer INSTANCE =
-            new ColumnSerializer(
-                    new EnumSerializer<>(ColumnType.class),
-                    PhysicalColumnSerializer.INSTANCE,
-                    MetadataColumnSerializer.INSTANCE);
+    public static final ColumnSerializer INSTANCE = new ColumnSerializer();
 
-    private final EnumSerializer<ColumnType> enumSerializer;
-    private final PhysicalColumnSerializer physicalColumnSerializer;
-    private final MetadataColumnSerializer metadataColumnSerializer;
-
-    public ColumnSerializer(
-            EnumSerializer<ColumnType> enumSerializer,
-            PhysicalColumnSerializer physicalColumnSerializer,
-            MetadataColumnSerializer metadataColumnSerializer) {
-        this.enumSerializer = enumSerializer;
-        this.physicalColumnSerializer = physicalColumnSerializer;
-        this.metadataColumnSerializer = metadataColumnSerializer;
-    }
+    private final EnumSerializer<ColumnType> enumSerializer =
+            new EnumSerializer<>(ColumnType.class);
+    private final PhysicalColumnSerializer physicalColumnSerializer =
+            PhysicalColumnSerializer.INSTANCE;
+    private final MetadataColumnSerializer metadataColumnSerializer =
+            MetadataColumnSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {
@@ -64,10 +54,7 @@ public class ColumnSerializer extends TypeSerializer<Column> {
 
     @Override
     public TypeSerializer<Column> duplicate() {
-        return new ColumnSerializer(
-                new EnumSerializer<>(ColumnType.class),
-                PhysicalColumnSerializer.INSTANCE,
-                MetadataColumnSerializer.INSTANCE);
+        return new ColumnSerializer();
     }
 
     @Override
@@ -147,12 +134,7 @@ public class ColumnSerializer extends TypeSerializer<Column> {
             extends SimpleTypeSerializerSnapshot<Column> {
 
         public ColumnSerializerSnapshot() {
-            super(
-                    () ->
-                            new ColumnSerializer(
-                                    new EnumSerializer<>(ColumnType.class),
-                                    PhysicalColumnSerializer.INSTANCE,
-                                    MetadataColumnSerializer.INSTANCE));
+            super(ColumnSerializer::new);
         }
     }
 

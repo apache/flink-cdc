@@ -1,5 +1,3 @@
-package com.ververica.cdc.common.serializer;
-
 /*
  * Copyright 2023 Ververica Inc.
  *
@@ -15,6 +13,8 @@ package com.ververica.cdc.common.serializer;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+package com.ververica.cdc.common.serializer;
 
 import org.apache.flink.api.common.typeutils.CompositeTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializer;

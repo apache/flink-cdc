@@ -54,18 +54,11 @@ public class DataTypeSerializer extends TypeSerializer<DataType> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
-    public static final DataTypeSerializer INSTANCE =
-            new DataTypeSerializer(
-                    new EnumSerializer<>(DataTypeClass.class), RowTypeSerializer.INSTANCE);
+    public static final DataTypeSerializer INSTANCE = new DataTypeSerializer();
 
-    private final EnumSerializer<DataTypeClass> enumSerializer;
-    private final RowTypeSerializer rowTypeSerializer;
-
-    public DataTypeSerializer(
-            EnumSerializer<DataTypeClass> enumSerializer, RowTypeSerializer rowTypeSerializer) {
-        this.enumSerializer = enumSerializer;
-        this.rowTypeSerializer = rowTypeSerializer;
-    }
+    private final EnumSerializer<DataTypeClass> enumSerializer =
+            new EnumSerializer<>(DataTypeClass.class);
+    private final RowTypeSerializer rowTypeSerializer = RowTypeSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {
@@ -74,8 +67,7 @@ public class DataTypeSerializer extends TypeSerializer<DataType> {
 
     @Override
     public TypeSerializer<DataType> duplicate() {
-        return new DataTypeSerializer(
-                new EnumSerializer<>(DataTypeClass.class), RowTypeSerializer.INSTANCE);
+        return new DataTypeSerializer();
     }
 
     @Override
@@ -268,11 +260,7 @@ public class DataTypeSerializer extends TypeSerializer<DataType> {
             extends SimpleTypeSerializerSnapshot<DataType> {
 
         public DataTypeSerializerSnapshot() {
-            super(
-                    () ->
-                            new DataTypeSerializer(
-                                    new EnumSerializer<>(DataTypeClass.class),
-                                    RowTypeSerializer.INSTANCE));
+            super(DataTypeSerializer::new);
         }
     }
 

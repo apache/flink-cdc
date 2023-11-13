@@ -34,17 +34,10 @@ public class DataFieldSerializer extends TypeSerializer<DataField> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
-    public static final DataFieldSerializer INSTANCE =
-            new DataFieldSerializer(StringSerializer.INSTANCE, DataTypeSerializer.INSTANCE);
+    public static final DataFieldSerializer INSTANCE = new DataFieldSerializer();
 
-    private final StringSerializer stringSerializer;
-    private final DataTypeSerializer dataTypeSerializer;
-
-    public DataFieldSerializer(
-            StringSerializer stringSerializer, DataTypeSerializer dataTypeSerializer) {
-        this.stringSerializer = stringSerializer;
-        this.dataTypeSerializer = dataTypeSerializer;
-    }
+    private final StringSerializer stringSerializer = StringSerializer.INSTANCE;
+    private final DataTypeSerializer dataTypeSerializer = DataTypeSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {
@@ -53,7 +46,7 @@ public class DataFieldSerializer extends TypeSerializer<DataField> {
 
     @Override
     public TypeSerializer<DataField> duplicate() {
-        return new DataFieldSerializer(StringSerializer.INSTANCE, DataTypeSerializer.INSTANCE);
+        return new DataFieldSerializer();
     }
 
     @Override
@@ -122,10 +115,7 @@ public class DataFieldSerializer extends TypeSerializer<DataField> {
             extends SimpleTypeSerializerSnapshot<DataField> {
 
         public DataFieldSerializerSnapshot() {
-            super(
-                    () ->
-                            new DataFieldSerializer(
-                                    StringSerializer.INSTANCE, DataTypeSerializer.INSTANCE));
+            super(DataFieldSerializer::new);
         }
     }
 }

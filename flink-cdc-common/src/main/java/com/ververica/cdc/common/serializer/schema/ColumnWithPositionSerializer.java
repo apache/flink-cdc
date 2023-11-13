@@ -35,20 +35,11 @@ public class ColumnWithPositionSerializer
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
-    public static final ColumnWithPositionSerializer INSTANCE =
-            new ColumnWithPositionSerializer(
-                    ColumnSerializer.INSTANCE,
-                    new EnumSerializer<>(AddColumnEvent.ColumnPosition.class));
+    public static final ColumnWithPositionSerializer INSTANCE = new ColumnWithPositionSerializer();
 
-    private final ColumnSerializer columnSerializer;
-    private final EnumSerializer<AddColumnEvent.ColumnPosition> positionEnumSerializer;
-
-    public ColumnWithPositionSerializer(
-            ColumnSerializer columnSerializer,
-            EnumSerializer<AddColumnEvent.ColumnPosition> positionEnumSerializer) {
-        this.columnSerializer = columnSerializer;
-        this.positionEnumSerializer = positionEnumSerializer;
-    }
+    private final ColumnSerializer columnSerializer = ColumnSerializer.INSTANCE;
+    private final EnumSerializer<AddColumnEvent.ColumnPosition> positionEnumSerializer =
+            new EnumSerializer<>(AddColumnEvent.ColumnPosition.class);
 
     @Override
     public boolean isImmutableType() {
@@ -57,9 +48,7 @@ public class ColumnWithPositionSerializer
 
     @Override
     public TypeSerializer<AddColumnEvent.ColumnWithPosition> duplicate() {
-        return new ColumnWithPositionSerializer(
-                ColumnSerializer.INSTANCE,
-                new EnumSerializer<>(AddColumnEvent.ColumnPosition.class));
+        return new ColumnWithPositionSerializer();
     }
 
     @Override
@@ -140,11 +129,7 @@ public class ColumnWithPositionSerializer
             extends SimpleTypeSerializerSnapshot<AddColumnEvent.ColumnWithPosition> {
 
         public ColumnWithPositionSerializerSnapshot() {
-            super(
-                    () ->
-                            new ColumnWithPositionSerializer(
-                                    ColumnSerializer.INSTANCE,
-                                    new EnumSerializer<>(AddColumnEvent.ColumnPosition.class)));
+            super(ColumnWithPositionSerializer::new);
         }
     }
 }
