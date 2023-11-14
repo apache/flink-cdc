@@ -16,9 +16,9 @@
 
 package com.ververica.cdc.connectors.mysql.source;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.table.catalog.ObjectPath;
 
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;

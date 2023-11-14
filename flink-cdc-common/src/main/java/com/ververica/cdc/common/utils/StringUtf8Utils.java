@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.common.utils;
 
-import org.apache.flink.annotation.Internal;
+import com.ververica.cdc.common.annotation.Internal;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;

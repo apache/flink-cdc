@@ -16,9 +16,10 @@
 
 package com.ververica.cdc.common.sink;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 /**
  * A marker interface used to provide an event sink for writing change events to external systems.

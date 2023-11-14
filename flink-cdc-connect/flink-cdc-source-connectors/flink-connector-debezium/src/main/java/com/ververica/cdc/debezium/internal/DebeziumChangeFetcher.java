@@ -16,10 +16,10 @@
 
 package com.ververica.cdc.debezium.internal;
 
-import org.apache.flink.annotation.Internal;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.util.Collector;
 
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.connector.SnapshotRecord;
 import io.debezium.data.Envelope;

@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.connectors.base.config;
 
-import org.apache.flink.annotation.Internal;
-
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.connectors.base.config.SourceConfig.Factory;
 import com.ververica.cdc.connectors.base.options.JdbcSourceOptions;
 import com.ververica.cdc.connectors.base.options.SourceOptions;

@@ -16,9 +16,8 @@
 
 package com.ververica.cdc.connectors.mongodb.source.assigners.splitters;
 
-import org.apache.flink.annotation.Internal;
-
 import com.mongodb.client.MongoClient;
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceConfig;
 import io.debezium.relational.TableId;
 import org.bson.BsonBoolean;

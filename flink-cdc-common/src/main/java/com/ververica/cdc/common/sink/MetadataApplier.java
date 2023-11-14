@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.sink;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 
 /** {@code MetadataApplier} is used to apply metadata changes to external systems. */

@@ -45,6 +45,12 @@ under the License.
             </exclusions>
         </dependency>
 
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- OceanBase Log Client -->
         <dependency>
             <groupId>com.oceanbase</groupId>

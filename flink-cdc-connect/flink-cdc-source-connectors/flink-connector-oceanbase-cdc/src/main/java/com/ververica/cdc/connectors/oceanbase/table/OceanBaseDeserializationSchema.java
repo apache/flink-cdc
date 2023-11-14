@@ -16,9 +16,10 @@
 
 package com.ververica.cdc.connectors.oceanbase.table;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.util.Collector;
+
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 import java.io.Serializable;
 

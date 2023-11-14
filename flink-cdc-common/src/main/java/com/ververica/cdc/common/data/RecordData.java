@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.common.data;
 
-import org.apache.flink.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 /**
  * Class {@code RecordData} describes the data of changed record (i.e. row) in the external system.

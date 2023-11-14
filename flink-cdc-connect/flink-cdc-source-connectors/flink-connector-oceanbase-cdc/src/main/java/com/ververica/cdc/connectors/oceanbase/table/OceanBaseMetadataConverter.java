@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.connectors.oceanbase.table;
 
-import org.apache.flink.annotation.Internal;
+import com.ververica.cdc.common.annotation.Internal;
 
 import java.io.Serializable;
 

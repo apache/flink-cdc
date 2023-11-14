@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.connectors.tidb.table;
 
-import org.apache.flink.annotation.Internal;
-
+import com.ververica.cdc.common.annotation.Internal;
 import org.tikv.kvproto.Cdcpb;
 import org.tikv.kvproto.Kvrpcpb;
 

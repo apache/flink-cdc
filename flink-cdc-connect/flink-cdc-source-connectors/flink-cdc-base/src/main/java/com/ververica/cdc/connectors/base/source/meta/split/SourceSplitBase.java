@@ -16,9 +16,9 @@
 
 package com.ververica.cdc.connectors.base.source.meta.split;
 
-import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.connector.source.SourceSplit;
 
+import com.ververica.cdc.common.annotation.Experimental;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 

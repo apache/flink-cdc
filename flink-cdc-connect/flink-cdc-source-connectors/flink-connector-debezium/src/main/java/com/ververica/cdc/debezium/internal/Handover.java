@@ -16,10 +16,10 @@
 
 package com.ververica.cdc.debezium.internal;
 
-import org.apache.flink.annotation.Internal;
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.util.ExceptionUtils;
 
+import com.ververica.cdc.common.annotation.Internal;
+import com.ververica.cdc.common.annotation.VisibleForTesting;
 import io.debezium.engine.ChangeEvent;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;

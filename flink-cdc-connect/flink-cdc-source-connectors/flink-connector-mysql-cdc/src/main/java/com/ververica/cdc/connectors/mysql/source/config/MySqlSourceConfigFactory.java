@@ -16,9 +16,9 @@
 
 package com.ververica.cdc.connectors.mysql.source.config;
 
-import org.apache.flink.annotation.Internal;
 import org.apache.flink.table.catalog.ObjectPath;
 
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;

@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.connectors.base.relational.connection;
 
-import org.apache.flink.annotation.Experimental;
-
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 
 /** A pool collection that consists of multiple connection pools. */

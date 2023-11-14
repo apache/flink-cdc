@@ -16,9 +16,9 @@
 
 package com.ververica.cdc.common.source;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.connector.source.Source;
 
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.event.Event;
 
 /**
