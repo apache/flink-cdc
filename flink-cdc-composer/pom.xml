@@ -25,4 +25,12 @@ under the License.
 
     <artifactId>flink-cdc-composer</artifactId>
 
+    <dependencies>
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
 </project>
