@@ -19,11 +19,15 @@ package com.ververica.cdc.common.data;
 import org.apache.flink.annotation.PublicEvolving;
 
 import com.ververica.cdc.common.types.ZonedTimestampType;
+import com.ververica.cdc.common.utils.Preconditions;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
@@ -44,31 +48,80 @@ public final class ZonedTimestampData implements Comparable<ZonedTimestampData> 
      */
     public static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
-    private final ZonedDateTime zonedDateTime;
+    // the number of milliseconds in a day
+    private static final long MILLIS_PER_DAY = 86400000; // = 24 * 60 * 60 * 1000
 
-    private ZonedTimestampData(ZonedDateTime zonedDateTime) {
-        this.zonedDateTime = zonedDateTime;
+    // this field holds the integral second and the milli-of-second
+    private final long millisecond;
+
+    // this field holds the nano-of-millisecond
+    private final int nanoOfMillisecond;
+
+    // this field holds time zone id
+    private final String zoneId;
+
+    private ZonedTimestampData(long millisecond, int nanoOfMillisecond, String zoneId) {
+        Preconditions.checkArgument(nanoOfMillisecond >= 0 && nanoOfMillisecond <= 999_999);
+        Preconditions.checkNotNull(zoneId);
+        this.millisecond = millisecond;
+        this.nanoOfMillisecond = nanoOfMillisecond;
+        this.zoneId = zoneId;
     }
 
     /** Returns the zoned date-time with time-zone. */
     public ZonedDateTime getZonedDateTime() {
-        return zonedDateTime;
-    }
-
-    /** Converts this {@link ZonedTimestampData} object to a {@link Timestamp}. */
-    public Timestamp toTimestamp() {
-        return Timestamp.from(zonedDateTime.toInstant());
+        return ZonedDateTime.of(getLocalDateTimePart(), ZoneId.of(zoneId));
     }
 
     /** Converts this {@link ZonedTimestampData} object to a {@link Instant}. */
     public Instant toInstant() {
-        return zonedDateTime.toInstant();
+        return ZonedDateTime.of(getLocalDateTimePart(), ZoneId.of(zoneId)).toInstant();
+    }
+
+    /** Converts this {@link ZonedTimestampData} object to a {@link Timestamp}. */
+    public Timestamp toTimestamp() {
+        return Timestamp.from(toInstant());
+    }
+
+    /** Returns the number of milliseconds since {@code 1970-01-01 00:00:00}. */
+    public long getMillisecond() {
+        return millisecond;
+    }
+
+    /**
+     * Returns the number of nanoseconds (the nanoseconds within the milliseconds).
+     *
+     * <p>The value range is from 0 to 999,999.
+     */
+    public int getNanoOfMillisecond() {
+        return nanoOfMillisecond;
+    }
+
+    /** Returns the {@code LocalDateTime} part of this zoned date-time. */
+    public LocalDateTime getLocalDateTimePart() {
+        int date = (int) (millisecond / MILLIS_PER_DAY);
+        int time = (int) (millisecond % MILLIS_PER_DAY);
+        if (time < 0) {
+            --date;
+            time += MILLIS_PER_DAY;
+        }
+        long nanoOfDay = time * 1_000_000L + nanoOfMillisecond;
+        LocalDate localDate = LocalDate.ofEpochDay(date);
+        LocalTime localTime = LocalTime.ofNanoOfDay(nanoOfDay);
+        return LocalDateTime.of(localDate, localTime);
+    }
+
+    /** Returns the {@code ZoneId} part of this zoned date-time. */
+    public ZoneId getTimeZoneId() {
+        return ZoneId.of(zoneId);
     }
 
     @Override
     public int compareTo(ZonedTimestampData that) {
+        // converts to instant and then compare
         long epochMillisecond = this.toInstant().getEpochSecond();
         int epochNanoOfMillisecond = this.toInstant().getNano();
+
         long thatEpochMillisecond = that.toInstant().getEpochSecond();
         int thatEpochNanoOfMillisecond = that.toInstant().getNano();
 
@@ -85,17 +138,19 @@ public final class ZonedTimestampData implements Comparable<ZonedTimestampData> 
             return false;
         }
         ZonedTimestampData that = (ZonedTimestampData) obj;
-        return this.zonedDateTime.equals(that.zonedDateTime);
+        return this.millisecond == that.millisecond
+                && this.nanoOfMillisecond == that.nanoOfMillisecond
+                && this.zoneId.equals(that.zoneId);
     }
 
     @Override
     public String toString() {
-        return zonedDateTime.format(ISO_FORMATTER);
+        return getZonedDateTime().format(ISO_FORMATTER);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(zonedDateTime);
+        return Objects.hash(millisecond, nanoOfMillisecond, zoneId);
     }
 
     // ------------------------------------------------------------------------------------------
@@ -108,7 +163,14 @@ public final class ZonedTimestampData implements Comparable<ZonedTimestampData> 
      * @param zonedDateTime an instance of {@link ZonedDateTime}
      */
     public static ZonedTimestampData fromZonedDateTime(ZonedDateTime zonedDateTime) {
-        return new ZonedTimestampData(zonedDateTime);
+        LocalDateTime dateTimePart = zonedDateTime.toLocalDateTime();
+        long epochDay = dateTimePart.toLocalDate().toEpochDay();
+        long nanoOfDay = dateTimePart.toLocalTime().toNanoOfDay();
+        long millisecond = epochDay * MILLIS_PER_DAY + nanoOfDay / 1_000_000;
+        int nanoOfMillisecond = (int) (nanoOfDay % 1_000_000);
+        String zoneId = zonedDateTime.getZone().toString();
+
+        return new ZonedTimestampData(millisecond, nanoOfMillisecond, zoneId);
     }
 
     /**
@@ -117,7 +179,7 @@ public final class ZonedTimestampData implements Comparable<ZonedTimestampData> 
      * @param offsetDateTime an instance of {@link OffsetDateTime}
      */
     public static ZonedTimestampData fromOffsetDateTime(OffsetDateTime offsetDateTime) {
-        return new ZonedTimestampData(offsetDateTime.toZonedDateTime());
+        return fromZonedDateTime(offsetDateTime.toZonedDateTime());
     }
 
     /**
@@ -160,6 +222,13 @@ public final class ZonedTimestampData implements Comparable<ZonedTimestampData> 
      * @param instant an instance of {@link Instant}
      */
     public static ZonedTimestampData fromInstant(Instant instant) {
-        return new ZonedTimestampData(ZonedDateTime.from(instant));
+        return fromZonedDateTime(ZonedDateTime.from(instant));
+    }
+
+    /**
+     * Returns whether the date-time part is small enough to be stored in a long of milliseconds.
+     */
+    public static boolean isCompact(int precision) {
+        return precision <= 3;
     }
 }

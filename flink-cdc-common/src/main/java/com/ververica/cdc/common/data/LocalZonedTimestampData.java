@@ -17,9 +17,9 @@
 package com.ververica.cdc.common.data;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.util.Preconditions;
 
 import com.ververica.cdc.common.types.LocalZonedTimestampType;
+import com.ververica.cdc.common.utils.Preconditions;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -98,14 +98,14 @@ public final class LocalZonedTimestampData implements Comparable<LocalZonedTimes
     }
 
     @Override
-    public String toString() {
-        return describeLocalZonedTimestampInUTC0().toString();
-    }
-
-    @Override
     public int hashCode() {
         int ret = (int) epochMillisecond ^ (int) (epochMillisecond >> 32);
         return 31 * ret + epochNanoOfMillisecond;
+    }
+
+    @Override
+    public String toString() {
+        return describeLocalZonedTimestampInUTC0().toString();
     }
 
     /**
@@ -172,7 +172,8 @@ public final class LocalZonedTimestampData implements Comparable<LocalZonedTimes
     }
 
     /**
-     * Returns whether the timestamp data is small enough to be stored in a long of milliseconds.
+     * Returns whether the local zoned timestamp data is small enough to be stored in a long of
+     * milliseconds.
      */
     public static boolean isCompact(int precision) {
         return precision <= 3;

@@ -17,25 +17,22 @@
 package com.ververica.cdc.common.data;
 
 import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.table.data.ArrayData;
-import org.apache.flink.table.data.GenericArrayData;
-import org.apache.flink.table.data.MapData;
-import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.types.logical.MapType;
-import org.apache.flink.table.types.logical.MultisetType;
+
+import com.ververica.cdc.common.types.MapType;
 
 import java.util.Map;
 import java.util.Objects;
 
 /**
- * An internal data structure representing data of {@link MapType} or {@link MultisetType}.
+ * An internal data structure representing data of {@link MapType}.
  *
- * <p>{@link GenericMapData} is a generic implementation of {@link
- * org.apache.flink.table.data.MapData} which wraps regular Java maps.
+ * <p>{@link GenericMapData} is a generic implementation of {@link MapData} which wraps regular Java
+ * maps.
  *
  * <p>Note: All keys and values of this data structure must be internal data structures. All keys
- * must be of the same type; same for values. See {@link RowData} for more information about
- * internal data structures.
+ * must be of the same type; same for values. See {@link RecordData} for more information about must
+ * be of the same type; same for values. See {@link RecordData} for more information about internal
+ * data structures.
  *
  * <p>Both keys and values can contain null for representing nullability.
  */
@@ -67,9 +64,9 @@ public final class GenericMapData implements MapData {
     }
 
     @Override
-    public org.apache.flink.table.data.ArrayData keyArray() {
+    public ArrayData keyArray() {
         Object[] keys = map.keySet().toArray();
-        return new org.apache.flink.table.data.GenericArrayData(keys);
+        return new GenericArrayData(keys);
     }
 
     @Override
