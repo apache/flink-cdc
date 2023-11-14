@@ -16,11 +16,11 @@
 
 package com.ververica.cdc.connectors.mongodb.source.assigners.splitters;
 
-import org.apache.flink.annotation.Internal;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.mongodb.MongoQueryException;
 import com.mongodb.client.MongoClient;
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;

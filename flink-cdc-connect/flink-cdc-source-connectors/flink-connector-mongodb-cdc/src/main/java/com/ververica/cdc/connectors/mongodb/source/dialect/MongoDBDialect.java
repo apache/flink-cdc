@@ -16,9 +16,8 @@
 
 package com.ververica.cdc.connectors.mongodb.source.dialect;
 
-import org.apache.flink.annotation.Experimental;
-
 import com.mongodb.client.MongoClient;
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;

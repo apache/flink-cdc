@@ -16,12 +16,11 @@
 
 package com.ververica.cdc.connectors.mongodb;
 
-import org.apache.flink.annotation.PublicEvolving;
-
 import com.mongodb.client.model.changestream.FullDocument;
 import com.mongodb.kafka.connect.source.MongoSourceConfig;
 import com.mongodb.kafka.connect.source.MongoSourceConfig.ErrorTolerance;
 import com.mongodb.kafka.connect.source.MongoSourceConfig.OutputFormat;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceConnector;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;

@@ -16,13 +16,13 @@
 
 package com.ververica.cdc.connectors.base.source.reader;
 
-import org.apache.flink.annotation.Experimental;
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitReader;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsAddition;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsChange;
 
+import com.ververica.cdc.common.annotation.Experimental;
+import com.ververica.cdc.common.annotation.VisibleForTesting;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.source.meta.split.ChangeEventRecords;

@@ -16,9 +16,10 @@
 
 package com.ververica.cdc.common.source;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.connector.source.Source;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
+
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 /**
  * A marker interface used to provide an event source for reading events from external systems. We

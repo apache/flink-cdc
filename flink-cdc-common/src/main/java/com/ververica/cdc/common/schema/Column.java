@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.schema;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.types.DataType;
 
 import javax.annotation.Nullable;

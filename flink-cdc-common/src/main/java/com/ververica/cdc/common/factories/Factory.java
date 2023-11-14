@@ -16,8 +16,9 @@
 
 package com.ververica.cdc.common.factories;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.configuration.ConfigOption;
+
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 import java.util.Set;
 

@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.debezium.internal;
 
-import org.apache.flink.annotation.Internal;
-
+import com.ververica.cdc.common.annotation.Internal;
 import io.debezium.embedded.EmbeddedEngineChangeEvent;
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.DebeziumEngine;

@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.connectors.base.experimental;
 
-import org.apache.flink.annotation.Experimental;
-
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.experimental.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.base.experimental.offset.BinlogOffsetFactory;
 import com.ververica.cdc.connectors.base.options.StartupOptions;

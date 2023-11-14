@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.mongodb.table;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
@@ -25,6 +24,7 @@ import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Collector;
 
 import com.mongodb.client.model.changestream.OperationType;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope;
 import com.ververica.cdc.debezium.table.MetadataConverter;
 import org.apache.kafka.connect.data.Schema;

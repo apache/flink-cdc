@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.connectors.mysql.source.connection;
 
-import org.apache.flink.annotation.Internal;
-
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.zaxxer.hikari.HikariDataSource;
 

@@ -16,10 +16,10 @@
 
 package com.ververica.cdc.connectors.tidb;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.util.Collector;
 
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import org.tikv.kvproto.Kvrpcpb.KvPair;
 
 import java.io.Serializable;

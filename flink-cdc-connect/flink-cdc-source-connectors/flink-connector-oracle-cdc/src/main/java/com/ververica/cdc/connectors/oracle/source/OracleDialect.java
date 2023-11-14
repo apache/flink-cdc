@@ -16,9 +16,9 @@
 
 package com.ververica.cdc.connectors.oracle.source;
 
-import org.apache.flink.annotation.Experimental;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;

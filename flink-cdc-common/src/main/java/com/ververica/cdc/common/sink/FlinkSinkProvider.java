@@ -16,9 +16,9 @@
 
 package com.ververica.cdc.common.sink;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.connector.sink2.Sink;
 
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.event.Event;
 
 /**

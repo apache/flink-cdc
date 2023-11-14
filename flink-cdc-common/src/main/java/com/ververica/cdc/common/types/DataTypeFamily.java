@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.common.types;
 
-import org.apache.flink.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 /** An enumeration of data type families for clustering {@link DataTypeRoot}s into categories. */
 @PublicEvolving

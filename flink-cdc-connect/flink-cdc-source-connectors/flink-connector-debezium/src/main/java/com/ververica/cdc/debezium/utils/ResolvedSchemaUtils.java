@@ -16,9 +16,10 @@
 
 package com.ververica.cdc.debezium.utils;
 
-import org.apache.flink.annotation.Internal;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ResolvedSchema;
+
+import com.ververica.cdc.common.annotation.Internal;
 
 import java.util.stream.Collectors;
 

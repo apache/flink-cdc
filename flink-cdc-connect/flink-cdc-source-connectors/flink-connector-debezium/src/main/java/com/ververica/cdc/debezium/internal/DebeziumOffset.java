@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.debezium.internal;
 
-import org.apache.flink.annotation.Internal;
+import com.ververica.cdc.common.annotation.Internal;
 
 import java.io.Serializable;
 import java.util.Map;

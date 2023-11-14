@@ -16,10 +16,10 @@
 
 package com.ververica.cdc.connectors.mysql.source.config;
 
-import org.apache.flink.annotation.Experimental;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
 import java.time.Duration;

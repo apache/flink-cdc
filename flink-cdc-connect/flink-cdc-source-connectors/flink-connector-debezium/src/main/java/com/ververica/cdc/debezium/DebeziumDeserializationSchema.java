@@ -16,10 +16,10 @@
 
 package com.ververica.cdc.debezium;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.util.Collector;
 
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.io.Serializable;
