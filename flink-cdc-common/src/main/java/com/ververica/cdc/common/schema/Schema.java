@@ -39,8 +39,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.ververica.cdc.common.types.DataTypes.ROW;
-
 /** Schema of a table or data collection. */
 @PublicEvolving
 public class Schema implements Serializable {
@@ -125,7 +123,7 @@ public class Schema implements Serializable {
         final DataField[] fields =
                 columns.stream().map(Schema::columnToField).toArray(DataField[]::new);
         // the row should never be null
-        return ROW(fields).notNull();
+        return DataTypes.ROW(fields).notNull();
     }
 
     // -----------------------------------------------------------------------------------
@@ -155,10 +153,7 @@ public class Schema implements Serializable {
 
     // -----------------------------------------------------------------------------------
 
-    /**
-     * A builder for constructing an immutable but still unresolved {@link
-     * org.apache.flink.table.api.Schema}.
-     */
+    /** A builder for constructing an immutable but still unresolved {@link Schema}. */
     @PublicEvolving
     public static final class Builder {
 

@@ -18,6 +18,8 @@ package com.ververica.cdc.common.event;
 
 import org.apache.flink.annotation.PublicEvolving;
 
+import com.ververica.cdc.common.data.RecordData;
+
 import java.io.Serializable;
 import java.util.Map;
 
