@@ -113,8 +113,8 @@ public final class GenericArrayData implements ArrayData {
      * Converts this {@link GenericArrayData} into an array of Java {@link Object}.
      *
      * <p>The method will convert a primitive array into an object array. But it will not convert
-     * internal data structures into external data structures (e.g. {@link
-     * org.apache.flink.table.data.StringData} to {@link String}).
+     * internal data structures into external data structures (e.g. {@link StringData} to {@link
+     * String}).
      */
     public Object[] toObjectArray() {
         if (isPrimitiveArray) {

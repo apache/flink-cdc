@@ -153,10 +153,7 @@ public class Schema implements Serializable {
 
     // -----------------------------------------------------------------------------------
 
-    /**
-     * A builder for constructing an immutable but still unresolved {@link
-     * org.apache.flink.table.api.Schema}.
-     */
+    /** A builder for constructing an immutable but still unresolved {@link Schema}. */
     @PublicEvolving
     public static final class Builder {
 

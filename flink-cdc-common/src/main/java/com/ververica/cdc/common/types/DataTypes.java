@@ -305,11 +305,10 @@ public class DataTypes {
      * +14:59} to {@code 9999-12-31 23:59:59.999999999 -14:59}. Leap seconds (23:59:60 and 23:59:61)
      * are not supported as the semantics are closer to {@link java.time.OffsetDateTime}.
      *
-     * <p>Compared to {@link org.apache.flink.table.types.logical.ZonedTimestampType}, the time zone
-     * offset information is not stored physically in every datum. Instead, the type assumes {@link
-     * java.time.Instant} semantics in UTC time zone at the edges of the table ecosystem. Every
-     * datum is interpreted in the local time zone configured in the current session for computation
-     * and visualization.
+     * <p>Compared to {@link ZonedTimestampType}, the time zone offset information is not stored
+     * physically in every datum. Instead, the type assumes {@link java.time.Instant} semantics in
+     * UTC time zone at the edges of the table ecosystem. Every datum is interpreted in the local
+     * time zone configured in the current session for computation and visualization.
      *
      * <p>This type fills the gap between time zone free and time zone mandatory timestamp types by
      * allowing the interpretation of UTC timestamps according to the configured session timezone.
@@ -331,11 +330,10 @@ public class DataTypes {
      * to {@code 9999-12-31 23:59:59.999999 -14:59}. Leap seconds (23:59:60 and 23:59:61) are not
      * supported as the semantics are closer to {@link java.time.OffsetDateTime}.
      *
-     * <p>Compared to {@link org.apache.flink.table.types.logical.ZonedTimestampType}, the time zone
-     * offset information is not stored physically in every datum. Instead, the type assumes {@link
-     * java.time.Instant} semantics in UTC time zone at the edges of the table ecosystem. Every
-     * datum is interpreted in the local time zone configured in the current session for computation
-     * and visualization.
+     * <p>Compared to {@link ZonedTimestampType}, the time zone offset information is not stored
+     * physically in every datum. Instead, the type assumes {@link java.time.Instant} semantics in
+     * UTC time zone at the edges of the table ecosystem. Every datum is interpreted in the local
+     * time zone configured in the current session for computation and visualization.
      *
      * <p>This type fills the gap between time zone free and time zone mandatory timestamp types by
      * allowing the interpretation of UTC timestamps according to the configured session timezone.
