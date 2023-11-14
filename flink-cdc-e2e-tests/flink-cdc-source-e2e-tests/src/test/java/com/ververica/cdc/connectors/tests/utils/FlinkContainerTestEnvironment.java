@@ -124,11 +124,11 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
 
     @Parameterized.Parameters(name = "flinkVersion: {0}")
     public static List<String> getFlinkVersion() {
-        return Arrays.asList("1.14.4", "1.15.2", "1.16.0", "1.17.0");
+        return Arrays.asList("1.14.6", "1.15.4", "1.16.2", "1.17.1", "1.18.0");
     }
 
     private static final List<String> FLINK_VERSION_WITH_SCALA_212 =
-            Arrays.asList("1.15.2", "1.16.0", "1.17.0");
+            Arrays.asList("1.15.4", "1.16.2", "1.17.1", "1.18.0");
 
     @Before
     public void before() {

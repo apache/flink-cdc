@@ -35,7 +35,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
-import static org.apache.flink.shaded.guava30.com.google.common.base.Preconditions.checkNotNull;
+import static org.apache.flink.shaded.guava31.com.google.common.base.Preconditions.checkNotNull;
 
 /** Parser for converting YAML formatted pipeline definition to {@link PipelineDef}. */
 public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {

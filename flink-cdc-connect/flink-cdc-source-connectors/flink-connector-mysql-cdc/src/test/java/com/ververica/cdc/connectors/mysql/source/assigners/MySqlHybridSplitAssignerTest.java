@@ -19,7 +19,7 @@ package com.ververica.cdc.connectors.mysql.source.assigners;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.RowType;
 
-import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.ChunkSplitterState;

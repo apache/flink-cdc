@@ -19,7 +19,7 @@ package com.ververica.cdc.connectors.base.source.reader.external;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava30.com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
