@@ -65,9 +65,10 @@ public class OracleSourceTestBase extends TestLogger {
     public static final String ORACLE_DATABASE = "ORCLCDB";
     public static final String ORACLE_SCHEMA = "DEBEZIUM";
     public static final String CONNECTOR_USER = "dbzuser";
+    public static final String CONNECTOR_PWD = "dbz";
     public static final String TEST_USER = "debezium";
     public static final String TEST_PWD = "dbz";
-    public static final String CONNECTOR_PWD = "dbz";
+    public static final String TOP_SECRET = "top_secret";
 
     public static final OracleContainer ORACLE_CONTAINER =
             new OracleContainer(
@@ -119,6 +120,11 @@ public class OracleSourceTestBase extends TestLogger {
 
     public static Connection getJdbcConnection() throws SQLException {
         return DriverManager.getConnection(ORACLE_CONTAINER.getJdbcUrl(), TEST_USER, TEST_PWD);
+    }
+
+    public static Connection getJdbcConnectionAsDBA() throws SQLException {
+        return DriverManager.getConnection(
+                ORACLE_CONTAINER.getJdbcUrl(), "sys as sysdba", TOP_SECRET);
     }
 
     public static void createAndInitialize(String sqlFile) throws Exception {
