@@ -64,6 +64,7 @@ public class MongoDBFetchTaskContext implements FetchTask.Context {
         this.changeStreamDescriptor = changeStreamDescriptor;
     }
 
+    @Override
     public void configure(SourceSplitBase sourceSplitBase) {
         // we need to use small batch size instead of INT.MAX as earlier because
         // now under the hood of debezium the ArrayDequeue was used as queue implementation
@@ -87,11 +88,13 @@ public class MongoDBFetchTaskContext implements FetchTask.Context {
                         .build();
     }
 
+    @Override
     public MongoDBSourceConfig getSourceConfig() {
         return sourceConfig;
     }
 
-    public MongoDBDialect getDialect() {
+    @Override
+    public MongoDBDialect getDataSourceDialect() {
         return dialect;
     }
 
@@ -99,6 +102,7 @@ public class MongoDBFetchTaskContext implements FetchTask.Context {
         return changeStreamDescriptor;
     }
 
+    @Override
     public ChangeEventQueue<DataChangeEvent> getQueue() {
         return changeEventQueue;
     }

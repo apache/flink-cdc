@@ -17,6 +17,8 @@
 package com.ververica.cdc.connectors.base.source.reader.external;
 
 import com.ververica.cdc.common.annotation.Experimental;
+import com.ververica.cdc.connectors.base.config.SourceConfig;
+import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import io.debezium.connector.base.ChangeEventQueue;
@@ -67,5 +69,9 @@ public interface FetchTask<Split> {
         List<SourceRecord> formatMessageTimestamp(Collection<SourceRecord> snapshotRecords);
 
         void close() throws Exception;
+
+        DataSourceDialect getDataSourceDialect();
+
+        SourceConfig getSourceConfig();
     }
 }
