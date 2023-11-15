@@ -48,7 +48,15 @@ public class TDBSourceOptions {
                     .defaultValue("initial")
                     .withDescription(
                             "Optional startup mode for TiDB CDC consumer, valid enumerations are "
-                                    + "\"initial\", \"latest-offset\"");
+                                    + "\"initial\", \"latest-offset\" or \"timestamp\"");
+
+    public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP =
+            ConfigOptions.key("scan.startup.timestamp")
+                    .longType()
+                    .defaultValue(0L)
+                    .withDescription(
+                            "Timestamp in seconds of the start point, only used for 'timestamp' startup mode."
+                                    + "eg: 1699891200000");
 
     public static final ConfigOption<String> PD_ADDRESSES =
             ConfigOptions.key("pd-addresses")

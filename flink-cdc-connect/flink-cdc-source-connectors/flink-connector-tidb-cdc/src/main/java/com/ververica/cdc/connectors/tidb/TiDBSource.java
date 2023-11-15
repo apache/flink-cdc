@@ -83,6 +83,7 @@ public class TiDBSource {
                     changeEventDeserializationSchema,
                     tiConf,
                     startupOptions.startupMode,
+                    startupOptions.startupTimestamp,
                     database,
                     tableName);
         }

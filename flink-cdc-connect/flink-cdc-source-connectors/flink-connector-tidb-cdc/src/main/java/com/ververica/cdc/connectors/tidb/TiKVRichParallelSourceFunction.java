@@ -41,6 +41,7 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.key.RowKey;
 import org.tikv.common.meta.TiTableInfo;
+import org.tikv.common.meta.TiTimestamp;
 import org.tikv.kvproto.Cdcpb;
 import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Kvrpcpb;
@@ -73,6 +74,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
     private final TiKVChangeEventDeserializationSchema<T> changeEventDeserializationSchema;
     private final TiConfiguration tiConf;
     private final StartupMode startupMode;
+    private final Long startupTimestamp;
     private final String database;
     private final String tableName;
 
@@ -101,12 +103,14 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
             TiKVChangeEventDeserializationSchema<T> changeEventDeserializationSchema,
             TiConfiguration tiConf,
             StartupMode startupMode,
+            Long startupTimestamp,
             String database,
             String tableName) {
         this.snapshotEventDeserializationSchema = snapshotEventDeserializationSchema;
         this.changeEventDeserializationSchema = changeEventDeserializationSchema;
         this.tiConf = tiConf;
         this.startupMode = startupMode;
+        this.startupTimestamp = startupTimestamp;
         this.database = database;
         this.tableName = tableName;
     }
@@ -156,6 +160,8 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
             synchronized (sourceContext.getCheckpointLock()) {
                 readSnapshotEvents();
             }
+        } else if (startupMode == StartupMode.TIMESTAMP) {
+            resolvedTs = new TiTimestamp(this.startupTimestamp, 0).getVersion();
         } else {
             LOG.info("Skip snapshot read");
             resolvedTs = session.getTimestamp().getVersion();
