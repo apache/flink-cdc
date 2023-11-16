@@ -23,6 +23,7 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
 import com.ververica.cdc.common.serializer.EnumSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 import com.ververica.cdc.common.types.ArrayType;
 import com.ververica.cdc.common.types.BigIntType;
 import com.ververica.cdc.common.types.BinaryType;
@@ -50,7 +51,7 @@ import java.io.IOException;
 import static com.ververica.cdc.common.serializer.schema.DataTypeSerializer.DataTypeClass.ROW;
 
 /** A {@link TypeSerializer} for {@link DataType}. */
-public class DataTypeSerializer extends TypeSerializer<DataType> {
+public class DataTypeSerializer extends TypeSerializerSingleton<DataType> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -63,11 +64,6 @@ public class DataTypeSerializer extends TypeSerializer<DataType> {
     @Override
     public boolean isImmutableType() {
         return false;
-    }
-
-    @Override
-    public TypeSerializer<DataType> duplicate() {
-        return new DataTypeSerializer();
     }
 
     @Override
@@ -237,16 +233,6 @@ public class DataTypeSerializer extends TypeSerializer<DataType> {
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override

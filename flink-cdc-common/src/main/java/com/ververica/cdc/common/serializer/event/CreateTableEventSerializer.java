@@ -26,12 +26,13 @@ import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.serializer.TableIdSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 import com.ververica.cdc.common.serializer.schema.SchemaSerializer;
 
 import java.io.IOException;
 
 /** A {@link TypeSerializer} for {@link CreateTableEvent}. */
-public class CreateTableEventSerializer extends TypeSerializer<CreateTableEvent> {
+public class CreateTableEventSerializer extends TypeSerializerSingleton<CreateTableEvent> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -46,18 +47,13 @@ public class CreateTableEventSerializer extends TypeSerializer<CreateTableEvent>
     }
 
     @Override
-    public TypeSerializer<CreateTableEvent> duplicate() {
-        return new CreateTableEventSerializer();
-    }
-
-    @Override
     public CreateTableEvent createInstance() {
         return new CreateTableEvent(TableId.tableId("unknown"), Schema.newBuilder().build());
     }
 
     @Override
     public CreateTableEvent copy(CreateTableEvent from) {
-        return from;
+        return new CreateTableEvent(from.tableId(), schemaSerializer.copy(from.getSchema()));
     }
 
     @Override
@@ -91,16 +87,6 @@ public class CreateTableEventSerializer extends TypeSerializer<CreateTableEvent>
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override

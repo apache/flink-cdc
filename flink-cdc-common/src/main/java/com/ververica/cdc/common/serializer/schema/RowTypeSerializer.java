@@ -23,6 +23,7 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
 import com.ververica.cdc.common.serializer.ListSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 import com.ververica.cdc.common.types.DataField;
 import com.ververica.cdc.common.types.RowType;
 
@@ -30,7 +31,7 @@ import java.io.IOException;
 import java.util.Collections;
 
 /** A {@link TypeSerializer} for {@link RowType}. */
-public class RowTypeSerializer extends TypeSerializer<RowType> {
+public class RowTypeSerializer extends TypeSerializerSingleton<RowType> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -45,18 +46,13 @@ public class RowTypeSerializer extends TypeSerializer<RowType> {
     }
 
     @Override
-    public TypeSerializer<RowType> duplicate() {
-        return new RowTypeSerializer();
-    }
-
-    @Override
     public RowType createInstance() {
         return new RowType(Collections.emptyList());
     }
 
     @Override
     public RowType copy(RowType from) {
-        return from;
+        return new RowType(from.isNullable(), fieldsSerializer.copy(from.getFields()));
     }
 
     @Override
@@ -89,16 +85,6 @@ public class RowTypeSerializer extends TypeSerializer<RowType> {
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override

@@ -27,6 +27,7 @@ import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.serializer.MapSerializer;
 import com.ververica.cdc.common.serializer.StringSerializer;
 import com.ververica.cdc.common.serializer.TableIdSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 import com.ververica.cdc.common.serializer.schema.DataTypeSerializer;
 import com.ververica.cdc.common.types.DataType;
 
@@ -34,7 +35,7 @@ import java.io.IOException;
 import java.util.Collections;
 
 /** A {@link TypeSerializer} for {@link AlterColumnTypeEvent}. */
-public class AlterColumnTypeEventSerializer extends TypeSerializer<AlterColumnTypeEvent> {
+public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<AlterColumnTypeEvent> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -51,18 +52,14 @@ public class AlterColumnTypeEventSerializer extends TypeSerializer<AlterColumnTy
     }
 
     @Override
-    public TypeSerializer<AlterColumnTypeEvent> duplicate() {
-        return new AlterColumnTypeEventSerializer();
-    }
-
-    @Override
     public AlterColumnTypeEvent createInstance() {
         return new AlterColumnTypeEvent(TableId.tableId("unknown"), Collections.emptyMap());
     }
 
     @Override
     public AlterColumnTypeEvent copy(AlterColumnTypeEvent from) {
-        return from;
+        return new AlterColumnTypeEvent(
+                from.tableId(), typeMapSerializer.copy(from.getTypeMapping()));
     }
 
     @Override
@@ -96,16 +93,6 @@ public class AlterColumnTypeEventSerializer extends TypeSerializer<AlterColumnTy
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override

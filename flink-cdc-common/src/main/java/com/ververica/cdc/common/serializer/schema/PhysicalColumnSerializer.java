@@ -25,13 +25,14 @@ import org.apache.flink.core.memory.DataOutputView;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.PhysicalColumn;
 import com.ververica.cdc.common.serializer.StringSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
 
 import java.io.IOException;
 
 /** A {@link TypeSerializer} for {@link PhysicalColumn}. */
-public class PhysicalColumnSerializer extends TypeSerializer<PhysicalColumn> {
+public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalColumn> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -46,18 +47,16 @@ public class PhysicalColumnSerializer extends TypeSerializer<PhysicalColumn> {
     }
 
     @Override
-    public TypeSerializer<PhysicalColumn> duplicate() {
-        return new PhysicalColumnSerializer();
-    }
-
-    @Override
     public PhysicalColumn createInstance() {
         return Column.physicalColumn("unknow", DataTypes.BIGINT());
     }
 
     @Override
     public PhysicalColumn copy(PhysicalColumn from) {
-        return from;
+        return Column.physicalColumn(
+                stringSerializer.copy(from.getName()),
+                dataTypeSerializer.copy(from.getType()),
+                stringSerializer.copy(from.getComment()));
     }
 
     @Override
@@ -94,16 +93,6 @@ public class PhysicalColumnSerializer extends TypeSerializer<PhysicalColumn> {
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override

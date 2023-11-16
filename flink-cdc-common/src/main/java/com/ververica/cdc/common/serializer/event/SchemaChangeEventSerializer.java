@@ -30,11 +30,12 @@ import com.ververica.cdc.common.event.RenameColumnEvent;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.serializer.EnumSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 
 import java.io.IOException;
 
 /** A {@link TypeSerializer} for {@link SchemaChangeEvent}. */
-public final class SchemaChangeEventSerializer extends TypeSerializer<SchemaChangeEvent> {
+public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<SchemaChangeEvent> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -49,18 +50,25 @@ public final class SchemaChangeEventSerializer extends TypeSerializer<SchemaChan
     }
 
     @Override
-    public TypeSerializer<SchemaChangeEvent> duplicate() {
-        return new SchemaChangeEventSerializer();
-    }
-
-    @Override
     public SchemaChangeEvent createInstance() {
         return () -> TableId.tableId("unknown", "unknown", "unknown");
     }
 
     @Override
     public SchemaChangeEvent copy(SchemaChangeEvent from) {
-        return from;
+        if (from instanceof AlterColumnTypeEvent) {
+            return AlterColumnTypeEventSerializer.INSTANCE.copy((AlterColumnTypeEvent) from);
+        } else if (from instanceof CreateTableEvent) {
+            return CreateTableEventSerializer.INSTANCE.copy((CreateTableEvent) from);
+        } else if (from instanceof RenameColumnEvent) {
+            return RenameColumnEventSerializer.INSTANCE.copy((RenameColumnEvent) from);
+        } else if (from instanceof AddColumnEvent) {
+            return AddColumnEventSerializer.INSTANCE.copy((AddColumnEvent) from);
+        } else if (from instanceof DropColumnEvent) {
+            return DropColumnEventSerializer.INSTANCE.copy((DropColumnEvent) from);
+        } else {
+            throw new IllegalArgumentException("Unknown schema change event: " + from);
+        }
     }
 
     @Override
@@ -125,16 +133,6 @@ public final class SchemaChangeEventSerializer extends TypeSerializer<SchemaChan
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override

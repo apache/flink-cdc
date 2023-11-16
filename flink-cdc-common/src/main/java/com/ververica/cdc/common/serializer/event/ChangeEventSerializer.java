@@ -27,12 +27,15 @@ import com.ververica.cdc.common.event.TableId;
 
 import java.io.IOException;
 
-/** TODO: A {@link TypeSerializer} for {@link ChangeEvent}. */
+/** TODO : A {@link TypeSerializer} for {@link ChangeEvent}. */
 public final class ChangeEventSerializer extends TypeSerializer<ChangeEvent> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
     public static final ChangeEventSerializer INSTANCE = new ChangeEventSerializer();
+
+    private final SchemaChangeEventSerializer schemaChangeEventSerializer =
+            SchemaChangeEventSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {

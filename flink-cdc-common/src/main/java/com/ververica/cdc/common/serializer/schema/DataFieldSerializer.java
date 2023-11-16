@@ -23,6 +23,7 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
 import com.ververica.cdc.common.serializer.StringSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 import com.ververica.cdc.common.types.DataField;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
@@ -30,7 +31,7 @@ import com.ververica.cdc.common.types.DataTypes;
 import java.io.IOException;
 
 /** A {@link TypeSerializer} for {@link DataField}. */
-public class DataFieldSerializer extends TypeSerializer<DataField> {
+public class DataFieldSerializer extends TypeSerializerSingleton<DataField> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -45,18 +46,16 @@ public class DataFieldSerializer extends TypeSerializer<DataField> {
     }
 
     @Override
-    public TypeSerializer<DataField> duplicate() {
-        return new DataFieldSerializer();
-    }
-
-    @Override
     public DataField createInstance() {
         return new DataField("unknown", DataTypes.BIGINT());
     }
 
     @Override
     public DataField copy(DataField from) {
-        return from;
+        return new DataField(
+                stringSerializer.copy(from.getName()),
+                dataTypeSerializer.copy(from.getType()),
+                stringSerializer.copy(from.getDescription()));
     }
 
     @Override
@@ -92,16 +91,6 @@ public class DataFieldSerializer extends TypeSerializer<DataField> {
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override

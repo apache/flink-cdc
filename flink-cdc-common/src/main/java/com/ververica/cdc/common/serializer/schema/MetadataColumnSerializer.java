@@ -25,13 +25,14 @@ import org.apache.flink.core.memory.DataOutputView;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.MetadataColumn;
 import com.ververica.cdc.common.serializer.StringSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
 
 import java.io.IOException;
 
 /** A {@link TypeSerializer} for {@link MetadataColumn}. */
-public class MetadataColumnSerializer extends TypeSerializer<MetadataColumn> {
+public class MetadataColumnSerializer extends TypeSerializerSingleton<MetadataColumn> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -46,18 +47,17 @@ public class MetadataColumnSerializer extends TypeSerializer<MetadataColumn> {
     }
 
     @Override
-    public TypeSerializer<MetadataColumn> duplicate() {
-        return new MetadataColumnSerializer();
-    }
-
-    @Override
     public MetadataColumn createInstance() {
         return Column.metadataColumn("unknow", DataTypes.BIGINT());
     }
 
     @Override
     public MetadataColumn copy(MetadataColumn from) {
-        return from;
+        return Column.metadataColumn(
+                stringSerializer.copy(from.getName()),
+                dataTypeSerializer.copy(from.getType()),
+                stringSerializer.copy(from.getMetadataKey()),
+                stringSerializer.copy(from.getComment()));
     }
 
     @Override
@@ -96,16 +96,6 @@ public class MetadataColumnSerializer extends TypeSerializer<MetadataColumn> {
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override

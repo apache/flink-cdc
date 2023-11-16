@@ -25,13 +25,14 @@ import org.apache.flink.core.memory.DataOutputView;
 import com.ververica.cdc.common.event.AddColumnEvent;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.serializer.EnumSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 import com.ververica.cdc.common.types.DataTypes;
 
 import java.io.IOException;
 
 /** A {@link TypeSerializer} for {@link AddColumnEvent.ColumnWithPosition}. */
 public class ColumnWithPositionSerializer
-        extends TypeSerializer<AddColumnEvent.ColumnWithPosition> {
+        extends TypeSerializerSingleton<AddColumnEvent.ColumnWithPosition> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -47,11 +48,6 @@ public class ColumnWithPositionSerializer
     }
 
     @Override
-    public TypeSerializer<AddColumnEvent.ColumnWithPosition> duplicate() {
-        return new ColumnWithPositionSerializer();
-    }
-
-    @Override
     public AddColumnEvent.ColumnWithPosition createInstance() {
         return new AddColumnEvent.ColumnWithPosition(
                 Column.physicalColumn("unknown", DataTypes.BIGINT()));
@@ -59,7 +55,10 @@ public class ColumnWithPositionSerializer
 
     @Override
     public AddColumnEvent.ColumnWithPosition copy(AddColumnEvent.ColumnWithPosition from) {
-        return from;
+        return new AddColumnEvent.ColumnWithPosition(
+                columnSerializer.copy(from.getAddColumn()),
+                from.getPosition(),
+                columnSerializer.copy(from.getExistingColumn()));
     }
 
     @Override
@@ -106,16 +105,6 @@ public class ColumnWithPositionSerializer
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override

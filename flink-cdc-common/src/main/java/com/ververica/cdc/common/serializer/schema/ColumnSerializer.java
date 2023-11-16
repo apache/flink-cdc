@@ -26,6 +26,7 @@ import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.MetadataColumn;
 import com.ververica.cdc.common.schema.PhysicalColumn;
 import com.ververica.cdc.common.serializer.EnumSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 import com.ververica.cdc.common.types.DataTypes;
 
 import java.io.IOException;
@@ -34,7 +35,7 @@ import static com.ververica.cdc.common.serializer.schema.ColumnSerializer.Column
 import static com.ververica.cdc.common.serializer.schema.ColumnSerializer.ColumnType.PHYSICAL;
 
 /** A {@link TypeSerializer} for {@link Column}. */
-public class ColumnSerializer extends TypeSerializer<Column> {
+public class ColumnSerializer extends TypeSerializerSingleton<Column> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -53,18 +54,19 @@ public class ColumnSerializer extends TypeSerializer<Column> {
     }
 
     @Override
-    public TypeSerializer<Column> duplicate() {
-        return new ColumnSerializer();
-    }
-
-    @Override
     public Column createInstance() {
         return Column.physicalColumn("unknown", DataTypes.BIGINT());
     }
 
     @Override
     public Column copy(Column from) {
-        return from;
+        if (from instanceof PhysicalColumn) {
+            return physicalColumnSerializer.copy((PhysicalColumn) from);
+        } else if (from instanceof MetadataColumn) {
+            return metadataColumnSerializer.copy((MetadataColumn) from);
+        } else {
+            throw new IllegalArgumentException("Unknown column type: " + from);
+        }
     }
 
     @Override
@@ -111,16 +113,6 @@ public class ColumnSerializer extends TypeSerializer<Column> {
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override

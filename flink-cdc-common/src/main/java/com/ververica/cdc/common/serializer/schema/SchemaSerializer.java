@@ -27,11 +27,12 @@ import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.serializer.ListSerializer;
 import com.ververica.cdc.common.serializer.MapSerializer;
 import com.ververica.cdc.common.serializer.StringSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 
 import java.io.IOException;
 
 /** A {@link TypeSerializer} for {@link Schema}. */
-public class SchemaSerializer extends TypeSerializer<Schema> {
+public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -51,18 +52,18 @@ public class SchemaSerializer extends TypeSerializer<Schema> {
     }
 
     @Override
-    public TypeSerializer<Schema> duplicate() {
-        return new SchemaSerializer();
-    }
-
-    @Override
     public Schema createInstance() {
         return Schema.newBuilder().build();
     }
 
     @Override
     public Schema copy(Schema from) {
-        return from;
+        return Schema.newBuilder()
+                .setColumns(columnsSerializer.copy(from.getColumns()))
+                .primaryKey(primaryKeysSerializer.copy(from.primaryKeys()))
+                .options(optionsSerializer.copy(from.options()))
+                .comment(stringSerializer.copy(from.comment()))
+                .build();
     }
 
     @Override
@@ -101,16 +102,6 @@ public class SchemaSerializer extends TypeSerializer<Schema> {
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override

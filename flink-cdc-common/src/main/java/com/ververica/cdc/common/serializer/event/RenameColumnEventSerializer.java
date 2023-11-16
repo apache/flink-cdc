@@ -27,12 +27,13 @@ import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.serializer.MapSerializer;
 import com.ververica.cdc.common.serializer.StringSerializer;
 import com.ververica.cdc.common.serializer.TableIdSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 
 import java.io.IOException;
 import java.util.Collections;
 
 /** A {@link TypeSerializer} for {@link RenameColumnEvent}. */
-public class RenameColumnEventSerializer extends TypeSerializer<RenameColumnEvent> {
+public class RenameColumnEventSerializer extends TypeSerializerSingleton<RenameColumnEvent> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -48,18 +49,13 @@ public class RenameColumnEventSerializer extends TypeSerializer<RenameColumnEven
     }
 
     @Override
-    public TypeSerializer<RenameColumnEvent> duplicate() {
-        return new RenameColumnEventSerializer();
-    }
-
-    @Override
     public RenameColumnEvent createInstance() {
         return new RenameColumnEvent(TableId.tableId("unknown"), Collections.emptyMap());
     }
 
     @Override
     public RenameColumnEvent copy(RenameColumnEvent from) {
-        return from;
+        return new RenameColumnEvent(from.tableId(), nameMapSerializer.copy(from.getNameMapping()));
     }
 
     @Override
@@ -93,16 +89,6 @@ public class RenameColumnEventSerializer extends TypeSerializer<RenameColumnEven
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override

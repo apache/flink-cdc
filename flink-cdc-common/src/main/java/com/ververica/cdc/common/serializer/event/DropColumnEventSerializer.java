@@ -27,13 +27,14 @@ import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.serializer.ListSerializer;
 import com.ververica.cdc.common.serializer.TableIdSerializer;
+import com.ververica.cdc.common.serializer.TypeSerializerSingleton;
 import com.ververica.cdc.common.serializer.schema.ColumnSerializer;
 
 import java.io.IOException;
 import java.util.Collections;
 
 /** A {@link TypeSerializer} for {@link DropColumnEvent}. */
-public class DropColumnEventSerializer extends TypeSerializer<DropColumnEvent> {
+public class DropColumnEventSerializer extends TypeSerializerSingleton<DropColumnEvent> {
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
@@ -49,18 +50,14 @@ public class DropColumnEventSerializer extends TypeSerializer<DropColumnEvent> {
     }
 
     @Override
-    public TypeSerializer<DropColumnEvent> duplicate() {
-        return new DropColumnEventSerializer();
-    }
-
-    @Override
     public DropColumnEvent createInstance() {
         return new DropColumnEvent(TableId.tableId("unknown"), Collections.emptyList());
     }
 
     @Override
     public DropColumnEvent copy(DropColumnEvent from) {
-        return from;
+        return new DropColumnEvent(
+                from.tableId(), columnsSerializer.copy(from.getDroppedColumns()));
     }
 
     @Override
@@ -94,16 +91,6 @@ public class DropColumnEventSerializer extends TypeSerializer<DropColumnEvent> {
     @Override
     public void copy(DataInputView source, DataOutputView target) throws IOException {
         serialize(deserialize(source), target);
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj == this || (obj != null && obj.getClass() == getClass());
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 
     @Override
