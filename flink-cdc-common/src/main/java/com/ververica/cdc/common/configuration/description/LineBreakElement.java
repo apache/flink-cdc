@@ -14,19 +14,23 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.cli.parser;
+package com.ververica.cdc.common.configuration.description;
 
-import com.ververica.cdc.common.configuration.Configuration;
-import com.ververica.cdc.composer.definition.PipelineDef;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
-import java.nio.file.Path;
+/** Represents a line break in the {@link Description}. */
+@PublicEvolving
+public class LineBreakElement implements InlineElement, BlockElement {
 
-/** Parsing pipeline definition files and generate {@link PipelineDef}. */
-public interface PipelineDefinitionParser {
+    /** Creates a line break in the description. */
+    public static LineBreakElement linebreak() {
+        return new LineBreakElement();
+    }
 
-    /**
-     * Parse the specified pipeline definition file path, merge global configurations, then generate
-     * the {@link PipelineDef}.
-     */
-    PipelineDef parse(Path pipelineDefPath, Configuration globalPipelineConfig) throws Exception;
+    private LineBreakElement() {}
+
+    @Override
+    public void format(Formatter formatter) {
+        formatter.format(this);
+    }
 }

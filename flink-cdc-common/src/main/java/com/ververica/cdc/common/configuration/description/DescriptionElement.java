@@ -14,19 +14,17 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.cli.parser;
+package com.ververica.cdc.common.configuration.description;
 
-import com.ververica.cdc.common.configuration.Configuration;
-import com.ververica.cdc.composer.definition.PipelineDef;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
-import java.nio.file.Path;
-
-/** Parsing pipeline definition files and generate {@link PipelineDef}. */
-public interface PipelineDefinitionParser {
-
+/** Part of a {@link Description} that can be converted into String representation. */
+@PublicEvolving
+interface DescriptionElement {
     /**
-     * Parse the specified pipeline definition file path, merge global configurations, then generate
-     * the {@link PipelineDef}.
+     * Transforms itself into String representation using given format.
+     *
+     * @param formatter formatter to use.
      */
-    PipelineDef parse(Path pipelineDefPath, Configuration globalPipelineConfig) throws Exception;
+    void format(Formatter formatter);
 }

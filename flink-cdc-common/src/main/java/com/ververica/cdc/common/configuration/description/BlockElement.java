@@ -14,19 +14,10 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.cli.parser;
+package com.ververica.cdc.common.configuration.description;
 
-import com.ververica.cdc.common.configuration.Configuration;
-import com.ververica.cdc.composer.definition.PipelineDef;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
-import java.nio.file.Path;
-
-/** Parsing pipeline definition files and generate {@link PipelineDef}. */
-public interface PipelineDefinitionParser {
-
-    /**
-     * Parse the specified pipeline definition file path, merge global configurations, then generate
-     * the {@link PipelineDef}.
-     */
-    PipelineDef parse(Path pipelineDefPath, Configuration globalPipelineConfig) throws Exception;
-}
+/** Part of description that represents a block e.g. some text, linebreak or a list. */
+@PublicEvolving
+public interface BlockElement extends DescriptionElement {}
