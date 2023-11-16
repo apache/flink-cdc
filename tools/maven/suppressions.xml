@@ -82,8 +82,8 @@ under the License.
 				files="io[\\/]debezium[\\/]connector[\\/]postgresql[\\/]"
 				checks=".*"/>
 		<suppress
-			files="io[\\/]debezium[\\/]connector[\\/]oracle[\\/]"
-			checks=".*"/>
+				files="io[\\/]debezium[\\/]"
+				checks=".*"/>
 		<!-- target directory is not relevant for checkstyle -->
 		<suppress
 			files="[\\/]target[\\/]"
