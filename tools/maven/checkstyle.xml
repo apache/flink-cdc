@@ -556,5 +556,13 @@ This file is based on the checkstyle file of Apache Beam.
 		</module>
 
 	</module>
+
+	<!-- check file header copyright -->
+	<module name="RegexpHeader">
+		<!-- regex expression to check -->
+		<property name="header" value="\/\*\n \* Copyright 2023 Ververica Inc\."/>
+		<property name="fileExtensions" value="java"/> <!-- only java files -->
+	</module>
+
 </module>
 
