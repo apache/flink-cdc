@@ -261,7 +261,7 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
-      <td>读取change stream时是否返回完整的文档信息。</td>
+      <td>读取change stream时是否返回完整的文档信息。仅支持使用Data Stream API读数据并写入支持upsert的存储时设置为<code>false</code>。</td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.enabled</td>

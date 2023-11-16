@@ -267,7 +267,7 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
-      <td>Determines what to return for update operations when using a Change Stream.</td>
+      <td>Determines what to return for update operations when using a Change Stream. Value <code>false</code> is only supported when using Data Stream API to read mongodb and write to a storage supports upsert.</td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.enabled</td>
