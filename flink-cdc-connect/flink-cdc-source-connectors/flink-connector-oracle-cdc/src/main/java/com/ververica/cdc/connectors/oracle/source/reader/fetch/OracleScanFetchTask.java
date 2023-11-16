@@ -167,12 +167,17 @@ public class OracleScanFetchTask implements FetchTask<SourceSplitBase> {
                 context.getSourceConfig()
                         .getDbzConfiguration()
                         .edit()
-                        // It will cause data loss before.Because the table name contains the database
-                        // prefix when logminer queries the redo log, but in fact the logminer content
-                        // does not contain the database prefix, this will cause the back fill to fail,
+                        // It will cause data loss before.
+                        // Because the table name contains the database
+                        // prefix when logminer queries the redo log, but in fact the
+                        // logminer content does not contain the database prefix,
+                        // this will cause the back fill tofail,
                         // thereby affecting data consistency.
-                        .with("table.include.list", String.format("%s.%s",
-                                split.getTableId().schema(), split.getTableId().table()))
+                        .with(
+                                "table.include.list",
+                                String.format(
+                                        "%s.%s",
+                                        split.getTableId().schema(), split.getTableId().table()))
                         // Disable heartbeat event in snapshot split fetcher
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
