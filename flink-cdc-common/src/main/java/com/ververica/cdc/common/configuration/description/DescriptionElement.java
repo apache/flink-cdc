@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.common.configuration.description;
 
-import org.apache.flink.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 /** Part of a {@link Description} that can be converted into String representation. */
 @PublicEvolving

@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.common.configuration;
 
-import org.apache.flink.annotation.Internal;
+import com.ververica.cdc.common.annotation.Internal;
 
 import java.util.ArrayList;
 import java.util.Arrays;

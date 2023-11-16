@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.common.configuration.description;
 
-import org.apache.flink.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 /** Part of description that represents a block e.g. some text, linebreak or a list. */
 @PublicEvolving

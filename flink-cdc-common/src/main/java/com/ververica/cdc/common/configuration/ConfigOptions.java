@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.configuration;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.configuration.description.Description;
 
 import java.time.Duration;

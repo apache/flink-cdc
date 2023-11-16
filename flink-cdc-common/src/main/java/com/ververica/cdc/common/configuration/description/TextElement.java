@@ -16,9 +16,9 @@
 
 package com.ververica.cdc.common.configuration.description;
 
-import org.apache.flink.annotation.PublicEvolving;
-
 import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
+
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 import java.util.Arrays;
 import java.util.Collections;
