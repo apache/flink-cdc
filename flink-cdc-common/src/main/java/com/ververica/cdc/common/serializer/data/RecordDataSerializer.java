@@ -40,6 +40,7 @@ import java.util.stream.IntStream;
 
 /** Serializer for {@link RecordData}. */
 public class RecordDataSerializer extends TypeSerializer<RecordData> {
+
     private static final long serialVersionUID = 1L;
 
     private final DataType[] types;

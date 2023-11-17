@@ -250,6 +250,7 @@ public interface RecordData {
      *
      * @see #createFieldGetter(DataType, int)
      */
+    @PublicEvolving
     interface FieldGetter extends Serializable {
         @Nullable
         Object getFieldOrNull(RecordData recordData);

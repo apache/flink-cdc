@@ -29,6 +29,7 @@ import java.io.IOException;
 
 /** TODO : A {@link TypeSerializer} for {@link ChangeEvent}. */
 public final class ChangeEventSerializer extends TypeSerializer<ChangeEvent> {
+
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */

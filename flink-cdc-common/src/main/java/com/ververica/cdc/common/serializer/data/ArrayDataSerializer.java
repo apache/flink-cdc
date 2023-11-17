@@ -39,6 +39,7 @@ import java.util.Arrays;
 
 /** Serializer for {@link ArrayData}. */
 public class ArrayDataSerializer extends TypeSerializer<ArrayData> {
+
     private static final long serialVersionUID = 1L;
 
     private final DataType eleType;

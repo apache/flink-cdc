@@ -33,6 +33,7 @@ import java.io.IOException;
 
 /** A {@link TypeSerializer} for {@link CreateTableEvent}. */
 public class CreateTableEventSerializer extends TypeSerializerSingleton<CreateTableEvent> {
+
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */

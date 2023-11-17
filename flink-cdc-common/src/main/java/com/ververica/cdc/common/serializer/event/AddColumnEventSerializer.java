@@ -34,6 +34,7 @@ import java.util.Collections;
 
 /** A {@link TypeSerializer} for {@link AddColumnEvent}. */
 public class AddColumnEventSerializer extends TypeSerializerSingleton<AddColumnEvent> {
+
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */

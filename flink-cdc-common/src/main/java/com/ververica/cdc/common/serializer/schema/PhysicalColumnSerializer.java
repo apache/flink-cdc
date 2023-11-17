@@ -33,6 +33,7 @@ import java.io.IOException;
 
 /** A {@link TypeSerializer} for {@link PhysicalColumn}. */
 public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalColumn> {
+
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */

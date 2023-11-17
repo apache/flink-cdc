@@ -33,6 +33,7 @@ import java.io.IOException;
 
 /** A {@link TypeSerializer} for {@link MetadataColumn}. */
 public class MetadataColumnSerializer extends TypeSerializerSingleton<MetadataColumn> {
+
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */

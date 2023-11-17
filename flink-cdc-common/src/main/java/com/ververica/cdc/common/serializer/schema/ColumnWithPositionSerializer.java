@@ -33,6 +33,7 @@ import java.io.IOException;
 /** A {@link TypeSerializer} for {@link AddColumnEvent.ColumnWithPosition}. */
 public class ColumnWithPositionSerializer
         extends TypeSerializerSingleton<AddColumnEvent.ColumnWithPosition> {
+
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */

@@ -32,6 +32,7 @@ import java.util.Collections;
 
 /** A {@link TypeSerializer} for {@link RowType}. */
 public class RowTypeSerializer extends TypeSerializerSingleton<RowType> {
+
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */

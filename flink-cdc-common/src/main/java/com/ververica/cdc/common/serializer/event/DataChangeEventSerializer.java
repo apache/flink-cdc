@@ -39,6 +39,7 @@ import java.util.Map;
 
 /** A {@link TypeSerializer} for {@link DataChangeEvent}. */
 public class DataChangeEventSerializer extends TypeSerializer<DataChangeEvent> {
+
     private static final long serialVersionUID = 1L;
 
     private final TypeSerializer<RecordData> recordDataSerializer;

@@ -36,6 +36,7 @@ import java.util.Collections;
 
 /** A {@link TypeSerializer} for {@link AlterColumnTypeEvent}. */
 public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<AlterColumnTypeEvent> {
+
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */

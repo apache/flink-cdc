@@ -52,6 +52,7 @@ import static com.ververica.cdc.common.serializer.schema.DataTypeSerializer.Data
 
 /** A {@link TypeSerializer} for {@link DataType}. */
 public class DataTypeSerializer extends TypeSerializerSingleton<DataType> {
+
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */

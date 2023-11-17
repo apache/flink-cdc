@@ -36,6 +36,7 @@ import static com.ververica.cdc.common.serializer.schema.ColumnSerializer.Column
 
 /** A {@link TypeSerializer} for {@link Column}. */
 public class ColumnSerializer extends TypeSerializerSingleton<Column> {
+
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */

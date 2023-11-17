@@ -22,6 +22,7 @@ import com.ververica.cdc.common.data.MapData;
 import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.data.StringData;
 import com.ververica.cdc.common.data.TimestampData;
+import com.ververica.cdc.common.data.ZonedTimestampData;
 import com.ververica.cdc.common.types.DataType;
 
 /** Utilities for handling {@link DataType}s. */
@@ -61,7 +62,7 @@ public class DataTypeUtils {
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return TimestampData.class;
             case TIMESTAMP_WITH_TIME_ZONE:
-                throw new UnsupportedOperationException("Unsupported type: " + type);
+                return ZonedTimestampData.class;
             case ARRAY:
                 return ArrayData.class;
             case MAP:

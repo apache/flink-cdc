@@ -35,6 +35,7 @@ import java.io.IOException;
  * int value.
  */
 public class LocalZonedTimestampDataSerializer extends TypeSerializer<LocalZonedTimestampData> {
+
     private static final long serialVersionUID = 1L;
 
     private final int precision;

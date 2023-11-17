@@ -28,6 +28,7 @@ import java.io.IOException;
 
 /** A {@link TypeSerializer} for {@link TableId}. */
 public final class TableIdSerializer extends TypeSerializer<TableId> {
+
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
