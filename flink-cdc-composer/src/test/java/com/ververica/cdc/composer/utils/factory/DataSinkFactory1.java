@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.composer.utils.factory;
 
-import org.apache.flink.configuration.ConfigOption;
-
+import com.ververica.cdc.common.configuration.ConfigOption;
 import com.ververica.cdc.common.factories.DataSinkFactory;
 import com.ververica.cdc.common.sink.DataSink;
 import com.ververica.cdc.common.sink.EventSinkProvider;
