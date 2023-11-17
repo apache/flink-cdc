@@ -26,5 +26,5 @@ import com.ververica.cdc.common.sink.DataSink;
 public interface DataSinkFactory extends Factory {
 
     /** Creates a {@link DataSink} instance. */
-    DataSink createDataSink();
+    DataSink createDataSink(Context context);
 }

@@ -29,7 +29,7 @@ import java.util.Set;
 /** A dummy {@link DataSourceFactory} for testing. */
 public class DataSourceFactory1 implements DataSourceFactory {
     @Override
-    public DataSource createDataSource() {
+    public DataSource createDataSource(Context context) {
         return new DataSource() {
             @Override
             public EventSourceProvider getEventSourceProvider() {
