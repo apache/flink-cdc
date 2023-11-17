@@ -63,6 +63,11 @@ public abstract class Column implements Serializable {
         return type;
     }
 
+    @Nullable
+    public String getComment() {
+        return comment;
+    }
+
     /** Returns a string that summarizes this column for printing to a console. */
     public String asSummaryString() {
         if (comment == null) {
