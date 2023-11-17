@@ -24,8 +24,7 @@ import java.util.Objects;
  */
 public class FlushEvent implements Event {
 
-    private static final long serialVersionUID = 1L;
-
+    /** The schema changes from which table. */
     private final TableId tableId;
 
     public FlushEvent(TableId tableId) {

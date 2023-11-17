@@ -18,9 +18,11 @@ package com.ververica.cdc.runtime.operators.schema.event;
 
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 
-import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaOperatorCoordinator;
+import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 
-/** A {@link OperatorEvent} that register sink writer to {@link SchemaOperatorCoordinator}. */
+import java.util.Objects;
+
+/** A {@link OperatorEvent} that register sink writer to {@link SchemaRegistry}. */
 public class SinkWriterRegisterEvent implements OperatorEvent {
 
     private static final long serialVersionUID = 1L;
@@ -33,5 +35,22 @@ public class SinkWriterRegisterEvent implements OperatorEvent {
 
     public int getSubtask() {
         return subtask;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof SinkWriterRegisterEvent)) {
+            return false;
+        }
+        SinkWriterRegisterEvent that = (SinkWriterRegisterEvent) o;
+        return subtask == that.subtask;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(subtask);
     }
 }

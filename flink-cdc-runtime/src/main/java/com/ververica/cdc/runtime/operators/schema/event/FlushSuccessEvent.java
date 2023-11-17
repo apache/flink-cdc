@@ -19,17 +19,21 @@ package com.ververica.cdc.runtime.operators.schema.event;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 
 import com.ververica.cdc.common.event.TableId;
-import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaOperatorCoordinator;
+import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
+
+import java.util.Objects;
 
 /**
- * A {@link OperatorEvent} from sink writer to notify {@link SchemaOperatorCoordinator} that it
- * finished flushing.
+ * A {@link OperatorEvent} from sink writer to notify {@link SchemaRegistry} that it finished
+ * flushing.
  */
 public class FlushSuccessEvent implements OperatorEvent {
     private static final long serialVersionUID = 1L;
 
+    /** The sink subtask finished flushing. */
     private final int subtask;
 
+    /** The schema changes from which table is executing it. */
     private final TableId tableId;
 
     public FlushSuccessEvent(int subtask, TableId tableId) {
@@ -43,5 +47,22 @@ public class FlushSuccessEvent implements OperatorEvent {
 
     public TableId getTableId() {
         return tableId;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof FlushSuccessEvent)) {
+            return false;
+        }
+        FlushSuccessEvent that = (FlushSuccessEvent) o;
+        return subtask == that.subtask && Objects.equals(tableId, that.tableId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(subtask, tableId);
     }
 }

@@ -14,12 +14,19 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.runtime.operators.schema.coordinator;
+package com.ververica.cdc.runtime.operators.schema.event;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 
-/** A manager to manages schema changes. */
-public class SchemaManager {
-    private static final Logger LOG = LoggerFactory.getLogger(SchemaManager.class);
+import com.ververica.cdc.common.event.FlushEvent;
+import com.ververica.cdc.runtime.operators.schema.SchemaOperator;
+import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
+
+/**
+ * The request from {@link SchemaOperator} to {@link SchemaRegistry} to request to release upstream
+ * after sending {@link FlushEvent}.
+ */
+public class ReleaseUpstreamRequest implements CoordinationRequest {
+
+    private static final long serialVersionUID = 1L;
 }

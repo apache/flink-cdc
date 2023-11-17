@@ -23,15 +23,15 @@ import org.apache.flink.util.SerializedValue;
 
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.runtime.operators.schema.SchemaOperator;
-import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaOperatorCoordinator;
+import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import com.ververica.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import com.ververica.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
 
 import java.io.IOException;
 
 /**
- * Client for {@link DataSinkWriterOperator} interact with {@link SchemaOperatorCoordinator} when
- * table schema evolution happened.
+ * Client for {@link DataSinkWriterOperator} interact with {@link SchemaRegistry} when table schema
+ * evolution happened.
  */
 public class SchemaEvolutionClient {
 
@@ -46,13 +46,13 @@ public class SchemaEvolutionClient {
         this.schemaOperatorID = schemaOperatorID;
     }
 
-    /** send {@link SinkWriterRegisterEvent} to {@link SchemaOperatorCoordinator}. */
+    /** send {@link SinkWriterRegisterEvent} to {@link SchemaRegistry}. */
     public void registerSubtask(int subtask) throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
                 schemaOperatorID, new SerializedValue<>(new SinkWriterRegisterEvent(subtask)));
     }
 
-    /** send {@link FlushSuccessEvent} to {@link SchemaOperatorCoordinator}. */
+    /** send {@link FlushSuccessEvent} to {@link SchemaRegistry}. */
     public void notifyFlushSuccess(int subtask, TableId tableId) throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
                 schemaOperatorID, new SerializedValue<>(new FlushSuccessEvent(subtask, tableId)));
