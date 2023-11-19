@@ -10,6 +10,7 @@ content/connectors/index
 content/formats/index
 content/downloads
 content/githublink
+connent/cdc-3.0-core-concepts
 ```
 
 # Indices and Search
