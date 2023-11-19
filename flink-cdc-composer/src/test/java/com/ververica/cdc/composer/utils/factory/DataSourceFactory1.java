@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.composer.utils.factory;
 
-import org.apache.flink.configuration.ConfigOption;
-
+import com.ververica.cdc.common.configuration.ConfigOption;
 import com.ververica.cdc.common.factories.DataSourceFactory;
 import com.ververica.cdc.common.source.DataSource;
 import com.ververica.cdc.common.source.EventSourceProvider;
