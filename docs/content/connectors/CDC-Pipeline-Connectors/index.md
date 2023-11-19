@@ -1,4 +1,4 @@
-# Core_Concepts
+# CDC-Pipeline-Connectors
 
 ```{toctree}
 :maxdepth: 2

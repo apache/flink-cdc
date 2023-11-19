@@ -1,4 +1,4 @@
-# CDC_Source_Connectors
+# CDC-Source-Connectors
 
 ```{toctree}
 :maxdepth: 2
