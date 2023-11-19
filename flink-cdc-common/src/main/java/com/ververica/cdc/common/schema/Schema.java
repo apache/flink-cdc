@@ -298,6 +298,12 @@ public class Schema implements Serializable {
             return this;
         }
 
+        public Builder column(Column column) {
+            checkColumn(column.getName(), column.getType());
+            columns.add(column);
+            return this;
+        }
+
         private void checkColumn(String columnName, DataType type) {
             Preconditions.checkNotNull(columnName, "Column name must not be null.");
             Preconditions.checkNotNull(type, "Data type must not be null.");
