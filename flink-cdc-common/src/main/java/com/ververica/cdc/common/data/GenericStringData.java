@@ -79,4 +79,9 @@ public final class GenericStringData implements StringData {
     public GenericStringData copy() {
         return fromString(javaStr);
     }
+
+    @Override
+    public String toString() {
+        return javaStr;
+    }
 }
