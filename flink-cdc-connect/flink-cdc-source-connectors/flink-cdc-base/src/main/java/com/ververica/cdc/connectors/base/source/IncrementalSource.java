@@ -30,6 +30,7 @@ import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.common.annotation.Experimental;
+import com.ververica.cdc.common.annotation.VisibleForTesting;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.options.StartupMode;
@@ -50,6 +51,7 @@ import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceRecordEmitter;
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceSplitReader;
+import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.relational.TableId;
 
@@ -72,6 +74,12 @@ public class IncrementalSource<T, C extends SourceConfig>
     protected final OffsetFactory offsetFactory;
     protected final DebeziumDeserializationSchema<T> deserializationSchema;
     protected final SourceSplitSerializer sourceSplitSerializer;
+
+    // Actions to perform during the snapshot phase.
+    // This field is introduced for testing purpose, for example testing if changes made in the
+    // snapshot phase are correctly backfilled into the snapshot by registering a pre high watermark
+    // hook for generating changes.
+    private SnapshotPhaseHooks snapshotHooks = SnapshotPhaseHooks.empty();
 
     public IncrementalSource(
             SourceConfig.Factory<C> configFactory,
@@ -111,7 +119,10 @@ public class IncrementalSource<T, C extends SourceConfig>
         Supplier<IncrementalSourceSplitReader<C>> splitReaderSupplier =
                 () ->
                         new IncrementalSourceSplitReader<>(
-                                readerContext.getIndexOfSubtask(), dataSourceDialect, sourceConfig);
+                                readerContext.getIndexOfSubtask(),
+                                dataSourceDialect,
+                                sourceConfig,
+                                snapshotHooks);
         return new IncrementalSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,
@@ -204,5 +215,10 @@ public class IncrementalSource<T, C extends SourceConfig>
                 sourceReaderMetrics,
                 sourceConfig.isIncludeSchemaChanges(),
                 offsetFactory);
+    }
+
+    @VisibleForTesting
+    public void setSnapshotHooks(SnapshotPhaseHooks snapshotHooks) {
+        this.snapshotHooks = snapshotHooks;
     }
 }

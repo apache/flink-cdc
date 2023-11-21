@@ -22,6 +22,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.ChangeEventRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceSplitReader;
+import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import com.ververica.cdc.connectors.mongodb.source.MongoDBSourceTestBase;
 import com.ververica.cdc.connectors.mongodb.source.assigners.splitters.SampleBucketSplitStrategy;
 import com.ververica.cdc.connectors.mongodb.source.assigners.splitters.ShardedSplitStrategy;
@@ -114,7 +115,8 @@ public class MongoDBSnapshotSplitReaderTest extends MongoDBSourceTestBase {
         assertTrue(snapshotSplits.size() > 0);
 
         IncrementalSourceSplitReader<MongoDBSourceConfig> snapshotSplitReader =
-                new IncrementalSourceSplitReader<>(0, dialect, sourceConfig);
+                new IncrementalSourceSplitReader<>(
+                        0, dialect, sourceConfig, SnapshotPhaseHooks.empty());
 
         int retry = 0;
         long actualCount = 0;

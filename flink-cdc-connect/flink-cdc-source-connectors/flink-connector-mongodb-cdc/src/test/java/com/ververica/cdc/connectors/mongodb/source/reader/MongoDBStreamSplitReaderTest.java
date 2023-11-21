@@ -24,6 +24,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.ChangeEventRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceSplitReader;
+import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import com.ververica.cdc.connectors.mongodb.source.MongoDBSourceTestBase;
 import com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceConfig;
 import com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceConfigFactory;
@@ -118,7 +119,8 @@ public class MongoDBStreamSplitReaderTest extends MongoDBSourceTestBase {
     @Test
     public void testStreamSplitReader() throws Exception {
         IncrementalSourceSplitReader<MongoDBSourceConfig> streamSplitReader =
-                new IncrementalSourceSplitReader<>(0, dialect, sourceConfig);
+                new IncrementalSourceSplitReader<>(
+                        0, dialect, sourceConfig, SnapshotPhaseHooks.empty());
 
         try {
             ChangeStreamOffset startOffset = new ChangeStreamOffset(startupResumeToken);

@@ -20,6 +20,8 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import com.ververica.cdc.connectors.postgres.source.PostgresConnectionPoolFactory;
+import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
+import com.ververica.cdc.connectors.postgres.testutils.UniqueDatabase;
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConfiguration;
@@ -48,7 +50,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Basic class for testing PostgreSQL source, this contains a PostgreSQL container which enables
@@ -186,5 +191,33 @@ public abstract class PostgresTestBase extends AbstractTestBase {
                 return 0;
             }
         }
+    }
+
+    protected PostgresSourceConfigFactory getMockPostgresSourceConfigFactory(
+            UniqueDatabase database, String schemaName, String tableName, int splitSize) {
+
+        PostgresSourceConfigFactory postgresSourceConfigFactory = new PostgresSourceConfigFactory();
+        postgresSourceConfigFactory.hostname(database.getHost());
+        postgresSourceConfigFactory.port(database.getDatabasePort());
+        postgresSourceConfigFactory.username(database.getUsername());
+        postgresSourceConfigFactory.password(database.getPassword());
+        postgresSourceConfigFactory.database(database.getDatabaseName());
+        postgresSourceConfigFactory.schemaList(new String[] {schemaName});
+        postgresSourceConfigFactory.tableList(schemaName + "." + tableName);
+        postgresSourceConfigFactory.splitSize(splitSize);
+        return postgresSourceConfigFactory;
+    }
+
+    public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
+        assertTrue(expected != null && actual != null);
+        assertEqualsInOrder(
+                expected.stream().sorted().collect(Collectors.toList()),
+                actual.stream().sorted().collect(Collectors.toList()));
+    }
+
+    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
+        assertTrue(expected != null && actual != null);
+        assertEquals(expected.size(), actual.size());
+        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
     }
 }
