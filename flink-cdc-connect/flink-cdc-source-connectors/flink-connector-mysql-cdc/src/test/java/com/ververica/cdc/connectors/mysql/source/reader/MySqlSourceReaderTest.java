@@ -49,6 +49,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
+import com.ververica.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -375,7 +376,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
         final CountDownLatch updatingExecuted = new CountDownLatch(1);
         TestingReaderContext testingReaderContext = new TestingReaderContext();
         MySqlSourceReader<SourceRecord> reader =
-                createReader(sourceConfig, testingReaderContext, 0);
+                createReader(sourceConfig, testingReaderContext, 0, SnapshotPhaseHooks.empty());
         reader.start();
 
         Thread updateWorker =
@@ -440,11 +441,15 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
 
     private MySqlSourceReader<SourceRecord> createReader(MySqlSourceConfig configuration, int limit)
             throws Exception {
-        return createReader(configuration, new TestingReaderContext(), limit);
+        return createReader(
+                configuration, new TestingReaderContext(), limit, SnapshotPhaseHooks.empty());
     }
 
     private MySqlSourceReader<SourceRecord> createReader(
-            MySqlSourceConfig configuration, SourceReaderContext readerContext, int limit)
+            MySqlSourceConfig configuration,
+            SourceReaderContext readerContext,
+            int limit,
+            SnapshotPhaseHooks snapshotHooks)
             throws Exception {
         final FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
@@ -467,7 +472,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                 new MySqlSourceReaderContext(readerContext);
         return new MySqlSourceReader<>(
                 elementsQueue,
-                () -> createSplitReader(configuration, mySqlSourceReaderContext),
+                () -> createSplitReader(configuration, mySqlSourceReaderContext, snapshotHooks),
                 recordEmitter,
                 readerContext.getConfiguration(),
                 mySqlSourceReaderContext,
@@ -475,8 +480,10 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
     }
 
     private MySqlSplitReader createSplitReader(
-            MySqlSourceConfig configuration, MySqlSourceReaderContext readerContext) {
-        return new MySqlSplitReader(configuration, 0, readerContext);
+            MySqlSourceConfig configuration,
+            MySqlSourceReaderContext readerContext,
+            SnapshotPhaseHooks snapshotHooks) {
+        return new MySqlSplitReader(configuration, 0, readerContext, snapshotHooks);
     }
 
     private void makeBinlogEventsInOneTransaction(MySqlSourceConfig sourceConfig, String tableId)

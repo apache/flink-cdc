@@ -30,18 +30,12 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
+import com.ververica.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
-import io.debezium.connector.mysql.MySqlPartition;
-import io.debezium.data.Envelope;
 import io.debezium.jdbc.JdbcConnection;
-import io.debezium.pipeline.EventDispatcher;
-import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.TableId;
-import io.debezium.schema.DataCollectionSchema;
-import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.header.ConnectHeaders;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -53,7 +47,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertNotNull;
@@ -304,11 +297,13 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 };
 
         StatefulTaskContext statefulTaskContext =
-                new MakeBinlogEventTaskContext(
-                        sourceConfig,
-                        binaryLogClient,
-                        mySqlConnection,
-                        () -> executeSql(sourceConfig, changingDataSql));
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
+
+        SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
+        snapshotHooks.setPreHighWatermarkAction(
+                (split) -> {
+                    mySqlConnection.execute(changingDataSql);
+                });
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -334,7 +329,11 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
         List<String> actual =
                 readTableSnapshotSplits(
-                        mySqlSplits, statefulTaskContext, mySqlSplits.size(), dataType);
+                        mySqlSplits,
+                        statefulTaskContext,
+                        mySqlSplits.size(),
+                        dataType,
+                        snapshotHooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -357,11 +356,12 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 };
 
         StatefulTaskContext statefulTaskContext =
-                new MakeBinlogEventTaskContext(
-                        sourceConfig,
-                        binaryLogClient,
-                        mySqlConnection,
-                        () -> executeSql(sourceConfig, insertDataSql));
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
+        SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
+        snapshotHooks.setPostLowWatermarkAction(
+                (split) -> {
+                    mySqlConnection.execute(insertDataSql);
+                });
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -389,7 +389,11 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
         List<String> actual =
                 readTableSnapshotSplits(
-                        mySqlSplits, statefulTaskContext, mySqlSplits.size(), dataType);
+                        mySqlSplits,
+                        statefulTaskContext,
+                        mySqlSplits.size(),
+                        dataType,
+                        snapshotHooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
         executeSql(sourceConfig, recoveryDataSql);
     }
@@ -413,11 +417,12 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 };
 
         StatefulTaskContext statefulTaskContext =
-                new MakeBinlogEventTaskContext(
-                        sourceConfig,
-                        binaryLogClient,
-                        mySqlConnection,
-                        () -> executeSql(sourceConfig, deleteDataSql));
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
+        SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
+        snapshotHooks.setPreHighWatermarkAction(
+                (split) -> {
+                    mySqlConnection.execute(deleteDataSql);
+                });
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -441,7 +446,11 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
         List<String> actual =
                 readTableSnapshotSplits(
-                        mySqlSplits, statefulTaskContext, mySqlSplits.size(), dataType);
+                        mySqlSplits,
+                        statefulTaskContext,
+                        mySqlSplits.size(),
+                        dataType,
+                        snapshotHooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
         executeSql(sourceConfig, recoveryDataSql);
     }
@@ -450,9 +459,11 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
             List<MySqlSplit> mySqlSplits,
             StatefulTaskContext statefulTaskContext,
             int scanSplitsNum,
-            DataType dataType)
+            DataType dataType,
+            SnapshotPhaseHooks snapshotHooks)
             throws Exception {
-        SnapshotSplitReader snapshotSplitReader = new SnapshotSplitReader(statefulTaskContext, 0);
+        SnapshotSplitReader snapshotSplitReader =
+                new SnapshotSplitReader(statefulTaskContext, 0, snapshotHooks);
 
         List<SourceRecord> result = new ArrayList<>();
         for (int i = 0; i < scanSplitsNum; i++) {
@@ -475,6 +486,20 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         assertTrue(snapshotSplitReader.getExecutorService().isTerminated());
 
         return formatResult(result, dataType);
+    }
+
+    private List<String> readTableSnapshotSplits(
+            List<MySqlSplit> mySqlSplits,
+            StatefulTaskContext statefulTaskContext,
+            int scanSplitsNum,
+            DataType dataType)
+            throws Exception {
+        return readTableSnapshotSplits(
+                mySqlSplits,
+                statefulTaskContext,
+                scanSplitsNum,
+                dataType,
+                SnapshotPhaseHooks.empty());
     }
 
     private List<String> formatResult(List<SourceRecord> records, DataType dataType) {
@@ -539,48 +564,5 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
             return false;
         }
         return true;
-    }
-
-    static class MakeBinlogEventTaskContext extends StatefulTaskContext {
-
-        private final Supplier<Boolean> makeBinlogFunction;
-
-        public MakeBinlogEventTaskContext(
-                MySqlSourceConfig sourceConfig,
-                BinaryLogClient binaryLogClient,
-                MySqlConnection connection,
-                Supplier<Boolean> makeBinlogFunction) {
-            super(sourceConfig, binaryLogClient, connection);
-            this.makeBinlogFunction = makeBinlogFunction;
-        }
-
-        @Override
-        public EventDispatcher.SnapshotReceiver<MySqlPartition> getSnapshotReceiver() {
-            EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver =
-                    super.getSnapshotReceiver();
-            return new EventDispatcher.SnapshotReceiver<MySqlPartition>() {
-
-                @Override
-                public void changeRecord(
-                        MySqlPartition partition,
-                        DataCollectionSchema schema,
-                        Envelope.Operation operation,
-                        Object key,
-                        Struct value,
-                        OffsetContext offset,
-                        ConnectHeaders headers)
-                        throws InterruptedException {
-                    snapshotReceiver.changeRecord(
-                            partition, schema, operation, key, value, offset, headers);
-                }
-
-                @Override
-                public void completeSnapshot() throws InterruptedException {
-                    snapshotReceiver.completeSnapshot();
-                    // make binlog events
-                    makeBinlogFunction.get();
-                }
-            };
-        }
     }
 }
