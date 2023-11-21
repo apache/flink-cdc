@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.base.source.reader.external;
 
+import com.ververica.cdc.common.annotation.VisibleForTesting;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
@@ -23,6 +24,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
+import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +37,7 @@ public abstract class AbstractScanFetchTask implements FetchTask {
     protected volatile boolean taskRunning = false;
 
     protected final SnapshotSplit snapshotSplit;
+    private SnapshotPhaseHooks snapshotPhaseHooks = SnapshotPhaseHooks.empty();
 
     public AbstractScanFetchTask(SnapshotSplit snapshotSplit) {
         this.snapshotSplit = snapshotSplit;
@@ -49,23 +52,34 @@ public abstract class AbstractScanFetchTask implements FetchTask {
 
         taskRunning = true;
 
+        if (snapshotPhaseHooks.getPreLowWatermarkAction() != null) {
+            snapshotPhaseHooks.getPreLowWatermarkAction().accept(sourceConfig, snapshotSplit);
+        }
         final Offset lowWatermark = dialect.displayCurrentOffset(sourceConfig);
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
                 lowWatermark,
                 snapshotSplit);
         dispatchLowWaterMarkEvent(context, snapshotSplit, lowWatermark);
+        if (snapshotPhaseHooks.getPostLowWatermarkAction() != null) {
+            snapshotPhaseHooks.getPostLowWatermarkAction().accept(sourceConfig, snapshotSplit);
+        }
 
         LOG.info("Snapshot step 2 - Snapshotting data");
         executeDataSnapshot(context);
 
+        if (snapshotPhaseHooks.getPreHighWatermarkAction() != null) {
+            snapshotPhaseHooks.getPreHighWatermarkAction().accept(sourceConfig, snapshotSplit);
+        }
         Offset highWatermark = dialect.displayCurrentOffset(sourceConfig);
-
         LOG.info(
                 "Snapshot step 3 - Determining high watermark {} for split {}",
                 highWatermark,
                 snapshotSplit);
         dispatchHighWaterMarkEvent(context, snapshotSplit, highWatermark);
+        if (snapshotPhaseHooks.getPostHighWatermarkAction() != null) {
+            snapshotPhaseHooks.getPostHighWatermarkAction().accept(sourceConfig, snapshotSplit);
+        }
 
         // optimization that skip the stream read when the low watermark equals high watermark
         final StreamSplit backfillStreamSplit =
@@ -181,5 +195,10 @@ public abstract class AbstractScanFetchTask implements FetchTask {
     @Override
     public void close() {
         taskRunning = false;
+    }
+
+    @VisibleForTesting
+    public void setSnapshotPhaseHooks(SnapshotPhaseHooks snapshotPhaseHooks) {
+        this.snapshotPhaseHooks = snapshotPhaseHooks;
     }
 }

@@ -54,13 +54,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link PostgresSourceBuilder.PostgresIncrementalSource}. */
@@ -658,19 +655,6 @@ public class PostgresSourceITCase extends PostgresTestBase {
         miniCluster.terminateTaskManager(0).get();
         afterFailAction.run();
         miniCluster.startTaskManager();
-    }
-
-    public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
-    }
-
-    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
     }
 
     private void waitUntilJobRunning(TableResult tableResult)

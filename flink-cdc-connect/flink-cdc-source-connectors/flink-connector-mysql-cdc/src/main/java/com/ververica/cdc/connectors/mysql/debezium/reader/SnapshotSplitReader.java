@@ -31,6 +31,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
+import com.ververica.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
@@ -78,6 +79,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
     private static final Logger LOG = LoggerFactory.getLogger(SnapshotSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
     private final ExecutorService executorService;
+    private final SnapshotPhaseHooks hooks;
 
     private volatile ChangeEventQueue<DataChangeEvent> queue;
     private volatile boolean currentTaskRunning;
@@ -92,7 +94,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
 
-    public SnapshotSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
+    public SnapshotSplitReader(
+            StatefulTaskContext statefulTaskContext, int subtaskId, SnapshotPhaseHooks hooks) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
                 new ThreadFactoryBuilder()
@@ -101,9 +104,14 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                                 (thread, throwable) -> setReadException(throwable))
                         .build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
+        this.hooks = hooks;
         this.currentTaskRunning = false;
         this.hasNextElement = new AtomicBoolean(false);
         this.reachEnd = new AtomicBoolean(false);
+    }
+
+    public SnapshotSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
+        this(statefulTaskContext, subtaskId, SnapshotPhaseHooks.empty());
     }
 
     @Override
@@ -124,7 +132,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         statefulTaskContext.getTopicSelector(),
                         statefulTaskContext.getSnapshotReceiver(),
                         StatefulTaskContext.getClock(),
-                        currentSnapshotSplit);
+                        currentSnapshotSplit,
+                        hooks);
         executorService.execute(
                 () -> {
                     try {

@@ -254,7 +254,7 @@ public class PostgresSourceBuilder<T> {
      */
     public PostgresIncrementalSource<T> build() {
         PostgresOffsetFactory offsetFactory = new PostgresOffsetFactory();
-        PostgresDialect dialect = new PostgresDialect(configFactory);
+        PostgresDialect dialect = new PostgresDialect(configFactory.create(0));
         return new PostgresIncrementalSource<>(
                 configFactory, checkNotNull(deserializer), offsetFactory, dialect);
     }

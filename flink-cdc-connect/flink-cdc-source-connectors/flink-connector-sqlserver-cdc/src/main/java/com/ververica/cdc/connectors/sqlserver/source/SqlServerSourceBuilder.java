@@ -219,7 +219,7 @@ public class SqlServerSourceBuilder<T> {
      */
     public SqlServerIncrementalSource<T> build() {
         this.offsetFactory = new LsnFactory();
-        this.dialect = new SqlServerDialect(configFactory);
+        this.dialect = new SqlServerDialect(configFactory.create(0));
         return new SqlServerIncrementalSource<T>(
                 configFactory, checkNotNull(deserializer), offsetFactory, dialect);
     }

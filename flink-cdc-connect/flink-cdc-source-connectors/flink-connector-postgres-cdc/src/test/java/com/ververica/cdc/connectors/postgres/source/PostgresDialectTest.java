@@ -54,16 +54,9 @@ public class PostgresDialectTest extends PostgresTestBase {
         // get table named 'customer.customers' from customDatabase which is actual in
         // inventoryDatabase
         PostgresSourceConfigFactory configFactoryOfCustomDatabase =
-                getMockPostgresSourceConfigFactory(
-                        customDatabase.getHost(),
-                        customDatabase.getDatabasePort(),
-                        customDatabase.getUsername(),
-                        customDatabase.getPassword(),
-                        customDatabase.getDatabaseName(),
-                        "customer",
-                        "customers");
+                getMockPostgresSourceConfigFactory(customDatabase, "customer", "customers", 10);
         PostgresDialect dialectOfcustomDatabase =
-                new PostgresDialect(configFactoryOfCustomDatabase);
+                new PostgresDialect(configFactoryOfCustomDatabase.create(0));
         List<TableId> tableIdsOfcustomDatabase =
                 dialectOfcustomDatabase.discoverDataCollections(
                         configFactoryOfCustomDatabase.create(0));
@@ -73,16 +66,9 @@ public class PostgresDialectTest extends PostgresTestBase {
         // inventoryDatabase
         // however, nothing is found
         PostgresSourceConfigFactory configFactoryOfInventoryDatabase =
-                getMockPostgresSourceConfigFactory(
-                        inventoryDatabase.getHost(),
-                        inventoryDatabase.getDatabasePort(),
-                        inventoryDatabase.getUsername(),
-                        inventoryDatabase.getPassword(),
-                        inventoryDatabase.getDatabaseName(),
-                        "inventory",
-                        "products");
+                getMockPostgresSourceConfigFactory(inventoryDatabase, "inventory", "products", 10);
         PostgresDialect dialectOfInventoryDatabase =
-                new PostgresDialect(configFactoryOfInventoryDatabase);
+                new PostgresDialect(configFactoryOfInventoryDatabase.create(0));
         List<TableId> tableIdsOfInventoryDatabase =
                 dialectOfInventoryDatabase.discoverDataCollections(
                         configFactoryOfInventoryDatabase.create(0));
@@ -92,38 +78,12 @@ public class PostgresDialectTest extends PostgresTestBase {
         // customDatabase
         // however, something is found
         PostgresSourceConfigFactory configFactoryOfInventoryDatabase2 =
-                getMockPostgresSourceConfigFactory(
-                        inventoryDatabase.getHost(),
-                        inventoryDatabase.getDatabasePort(),
-                        inventoryDatabase.getUsername(),
-                        inventoryDatabase.getPassword(),
-                        inventoryDatabase.getDatabaseName(),
-                        "customer",
-                        "customers");
+                getMockPostgresSourceConfigFactory(inventoryDatabase, "customer", "customers", 10);
         PostgresDialect dialectOfInventoryDatabase2 =
-                new PostgresDialect(configFactoryOfInventoryDatabase2);
+                new PostgresDialect(configFactoryOfInventoryDatabase2.create(0));
         List<TableId> tableIdsOfInventoryDatabase2 =
                 dialectOfInventoryDatabase2.discoverDataCollections(
                         configFactoryOfInventoryDatabase2.create(0));
         Assert.assertTrue(tableIdsOfInventoryDatabase2.isEmpty());
-    }
-
-    private static PostgresSourceConfigFactory getMockPostgresSourceConfigFactory(
-            String hostname,
-            int port,
-            String username,
-            String password,
-            String database,
-            String schemaName,
-            String tableName) {
-        PostgresSourceConfigFactory postgresSourceConfigFactory = new PostgresSourceConfigFactory();
-        postgresSourceConfigFactory.hostname(hostname);
-        postgresSourceConfigFactory.port(port);
-        postgresSourceConfigFactory.username(username);
-        postgresSourceConfigFactory.password(password);
-        postgresSourceConfigFactory.database(database);
-        postgresSourceConfigFactory.schemaList(new String[] {schemaName});
-        postgresSourceConfigFactory.tableList(schemaName + "." + tableName);
-        return postgresSourceConfigFactory;
     }
 }

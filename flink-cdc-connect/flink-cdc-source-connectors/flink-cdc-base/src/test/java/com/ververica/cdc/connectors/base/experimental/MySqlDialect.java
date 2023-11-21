@@ -23,7 +23,6 @@ import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import com.ververica.cdc.connectors.base.experimental.config.MySqlSourceConfig;
-import com.ververica.cdc.connectors.base.experimental.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.base.experimental.fetch.MySqlScanFetchTask;
 import com.ververica.cdc.connectors.base.experimental.fetch.MySqlSourceFetchTaskContext;
 import com.ververica.cdc.connectors.base.experimental.fetch.MySqlStreamFetchTask;
@@ -59,13 +58,11 @@ public class MySqlDialect implements JdbcDataSourceDialect {
     private static final String QUOTED_CHARACTER = "`";
 
     private static final long serialVersionUID = 1L;
-    private final MySqlSourceConfigFactory configFactory;
     private final MySqlSourceConfig sourceConfig;
     private transient MySqlSchema mySqlSchema;
 
-    public MySqlDialect(MySqlSourceConfigFactory configFactory) {
-        this.configFactory = configFactory;
-        this.sourceConfig = configFactory.create(0);
+    public MySqlDialect(MySqlSourceConfig sourceConfig) {
+        this.sourceConfig = sourceConfig;
     }
 
     @Override
