@@ -14,16 +14,12 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.runtime.operators.schema.event;
+package com.ververica.cdc.common.event;
 
-import org.apache.flink.streaming.runtime.operators.sink.DataSinkWriterOperator;
-
-import com.ververica.cdc.common.event.Event;
-import com.ververica.cdc.common.event.TableId;
-import com.ververica.cdc.runtime.operators.schema.SchemaOperator;
+import java.util.Objects;
 
 /**
- * An {@link Event} from {@link SchemaOperator} to notify {@link DataSinkWriterOperator} that it
+ * An {@link Event} from {@code SchemaOperator} to notify {@code DataSinkWriterOperator} that it
  * start flushing.
  */
 public class FlushEvent implements Event {
@@ -38,5 +34,22 @@ public class FlushEvent implements Event {
 
     public TableId getTableId() {
         return tableId;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof FlushEvent)) {
+            return false;
+        }
+        FlushEvent that = (FlushEvent) o;
+        return Objects.equals(tableId, that.tableId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(tableId);
     }
 }
