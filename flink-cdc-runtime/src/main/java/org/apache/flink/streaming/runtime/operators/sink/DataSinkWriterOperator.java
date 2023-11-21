@@ -28,7 +28,7 @@ import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
 import com.ververica.cdc.common.event.Event;
-import com.ververica.cdc.runtime.operators.schema.event.FlushEvent;
+import com.ververica.cdc.common.event.FlushEvent;
 import com.ververica.cdc.runtime.operators.sink.SchemaEvolutionClient;
 
 import java.lang.reflect.Field;
