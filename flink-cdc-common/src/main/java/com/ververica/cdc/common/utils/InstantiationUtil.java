@@ -29,6 +29,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
@@ -217,6 +218,47 @@ public class InstantiationUtil {
             return (T) oois.readObject();
         } finally {
             Thread.currentThread().setContextClassLoader(old);
+        }
+    }
+
+    /**
+     * Clones the given serializable object using Java serialization.
+     *
+     * @param obj Object to clone
+     * @param <T> Type of the object to clone
+     * @return The cloned object
+     * @throws IOException Thrown if the serialization or deserialization process fails.
+     * @throws ClassNotFoundException Thrown if any of the classes referenced by the object cannot
+     *     be resolved during deserialization.
+     */
+    public static <T extends Serializable> T clone(T obj)
+            throws IOException, ClassNotFoundException {
+        if (obj == null) {
+            return null;
+        } else {
+            return clone(obj, obj.getClass().getClassLoader());
+        }
+    }
+
+    /**
+     * Clones the given serializable object using Java serialization, using the given classloader to
+     * resolve the cloned classes.
+     *
+     * @param obj Object to clone
+     * @param classLoader The classloader to resolve the classes during deserialization.
+     * @param <T> Type of the object to clone
+     * @return Cloned object
+     * @throws IOException Thrown if the serialization or deserialization process fails.
+     * @throws ClassNotFoundException Thrown if any of the classes referenced by the object cannot
+     *     be resolved during deserialization.
+     */
+    public static <T extends Serializable> T clone(T obj, ClassLoader classLoader)
+            throws IOException, ClassNotFoundException {
+        if (obj == null) {
+            return null;
+        } else {
+            final byte[] serializedObject = serializeObject(obj);
+            return deserializeObject(serializedObject, classLoader);
         }
     }
 }
