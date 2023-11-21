@@ -50,10 +50,7 @@ public class DropColumnEvent implements SchemaChangeEvent {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        if (!super.equals(o)) {
+        if (!(o instanceof DropColumnEvent)) {
             return false;
         }
         DropColumnEvent that = (DropColumnEvent) o;

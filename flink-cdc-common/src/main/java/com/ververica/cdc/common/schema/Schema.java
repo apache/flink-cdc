@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -123,6 +124,27 @@ public class Schema implements Serializable {
                 columns.stream().map(Schema::columnToField).toArray(DataField[]::new);
         // the row should never be null
         return DataTypes.ROW(fields).notNull();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof Schema)) {
+            return false;
+        }
+        Schema schema = (Schema) o;
+        return Objects.equals(columns, schema.columns)
+                && Objects.equals(primaryKeys, schema.primaryKeys)
+                && Objects.equals(options, schema.options)
+                && Objects.equals(comment, schema.comment)
+                && Objects.equals(nameToColumns, schema.nameToColumns);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(columns, primaryKeys, options, comment, nameToColumns);
     }
 
     // -----------------------------------------------------------------------------------
