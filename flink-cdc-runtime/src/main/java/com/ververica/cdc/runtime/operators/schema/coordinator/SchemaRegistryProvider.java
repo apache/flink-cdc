@@ -19,27 +19,23 @@ package com.ververica.cdc.runtime.operators.schema.coordinator;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 
-import com.ververica.cdc.common.event.TableId;
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.common.sink.MetadataApplier;
 
-import java.util.List;
-import java.util.Map;
-
 /** Provider of {@link SchemaRegistry}. */
+@Internal
 public class SchemaRegistryProvider implements OperatorCoordinator.Provider {
     private static final long serialVersionUID = 1L;
 
     private final OperatorID operatorID;
     private final String operatorName;
-    private final Map<TableId, List<MetadataApplier>> metadataAppliers;
+    private final MetadataApplier metadataApplier;
 
     public SchemaRegistryProvider(
-            OperatorID operatorID,
-            String operatorName,
-            Map<TableId, List<MetadataApplier>> metadataAppliers) {
+            OperatorID operatorID, String operatorName, MetadataApplier metadataApplier) {
         this.operatorID = operatorID;
         this.operatorName = operatorName;
-        this.metadataAppliers = metadataAppliers;
+        this.metadataApplier = metadataApplier;
     }
 
     @Override
@@ -49,6 +45,6 @@ public class SchemaRegistryProvider implements OperatorCoordinator.Provider {
 
     @Override
     public OperatorCoordinator create(OperatorCoordinator.Context context) throws Exception {
-        return new SchemaRegistry(operatorName, context, metadataAppliers);
+        return new SchemaRegistry(operatorName, context, metadataApplier);
     }
 }

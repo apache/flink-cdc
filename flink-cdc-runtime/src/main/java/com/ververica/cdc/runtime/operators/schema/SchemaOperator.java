@@ -55,12 +55,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     private transient TaskOperatorEventGateway toCoordinator;
 
-    private final int partitionChannelNum;
-
-    public SchemaOperator(int partitionChannelNum) {
-        this.partitionChannelNum = partitionChannelNum;
-    }
-
     @Override
     public void setup(
             StreamTask<?, ?> containingTask,
@@ -98,16 +92,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                     "Sending the FlushEvent for table {} in subtask {}.",
                     tableId,
                     getRuntimeContext().getIndexOfThisSubtask());
-            broadcastEvents(new FlushEvent(tableId));
+            output.collect(new StreamRecord<>(new FlushEvent(tableId)));
+            output.collect(new StreamRecord<>(schemaChangeEvent));
             // The request will block until flushing finished in each sink writer
             requestReleaseUpstream();
         }
-        broadcastEvents(schemaChangeEvent);
-    }
-
-    // TODO
-    private void broadcastEvents(Event event) {
-        output.collect(new StreamRecord<>(event));
     }
 
     private CoordinationResponse requestSchemaChange(

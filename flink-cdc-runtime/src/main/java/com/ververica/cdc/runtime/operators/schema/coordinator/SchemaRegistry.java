@@ -23,10 +23,13 @@ import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.util.FlinkException;
 
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.sink.MetadataApplier;
 import com.ververica.cdc.runtime.operators.schema.SchemaOperator;
 import com.ververica.cdc.runtime.operators.schema.event.FlushSuccessEvent;
+import com.ververica.cdc.runtime.operators.schema.event.GetSchemaRequest;
+import com.ververica.cdc.runtime.operators.schema.event.GetSchemaResponse;
 import com.ververica.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
 import com.ververica.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import com.ververica.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
@@ -35,8 +38,11 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -56,6 +62,7 @@ import java.util.concurrent.CompletableFuture;
  *       FlushSuccessEvent} from its registered sink writer
  * </ul>
  */
+@Internal
 public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(SchemaRegistry.class);
@@ -71,17 +78,25 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
      */
     private final Map<Integer, Throwable> failedReasons;
 
+    /** Metadata applier for applying schema changes to external system. */
+    private final MetadataApplier metadataApplier;
+
     /** The request handler that handle all requests and events. */
-    private final SchemaRegistryRequestHandler requestHandler;
+    private SchemaRegistryRequestHandler requestHandler;
+
+    /** Schema manager for tracking schemas of all tables. */
+    private SchemaManager schemaManager = new SchemaManager();
 
     public SchemaRegistry(
             String operatorName,
             OperatorCoordinator.Context context,
-            Map<TableId, List<MetadataApplier>> metadataAppliers) {
+            MetadataApplier metadataApplier) {
         this.context = context;
         this.operatorName = operatorName;
         this.failedReasons = new HashMap<>();
-        this.requestHandler = new SchemaRegistryRequestHandler(metadataAppliers);
+        this.metadataApplier = metadataApplier;
+        schemaManager = new SchemaManager();
+        requestHandler = new SchemaRegistryRequestHandler(metadataApplier, schemaManager);
     }
 
     @Override
@@ -117,7 +132,15 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     @Override
     public void checkpointCoordinator(long checkpointId, CompletableFuture<byte[]> resultFuture)
             throws Exception {
-        // do nothing
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                DataOutputStream out = new DataOutputStream(baos)) {
+            // Serialize SchemaManager
+            int schemaManagerSerializerVersion = SchemaManager.SERIALIZER.getVersion();
+            out.writeInt(schemaManagerSerializerVersion);
+            byte[] serializedSchemaManager = SchemaManager.SERIALIZER.serialize(schemaManager);
+            out.writeInt(serializedSchemaManager.length);
+            out.write(serializedSchemaManager);
+        }
     }
 
     @Override
@@ -132,7 +155,10 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             SchemaChangeRequest schemaChangeRequest = (SchemaChangeRequest) request;
             return requestHandler.handleSchemaChangeRequest(schemaChangeRequest);
         } else if (request instanceof ReleaseUpstreamRequest) {
-            return requestHandler.handleReleaseUpstreamRequest((ReleaseUpstreamRequest) request);
+            return requestHandler.handleReleaseUpstreamRequest();
+        } else if (request instanceof GetSchemaRequest) {
+            return CompletableFuture.completedFuture(
+                    handleGetSchemaRequest(((GetSchemaRequest) request)));
         } else {
             throw new IllegalArgumentException("Unrecognized CoordinationRequest type: " + request);
         }
@@ -141,7 +167,20 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     @Override
     public void resetToCheckpoint(long checkpointId, @Nullable byte[] checkpointData)
             throws Exception {
-        // do nothing
+        if (checkpointData == null) {
+            return;
+        }
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(checkpointData);
+                DataInputStream in = new DataInputStream(bais)) {
+            int schemaManagerSerializerVersion = in.readInt();
+            int length = in.readInt();
+            byte[] serializedSchemaManager = new byte[length];
+            in.readFully(serializedSchemaManager);
+            schemaManager =
+                    SchemaManager.SERIALIZER.deserialize(
+                            schemaManagerSerializerVersion, serializedSchemaManager);
+            requestHandler = new SchemaRegistryRequestHandler(metadataApplier, schemaManager);
+        }
     }
 
     @Override
@@ -162,5 +201,24 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     public void executionAttemptReady(
             int subtask, int attemptNumber, SubtaskGateway subtaskGateway) {
         // do nothing
+    }
+
+    private GetSchemaResponse handleGetSchemaRequest(GetSchemaRequest getSchemaRequest) {
+        LOG.info("Handling schema request: {}", getSchemaRequest);
+        int schemaVersion = getSchemaRequest.getSchemaVersion();
+        TableId tableId = getSchemaRequest.getTableId();
+        if (schemaVersion == GetSchemaRequest.LATEST_SCHEMA_VERSION) {
+            return new GetSchemaResponse(schemaManager.getLatestSchema(tableId).orElse(null));
+        } else {
+            try {
+                return new GetSchemaResponse(schemaManager.getSchema(tableId, schemaVersion));
+            } catch (IllegalArgumentException iae) {
+                LOG.warn(
+                        "Some client is requesting an non-existed schema for table {} with version {}",
+                        tableId,
+                        schemaVersion);
+                return new GetSchemaResponse(null);
+            }
+        }
     }
 }
