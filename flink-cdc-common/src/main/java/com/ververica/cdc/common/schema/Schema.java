@@ -99,6 +99,15 @@ public class Schema implements Serializable {
         return options;
     }
 
+    public String describeOptions() {
+        StringBuilder stringBuilder = new StringBuilder("(");
+        if (options != null && !options.isEmpty()) {
+            stringBuilder.append(options);
+        }
+        stringBuilder.append(")");
+        return stringBuilder.toString();
+    }
+
     /** Returns the comment of the table or data collection. */
     public String comment() {
         return comment;
@@ -175,6 +184,23 @@ public class Schema implements Serializable {
     /** Builder for configuring and creating instances of {@link Schema}. */
     public static Schema.Builder newBuilder() {
         return new Builder();
+    }
+
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append("columns={");
+        for (int i = 0; i < columns.size(); i++) {
+            sb.append(columns.get(i).asSummaryString());
+            if (i != columns.size() - 1) {
+                sb.append(",");
+            }
+        }
+        sb.append("}");
+        sb.append(", primaryKeys=").append(String.join(";", primaryKeys));
+        sb.append(", options=").append(describeOptions());
+
+        return sb.toString();
     }
 
     // -----------------------------------------------------------------------------------
