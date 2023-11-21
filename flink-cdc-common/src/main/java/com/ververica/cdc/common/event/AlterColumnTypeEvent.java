@@ -49,10 +49,7 @@ public class AlterColumnTypeEvent implements SchemaChangeEvent {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        if (!super.equals(o)) {
+        if (!(o instanceof AlterColumnTypeEvent)) {
             return false;
         }
         AlterColumnTypeEvent that = (AlterColumnTypeEvent) o;

@@ -50,10 +50,7 @@ public class CreateTableEvent implements SchemaChangeEvent {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        if (!super.equals(o)) {
+        if (!(o instanceof CreateTableEvent)) {
             return false;
         }
         CreateTableEvent that = (CreateTableEvent) o;
