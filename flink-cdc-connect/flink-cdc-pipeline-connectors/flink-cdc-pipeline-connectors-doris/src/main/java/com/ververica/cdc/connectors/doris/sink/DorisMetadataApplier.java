@@ -80,7 +80,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         }
     }
 
-    private void applyCreateTableEvent(CreateTableEvent event) {
+    private void applyCreateTableEvent(CreateTableEvent event) throws IOException, IllegalArgumentException {
         Schema schema = event.getSchema();
         TableId tableId = event.tableId();
         TableSchema tableSchema = new TableSchema();
