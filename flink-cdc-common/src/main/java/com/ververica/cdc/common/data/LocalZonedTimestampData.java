@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 
 /**
  * An internal data structure representing data of {@link LocalZonedTimestampType}.
@@ -74,7 +75,9 @@ public final class LocalZonedTimestampData implements Comparable<LocalZonedTimes
             milliOfSecond += 1000;
         }
         long nanoAdjustment = milliOfSecond * 1_000_000 + epochNanoOfMillisecond;
-        return Instant.ofEpochSecond(epochSecond, nanoAdjustment);
+        return Instant.ofEpochSecond(epochSecond, nanoAdjustment)
+                .atZone(ZoneId.of("UTC"))
+                .toInstant();
     }
 
     @Override
