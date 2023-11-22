@@ -31,7 +31,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -163,17 +162,6 @@ public class SchemaRegistryRequestHandler {
                     .getResponseFuture()
                     .complete(new SchemaChangeResponse(true));
         }
-    }
-
-    /** Snapshot the state of the {@link SchemaRegistryRequestHandler}. */
-    public byte[] snapshotState() throws IOException {
-        // TODO
-        return new byte[0];
-    }
-
-    /** Restores a {@link SchemaRegistryRequestHandler} from checkpoint data. */
-    public void resetToCheckpoint(byte[] checkpointData) throws IOException {
-        // TODO
     }
 
     class PendingSchemaChange {
