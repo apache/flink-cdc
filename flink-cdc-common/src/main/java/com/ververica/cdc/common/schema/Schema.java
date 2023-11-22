@@ -172,6 +172,32 @@ public class Schema implements Serializable {
         return new Builder();
     }
 
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append("columns={");
+        for (int i = 0; i < columns.size(); i++) {
+            sb.append(columns.get(i).asSummaryString());
+            if (i != columns.size() - 1) {
+                sb.append(",");
+            }
+        }
+        sb.append("}");
+        sb.append(", primaryKeys=").append(String.join(";", primaryKeys));
+        sb.append(", options=").append(describeOptions());
+
+        return sb.toString();
+    }
+
+    public String describeOptions() {
+        StringBuilder stringBuilder = new StringBuilder("(");
+        if (options != null && !options.isEmpty()) {
+            stringBuilder.append(options);
+        }
+        stringBuilder.append(")");
+        return stringBuilder.toString();
+    }
+
     // -----------------------------------------------------------------------------------
 
     /** A builder for constructing an immutable but still unresolved {@link Schema}. */

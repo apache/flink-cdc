@@ -45,6 +45,11 @@ public final class GenericStringData implements StringData {
     }
 
     @Override
+    public String toString() {
+        return javaStr;
+    }
+
+    @Override
     public int compareTo(@Nonnull StringData o) {
         GenericStringData other = (GenericStringData) o;
         return javaStr.compareTo(other.javaStr);
