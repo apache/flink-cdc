@@ -54,17 +54,12 @@ public class SchemaRegistryRequestHandler {
      * Not applied SchemaChangeRequest's future before receiving all flush success events for its
      * table from sink writers.
      */
-    private CompletableFuture<CoordinationResponse> waitFlushSuccess = null;
+    private PendingSchemaChange waitFlushSuccess;
     /**
      * Not applied SchemaChangeRequest before receiving all flush success events for its table from
      * sink writers.
      */
-    private final List<CompletableFuture<CoordinationResponse>> pendingSchemaChanges;
-    /**
-     * Not applied SchemaChangeRequest before receiving all flush success events for its table from
-     * sink writers.
-     */
-    private final List<SchemaChangeEvent> pendingSchemaChangeEvents;
+    private final List<PendingSchemaChange> pendingSchemaChanges;
     /** Sink writers which have sent flush success events for the request. */
     private final Set<Integer> flushedSinkWriters;
 
@@ -73,7 +68,6 @@ public class SchemaRegistryRequestHandler {
         this.activeSinkWriters = new HashSet<>();
         this.flushedSinkWriters = new HashSet<>();
         this.pendingSchemaChanges = new LinkedList<>();
-        this.pendingSchemaChangeEvents = new LinkedList<>();
     }
 
     /**
@@ -104,19 +98,20 @@ public class SchemaRegistryRequestHandler {
      */
     public CompletableFuture<CoordinationResponse> handleSchemaChangeRequest(
             SchemaChangeRequest request) {
-        pendingSchemaChangeEvents.add(request.getSchemaChangeEvent());
-        if (waitFlushSuccess == null) {
+        CompletableFuture<CoordinationResponse> response;
+        if (pendingSchemaChanges.isEmpty() && waitFlushSuccess == null) {
             LOG.info(
                     "Received schema change event request from table {}. Start to pend requests for others.",
                     request.getTableId().toString());
-            // TODO : skip flushing
-            return CompletableFuture.completedFuture(new SchemaChangeResponse(true));
+            // TODO : skip flushing and please not put it to pendingSchemaChanges
+            response = CompletableFuture.completedFuture(new SchemaChangeResponse(true));
+            pendingSchemaChanges.add(new PendingSchemaChange(request, response));
         } else {
             LOG.info("There are already processing requests. Wait for processing.");
-            CompletableFuture<CoordinationResponse> response = new CompletableFuture<>();
-            pendingSchemaChanges.add(response);
-            return response;
+            response = new CompletableFuture<>();
+            pendingSchemaChanges.add(new PendingSchemaChange(request, response));
         }
+        return response;
     }
 
     /**
@@ -126,8 +121,8 @@ public class SchemaRegistryRequestHandler {
      */
     public CompletableFuture<CoordinationResponse> handleReleaseUpstreamRequest(
             ReleaseUpstreamRequest request) {
-        this.waitFlushSuccess = new CompletableFuture<>();
-        return waitFlushSuccess;
+        this.waitFlushSuccess = pendingSchemaChanges.remove(0).startToWaitForFlushSuccess();
+        return waitFlushSuccess.getResponseFuture();
     }
 
     /**
@@ -152,8 +147,8 @@ public class SchemaRegistryRequestHandler {
             LOG.info(
                     "All sink subtask have flushed for table {}. Start to apply schema change.",
                     tableId.toString());
-            applySchemaChange(tableId, pendingSchemaChangeEvents.remove(0));
-            waitFlushSuccess.complete(new ReleaseUpstreamResponse());
+            applySchemaChange(tableId, waitFlushSuccess.getChangeRequest().getSchemaChangeEvent());
+            waitFlushSuccess.getResponseFuture().complete(new ReleaseUpstreamResponse());
             startNextSchemaChangeRequest();
         }
     }
@@ -162,7 +157,11 @@ public class SchemaRegistryRequestHandler {
         flushedSinkWriters.clear();
         waitFlushSuccess = null;
         if (!pendingSchemaChanges.isEmpty()) {
-            pendingSchemaChanges.remove(0).complete(new SchemaChangeResponse(true));
+            // TODO : if no need to flush, remove it from pendingSchemaChanges
+            pendingSchemaChanges
+                    .get(0)
+                    .getResponseFuture()
+                    .complete(new SchemaChangeResponse(true));
         }
     }
 
@@ -175,5 +174,33 @@ public class SchemaRegistryRequestHandler {
     /** Restores a {@link SchemaRegistryRequestHandler} from checkpoint data. */
     public void resetToCheckpoint(byte[] checkpointData) throws IOException {
         // TODO
+    }
+
+    class PendingSchemaChange {
+        private final SchemaChangeRequest changeRequest;
+        private final CompletableFuture<CoordinationResponse> responseFuture;
+
+        public PendingSchemaChange(
+                SchemaChangeRequest changeRequest,
+                CompletableFuture<CoordinationResponse> responseFuture) {
+            this.changeRequest = changeRequest;
+            this.responseFuture = responseFuture;
+        }
+
+        public SchemaChangeRequest getChangeRequest() {
+            return changeRequest;
+        }
+
+        public CompletableFuture<CoordinationResponse> getResponseFuture() {
+            return responseFuture;
+        }
+
+        public PendingSchemaChange startToWaitForFlushSuccess() {
+            if (!responseFuture.isDone()) {
+                throw new IllegalStateException(
+                        "Cannot start to wait for flush success before the SchemaChangeRequest is done.");
+            }
+            return new PendingSchemaChange(changeRequest, new CompletableFuture<>());
+        }
     }
 }
