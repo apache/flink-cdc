@@ -88,6 +88,9 @@ public abstract class Column implements Serializable {
     /** Returns a copy of the column with a replaced {@link DataType}. */
     public abstract Column copy(DataType newType);
 
+    /** Returns a copy of the column with a replaced name. */
+    public abstract Column copy(String newName);
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {

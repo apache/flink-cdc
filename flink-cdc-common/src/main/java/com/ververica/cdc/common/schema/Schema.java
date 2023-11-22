@@ -126,6 +126,11 @@ public class Schema implements Serializable {
         return DataTypes.ROW(fields).notNull();
     }
 
+    /** Returns a copy of the schema with a replaced list of {@Column}. */
+    public Schema copy(List<Column> columns) {
+        return new Schema(columns, new ArrayList<>(primaryKeys), new HashMap<>(options), comment);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
