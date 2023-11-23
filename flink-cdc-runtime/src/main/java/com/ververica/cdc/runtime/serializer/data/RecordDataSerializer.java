@@ -27,12 +27,16 @@ import org.apache.flink.core.memory.DataOutputView;
 
 import com.ververica.cdc.common.data.GenericRecordData;
 import com.ververica.cdc.common.data.RecordData;
+import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.common.utils.InstantiationUtil;
 import com.ververica.cdc.runtime.serializer.InternalSerializers;
 import com.ververica.cdc.runtime.serializer.NestedSerializersSnapshotDelegate;
 import com.ververica.cdc.runtime.serializer.NullableSerializerWrapper;
+import com.ververica.cdc.runtime.serializer.data.binary.BinaryRecordDataSerializer;
+import com.ververica.cdc.runtime.serializer.data.writer.BinaryRecordDataWriter;
+import com.ververica.cdc.runtime.serializer.data.writer.BinaryWriter;
 import com.ververica.cdc.runtime.serializer.schema.DataTypeSerializer;
 
 import java.io.IOException;
@@ -47,6 +51,10 @@ public class RecordDataSerializer extends TypeSerializer<RecordData> {
     private final DataType[] types;
     private final TypeSerializer[] fieldSerializers;
     private final RecordData.FieldGetter[] fieldGetters;
+    private final BinaryRecordDataSerializer binarySerializer = BinaryRecordDataSerializer.INSTANCE;
+
+    private transient BinaryRecordData reuseRow;
+    private transient BinaryRecordDataWriter reuseWriter;
 
     private final DataTypeSerializer dataTypeSerializer = new DataTypeSerializer();
 
@@ -96,19 +104,30 @@ public class RecordDataSerializer extends TypeSerializer<RecordData> {
 
     @Override
     public void serialize(RecordData recordData, DataOutputView target) throws IOException {
-        target.writeInt(types.length);
-        for (int i = 0; i < types.length; i++) {
-            fieldSerializers[i].serialize(fieldGetters[i].getFieldOrNull(recordData), target);
+        if (recordData instanceof BinaryRecordData) {
+            target.writeBoolean(true);
+            binarySerializer.serialize((BinaryRecordData) recordData, target);
+        } else {
+            target.writeBoolean(false);
+            target.writeInt(types.length);
+            for (int i = 0; i < types.length; i++) {
+                fieldSerializers[i].serialize(fieldGetters[i].getFieldOrNull(recordData), target);
+            }
         }
     }
 
     @Override
     public RecordData deserialize(DataInputView source) throws IOException {
-        Object[] fields = new Object[source.readInt()];
-        for (int i = 0; i < fields.length; i++) {
-            fields[i] = fieldSerializers[i].deserialize(source);
+        boolean isBinary = source.readBoolean();
+        if (isBinary) {
+            return binarySerializer.deserialize(source);
+        } else {
+            Object[] fields = new Object[source.readInt()];
+            for (int i = 0; i < fields.length; i++) {
+                fields[i] = fieldSerializers[i].deserialize(source);
+            }
+            return GenericRecordData.of(fields);
         }
-        return GenericRecordData.of(fields);
     }
 
     @Override
@@ -193,6 +212,32 @@ public class RecordDataSerializer extends TypeSerializer<RecordData> {
     @Override
     public TypeSerializerSnapshot<RecordData> snapshotConfiguration() {
         return new RecordDataSerializerSnapshot(types, fieldSerializers);
+    }
+
+    /** Convert {@link RecordData} into {@link BinaryRecordData}. */
+    public BinaryRecordData toBinaryRecordData(RecordData row) {
+        if (row instanceof BinaryRecordData) {
+            return (BinaryRecordData) row;
+        }
+        if (reuseRow == null) {
+            reuseRow = new BinaryRecordData(types.length);
+            reuseWriter = new BinaryRecordDataWriter(reuseRow);
+        }
+        reuseWriter.reset();
+        for (int i = 0; i < types.length; i++) {
+            if (row.isNullAt(i)) {
+                reuseWriter.setNullAt(i);
+            } else {
+                BinaryWriter.write(
+                        reuseWriter,
+                        i,
+                        fieldGetters[i].getFieldOrNull(reuseRow),
+                        types[i],
+                        fieldSerializers[i]);
+            }
+        }
+        reuseWriter.complete();
+        return reuseRow;
     }
 
     /** {@link TypeSerializerSnapshot} for {@link RecordDataSerializer}. */

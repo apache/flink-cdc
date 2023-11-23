@@ -143,6 +143,18 @@ public final class TimestampData implements Comparable<TimestampData> {
     }
 
     /**
+     * Creates an instance of {@link TimestampData} from milliseconds.
+     *
+     * <p>The nanos-of-millisecond field will be set to zero.
+     *
+     * @param milliseconds the number of milliseconds since {@code 1970-01-01 00:00:00}; a negative
+     *     number is the number of milliseconds before {@code 1970-01-01 00:00:00}
+     */
+    public static TimestampData fromEpochMillis(long milliseconds) {
+        return new TimestampData(milliseconds, 0);
+    }
+
+    /**
      * Creates an instance of {@link TimestampData} from an instance of {@link Timestamp}.
      *
      * @param timestamp an instance of {@link Timestamp}
