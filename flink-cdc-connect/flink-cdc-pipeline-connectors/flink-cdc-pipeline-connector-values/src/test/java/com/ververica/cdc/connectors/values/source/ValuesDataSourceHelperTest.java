@@ -21,8 +21,7 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.CloseableIterator;
 
-import com.ververica.cdc.common.data.GenericRecordData;
-import com.ververica.cdc.common.data.GenericStringData;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
@@ -35,6 +34,7 @@ import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.connectors.values.ValuesDatabase;
 import com.ververica.cdc.connectors.values.factory.ValuesDataFactory;
 import com.ververica.cdc.runtime.typeutils.EventTypeInfo;
+import com.ververica.cdc.runtime.typeutils.RecordDataUtil;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -148,21 +148,27 @@ public class ValuesDataSourceHelperTest {
                         .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
         split1.add(createTableEvent);
+
+        RowType rowType = RowType.of(DataTypes.STRING(), DataTypes.STRING());
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("1"),
-                                GenericStringData.fromString("1")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
+                                }));
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("2"),
-                                GenericStringData.fromString("2")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
+                                }));
         split1.add(insertEvent2);
         splits.add(split1);
         ValuesDataSourceHelper.setSourceEvents(splits);

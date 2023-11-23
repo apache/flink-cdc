@@ -121,15 +121,10 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
 
     @Override
     public void writeRecord(int pos, RecordData input, RecordDataSerializer serializer) {
-        if (input instanceof BinaryFormat) {
-            BinaryFormat row = (BinaryFormat) input;
-            writeSegmentsToVarLenPart(
-                    pos, row.getSegments(), row.getOffset(), row.getSizeInBytes());
-        } else {
-            BinaryRecordData row = serializer.toBinaryRecordData(input);
-            writeSegmentsToVarLenPart(
-                    pos, row.getSegments(), row.getOffset(), row.getSizeInBytes());
-        }
+        // BinaryRecordData is the only implementation of RecordData
+        BinaryRecordData recordData = (BinaryRecordData) input;
+        writeSegmentsToVarLenPart(
+                pos, recordData.getSegments(), recordData.getOffset(), recordData.getSizeInBytes());
     }
 
     @Override

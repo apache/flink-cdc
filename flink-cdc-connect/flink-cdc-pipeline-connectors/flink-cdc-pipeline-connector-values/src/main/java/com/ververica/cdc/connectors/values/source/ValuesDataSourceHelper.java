@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.connectors.values.source;
 
-import com.ververica.cdc.common.data.GenericRecordData;
-import com.ververica.cdc.common.data.GenericStringData;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.AddColumnEvent;
 import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
@@ -30,6 +29,7 @@ import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
+import com.ververica.cdc.runtime.typeutils.RecordDataUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -110,30 +110,37 @@ public class ValuesDataSourceHelper {
         CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
         split1.add(createTableEvent);
 
+        RowType rowType = RowType.of(DataTypes.STRING(), DataTypes.STRING());
         // insert
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("1"),
-                                GenericStringData.fromString("1")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
+                                }));
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("2"),
-                                GenericStringData.fromString("2")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
+                                }));
         split1.add(insertEvent2);
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("3"),
-                                GenericStringData.fromString("3")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3")
+                                }));
         split1.add(insertEvent3);
 
         // add column
@@ -163,22 +170,29 @@ public class ValuesDataSourceHelper {
         split1.add(
                 DataChangeEvent.deleteEvent(
                         table1,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("1"),
-                                GenericStringData.fromString("1"))));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
+                                })));
 
         // update
         split1.add(
                 DataChangeEvent.updateEvent(
                         table1,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("2"),
-                                GenericStringData.fromString("")),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("2"),
-                                GenericStringData.fromString("x"))));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("")
+                                }),
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("x")
+                                })));
 
         eventOfSplits.add(split1);
         return eventOfSplits;
@@ -200,30 +214,37 @@ public class ValuesDataSourceHelper {
         CreateTableEvent createTableEvent2 = new CreateTableEvent(table2, schema);
         split1.add(createTableEvent2);
 
+        RowType rowType = RowType.of(DataTypes.STRING(), DataTypes.STRING());
         // insert into table1
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("1"),
-                                GenericStringData.fromString("1")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
+                                }));
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("2"),
-                                GenericStringData.fromString("2")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
+                                }));
         split1.add(insertEvent2);
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("3"),
-                                GenericStringData.fromString("3")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3")
+                                }));
         split1.add(insertEvent3);
 
         // add column
@@ -238,26 +259,32 @@ public class ValuesDataSourceHelper {
         insertEvent1 =
                 DataChangeEvent.insertEvent(
                         table2,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("1"),
-                                GenericStringData.fromString("1")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
+                                }));
         split1.add(insertEvent1);
         insertEvent2 =
                 DataChangeEvent.insertEvent(
                         table2,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("2"),
-                                GenericStringData.fromString("2")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
+                                }));
         split1.add(insertEvent2);
         insertEvent3 =
                 DataChangeEvent.insertEvent(
                         table2,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("3"),
-                                GenericStringData.fromString("3")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3")
+                                }));
         split1.add(insertEvent3);
 
         // rename column
@@ -279,22 +306,29 @@ public class ValuesDataSourceHelper {
         split1.add(
                 DataChangeEvent.deleteEvent(
                         table1,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("1"),
-                                GenericStringData.fromString("1"))));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
+                                })));
 
         // update
         split1.add(
                 DataChangeEvent.updateEvent(
                         table1,
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("2"),
-                                GenericStringData.fromString("2")),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("2"),
-                                GenericStringData.fromString("x"))));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
+                                }),
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("x")
+                                })));
 
         eventOfSplits.add(split1);
         return eventOfSplits;
