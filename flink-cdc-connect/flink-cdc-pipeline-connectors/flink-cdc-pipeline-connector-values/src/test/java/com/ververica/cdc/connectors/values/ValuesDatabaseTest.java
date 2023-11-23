@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.values;
 
-import com.ververica.cdc.common.data.GenericRecordData;
 import com.ververica.cdc.common.data.GenericStringData;
 import com.ververica.cdc.common.event.AddColumnEvent;
 import com.ververica.cdc.common.event.AlterColumnTypeEvent;
@@ -31,8 +30,10 @@ import com.ververica.cdc.common.sink.MetadataApplier;
 import com.ververica.cdc.common.source.MetadataAccessor;
 import com.ververica.cdc.common.types.CharType;
 import com.ververica.cdc.common.types.DataType;
+import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.common.types.VarCharType;
+import com.ververica.cdc.runtime.typeutils.RecordDataUtil;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -104,29 +105,37 @@ public class ValuesDatabaseTest {
         metadataApplier.applySchemaChange(createTableEvent);
         createTableEvent = new CreateTableEvent(TableId.parse("table3"), schema);
         metadataApplier.applySchemaChange(createTableEvent);
+
+        RowType rowType = RowType.of(DataTypes.STRING(), DataTypes.STRING());
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RowType.of(new CharType(), new CharType()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("1"),
-                                GenericStringData.fromString("1")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    GenericStringData.fromString("1"),
+                                    GenericStringData.fromString("1")
+                                }));
         ValuesDatabase.applyDataChangeEvent(insertEvent1);
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RowType.of(new CharType(), new CharType()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("2"),
-                                GenericStringData.fromString("2")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    GenericStringData.fromString("2"),
+                                    GenericStringData.fromString("2")
+                                }));
         ValuesDatabase.applyDataChangeEvent(insertEvent2);
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RowType.of(new CharType(), new CharType()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("3"),
-                                GenericStringData.fromString("3")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    GenericStringData.fromString("3"),
+                                    GenericStringData.fromString("3")
+                                }));
         ValuesDatabase.applyDataChangeEvent(insertEvent3);
     }
 
@@ -215,13 +224,16 @@ public class ValuesDatabaseTest {
         results.add("default.default.table1:col1=3;col2=3");
         Assert.assertEquals(results, ValuesDatabase.getResults(table1));
 
+        RowType rowType = RowType.of(DataTypes.STRING(), DataTypes.STRING());
         DataChangeEvent deleteEvent =
                 DataChangeEvent.deleteEvent(
                         table1,
-                        RowType.of(new CharType(), new CharType()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("1"),
-                                GenericStringData.fromString("1")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    GenericStringData.fromString("1"),
+                                    GenericStringData.fromString("1")
+                                }));
         ValuesDatabase.applyDataChangeEvent(deleteEvent);
         results.clear();
         results.add("default.default.table1:col1=2;col2=2");
@@ -231,13 +243,18 @@ public class ValuesDatabaseTest {
         DataChangeEvent updateEvent =
                 DataChangeEvent.updateEvent(
                         table1,
-                        RowType.of(new CharType(), new CharType()),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("2"),
-                                GenericStringData.fromString("2")),
-                        GenericRecordData.of(
-                                GenericStringData.fromString("2"),
-                                GenericStringData.fromString("x")));
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    GenericStringData.fromString("2"),
+                                    GenericStringData.fromString("2")
+                                }),
+                        RecordDataUtil.of(
+                                rowType,
+                                new Object[] {
+                                    GenericStringData.fromString("2"),
+                                    GenericStringData.fromString("x")
+                                }));
         ValuesDatabase.applyDataChangeEvent(updateEvent);
         results.clear();
         results.add("default.default.table1:col1=2;col2=x");

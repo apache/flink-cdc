@@ -20,7 +20,6 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
 
-import com.ververica.cdc.common.data.GenericRecordData;
 import com.ververica.cdc.common.data.GenericStringData;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
@@ -28,6 +27,7 @@ import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.serializer.event.EventSerializer;
+import com.ververica.cdc.runtime.typeutils.RecordDataUtil;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -64,15 +64,21 @@ public class SchemaOperatorTest {
                     Arrays.asList(
                             DataChangeEvent.updateEvent(
                                     tableId,
-                                    rowType,
-                                    GenericRecordData.of(1L, GenericStringData.fromString("1")),
-                                    GenericRecordData.of(2L, GenericStringData.fromString("2")),
+                                    RecordDataUtil.of(
+                                            rowType,
+                                            new Object[] {1L, GenericStringData.fromString("1")}),
+                                    RecordDataUtil.of(
+                                            rowType,
+                                            new Object[] {2L, GenericStringData.fromString("2")}),
                                     meta),
                             DataChangeEvent.updateEvent(
                                     tableId,
-                                    rowType,
-                                    GenericRecordData.of(3L, GenericStringData.fromString("3")),
-                                    GenericRecordData.of(4L, GenericStringData.fromString("4")),
+                                    RecordDataUtil.of(
+                                            rowType,
+                                            new Object[] {3L, GenericStringData.fromString("3")}),
+                                    RecordDataUtil.of(
+                                            rowType,
+                                            new Object[] {4L, GenericStringData.fromString("4")}),
                                     meta));
             for (Event event : testData) {
                 testHarness.processElement(event, 0);

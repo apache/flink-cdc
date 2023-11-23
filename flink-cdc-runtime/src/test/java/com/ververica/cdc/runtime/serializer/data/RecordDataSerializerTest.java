@@ -16,18 +16,19 @@
 
 package com.ververica.cdc.runtime.serializer.data;
 
-import com.ververica.cdc.common.data.GenericRecordData;
 import com.ververica.cdc.common.data.GenericStringData;
 import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.types.DataTypes;
+import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.serializer.SerializerTestBase;
+import com.ververica.cdc.runtime.typeutils.RecordDataUtil;
 
 /** A test for the {@link StringDataSerializer}. */
 public class RecordDataSerializerTest extends SerializerTestBase<RecordData> {
 
     @Override
     protected RecordDataSerializer createSerializer() {
-        return new RecordDataSerializer(DataTypes.BIGINT(), DataTypes.STRING());
+        return RecordDataSerializer.INSTANCE;
     }
 
     @Override
@@ -42,9 +43,11 @@ public class RecordDataSerializerTest extends SerializerTestBase<RecordData> {
 
     @Override
     protected RecordData[] getTestData() {
+        RowType rowType = RowType.of(DataTypes.BIGINT(), DataTypes.STRING());
         return new RecordData[] {
-            GenericRecordData.of(1L, GenericStringData.fromString("test1")),
-            GenericRecordData.of(2L, GenericStringData.fromString("test2"))
+            RecordDataUtil.of(rowType, new Object[] {1L, GenericStringData.fromString("test1")}),
+            RecordDataUtil.of(rowType, new Object[] {2L, GenericStringData.fromString("test2")}),
+            RecordDataUtil.of(rowType, new Object[] {3L, null})
         };
     }
 }
