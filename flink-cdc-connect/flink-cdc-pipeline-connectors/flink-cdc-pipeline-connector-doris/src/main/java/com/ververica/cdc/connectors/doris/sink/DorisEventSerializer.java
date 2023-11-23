@@ -16,6 +16,13 @@
 
 package com.ververica.cdc.connectors.doris.sink;
 
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.table.data.GenericRowData;
+import org.apache.flink.table.types.DataType;
+
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+
 import com.ververica.cdc.common.data.GenericRecordData;
 import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.event.CreateTableEvent;
@@ -32,11 +39,6 @@ import com.ververica.cdc.common.utils.RecordDataUtils;
 import com.ververica.cdc.common.utils.SchemaUtils;
 import org.apache.doris.flink.deserialization.converter.DorisRowConverter;
 import org.apache.doris.flink.sink.writer.serializer.DorisRecordSerializer;
-import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.flink.table.data.GenericRowData;
-import org.apache.flink.table.types.DataType;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -46,15 +48,16 @@ import java.util.Map;
 
 import static org.apache.doris.flink.sink.util.DeleteOperation.addDeleteSign;
 
+/** A serializer for Event to Tuple2<String, byte[]> */
 public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     private ObjectMapper objectMapper = new ObjectMapper();
     private Map<TableId, Schema> schemaMaps = new HashMap<>();
 
     @Override
     public Tuple2<String, byte[]> serialize(Event event) throws IOException {
-        if(event instanceof DataChangeEvent){
-            return applyDataChangeEvent((DataChangeEvent)event);
-        }else if(event instanceof SchemaChangeEvent){
+        if (event instanceof DataChangeEvent) {
+            return applyDataChangeEvent((DataChangeEvent) event);
+        } else if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             TableId tableId = schemaChangeEvent.tableId();
             if (event instanceof CreateTableEvent) {
@@ -72,7 +75,8 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         return null;
     }
 
-    private Tuple2<String, byte[]> applyDataChangeEvent(DataChangeEvent event) throws JsonProcessingException {
+    private Tuple2<String, byte[]> applyDataChangeEvent(DataChangeEvent event)
+            throws JsonProcessingException {
         TableId tableId = event.tableId();
         Schema schema = schemaMaps.get(tableId);
         Preconditions.checkNotNull(schema, event.tableId() + " is not existed");
@@ -80,7 +84,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         List<Column> columns = schema.getColumns();
         Map<String, Object> valueMap;
         OperationType op = event.op();
-        switch (op){
+        switch (op) {
             case INSERT:
             case UPDATE:
             case REPLACE:
@@ -88,31 +92,32 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                 addDeleteSign(valueMap, false);
                 break;
             case DELETE:
-                valueMap =  serializerRecord(event.before(), columns);
+                valueMap = serializerRecord(event.before(), columns);
                 addDeleteSign(valueMap, true);
                 break;
             default:
-                throw new UnsupportedOperationException("Unsupport Operation " +  op);
+                throw new UnsupportedOperationException("Unsupport Operation " + op);
         }
-        return Tuple2.of(tableKey, objectMapper.writeValueAsString(valueMap).getBytes(StandardCharsets.UTF_8));
+        return Tuple2.of(
+                tableKey,
+                objectMapper.writeValueAsString(valueMap).getBytes(StandardCharsets.UTF_8));
     }
 
-    /**
-     * serializer RecordData to Doris Value
-     */
+    /** serializer RecordData to Doris Value */
     public Map<String, Object> serializerRecord(RecordData recordData, List<Column> columns) {
         Map<String, Object> record = new HashMap<>();
-        Preconditions.checkState(columns.size() == recordData.getArity(), "Column size does not match the data size");
-        //convert RecordData to flink RowData
+        Preconditions.checkState(
+                columns.size() == recordData.getArity(),
+                "Column size does not match the data size");
+        // convert RecordData to flink RowData
         GenericRowData rowData = RecordDataUtils.toFlinkRowData((GenericRecordData) recordData);
         for (int i = 0; i < recordData.getArity(); i++) {
-             DataType dataType = DataTypeUtils.toFlinkDataType(columns.get(i).getType());
-             DorisRowConverter.SerializationConverter converter = DorisRowConverter.createNullableExternalConverter(dataType.getLogicalType());
-             Object field = converter.serialize(i, rowData);
-             record.put(columns.get(i).getName(), field);
+            DataType dataType = DataTypeUtils.toFlinkDataType(columns.get(i).getType());
+            DorisRowConverter.SerializationConverter converter =
+                    DorisRowConverter.createNullableExternalConverter(dataType.getLogicalType());
+            Object field = converter.serialize(i, rowData);
+            record.put(columns.get(i).getName(), field);
         }
         return record;
     }
-
-
 }

@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.doris.sink;
+package com.ververica.cdc.connectors.doris.factory;
 
 import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.common.configuration.ConfigOption;
 import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.factories.DataSinkFactory;
 import com.ververica.cdc.common.sink.DataSink;
+import com.ververica.cdc.connectors.doris.sink.DorisDataSink;
 import org.apache.doris.flink.cfg.DorisExecutionOptions;
 import org.apache.doris.flink.cfg.DorisOptions;
 import org.apache.doris.flink.cfg.DorisReadOptions;
@@ -48,10 +49,7 @@ import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_IDENTIFIER;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.USERNAME;
 
-
-/**
- * A dummy {@link DataSinkFactory} to create {@link DorisDataSink}.
- */
+/** A dummy {@link DataSinkFactory} to create {@link DorisDataSink}. */
 @Internal
 public class DorisDataSinkFactory implements DataSinkFactory {
     @Override
@@ -73,20 +71,32 @@ public class DorisDataSinkFactory implements DataSinkFactory {
         config.getOptional(SINK_LABEL_PREFIX).ifPresent(executionBuilder::setLabelPrefix);
         config.getOptional(SINK_BUFFER_SIZE).ifPresent(executionBuilder::setBufferSize);
         config.getOptional(SINK_BUFFER_COUNT).ifPresent(executionBuilder::setBufferCount);
-        config.getOptional(SINK_BUFFER_FLUSH_MAX_ROWS).ifPresent(executionBuilder::setBufferFlushMaxRows);
-        config.getOptional(SINK_BUFFER_FLUSH_MAX_BYTES).ifPresent(executionBuilder::setBufferFlushMaxBytes);
+        config.getOptional(SINK_BUFFER_FLUSH_MAX_ROWS)
+                .ifPresent(executionBuilder::setBufferFlushMaxRows);
+        config.getOptional(SINK_BUFFER_FLUSH_MAX_BYTES)
+                .ifPresent(executionBuilder::setBufferFlushMaxBytes);
         config.getOptional(SINK_FLUSH_QUEUE_SIZE).ifPresent(executionBuilder::setFlushQueueSize);
-        config.getOptional(SINK_BUFFER_FLUSH_INTERVAL).ifPresent(v-> executionBuilder.setBufferFlushIntervalMs(v.toMillis()));
+        config.getOptional(SINK_BUFFER_FLUSH_INTERVAL)
+                .ifPresent(v -> executionBuilder.setBufferFlushIntervalMs(v.toMillis()));
 
-        config.getOptional(SINK_ENABLE_2PC).ifPresent(b -> {
-            if (b) {
-                executionBuilder.enable2PC();
-            } else {
-                executionBuilder.disable2PC();
-            }
-        } );
-        config.getOptional(SINK_ENABLE_BATCH_MODE).ifPresent(b-> { if(b) executionBuilder.enableBatchMode(); });
-        return new DorisDataSink(optionsBuilder.build(), DorisReadOptions.builder().build(), executionBuilder.build());
+        config.getOptional(SINK_ENABLE_2PC)
+                .ifPresent(
+                        b -> {
+                            if (b) {
+                                executionBuilder.enable2PC();
+                            } else {
+                                executionBuilder.disable2PC();
+                            }
+                        });
+        config.getOptional(SINK_ENABLE_BATCH_MODE)
+                .ifPresent(
+                        b -> {
+                            if (b) executionBuilder.enableBatchMode();
+                        });
+        return new DorisDataSink(
+                optionsBuilder.build(),
+                DorisReadOptions.builder().build(),
+                executionBuilder.build());
     }
 
     @Override

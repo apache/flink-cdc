@@ -28,14 +28,17 @@ import org.apache.doris.flink.sink.batch.DorisBatchSink;
 
 import java.io.Serializable;
 
-
+/** A {@link DataSink} for "Doris" connector. */
 public class DorisDataSink implements DataSink, Serializable {
 
     private final DorisOptions dorisOptions;
     private final DorisReadOptions readOptions;
     private final DorisExecutionOptions executionOptions;
 
-    public DorisDataSink(DorisOptions dorisOptions, DorisReadOptions dorisReadOptions, DorisExecutionOptions dorisExecutionOptions) {
+    public DorisDataSink(
+            DorisOptions dorisOptions,
+            DorisReadOptions dorisReadOptions,
+            DorisExecutionOptions dorisExecutionOptions) {
         this.dorisOptions = dorisOptions;
         this.readOptions = dorisReadOptions;
         this.executionOptions = dorisExecutionOptions;
@@ -43,10 +46,20 @@ public class DorisDataSink implements DataSink, Serializable {
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        if(!executionOptions.enableBatchMode()){
-            return FlinkSinkProvider.of(new DorisSink<>(dorisOptions, readOptions, executionOptions, new DorisEventSerializer()));
+        if (!executionOptions.enableBatchMode()) {
+            return FlinkSinkProvider.of(
+                    new DorisSink<>(
+                            dorisOptions,
+                            readOptions,
+                            executionOptions,
+                            new DorisEventSerializer()));
         } else {
-            return FlinkSinkProvider.of(new DorisBatchSink<>(dorisOptions, readOptions, executionOptions, new DorisEventSerializer()));
+            return FlinkSinkProvider.of(
+                    new DorisBatchSink<>(
+                            dorisOptions,
+                            readOptions,
+                            executionOptions,
+                            new DorisEventSerializer()));
         }
     }
 
@@ -54,5 +67,4 @@ public class DorisDataSink implements DataSink, Serializable {
     public MetadataApplier getMetadataApplier() {
         return new DorisMetadataApplier(dorisOptions);
     }
-
 }

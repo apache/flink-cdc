@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.doris.sink;
 
+import org.apache.flink.util.CollectionUtil;
+
 import com.ververica.cdc.common.event.AddColumnEvent;
 import com.ververica.cdc.common.event.AlterColumnTypeEvent;
 import com.ververica.cdc.common.event.CreateTableEvent;
@@ -26,18 +28,14 @@ import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.sink.MetadataApplier;
-import com.ververica.cdc.common.types.DataType;
-import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.utils.DataTypeUtils;
 import org.apache.doris.flink.catalog.DorisTypeMapper;
 import org.apache.doris.flink.catalog.doris.DataModel;
-import org.apache.doris.flink.catalog.doris.DorisType;
 import org.apache.doris.flink.catalog.doris.FieldSchema;
 import org.apache.doris.flink.catalog.doris.TableSchema;
 import org.apache.doris.flink.cfg.DorisOptions;
 import org.apache.doris.flink.exception.IllegalArgumentException;
 import org.apache.doris.flink.sink.schema.SchemaChangeManager;
-import org.apache.flink.util.CollectionUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +46,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
+/** Supports {@link DorisDataSink} to schema evolution. */
 public class DorisMetadataApplier implements MetadataApplier {
     private static final Logger LOG = LoggerFactory.getLogger(DorisMetadataApplier.class);
     private DorisOptions dorisOptions;
@@ -61,9 +59,9 @@ public class DorisMetadataApplier implements MetadataApplier {
 
     @Override
     public void applySchemaChange(SchemaChangeEvent event) {
-        try{
-            //send schema change op to doris
-            if (event instanceof CreateTableEvent){
+        try {
+            // send schema change op to doris
+            if (event instanceof CreateTableEvent) {
                 applyCreateTableEvent((CreateTableEvent) event);
             } else if (event instanceof AddColumnEvent) {
                 applyAddColumnEvent((AddColumnEvent) event);
@@ -74,13 +72,14 @@ public class DorisMetadataApplier implements MetadataApplier {
             } else if (event instanceof AlterColumnTypeEvent) {
                 LOG.warn("AlterColumnType is not supported, skip.");
             }
-        }catch (Exception ex){
-            //Catch exceptions to avoid affecting the main process
+        } catch (Exception ex) {
+            // Catch exceptions to avoid affecting the main process
             LOG.error("Schema change error, skip {}", event);
         }
     }
 
-    private void applyCreateTableEvent(CreateTableEvent event) throws IOException, IllegalArgumentException {
+    private void applyCreateTableEvent(CreateTableEvent event)
+            throws IOException, IllegalArgumentException {
         Schema schema = event.getSchema();
         TableId tableId = event.tableId();
         TableSchema tableSchema = new TableSchema();
@@ -89,60 +88,74 @@ public class DorisMetadataApplier implements MetadataApplier {
         tableSchema.setFields(buildFields(schema));
         tableSchema.setDistributeKeys(buildDistributeKeys(schema));
 
-        if(CollectionUtil.isNullOrEmpty(schema.primaryKeys())){
+        if (CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
             tableSchema.setModel(DataModel.DUPLICATE);
-        }else{
+        } else {
             tableSchema.setKeys(schema.primaryKeys());
             tableSchema.setModel(DataModel.UNIQUE);
         }
         schemaChangeManager.createTable(tableSchema);
     }
 
-    private Map<String, FieldSchema> buildFields(Schema schema){
+    private Map<String, FieldSchema> buildFields(Schema schema) {
         Map<String, FieldSchema> fieldSchemaMap = new HashMap<>();
         List<String> columnNameList = schema.getColumnNames();
-        for(String columnName : columnNameList){
+        for (String columnName : columnNameList) {
             Column column = schema.getColumn(columnName).get();
-            String dorisTypeStr = DorisTypeMapper.toDorisType(DataTypeUtils.toFlinkDataType(column.getType()));
-            fieldSchemaMap.put(column.getName(), new FieldSchema(column.getName(), dorisTypeStr, column.getComment()));
+            String dorisTypeStr =
+                    DorisTypeMapper.toDorisType(DataTypeUtils.toFlinkDataType(column.getType()));
+            fieldSchemaMap.put(
+                    column.getName(),
+                    new FieldSchema(column.getName(), dorisTypeStr, column.getComment()));
         }
         return fieldSchemaMap;
     }
 
-    private List<String> buildDistributeKeys(Schema schema){
-        if(!CollectionUtil.isNullOrEmpty(schema.primaryKeys())){
+    private List<String> buildDistributeKeys(Schema schema) {
+        if (!CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
             return schema.primaryKeys();
         }
-        if(!CollectionUtil.isNullOrEmpty(schema.getColumnNames())){
+        if (!CollectionUtil.isNullOrEmpty(schema.getColumnNames())) {
             return Collections.singletonList(schema.getColumnNames().get(0));
         }
         return new ArrayList<>();
     }
 
-    private void applyAddColumnEvent(AddColumnEvent event) throws IOException, IllegalArgumentException {
+    private void applyAddColumnEvent(AddColumnEvent event)
+            throws IOException, IllegalArgumentException {
         TableId tableId = event.tableId();
         List<AddColumnEvent.ColumnWithPosition> addedColumns = event.getAddedColumns();
-        for(AddColumnEvent.ColumnWithPosition col: addedColumns){
+        for (AddColumnEvent.ColumnWithPosition col : addedColumns) {
             Column column = col.getAddColumn();
-            String typeString = DorisTypeMapper.toDorisType(DataTypeUtils.toFlinkDataType(column.getType()));
-            FieldSchema addFieldSchema = new FieldSchema(column.getName(), typeString, column.getComment());
-            schemaChangeManager.addColumn(tableId.getSchemaName(), tableId.getTableName(), addFieldSchema);
+            String typeString =
+                    DorisTypeMapper.toDorisType(DataTypeUtils.toFlinkDataType(column.getType()));
+            FieldSchema addFieldSchema =
+                    new FieldSchema(column.getName(), typeString, column.getComment());
+            schemaChangeManager.addColumn(
+                    tableId.getSchemaName(), tableId.getTableName(), addFieldSchema);
         }
     }
 
-    private  void applyDropColumnEvent(DropColumnEvent event) throws IOException, IllegalArgumentException {
+    private void applyDropColumnEvent(DropColumnEvent event)
+            throws IOException, IllegalArgumentException {
         TableId tableId = event.tableId();
         List<Column> droppedColumns = event.getDroppedColumns();
-        for(Column col : droppedColumns){
-            schemaChangeManager.dropColumn(tableId.getSchemaName(), tableId.getTableName(), col.getName());
+        for (Column col : droppedColumns) {
+            schemaChangeManager.dropColumn(
+                    tableId.getSchemaName(), tableId.getTableName(), col.getName());
         }
     }
 
-    private  void applyRenameColumnEvent(RenameColumnEvent event) throws IOException, IllegalArgumentException {
+    private void applyRenameColumnEvent(RenameColumnEvent event)
+            throws IOException, IllegalArgumentException {
         TableId tableId = event.tableId();
         Map<String, String> nameMapping = event.getNameMapping();
-        for(Map.Entry<String, String> entry : nameMapping.entrySet()){
-            schemaChangeManager.renameColumn(tableId.getSchemaName(), tableId.getTableName(), entry.getKey(), entry.getValue());
+        for (Map.Entry<String, String> entry : nameMapping.entrySet()) {
+            schemaChangeManager.renameColumn(
+                    tableId.getSchemaName(),
+                    tableId.getTableName(),
+                    entry.getKey(),
+                    entry.getValue());
         }
     }
 }
