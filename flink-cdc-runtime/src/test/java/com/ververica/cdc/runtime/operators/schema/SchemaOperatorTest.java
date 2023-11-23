@@ -20,7 +20,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
 
-import com.ververica.cdc.common.data.GenericStringData;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.event.TableId;
@@ -66,19 +66,19 @@ public class SchemaOperatorTest {
                                     tableId,
                                     RecordDataUtil.of(
                                             rowType,
-                                            new Object[] {1L, GenericStringData.fromString("1")}),
+                                            new Object[] {1L, BinaryStringData.fromString("1")}),
                                     RecordDataUtil.of(
                                             rowType,
-                                            new Object[] {2L, GenericStringData.fromString("2")}),
+                                            new Object[] {2L, BinaryStringData.fromString("2")}),
                                     meta),
                             DataChangeEvent.updateEvent(
                                     tableId,
                                     RecordDataUtil.of(
                                             rowType,
-                                            new Object[] {3L, GenericStringData.fromString("3")}),
+                                            new Object[] {3L, BinaryStringData.fromString("3")}),
                                     RecordDataUtil.of(
                                             rowType,
-                                            new Object[] {4L, GenericStringData.fromString("4")}),
+                                            new Object[] {4L, BinaryStringData.fromString("4")}),
                                     meta));
             for (Event event : testData) {
                 testHarness.processElement(event, 0);

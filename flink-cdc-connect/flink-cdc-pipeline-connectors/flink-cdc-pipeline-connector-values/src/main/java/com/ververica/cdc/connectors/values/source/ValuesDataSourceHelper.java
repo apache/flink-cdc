@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.connectors.values.source;
 
-import com.ververica.cdc.common.data.GenericStringData;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.AddColumnEvent;
 import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
@@ -118,8 +118,8 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("1"),
-                                    GenericStringData.fromString("1")
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
                                 }));
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
@@ -128,8 +128,8 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("2"),
-                                    GenericStringData.fromString("2")
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
                                 }));
         split1.add(insertEvent2);
         DataChangeEvent insertEvent3 =
@@ -138,8 +138,8 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("3"),
-                                    GenericStringData.fromString("3")
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3")
                                 }));
         split1.add(insertEvent3);
 
@@ -173,8 +173,8 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("1"),
-                                    GenericStringData.fromString("1")
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
                                 })));
 
         // update
@@ -184,14 +184,14 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("2"),
-                                    GenericStringData.fromString("")
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("")
                                 }),
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("2"),
-                                    GenericStringData.fromString("x")
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("x")
                                 })));
 
         eventOfSplits.add(split1);
@@ -222,8 +222,8 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("1"),
-                                    GenericStringData.fromString("1")
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
                                 }));
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
@@ -232,8 +232,8 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("2"),
-                                    GenericStringData.fromString("2")
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
                                 }));
         split1.add(insertEvent2);
         DataChangeEvent insertEvent3 =
@@ -242,8 +242,8 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("3"),
-                                    GenericStringData.fromString("3")
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3")
                                 }));
         split1.add(insertEvent3);
 
@@ -262,8 +262,8 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("1"),
-                                    GenericStringData.fromString("1")
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
                                 }));
         split1.add(insertEvent1);
         insertEvent2 =
@@ -272,8 +272,8 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("2"),
-                                    GenericStringData.fromString("2")
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
                                 }));
         split1.add(insertEvent2);
         insertEvent3 =
@@ -282,8 +282,8 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("3"),
-                                    GenericStringData.fromString("3")
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3")
                                 }));
         split1.add(insertEvent3);
 
@@ -309,8 +309,8 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("1"),
-                                    GenericStringData.fromString("1")
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
                                 })));
 
         // update
@@ -320,14 +320,14 @@ public class ValuesDataSourceHelper {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("2"),
-                                    GenericStringData.fromString("2")
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
                                 }),
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("2"),
-                                    GenericStringData.fromString("x")
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("x")
                                 })));
 
         eventOfSplits.add(split1);

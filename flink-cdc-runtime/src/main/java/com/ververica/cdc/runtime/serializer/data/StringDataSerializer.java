@@ -20,10 +20,10 @@ import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
+import org.apache.flink.table.data.binary.BinarySegmentUtils;
 
-import com.ververica.cdc.common.data.GenericStringData;
 import com.ververica.cdc.common.data.StringData;
-import com.ververica.cdc.common.utils.StringUtf8Utils;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.runtime.serializer.TypeSerializerSingleton;
 
 import java.io.IOException;
@@ -44,19 +44,19 @@ public final class StringDataSerializer extends TypeSerializerSingleton<StringDa
 
     @Override
     public StringData createInstance() {
-        return GenericStringData.fromString("");
+        return BinaryStringData.fromString("");
     }
 
     @Override
     public StringData copy(StringData from) {
-        // GenericStringData is the only implementation of StringData
-        return ((GenericStringData) from).copy();
+        // BinaryStringData is the only implementation of StringData
+        return ((BinaryStringData) from).copy();
     }
 
     @Override
     public StringData copy(StringData from, StringData reuse) {
-        // GenericStringData is the only implementation of StringData
-        return ((GenericStringData) from).copy();
+        // BinaryStringData is the only implementation of StringData
+        return ((BinaryStringData) from).copy();
     }
 
     @Override
@@ -66,15 +66,12 @@ public final class StringDataSerializer extends TypeSerializerSingleton<StringDa
 
     @Override
     public void serialize(StringData record, DataOutputView target) throws IOException {
-        // GenericStringData is the only implementation of StringData
-        GenericStringData string = (GenericStringData) record;
-        if (string.toBytes() == null) {
-            target.writeInt(0);
-        } else {
-            byte[] bytes = string.toBytes();
-            target.writeInt(bytes.length);
-            target.write(bytes);
-        }
+        // BinaryStringData is the only implementation of StringData
+        BinaryStringData string = (BinaryStringData) record;
+        string.ensureMaterialized();
+        target.writeInt(string.getSizeInBytes());
+        BinarySegmentUtils.copyToView(
+                string.getSegments(), string.getOffset(), string.getSizeInBytes(), target);
     }
 
     @Override
@@ -86,8 +83,8 @@ public final class StringDataSerializer extends TypeSerializerSingleton<StringDa
         int length = source.readInt();
         byte[] bytes = new byte[length];
         source.readFully(bytes);
-        // GenericStringData is the only implementation of StringData
-        return GenericStringData.fromString(StringUtf8Utils.decodeUTF8(bytes, 0, length));
+        // BinaryStringData is the only implementation of StringData
+        return BinaryStringData.fromBytes(bytes);
     }
 
     @Override

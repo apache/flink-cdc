@@ -16,8 +16,8 @@
 
 package com.ververica.cdc.runtime.serializer.data;
 
-import com.ververica.cdc.common.data.GenericStringData;
 import com.ververica.cdc.common.data.StringData;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.runtime.serializer.SerializerTestBase;
 
 import java.util.Arrays;
@@ -46,7 +46,7 @@ public class StringDataSerializerTest extends SerializerTestBase<StringData> {
                         new String[] {
                             "a", "", "bcd", "jbmbmner8 jhk hj \n \t üäßß@µ", "", "non-empty"
                         })
-                .map(GenericStringData::fromString)
+                .map(BinaryStringData::fromString)
                 .toArray(StringData[]::new);
     }
 }

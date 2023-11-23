@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.connectors.values;
 
-import com.ververica.cdc.common.data.GenericStringData;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.AddColumnEvent;
 import com.ververica.cdc.common.event.AlterColumnTypeEvent;
 import com.ververica.cdc.common.event.CreateTableEvent;
@@ -113,8 +113,8 @@ public class ValuesDatabaseTest {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("1"),
-                                    GenericStringData.fromString("1")
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
                                 }));
         ValuesDatabase.applyDataChangeEvent(insertEvent1);
         DataChangeEvent insertEvent2 =
@@ -123,8 +123,8 @@ public class ValuesDatabaseTest {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("2"),
-                                    GenericStringData.fromString("2")
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
                                 }));
         ValuesDatabase.applyDataChangeEvent(insertEvent2);
         DataChangeEvent insertEvent3 =
@@ -133,8 +133,8 @@ public class ValuesDatabaseTest {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("3"),
-                                    GenericStringData.fromString("3")
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3")
                                 }));
         ValuesDatabase.applyDataChangeEvent(insertEvent3);
     }
@@ -231,8 +231,8 @@ public class ValuesDatabaseTest {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("1"),
-                                    GenericStringData.fromString("1")
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
                                 }));
         ValuesDatabase.applyDataChangeEvent(deleteEvent);
         results.clear();
@@ -246,14 +246,14 @@ public class ValuesDatabaseTest {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("2"),
-                                    GenericStringData.fromString("2")
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
                                 }),
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("2"),
-                                    GenericStringData.fromString("x")
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("x")
                                 }));
         ValuesDatabase.applyDataChangeEvent(updateEvent);
         results.clear();

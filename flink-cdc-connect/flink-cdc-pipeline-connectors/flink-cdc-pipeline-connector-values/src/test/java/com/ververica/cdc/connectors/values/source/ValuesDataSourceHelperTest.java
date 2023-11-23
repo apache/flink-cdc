@@ -21,7 +21,7 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.CloseableIterator;
 
-import com.ververica.cdc.common.data.GenericStringData;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
@@ -156,8 +156,8 @@ public class ValuesDataSourceHelperTest {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("1"),
-                                    GenericStringData.fromString("1")
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
                                 }));
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
@@ -166,8 +166,8 @@ public class ValuesDataSourceHelperTest {
                         RecordDataUtil.of(
                                 rowType,
                                 new Object[] {
-                                    GenericStringData.fromString("2"),
-                                    GenericStringData.fromString("2")
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
                                 }));
         split1.add(insertEvent2);
         splits.add(split1);

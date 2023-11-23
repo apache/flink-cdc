@@ -18,8 +18,8 @@ package com.ververica.cdc.runtime.serializer.event;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 
-import com.ververica.cdc.common.data.GenericStringData;
 import com.ververica.cdc.common.data.RecordData;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.types.DataTypes;
@@ -58,13 +58,13 @@ public class DataChangeEventSerializerTest extends SerializerTestBase<DataChange
                         rowType,
                         new Object[] {
                             1L,
-                            GenericStringData.fromString("test"),
-                            GenericStringData.fromString("comment")
+                            BinaryStringData.fromString("test"),
+                            BinaryStringData.fromString("comment")
                         });
         RecordData after =
                 RecordDataUtil.of(
                         rowType,
-                        new Object[] {1L, null, GenericStringData.fromString("updateComment")});
+                        new Object[] {1L, null, BinaryStringData.fromString("updateComment")});
         return new DataChangeEvent[] {
             DataChangeEvent.insertEvent(TableId.tableId("table"), after),
             DataChangeEvent.insertEvent(TableId.tableId("table"), after, meta),
