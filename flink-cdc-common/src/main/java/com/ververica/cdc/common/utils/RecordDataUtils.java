@@ -19,8 +19,8 @@ package com.ververica.cdc.common.utils;
 import com.ververica.cdc.common.data.GenericRecordData;
 import com.ververica.cdc.common.data.RecordData;
 import org.apache.flink.table.data.GenericRowData;
-import org.apache.flink.table.data.RowData;
 
+/** Utilities for handling {@link RecordData}s. */
 public class RecordDataUtils {
     public static GenericRowData toFlinkRowData(GenericRecordData recordData){
         GenericRowData rowData = new GenericRowData(recordData.getArity());
