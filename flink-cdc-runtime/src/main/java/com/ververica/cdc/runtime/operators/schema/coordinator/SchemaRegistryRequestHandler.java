@@ -38,6 +38,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import static com.ververica.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
+
 /** A handler to deal with all requests and events for {@link SchemaRegistry}. */
 @Internal
 @NotThreadSafe
@@ -97,10 +99,11 @@ public class SchemaRegistryRequestHandler {
                     request.getTableId().toString());
             if (request.getSchemaChangeEvent() instanceof CreateTableEvent
                     && schemaManager.schemaExists(request.getTableId())) {
-                return CompletableFuture.completedFuture(new SchemaChangeResponse(false));
+                return CompletableFuture.completedFuture(wrap(new SchemaChangeResponse(false)));
             }
             CompletableFuture<CoordinationResponse> response =
-                    CompletableFuture.completedFuture(new SchemaChangeResponse(true));
+                    CompletableFuture.completedFuture(wrap(new SchemaChangeResponse(true)));
+            schemaManager.applySchemaChange(request.getSchemaChangeEvent());
             pendingSchemaChanges.add(new PendingSchemaChange(request, response));
             return response;
         } else {
@@ -140,7 +143,7 @@ public class SchemaRegistryRequestHandler {
                     "All sink subtask have flushed for table {}. Start to apply schema change.",
                     tableId.toString());
             applySchemaChange(tableId, waitFlushSuccess.getChangeRequest().getSchemaChangeEvent());
-            waitFlushSuccess.getResponseFuture().complete(new ReleaseUpstreamResponse());
+            waitFlushSuccess.getResponseFuture().complete(wrap(new ReleaseUpstreamResponse()));
             startNextSchemaChangeRequest();
         }
     }
@@ -153,10 +156,15 @@ public class SchemaRegistryRequestHandler {
             SchemaChangeRequest request = pendingSchemaChange.changeRequest;
             if (request.getSchemaChangeEvent() instanceof CreateTableEvent
                     && schemaManager.schemaExists(request.getTableId())) {
-                pendingSchemaChange.getResponseFuture().complete(new SchemaChangeResponse(false));
+                pendingSchemaChange
+                        .getResponseFuture()
+                        .complete(wrap(new SchemaChangeResponse(false)));
                 pendingSchemaChanges.remove(0);
             } else {
-                pendingSchemaChange.getResponseFuture().complete(new SchemaChangeResponse(true));
+                schemaManager.applySchemaChange(request.getSchemaChangeEvent());
+                pendingSchemaChange
+                        .getResponseFuture()
+                        .complete(wrap(new SchemaChangeResponse(true)));
                 break;
             }
         }
