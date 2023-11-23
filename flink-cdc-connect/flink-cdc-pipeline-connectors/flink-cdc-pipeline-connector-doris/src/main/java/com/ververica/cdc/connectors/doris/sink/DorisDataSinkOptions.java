@@ -136,6 +136,20 @@ public class DorisDataSinkOptions {
                             "the flush interval mills, over this time, asynchronous threads will flush data. The "
                                     + "default value is 10s.");
 
+    public static final ConfigOption<Boolean> SINK_IGNORE_UPDATE_BEFORE =
+            ConfigOptions.key("sink.ignore.update-before")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "In the CDC scenario, when the primary key of the upstream is inconsistent with that of the downstream, the update-before data needs to be passed to the downstream as deleted data, otherwise the data cannot be deleted.\n"
+                                    + "The default is to ignore, that is, perform upsert semantics.");
+
+    public static final ConfigOption<Boolean> SINK_USE_CACHE =
+            ConfigOptions.key("sink.use-cache")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Whether to use buffer cache for breakpoint resume");
+
     // Prefix for Doris StreamLoad specific properties.
     public static final String STREAM_LOAD_PROP_PREFIX = "sink.properties.";
 

@@ -44,8 +44,10 @@ import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_ENABLE_BATCH_MODE;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_ENABLE_DELETE;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_FLUSH_QUEUE_SIZE;
+import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_IGNORE_UPDATE_BEFORE;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_LABEL_PREFIX;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_MAX_RETRIES;
+import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_USE_CACHE;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_IDENTIFIER;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.USERNAME;
 
@@ -76,6 +78,9 @@ public class DorisDataSinkFactory implements DataSinkFactory {
         config.getOptional(SINK_BUFFER_FLUSH_MAX_BYTES)
                 .ifPresent(executionBuilder::setBufferFlushMaxBytes);
         config.getOptional(SINK_FLUSH_QUEUE_SIZE).ifPresent(executionBuilder::setFlushQueueSize);
+        config.getOptional(SINK_IGNORE_UPDATE_BEFORE)
+                .ifPresent(executionBuilder::setIgnoreUpdateBefore);
+        config.getOptional(SINK_USE_CACHE).ifPresent(executionBuilder::setUseCache);
         config.getOptional(SINK_BUFFER_FLUSH_INTERVAL)
                 .ifPresent(v -> executionBuilder.setBufferFlushIntervalMs(v.toMillis()));
 
@@ -133,6 +138,8 @@ public class DorisDataSinkFactory implements DataSinkFactory {
         options.add(SINK_BUFFER_FLUSH_MAX_BYTES);
         options.add(SINK_FLUSH_QUEUE_SIZE);
         options.add(SINK_BUFFER_FLUSH_INTERVAL);
+        options.add(SINK_IGNORE_UPDATE_BEFORE);
+        options.add(SINK_USE_CACHE);
 
         return options;
     }
