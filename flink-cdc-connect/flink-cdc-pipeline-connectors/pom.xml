@@ -29,6 +29,7 @@ under the License.
         <module>flink-cdc-pipeline-connector-values</module>
         <module>flink-cdc-pipeline-connector-mysql</module>
         <module>flink-cdc-pipeline-connector-doris</module>
+        <module>flink-cdc-pipeline-connector-starrocks</module>
     </modules>
 
     <dependencies>
