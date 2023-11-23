@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.vervetica.cdc.connectors.vitess.table;
+package com.ververica.cdc.connectors.vitess.table;
 
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
@@ -24,7 +24,7 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import com.vervetica.cdc.connectors.vitess.VitessTestBase;
+import com.ververica.cdc.connectors.vitess.VitessTestBase;
 import org.junit.Before;
 import org.junit.Test;
 

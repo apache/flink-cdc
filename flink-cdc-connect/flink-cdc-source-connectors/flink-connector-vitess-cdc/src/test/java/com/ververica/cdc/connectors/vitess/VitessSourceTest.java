@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.vervetica.cdc.connectors.vitess;
+package com.ververica.cdc.connectors.vitess;
 
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.KeyedStateStore;
@@ -31,7 +31,6 @@ import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
 import org.apache.flink.util.Collector;
 
 import com.ververica.cdc.connectors.utils.TestSourceContext;
-import com.ververica.cdc.connectors.vitess.VitessSource;
 import com.ververica.cdc.connectors.vitess.config.TabletType;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;

@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.vervetica.cdc.connectors.vitess;
+package com.ververica.cdc.connectors.vitess;
 
 import org.apache.flink.test.util.AbstractTestBase;
 
-import com.vervetica.cdc.connectors.vitess.container.VitessContainer;
+import com.ververica.cdc.connectors.vitess.container.VitessContainer;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,8 +39,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.vervetica.cdc.connectors.vitess.container.VitessContainer.GRPC_PORT;
-import static com.vervetica.cdc.connectors.vitess.container.VitessContainer.MYSQL_PORT;
 import static org.junit.Assert.assertNotNull;
 
 /** Basic class for testing Vitess source, this contains a Vitess container. */
@@ -55,7 +53,7 @@ public abstract class VitessTestBase extends AbstractTestBase {
                             .withKeyspace("test")
                             .withUsername("flinkuser")
                             .withPassword("flinkpwd")
-                            .withExposedPorts(MYSQL_PORT, GRPC_PORT)
+                            .withExposedPorts(VitessContainer.MYSQL_PORT, VitessContainer.GRPC_PORT)
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @BeforeClass

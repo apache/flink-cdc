@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.vervetica.cdc.connectors.vitess.table;
+package com.ververica.cdc.connectors.vitess.table;
 
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
@@ -32,8 +32,6 @@ import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.connectors.vitess.config.SchemaAdjustmentMode;
 import com.ververica.cdc.connectors.vitess.config.TabletType;
-import com.ververica.cdc.connectors.vitess.table.VitessTableFactory;
-import com.ververica.cdc.connectors.vitess.table.VitessTableSource;
 import org.junit.Test;
 
 import java.util.ArrayList;
