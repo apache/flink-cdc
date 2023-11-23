@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.vervetica.cdc.connectors.vitess.container;
+package com.ververica.cdc.connectors.vitess.container;
 
 import org.testcontainers.containers.JdbcDatabaseContainer;
 
