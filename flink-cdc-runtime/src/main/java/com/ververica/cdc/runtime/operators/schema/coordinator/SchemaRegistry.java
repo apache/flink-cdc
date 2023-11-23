@@ -23,7 +23,6 @@ import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.util.FlinkException;
 
-import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.sink.MetadataApplier;
 import com.ververica.cdc.runtime.operators.schema.SchemaOperator;
@@ -46,6 +45,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import static com.ververica.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
+
 /**
  * The implementation of the {@link OperatorCoordinator} for the {@link SchemaOperator}.
  *
@@ -62,7 +63,6 @@ import java.util.concurrent.CompletableFuture;
  *       FlushSuccessEvent} from its registered sink writer
  * </ul>
  */
-@Internal
 public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(SchemaRegistry.class);
@@ -158,7 +158,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             return requestHandler.handleReleaseUpstreamRequest();
         } else if (request instanceof GetSchemaRequest) {
             return CompletableFuture.completedFuture(
-                    handleGetSchemaRequest(((GetSchemaRequest) request)));
+                    wrap(handleGetSchemaRequest(((GetSchemaRequest) request))));
         } else {
             throw new IllegalArgumentException("Unrecognized CoordinationRequest type: " + request);
         }
