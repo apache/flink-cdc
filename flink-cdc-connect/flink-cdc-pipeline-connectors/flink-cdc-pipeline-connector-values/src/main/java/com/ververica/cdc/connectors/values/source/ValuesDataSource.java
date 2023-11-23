@@ -71,8 +71,7 @@ public class ValuesDataSource implements DataSource {
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
-        ValuesDataSourceHelper.setSourceEvents(eventType);
-        return FlinkSourceProvider.of(new ValuesSource(failAtPos));
+        return FlinkSourceProvider.of(new ValuesSource(failAtPos, eventType));
     }
 
     @Override
@@ -91,8 +90,11 @@ public class ValuesDataSource implements DataSource {
 
         private final int failAtPos;
 
-        public ValuesSource(int failAtPos) {
+        private final ValuesDataSourceHelper.SourceEventType eventType;
+
+        public ValuesSource(int failAtPos, ValuesDataSourceHelper.SourceEventType eventType) {
             this.failAtPos = failAtPos;
+            this.eventType = eventType;
         }
 
         @Override
@@ -103,6 +105,7 @@ public class ValuesDataSource implements DataSource {
         @Override
         public SplitEnumerator<EventIteratorSplit, Collection<EventIteratorSplit>> createEnumerator(
                 SplitEnumeratorContext<EventIteratorSplit> enumContext) {
+            ValuesDataSourceHelper.setSourceEvents(eventType);
             Collection<EventIteratorSplit> eventIteratorSplits = new ArrayList<>();
             List<List<Event>> eventWithSplits = ValuesDataSourceHelper.getSourceEvents();
             for (int i = 0; i < eventWithSplits.size(); i++) {
@@ -133,7 +136,7 @@ public class ValuesDataSource implements DataSource {
         @Override
         public SourceReader<Event, EventIteratorSplit> createReader(
                 SourceReaderContext readerContext) {
-            return new EventIteratorReader(readerContext, failAtPos);
+            return new EventIteratorReader(readerContext, failAtPos, eventType);
         }
 
         private static void serializeEventIteratorSplit(
@@ -238,11 +241,23 @@ public class ValuesDataSource implements DataSource {
         // position for this Split to fail
         private final int failAtPos;
 
+        private final ValuesDataSourceHelper.SourceEventType eventType;
+
         private int numberOfEventsEmit = 0;
 
-        public EventIteratorReader(SourceReaderContext context, int failAtPos) {
+        public EventIteratorReader(
+                SourceReaderContext context,
+                int failAtPos,
+                ValuesDataSourceHelper.SourceEventType eventType) {
             super(context);
             this.failAtPos = failAtPos;
+            this.eventType = eventType;
+        }
+
+        @Override
+        public void start() {
+            ValuesDataSourceHelper.setSourceEvents(eventType);
+            super.start();
         }
 
         @Override
