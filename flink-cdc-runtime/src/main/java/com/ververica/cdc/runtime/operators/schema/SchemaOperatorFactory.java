@@ -21,9 +21,14 @@ import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.streaming.api.operators.CoordinatedOperatorFactory;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
-import org.apache.flink.streaming.api.operators.StreamOperator;
 
 import com.ververica.cdc.common.event.Event;
+import com.ververica.cdc.common.event.TableId;
+import com.ververica.cdc.common.sink.MetadataApplier;
+import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaRegistryProvider;
+
+import java.util.List;
+import java.util.Map;
 
 /** Factory to create {@link SchemaOperator}. */
 public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
@@ -31,12 +36,17 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
 
     private static final long serialVersionUID = 1L;
 
-    protected SchemaOperatorFactory(StreamOperator<Event> operator) {
-        super(operator);
+    private final Map<TableId, List<MetadataApplier>> metadataAppliers;
+
+    public SchemaOperatorFactory(
+            int partitionChannelNum, Map<TableId, List<MetadataApplier>> metadataAppliers) {
+        super(new SchemaOperator(partitionChannelNum));
+        this.metadataAppliers = metadataAppliers;
     }
 
     @Override
-    public OperatorCoordinator.Provider getCoordinatorProvider(String s, OperatorID operatorID) {
-        return null;
+    public OperatorCoordinator.Provider getCoordinatorProvider(
+            String operatorName, OperatorID operatorID) {
+        return new SchemaRegistryProvider(operatorID, operatorName, metadataAppliers);
     }
 }

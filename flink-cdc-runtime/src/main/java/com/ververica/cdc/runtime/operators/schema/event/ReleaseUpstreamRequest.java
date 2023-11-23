@@ -16,16 +16,17 @@
 
 package com.ververica.cdc.runtime.operators.schema.event;
 
-import org.apache.flink.runtime.operators.coordination.OperatorEvent;
+import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 
+import com.ververica.cdc.common.event.FlushEvent;
 import com.ververica.cdc.runtime.operators.schema.SchemaOperator;
-import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaOperatorCoordinator;
+import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 
 /**
- * A {@link OperatorEvent} from {@link SchemaOperatorCoordinator} to notify {@link SchemaOperator}
- * that the coordinator has finished schema change and the {@link SchemaOperator} should continue to
- * push data.
+ * The request from {@link SchemaOperator} to {@link SchemaRegistry} to request to release upstream
+ * after sending {@link FlushEvent}.
  */
-public class ReleaseUpstreamEvent implements OperatorEvent {
+public class ReleaseUpstreamRequest implements CoordinationRequest {
+
     private static final long serialVersionUID = 1L;
 }

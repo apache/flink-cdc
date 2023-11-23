@@ -14,12 +14,18 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.runtime.operators.schema.coordinator;
+package com.ververica.cdc.connectors.values.sink;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.ververica.cdc.common.configuration.ConfigOption;
+import com.ververica.cdc.common.configuration.ConfigOptions;
 
-/** A manager to manages schema changes. */
-public class SchemaManager {
-    private static final Logger LOG = LoggerFactory.getLogger(SchemaManager.class);
+/** Configurations for {@link ValuesDataSink}. */
+public class ValuesDataSinkOptions {
+
+    public static final ConfigOption<Boolean> MATERIALIZED_IN_MEMORY =
+            ConfigOptions.key("materialized.in.memory")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "True if the DataChangeEvent need to be materialized in memory.");
 }

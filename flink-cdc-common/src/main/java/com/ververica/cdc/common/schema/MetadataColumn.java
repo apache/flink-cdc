@@ -53,6 +53,11 @@ public class MetadataColumn extends Column {
     }
 
     @Override
+    public Column copy(String newName) {
+        return new MetadataColumn(newName, type, metadataKey, comment);
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;

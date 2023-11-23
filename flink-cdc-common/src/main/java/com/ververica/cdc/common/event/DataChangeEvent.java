@@ -181,4 +181,30 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
     public int hashCode() {
         return Objects.hash(tableId, recordDataType, before, after, op, meta);
     }
+
+    /** Creates a string to describe the information of meta. */
+    public String describeMeta() {
+        StringBuilder stringBuilder = new StringBuilder("(");
+        if (meta != null && !meta.isEmpty()) {
+            stringBuilder.append(meta);
+        }
+        stringBuilder.append(")");
+        return stringBuilder.toString();
+    }
+
+    @Override
+    public String toString() {
+        return "DataChangeEvent{"
+                + "tableId="
+                + tableId
+                + ", before="
+                + before
+                + ", after="
+                + after
+                + ", op="
+                + op
+                + ", meta="
+                + describeMeta()
+                + '}';
+    }
 }

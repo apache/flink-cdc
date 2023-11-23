@@ -24,7 +24,6 @@ import com.ververica.cdc.debezium.table.DeserializationRuntimeConverterFactory;
 import org.apache.kafka.connect.data.Schema;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
@@ -42,7 +41,7 @@ public class SqlServerDeserializationConverterFactory {
                     LogicalType logicalType, ZoneId serverTimeZone) {
                 switch (logicalType.getTypeRoot()) {
                     case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                        return convertToLocalTimeZoneTimestamp(serverTimeZone);
+                        return convertToLocalTimeZoneTimestamp();
                     default:
                         // fallback to default converter
                         return Optional.empty();
@@ -51,8 +50,7 @@ public class SqlServerDeserializationConverterFactory {
         };
     }
 
-    private static Optional<DeserializationRuntimeConverter> convertToLocalTimeZoneTimestamp(
-            ZoneId serverTimeZone) {
+    private static Optional<DeserializationRuntimeConverter> convertToLocalTimeZoneTimestamp() {
         return Optional.of(
                 new DeserializationRuntimeConverter() {
 
@@ -66,8 +64,7 @@ public class SqlServerDeserializationConverterFactory {
                             Instant parse =
                                     DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(
                                             str, Instant::from);
-                            return TimestampData.fromLocalDateTime(
-                                    LocalDateTime.ofInstant(parse, serverTimeZone));
+                            return TimestampData.fromInstant(parse);
                         }
                         throw new IllegalArgumentException(
                                 "Unable to convert to TimestampData from unexpected value '"

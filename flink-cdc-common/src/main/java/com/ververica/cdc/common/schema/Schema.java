@@ -99,6 +99,15 @@ public class Schema implements Serializable {
         return options;
     }
 
+    public String describeOptions() {
+        StringBuilder stringBuilder = new StringBuilder("(");
+        if (options != null && !options.isEmpty()) {
+            stringBuilder.append(options);
+        }
+        stringBuilder.append(")");
+        return stringBuilder.toString();
+    }
+
     /** Returns the comment of the table or data collection. */
     public String comment() {
         return comment;
@@ -124,6 +133,11 @@ public class Schema implements Serializable {
                 columns.stream().map(Schema::columnToField).toArray(DataField[]::new);
         // the row should never be null
         return DataTypes.ROW(fields).notNull();
+    }
+
+    /** Returns a copy of the schema with a replaced list of {@Column}. */
+    public Schema copy(List<Column> columns) {
+        return new Schema(columns, new ArrayList<>(primaryKeys), new HashMap<>(options), comment);
     }
 
     @Override
@@ -187,15 +201,6 @@ public class Schema implements Serializable {
         sb.append(", options=").append(describeOptions());
 
         return sb.toString();
-    }
-
-    public String describeOptions() {
-        StringBuilder stringBuilder = new StringBuilder("(");
-        if (options != null && !options.isEmpty()) {
-            stringBuilder.append(options);
-        }
-        stringBuilder.append(")");
-        return stringBuilder.toString();
     }
 
     // -----------------------------------------------------------------------------------
