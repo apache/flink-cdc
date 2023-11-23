@@ -28,6 +28,8 @@ import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.sink.MetadataApplier;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
+import com.ververica.cdc.common.types.utils.DataTypeUtils;
+import org.apache.doris.flink.catalog.DorisTypeMapper;
 import org.apache.doris.flink.catalog.doris.DataModel;
 import org.apache.doris.flink.catalog.doris.DorisType;
 import org.apache.doris.flink.catalog.doris.FieldSchema;
@@ -60,8 +62,6 @@ public class DorisMetadataApplier implements MetadataApplier {
     @Override
     public void applySchemaChange(SchemaChangeEvent event) {
         try{
-            //refresh meta in memory
-            DorisDatabase.applySchemaChangeEvent(event);
             //send schema change op to doris
             if (event instanceof CreateTableEvent){
                 applyCreateTableEvent((CreateTableEvent) event);
@@ -103,7 +103,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         List<String> columnNameList = schema.getColumnNames();
         for(String columnName : columnNameList){
             Column column = schema.getColumn(columnName).get();
-            String dorisTypeStr = convertToDorisType(column.getType());
+            String dorisTypeStr = DorisTypeMapper.toDorisType(DataTypeUtils.toFlinkDataType(column.getType()));
             fieldSchemaMap.put(column.getName(), new FieldSchema(column.getName(), dorisTypeStr, column.getComment()));
         }
         return fieldSchemaMap;
@@ -124,7 +124,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         List<AddColumnEvent.ColumnWithPosition> addedColumns = event.getAddedColumns();
         for(AddColumnEvent.ColumnWithPosition col: addedColumns){
             Column column = col.getAddColumn();
-            String typeString = convertToDorisType(column.getType());
+            String typeString = DorisTypeMapper.toDorisType(DataTypeUtils.toFlinkDataType(column.getType()));
             FieldSchema addFieldSchema = new FieldSchema(column.getName(), typeString, column.getComment());
             schemaChangeManager.addColumn(tableId.getSchemaName(), tableId.getTableName(), addFieldSchema);
         }
@@ -143,54 +143,6 @@ public class DorisMetadataApplier implements MetadataApplier {
         Map<String, String> nameMapping = event.getNameMapping();
         for(Map.Entry<String, String> entry : nameMapping.entrySet()){
             schemaChangeManager.renameColumn(tableId.getSchemaName(), tableId.getTableName(), entry.getKey(), entry.getValue());
-        }
-    }
-
-    /**
-     * convert datatype to doris type for add column event
-     */
-    private String convertToDorisType(DataType type) {
-        int length = DataTypes.getLength(type).orElse(0);
-        int precision = DataTypes.getPrecision(type).orElse(0);
-        int scale = DataTypes.getScale(type).orElse(0);
-        switch (type.getTypeRoot()) {
-            case BOOLEAN:
-                return DorisType.BOOLEAN;
-            case TINYINT:
-                return DorisType.TINYINT;
-            case SMALLINT:
-                return DorisType.SMALLINT;
-            case INTEGER:
-                return DorisType.INT;
-            case BIGINT:
-                return DorisType.BIGINT;
-            case FLOAT:
-                return DorisType.FLOAT;
-            case DOUBLE:
-                return DorisType.DOUBLE;
-            case DECIMAL:
-                return precision > 0 && precision <= 38
-                        ? String.format("%s(%s,%s)", DorisType.DECIMAL_V3, length, Math.max(scale, 0))
-                        : DorisType.STRING;
-            case DATE:
-                return DorisType.DATE_V2;
-            case TIMESTAMP_WITH_TIME_ZONE:
-            case TIMESTAMP_WITHOUT_TIME_ZONE:
-            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return String.format("%s(%s)", DorisType.DATETIME_V2, Math.min(Math.max(precision, 0), 6));
-            case CHAR:
-            case VARCHAR:
-                return length * 4 > 65533 ? DorisType.STRING : String.format("%s(%s)", DorisType.VARCHAR, length * 4);
-            case BINARY:
-            case VARBINARY:
-            case ARRAY:
-            case MAP:
-            case TIME_WITHOUT_TIME_ZONE:
-                return DorisType.STRING;
-            case ROW:
-                return DorisType.JSONB;
-            default:
-                throw new UnsupportedOperationException("Unsupported Flink Type: " + type);
         }
     }
 }

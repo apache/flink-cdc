@@ -16,18 +16,27 @@
 
 package com.ververica.cdc.connectors.doris.sink;
 
+import com.ververica.cdc.common.data.GenericRecordData;
 import com.ververica.cdc.common.data.RecordData;
+import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.event.OperationType;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
+import com.ververica.cdc.common.schema.Schema;
+import com.ververica.cdc.common.types.utils.DataTypeUtils;
 import com.ververica.cdc.common.utils.Preconditions;
+import com.ververica.cdc.common.utils.RecordDataUtils;
+import com.ververica.cdc.common.utils.SchemaUtils;
+import org.apache.doris.flink.deserialization.converter.DorisRowConverter;
 import org.apache.doris.flink.sink.writer.serializer.DorisRecordSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.table.data.GenericRowData;
+import org.apache.flink.table.types.DataType;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -39,23 +48,36 @@ import static org.apache.doris.flink.sink.util.DeleteOperation.addDeleteSign;
 
 public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     private ObjectMapper objectMapper = new ObjectMapper();
+    private Map<TableId, Schema> schemaMaps = new HashMap<>();
 
     @Override
-    public Tuple2<String, byte[]> serialize(Event record) throws IOException {
-        if(record instanceof DataChangeEvent){
-            return applyDataChangeEvent((DataChangeEvent)record);
-        }else if(record instanceof SchemaChangeEvent){
-            // All operations are handled in DorisMetadataApplier.applySchemaChange
+    public Tuple2<String, byte[]> serialize(Event event) throws IOException {
+        if(event instanceof DataChangeEvent){
+            return applyDataChangeEvent((DataChangeEvent)event);
+        }else if(event instanceof SchemaChangeEvent){
+            SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
+            TableId tableId = schemaChangeEvent.tableId();
+            if (event instanceof CreateTableEvent) {
+                schemaMaps.put(tableId, ((CreateTableEvent) event).getSchema());
+            } else {
+                if (!schemaMaps.containsKey(tableId)) {
+                    throw new RuntimeException("schema of " + tableId + " is not existed.");
+                }
+                schemaMaps.put(
+                        tableId,
+                        SchemaUtils.applySchemaChangeEvent(
+                                schemaMaps.get(tableId), schemaChangeEvent));
+            }
         }
         return null;
     }
 
     private Tuple2<String, byte[]> applyDataChangeEvent(DataChangeEvent event) throws JsonProcessingException {
         TableId tableId = event.tableId();
-        DorisDatabase.DorisTable table = DorisDatabase.globalTables.get(tableId);
-        Preconditions.checkNotNull(table, event.tableId() + " is not existed");
+        Schema schema = schemaMaps.get(tableId);
+        Preconditions.checkNotNull(schema, event.tableId() + " is not existed");
         String tableKey = String.format("%s.%s", tableId.getSchemaName(), tableId.getTableName());
-        List<Column> columns = table.getColumns();
+        List<Column> columns = schema.getColumns();
         Map<String, Object> valueMap;
         OperationType op = event.op();
         switch (op){
@@ -81,11 +103,16 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     public Map<String, Object> serializerRecord(RecordData recordData, List<Column> columns) {
         Map<String, Object> record = new HashMap<>();
         Preconditions.checkState(columns.size() == recordData.getArity(), "Column size does not match the data size");
-         for (int i = 0; i < recordData.getArity(); i++) {
-             DorisRowConverter.SerializationConverter externalConverter = DorisRowConverter.createNullableExternalConverter(columns.get(i).getType());
-             Object field = externalConverter.serialize(i, recordData);
+        //convert RecordData to flink RowData
+        GenericRowData rowData = RecordDataUtils.toFlinkRowData((GenericRecordData) recordData);
+        for (int i = 0; i < recordData.getArity(); i++) {
+             DataType dataType = DataTypeUtils.toFlinkDataType(columns.get(i).getType());
+             DorisRowConverter.SerializationConverter converter = DorisRowConverter.createNullableExternalConverter(dataType.getLogicalType());
+             Object field = converter.serialize(i, rowData);
              record.put(columns.get(i).getName(), field);
         }
         return record;
     }
+
+
 }
