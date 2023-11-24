@@ -52,6 +52,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final boolean closeIdleReaders;
     private final boolean enableFullDocPrePostImage;
     private final boolean disableCursorTimeout;
+    private final boolean skipSnapshotBackfill;
 
     MongoDBSourceConfig(
             String scheme,
@@ -72,7 +73,8 @@ public class MongoDBSourceConfig implements SourceConfig {
             int samplesPerChunk,
             boolean closeIdleReaders,
             boolean enableFullDocPrePostImage,
-            boolean disableCursorTimeout) {
+            boolean disableCursorTimeout,
+            boolean skipSnapshotBackfill) {
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
         this.username = username;
@@ -93,6 +95,7 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.closeIdleReaders = closeIdleReaders;
         this.enableFullDocPrePostImage = enableFullDocPrePostImage;
         this.disableCursorTimeout = disableCursorTimeout;
+        this.skipSnapshotBackfill = skipSnapshotBackfill;
     }
 
     public String getScheme() {
