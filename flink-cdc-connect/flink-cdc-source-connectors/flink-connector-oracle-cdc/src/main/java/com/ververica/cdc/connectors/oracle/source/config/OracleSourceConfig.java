@@ -85,7 +85,8 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                true);
         this.url = url;
     }
 

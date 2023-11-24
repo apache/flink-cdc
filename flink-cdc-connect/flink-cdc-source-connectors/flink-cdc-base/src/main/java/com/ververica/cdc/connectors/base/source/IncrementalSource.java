@@ -217,6 +217,11 @@ public class IncrementalSource<T, C extends SourceConfig>
                 offsetFactory);
     }
 
+    /**
+     * Set snapshot hooks only for test. The SnapshotPhaseHook should be serializable。
+     *
+     * @param snapshotHooks
+     */
     @VisibleForTesting
     public void setSnapshotHooks(SnapshotPhaseHooks snapshotHooks) {
         this.snapshotHooks = snapshotHooks;
