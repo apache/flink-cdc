@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.mongodb.utils;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 
@@ -26,6 +27,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.fail;
 
@@ -67,6 +70,17 @@ public class MongoDBTestUtils {
                 return 0;
             }
         }
+    }
+
+    public static List<String> fetchRowData(
+            Iterator<RowData> iter, int size, Function<RowData, String> stringifier) {
+        List<RowData> rows = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            RowData row = iter.next();
+            rows.add(row);
+            size--;
+        }
+        return rows.stream().map(stringifier).collect(Collectors.toList());
     }
 
     public static List<String> fetchRows(Iterator<Row> iter, int size) {
