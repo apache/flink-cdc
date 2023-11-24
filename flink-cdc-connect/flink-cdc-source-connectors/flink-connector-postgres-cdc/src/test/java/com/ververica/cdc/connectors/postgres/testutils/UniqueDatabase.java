@@ -159,11 +159,14 @@ public class UniqueDatabase {
      *
      * @param slotName
      */
-    public void removeSlot(String slotName) throws SQLException {
+    public boolean removeSlot(String slotName) {
         String sql = String.format("SELECT pg_drop_replication_slot('%s')", slotName);
         try (Connection connection = PostgresTestBase.getJdbcConnection(container, databaseName);
                 Statement statement = connection.createStatement()) {
             statement.execute(sql);
+            return true;
+        } catch (Exception exception) {
+            return false;
         }
     }
 
