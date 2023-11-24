@@ -20,7 +20,6 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import com.ververica.cdc.common.annotation.Internal;
-import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.factories.DataSinkFactory;
 import com.ververica.cdc.common.factories.DataSourceFactory;
@@ -115,7 +114,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
         return sinkFactory.createDataSink(
                 new FactoryHelper.DefaultContext(
                         sinkDef.getConfig().toMap(),
-                        new Configuration(),
+                        sinkDef.getConfig(),
                         Thread.currentThread().getContextClassLoader()));
     }
 }
