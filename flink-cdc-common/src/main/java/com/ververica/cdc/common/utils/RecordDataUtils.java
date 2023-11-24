@@ -16,15 +16,16 @@
 
 package com.ververica.cdc.common.utils;
 
+import org.apache.flink.table.data.GenericRowData;
+
 import com.ververica.cdc.common.data.GenericRecordData;
 import com.ververica.cdc.common.data.RecordData;
-import org.apache.flink.table.data.GenericRowData;
 
 /** Utilities for handling {@link RecordData}s. */
 public class RecordDataUtils {
-    public static GenericRowData toFlinkRowData(GenericRecordData recordData){
+    public static GenericRowData toFlinkRowData(GenericRecordData recordData) {
         GenericRowData rowData = new GenericRowData(recordData.getArity());
-        for(int i=0; i< recordData.getArity(); i++){
+        for (int i = 0; i < recordData.getArity(); i++) {
             rowData.setField(i, recordData.getField(i));
         }
         return rowData;

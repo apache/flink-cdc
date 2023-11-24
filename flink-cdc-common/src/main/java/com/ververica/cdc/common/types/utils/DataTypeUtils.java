@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.common.types.utils;
 
+import org.apache.flink.util.CollectionUtil;
+
 import com.ververica.cdc.common.data.ArrayData;
 import com.ververica.cdc.common.data.DecimalData;
 import com.ververica.cdc.common.data.MapData;
@@ -26,8 +28,6 @@ import com.ververica.cdc.common.data.ZonedTimestampData;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.utils.Preconditions;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.flink.util.CollectionUtil;
 
 import java.util.List;
 
@@ -126,13 +126,14 @@ public class DataTypeUtils {
                 return org.apache.flink.table.api.DataTypes.ARRAY(toFlinkDataType(children.get(0)));
             case MAP:
                 Preconditions.checkState(children != null && children.size() > 1);
-                return org.apache.flink.table.api.DataTypes.MAP(toFlinkDataType(children.get(0)), toFlinkDataType(children.get(1)));
+                return org.apache.flink.table.api.DataTypes.MAP(
+                        toFlinkDataType(children.get(0)), toFlinkDataType(children.get(1)));
             case ROW:
                 Preconditions.checkState(!CollectionUtil.isNullOrEmpty(children));
-                return org.apache.flink.table.api.DataTypes.ROW(children.toArray(new org.apache.flink.table.types.DataType[]{}));
+                return org.apache.flink.table.api.DataTypes.ROW(
+                        children.toArray(new org.apache.flink.table.types.DataType[] {}));
             default:
                 throw new IllegalArgumentException("Illegal type: " + type);
         }
-
     }
 }

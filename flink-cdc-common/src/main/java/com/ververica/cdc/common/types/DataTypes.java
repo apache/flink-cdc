@@ -472,6 +472,7 @@ public class DataTypes {
         public OptionalInt visit(DecimalType decimalType) {
             return OptionalInt.of(decimalType.getScale());
         }
+
         @Override
         protected OptionalInt defaultMethod(DataType dataType) {
             return OptionalInt.empty();
