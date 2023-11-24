@@ -21,7 +21,6 @@ import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import com.ververica.cdc.common.annotation.Internal;
-import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.factories.DataSourceFactory;
 import com.ververica.cdc.common.factories.FactoryHelper;
@@ -52,7 +51,7 @@ public class DataSourceTranslator {
                 sourceFactory.createDataSource(
                         new FactoryHelper.DefaultContext(
                                 sourceDef.getConfig().toMap(),
-                                new Configuration(),
+                                sourceDef.getConfig(),
                                 Thread.currentThread().getContextClassLoader()));
 
         // Add source JAR to environment
