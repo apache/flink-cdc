@@ -28,7 +28,7 @@ import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.source.meta.split.ChangeEventRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
-import com.ververica.cdc.connectors.base.source.reader.external.AbstractScanFetcherTask;
+import com.ververica.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.Fetcher;
 import com.ververica.cdc.connectors.base.source.reader.external.IncrementalSourceScanFetcher;
@@ -132,7 +132,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
                     final FetchTask.Context taskContext =
                             dataSourceDialect.createFetchTaskContext(nextSplit, sourceConfig);
                     currentFetcher = new IncrementalSourceScanFetcher(taskContext, subtaskId);
-                    ((AbstractScanFetcherTask) fetchTask).setSnapshotPhaseHooks(snapshotHooks);
+                    ((AbstractScanFetchTask) fetchTask).setSnapshotPhaseHooks(snapshotHooks);
                 }
             } else {
                 // point from snapshot split to stream split

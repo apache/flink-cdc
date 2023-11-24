@@ -71,7 +71,17 @@ public abstract class AbstractScanFetchTask implements FetchTask {
         if (snapshotPhaseHooks.getPreHighWatermarkAction() != null) {
             snapshotPhaseHooks.getPreHighWatermarkAction().accept(sourceConfig, snapshotSplit);
         }
-        Offset highWatermark = dialect.displayCurrentOffset(sourceConfig);
+        // Directly set HW = LW if backfill is skipped. Binlog events created during snapshot
+        // phase could be processed later in binlog reading phase.
+        //
+        // Note that this behaviour downgrades the delivery guarantee to at-least-once. We can't
+        // promise that the snapshot is exactly the view of the table at low watermark moment,
+        // so binlog events created during snapshot might be replayed later in binlog reading
+        // phase.
+        Offset highWatermark =
+                context.getSourceConfig().isSkipSnapshotBackfill()
+                        ? lowWatermark
+                        : dialect.displayCurrentOffset(sourceConfig);
         LOG.info(
                 "Snapshot step 3 - Determining high watermark {} for split {}",
                 highWatermark,

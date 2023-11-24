@@ -24,7 +24,7 @@ import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
-import com.ververica.cdc.connectors.base.source.reader.external.AbstractScanFetcherTask;
+import com.ververica.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.IncrementalSourceScanFetcher;
 import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
@@ -208,7 +208,7 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
             if (sourceScanFetcher.isFinished()) {
                 FetchTask<SourceSplitBase> fetchTask =
                         taskContext.getDataSourceDialect().createFetchTask(sqlSplit);
-                ((AbstractScanFetcherTask) fetchTask).setSnapshotPhaseHooks(snapshotPhaseHooks);
+                ((AbstractScanFetchTask) fetchTask).setSnapshotPhaseHooks(snapshotPhaseHooks);
                 sourceScanFetcher.submitTask(fetchTask);
             }
             Iterator<SourceRecords> res;

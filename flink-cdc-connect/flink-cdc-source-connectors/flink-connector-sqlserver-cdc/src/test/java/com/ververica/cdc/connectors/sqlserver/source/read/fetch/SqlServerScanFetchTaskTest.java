@@ -24,7 +24,7 @@ import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
-import com.ververica.cdc.connectors.base.source.reader.external.AbstractScanFetcherTask;
+import com.ververica.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.IncrementalSourceScanFetcher;
 import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
@@ -183,7 +183,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
         SqlServerSourceConfigFactory sourceConfigFactory =
                 getConfigFactory(databaseName, new String[] {tableName}, 10);
-        SqlServerSourceConfig sourceConfig = sourceConfigFactory.create(0);
+        SqlServerSourceConfig sqlServerSourceConfigs = sourceConfigFactory.create(0);
         SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfigFactory.create(0));
 
         String tableId = databaseName + "." + tableName;
@@ -195,13 +195,13 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
         SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
         hooks.setPostLowWatermarkAction(
-                (dialect, split) -> executeSql(sourceConfig, deleteDataSql));
+                (sourceConfig, split) -> executeSql(sqlServerSourceConfigs, deleteDataSql));
         SqlServerSourceFetchTaskContext sqlServerSourceFetchTaskContext =
                 new SqlServerSourceFetchTaskContext(
-                        sourceConfig,
+                        sqlServerSourceConfigs,
                         sqlServerDialect,
-                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
-                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()));
+                        createSqlServerConnection(sqlServerSourceConfigs.getDbzConnectorConfig()),
+                        createSqlServerConnection(sqlServerSourceConfigs.getDbzConnectorConfig()));
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -209,7 +209,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        List<SnapshotSplit> snapshotSplits = getSnapshotSplits(sourceConfig, sqlServerDialect);
+        List<SnapshotSplit> snapshotSplits =
+                getSnapshotSplits(sqlServerSourceConfigs, sqlServerDialect);
 
         String[] expected =
                 new String[] {
@@ -254,7 +255,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
             if (sourceScanFetcher.isFinished()) {
                 FetchTask<SourceSplitBase> fetchTask =
                         taskContext.getDataSourceDialect().createFetchTask(sqlSplit);
-                ((AbstractScanFetcherTask) fetchTask).setSnapshotPhaseHooks(snapshotPhaseHooks);
+                ((AbstractScanFetchTask) fetchTask).setSnapshotPhaseHooks(snapshotPhaseHooks);
                 sourceScanFetcher.submitTask(fetchTask);
             }
             Iterator<SourceRecords> res;
