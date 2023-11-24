@@ -77,7 +77,8 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                true);
     }
 
     @Override
