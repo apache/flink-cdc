@@ -195,6 +195,16 @@ public abstract class PostgresTestBase extends AbstractTestBase {
 
     protected PostgresSourceConfigFactory getMockPostgresSourceConfigFactory(
             UniqueDatabase database, String schemaName, String tableName, int splitSize) {
+        return getMockPostgresSourceConfigFactory(
+                database, schemaName, tableName, splitSize, false);
+    }
+
+    protected PostgresSourceConfigFactory getMockPostgresSourceConfigFactory(
+            UniqueDatabase database,
+            String schemaName,
+            String tableName,
+            int splitSize,
+            boolean skipSnapshotBackfill) {
 
         PostgresSourceConfigFactory postgresSourceConfigFactory = new PostgresSourceConfigFactory();
         postgresSourceConfigFactory.hostname(database.getHost());
@@ -205,6 +215,7 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         postgresSourceConfigFactory.schemaList(new String[] {schemaName});
         postgresSourceConfigFactory.tableList(schemaName + "." + tableName);
         postgresSourceConfigFactory.splitSize(splitSize);
+        postgresSourceConfigFactory.skipSnapshotBackfill(skipSnapshotBackfill);
         return postgresSourceConfigFactory;
     }
 
