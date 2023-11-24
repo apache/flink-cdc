@@ -126,7 +126,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                skipSnapshotBackfill);
     }
 
     /**

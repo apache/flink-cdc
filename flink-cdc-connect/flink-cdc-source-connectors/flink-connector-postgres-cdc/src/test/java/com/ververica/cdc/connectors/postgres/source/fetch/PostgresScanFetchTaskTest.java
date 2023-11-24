@@ -55,8 +55,8 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     private static final int USE_POST_LOWWATERMARK_HOOK = 1;
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
 
-    private static String schemaName = "customer";
-    private static String tableName = "customers";
+    private static final String schemaName = "customer";
+    private static final String tableName = "customers";
 
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(
@@ -95,7 +95,7 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
                 };
         List<String> actual =
                 getDataInSnapshotScan(
-                        changingDataSql, schemaName, tableName, USE_PRE_HIGHWATERMARK_HOOK);
+                        changingDataSql, schemaName, tableName, USE_PRE_HIGHWATERMARK_HOOK, false);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -124,7 +124,7 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
                 };
         List<String> actual =
                 getDataInSnapshotScan(
-                        insertDataSql, schemaName, tableName, USE_POST_LOWWATERMARK_HOOK);
+                        insertDataSql, schemaName, tableName, USE_POST_LOWWATERMARK_HOOK, false);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -149,15 +149,90 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
                 };
         List<String> actual =
                 getDataInSnapshotScan(
-                        deleteDataSql, schemaName, tableName, USE_PRE_HIGHWATERMARK_HOOK);
+                        deleteDataSql, schemaName, tableName, USE_PRE_HIGHWATERMARK_HOOK, false);
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+    }
+
+    @Test
+    public void testSnapshotScanSkipBackfillWithPostLowWatermark() throws Exception {
+        customDatabase.createAndInitialize();
+
+        String tableId = schemaName + "." + tableName;
+        String[] changingDataSql =
+                new String[] {
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
+                    "DELETE FROM " + tableId + " where id = 102",
+                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','hangzhou','123567891234')",
+                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
+                };
+
+        String[] expected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, hangzhou, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Hangzhou, 123567891234]",
+                    "+I[111, user_6, Hangzhou, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                };
+
+        // Change data during [low_watermark, snapshot) will not be captured by snapshotting
+        List<String> actual =
+                getDataInSnapshotScan(
+                        changingDataSql, schemaName, tableName, USE_POST_LOWWATERMARK_HOOK, true);
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+    }
+
+    @Test
+    public void testSnapshotScanSkipBackfillWithPreHighWatermark() throws Exception {
+        customDatabase.createAndInitialize();
+
+        String tableId = schemaName + "." + tableName;
+        String[] changingDataSql =
+                new String[] {
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
+                    "DELETE FROM " + tableId + " where id = 102",
+                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','hangzhou','123567891234')",
+                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
+                };
+
+        String[] expected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                };
+
+        // Change data during [snapshot, high_watermark) will not be captured by snapshotting
+        List<String> actual =
+                getDataInSnapshotScan(
+                        changingDataSql, schemaName, tableName, USE_PRE_HIGHWATERMARK_HOOK, true);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
     private List<String> getDataInSnapshotScan(
-            String[] changingDataSql, String schemaName, String tableName, int hookType)
+            String[] changingDataSql,
+            String schemaName,
+            String tableName,
+            int hookType,
+            boolean skipSnapshotBackfill)
             throws Exception {
         PostgresSourceConfigFactory sourceConfigFactory =
-                getMockPostgresSourceConfigFactory(customDatabase, schemaName, tableName, 10);
+                getMockPostgresSourceConfigFactory(
+                        customDatabase, schemaName, tableName, 10, skipSnapshotBackfill);
         PostgresSourceConfig sourceConfig = sourceConfigFactory.create(0);
         PostgresDialect postgresDialect = new PostgresDialect(sourceConfigFactory.create(0));
         SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
@@ -167,6 +242,11 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
                     (postgresSourceConfig, split) -> {
                         postgresConnection.execute(changingDataSql);
                         postgresConnection.commit();
+                        try {
+                            Thread.sleep(500L);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
                     };
 
             if (hookType == USE_POST_LOWWATERMARK_HOOK) {
@@ -185,10 +265,9 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
 
             PostgresSourceFetchTaskContext postgresSourceFetchTaskContext =
                     new PostgresSourceFetchTaskContext(sourceConfig, postgresDialect);
-            List<String> actual =
-                    readTableSnapshotSplits(
-                            snapshotSplits, postgresSourceFetchTaskContext, 1, dataType, hooks);
-            return actual;
+
+            return readTableSnapshotSplits(
+                    snapshotSplits, postgresSourceFetchTaskContext, 1, dataType, hooks);
         }
     }
 

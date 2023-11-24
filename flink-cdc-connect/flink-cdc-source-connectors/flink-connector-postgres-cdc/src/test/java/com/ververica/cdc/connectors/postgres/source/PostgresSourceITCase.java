@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.postgres.source;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
@@ -25,16 +26,25 @@ import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
+import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.catalog.UniqueConstraint;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.ExceptionUtils;
 
+import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
+import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import com.ververica.cdc.connectors.postgres.PostgresTestBase;
+import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
+import com.ververica.cdc.connectors.postgres.testutils.TestTable;
 import com.ververica.cdc.connectors.postgres.testutils.UniqueDatabase;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -44,6 +54,7 @@ import org.junit.runners.Parameterized;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -54,9 +65,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
+import static org.apache.flink.table.api.DataTypes.BIGINT;
+import static org.apache.flink.table.api.DataTypes.STRING;
+import static org.apache.flink.table.catalog.Column.physical;
 import static org.apache.flink.util.Preconditions.checkState;
 import static org.junit.Assert.assertTrue;
 
@@ -70,6 +86,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
     private static final String DB_NAME_PREFIX = "postgres";
     private static final String SCHEMA_NAME = "customer";
+
+    private static final int USE_POST_LOWWATERMARK_HOOK = 1;
+    private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
 
     private final String scanStartupMode;
 
@@ -93,6 +112,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     POSTGRES_CONTAINER.getUsername(),
                     POSTGRES_CONTAINER.getPassword());
 
+    private String slotName;
+
     /** First part stream events, which is made by {@link #makeFirstPartStreamEvents}. */
     private final List<String> firstPartStreamEvents =
             Arrays.asList(
@@ -103,6 +124,15 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     "-U[103, user_3, Hangzhou, 123567891234]",
                     "+U[103, user_3, Shanghai, 123567891234]");
 
+    /** Second part stream events, which is made by {@link #makeSecondPartStreamEvents}. */
+    private final List<String> secondPartStreamEvents =
+            Arrays.asList(
+                    "-U[1010, user_11, Shanghai, 123567891234]",
+                    "+I[2001, user_22, Shanghai, 123567891234]",
+                    "+I[2002, user_23, Shanghai, 123567891234]",
+                    "+I[2003, user_24, Shanghai, 123567891234]",
+                    "+U[1010, user_11, Hangzhou, 123567891234]");
+
     public PostgresSourceITCase(String scanStartupMode) {
         this.scanStartupMode = scanStartupMode;
     }
@@ -112,14 +142,18 @@ public class PostgresSourceITCase extends PostgresTestBase {
         return new Object[][] {new Object[] {"initial"}, new Object[] {"latest-offset"}};
     }
 
-    /** Second part stream events, which is made by {@link #makeSecondPartStreamEvents}. */
-    private final List<String> secondPartStreamEvents =
-            Arrays.asList(
-                    "-U[1010, user_11, Shanghai, 123567891234]",
-                    "+I[2001, user_22, Shanghai, 123567891234]",
-                    "+I[2002, user_23, Shanghai, 123567891234]",
-                    "+I[2003, user_24, Shanghai, 123567891234]",
-                    "+U[1010, user_11, Hangzhou, 123567891234]");
+    @Before
+    public void before() {
+        customDatabase.createAndInitialize();
+        this.slotName = getSlotName();
+    }
+
+    @After
+    public void after() throws Exception {
+        // sleep 1000ms to wait until connections are closed.
+        Thread.sleep(1000L);
+        customDatabase.removeSlot(slotName);
+    }
 
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
@@ -190,7 +224,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
     @Test
     public void testConsumingTableWithoutPrimaryKey() throws Exception {
-        if (scanStartupMode == DEFAULT_SCAN_STARTUP_MODE) {
+        if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             try {
                 testPostgresParallelSource(
                         1,
@@ -198,7 +232,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         FailoverType.NONE,
                         FailoverPhase.NEVER,
                         new String[] {"customers_no_pk"},
-                        RestartStrategies.noRestart());
+                        RestartStrategies.noRestart(),
+                        false);
             } catch (Exception e) {
                 assertTrue(
                         ExceptionUtils.findThrowableWithMessage(
@@ -215,75 +250,302 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     FailoverType.NONE,
                     FailoverPhase.NEVER,
                     new String[] {"customers_no_pk"},
-                    RestartStrategies.noRestart());
+                    RestartStrategies.noRestart(),
+                    false);
         }
     }
 
     @Test
+    public void testReadSingleTableWithSingleParallelismAndSkipBackfill() throws Exception {
+        testPostgresParallelSource(
+                DEFAULT_PARALLELISM,
+                DEFAULT_SCAN_STARTUP_MODE,
+                FailoverType.TM,
+                FailoverPhase.SNAPSHOT,
+                new String[] {"customers"},
+                RestartStrategies.fixedDelayRestart(1, 0),
+                true);
+    }
+
+    @Test
     public void testDebeziumSlotDropOnStop() throws Exception {
-        String slotName = getSlotName();
-        try {
-            customDatabase.createAndInitialize();
-            StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-            StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
-            env.setParallelism(2);
-            env.enableCheckpointing(200L);
-            env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
-            String sourceDDL =
-                    format(
-                            "CREATE TABLE customers ("
-                                    + " id BIGINT NOT NULL,"
-                                    + " name STRING,"
-                                    + " address STRING,"
-                                    + " phone_number STRING,"
-                                    + " primary key (id) not enforced"
-                                    + ") WITH ("
-                                    + " 'connector' = 'postgres-cdc',"
-                                    + " 'scan.incremental.snapshot.enabled' = 'true',"
-                                    + " 'hostname' = '%s',"
-                                    + " 'port' = '%s',"
-                                    + " 'username' = '%s',"
-                                    + " 'password' = '%s',"
-                                    + " 'database-name' = '%s',"
-                                    + " 'schema-name' = '%s',"
-                                    + " 'table-name' = '%s',"
-                                    + " 'scan.startup.mode' = '%s',"
-                                    + " 'scan.incremental.snapshot.chunk.size' = '100',"
-                                    + " 'slot.name' = '%s', "
-                                    + " 'debezium.slot.drop.on.stop' = 'true'"
-                                    + ")",
-                            customDatabase.getHost(),
-                            customDatabase.getDatabasePort(),
-                            customDatabase.getUsername(),
-                            customDatabase.getPassword(),
-                            customDatabase.getDatabaseName(),
-                            SCHEMA_NAME,
-                            "customers",
-                            scanStartupMode,
-                            slotName);
-            tEnv.executeSql(sourceDDL);
-            TableResult tableResult = tEnv.executeSql("select * from customers");
+        env.setParallelism(2);
+        env.enableCheckpointing(200L);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+        String sourceDDL =
+                format(
+                        "CREATE TABLE customers ("
+                                + " id BIGINT NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " primary key (id) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.startup.mode' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'slot.name' = '%s', "
+                                + " 'debezium.slot.drop.on.stop' = 'true'"
+                                + ")",
+                        customDatabase.getHost(),
+                        customDatabase.getDatabasePort(),
+                        customDatabase.getUsername(),
+                        customDatabase.getPassword(),
+                        customDatabase.getDatabaseName(),
+                        SCHEMA_NAME,
+                        "customers",
+                        scanStartupMode,
+                        slotName);
+        tEnv.executeSql(sourceDDL);
+        TableResult tableResult = tEnv.executeSql("select * from customers");
 
-            // first step: check the snapshot data
-            if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
-                checkSnapshotData(
-                        tableResult,
-                        FailoverType.JM,
-                        FailoverPhase.STREAM,
-                        new String[] {"customers"});
-            }
-
-            // second step: check the stream data
-            checkStreamDataWithDDLDuringFailover(
+        // first step: check the snapshot data
+        if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            checkSnapshotData(
                     tableResult, FailoverType.JM, FailoverPhase.STREAM, new String[] {"customers"});
-
-            tableResult.getJobClient().get().cancel().get();
-            // sleep 1000ms to wait until connections are closed.
-            Thread.sleep(1000L);
-        } finally {
-            customDatabase.removeSlot(slotName);
         }
+
+        // second step: check the stream data
+        checkStreamDataWithDDLDuringFailover(
+                tableResult, FailoverType.JM, FailoverPhase.STREAM, new String[] {"customers"});
+
+        tableResult.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
+        if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            return;
+        }
+
+        List<String> records = testBackfillWhenWritingEvents(false, 21, USE_PRE_HIGHWATERMARK_HOOK);
+
+        List<String> expectedRecords =
+                Arrays.asList(
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[109, user_4, Shanghai, 123567891234]",
+                        "+I[110, user_5, Shanghai, 123567891234]",
+                        "+I[111, user_6, Shanghai, 123567891234]",
+                        "+I[118, user_7, Shanghai, 123567891234]",
+                        "+I[121, user_8, Shanghai, 123567891234]",
+                        "+I[123, user_9, Shanghai, 123567891234]",
+                        "+I[1009, user_10, Shanghai, 123567891234]",
+                        "+I[1010, user_11, Shanghai, 123567891234]",
+                        "+I[1011, user_12, Shanghai, 123567891234]",
+                        "+I[1012, user_13, Shanghai, 123567891234]",
+                        "+I[1013, user_14, Shanghai, 123567891234]",
+                        "+I[1014, user_15, Shanghai, 123567891234]",
+                        "+I[1015, user_16, Shanghai, 123567891234]",
+                        "+I[1016, user_17, Shanghai, 123567891234]",
+                        "+I[1017, user_18, Shanghai, 123567891234]",
+                        "+I[1018, user_19, Shanghai, 123567891234]",
+                        "+I[2000, user_21, Pittsburgh, 123567891234]",
+                        "+I[15213, user_15213, Shanghai, 123567891234]");
+        // when enable backfill, the wal log between (snapshot,  high_watermark) will be
+        // applied as snapshot image
+        assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    @Test
+    public void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
+        if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            return;
+        }
+
+        List<String> records = testBackfillWhenWritingEvents(false, 21, USE_POST_LOWWATERMARK_HOOK);
+
+        List<String> expectedRecords =
+                Arrays.asList(
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[109, user_4, Shanghai, 123567891234]",
+                        "+I[110, user_5, Shanghai, 123567891234]",
+                        "+I[111, user_6, Shanghai, 123567891234]",
+                        "+I[118, user_7, Shanghai, 123567891234]",
+                        "+I[121, user_8, Shanghai, 123567891234]",
+                        "+I[123, user_9, Shanghai, 123567891234]",
+                        "+I[1009, user_10, Shanghai, 123567891234]",
+                        "+I[1010, user_11, Shanghai, 123567891234]",
+                        "+I[1011, user_12, Shanghai, 123567891234]",
+                        "+I[1012, user_13, Shanghai, 123567891234]",
+                        "+I[1013, user_14, Shanghai, 123567891234]",
+                        "+I[1014, user_15, Shanghai, 123567891234]",
+                        "+I[1015, user_16, Shanghai, 123567891234]",
+                        "+I[1016, user_17, Shanghai, 123567891234]",
+                        "+I[1017, user_18, Shanghai, 123567891234]",
+                        "+I[1018, user_19, Shanghai, 123567891234]",
+                        "+I[2000, user_21, Pittsburgh, 123567891234]",
+                        "+I[15213, user_15213, Shanghai, 123567891234]");
+        // when enable backfill, the wal log between (low_watermark, snapshot) will be applied
+        // as snapshot image
+        assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    @Test
+    public void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
+        if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            return;
+        }
+
+        List<String> records = testBackfillWhenWritingEvents(true, 25, USE_PRE_HIGHWATERMARK_HOOK);
+
+        List<String> expectedRecords =
+                Arrays.asList(
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[109, user_4, Shanghai, 123567891234]",
+                        "+I[110, user_5, Shanghai, 123567891234]",
+                        "+I[111, user_6, Shanghai, 123567891234]",
+                        "+I[118, user_7, Shanghai, 123567891234]",
+                        "+I[121, user_8, Shanghai, 123567891234]",
+                        "+I[123, user_9, Shanghai, 123567891234]",
+                        "+I[1009, user_10, Shanghai, 123567891234]",
+                        "+I[1010, user_11, Shanghai, 123567891234]",
+                        "+I[1011, user_12, Shanghai, 123567891234]",
+                        "+I[1012, user_13, Shanghai, 123567891234]",
+                        "+I[1013, user_14, Shanghai, 123567891234]",
+                        "+I[1014, user_15, Shanghai, 123567891234]",
+                        "+I[1015, user_16, Shanghai, 123567891234]",
+                        "+I[1016, user_17, Shanghai, 123567891234]",
+                        "+I[1017, user_18, Shanghai, 123567891234]",
+                        "+I[1018, user_19, Shanghai, 123567891234]",
+                        "+I[1019, user_20, Shanghai, 123567891234]",
+                        "+I[2000, user_21, Shanghai, 123567891234]",
+                        "+I[15213, user_15213, Shanghai, 123567891234]",
+                        "-U[2000, user_21, Shanghai, 123567891234]",
+                        "+U[2000, user_21, Pittsburgh, 123567891234]",
+                        "-D[1019, user_20, Shanghai, 123567891234]");
+        // when skip backfill, the wal log between (snapshot,  high_watermark) will be seen as
+        // stream event.
+        assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    @Test
+    public void testSkipBackfillWithDMLPostLowWaterMark() throws Exception {
+        if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            return;
+        }
+
+        List<String> records = testBackfillWhenWritingEvents(true, 25, USE_POST_LOWWATERMARK_HOOK);
+
+        List<String> expectedRecords =
+                Arrays.asList(
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[109, user_4, Shanghai, 123567891234]",
+                        "+I[110, user_5, Shanghai, 123567891234]",
+                        "+I[111, user_6, Shanghai, 123567891234]",
+                        "+I[118, user_7, Shanghai, 123567891234]",
+                        "+I[121, user_8, Shanghai, 123567891234]",
+                        "+I[123, user_9, Shanghai, 123567891234]",
+                        "+I[1009, user_10, Shanghai, 123567891234]",
+                        "+I[1010, user_11, Shanghai, 123567891234]",
+                        "+I[1011, user_12, Shanghai, 123567891234]",
+                        "+I[1012, user_13, Shanghai, 123567891234]",
+                        "+I[1013, user_14, Shanghai, 123567891234]",
+                        "+I[1014, user_15, Shanghai, 123567891234]",
+                        "+I[1015, user_16, Shanghai, 123567891234]",
+                        "+I[1016, user_17, Shanghai, 123567891234]",
+                        "+I[1017, user_18, Shanghai, 123567891234]",
+                        "+I[1018, user_19, Shanghai, 123567891234]",
+                        "+I[2000, user_21, Pittsburgh, 123567891234]",
+                        "+I[15213, user_15213, Shanghai, 123567891234]",
+                        "+I[15213, user_15213, Shanghai, 123567891234]",
+                        "-U[2000, user_21, Shanghai, 123567891234]",
+                        "+U[2000, user_21, Pittsburgh, 123567891234]",
+                        "-D[1019, user_20, Shanghai, 123567891234]");
+        // when skip backfill, the wal log between (snapshot,  high_watermark) will still be
+        // seen as stream event. This will occur data duplicate. For example, user_20 will be
+        // deleted twice, and user_15213 will be inserted twice.
+        assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    private List<String> testBackfillWhenWritingEvents(
+            boolean skipSnapshotBackfill, int fetchSize, int hookType) throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.enableCheckpointing(1000);
+        env.setParallelism(1);
+
+        ResolvedSchema customersSchame =
+                new ResolvedSchema(
+                        Arrays.asList(
+                                physical("id", BIGINT().notNull()),
+                                physical("name", STRING()),
+                                physical("address", STRING()),
+                                physical("phone_number", STRING())),
+                        new ArrayList<>(),
+                        UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
+        TestTable customerTable =
+                new TestTable(customDatabase, "customer", "customers", customersSchame);
+        String tableId = customerTable.getTableId();
+
+        PostgresSourceBuilder.PostgresIncrementalSource source =
+                PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
+                        .hostname(customDatabase.getHost())
+                        .port(customDatabase.getDatabasePort())
+                        .username(customDatabase.getUsername())
+                        .password(customDatabase.getPassword())
+                        .database(customDatabase.getDatabaseName())
+                        .slotName(slotName)
+                        .tableList(tableId)
+                        .skipSnapshotBackfill(skipSnapshotBackfill)
+                        .deserializer(customerTable.getDeserializer())
+                        .build();
+
+        // Do some database operations during hook in snapshot period.
+        SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
+        String[] statements =
+                new String[] {
+                    String.format(
+                            "INSERT INTO %s VALUES (15213, 'user_15213', 'Shanghai', '123567891234')",
+                            tableId),
+                    String.format("UPDATE %s SET address='Pittsburgh' WHERE id=2000", tableId),
+                    String.format("DELETE FROM %s WHERE id=1019", tableId)
+                };
+        SnapshotPhaseHook snapshotPhaseHook =
+                (sourceConfig, split) -> {
+                    PostgresDialect dialect =
+                            new PostgresDialect((PostgresSourceConfig) sourceConfig);
+                    try (PostgresConnection postgresConnection = dialect.openJdbcConnection()) {
+                        postgresConnection.execute(statements);
+                        postgresConnection.commit();
+                        Thread.sleep(500L);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                };
+
+        if (hookType == USE_POST_LOWWATERMARK_HOOK) {
+            hooks.setPostLowWatermarkAction(snapshotPhaseHook);
+        } else if (hookType == USE_PRE_HIGHWATERMARK_HOOK) {
+            hooks.setPreHighWatermarkAction(snapshotPhaseHook);
+        }
+        source.setSnapshotHooks(hooks);
+
+        List<String> records;
+        try (CloseableIterator<RowData> iterator =
+                env.fromSource(source, WatermarkStrategy.noWatermarks(), "Backfill Skipped Source")
+                        .executeAndCollect()) {
+            records = fetchRowData(iterator, fetchSize, customerTable::stringify);
+            env.close();
+        }
+        return records;
     }
 
     private void testPostgresParallelSource(
@@ -305,7 +567,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                RestartStrategies.fixedDelayRestart(1, 0));
+                RestartStrategies.fixedDelayRestart(1, 0),
+                false);
     }
 
     private void testPostgresParallelSource(
@@ -314,66 +577,63 @@ public class PostgresSourceITCase extends PostgresTestBase {
             FailoverType failoverType,
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration)
+            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            boolean skipSnapshotBackfill)
             throws Exception {
-        String slotName = getSlotName();
-        try {
-            customDatabase.createAndInitialize();
-            StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-            StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
-            env.setParallelism(parallelism);
-            env.enableCheckpointing(200L);
-            env.setRestartStrategy(restartStrategyConfiguration);
-            String sourceDDL =
-                    format(
-                            "CREATE TABLE customers ("
-                                    + " id BIGINT NOT NULL,"
-                                    + " name STRING,"
-                                    + " address STRING,"
-                                    + " phone_number STRING,"
-                                    + " primary key (id) not enforced"
-                                    + ") WITH ("
-                                    + " 'connector' = 'postgres-cdc',"
-                                    + " 'scan.incremental.snapshot.enabled' = 'true',"
-                                    + " 'hostname' = '%s',"
-                                    + " 'port' = '%s',"
-                                    + " 'username' = '%s',"
-                                    + " 'password' = '%s',"
-                                    + " 'database-name' = '%s',"
-                                    + " 'schema-name' = '%s',"
-                                    + " 'table-name' = '%s',"
-                                    + " 'scan.startup.mode' = '%s',"
-                                    + " 'scan.incremental.snapshot.chunk.size' = '100',"
-                                    + " 'slot.name' = '%s'"
-                                    + ")",
-                            customDatabase.getHost(),
-                            customDatabase.getDatabasePort(),
-                            customDatabase.getUsername(),
-                            customDatabase.getPassword(),
-                            customDatabase.getDatabaseName(),
-                            SCHEMA_NAME,
-                            getTableNameRegex(captureCustomerTables),
-                            scanStartupMode,
-                            slotName);
-            tEnv.executeSql(sourceDDL);
-            TableResult tableResult = tEnv.executeSql("select * from customers");
+        env.setParallelism(parallelism);
+        env.enableCheckpointing(200L);
+        env.setRestartStrategy(restartStrategyConfiguration);
+        String sourceDDL =
+                format(
+                        "CREATE TABLE customers ("
+                                + " id BIGINT NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " primary key (id) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.startup.mode' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'slot.name' = '%s',"
+                                + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
+                                + ")",
+                        customDatabase.getHost(),
+                        customDatabase.getDatabasePort(),
+                        customDatabase.getUsername(),
+                        customDatabase.getPassword(),
+                        customDatabase.getDatabaseName(),
+                        SCHEMA_NAME,
+                        getTableNameRegex(captureCustomerTables),
+                        scanStartupMode,
+                        slotName,
+                        skipSnapshotBackfill);
+        tEnv.executeSql(sourceDDL);
+        TableResult tableResult = tEnv.executeSql("select * from customers");
 
-            // first step: check the snapshot data
-            if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
-                checkSnapshotData(tableResult, failoverType, failoverPhase, captureCustomerTables);
-            }
-
-            // second step: check the stream data
-            checkStreamData(tableResult, failoverType, failoverPhase, captureCustomerTables);
-
-            tableResult.getJobClient().get().cancel().get();
-
-            // sleep 1000ms to wait until connections are closed.
-            Thread.sleep(1000L);
-        } finally {
-            customDatabase.removeSlot(slotName);
+        // first step: check the snapshot data
+        if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            checkSnapshotData(tableResult, failoverType, failoverPhase, captureCustomerTables);
         }
+
+        // second step: check the stream data
+        checkStreamData(tableResult, failoverType, failoverPhase, captureCustomerTables);
+
+        tableResult.getJobClient().get().cancel().get();
+
+        // sleep 1000ms to wait until connections are closed.
+        Thread.sleep(1000L);
     }
 
     private void checkSnapshotData(
@@ -538,6 +798,17 @@ public class PostgresSourceITCase extends PostgresTestBase {
             // pattern that matches multiple tables
             return format("(%s)", StringUtils.join(captureCustomerTables, "|"));
         }
+    }
+
+    private static List<String> fetchRowData(
+            Iterator<RowData> iter, int size, Function<RowData, String> stringifier) {
+        List<RowData> rows = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            RowData row = iter.next();
+            rows.add(row);
+            size--;
+        }
+        return rows.stream().map(stringifier).collect(Collectors.toList());
     }
 
     private static List<String> fetchRows(Iterator<Row> iter, int size) {

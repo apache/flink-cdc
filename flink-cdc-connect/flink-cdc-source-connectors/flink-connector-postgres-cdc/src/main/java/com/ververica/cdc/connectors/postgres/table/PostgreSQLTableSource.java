@@ -83,6 +83,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final String chunkKeyColumn;
     private final boolean closeIdleReaders;
 
+    private final boolean skipSnapshotBackfill;
+
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
     // --------------------------------------------------------------------------------------------
@@ -118,7 +120,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             Duration heartbeatInterval,
             StartupOptions startupOptions,
             @Nullable String chunkKeyColumn,
-            boolean closeIdleReaders) {
+            boolean closeIdleReaders,
+            boolean skipSnapshotBackfill) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -147,6 +150,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
         this.closeIdleReaders = closeIdleReaders;
+        this.skipSnapshotBackfill = skipSnapshotBackfill;
     }
 
     @Override
@@ -206,6 +210,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .chunkKeyColumn(chunkKeyColumn)
                             .heartbeatInterval(heartbeatInterval)
                             .closeIdleReaders(closeIdleReaders)
+                            .skipSnapshotBackfill(skipSnapshotBackfill)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -271,7 +276,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         heartbeatInterval,
                         startupOptions,
                         chunkKeyColumn,
-                        closeIdleReaders);
+                        closeIdleReaders,
+                        skipSnapshotBackfill);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -312,7 +318,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 && Objects.equals(heartbeatInterval, that.heartbeatInterval)
                 && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
-                && Objects.equals(closeIdleReaders, that.closeIdleReaders);
+                && Objects.equals(closeIdleReaders, that.closeIdleReaders)
+                && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill);
     }
 
     @Override
@@ -344,7 +351,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 heartbeatInterval,
                 startupOptions,
                 chunkKeyColumn,
-                closeIdleReaders);
+                closeIdleReaders,
+                skipSnapshotBackfill);
     }
 
     @Override
