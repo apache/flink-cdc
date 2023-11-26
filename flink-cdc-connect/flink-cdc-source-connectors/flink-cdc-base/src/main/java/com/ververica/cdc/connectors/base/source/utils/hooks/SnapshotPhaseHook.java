@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.source.utils.hooks;
+package com.ververica.cdc.connectors.base.source.utils.hooks;
 
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.connector.source.SourceSplit;
 import org.apache.flink.util.function.BiConsumerWithException;
 
-import io.debezium.connector.mysql.MySqlConnection;
+import com.ververica.cdc.connectors.base.config.SourceConfig;
 
 import java.io.Serializable;
 import java.sql.SQLException;
@@ -34,4 +34,4 @@ import java.sql.SQLException;
 @Internal
 @FunctionalInterface
 public interface SnapshotPhaseHook
-        extends BiConsumerWithException<MySqlConnection, SourceSplit, SQLException>, Serializable {}
+        extends BiConsumerWithException<SourceConfig, SourceSplit, SQLException>, Serializable {}

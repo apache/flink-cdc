@@ -28,7 +28,6 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
-import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import com.ververica.cdc.connectors.postgres.source.fetch.PostgresScanFetchTask;
 import com.ververica.cdc.connectors.postgres.source.fetch.PostgresSourceFetchTaskContext;
 import com.ververica.cdc.connectors.postgres.source.fetch.PostgresStreamFetchTask;
@@ -70,8 +69,8 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
     @Nullable private PostgresStreamFetchTask streamFetchTask;
 
-    public PostgresDialect(PostgresSourceConfigFactory configFactory) {
-        this.sourceConfig = configFactory.create(0);
+    public PostgresDialect(PostgresSourceConfig sourceConfig) {
+        this.sourceConfig = sourceConfig;
     }
 
     @Override

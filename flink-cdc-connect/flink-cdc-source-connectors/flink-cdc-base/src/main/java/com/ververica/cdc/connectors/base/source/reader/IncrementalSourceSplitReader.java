@@ -28,10 +28,12 @@ import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.source.meta.split.ChangeEventRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.reader.external.AbstractScanFetcherTask;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.Fetcher;
 import com.ververica.cdc.connectors.base.source.reader.external.IncrementalSourceScanFetcher;
 import com.ververica.cdc.connectors.base.source.reader.external.IncrementalSourceStreamFetcher;
+import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,12 +59,18 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
     private final DataSourceDialect<C> dataSourceDialect;
     private final C sourceConfig;
 
+    private final SnapshotPhaseHooks snapshotHooks;
+
     public IncrementalSourceSplitReader(
-            int subtaskId, DataSourceDialect<C> dataSourceDialect, C sourceConfig) {
+            int subtaskId,
+            DataSourceDialect<C> dataSourceDialect,
+            C sourceConfig,
+            SnapshotPhaseHooks snapshotHooks) {
         this.subtaskId = subtaskId;
         this.splits = new ArrayDeque<>();
         this.dataSourceDialect = dataSourceDialect;
         this.sourceConfig = sourceConfig;
+        this.snapshotHooks = snapshotHooks;
     }
 
     @Override
@@ -113,16 +121,18 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
 
         if (canAssignNextSplit()) {
             final SourceSplitBase nextSplit = splits.poll();
+
             if (nextSplit == null) {
                 throw new IOException("Cannot fetch from another split - no split remaining.");
             }
             currentSplitId = nextSplit.splitId();
-
+            FetchTask fetchTask = dataSourceDialect.createFetchTask(nextSplit);
             if (nextSplit.isSnapshotSplit()) {
                 if (currentFetcher == null) {
                     final FetchTask.Context taskContext =
                             dataSourceDialect.createFetchTaskContext(nextSplit, sourceConfig);
                     currentFetcher = new IncrementalSourceScanFetcher(taskContext, subtaskId);
+                    ((AbstractScanFetcherTask) fetchTask).setSnapshotPhaseHooks(snapshotHooks);
                 }
             } else {
                 // point from snapshot split to stream split
@@ -135,7 +145,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
                 currentFetcher = new IncrementalSourceStreamFetcher(taskContext, subtaskId);
                 LOG.info("Stream fetcher is created.");
             }
-            currentFetcher.submitTask(dataSourceDialect.createFetchTask(nextSplit));
+            currentFetcher.submitTask(fetchTask);
         }
     }
 

@@ -301,8 +301,9 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
         SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
         snapshotHooks.setPreHighWatermarkAction(
-                (split) -> {
+                (mySqlConnection, split) -> {
                     mySqlConnection.execute(changingDataSql);
+                    mySqlConnection.commit();
                 });
 
         final DataType dataType =
@@ -359,8 +360,9 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
         SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
         snapshotHooks.setPostLowWatermarkAction(
-                (split) -> {
+                (mySqlConnection, split) -> {
                     mySqlConnection.execute(insertDataSql);
+                    mySqlConnection.commit();
                 });
 
         final DataType dataType =
@@ -420,8 +422,9 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
         SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
         snapshotHooks.setPreHighWatermarkAction(
-                (split) -> {
+                (mySqlConnection, split) -> {
                     mySqlConnection.execute(deleteDataSql);
+                    mySqlConnection.commit();
                 });
 
         final DataType dataType =

@@ -145,7 +145,7 @@ public class MySqlSnapshotSplitReadTask
                         dispatcher.getQueue());
 
         if (hooks.getPreLowWatermarkAction() != null) {
-            hooks.getPreLowWatermarkAction().accept(snapshotSplit);
+            hooks.getPreLowWatermarkAction().accept(jdbcConnection, snapshotSplit);
         }
         final BinlogOffset lowWatermark = currentBinlogOffset(jdbcConnection);
         LOG.info(
@@ -158,14 +158,14 @@ public class MySqlSnapshotSplitReadTask
                 snapshotSplit, lowWatermark, SignalEventDispatcher.WatermarkKind.LOW);
 
         if (hooks.getPostLowWatermarkAction() != null) {
-            hooks.getPostLowWatermarkAction().accept(snapshotSplit);
+            hooks.getPostLowWatermarkAction().accept(jdbcConnection, snapshotSplit);
         }
 
         LOG.info("Snapshot step 2 - Snapshotting data");
         createDataEvents(ctx, snapshotSplit.getTableId());
 
         if (hooks.getPreHighWatermarkAction() != null) {
-            hooks.getPreHighWatermarkAction().accept(snapshotSplit);
+            hooks.getPreHighWatermarkAction().accept(jdbcConnection, snapshotSplit);
         }
 
         final BinlogOffset highWatermark = currentBinlogOffset(jdbcConnection);
@@ -179,7 +179,7 @@ public class MySqlSnapshotSplitReadTask
                 .setHighWatermark(highWatermark);
 
         if (hooks.getPostHighWatermarkAction() != null) {
-            hooks.getPostHighWatermarkAction().accept(snapshotSplit);
+            hooks.getPostHighWatermarkAction().accept(jdbcConnection, snapshotSplit);
         }
         return SnapshotResult.completed(ctx.offset);
     }

@@ -27,7 +27,6 @@ import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.sqlserver.source.config.SqlServerSourceConfig;
-import com.ververica.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
 import com.ververica.cdc.connectors.sqlserver.source.reader.fetch.SqlServerScanFetchTask;
 import com.ververica.cdc.connectors.sqlserver.source.reader.fetch.SqlServerSourceFetchTaskContext;
 import com.ververica.cdc.connectors.sqlserver.source.reader.fetch.SqlServerStreamFetchTask;
@@ -53,8 +52,8 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
     private final SqlServerSourceConfig sourceConfig;
     private transient SqlServerSchema sqlserverSchema;
 
-    public SqlServerDialect(SqlServerSourceConfigFactory configFactory) {
-        this.sourceConfig = configFactory.create(0);
+    public SqlServerDialect(SqlServerSourceConfig sourceConfig) {
+        this.sourceConfig = sourceConfig;
     }
 
     @Override

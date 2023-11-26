@@ -19,12 +19,15 @@ package com.ververica.cdc.connectors.sqlserver.source.read.fetch;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 
-import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
+import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.reader.external.AbstractScanFetcherTask;
+import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.IncrementalSourceScanFetcher;
+import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import com.ververica.cdc.connectors.sqlserver.source.SqlServerSourceTestBase;
 import com.ververica.cdc.connectors.sqlserver.source.config.SqlServerSourceConfig;
 import com.ververica.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
@@ -32,16 +35,8 @@ import com.ververica.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
 import com.ververica.cdc.connectors.sqlserver.source.reader.fetch.SqlServerScanFetchTask;
 import com.ververica.cdc.connectors.sqlserver.source.reader.fetch.SqlServerSourceFetchTaskContext;
 import com.ververica.cdc.connectors.sqlserver.testutils.RecordsFormatter;
-import io.debezium.connector.sqlserver.SqlServerConnection;
-import io.debezium.connector.sqlserver.SqlServerPartition;
-import io.debezium.data.Envelope;
 import io.debezium.jdbc.JdbcConnection;
-import io.debezium.pipeline.EventDispatcher;
-import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.TableId;
-import io.debezium.schema.DataCollectionSchema;
-import org.apache.kafka.connect.data.Struct;
-import org.apache.kafka.connect.header.ConnectHeaders;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
 
@@ -51,7 +46,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.sqlserver.source.utils.SqlServerConnectionUtils.createSqlServerConnection;
@@ -72,7 +66,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
         SqlServerSourceConfigFactory sourceConfigFactory =
                 getConfigFactory(databaseName, new String[] {tableName}, 10);
         SqlServerSourceConfig sourceConfig = sourceConfigFactory.create(0);
-        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfigFactory);
+        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfigFactory.create(0));
 
         String tableId = databaseName + "." + tableName;
         String[] changingDataSql =
@@ -85,13 +79,15 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                     "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
                 };
 
-        MakeChangeEventTaskContext makeChangeEventTaskContext =
-                new MakeChangeEventTaskContext(
+        SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
+        hooks.setPostHighWatermarkAction(
+                (dialect, split) -> executeSql(sourceConfig, changingDataSql));
+        SqlServerSourceFetchTaskContext sqlServerSourceFetchTaskContext =
+                new SqlServerSourceFetchTaskContext(
                         sourceConfig,
                         sqlServerDialect,
                         createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
-                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
-                        () -> executeSql(sourceConfig, changingDataSql));
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()));
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -115,7 +111,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                 };
 
         List<String> actual =
-                readTableSnapshotSplits(snapshotSplits, makeChangeEventTaskContext, 1, dataType);
+                readTableSnapshotSplits(
+                        snapshotSplits, sqlServerSourceFetchTaskContext, 1, dataType);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -129,7 +126,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
         SqlServerSourceConfigFactory sourceConfigFactory =
                 getConfigFactory(databaseName, new String[] {tableName}, 10);
         SqlServerSourceConfig sourceConfig = sourceConfigFactory.create(0);
-        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfigFactory);
+        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfigFactory.create(0));
 
         String tableId = databaseName + "." + tableName;
         String[] insertDataSql =
@@ -138,13 +135,15 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                     "INSERT INTO " + tableId + " VALUES(113, 'user_13','Shanghai','123567891234')",
                 };
 
-        MakeChangeEventTaskContext makeChangeEventTaskContext =
-                new MakeChangeEventTaskContext(
+        SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
+        hooks.setPostHighWatermarkAction(
+                (dialect, split) -> executeSql(sourceConfig, insertDataSql));
+        SqlServerSourceFetchTaskContext sqlServerSourceFetchTaskContext =
+                new SqlServerSourceFetchTaskContext(
                         sourceConfig,
                         sqlServerDialect,
                         createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
-                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
-                        () -> executeSql(sourceConfig, insertDataSql));
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()));
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -170,7 +169,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                 };
 
         List<String> actual =
-                readTableSnapshotSplits(snapshotSplits, makeChangeEventTaskContext, 1, dataType);
+                readTableSnapshotSplits(
+                        snapshotSplits, sqlServerSourceFetchTaskContext, 1, dataType);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -184,7 +184,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
         SqlServerSourceConfigFactory sourceConfigFactory =
                 getConfigFactory(databaseName, new String[] {tableName}, 10);
         SqlServerSourceConfig sourceConfig = sourceConfigFactory.create(0);
-        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfigFactory);
+        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfigFactory.create(0));
 
         String tableId = databaseName + "." + tableName;
         String[] deleteDataSql =
@@ -193,13 +193,15 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                     "DELETE FROM " + tableId + " where id = 102",
                 };
 
-        MakeChangeEventTaskContext makeChangeEventTaskContext =
-                new MakeChangeEventTaskContext(
+        SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
+        hooks.setPostLowWatermarkAction(
+                (dialect, split) -> executeSql(sourceConfig, deleteDataSql));
+        SqlServerSourceFetchTaskContext sqlServerSourceFetchTaskContext =
+                new SqlServerSourceFetchTaskContext(
                         sourceConfig,
                         sqlServerDialect,
                         createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
-                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
-                        () -> executeSql(sourceConfig, deleteDataSql));
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()));
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -221,7 +223,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                 };
 
         List<String> actual =
-                readTableSnapshotSplits(snapshotSplits, makeChangeEventTaskContext, 1, dataType);
+                readTableSnapshotSplits(
+                        snapshotSplits, sqlServerSourceFetchTaskContext, 1, dataType, hooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -231,6 +234,17 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
             int scanSplitsNum,
             DataType dataType)
             throws Exception {
+        return readTableSnapshotSplits(
+                snapshotSplits, taskContext, scanSplitsNum, dataType, SnapshotPhaseHooks.empty());
+    }
+
+    private List<String> readTableSnapshotSplits(
+            List<SnapshotSplit> snapshotSplits,
+            SqlServerSourceFetchTaskContext taskContext,
+            int scanSplitsNum,
+            DataType dataType,
+            SnapshotPhaseHooks snapshotPhaseHooks)
+            throws Exception {
         IncrementalSourceScanFetcher sourceScanFetcher =
                 new IncrementalSourceScanFetcher(taskContext, 0);
 
@@ -238,8 +252,10 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
         for (int i = 0; i < scanSplitsNum; i++) {
             SnapshotSplit sqlSplit = snapshotSplits.get(i);
             if (sourceScanFetcher.isFinished()) {
-                sourceScanFetcher.submitTask(
-                        taskContext.getDataSourceDialect().createFetchTask(sqlSplit));
+                FetchTask<SourceSplitBase> fetchTask =
+                        taskContext.getDataSourceDialect().createFetchTask(sqlSplit);
+                ((AbstractScanFetcherTask) fetchTask).setSnapshotPhaseHooks(snapshotPhaseHooks);
+                sourceScanFetcher.submitTask(fetchTask);
             }
             Iterator<SourceRecords> res;
             while ((res = sourceScanFetcher.pollSplitRecords()) != null) {
@@ -304,50 +320,5 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
             return false;
         }
         return true;
-    }
-
-    static class MakeChangeEventTaskContext extends SqlServerSourceFetchTaskContext {
-
-        private final Supplier<Boolean> makeChangeEventFunction;
-
-        public MakeChangeEventTaskContext(
-                JdbcSourceConfig jdbcSourceConfig,
-                SqlServerDialect sqlServerDialect,
-                SqlServerConnection connection,
-                SqlServerConnection metaDataConnection,
-                Supplier<Boolean> makeChangeEventFunction) {
-            super(jdbcSourceConfig, sqlServerDialect, connection, metaDataConnection);
-            this.makeChangeEventFunction = makeChangeEventFunction;
-        }
-
-        @Override
-        public EventDispatcher.SnapshotReceiver<SqlServerPartition> getSnapshotReceiver() {
-            EventDispatcher.SnapshotReceiver<SqlServerPartition> snapshotReceiver =
-                    super.getSnapshotReceiver();
-            return new EventDispatcher.SnapshotReceiver<SqlServerPartition>() {
-
-                @Override
-                public void changeRecord(
-                        SqlServerPartition partition,
-                        DataCollectionSchema schema,
-                        Envelope.Operation operation,
-                        Object key,
-                        Struct value,
-                        OffsetContext offset,
-                        ConnectHeaders headers)
-                        throws InterruptedException {
-                    snapshotReceiver.changeRecord(
-                            partition, schema, operation, key, value, offset, headers);
-                }
-
-                @Override
-                public void completeSnapshot() throws InterruptedException {
-                    snapshotReceiver.completeSnapshot();
-                    // make change events
-                    makeChangeEventFunction.get();
-                    Thread.sleep(10 * 1000);
-                }
-            };
-        }
     }
 }
