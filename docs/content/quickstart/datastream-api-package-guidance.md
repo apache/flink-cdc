@@ -87,6 +87,7 @@ flink 1.17.2  flink mysql cdc 2.4.2
         <!--  Use flink shaded guava  30.1.1-jre-15.0 for flink-1.15  -->
         <!--  Use flink shaded guava  30.1.1-jre-15.0 for flink-1.16  -->
         <!--  Use flink shaded guava  30.1.1-jre-16.1 for flink-1.17  -->
+        <!--  Use flink shaded guava  31.1-jre-17.0   for flink-1.18  -->
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-shaded-guava</artifactId>
