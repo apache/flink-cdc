@@ -44,6 +44,12 @@ under the License.
             <version>${revision}</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>com.starrocks</groupId>
+            <artifactId>flink-connector-starrocks</artifactId>
+            <version>1.2.9_flink-1.18-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
 </project>

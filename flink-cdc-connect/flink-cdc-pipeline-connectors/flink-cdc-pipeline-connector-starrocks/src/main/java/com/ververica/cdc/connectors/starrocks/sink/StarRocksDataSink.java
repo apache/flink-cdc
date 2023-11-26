@@ -16,12 +16,15 @@
 
 package com.ververica.cdc.connectors.starrocks.sink;
 
+import com.starrocks.connector.flink.table.sink.SinkFunctionFactory;
 import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.starrocks.connector.flink.table.sink.v2.StarRocksSink;
+import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.sink.DataSink;
 import com.ververica.cdc.common.sink.EventSinkProvider;
 import com.ververica.cdc.common.sink.FlinkSinkProvider;
 import com.ververica.cdc.common.sink.MetadataApplier;
+import com.ververica.cdc.connectors.starrocks.sink.catalog.StarRocksCatalog;
 
 import java.io.Serializable;
 
@@ -30,19 +33,39 @@ public class StarRocksDataSink implements DataSink, Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    /** Configurations for sink connector. */
     private final StarRocksSinkOptions sinkOptions;
 
-    public StarRocksDataSink(StarRocksSinkOptions sinkOptions) {
+    /** Configurations for creating a StarRocks table. */
+    private final TableConfig tableConfig;
+
+    /** Configurations for schema change. */
+    private final SchemaChangeConfig schemaChangeConfig;
+
+    public StarRocksDataSink(
+            StarRocksSinkOptions sinkOptions,
+            TableConfig tableConfig,
+            SchemaChangeConfig schemaChangeConfig) {
         this.sinkOptions = sinkOptions;
+        this.tableConfig = tableConfig;
+        this.schemaChangeConfig = schemaChangeConfig;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        return FlinkSinkProvider.of(new StarRocksSink<>(sinkOptions));
+        // TODO custom event serializer
+        StarRocksSink<Event> starRocksSink = SinkFunctionFactory.createSink(sinkOptions);
+        return FlinkSinkProvider.of(starRocksSink);
     }
 
     @Override
     public MetadataApplier getMetadataApplier() {
-        return new StarRocksMetadataApplier();
+        JdbcConfig jdbcConfig =
+                new JdbcConfig(
+                        sinkOptions.getJdbcUrl(),
+                        sinkOptions.getUsername(),
+                        sinkOptions.getPassword());
+        StarRocksCatalog catalog = new StarRocksCatalog(jdbcConfig);
+        return new StarRocksMetadataApplier(catalog, tableConfig, schemaChangeConfig);
     }
 }
