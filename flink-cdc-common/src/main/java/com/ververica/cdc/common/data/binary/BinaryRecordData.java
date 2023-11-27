@@ -215,7 +215,7 @@ public final class BinaryRecordData extends BinarySection implements RecordData,
         assertIndexIsValid(pos);
 
         if (TimestampData.isCompact(precision)) {
-            return TimestampData.fromEpochMillis(segments[0].getLong(getFieldOffset(pos)));
+            return TimestampData.fromMillis(segments[0].getLong(getFieldOffset(pos)));
         }
 
         int fieldOffset = getFieldOffset(pos);

@@ -42,17 +42,17 @@ abstract class TimestampDataSerializerTest extends SerializerTestBase<TimestampD
     protected TimestampData[] getTestData() {
         if (getPrecision() > 3) {
             return new TimestampData[] {
-                TimestampData.fromEpochMillis(1, 1),
-                TimestampData.fromEpochMillis(2, 2),
-                TimestampData.fromEpochMillis(3, 3),
-                TimestampData.fromEpochMillis(4, 4)
+                TimestampData.fromMillis(1, 1),
+                TimestampData.fromMillis(2, 2),
+                TimestampData.fromMillis(3, 3),
+                TimestampData.fromMillis(4, 4)
             };
         } else {
             return new TimestampData[] {
-                TimestampData.fromEpochMillis(1, 0),
-                TimestampData.fromEpochMillis(2, 0),
-                TimestampData.fromEpochMillis(3, 0),
-                TimestampData.fromEpochMillis(4, 0)
+                TimestampData.fromMillis(1, 0),
+                TimestampData.fromMillis(2, 0),
+                TimestampData.fromMillis(3, 0),
+                TimestampData.fromMillis(4, 0)
             };
         }
     }
