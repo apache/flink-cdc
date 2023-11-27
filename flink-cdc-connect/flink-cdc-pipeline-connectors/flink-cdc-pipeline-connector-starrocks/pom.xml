@@ -55,7 +55,7 @@ under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
-                                    <include>*:*</include>
+                                    <include>com.starrocks:*</include>
                                 </includes>
                             </artifactSet>
                         </configuration>
@@ -65,4 +65,10 @@ under the License.
         </plugins>
     </build>
 
+    <repositories>
+        <repository>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+        </repository>
+    </repositories>
 </project>
