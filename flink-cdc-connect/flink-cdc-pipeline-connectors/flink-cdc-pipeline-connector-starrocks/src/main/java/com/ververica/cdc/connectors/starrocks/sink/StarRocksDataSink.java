@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.starrocks.sink;
 
+import com.starrocks.connector.flink.catalog.StarRocksCatalog;
 import com.starrocks.connector.flink.table.sink.SinkFunctionFactory;
 import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.starrocks.connector.flink.table.sink.v2.StarRocksSink;
@@ -24,7 +25,6 @@ import com.ververica.cdc.common.sink.DataSink;
 import com.ververica.cdc.common.sink.EventSinkProvider;
 import com.ververica.cdc.common.sink.FlinkSinkProvider;
 import com.ververica.cdc.common.sink.MetadataApplier;
-import com.ververica.cdc.connectors.starrocks.sink.catalog.StarRocksCatalog;
 
 import java.io.Serializable;
 
@@ -60,12 +60,11 @@ public class StarRocksDataSink implements DataSink, Serializable {
 
     @Override
     public MetadataApplier getMetadataApplier() {
-        JdbcConfig jdbcConfig =
-                new JdbcConfig(
+        StarRocksCatalog catalog =
+                new StarRocksCatalog(
                         sinkOptions.getJdbcUrl(),
                         sinkOptions.getUsername(),
                         sinkOptions.getPassword());
-        StarRocksCatalog catalog = new StarRocksCatalog(jdbcConfig);
         return new StarRocksMetadataApplier(catalog, tableConfig, schemaChangeConfig);
     }
 }

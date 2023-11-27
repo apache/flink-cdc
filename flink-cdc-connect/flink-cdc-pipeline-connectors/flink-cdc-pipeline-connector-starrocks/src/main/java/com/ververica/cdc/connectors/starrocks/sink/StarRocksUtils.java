@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.starrocks.sink;
 
+import com.starrocks.connector.flink.catalog.StarRocksColumn;
+import com.starrocks.connector.flink.catalog.StarRocksTable;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;

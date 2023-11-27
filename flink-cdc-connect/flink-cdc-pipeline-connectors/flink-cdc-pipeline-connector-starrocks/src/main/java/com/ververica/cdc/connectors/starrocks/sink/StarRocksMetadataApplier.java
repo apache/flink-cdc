@@ -16,6 +16,10 @@
 
 package com.ververica.cdc.connectors.starrocks.sink;
 
+import com.starrocks.connector.flink.catalog.StarRocksCatalog;
+import com.starrocks.connector.flink.catalog.StarRocksCatalogException;
+import com.starrocks.connector.flink.catalog.StarRocksColumn;
+import com.starrocks.connector.flink.catalog.StarRocksTable;
 import com.ververica.cdc.common.event.AddColumnEvent;
 import com.ververica.cdc.common.event.AlterColumnTypeEvent;
 import com.ververica.cdc.common.event.CreateTableEvent;
@@ -25,8 +29,6 @@ import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.sink.MetadataApplier;
-import com.ververica.cdc.connectors.starrocks.sink.catalog.StarRocksCatalog;
-import com.ververica.cdc.connectors.starrocks.sink.catalog.StarRocksCatalogException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
