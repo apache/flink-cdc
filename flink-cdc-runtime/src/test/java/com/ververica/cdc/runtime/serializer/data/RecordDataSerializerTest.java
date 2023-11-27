@@ -21,7 +21,7 @@ import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.serializer.SerializerTestBase;
-import com.ververica.cdc.runtime.typeutils.RecordDataUtil;
+import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 /** A test for the {@link StringDataSerializer}. */
 public class RecordDataSerializerTest extends SerializerTestBase<RecordData> {
@@ -43,11 +43,12 @@ public class RecordDataSerializerTest extends SerializerTestBase<RecordData> {
 
     @Override
     protected RecordData[] getTestData() {
-        RowType rowType = RowType.of(DataTypes.BIGINT(), DataTypes.STRING());
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.BIGINT(), DataTypes.STRING()));
         return new RecordData[] {
-            RecordDataUtil.of(rowType, new Object[] {1L, BinaryStringData.fromString("test1")}),
-            RecordDataUtil.of(rowType, new Object[] {2L, BinaryStringData.fromString("test2")}),
-            RecordDataUtil.of(rowType, new Object[] {3L, null})
+            generator.generate(new Object[] {1L, BinaryStringData.fromString("test1")}),
+            generator.generate(new Object[] {2L, BinaryStringData.fromString("test2")}),
+            generator.generate(new Object[] {3L, null})
         };
     }
 }

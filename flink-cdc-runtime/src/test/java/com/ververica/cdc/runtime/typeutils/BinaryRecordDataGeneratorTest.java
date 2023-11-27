@@ -33,8 +33,8 @@ import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Unit tests for {@link RecordDataUtil}. */
-public class RecordDataUtilTest {
+/** Unit tests for {@link BinaryRecordDataGenerator}. */
+public class BinaryRecordDataGeneratorTest {
 
     @Test
     void testOf() {
@@ -93,12 +93,12 @@ public class RecordDataUtilTest {
                     LocalZonedTimestampData.fromEpochMillis(400),
                     ZonedTimestampData.of(500, 1, "UTC"),
                     ZonedTimestampData.of(600, 0, "UTC"),
-                    RecordDataUtil.of(
-                            RowType.of(DataTypes.STRING(), DataTypes.BIGINT()),
-                            new Object[] {BinaryStringData.fromString("test"), 23L}),
+                    new BinaryRecordDataGenerator(
+                                    RowType.of(DataTypes.STRING(), DataTypes.BIGINT()))
+                            .generate(new Object[] {BinaryStringData.fromString("test"), 23L}),
                     null
                 };
-        BinaryRecordData actual = RecordDataUtil.of(rowType, testData);
+        BinaryRecordData actual = new BinaryRecordDataGenerator(rowType).generate(testData);
 
         assertThat(actual.getBoolean(0)).isTrue();
 

@@ -29,7 +29,7 @@ import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
-import com.ververica.cdc.runtime.typeutils.RecordDataUtil;
+import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -110,13 +110,13 @@ public class ValuesDataSourceHelper {
         CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
         split1.add(createTableEvent);
 
-        RowType rowType = RowType.of(DataTypes.STRING(), DataTypes.STRING());
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
         // insert
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
@@ -125,8 +125,7 @@ public class ValuesDataSourceHelper {
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("2")
@@ -135,8 +134,7 @@ public class ValuesDataSourceHelper {
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("3"),
                                     BinaryStringData.fromString("3")
@@ -170,8 +168,7 @@ public class ValuesDataSourceHelper {
         split1.add(
                 DataChangeEvent.deleteEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
@@ -181,14 +178,12 @@ public class ValuesDataSourceHelper {
         split1.add(
                 DataChangeEvent.updateEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("")
                                 }),
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("x")
@@ -214,13 +209,13 @@ public class ValuesDataSourceHelper {
         CreateTableEvent createTableEvent2 = new CreateTableEvent(table2, schema);
         split1.add(createTableEvent2);
 
-        RowType rowType = RowType.of(DataTypes.STRING(), DataTypes.STRING());
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
         // insert into table1
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
@@ -229,8 +224,7 @@ public class ValuesDataSourceHelper {
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("2")
@@ -239,8 +233,7 @@ public class ValuesDataSourceHelper {
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("3"),
                                     BinaryStringData.fromString("3")
@@ -259,8 +252,7 @@ public class ValuesDataSourceHelper {
         insertEvent1 =
                 DataChangeEvent.insertEvent(
                         table2,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
@@ -269,8 +261,7 @@ public class ValuesDataSourceHelper {
         insertEvent2 =
                 DataChangeEvent.insertEvent(
                         table2,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("2")
@@ -279,8 +270,7 @@ public class ValuesDataSourceHelper {
         insertEvent3 =
                 DataChangeEvent.insertEvent(
                         table2,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("3"),
                                     BinaryStringData.fromString("3")
@@ -306,8 +296,7 @@ public class ValuesDataSourceHelper {
         split1.add(
                 DataChangeEvent.deleteEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
@@ -317,14 +306,12 @@ public class ValuesDataSourceHelper {
         split1.add(
                 DataChangeEvent.updateEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("2")
                                 }),
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("x")
