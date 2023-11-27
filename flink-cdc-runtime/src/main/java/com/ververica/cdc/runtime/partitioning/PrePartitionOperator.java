@@ -22,7 +22,12 @@ import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
+import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
+import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
+import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
+
 import com.ververica.cdc.common.annotation.Internal;
+import com.ververica.cdc.common.annotation.VisibleForTesting;
 import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
@@ -33,10 +38,9 @@ import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.runtime.operators.sink.SchemaEvolutionClient;
 
+import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -49,12 +53,13 @@ import java.util.function.Function;
 public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEvent>
         implements OneInputStreamOperator<Event, PartitioningEvent> {
 
+    private static final Duration CACHE_EXPIRE_DURATION = Duration.ofDays(1);
+
     private final OperatorID schemaOperatorId;
     private final int downstreamParallelism;
 
-    private SchemaEvolutionClient schemaEvolutionClient;
-    private final Map<TableId, Function<DataChangeEvent, Integer>> cachedHashFunctions =
-            new HashMap<>();
+    private transient SchemaEvolutionClient schemaEvolutionClient;
+    private transient LoadingCache<TableId, HashFunction> cachedHashFunctions;
 
     public PrePartitionOperator(OperatorID schemaOperatorId, int downstreamParallelism) {
         this.schemaOperatorId = schemaOperatorId;
@@ -67,6 +72,7 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
         TaskOperatorEventGateway toCoordinator =
                 getContainingTask().getEnvironment().getOperatorCoordinatorEventGateway();
         schemaEvolutionClient = new SchemaEvolutionClient(toCoordinator, schemaOperatorId);
+        cachedHashFunctions = createCache();
     }
 
     @Override
@@ -74,7 +80,8 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
         Event event = element.getValue();
         if (event instanceof SchemaChangeEvent) {
             // Update hash function
-            recreateHashFunction(((SchemaChangeEvent) event).tableId());
+            TableId tableId = ((SchemaChangeEvent) event).tableId();
+            cachedHashFunctions.put(tableId, recreateHashFunction(tableId));
             // Broadcast SchemaChangeEvent
             broadcastEvent(event);
         } else if (event instanceof FlushEvent) {
@@ -86,14 +93,15 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
         }
     }
 
-    private void partitionBy(DataChangeEvent dataChangeEvent) {
-        Function<DataChangeEvent, Integer> hashFunction =
-                cachedHashFunctions.get(dataChangeEvent.tableId());
+    private void partitionBy(DataChangeEvent dataChangeEvent) throws Exception {
         output.collect(
                 new StreamRecord<>(
                         new PartitioningEvent(
                                 dataChangeEvent,
-                                hashFunction.apply(dataChangeEvent) % downstreamParallelism)));
+                                cachedHashFunctions
+                                                .get(dataChangeEvent.tableId())
+                                                .apply(dataChangeEvent)
+                                        % downstreamParallelism)));
     }
 
     private void broadcastEvent(Event toBroadcast) {
@@ -102,16 +110,40 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
         }
     }
 
-    private void recreateHashFunction(TableId tableId) throws Exception {
-        Optional<Schema> optionalSchema = schemaEvolutionClient.getLatestSchema(tableId);
-        if (!optionalSchema.isPresent()) {
-            throw new IllegalStateException(
-                    String.format("Unable to get latest schema for table %s", tableId));
+    private Schema loadLatestSchemaFromRegistry(TableId tableId) {
+        Optional<Schema> schema;
+        try {
+            schema = schemaEvolutionClient.getLatestSchema(tableId);
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format("Failed to request latest schema for table \"%s\"", tableId), e);
         }
-        cachedHashFunctions.put(tableId, new HashFunction(optionalSchema.get()));
+        if (!schema.isPresent()) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Schema is never registered or outdated for table \"%s\"", tableId));
+        }
+        return schema.get();
     }
 
-    private static class HashFunction implements Function<DataChangeEvent, Integer> {
+    private HashFunction recreateHashFunction(TableId tableId) {
+        return new HashFunction(loadLatestSchemaFromRegistry(tableId));
+    }
+
+    private LoadingCache<TableId, HashFunction> createCache() {
+        return CacheBuilder.newBuilder()
+                .expireAfterAccess(CACHE_EXPIRE_DURATION)
+                .build(
+                        new CacheLoader<TableId, HashFunction>() {
+                            @Override
+                            public HashFunction load(TableId key) {
+                                return recreateHashFunction(key);
+                            }
+                        });
+    }
+
+    @VisibleForTesting
+    static class HashFunction implements Function<DataChangeEvent, Integer> {
         private final List<RecordData.FieldGetter> primaryKeyGetters;
 
         public HashFunction(Schema schema) {
@@ -135,7 +167,7 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
             }
 
             // Calculate hash
-            return Objects.hash(objectsToHash.toArray());
+            return (Objects.hash(objectsToHash.toArray()) * 31) & 0x7FFFFFFF;
         }
 
         private List<RecordData.FieldGetter> createFieldGetters(Schema schema) {
