@@ -22,7 +22,6 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.factories.DataSinkFactory;
-import com.ververica.cdc.common.factories.DataSourceFactory;
 import com.ververica.cdc.common.factories.FactoryHelper;
 import com.ververica.cdc.common.pipeline.PipelineOptions;
 import com.ververica.cdc.common.sink.DataSink;
@@ -107,7 +106,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         sinkDef.getType(), DataSinkFactory.class);
 
         // Include sink connector JAR
-        FactoryDiscoveryUtils.getJarPathByIdentifier(sinkDef.getType(), DataSourceFactory.class)
+        FactoryDiscoveryUtils.getJarPathByIdentifier(sinkDef.getType(), DataSinkFactory.class)
                 .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
 
         // Create data sink
