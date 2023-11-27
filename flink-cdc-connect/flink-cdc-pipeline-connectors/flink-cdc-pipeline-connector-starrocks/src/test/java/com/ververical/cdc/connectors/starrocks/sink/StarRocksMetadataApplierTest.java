@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
-package com.ververical.cdc.connectors.starrocks.sink.catalog;
+package com.ververical.cdc.connectors.starrocks.sink;
 
-import com.ververica.cdc.connectors.starrocks.sink.EventRecordSerializer;
+import com.ververica.cdc.connectors.starrocks.sink.StarRocksMetadataApplier;
 
-/** Tests for {@link EventRecordSerializer}. */
-public class EventRecordSerializerTest {}
+/** Tests for {@link StarRocksMetadataApplier}. */
+public class StarRocksMetadataApplierTest {
+
+
+}

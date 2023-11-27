@@ -44,11 +44,11 @@ under the License.
             <version>${revision}</version>
             <scope>provided</scope>
         </dependency>
+
         <dependency>
-            <groupId>com.starrocks</groupId>
-            <artifactId>flink-connector-starrocks</artifactId>
-            <version>1.2.9_flink-1.18-SNAPSHOT</version>
-            <scope>compile</scope>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-composer</artifactId>
+            <version>${revision}</version>
         </dependency>
     </dependencies>
 

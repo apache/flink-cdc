@@ -14,16 +14,13 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.starrocks.factory;
+package com.ververica.cdc.connectors.starrocks.sink;
 
 import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.ververica.cdc.common.configuration.ConfigOption;
 import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.factories.DataSinkFactory;
 import com.ververica.cdc.common.sink.DataSink;
-import com.ververica.cdc.connectors.starrocks.sink.SchemaChangeConfig;
-import com.ververica.cdc.connectors.starrocks.sink.StarRocksDataSink;
-import com.ververica.cdc.connectors.starrocks.sink.TableConfig;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -48,7 +45,7 @@ import static com.ververica.cdc.connectors.starrocks.sink.StarRocksDataSinkOptio
 import static com.ververica.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.USERNAME;
 
 /** A {@link DataSinkFactory} to create {@link StarRocksDataSink}. */
-public class StarRocksDataFactory implements DataSinkFactory {
+public class StarRocksDataSinkFactory implements DataSinkFactory {
 
     public static final String IDENTIFIER = "starrocks";
 

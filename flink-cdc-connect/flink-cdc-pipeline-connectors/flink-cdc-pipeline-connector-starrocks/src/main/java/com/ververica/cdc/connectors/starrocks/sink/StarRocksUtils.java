@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.starrocks.sink;
 
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
 import com.starrocks.connector.flink.catalog.StarRocksTable;
+import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
@@ -37,8 +38,15 @@ import com.ververica.cdc.common.types.TimestampType;
 import com.ververica.cdc.common.types.TinyIntType;
 import com.ververica.cdc.common.types.VarCharType;
 
+import java.sql.Date;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.ververica.cdc.common.types.DataTypeChecks.getPrecision;
+import static com.ververica.cdc.common.types.DataTypeChecks.getScale;
 
 /** Utilities for conversion from source table to StarRocks table. */
 public class StarRocksUtils {
@@ -99,6 +107,94 @@ public class StarRocksUtils {
     public static void toStarRocksDataType(Column cdcColumn, StarRocksColumn.Builder builder) {
         CdcDataTypeTransformer dataTypeTransformer = new CdcDataTypeTransformer(builder);
         cdcColumn.getType().accept(dataTypeTransformer);
+    }
+
+    /** Format DATE type data. */
+    private static final SimpleDateFormat DATE_FORMATTER = new SimpleDateFormat("yyyy-MM-dd");
+
+    /** Format timestamp-related type data. */
+    private static final DateTimeFormatter DATETIME_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    /**
+     * Creates an accessor for getting elements in an internal RecordData structure at the given
+     * position.
+     *
+     * @param fieldType the element type of the RecordData
+     * @param fieldPos the element position of the RecordData
+     */
+    public static RecordData.FieldGetter createFieldGetter(DataType fieldType, int fieldPos) {
+        final RecordData.FieldGetter fieldGetter;
+        // ordered by type root definition
+        switch (fieldType.getTypeRoot()) {
+            case BOOLEAN:
+                fieldGetter = record -> record.getBoolean(fieldPos);
+                break;
+            case TINYINT:
+                fieldGetter = record -> record.getByte(fieldPos);
+                break;
+            case SMALLINT:
+                fieldGetter = record -> record.getShort(fieldPos);
+                break;
+            case INTEGER:
+                fieldGetter = record -> record.getInt(fieldPos);
+                break;
+            case BIGINT:
+                fieldGetter = record -> record.getLong(fieldPos);
+                break;
+            case FLOAT:
+                fieldGetter = record -> record.getFloat(fieldPos);
+                break;
+            case DOUBLE:
+                fieldGetter = record -> record.getDouble(fieldPos);
+                break;
+            case DECIMAL:
+                final int decimalPrecision = getPrecision(fieldType);
+                final int decimalScale = getScale(fieldType);
+                fieldGetter =
+                        record ->
+                                record.getDecimal(fieldPos, decimalPrecision, decimalScale)
+                                        .toBigDecimal();
+                break;
+            case CHAR:
+            case VARCHAR:
+                fieldGetter = record -> record.getString(fieldPos).toString();
+                break;
+            case DATE:
+                fieldGetter =
+                        record ->
+                                DATE_FORMATTER.format(
+                                        Date.valueOf(
+                                                LocalDate.ofEpochDay(record.getInt(fieldPos))));
+                break;
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                fieldGetter =
+                        record ->
+                                record.getTimestamp(fieldPos, getPrecision(fieldType))
+                                        .toLocalDateTime()
+                                        .format(DATETIME_FORMATTER);
+                break;
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                fieldGetter =
+                        record ->
+                                DATETIME_FORMATTER.format(
+                                        record.getLocalZonedTimestampData(
+                                                        fieldPos, getPrecision(fieldType))
+                                                .toInstant());
+                break;
+            default:
+                throw new UnsupportedOperationException(
+                        "Don't support data type " + fieldType.getTypeRoot());
+        }
+        if (!fieldType.isNullable()) {
+            return fieldGetter;
+        }
+        return row -> {
+            if (row.isNullAt(fieldPos)) {
+                return null;
+            }
+            return fieldGetter.getFieldOrNull(row);
+        };
     }
 
     // ------------------------------------------------------------------------------------------

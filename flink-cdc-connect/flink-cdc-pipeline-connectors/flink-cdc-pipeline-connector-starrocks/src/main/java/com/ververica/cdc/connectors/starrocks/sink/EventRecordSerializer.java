@@ -28,21 +28,16 @@ import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
-import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.utils.Preconditions;
 import com.ververica.cdc.common.utils.SchemaUtils;
 
-import java.sql.Date;
-import java.text.SimpleDateFormat;
-import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.ververica.cdc.common.types.DataTypeChecks.getPrecision;
-import static com.ververica.cdc.common.types.DataTypeChecks.getScale;
+import static com.ververica.cdc.connectors.starrocks.sink.StarRocksUtils.createFieldGetter;
 
-/** Serializer for the input {@link Event}. */
+/** Serializer for the input {@link Event}. It will serialize a row to a json string. */
 public class EventRecordSerializer implements RecordSerializer<Event> {
 
     private static final long serialVersionUID = 1L;
@@ -51,14 +46,12 @@ public class EventRecordSerializer implements RecordSerializer<Event> {
     private transient Map<TableId, TableInfo> tableInfoMap;
 
     private transient DefaultStarRocksRowData reusableRowData;
-    private transient SimpleDateFormat dateFormatter;
     private transient JsonWrapper jsonWrapper;
 
     @Override
     public void open() {
         this.tableInfoMap = new HashMap<>();
         this.reusableRowData = new DefaultStarRocksRowData();
-        this.dateFormatter = new SimpleDateFormat("yyyy-MM-dd");
         this.jsonWrapper = new JsonWrapper();
     }
 
@@ -126,84 +119,8 @@ public class EventRecordSerializer implements RecordSerializer<Event> {
         for (int i = 0; i < record.getArity(); i++) {
             rowMap.put(columns.get(i).getName(), tableInfo.fieldGetters[i].getFieldOrNull(record));
         }
-        rowMap.put("__op", isDelete);
+        rowMap.put("__op", isDelete ? 1 : 0);
         return jsonWrapper.toJSONString(rowMap);
-    }
-
-    /**
-     * Creates an accessor for getting elements in an internal RecordData structure at the given
-     * position.
-     *
-     * @param fieldType the element type of the RecordData
-     * @param fieldPos the element position of the RecordData
-     */
-    private RecordData.FieldGetter createFieldGetter(DataType fieldType, int fieldPos) {
-        final RecordData.FieldGetter fieldGetter;
-        // ordered by type root definition
-        switch (fieldType.getTypeRoot()) {
-            case BOOLEAN:
-                fieldGetter = record -> record.getBoolean(fieldPos);
-                break;
-            case TINYINT:
-                fieldGetter = record -> record.getByte(fieldPos);
-                break;
-            case SMALLINT:
-                fieldGetter = record -> record.getShort(fieldPos);
-                break;
-            case INTEGER:
-                fieldGetter = record -> record.getInt(fieldPos);
-                break;
-            case BIGINT:
-                fieldGetter = record -> record.getLong(fieldPos);
-                break;
-            case FLOAT:
-                fieldGetter = record -> record.getFloat(fieldPos);
-                break;
-            case DOUBLE:
-                fieldGetter = record -> record.getDouble(fieldPos);
-                break;
-            case DECIMAL:
-                final int decimalPrecision = getPrecision(fieldType);
-                final int decimalScale = getScale(fieldType);
-                fieldGetter = record -> record.getDecimal(fieldPos, decimalPrecision, decimalScale);
-                break;
-            case CHAR:
-            case VARCHAR:
-                fieldGetter = record -> record.getString(fieldPos);
-                break;
-            case DATE:
-                fieldGetter =
-                        record ->
-                                dateFormatter.format(
-                                        Date.valueOf(
-                                                LocalDate.ofEpochDay(record.getInt(fieldPos))));
-                break;
-            case TIMESTAMP_WITHOUT_TIME_ZONE:
-                fieldGetter =
-                        record ->
-                                record.getTimestamp(fieldPos, getPrecision(fieldType))
-                                        .toLocalDateTime()
-                                        .toString();
-                break;
-            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                fieldGetter =
-                        record ->
-                                record.getLocalZonedTimestampData(fieldPos, getPrecision(fieldType))
-                                        .toString();
-                break;
-            default:
-                throw new UnsupportedOperationException(
-                        "Don't support data type " + fieldType.getTypeRoot());
-        }
-        if (!fieldType.isNullable()) {
-            return fieldGetter;
-        }
-        return row -> {
-            if (row.isNullAt(fieldPos)) {
-                return null;
-            }
-            return fieldGetter.getFieldOrNull(row);
-        };
     }
 
     @Override
