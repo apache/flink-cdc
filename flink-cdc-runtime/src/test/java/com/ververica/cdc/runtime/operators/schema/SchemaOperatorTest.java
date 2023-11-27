@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** A test for the {@link SchemaOperator}. */
+/** Unit tests for the {@link SchemaOperator}. */
 public class SchemaOperatorTest {
     @Test
     void testProcessElement() throws Exception {

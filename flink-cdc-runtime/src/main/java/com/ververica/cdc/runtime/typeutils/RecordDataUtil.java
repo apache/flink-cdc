@@ -18,6 +18,8 @@ package com.ververica.cdc.runtime.typeutils;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 
+import com.ververica.cdc.common.annotation.PublicEvolving;
+import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.RowType;
@@ -31,22 +33,23 @@ import java.util.Arrays;
 import static com.ververica.cdc.common.utils.Preconditions.checkArgument;
 
 /** Utils to create {@link BinaryRecordData}. */
+@PublicEvolving
 public class RecordDataUtil {
 
     /**
      * Creates an instance of {@link BinaryRecordData} with given field values and {@link RowType}.
      *
-     * <p>Note: All fields of the record must be internal data structures.
+     * <p>Note: All fields of the record must be internal data structures. See {@link RecordData}.
      */
-    public static BinaryRecordData of(RowType rowType, Object[] values) {
-        return of(rowType.getChildren().toArray(new DataType[0]), values);
+    public static BinaryRecordData of(RowType recordType, Object[] rowFields) {
+        return of(recordType.getChildren().toArray(new DataType[0]), rowFields);
     }
 
     /**
      * Creates an instance of {@link BinaryRecordData} with given field values and {@link
      * DataType}s.
      *
-     * <p>Note: All fields of the record must be internal data structures.
+     * <p>Note: All fields of the record must be internal data structures. See {@link RecordData}.
      */
     public static BinaryRecordData of(DataType[] types, Object[] values) {
         checkArgument(
