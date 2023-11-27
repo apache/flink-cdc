@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.data;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.types.CharType;
 import com.ververica.cdc.common.types.VarCharType;
 import com.ververica.cdc.common.utils.StringUtf8Utils;
@@ -74,5 +73,15 @@ public final class GenericStringData implements StringData {
 
     public static GenericStringData fromString(String javaStr) {
         return new GenericStringData(javaStr);
+    }
+
+    /** Copy a new {@code GenericStringData}. */
+    public GenericStringData copy() {
+        return fromString(javaStr);
+    }
+
+    @Override
+    public String toString() {
+        return javaStr;
     }
 }

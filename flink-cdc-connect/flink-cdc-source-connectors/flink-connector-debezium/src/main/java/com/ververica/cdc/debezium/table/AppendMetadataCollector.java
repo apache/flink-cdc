@@ -16,12 +16,12 @@
 
 package com.ververica.cdc.debezium.table;
 
-import org.apache.flink.annotation.Internal;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.utils.JoinedRowData;
 import org.apache.flink.util.Collector;
 
+import com.ververica.cdc.common.annotation.Internal;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.io.Serializable;

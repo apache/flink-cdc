@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.factories;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.sink.DataSink;
 
 /**
@@ -27,5 +26,5 @@ import com.ververica.cdc.common.sink.DataSink;
 public interface DataSinkFactory extends Factory {
 
     /** Creates a {@link DataSink} instance. */
-    DataSink createDataSink();
+    DataSink createDataSink(Context context);
 }

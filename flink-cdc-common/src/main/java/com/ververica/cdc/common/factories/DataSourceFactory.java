@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.factories;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.source.DataSource;
 
 /**
@@ -27,5 +26,5 @@ import com.ververica.cdc.common.source.DataSource;
 public interface DataSourceFactory extends Factory {
 
     /** Creates a {@link DataSource} instance. */
-    DataSource createDataSource();
+    DataSource createDataSource(Context context);
 }

@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.schema;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.types.DataField;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypeRoot;
@@ -34,6 +33,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -99,6 +99,15 @@ public class Schema implements Serializable {
         return options;
     }
 
+    public String describeOptions() {
+        StringBuilder stringBuilder = new StringBuilder("(");
+        if (options != null && !options.isEmpty()) {
+            stringBuilder.append(options);
+        }
+        stringBuilder.append(")");
+        return stringBuilder.toString();
+    }
+
     /** Returns the comment of the table or data collection. */
     public String comment() {
         return comment;
@@ -126,6 +135,32 @@ public class Schema implements Serializable {
         return DataTypes.ROW(fields).notNull();
     }
 
+    /** Returns a copy of the schema with a replaced list of {@Column}. */
+    public Schema copy(List<Column> columns) {
+        return new Schema(columns, new ArrayList<>(primaryKeys), new HashMap<>(options), comment);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof Schema)) {
+            return false;
+        }
+        Schema schema = (Schema) o;
+        return Objects.equals(columns, schema.columns)
+                && Objects.equals(primaryKeys, schema.primaryKeys)
+                && Objects.equals(options, schema.options)
+                && Objects.equals(comment, schema.comment)
+                && Objects.equals(nameToColumns, schema.nameToColumns);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(columns, primaryKeys, options, comment, nameToColumns);
+    }
+
     // -----------------------------------------------------------------------------------
     private void initializeNameToColumns() {
         if (nameToColumns == null) {
@@ -151,13 +186,30 @@ public class Schema implements Serializable {
         return new Builder();
     }
 
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append("columns={");
+        for (int i = 0; i < columns.size(); i++) {
+            sb.append(columns.get(i).asSummaryString());
+            if (i != columns.size() - 1) {
+                sb.append(",");
+            }
+        }
+        sb.append("}");
+        sb.append(", primaryKeys=").append(String.join(";", primaryKeys));
+        sb.append(", options=").append(describeOptions());
+
+        return sb.toString();
+    }
+
     // -----------------------------------------------------------------------------------
 
     /** A builder for constructing an immutable but still unresolved {@link Schema}. */
     @PublicEvolving
     public static final class Builder {
 
-        private final List<Column> columns;
+        private List<Column> columns;
         private List<String> primaryKeys = new ArrayList<>();
         private Map<String, String> options = new HashMap<>();
         private @Nullable String comment;
@@ -246,6 +298,12 @@ public class Schema implements Serializable {
             return this;
         }
 
+        public Builder column(Column column) {
+            checkColumn(column.getName(), column.getType());
+            columns.add(column);
+            return this;
+        }
+
         private void checkColumn(String columnName, DataType type) {
             Preconditions.checkNotNull(columnName, "Column name must not be null.");
             Preconditions.checkNotNull(type, "Data type must not be null.");
@@ -294,6 +352,12 @@ public class Schema implements Serializable {
         /** Declares table comment. */
         public Builder comment(String comment) {
             this.comment = comment;
+            return this;
+        }
+
+        /** Set new columns. */
+        public Builder setColumns(List<Column> columns) {
+            this.columns = columns;
             return this;
         }
 

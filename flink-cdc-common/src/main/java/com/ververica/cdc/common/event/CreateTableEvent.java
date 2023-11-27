@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.event;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.source.DataSource;
 
@@ -51,10 +50,7 @@ public class CreateTableEvent implements SchemaChangeEvent {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        if (!super.equals(o)) {
+        if (!(o instanceof CreateTableEvent)) {
             return false;
         }
         CreateTableEvent that = (CreateTableEvent) o;

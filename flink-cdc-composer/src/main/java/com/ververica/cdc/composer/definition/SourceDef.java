@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.composer.definition;
 
-import org.apache.flink.configuration.Configuration;
+import com.ververica.cdc.common.configuration.Configuration;
 
 import javax.annotation.Nullable;
 

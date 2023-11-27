@@ -266,7 +266,6 @@ under the License.
                                 implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
                             <licenseFamilyCategory>AL2</licenseFamilyCategory>
                             <licenseFamilyName>Apache License 2.0</licenseFamilyName>
-                            <notes/>
                             <patterns>
                                 <pattern>Copyright 2023 Ververica Inc.
                                 </pattern>

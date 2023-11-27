@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.cli.parser;
 
-import org.apache.flink.configuration.Configuration;
-
+import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.composer.definition.PipelineDef;
 
 import java.nio.file.Path;

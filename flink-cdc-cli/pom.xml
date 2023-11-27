@@ -32,8 +32,14 @@ under the License.
     <dependencies>
         <dependency>
             <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-common</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.ververica</groupId>
             <artifactId>flink-cdc-composer</artifactId>
-            <version>${project.version}</version>
+            <version>${revision}</version>
         </dependency>
 
         <dependency>

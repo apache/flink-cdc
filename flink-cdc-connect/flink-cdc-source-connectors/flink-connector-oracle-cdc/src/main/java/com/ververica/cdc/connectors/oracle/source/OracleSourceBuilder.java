@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.connectors.oracle.source;
 
-import org.apache.flink.annotation.Internal;
-
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;

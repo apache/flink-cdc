@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.common.types;
 
-import org.apache.flink.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 /**
  * The visitor definition of {@link DataType}. The visitor transforms a data type into instances of

@@ -48,6 +48,12 @@ under the License.
             <version>${debezium.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- geometry dependencies -->
         <dependency>
             <groupId>com.esri.geometry</groupId>

@@ -16,9 +16,9 @@
 
 package com.ververica.cdc.connectors.base.source.assigner;
 
-import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.common.state.CheckpointListener;
 
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsState;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;

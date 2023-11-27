@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.data;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.types.TimestampType;
 import com.ververica.cdc.common.utils.Preconditions;
 
@@ -130,6 +129,17 @@ public final class TimestampData implements Comparable<TimestampData> {
         int nanoOfMillisecond = (int) (nanoOfDay % 1_000_000);
 
         return new TimestampData(millisecond, nanoOfMillisecond);
+    }
+
+    /**
+     * Creates an instance of {@link TimestampData} from milliseconds and a nanos-of-millisecond.
+     *
+     * @param milliseconds the number of milliseconds since {@code 1970-01-01 00:00:00}; a negative
+     *     number is the number of milliseconds before {@code 1970-01-01 00:00:00}
+     * @param nanosOfMillisecond the nanoseconds within the millisecond, from 0 to 999,999
+     */
+    public static TimestampData fromEpochMillis(long milliseconds, int nanosOfMillisecond) {
+        return new TimestampData(milliseconds, nanosOfMillisecond);
     }
 
     /**

@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.schema;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.types.DataType;
 
 import javax.annotation.Nullable;
@@ -64,6 +63,11 @@ public abstract class Column implements Serializable {
         return type;
     }
 
+    @Nullable
+    public String getComment() {
+        return comment;
+    }
+
     /** Returns a string that summarizes this column for printing to a console. */
     public String asSummaryString() {
         if (comment == null) {
@@ -83,6 +87,9 @@ public abstract class Column implements Serializable {
 
     /** Returns a copy of the column with a replaced {@link DataType}. */
     public abstract Column copy(DataType newType);
+
+    /** Returns a copy of the column with a replaced name. */
+    public abstract Column copy(String newName);
 
     @Override
     public boolean equals(Object o) {

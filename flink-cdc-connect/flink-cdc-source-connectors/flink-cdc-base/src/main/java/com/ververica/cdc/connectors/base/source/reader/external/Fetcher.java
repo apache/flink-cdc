@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.connectors.base.source.reader.external;
 
-import org.apache.flink.annotation.Experimental;
-
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 

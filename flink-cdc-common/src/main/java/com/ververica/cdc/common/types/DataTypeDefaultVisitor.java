@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.common.types;
 
-import org.apache.flink.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 /**
  * Implementation of {@link DataTypeVisitor} that redirects all calls to {@link

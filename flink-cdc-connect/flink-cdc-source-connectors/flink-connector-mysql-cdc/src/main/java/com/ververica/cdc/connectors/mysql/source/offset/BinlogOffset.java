@@ -16,10 +16,9 @@
 
 package com.ververica.cdc.connectors.mysql.source.offset;
 
-import org.apache.flink.annotation.Internal;
-import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.annotation.VisibleForTesting;
-
+import com.ververica.cdc.common.annotation.Internal;
+import com.ververica.cdc.common.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.VisibleForTesting;
 import io.debezium.connector.mysql.GtidSet;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.errors.ConnectException;

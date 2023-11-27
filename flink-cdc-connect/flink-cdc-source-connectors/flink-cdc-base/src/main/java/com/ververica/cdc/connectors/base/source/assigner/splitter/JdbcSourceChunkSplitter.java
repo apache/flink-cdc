@@ -16,11 +16,11 @@
 
 package com.ververica.cdc.connectors.base.source.assigner.splitter;
 
-import org.apache.flink.annotation.Experimental;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
