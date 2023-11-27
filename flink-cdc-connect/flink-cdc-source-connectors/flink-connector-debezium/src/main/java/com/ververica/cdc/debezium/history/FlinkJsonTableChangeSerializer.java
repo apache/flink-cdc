@@ -81,35 +81,35 @@ public class FlinkJsonTableChangeSerializer implements TableChanges.TableChanges
 
         document.setString("name", column.name());
         document.setNumber("jdbcType", column.jdbcType());
-
         if (column.nativeType() != Column.UNSET_INT_VALUE) {
             document.setNumber("nativeType", column.nativeType());
         }
-
         document.setString("typeName", column.typeName());
         document.setString("typeExpression", column.typeExpression());
         document.setString("charsetName", column.charsetName());
-
         if (column.length() != Column.UNSET_INT_VALUE) {
             document.setNumber("length", column.length());
         }
-
         column.scale().ifPresent(s -> document.setNumber("scale", s));
-
         document.setNumber("position", column.position());
         document.setBoolean("optional", column.isOptional());
         document.setBoolean("autoIncremented", column.isAutoIncremented());
         document.setBoolean("generated", column.isGenerated());
         document.setString("comment", column.comment());
         document.setBoolean("hasDefaultValue", column.hasDefaultValue());
-
         column.defaultValueExpression()
                 .ifPresent(d -> document.setString("defaultValueExpression", d));
+        Document documents = Document.create();
+        documents = addEnumValueInDocument(document,column);
+
+        return documents;
+    }
+
+    private Document addEnumValueInDocument(Document document,Column column){
 
         Optional.ofNullable(column.enumValues())
                 .map(List::toArray)
                 .ifPresent(enums -> document.setArray("enumValues", enums));
-
         return document;
     }
 

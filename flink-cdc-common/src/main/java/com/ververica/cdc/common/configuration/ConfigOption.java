@@ -240,12 +240,18 @@ public class ConfigOption<T> {
             return true;
         } else if (o != null && o.getClass() == ConfigOption.class) {
             ConfigOption<?> that = (ConfigOption<?>) o;
-            return this.key.equals(that.key)
-                    && Arrays.equals(this.fallbackKeys, that.fallbackKeys)
-                    && (this.defaultValue == null
-                            ? that.defaultValue == null
-                            : (that.defaultValue != null
-                                    && this.defaultValue.equals(that.defaultValue)));
+            boolean keysAreEqual = this.key.equals(that.key);
+            boolean fallbackKeysAreEqual = Arrays.equals(this.fallbackKeys, that.fallbackKeys);
+
+            boolean defaultValuesAreEqual;
+            if (this.defaultValue == null) {
+                defaultValuesAreEqual = that.defaultValue == null;
+            } else {
+                defaultValuesAreEqual = that.defaultValue != null && this.defaultValue.equals(that.defaultValue);
+            }
+
+            boolean areEqual = keysAreEqual && fallbackKeysAreEqual && defaultValuesAreEqual;
+            return areEqual;
         } else {
             return false;
         }
