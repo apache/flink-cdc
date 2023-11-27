@@ -37,16 +37,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** A helper class for {@link ValuesDataSource} to build events of each split. */
+/**
+ * A helper class for {@link ValuesDataSource} to build events of each split.
+ *
+ * <p>the last list of getSourceEvents method is defined as the split for incremental stage.
+ */
 public class ValuesDataSourceHelper {
 
     /**
-     * Different situations for creating sourceEvents, {@link
-     * ValuesDataSourceOptions#SOURCE_EVENT_TYPE}.
+     * Different situations for creating sourceEvents, {@link ValuesDataSourceOptions#EVENT_SET_ID}.
      */
-    public enum SourceEventType {
+    public enum EventSetId {
         SINGLE_SPLIT_SINGLE_TABLE,
         SINGLE_SPLIT_MULTI_TABLES,
+        MULTI_SPLITS_SINGLE_TABLE,
         CUSTOM_SOURCE_EVENTS
     }
 
@@ -62,8 +66,8 @@ public class ValuesDataSourceHelper {
 
     public static List<List<Event>> getSourceEvents() {
         if (sourceEvents == null) {
-            throw new IllegalArgumentException(
-                    "sourceEvents should be set by `setSourceEvents` method.");
+            // use default enum of SINGLE_SPLIT_SINGLE_TABLE
+            sourceEvents = singleSplitSingleTable();
         }
         return sourceEvents;
     }
@@ -74,17 +78,21 @@ public class ValuesDataSourceHelper {
     }
 
     /** set sourceEvents using predefined events. */
-    public static void setSourceEvents(SourceEventType eventType) {
+    public static void setSourceEvents(EventSetId eventType) {
         switch (eventType) {
             case SINGLE_SPLIT_SINGLE_TABLE:
                 {
                     sourceEvents = singleSplitSingleTable();
                     break;
                 }
-
             case SINGLE_SPLIT_MULTI_TABLES:
                 {
                     sourceEvents = singleSplitMultiTables();
+                    break;
+                }
+            case MULTI_SPLITS_SINGLE_TABLE:
+                {
+                    sourceEvents = multiSplitsSingleTable();
                     break;
                 }
             case CUSTOM_SOURCE_EVENTS:
@@ -318,6 +326,164 @@ public class ValuesDataSourceHelper {
                                 })));
 
         eventOfSplits.add(split1);
+        return eventOfSplits;
+    }
+
+    private static List<List<Event>> multiSplitsSingleTable() {
+        List<List<Event>> eventOfSplits = new ArrayList<>();
+        List<Event> split1 = new ArrayList<>();
+        // create table
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .primaryKey("col1")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
+        split1.add(createTableEvent);
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
+
+        // create slit1
+        DataChangeEvent insertEvent1 =
+                DataChangeEvent.insertEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
+                                }));
+        split1.add(insertEvent1);
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
+                                }));
+        split1.add(insertEvent2);
+        eventOfSplits.add(split1);
+
+        // create slit2
+        List<Event> split2 = new ArrayList<>();
+        split2.add(createTableEvent);
+        DataChangeEvent insertEvent3 =
+                DataChangeEvent.insertEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3")
+                                }));
+        split2.add(insertEvent3);
+        DataChangeEvent insertEvent4 =
+                DataChangeEvent.insertEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("4"),
+                                    BinaryStringData.fromString("4")
+                                }));
+        split2.add(insertEvent4);
+        eventOfSplits.add(split2);
+
+        // create slit3
+        List<Event> split3 = new ArrayList<>();
+        split3.add(createTableEvent);
+        DataChangeEvent insertEvent5 =
+                DataChangeEvent.insertEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("5"),
+                                    BinaryStringData.fromString("5")
+                                }));
+        split3.add(insertEvent5);
+        DataChangeEvent insertEvent6 =
+                DataChangeEvent.insertEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("6"),
+                                    BinaryStringData.fromString("6")
+                                }));
+        split3.add(insertEvent6);
+        eventOfSplits.add(split3);
+
+        // create slit4
+        List<Event> split4 = new ArrayList<>();
+        split4.add(createTableEvent);
+        DataChangeEvent deleteEvent1 =
+                DataChangeEvent.deleteEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
+                                }));
+        split4.add(deleteEvent1);
+        DataChangeEvent deleteEvent2 =
+                DataChangeEvent.deleteEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("4"),
+                                    BinaryStringData.fromString("4")
+                                }));
+        split4.add(deleteEvent2);
+        DataChangeEvent deleteEvent3 =
+                DataChangeEvent.deleteEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("6"),
+                                    BinaryStringData.fromString("6")
+                                }));
+        split4.add(deleteEvent3);
+        AddColumnEvent.ColumnWithPosition columnWithPosition =
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("col3", DataTypes.STRING()));
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(table1, Collections.singletonList(columnWithPosition));
+        split4.add(addColumnEvent);
+        generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
+        DataChangeEvent updateEvent1 =
+                DataChangeEvent.updateEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("")
+                                }),
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("x")
+                                }));
+        split4.add(updateEvent1);
+        DataChangeEvent updateEvent2 =
+                DataChangeEvent.updateEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("")
+                                }),
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("x")
+                                }));
+        split4.add(updateEvent2);
+        eventOfSplits.add(split4);
+
         return eventOfSplits;
     }
 }
