@@ -33,7 +33,6 @@ import com.ververica.cdc.common.types.LocalZonedTimestampType;
 import com.ververica.cdc.common.types.TimestampType;
 import com.ververica.cdc.common.types.ZonedTimestampType;
 import com.ververica.cdc.runtime.serializer.data.ArrayDataSerializer;
-import com.ververica.cdc.runtime.serializer.data.RecordDataSerializer;
 
 /**
  * Writer to write a composite data format, like row, array. 1. Invoke {@link #reset()}. 2. Write
@@ -79,7 +78,7 @@ public interface BinaryWriter {
 
     void writeMap(int pos, MapData value, TypeSerializer<MapData> serializer);
 
-    void writeRecord(int pos, RecordData value, RecordDataSerializer serializer);
+    void writeRecord(int pos, RecordData value, TypeSerializer<RecordData> serializer);
 
     /** Finally, complete write to set real size to binary. */
     void complete();
@@ -138,7 +137,7 @@ public interface BinaryWriter {
                 writer.writeMap(pos, (MapData) o, (TypeSerializer<MapData>) serializer);
                 break;
             case ROW:
-                writer.writeRecord(pos, (RecordData) o, (RecordDataSerializer) serializer);
+                writer.writeRecord(pos, (RecordData) o, (TypeSerializer<RecordData>) serializer);
                 break;
             case BINARY:
             case VARBINARY:

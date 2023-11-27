@@ -25,7 +25,7 @@ import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.serializer.SerializerTestBase;
-import com.ververica.cdc.runtime.typeutils.RecordDataUtil;
+import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -52,18 +52,18 @@ public class DataChangeEventSerializerTest extends SerializerTestBase<DataChange
         Map<String, String> meta = new HashMap<>();
         meta.put("option", "meta1");
 
-        RowType rowType = RowType.of(DataTypes.BIGINT(), DataTypes.STRING(), DataTypes.STRING());
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(DataTypes.BIGINT(), DataTypes.STRING(), DataTypes.STRING()));
         RecordData before =
-                RecordDataUtil.of(
-                        rowType,
+                generator.generate(
                         new Object[] {
                             1L,
                             BinaryStringData.fromString("test"),
                             BinaryStringData.fromString("comment")
                         });
         RecordData after =
-                RecordDataUtil.of(
-                        rowType,
+                generator.generate(
                         new Object[] {1L, null, BinaryStringData.fromString("updateComment")});
         return new DataChangeEvent[] {
             DataChangeEvent.insertEvent(TableId.tableId("table"), after),

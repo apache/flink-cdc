@@ -27,7 +27,7 @@ import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.serializer.event.EventSerializer;
-import com.ververica.cdc.runtime.typeutils.RecordDataUtil;
+import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** A test for the {@link SchemaOperator}. */
+/** Unit tests for the {@link SchemaOperator}. */
 public class SchemaOperatorTest {
     @Test
     void testProcessElement() throws Exception {
@@ -60,24 +60,22 @@ public class SchemaOperatorTest {
 
             Map<String, String> meta = new HashMap<>();
             meta.put("subtask", String.valueOf(subtaskIndex));
+
+            BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
             List<Event> testData =
                     Arrays.asList(
                             DataChangeEvent.updateEvent(
                                     tableId,
-                                    RecordDataUtil.of(
-                                            rowType,
+                                    generator.generate(
                                             new Object[] {1L, BinaryStringData.fromString("1")}),
-                                    RecordDataUtil.of(
-                                            rowType,
+                                    generator.generate(
                                             new Object[] {2L, BinaryStringData.fromString("2")}),
                                     meta),
                             DataChangeEvent.updateEvent(
                                     tableId,
-                                    RecordDataUtil.of(
-                                            rowType,
+                                    generator.generate(
                                             new Object[] {3L, BinaryStringData.fromString("3")}),
-                                    RecordDataUtil.of(
-                                            rowType,
+                                    generator.generate(
                                             new Object[] {4L, BinaryStringData.fromString("4")}),
                                     meta));
             for (Event event : testData) {

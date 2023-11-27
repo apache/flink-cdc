@@ -1015,7 +1015,7 @@ public final class BinarySegmentUtils {
         final int nanoOfMillisecond = (int) offsetAndNanos;
         final int subOffset = (int) (offsetAndNanos >> 32);
         final long millisecond = getLong(segments, baseOffset + subOffset);
-        return TimestampData.fromEpochMillis(millisecond, nanoOfMillisecond);
+        return TimestampData.fromMillis(millisecond, nanoOfMillisecond);
     }
 
     /**

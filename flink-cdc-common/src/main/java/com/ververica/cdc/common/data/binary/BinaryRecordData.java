@@ -43,7 +43,7 @@ import static org.apache.flink.util.Preconditions.checkArgument;
  * An implementation of {@link RecordData} which is backed by {@link MemorySegment} instead of
  * Object. It can significantly reduce the serialization/deserialization of Java objects.
  *
- * <p>A Row has two part: Fixed-length part and variable-length part.
+ * <p>A BinaryRecordData has two part: Fixed-length part and variable-length part.
  *
  * <p>Fixed-length part contains 1 byte header and null bit set and field values. Null bit set is
  * used for null tracking and is aligned to 8-byte word boundaries. `Field values` holds
@@ -67,7 +67,7 @@ public final class BinaryRecordData extends BinarySection implements RecordData,
     private static final long FIRST_BYTE_ZERO = LITTLE_ENDIAN ? ~0xFFL : ~(0xFFL << 56L);
     public static final int HEADER_SIZE_IN_BITS = 8;
 
-    public static final String TIMESTAMP_DELIMITER = "|";
+    public static final String TIMESTAMP_DELIMITER = "//";
 
     public static int calculateBitSetWidthInBytes(int arity) {
         return ((arity + 63 + HEADER_SIZE_IN_BITS) / 64) * 8;
@@ -78,7 +78,7 @@ public final class BinaryRecordData extends BinarySection implements RecordData,
     }
 
     /**
-     * If it is a fixed-length field, we can call this BinaryRowData's setXX method for in-place
+     * If it is a fixed-length field, we can call this BinaryRecordData's setXX method for in-place
      * updates. If it is variable-length field, can't use this method, because the underlying data
      * is stored continuously.
      */
@@ -215,7 +215,7 @@ public final class BinaryRecordData extends BinarySection implements RecordData,
         assertIndexIsValid(pos);
 
         if (TimestampData.isCompact(precision)) {
-            return TimestampData.fromEpochMillis(segments[0].getLong(getFieldOffset(pos)));
+            return TimestampData.fromMillis(segments[0].getLong(getFieldOffset(pos)));
         }
 
         int fieldOffset = getFieldOffset(pos);
@@ -319,7 +319,7 @@ public final class BinaryRecordData extends BinarySection implements RecordData,
         if (this == o) {
             return true;
         }
-        // both BinaryRowData and NestedRowData have the same memory format
+        // both BinaryRecordData and NestedRowData have the same memory format
         if (!(o instanceof BinaryRecordData)) {
             return false;
         }

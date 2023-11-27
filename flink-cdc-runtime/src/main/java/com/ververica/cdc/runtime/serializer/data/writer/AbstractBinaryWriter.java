@@ -35,7 +35,6 @@ import com.ververica.cdc.common.data.binary.BinaryRecordData;
 import com.ververica.cdc.common.data.binary.BinarySegmentUtils;
 import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.runtime.serializer.data.ArrayDataSerializer;
-import com.ververica.cdc.runtime.serializer.data.RecordDataSerializer;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -120,7 +119,7 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
     }
 
     @Override
-    public void writeRecord(int pos, RecordData input, RecordDataSerializer serializer) {
+    public void writeRecord(int pos, RecordData input, TypeSerializer<RecordData> serializer) {
         // BinaryRecordData is the only implementation of RecordData
         BinaryRecordData recordData = (BinaryRecordData) input;
         writeSegmentsToVarLenPart(

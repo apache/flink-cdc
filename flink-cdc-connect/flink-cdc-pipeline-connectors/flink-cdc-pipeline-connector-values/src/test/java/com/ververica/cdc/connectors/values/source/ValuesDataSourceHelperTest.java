@@ -33,8 +33,8 @@ import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.connectors.values.ValuesDatabase;
 import com.ververica.cdc.connectors.values.factory.ValuesDataFactory;
+import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import com.ververica.cdc.runtime.typeutils.EventTypeInfo;
-import com.ververica.cdc.runtime.typeutils.RecordDataUtil;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -149,12 +149,12 @@ public class ValuesDataSourceHelperTest {
         CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
         split1.add(createTableEvent);
 
-        RowType rowType = RowType.of(DataTypes.STRING(), DataTypes.STRING());
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
@@ -163,8 +163,7 @@ public class ValuesDataSourceHelperTest {
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("2")

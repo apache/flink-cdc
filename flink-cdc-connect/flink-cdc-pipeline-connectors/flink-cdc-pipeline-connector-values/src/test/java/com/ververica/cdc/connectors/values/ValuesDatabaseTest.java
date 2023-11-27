@@ -33,7 +33,7 @@ import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.common.types.VarCharType;
-import com.ververica.cdc.runtime.typeutils.RecordDataUtil;
+import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -106,12 +106,12 @@ public class ValuesDatabaseTest {
         createTableEvent = new CreateTableEvent(TableId.parse("table3"), schema);
         metadataApplier.applySchemaChange(createTableEvent);
 
-        RowType rowType = RowType.of(DataTypes.STRING(), DataTypes.STRING());
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
@@ -120,8 +120,7 @@ public class ValuesDatabaseTest {
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("2")
@@ -130,8 +129,7 @@ public class ValuesDatabaseTest {
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("3"),
                                     BinaryStringData.fromString("3")
@@ -224,12 +222,12 @@ public class ValuesDatabaseTest {
         results.add("default.default.table1:col1=3;col2=3");
         Assert.assertEquals(results, ValuesDatabase.getResults(table1));
 
-        RowType rowType = RowType.of(DataTypes.STRING(), DataTypes.STRING());
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
         DataChangeEvent deleteEvent =
                 DataChangeEvent.deleteEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
@@ -243,14 +241,12 @@ public class ValuesDatabaseTest {
         DataChangeEvent updateEvent =
                 DataChangeEvent.updateEvent(
                         table1,
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("2")
                                 }),
-                        RecordDataUtil.of(
-                                rowType,
+                        generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("x")
