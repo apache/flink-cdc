@@ -152,13 +152,12 @@ public class Schema implements Serializable {
         return Objects.equals(columns, schema.columns)
                 && Objects.equals(primaryKeys, schema.primaryKeys)
                 && Objects.equals(options, schema.options)
-                && Objects.equals(comment, schema.comment)
-                && Objects.equals(nameToColumns, schema.nameToColumns);
+                && Objects.equals(comment, schema.comment);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(columns, primaryKeys, options, comment, nameToColumns);
+        return Objects.hash(columns, primaryKeys, options, comment);
     }
 
     // -----------------------------------------------------------------------------------

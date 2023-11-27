@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.common.utils;
 
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.event.AddColumnEvent;
 import com.ververica.cdc.common.event.AlterColumnTypeEvent;
 import com.ververica.cdc.common.event.DropColumnEvent;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /** Utils for {@link Schema} to perform the ability of evolution. */
+@PublicEvolving
 public class SchemaUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(SchemaUtils.class);

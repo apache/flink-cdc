@@ -28,10 +28,8 @@ import com.ververica.cdc.common.event.DropColumnEvent;
 import com.ververica.cdc.common.event.RenameColumnEvent;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
-import com.ververica.cdc.common.schema.Column;
-import com.ververica.cdc.common.schema.PhysicalColumn;
 import com.ververica.cdc.common.schema.Schema;
-import com.ververica.cdc.common.types.DataType;
+import com.ververica.cdc.common.utils.SchemaUtils;
 import com.ververica.cdc.runtime.serializer.TableIdSerializer;
 import com.ververica.cdc.runtime.serializer.schema.SchemaSerializer;
 import org.slf4j.Logger;
@@ -43,18 +41,14 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 
 import static com.ververica.cdc.common.utils.Preconditions.checkArgument;
-import static com.ververica.cdc.common.utils.Preconditions.checkNotNull;
 
 /**
  * Schema manager handles handles schema changes for tables, and manages historical schema versions
@@ -173,27 +167,8 @@ public class SchemaManager {
                 event.tableId());
 
         LOG.info("Handling schema change event: {}", event);
-        Map<String, DataType> typeMapping = event.getTypeMapping();
-        Schema oldSchema = optionalSchema.get();
-        Schema.Builder schemaBuilder = Schema.newBuilder();
-
-        // Rebuild physical columns
-        for (Column column : oldSchema.getColumns()) {
-            if (typeMapping.containsKey(column.getName())) {
-                // The column type is being changed
-                Column newColumn = column.copy(typeMapping.get(column.getName()));
-                schemaBuilder.column(newColumn);
-            } else {
-                schemaBuilder.column(column);
-            }
-        }
-
-        // Dump the rest of information
-        schemaBuilder.primaryKey(oldSchema.primaryKeys());
-        schemaBuilder.comment(oldSchema.comment());
-        schemaBuilder.options(oldSchema.options());
-        Schema newSchema = schemaBuilder.build();
-        registerNewSchema(event.tableId(), newSchema);
+        registerNewSchema(
+                event.tableId(), SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), event));
     }
 
     private void handleRenameColumnEvent(RenameColumnEvent event) {
@@ -204,30 +179,8 @@ public class SchemaManager {
                 event.tableId());
 
         LOG.info("Handling schema change event: {}", event);
-        Map<String, String> nameMapping = event.getNameMapping();
-        Schema oldSchema = optionalSchema.get();
-        Schema.Builder schemaBuilder = Schema.newBuilder();
-        for (Column column : oldSchema.getColumns()) {
-            if (nameMapping.containsKey(column.getName())) {
-                // The column is being renamed
-                if (column instanceof PhysicalColumn) {
-                    schemaBuilder.physicalColumn(
-                            nameMapping.get(column.getName()), column.getType());
-                } else {
-                    schemaBuilder.metadataColumn(
-                            nameMapping.get(column.getName()), column.getType());
-                }
-            } else {
-                schemaBuilder.column(column);
-            }
-        }
-
-        // Dump the rest of information
-        schemaBuilder.primaryKey(oldSchema.primaryKeys());
-        schemaBuilder.comment(oldSchema.comment());
-        schemaBuilder.options(oldSchema.options());
-        Schema newSchema = schemaBuilder.build();
-        registerNewSchema(event.tableId(), newSchema);
+        registerNewSchema(
+                event.tableId(), SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), event));
     }
 
     private void handleDropColumnEvent(DropColumnEvent event) {
@@ -237,24 +190,8 @@ public class SchemaManager {
                 "Unable to apply DropColumnEvent for table \"%s\" without existing schema",
                 event.tableId());
         LOG.info("Handling schema change event: {}", event);
-        List<String> droppedColumns =
-                event.getDroppedColumns().stream()
-                        .map(Column::getName)
-                        .collect(Collectors.toList());
-        Schema oldSchema = optionalSchema.get();
-        Schema.Builder schemaBuilder = Schema.newBuilder();
-        for (Column column : oldSchema.getColumns()) {
-            if (!droppedColumns.contains(column.getName())) {
-                schemaBuilder.column(column);
-            }
-        }
-
-        // Dump the rest of information
-        schemaBuilder.primaryKey(oldSchema.primaryKeys());
-        schemaBuilder.comment(oldSchema.comment());
-        schemaBuilder.options(oldSchema.options());
-        Schema newSchema = schemaBuilder.build();
-        registerNewSchema(event.tableId(), newSchema);
+        registerNewSchema(
+                event.tableId(), SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), event));
     }
 
     private void handleAddColumnEvent(AddColumnEvent event) {
@@ -264,64 +201,8 @@ public class SchemaManager {
                 "Unable to apply AddColumnEvent for table \"%s\" without existing schema",
                 event.tableId());
         LOG.info("Handling schema change event: {}", event);
-        List<AddColumnEvent.ColumnWithPosition> addedColumns = event.getAddedColumns();
-        Schema oldSchema = optionalSchema.get();
-        LinkedList<Column> columns = new LinkedList<>(oldSchema.getColumns());
-        for (AddColumnEvent.ColumnWithPosition addedColumn : addedColumns) {
-            Column existingColumn = addedColumn.getExistingColumn();
-            switch (addedColumn.getPosition()) {
-                case BEFORE:
-                    columns.add(
-                            searchColumnIndex(
-                                    columns,
-                                    checkNotNull(
-                                                    existingColumn,
-                                                    "Existing column should not be null for position BEFORE")
-                                            .getName()),
-                            addedColumn.getAddColumn());
-                    break;
-                case AFTER:
-                    columns.add(
-                            searchColumnIndex(
-                                            columns,
-                                            checkNotNull(
-                                                            existingColumn,
-                                                            "Existing column should not be null for position AFTER")
-                                                    .getName())
-                                    + 1,
-                            addedColumn.getAddColumn());
-                    break;
-                case FIRST:
-                    columns.add(0, addedColumn.getAddColumn());
-                    break;
-                case LAST:
-                    columns.add(columns.size(), addedColumn.getAddColumn());
-                    break;
-            }
-        }
-        Schema.Builder schemaBuilder = Schema.newBuilder();
-        for (Column column : columns) {
-            schemaBuilder.column(column);
-        }
-
-        // Dump the rest of information
-        schemaBuilder.primaryKey(oldSchema.primaryKeys());
-        schemaBuilder.comment(oldSchema.comment());
-        schemaBuilder.options(oldSchema.options());
-        Schema newSchema = schemaBuilder.build();
-        registerNewSchema(event.tableId(), newSchema);
-    }
-
-    private int searchColumnIndex(List<Column> columns, String columnNameToSearch) {
-        int i = 0;
-        while (i < columns.size()) {
-            if (columns.get(i).getName().equals(columnNameToSearch)) {
-                return i;
-            }
-            ++i;
-        }
-        throw new IllegalStateException(
-                String.format("Unable to find column with name \"%s\"", columnNameToSearch));
+        registerNewSchema(
+                event.tableId(), SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), event));
     }
 
     private void registerNewSchema(TableId tableId, Schema newSchema) {
