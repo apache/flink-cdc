@@ -28,4 +28,10 @@ public class ValuesDataSinkOptions {
                     .defaultValue(false)
                     .withDescription(
                             "True if the DataChangeEvent need to be materialized in memory.");
+
+    public static final ConfigOption<Boolean> PRINT =
+            ConfigOptions.key("print")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription("True if the Event should be print to console.");
 }
