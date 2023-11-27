@@ -162,6 +162,8 @@ public class MongoDBFetchTaskContext implements FetchTask.Context {
                 case INSERT:
                 case UPDATE:
                 case REPLACE:
+                    value.put(
+                            MongoDBEnvelope.OPERATION_TYPE_FIELD, OperationType.INSERT.getValue());
                     outputBuffer.put(key, changeRecord);
                     break;
                 case DELETE:
