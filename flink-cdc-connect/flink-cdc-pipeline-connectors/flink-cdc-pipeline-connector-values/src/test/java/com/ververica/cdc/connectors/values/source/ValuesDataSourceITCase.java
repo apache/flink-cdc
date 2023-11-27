@@ -43,8 +43,11 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Integration tests for different enumeration situations of {@link ValuesDataSourceHelper}. */
-public class ValuesDataSourceHelperTest {
+/**
+ * Integration tests for {@link ValuesDataSource} in different enumeration situations of {@link
+ * ValuesDataSourceHelper}.
+ */
+public class ValuesDataSourceITCase {
 
     @Before
     public void before() {
@@ -56,17 +59,13 @@ public class ValuesDataSourceHelperTest {
         ValuesDatabase.clear();
     }
 
-    @Test
-    public void testSingleSplitSingleTable() throws Exception {
+    /** read Events from {@link ValuesDataSource} and apply the events to ValuesDatabase. */
+    private void executeDataStreamJob(ValuesDataSourceHelper.EventSetId type) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(3000);
         env.setRestartStrategy(RestartStrategies.noRestart());
         FlinkSourceProvider sourceProvider =
-                (FlinkSourceProvider)
-                        new ValuesDataSource(
-                                        ValuesDataSourceHelper.SourceEventType
-                                                .SINGLE_SPLIT_SINGLE_TABLE)
-                                .getEventSourceProvider();
+                (FlinkSourceProvider) new ValuesDataSource(type).getEventSourceProvider();
         CloseableIterator<Event> events =
                 env.fromSource(
                                 sourceProvider.getSource(),
@@ -82,7 +81,11 @@ public class ValuesDataSourceHelperTest {
                         ValuesDatabase.applySchemaChangeEvent((SchemaChangeEvent) event);
                     }
                 });
+    }
 
+    @Test
+    public void testSingleSplitSingleTable() throws Exception {
+        executeDataStreamJob(ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_SINGLE_TABLE);
         List<String> results = new ArrayList<>();
         results.add("default.default.table1:col1=2;newCol3=x");
         results.add("default.default.table1:col1=3;newCol3=");
@@ -92,31 +95,7 @@ public class ValuesDataSourceHelperTest {
 
     @Test
     public void testSingleSplitMultiTables() throws Exception {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.enableCheckpointing(3000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
-        FlinkSourceProvider sourceProvider =
-                (FlinkSourceProvider)
-                        new ValuesDataSource(
-                                        ValuesDataSourceHelper.SourceEventType
-                                                .SINGLE_SPLIT_MULTI_TABLES)
-                                .getEventSourceProvider();
-        CloseableIterator<Event> events =
-                env.fromSource(
-                                sourceProvider.getSource(),
-                                WatermarkStrategy.noWatermarks(),
-                                ValuesDataFactory.IDENTIFIER,
-                                new EventTypeInfo())
-                        .executeAndCollect();
-        events.forEachRemaining(
-                (event) -> {
-                    if (event instanceof DataChangeEvent) {
-                        ValuesDatabase.applyDataChangeEvent((DataChangeEvent) event);
-                    } else if (event instanceof SchemaChangeEvent) {
-                        ValuesDatabase.applySchemaChangeEvent((SchemaChangeEvent) event);
-                    }
-                });
-
+        executeDataStreamJob(ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_MULTI_TABLES);
         List<String> results = new ArrayList<>();
         results.add("default.default.table1:col1=2;newCol3=x");
         results.add("default.default.table1:col1=3;newCol3=");
@@ -133,10 +112,6 @@ public class ValuesDataSourceHelperTest {
 
     @Test
     public void testCustomSourceEvents() throws Exception {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.enableCheckpointing(3000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
-
         List<List<Event>> splits = new ArrayList<>();
         List<Event> split1 = new ArrayList<>();
         TableId table1 = TableId.tableId("default", "default", "table1");
@@ -146,11 +121,10 @@ public class ValuesDataSourceHelperTest {
                         .physicalColumn("col2", DataTypes.STRING())
                         .primaryKey("col1")
                         .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
-        split1.add(createTableEvent);
-
         BinaryRecordDataGenerator generator =
                 new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
+        CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
+        split1.add(createTableEvent);
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
                         table1,
@@ -171,31 +145,22 @@ public class ValuesDataSourceHelperTest {
         split1.add(insertEvent2);
         splits.add(split1);
         ValuesDataSourceHelper.setSourceEvents(splits);
-
-        FlinkSourceProvider sourceProvider =
-                (FlinkSourceProvider)
-                        new ValuesDataSource(
-                                        ValuesDataSourceHelper.SourceEventType.CUSTOM_SOURCE_EVENTS)
-                                .getEventSourceProvider();
-        CloseableIterator<Event> events =
-                env.fromSource(
-                                sourceProvider.getSource(),
-                                WatermarkStrategy.noWatermarks(),
-                                ValuesDataFactory.IDENTIFIER,
-                                new EventTypeInfo())
-                        .executeAndCollect();
-        events.forEachRemaining(
-                (event) -> {
-                    if (event instanceof DataChangeEvent) {
-                        ValuesDatabase.applyDataChangeEvent((DataChangeEvent) event);
-                    } else if (event instanceof SchemaChangeEvent) {
-                        ValuesDatabase.applySchemaChangeEvent((SchemaChangeEvent) event);
-                    }
-                });
+        executeDataStreamJob(ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
 
         List<String> results = new ArrayList<>();
         results.add("default.default.table1:col1=1;col2=1");
         results.add("default.default.table1:col1=2;col2=2");
+        Assert.assertEquals(
+                results, ValuesDatabase.getResults(TableId.parse("default.default.table1")));
+    }
+
+    @Test
+    public void testMultiSplitsSingleTable() throws Exception {
+        executeDataStreamJob(ValuesDataSourceHelper.EventSetId.MULTI_SPLITS_SINGLE_TABLE);
+        List<String> results = new ArrayList<>();
+        results.add("default.default.table1:col1=1;col2=1;col3=x");
+        results.add("default.default.table1:col1=3;col2=3;col3=x");
+        results.add("default.default.table1:col1=5;col2=5;col3=");
         Assert.assertEquals(
                 results, ValuesDatabase.getResults(TableId.parse("default.default.table1")));
     }

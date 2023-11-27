@@ -26,6 +26,7 @@ import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.api.connector.source.lib.util.IteratorSourceEnumerator;
 import org.apache.flink.api.connector.source.lib.util.IteratorSourceReader;
 import org.apache.flink.api.connector.source.lib.util.IteratorSourceSplit;
+import org.apache.flink.connector.base.source.hybrid.HybridSource;
 import org.apache.flink.core.io.InputStatus;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
@@ -54,25 +55,29 @@ import java.util.List;
 public class ValuesDataSource implements DataSource {
 
     /** index of testCase for {@link ValuesDataSourceHelper}. */
-    private final ValuesDataSourceHelper.SourceEventType eventType;
+    private final ValuesDataSourceHelper.EventSetId eventSetId;
 
     /** index for {@link EventIteratorReader} to fail when reading. */
     private final int failAtPos;
 
-    public ValuesDataSource(ValuesDataSourceHelper.SourceEventType eventType) {
-        this.eventType = eventType;
+    public ValuesDataSource(ValuesDataSourceHelper.EventSetId eventSetId) {
+        this.eventSetId = eventSetId;
         this.failAtPos = Integer.MAX_VALUE;
     }
 
-    public ValuesDataSource(ValuesDataSourceHelper.SourceEventType eventType, int failAtPos) {
-        this.eventType = eventType;
+    public ValuesDataSource(ValuesDataSourceHelper.EventSetId eventSetId, int failAtPos) {
+        this.eventSetId = eventSetId;
         this.failAtPos = failAtPos;
     }
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
-        ValuesDataSourceHelper.setSourceEvents(eventType);
-        return FlinkSourceProvider.of(new ValuesSource(failAtPos));
+        ValuesDataSourceHelper.setSourceEvents(eventSetId);
+        HybridSource<Event> hybridSource =
+                HybridSource.builder(new ValuesSource(failAtPos, eventSetId, true))
+                        .addSource(new ValuesSource(failAtPos, eventSetId, false))
+                        .build();
+        return FlinkSourceProvider.of(hybridSource);
     }
 
     @Override
@@ -91,8 +96,18 @@ public class ValuesDataSource implements DataSource {
 
         private final int failAtPos;
 
-        public ValuesSource(int failAtPos) {
+        private final ValuesDataSourceHelper.EventSetId eventSetId;
+
+        /** True this source is in snapshot stage, otherwise is in incremental stage. */
+        private final boolean isInSnapshotPhase;
+
+        public ValuesSource(
+                int failAtPos,
+                ValuesDataSourceHelper.EventSetId eventSetId,
+                boolean isInSnapshotPhase) {
             this.failAtPos = failAtPos;
+            this.eventSetId = eventSetId;
+            this.isInSnapshotPhase = isInSnapshotPhase;
         }
 
         @Override
@@ -103,10 +118,17 @@ public class ValuesDataSource implements DataSource {
         @Override
         public SplitEnumerator<EventIteratorSplit, Collection<EventIteratorSplit>> createEnumerator(
                 SplitEnumeratorContext<EventIteratorSplit> enumContext) {
+            ValuesDataSourceHelper.setSourceEvents(eventSetId);
             Collection<EventIteratorSplit> eventIteratorSplits = new ArrayList<>();
             List<List<Event>> eventWithSplits = ValuesDataSourceHelper.getSourceEvents();
-            for (int i = 0; i < eventWithSplits.size(); i++) {
-                eventIteratorSplits.add(new EventIteratorSplit(i, 0));
+            // make the last EventIteratorSplit of eventWithSplits to be an incremental
+            // EventIteratorSplit.
+            if (isInSnapshotPhase) {
+                for (int i = 0; i < eventWithSplits.size() - 1; i++) {
+                    eventIteratorSplits.add(new EventIteratorSplit(i, 0));
+                }
+            } else {
+                eventIteratorSplits.add(new EventIteratorSplit(eventWithSplits.size() - 1, 0));
             }
             return new IteratorSourceEnumerator<>(enumContext, eventIteratorSplits);
         }
@@ -133,7 +155,7 @@ public class ValuesDataSource implements DataSource {
         @Override
         public SourceReader<Event, EventIteratorSplit> createReader(
                 SourceReaderContext readerContext) {
-            return new EventIteratorReader(readerContext, failAtPos);
+            return new EventIteratorReader(readerContext, failAtPos, eventSetId);
         }
 
         private static void serializeEventIteratorSplit(
@@ -238,11 +260,23 @@ public class ValuesDataSource implements DataSource {
         // position for this Split to fail
         private final int failAtPos;
 
+        private final ValuesDataSourceHelper.EventSetId eventSetId;
+
         private int numberOfEventsEmit = 0;
 
-        public EventIteratorReader(SourceReaderContext context, int failAtPos) {
+        public EventIteratorReader(
+                SourceReaderContext context,
+                int failAtPos,
+                ValuesDataSourceHelper.EventSetId eventSetId) {
             super(context);
             this.failAtPos = failAtPos;
+            this.eventSetId = eventSetId;
+        }
+
+        @Override
+        public void start() {
+            ValuesDataSourceHelper.setSourceEvents(eventSetId);
+            super.start();
         }
 
         @Override
