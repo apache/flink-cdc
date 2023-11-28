@@ -449,13 +449,133 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
         List<String> actual =
                 readTableSnapshotSplits(
-                        mySqlSplits,
-                        statefulTaskContext,
-                        mySqlSplits.size(),
-                        dataType,
-                        snapshotHooks);
+                        mySqlSplits, statefulTaskContext, 1, dataType, snapshotHooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
         executeSql(sourceConfig, recoveryDataSql);
+    }
+
+    @Test
+    public void testSnapshotScanSkipBackfillWithPostLowWatermark() throws Exception {
+        String tableName = "customers";
+        MySqlSourceConfig sourceConfig =
+                getConfig(customerDatabase, new String[] {tableName}, 10, true);
+
+        String tableId = customerDatabase.getDatabaseName() + "." + tableName;
+        String[] changingDataSql =
+                new String[] {
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
+                    "DELETE FROM " + tableId + " where id = 102",
+                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','hangzhou','123567891234')",
+                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
+                };
+
+        StatefulTaskContext statefulTaskContext =
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
+
+        SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
+        snapshotHooks.setPostLowWatermarkAction(
+                (mySqlConnection, split) -> {
+                    mySqlConnection.execute(changingDataSql);
+                    mySqlConnection.commit();
+                });
+
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        List<MySqlSplit> mySqlSplits = getMySqlSplits(sourceConfig);
+
+        // Change data during [low_watermark, snapshot) will be captured by snapshotting
+        String[] expected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, hangzhou, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Hangzhou, 123567891234]",
+                    "+I[111, user_6, Hangzhou, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                };
+
+        List<String> actual =
+                readTableSnapshotSplits(
+                        mySqlSplits, statefulTaskContext, 1, dataType, snapshotHooks);
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+    }
+
+    @Test
+    public void testSnapshotScanSkipBackfillWithPreHighWatermark() throws Exception {
+        String tableName = "customers";
+        MySqlSourceConfig sourceConfig =
+                getConfig(customerDatabase, new String[] {tableName}, 10, true);
+
+        String tableId = customerDatabase.getDatabaseName() + "." + tableName;
+        String[] changingDataSql =
+                new String[] {
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
+                    "DELETE FROM " + tableId + " where id = 102",
+                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','hangzhou','123567891234')",
+                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
+                };
+
+        StatefulTaskContext statefulTaskContext =
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
+
+        SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
+        snapshotHooks.setPreHighWatermarkAction(
+                (mySqlConnection, split) -> {
+                    mySqlConnection.execute(changingDataSql);
+                    mySqlConnection.commit();
+                });
+
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        List<MySqlSplit> mySqlSplits = getMySqlSplits(sourceConfig);
+
+        // Change data during [snapshot, high_watermark) will not be captured by snapshotting
+        String[] expected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                };
+
+        List<String> actual =
+                readTableSnapshotSplits(
+                        mySqlSplits, statefulTaskContext, 1, dataType, snapshotHooks);
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+    }
+
+    private List<String> readTableSnapshotSplits(
+            List<MySqlSplit> mySqlSplits,
+            StatefulTaskContext statefulTaskContext,
+            int scanSplitsNum,
+            DataType dataType)
+            throws Exception {
+        return readTableSnapshotSplits(
+                mySqlSplits,
+                statefulTaskContext,
+                scanSplitsNum,
+                dataType,
+                SnapshotPhaseHooks.empty());
     }
 
     private List<String> readTableSnapshotSplits(
@@ -489,20 +609,6 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         assertTrue(snapshotSplitReader.getExecutorService().isTerminated());
 
         return formatResult(result, dataType);
-    }
-
-    private List<String> readTableSnapshotSplits(
-            List<MySqlSplit> mySqlSplits,
-            StatefulTaskContext statefulTaskContext,
-            int scanSplitsNum,
-            DataType dataType)
-            throws Exception {
-        return readTableSnapshotSplits(
-                mySqlSplits,
-                statefulTaskContext,
-                scanSplitsNum,
-                dataType,
-                SnapshotPhaseHooks.empty());
     }
 
     private List<String> formatResult(List<SourceRecord> records, DataType dataType) {
@@ -539,6 +645,14 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     public static MySqlSourceConfig getConfig(
             UniqueDatabase database, String[] captureTables, int splitSize) {
+        return getConfig(database, captureTables, splitSize, false);
+    }
+
+    public static MySqlSourceConfig getConfig(
+            UniqueDatabase database,
+            String[] captureTables,
+            int splitSize,
+            boolean skipSnapshotBackfill) {
         String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> database.getDatabaseName() + "." + tableName)
@@ -554,6 +668,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 .splitSize(splitSize)
                 .fetchSize(2)
                 .password(database.getPassword())
+                .skipSnapshotBackfill(skipSnapshotBackfill)
                 .createConfig(0);
     }
 

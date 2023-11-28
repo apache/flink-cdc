@@ -133,60 +133,74 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         statefulTaskContext.getSnapshotReceiver(),
                         StatefulTaskContext.getClock(),
                         currentSnapshotSplit,
-                        hooks);
+                        hooks,
+                        statefulTaskContext.getSourceConfig().isSkipSnapshotBackfill());
         executorService.execute(
                 () -> {
                     try {
                         currentTaskRunning = true;
-                        // execute snapshot read task
                         final SnapshotSplitChangeEventSourceContextImpl sourceContext =
                                 new SnapshotSplitChangeEventSourceContextImpl();
-                        SnapshotResult<MySqlOffsetContext> snapshotResult =
-                                splitSnapshotReadTask.execute(
-                                        sourceContext,
-                                        statefulTaskContext.getMySqlPartition(),
-                                        statefulTaskContext.getOffsetContext());
 
-                        final MySqlBinlogSplit backfillBinlogSplit =
-                                createBackfillBinlogSplit(sourceContext);
-                        // optimization that skip the binlog read when the low watermark equals high
-                        // watermark
-                        final boolean binlogBackfillRequired =
-                                backfillBinlogSplit
-                                        .getEndingOffset()
-                                        .isAfter(backfillBinlogSplit.getStartingOffset());
-                        if (!binlogBackfillRequired) {
-                            dispatchBinlogEndEvent(backfillBinlogSplit);
-                            currentTaskRunning = false;
-                            return;
-                        }
+                        // Step 1: execute snapshot read task
+                        SnapshotResult<MySqlOffsetContext> snapshotResult = snapshot(sourceContext);
 
-                        // execute binlog read task
-                        if (snapshotResult.isCompletedOrSkipped()) {
-                            final MySqlBinlogSplitReadTask backfillBinlogReadTask =
-                                    createBackfillBinlogReadTask(backfillBinlogSplit);
-                            final MySqlOffsetContext.Loader loader =
-                                    new MySqlOffsetContext.Loader(
-                                            statefulTaskContext.getConnectorConfig());
-                            final MySqlOffsetContext mySqlOffsetContext =
-                                    loader.load(
-                                            backfillBinlogSplit.getStartingOffset().getOffset());
+                        // Step 2: read binlog events between low and high watermark and backfill
+                        // changes into snapshot
+                        backfill(snapshotResult, sourceContext);
 
-                            backfillBinlogReadTask.execute(
-                                    new SnapshotBinlogSplitChangeEventSourceContextImpl(),
-                                    statefulTaskContext.getMySqlPartition(),
-                                    mySqlOffsetContext);
-                        } else {
-                            setReadException(
-                                    new IllegalStateException(
-                                            String.format(
-                                                    "Read snapshot for mysql split %s fail",
-                                                    currentSnapshotSplit)));
-                        }
-                    } catch (Throwable e) {
+                    } catch (Exception e) {
                         setReadException(e);
+                    } finally {
+                        currentTaskRunning = false;
                     }
                 });
+    }
+
+    private SnapshotResult<MySqlOffsetContext> snapshot(
+            SnapshotSplitChangeEventSourceContextImpl sourceContext) throws Exception {
+        return splitSnapshotReadTask.execute(
+                sourceContext,
+                statefulTaskContext.getMySqlPartition(),
+                statefulTaskContext.getOffsetContext());
+    }
+
+    private void backfill(
+            SnapshotResult<MySqlOffsetContext> snapshotResult,
+            SnapshotSplitChangeEventSourceContextImpl sourceContext)
+            throws Exception {
+        final MySqlBinlogSplit backfillBinlogSplit = createBackfillBinlogSplit(sourceContext);
+
+        // Dispatch BINLOG_END event directly is backfill is not required
+        if (!isBackfillRequired(backfillBinlogSplit)) {
+            dispatchBinlogEndEvent(backfillBinlogSplit);
+            return;
+        }
+
+        // execute binlog read task
+        if (snapshotResult.isCompletedOrSkipped()) {
+            final MySqlBinlogSplitReadTask backfillBinlogReadTask =
+                    createBackfillBinlogReadTask(backfillBinlogSplit);
+            final MySqlOffsetContext.Loader loader =
+                    new MySqlOffsetContext.Loader(statefulTaskContext.getConnectorConfig());
+            final MySqlOffsetContext mySqlOffsetContext =
+                    loader.load(backfillBinlogSplit.getStartingOffset().getOffset());
+
+            backfillBinlogReadTask.execute(
+                    new SnapshotBinlogSplitChangeEventSourceContextImpl(),
+                    statefulTaskContext.getMySqlPartition(),
+                    mySqlOffsetContext);
+        } else {
+            throw new IllegalStateException(
+                    String.format("Read snapshot for mysql split %s fail", currentSnapshotSplit));
+        }
+    }
+
+    private boolean isBackfillRequired(MySqlBinlogSplit backfillBinlogSplit) {
+        return !statefulTaskContext.getSourceConfig().isSkipSnapshotBackfill()
+                && backfillBinlogSplit
+                        .getEndingOffset()
+                        .isAfter(backfillBinlogSplit.getStartingOffset());
     }
 
     private MySqlBinlogSplit createBackfillBinlogSplit(
