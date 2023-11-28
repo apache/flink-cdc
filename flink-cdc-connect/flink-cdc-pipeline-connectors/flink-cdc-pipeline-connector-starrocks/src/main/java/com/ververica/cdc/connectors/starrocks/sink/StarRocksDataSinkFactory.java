@@ -60,29 +60,54 @@ public class StarRocksDataSinkFactory implements DataSinkFactory {
     private StarRocksSinkOptions buildSinkConnectorOptions(Configuration cdcConfig) {
         org.apache.flink.configuration.Configuration sinkConfig =
                 new org.apache.flink.configuration.Configuration();
-        // sink configurations from users
+        // required sink configurations
         sinkConfig.set(StarRocksSinkOptions.JDBC_URL, cdcConfig.get(JDBC_URL));
         sinkConfig.set(StarRocksSinkOptions.LOAD_URL, cdcConfig.get(LOAD_URL));
         sinkConfig.set(StarRocksSinkOptions.USERNAME, cdcConfig.get(USERNAME));
         sinkConfig.set(StarRocksSinkOptions.PASSWORD, cdcConfig.get(PASSWORD));
-        sinkConfig.set(StarRocksSinkOptions.SINK_LABEL_PREFIX, cdcConfig.get(SINK_LABEL_PREFIX));
-        sinkConfig.set(
-                StarRocksSinkOptions.SINK_CONNECT_TIMEOUT, cdcConfig.get(SINK_CONNECT_TIMEOUT));
-        sinkConfig.set(
-                StarRocksSinkOptions.SINK_WAIT_FOR_CONTINUE_TIMEOUT,
-                cdcConfig.get(SINK_WAIT_FOR_CONTINUE_TIMEOUT));
-        sinkConfig.set(
-                StarRocksSinkOptions.SINK_BATCH_MAX_SIZE, cdcConfig.get(SINK_BATCH_MAX_SIZE));
-        sinkConfig.set(
-                StarRocksSinkOptions.SINK_BATCH_FLUSH_INTERVAL,
-                cdcConfig.get(SINK_BATCH_FLUSH_INTERVAL));
-        sinkConfig.set(
-                StarRocksSinkOptions.SINK_SCAN_FREQUENCY, cdcConfig.get(SINK_SCAN_FREQUENCY));
-        sinkConfig.set(
-                StarRocksSinkOptions.SINK_IO_THREAD_COUNT, cdcConfig.get(SINK_IO_THREAD_COUNT));
-        sinkConfig.set(
-                StarRocksSinkOptions.SINK_METRIC_HISTOGRAM_WINDOW_SIZE,
-                cdcConfig.get(SINK_METRIC_HISTOGRAM_WINDOW_SIZE));
+        // optional sink configurations
+        cdcConfig
+                .getOptional(SINK_LABEL_PREFIX)
+                .ifPresent(
+                        config -> sinkConfig.set(StarRocksSinkOptions.SINK_LABEL_PREFIX, config));
+        cdcConfig
+                .getOptional(SINK_CONNECT_TIMEOUT)
+                .ifPresent(
+                        config ->
+                                sinkConfig.set(StarRocksSinkOptions.SINK_CONNECT_TIMEOUT, config));
+        cdcConfig
+                .getOptional(SINK_WAIT_FOR_CONTINUE_TIMEOUT)
+                .ifPresent(
+                        config ->
+                                sinkConfig.set(
+                                        StarRocksSinkOptions.SINK_WAIT_FOR_CONTINUE_TIMEOUT,
+                                        config));
+        cdcConfig
+                .getOptional(SINK_BATCH_MAX_SIZE)
+                .ifPresent(
+                        config -> sinkConfig.set(StarRocksSinkOptions.SINK_BATCH_MAX_SIZE, config));
+        cdcConfig
+                .getOptional(SINK_BATCH_FLUSH_INTERVAL)
+                .ifPresent(
+                        config ->
+                                sinkConfig.set(
+                                        StarRocksSinkOptions.SINK_BATCH_FLUSH_INTERVAL, config));
+        cdcConfig
+                .getOptional(SINK_SCAN_FREQUENCY)
+                .ifPresent(
+                        config -> sinkConfig.set(StarRocksSinkOptions.SINK_SCAN_FREQUENCY, config));
+        cdcConfig
+                .getOptional(SINK_IO_THREAD_COUNT)
+                .ifPresent(
+                        config ->
+                                sinkConfig.set(StarRocksSinkOptions.SINK_IO_THREAD_COUNT, config));
+        cdcConfig
+                .getOptional(SINK_METRIC_HISTOGRAM_WINDOW_SIZE)
+                .ifPresent(
+                        config ->
+                                sinkConfig.set(
+                                        StarRocksSinkOptions.SINK_METRIC_HISTOGRAM_WINDOW_SIZE,
+                                        config));
         // specified sink configurations for cdc scenario
         sinkConfig.set(StarRocksSinkOptions.DATABASE_NAME, "*");
         sinkConfig.set(StarRocksSinkOptions.TABLE_NAME, "*");
