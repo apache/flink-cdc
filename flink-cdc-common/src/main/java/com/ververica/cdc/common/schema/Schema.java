@@ -211,7 +211,7 @@ public class Schema implements Serializable {
 
         private List<Column> columns;
         private List<String> primaryKeys = new ArrayList<>();
-        private Map<String, String> options = new HashMap<>();
+        private final Map<String, String> options = new HashMap<>();
         private @Nullable String comment;
 
         // Used to check duplicate columns
