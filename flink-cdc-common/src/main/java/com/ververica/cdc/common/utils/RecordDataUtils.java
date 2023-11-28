@@ -18,15 +18,20 @@ package com.ververica.cdc.common.utils;
 
 import org.apache.flink.table.data.GenericRowData;
 
-import com.ververica.cdc.common.data.GenericRecordData;
 import com.ververica.cdc.common.data.RecordData;
+
+import java.util.List;
 
 /** Utilities for handling {@link RecordData}s. */
 public class RecordDataUtils {
-    public static GenericRowData toFlinkRowData(GenericRecordData recordData) {
+    /** convert recordData to Flink GenericRowData */
+    public static GenericRowData toFlinkRowData(
+            RecordData recordData, List<RecordData.FieldGetter> fieldGetters) {
+        Preconditions.checkState(fieldGetters.size() == recordData.getArity());
         GenericRowData rowData = new GenericRowData(recordData.getArity());
         for (int i = 0; i < recordData.getArity(); i++) {
-            rowData.setField(i, recordData.getField(i));
+            Object field = fieldGetters.get(i).getFieldOrNull(recordData);
+            rowData.setField(i, field);
         }
         return rowData;
     }

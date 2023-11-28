@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.common.utils;
 
+import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.event.AddColumnEvent;
 import com.ververica.cdc.common.event.AlterColumnTypeEvent;
 import com.ververica.cdc.common.event.DropColumnEvent;
@@ -35,6 +36,18 @@ import java.util.stream.Collectors;
 public class SchemaUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(SchemaUtils.class);
+
+    /**
+     * create a list of {@link RecordData.FieldGetter} from given {@link Schema} to get Object from
+     * RecordData.
+     */
+    public static List<RecordData.FieldGetter> createFieldGetters(Schema schema) {
+        List<RecordData.FieldGetter> fieldGetters = new ArrayList<>(schema.getColumns().size());
+        for (int i = 0; i < schema.getColumns().size(); i++) {
+            fieldGetters.add(RecordData.createFieldGetter(schema.getColumns().get(i).getType(), i));
+        }
+        return fieldGetters;
+    }
 
     /**
      * apply SchemaChangeEvent to the old schema and return the schema after changing, throw

@@ -23,7 +23,6 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
-import com.ververica.cdc.common.data.GenericRecordData;
 import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
@@ -81,18 +80,17 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         Schema schema = schemaMaps.get(tableId);
         Preconditions.checkNotNull(schema, event.tableId() + " is not existed");
         String tableKey = String.format("%s.%s", tableId.getSchemaName(), tableId.getTableName());
-        List<Column> columns = schema.getColumns();
         Map<String, Object> valueMap;
         OperationType op = event.op();
         switch (op) {
             case INSERT:
             case UPDATE:
             case REPLACE:
-                valueMap = serializerRecord(event.after(), columns);
+                valueMap = serializerRecord(event.after(), schema);
                 addDeleteSign(valueMap, false);
                 break;
             case DELETE:
-                valueMap = serializerRecord(event.before(), columns);
+                valueMap = serializerRecord(event.before(), schema);
                 addDeleteSign(valueMap, true);
                 break;
             default:
@@ -104,13 +102,15 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     }
 
     /** serializer RecordData to Doris Value */
-    public Map<String, Object> serializerRecord(RecordData recordData, List<Column> columns) {
+    public Map<String, Object> serializerRecord(RecordData recordData, Schema schema) {
+        List<Column> columns = schema.getColumns();
         Map<String, Object> record = new HashMap<>();
         Preconditions.checkState(
                 columns.size() == recordData.getArity(),
                 "Column size does not match the data size");
-        // convert RecordData to flink RowData
-        GenericRowData rowData = RecordDataUtils.toFlinkRowData((GenericRecordData) recordData);
+
+        List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(schema);
+        GenericRowData rowData = RecordDataUtils.toFlinkRowData(recordData, fieldGetters);
         for (int i = 0; i < recordData.getArity(); i++) {
             DataType dataType = DataTypeUtils.toFlinkDataType(columns.get(i).getType());
             DorisRowConverter.SerializationConverter converter =
