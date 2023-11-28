@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.common.utils;
 
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.event.AddColumnEvent;
 import com.ververica.cdc.common.event.AlterColumnTypeEvent;
 import com.ververica.cdc.common.event.DropColumnEvent;
@@ -23,8 +24,6 @@ import com.ververica.cdc.common.event.RenameColumnEvent;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -32,40 +31,25 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /** Utils for {@link Schema} to perform the ability of evolution. */
+@PublicEvolving
 public class SchemaUtils {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SchemaUtils.class);
-
-    /**
-     * apply SchemaChangeEvent to the old schema and return the schema after changing, throw
-     * exception if incompatible changes happen.
-     */
-    public static Schema applySchemaChangeEvent(Schema oldSchema, SchemaChangeEvent event) {
-        return applySchemaChangeEvent(oldSchema, event, false);
-    }
-
     /** apply SchemaChangeEvent to the old schema and return the schema after changing. */
-    public static Schema applySchemaChangeEvent(
-            Schema oldSchema, SchemaChangeEvent event, boolean ignoreException) {
-        Schema newSchema = oldSchema;
-        try {
-            if (event instanceof AddColumnEvent) {
-                newSchema = applyAddColumnEvent((AddColumnEvent) event, oldSchema);
-            } else if (event instanceof DropColumnEvent) {
-                newSchema = applyDropColumnEvent((DropColumnEvent) event, oldSchema);
-            } else if (event instanceof RenameColumnEvent) {
-                newSchema = applyRenameColumnEvent((RenameColumnEvent) event, oldSchema);
-            } else if (event instanceof AlterColumnTypeEvent) {
-                newSchema = applyAlterColumnTypeEvent((AlterColumnTypeEvent) event, oldSchema);
-            }
-        } catch (Exception e) {
-            if (ignoreException) {
-                LOG.warn("", e);
-            } else {
-                throw e;
-            }
+    public static Schema applySchemaChangeEvent(Schema schema, SchemaChangeEvent event) {
+        if (event instanceof AddColumnEvent) {
+            return applyAddColumnEvent((AddColumnEvent) event, schema);
+        } else if (event instanceof DropColumnEvent) {
+            return applyDropColumnEvent((DropColumnEvent) event, schema);
+        } else if (event instanceof RenameColumnEvent) {
+            return applyRenameColumnEvent((RenameColumnEvent) event, schema);
+        } else if (event instanceof AlterColumnTypeEvent) {
+            return applyAlterColumnTypeEvent((AlterColumnTypeEvent) event, schema);
+        } else {
+            throw new UnsupportedOperationException(
+                    String.format(
+                            "Unsupported schema change event type \"%s\"",
+                            event.getClass().getCanonicalName()));
         }
-        return newSchema;
     }
 
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
