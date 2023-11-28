@@ -34,7 +34,6 @@ import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.utils.DataTypeUtils;
 import com.ververica.cdc.common.utils.Preconditions;
-import com.ververica.cdc.common.utils.RecordDataUtils;
 import com.ververica.cdc.common.utils.SchemaUtils;
 import org.apache.doris.flink.deserialization.converter.DorisRowConverter;
 import org.apache.doris.flink.sink.writer.serializer.DorisRecordSerializer;
@@ -47,7 +46,7 @@ import java.util.Map;
 
 import static org.apache.doris.flink.sink.util.DeleteOperation.addDeleteSign;
 
-/** A serializer for Event to Tuple2<String, byte[]> */
+/** A serializer for Event to Tuple2<String, byte[]>. */
 public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     private ObjectMapper objectMapper = new ObjectMapper();
     private Map<TableId, Schema> schemaMaps = new HashMap<>();
@@ -101,7 +100,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                 objectMapper.writeValueAsString(valueMap).getBytes(StandardCharsets.UTF_8));
     }
 
-    /** serializer RecordData to Doris Value */
+    /** serializer RecordData to Doris Value. */
     public Map<String, Object> serializerRecord(RecordData recordData, Schema schema) {
         List<Column> columns = schema.getColumns();
         Map<String, Object> record = new HashMap<>();
@@ -110,7 +109,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                 "Column size does not match the data size");
 
         List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(schema);
-        GenericRowData rowData = RecordDataUtils.toFlinkRowData(recordData, fieldGetters);
+        GenericRowData rowData = toFlinkRowData(recordData, fieldGetters);
         for (int i = 0; i < recordData.getArity(); i++) {
             DataType dataType = DataTypeUtils.toFlinkDataType(columns.get(i).getType());
             DorisRowConverter.SerializationConverter converter =
@@ -119,5 +118,17 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             record.put(columns.get(i).getName(), field);
         }
         return record;
+    }
+
+    /** convert recordData to Flink GenericRowData. */
+    public static GenericRowData toFlinkRowData(
+            RecordData recordData, List<RecordData.FieldGetter> fieldGetters) {
+        Preconditions.checkState(fieldGetters.size() == recordData.getArity());
+        GenericRowData rowData = new GenericRowData(recordData.getArity());
+        for (int i = 0; i < recordData.getArity(); i++) {
+            Object field = fieldGetters.get(i).getFieldOrNull(recordData);
+            rowData.setField(i, field);
+        }
+        return rowData;
     }
 }
