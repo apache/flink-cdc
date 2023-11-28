@@ -27,6 +27,13 @@ import static com.ververica.cdc.common.configuration.description.TextElement.tex
 /** Predefined pipeline configuration options. */
 @PublicEvolving
 public class PipelineOptions {
+
+    public static final ConfigOption<String> PIPELINE_NAME =
+            ConfigOptions.key("pipeline.name")
+                    .stringType()
+                    .defaultValue("Flink CDC Pipeline Job")
+                    .withDescription("The name of the pipeline");
+
     public static final ConfigOption<Integer> GLOBAL_PARALLELISM =
             ConfigOptions.key("pipeline.global.parallelism")
                     .intType()

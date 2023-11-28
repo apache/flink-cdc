@@ -96,7 +96,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
         sinkTranslator.translate(stream, dataSink, schemaOperatorIDGenerator.generate());
 
-        return new FlinkPipelineExecution(env, "CDC Job", isBlocking);
+        return new FlinkPipelineExecution(
+                env, pipelineDef.getConfig().get(PipelineOptions.PIPELINE_NAME), isBlocking);
     }
 
     private DataSink createDataSink(SinkDef sinkDef) {
