@@ -126,7 +126,8 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                                 "table.include.list",
                                 String.format(
                                         "%s.%s",
-                                        snapshotSplit.getTableId().schema(), snapshotSplit.getTableId().table()))
+                                        snapshotSplit.getTableId().schema(),
+                                        snapshotSplit.getTableId().table()))
                         // Disable heartbeat event in snapshot split fetcher
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
