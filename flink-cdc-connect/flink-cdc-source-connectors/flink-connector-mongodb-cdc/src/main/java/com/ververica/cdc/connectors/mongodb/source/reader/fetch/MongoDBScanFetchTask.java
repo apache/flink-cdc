@@ -20,15 +20,14 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.changestream.OperationType;
+import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkEvent;
 import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
-import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
+import com.ververica.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceConfig;
-import com.ververica.cdc.connectors.mongodb.source.dialect.MongoDBDialect;
-import com.ververica.cdc.connectors.mongodb.source.offset.ChangeStreamOffset;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.relational.TableId;
@@ -39,8 +38,6 @@ import org.bson.BsonString;
 import org.bson.RawBsonDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.DOCUMENT_KEY_FIELD;
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.FULL_DOCUMENT_FIELD;
@@ -61,43 +58,21 @@ import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.clien
 import static com.ververica.cdc.connectors.mongodb.source.utils.MongoUtils.collectionFor;
 
 /** The task to work for fetching data of MongoDB collection snapshot split . */
-public class MongoDBScanFetchTask implements FetchTask<SourceSplitBase> {
+public class MongoDBScanFetchTask extends AbstractScanFetchTask {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoDBScanFetchTask.class);
 
-    private final SnapshotSplit snapshotSplit;
-    private volatile boolean taskRunning = false;
-
     public MongoDBScanFetchTask(SnapshotSplit snapshotSplit) {
-        this.snapshotSplit = snapshotSplit;
+        super(snapshotSplit);
     }
 
     @Override
-    public void execute(Context context) throws Exception {
+    protected void executeDataSnapshot(Context context) throws Exception {
+        ChangeEventQueue<DataChangeEvent> changeEventQueue = context.getQueue();
         MongoDBFetchTaskContext taskContext = (MongoDBFetchTaskContext) context;
         MongoDBSourceConfig sourceConfig = taskContext.getSourceConfig();
-        MongoDBDialect dialect = taskContext.getDialect();
-        ChangeEventQueue<DataChangeEvent> changeEventQueue = taskContext.getQueue();
-
-        taskRunning = true;
         TableId collectionId = snapshotSplit.getTableId();
 
-        final ChangeStreamOffset lowWatermark = dialect.displayCurrentOffset(sourceConfig);
-        LOG.info(
-                "Snapshot step 1 - Determining low watermark {} for split {}",
-                lowWatermark,
-                snapshotSplit);
-
-        changeEventQueue.enqueue(
-                new DataChangeEvent(
-                        WatermarkEvent.create(
-                                createWatermarkPartitionMap(collectionId.identifier()),
-                                WATERMARK_TOPIC_NAME,
-                                snapshotSplit.splitId(),
-                                WatermarkKind.LOW,
-                                lowWatermark)));
-
-        LOG.info("Snapshot step 2 - Snapshotting data");
         MongoCursor<RawBsonDocument> cursor = null;
         try {
             MongoClient mongoClient = clientFor(sourceConfig);
@@ -142,49 +117,6 @@ public class MongoDBScanFetchTask implements FetchTask<SourceSplitBase> {
                 changeEventQueue.enqueue(new DataChangeEvent(snapshotRecord));
             }
 
-            ChangeStreamOffset highWatermark = dialect.displayCurrentOffset(sourceConfig);
-
-            LOG.info(
-                    "Snapshot step 3 - Determining high watermark {} for split {}",
-                    highWatermark,
-                    snapshotSplit);
-            changeEventQueue.enqueue(
-                    new DataChangeEvent(
-                            WatermarkEvent.create(
-                                    createWatermarkPartitionMap(collectionId.identifier()),
-                                    WATERMARK_TOPIC_NAME,
-                                    snapshotSplit.splitId(),
-                                    WatermarkKind.HIGH,
-                                    highWatermark)));
-
-            LOG.info(
-                    "Snapshot step 4 - Back fill stream split for snapshot split {}",
-                    snapshotSplit);
-            final StreamSplit backfillStreamSplit =
-                    createBackfillStreamSplit(lowWatermark, highWatermark);
-
-            // optimization that skip the stream read when the low watermark equals high watermark
-            final boolean streamBackfillRequired =
-                    backfillStreamSplit
-                            .getEndingOffset()
-                            .isAfter(backfillStreamSplit.getStartingOffset());
-
-            if (!streamBackfillRequired) {
-                changeEventQueue.enqueue(
-                        new DataChangeEvent(
-                                WatermarkEvent.create(
-                                        createWatermarkPartitionMap(collectionId.identifier()),
-                                        WATERMARK_TOPIC_NAME,
-                                        backfillStreamSplit.splitId(),
-                                        WatermarkKind.END,
-                                        backfillStreamSplit.getEndingOffset())));
-            } else {
-                MongoDBStreamFetchTask backfillStreamTask =
-                        new MongoDBStreamFetchTask(backfillStreamSplit);
-                backfillStreamTask.execute(taskContext);
-            }
-
-            taskRunning = false;
         } catch (Exception e) {
             taskRunning = false;
             LOG.error(
@@ -200,27 +132,58 @@ public class MongoDBScanFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     @Override
-    public boolean isRunning() {
-        return taskRunning;
+    protected void executeBackfillTask(Context context, StreamSplit backfillStreamSplit)
+            throws Exception {
+        MongoDBStreamFetchTask backfillStreamTask = new MongoDBStreamFetchTask(backfillStreamSplit);
+        backfillStreamTask.execute(context);
     }
 
     @Override
-    public SnapshotSplit getSplit() {
-        return snapshotSplit;
+    protected void dispatchLowWaterMarkEvent(
+            Context context, SourceSplitBase split, Offset lowWatermark)
+            throws InterruptedException {
+        ChangeEventQueue<DataChangeEvent> changeEventQueue = context.getQueue();
+        changeEventQueue.enqueue(
+                new DataChangeEvent(
+                        WatermarkEvent.create(
+                                createWatermarkPartitionMap(
+                                        snapshotSplit.getTableId().identifier()),
+                                WATERMARK_TOPIC_NAME,
+                                snapshotSplit.splitId(),
+                                WatermarkKind.LOW,
+                                lowWatermark)));
     }
 
     @Override
-    public void close() {}
+    protected void dispatchHighWaterMarkEvent(
+            Context context, SourceSplitBase split, Offset highWatermark)
+            throws InterruptedException {
+        ChangeEventQueue<DataChangeEvent> changeEventQueue = context.getQueue();
+        changeEventQueue.enqueue(
+                new DataChangeEvent(
+                        WatermarkEvent.create(
+                                createWatermarkPartitionMap(
+                                        snapshotSplit.getTableId().identifier()),
+                                WATERMARK_TOPIC_NAME,
+                                split.splitId(),
+                                WatermarkKind.HIGH,
+                                highWatermark)));
+    }
 
-    private StreamSplit createBackfillStreamSplit(
-            ChangeStreamOffset lowWatermark, ChangeStreamOffset highWatermark) {
-        return new StreamSplit(
-                snapshotSplit.splitId(),
-                lowWatermark,
-                highWatermark,
-                new ArrayList<>(),
-                snapshotSplit.getTableSchemas(),
-                0);
+    @Override
+    protected void dispatchEndWaterMarkEvent(
+            Context context, SourceSplitBase split, Offset endWatermark)
+            throws InterruptedException {
+        ChangeEventQueue<DataChangeEvent> changeEventQueue = context.getQueue();
+        changeEventQueue.enqueue(
+                new DataChangeEvent(
+                        WatermarkEvent.create(
+                                createWatermarkPartitionMap(
+                                        snapshotSplit.getTableId().identifier()),
+                                WATERMARK_TOPIC_NAME,
+                                split.splitId(),
+                                WatermarkKind.END,
+                                endWatermark)));
     }
 
     private BsonDocument normalizeSnapshotDocument(
