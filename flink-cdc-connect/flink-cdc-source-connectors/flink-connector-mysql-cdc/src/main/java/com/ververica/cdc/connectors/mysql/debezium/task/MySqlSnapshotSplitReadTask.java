@@ -80,6 +80,7 @@ public class MySqlSnapshotSplitReadTask
     private final SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
 
     private final SnapshotPhaseHooks hooks;
+    private final boolean isBackfillSkipped;
 
     public MySqlSnapshotSplitReadTask(
             MySqlConnectorConfig connectorConfig,
@@ -91,7 +92,8 @@ public class MySqlSnapshotSplitReadTask
             EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver,
             Clock clock,
             MySqlSnapshotSplit snapshotSplit,
-            SnapshotPhaseHooks hooks) {
+            SnapshotPhaseHooks hooks,
+            boolean isBackfillSkipped) {
         super(connectorConfig, snapshotChangeEventSourceMetrics);
         this.connectorConfig = connectorConfig;
         this.databaseSchema = databaseSchema;
@@ -103,6 +105,7 @@ public class MySqlSnapshotSplitReadTask
         this.snapshotReceiver = snapshotReceiver;
         this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
         this.hooks = hooks;
+        this.isBackfillSkipped = isBackfillSkipped;
     }
 
     @Override
@@ -168,7 +171,21 @@ public class MySqlSnapshotSplitReadTask
             hooks.getPreHighWatermarkAction().accept(jdbcConnection, snapshotSplit);
         }
 
-        final BinlogOffset highWatermark = currentBinlogOffset(jdbcConnection);
+        BinlogOffset highWatermark;
+        if (isBackfillSkipped) {
+            // Directly set HW = LW if backfill is skipped. Binlog events created during snapshot
+            // phase could be processed later in binlog reading phase.
+            //
+            // Note that this behaviour downgrades the delivery guarantee to at-least-once. We can't
+            // promise that the snapshot is exactly the view of the table at low watermark moment,
+            // so binlog events created during snapshot might be replayed later in binlog reading
+            // phase.
+            highWatermark = lowWatermark;
+        } else {
+            // Get the current binlog offset as HW
+            highWatermark = currentBinlogOffset(jdbcConnection);
+        }
+
         LOG.info(
                 "Snapshot step 3 - Determining high watermark {} for split {}",
                 highWatermark,

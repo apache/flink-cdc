@@ -77,6 +77,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Duration heartbeatInterval = HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
     private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
+    private boolean skipSnapshotBackfill = false;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -263,6 +264,22 @@ public class MySqlSourceConfigFactory implements Serializable {
     }
 
     /**
+     * Whether to skip backfill in snapshot reading phase.
+     *
+     * <p>If backfill is skipped, changes on captured tables during snapshot phase will be consumed
+     * later in binlog reading phase instead of being merged into the snapshot.
+     *
+     * <p>WARNING: Skipping backfill might lead to data inconsistency because some binlog events
+     * happened within the snapshot phase might be replayed (only at-least-once semantic is
+     * promised). For example updating an already updated value in snapshot, or deleting an already
+     * deleted entry in snapshot. These replayed binlog events should be handled specially.
+     */
+    public MySqlSourceConfigFactory skipSnapshotBackfill(boolean skipSnapshotBackfill) {
+        this.skipSnapshotBackfill = skipSnapshotBackfill;
+        return this;
+    }
+
+    /**
      * Whether to close idle readers at the end of the snapshot phase. This feature depends on
      * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
      * greater than or equal to 1.14, and the configuration <code>
@@ -368,6 +385,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 closeIdleReaders,
                 props,
                 jdbcProperties,
-                chunkKeyColumns);
+                chunkKeyColumns,
+                skipSnapshotBackfill);
     }
 }
