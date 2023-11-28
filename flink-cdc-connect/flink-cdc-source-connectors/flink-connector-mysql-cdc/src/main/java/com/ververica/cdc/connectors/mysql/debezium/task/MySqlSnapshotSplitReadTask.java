@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.mysql.debezium.task;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.utils.StatementUtils;
@@ -68,7 +69,7 @@ public class MySqlSnapshotSplitReadTask
     /** Interval for showing a log statement with the progress while scanning a single table. */
     private static final Duration LOG_INTERVAL = Duration.ofMillis(10_000);
 
-    private final MySqlConnectorConfig connectorConfig;
+    private final MySqlSourceConfig sourceConfig;
     private final MySqlDatabaseSchema databaseSchema;
     private final MySqlConnection jdbcConnection;
     private final EventDispatcherImpl<TableId> dispatcher;
@@ -79,6 +80,7 @@ public class MySqlSnapshotSplitReadTask
     private final SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
 
     public MySqlSnapshotSplitReadTask(
+            MySqlSourceConfig sourceConfig,
             MySqlConnectorConfig connectorConfig,
             SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics,
             MySqlDatabaseSchema databaseSchema,
@@ -89,7 +91,7 @@ public class MySqlSnapshotSplitReadTask
             Clock clock,
             MySqlSnapshotSplit snapshotSplit) {
         super(connectorConfig, snapshotChangeEventSourceMetrics);
-        this.connectorConfig = connectorConfig;
+        this.sourceConfig = sourceConfig;
         this.databaseSchema = databaseSchema;
         this.jdbcConnection = jdbcConnection;
         this.dispatcher = dispatcher;
@@ -224,7 +226,7 @@ public class MySqlSnapshotSplitReadTask
                                 snapshotSplit.getSplitStart(),
                                 snapshotSplit.getSplitEnd(),
                                 snapshotSplit.getSplitKeyType().getFieldCount(),
-                                connectorConfig.getQueryFetchSize());
+                                sourceConfig.getFetchSize());
                 ResultSet rs = selectStatement.executeQuery()) {
 
             ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);

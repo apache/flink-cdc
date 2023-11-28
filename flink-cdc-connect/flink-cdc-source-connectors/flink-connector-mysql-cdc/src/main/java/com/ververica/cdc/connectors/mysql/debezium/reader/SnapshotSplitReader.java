@@ -116,6 +116,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         this.reachEnd.set(false);
         this.splitSnapshotReadTask =
                 new MySqlSnapshotSplitReadTask(
+                        statefulTaskContext.getSourceConfig(),
                         statefulTaskContext.getConnectorConfig(),
                         statefulTaskContext.getSnapshotChangeEventSourceMetrics(),
                         statefulTaskContext.getDatabaseSchema(),
