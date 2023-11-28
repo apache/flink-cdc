@@ -106,7 +106,7 @@ public class DorisDataSinkFactory implements DataSinkFactory {
 
     @Override
     public String identifier() {
-        return "doris-sink";
+        return "doris";
     }
 
     @Override
