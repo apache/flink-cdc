@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -152,13 +153,12 @@ public class Schema implements Serializable {
         return Objects.equals(columns, schema.columns)
                 && Objects.equals(primaryKeys, schema.primaryKeys)
                 && Objects.equals(options, schema.options)
-                && Objects.equals(comment, schema.comment)
-                && Objects.equals(nameToColumns, schema.nameToColumns);
+                && Objects.equals(comment, schema.comment);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(columns, primaryKeys, options, comment, nameToColumns);
+        return Objects.hash(columns, primaryKeys, options, comment);
     }
 
     // -----------------------------------------------------------------------------------
@@ -172,6 +172,7 @@ public class Schema implements Serializable {
                     for (Column col : columns) {
                         nameToColumns.put(col.getName(), col);
                     }
+                    nameToColumns = Collections.unmodifiableMap(nameToColumns);
                 }
             }
         }
@@ -210,14 +211,16 @@ public class Schema implements Serializable {
     public static final class Builder {
 
         private List<Column> columns;
-        private List<String> primaryKeys = new ArrayList<>();
-        private Map<String, String> options = new HashMap<>();
+        private List<String> primaryKeys;
+        private final Map<String, String> options;
         private @Nullable String comment;
 
         // Used to check duplicate columns
         private final Set<String> columnNames;
 
         public Builder() {
+            this.primaryKeys = new ArrayList<>();
+            this.options = new HashMap<>();
             this.columns = new ArrayList<>();
             this.columnNames = new HashSet<>();
         }

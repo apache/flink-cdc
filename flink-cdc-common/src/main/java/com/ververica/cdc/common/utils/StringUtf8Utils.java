@@ -18,7 +18,6 @@ package com.ververica.cdc.common.utils;
 
 import com.ververica.cdc.common.annotation.Internal;
 
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -112,13 +111,9 @@ public final class StringUtf8Utils {
     }
 
     public static int defaultEncodeUTF8(String str, byte[] bytes) {
-        try {
-            byte[] buffer = str.getBytes("UTF-8");
-            System.arraycopy(buffer, 0, bytes, 0, buffer.length);
-            return buffer.length;
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException("encodeUTF8 error", e);
-        }
+        byte[] buffer = str.getBytes(StandardCharsets.UTF_8);
+        System.arraycopy(buffer, 0, bytes, 0, buffer.length);
+        return buffer.length;
     }
 
     public static String decodeUTF8(byte[] input, int offset, int byteLen) {

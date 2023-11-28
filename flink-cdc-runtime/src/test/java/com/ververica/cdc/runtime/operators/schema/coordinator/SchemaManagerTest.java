@@ -90,7 +90,7 @@ class SchemaManagerTest {
                         new AddColumnEvent.ColumnWithPosition(
                                 Column.physicalColumn("append_before_phone", DataTypes.BIGINT()),
                                 AddColumnEvent.ColumnPosition.BEFORE,
-                                Column.physicalColumn("phone", DataTypes.STRING())));
+                                Column.physicalColumn("phone", DataTypes.BIGINT())));
 
         schemaManager.applySchemaChange(new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
         schemaManager.applySchemaChange(new AddColumnEvent(CUSTOMERS, newColumns));

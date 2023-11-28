@@ -59,4 +59,14 @@ public class PartitioningEvent implements Event {
     public int hashCode() {
         return Objects.hash(payload, targetPartition);
     }
+
+    @Override
+    public String toString() {
+        return "PartitioningEvent{"
+                + "payload="
+                + payload
+                + ", targetPartition="
+                + targetPartition
+                + '}';
+    }
 }
