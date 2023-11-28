@@ -32,11 +32,19 @@ import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
 import com.ververica.cdc.common.annotation.Internal;
+import com.ververica.cdc.common.event.ChangeEvent;
+import com.ververica.cdc.common.event.CreateTableEvent;
+import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.event.FlushEvent;
+import com.ververica.cdc.common.event.TableId;
+import com.ververica.cdc.common.schema.Schema;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.util.HashSet;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * An operator that processes records to be written into a {@link
@@ -71,6 +79,9 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
      */
     private SinkWriter<Event> copySinkWriter;
 
+    /** A set of {@link TableId} that already processed {@link CreateTableEvent}. */
+    private final Set<TableId> processedTableIds;
+
     public DataSinkWriterOperator(
             Sink<Event> sink,
             ProcessingTimeService processingTimeService,
@@ -80,6 +91,7 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
         this.processingTimeService = processingTimeService;
         this.mailboxExecutor = mailboxExecutor;
         this.schemaOperatorID = schemaOperatorID;
+        this.processedTableIds = new HashSet<>();
     }
 
     @Override
@@ -118,6 +130,24 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
             schemaEvolutionClient.notifyFlushSuccess(
                     getRuntimeContext().getIndexOfThisSubtask(), ((FlushEvent) event).getTableId());
         } else {
+            TableId tableId = ((ChangeEvent) event).tableId();
+            if (event instanceof DataChangeEvent && !processedTableIds.contains(tableId)) {
+                Optional<Schema> schema = schemaEvolutionClient.getLatestSchema(tableId);
+                if (schema.isPresent()) {
+                    // request and process CreateTableEvent because SinkWriter need to retrieve
+                    // Schema to deserialize RecordData after resuming job.
+                    this
+                            .<OneInputStreamOperator<Event, CommittableMessage<CommT>>>
+                                    getFlinkWriterOperator()
+                            .processElement(
+                                    new StreamRecord<>(
+                                            new CreateTableEvent(tableId, schema.get())));
+                    processedTableIds.add(tableId);
+                } else {
+                    throw new RuntimeException(
+                            "Could not find schema message from SchemaRegistry for " + tableId);
+                }
+            }
             this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
                     .processElement(element);
         }
