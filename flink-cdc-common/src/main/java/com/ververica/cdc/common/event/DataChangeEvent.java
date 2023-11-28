@@ -20,6 +20,7 @@ import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.data.RecordData;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 
@@ -82,7 +83,8 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
 
     /** Creates a {@link DataChangeEvent} instance that describes the insert event. */
     public static DataChangeEvent insertEvent(TableId tableId, RecordData after) {
-        return new DataChangeEvent(tableId, null, after, OperationType.INSERT, null);
+        return new DataChangeEvent(
+                tableId, null, after, OperationType.INSERT, Collections.emptyMap());
     }
 
     /**
@@ -95,7 +97,8 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
 
     /** Creates a {@link DataChangeEvent} instance that describes the delete event. */
     public static DataChangeEvent deleteEvent(TableId tableId, RecordData before) {
-        return new DataChangeEvent(tableId, before, null, OperationType.DELETE, null);
+        return new DataChangeEvent(
+                tableId, before, null, OperationType.DELETE, Collections.emptyMap());
     }
 
     /**
@@ -109,7 +112,8 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
     /** Creates a {@link DataChangeEvent} instance that describes the update event. */
     public static DataChangeEvent updateEvent(
             TableId tableId, RecordData before, RecordData after) {
-        return new DataChangeEvent(tableId, before, after, OperationType.UPDATE, null);
+        return new DataChangeEvent(
+                tableId, before, after, OperationType.UPDATE, Collections.emptyMap());
     }
 
     /**
@@ -122,7 +126,8 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
 
     /** Creates a {@link DataChangeEvent} instance that describes the replace event. */
     public static DataChangeEvent replaceEvent(TableId tableId, RecordData after) {
-        return new DataChangeEvent(tableId, null, after, OperationType.REPLACE, null);
+        return new DataChangeEvent(
+                tableId, null, after, OperationType.REPLACE, Collections.emptyMap());
     }
 
     /**
