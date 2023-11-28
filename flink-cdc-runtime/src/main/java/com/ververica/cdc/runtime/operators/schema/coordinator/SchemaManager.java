@@ -21,11 +21,7 @@ import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 
 import com.ververica.cdc.common.annotation.Internal;
-import com.ververica.cdc.common.event.AddColumnEvent;
-import com.ververica.cdc.common.event.AlterColumnTypeEvent;
 import com.ververica.cdc.common.event.CreateTableEvent;
-import com.ververica.cdc.common.event.DropColumnEvent;
-import com.ververica.cdc.common.event.RenameColumnEvent;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Schema;
@@ -104,19 +100,17 @@ public class SchemaManager {
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
         if (schemaChangeEvent instanceof CreateTableEvent) {
             handleCreateTableEvent(((CreateTableEvent) schemaChangeEvent));
-        } else if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
-            handleAlterColumnTypeEvent((AlterColumnTypeEvent) schemaChangeEvent);
-        } else if (schemaChangeEvent instanceof RenameColumnEvent) {
-            handleRenameColumnEvent(((RenameColumnEvent) schemaChangeEvent));
-        } else if (schemaChangeEvent instanceof DropColumnEvent) {
-            handleDropColumnEvent(((DropColumnEvent) schemaChangeEvent));
-        } else if (schemaChangeEvent instanceof AddColumnEvent) {
-            handleAddColumnEvent(((AddColumnEvent) schemaChangeEvent));
         } else {
-            throw new UnsupportedOperationException(
-                    String.format(
-                            "Unsupported schema change event type \"%s\"",
-                            schemaChangeEvent.getClass().getCanonicalName()));
+            Optional<Schema> optionalSchema = getLatestSchema(schemaChangeEvent.tableId());
+            checkArgument(
+                    optionalSchema.isPresent(),
+                    "Unable to apply SchemaChangeEvent for table \"%s\" without existing schema",
+                    schemaChangeEvent.tableId());
+
+            LOG.info("Handling schema change event: {}", schemaChangeEvent);
+            registerNewSchema(
+                    schemaChangeEvent.tableId(),
+                    SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), schemaChangeEvent));
         }
     }
 
@@ -157,52 +151,6 @@ public class SchemaManager {
                 event.tableId());
         LOG.info("Handling schema change event: {}", event);
         registerNewSchema(event.tableId(), event.getSchema());
-    }
-
-    private void handleAlterColumnTypeEvent(AlterColumnTypeEvent event) {
-        Optional<Schema> optionalSchema = getLatestSchema(event.tableId());
-        checkArgument(
-                optionalSchema.isPresent(),
-                "Unable to apply AlterColumnTypeEvent for table \"%s\" without existing schema",
-                event.tableId());
-
-        LOG.info("Handling schema change event: {}", event);
-        registerNewSchema(
-                event.tableId(), SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), event));
-    }
-
-    private void handleRenameColumnEvent(RenameColumnEvent event) {
-        Optional<Schema> optionalSchema = getLatestSchema(event.tableId());
-        checkArgument(
-                optionalSchema.isPresent(),
-                "Unable to apply RenameColumnEvent for table \"%s\" without existing schema",
-                event.tableId());
-
-        LOG.info("Handling schema change event: {}", event);
-        registerNewSchema(
-                event.tableId(), SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), event));
-    }
-
-    private void handleDropColumnEvent(DropColumnEvent event) {
-        Optional<Schema> optionalSchema = getLatestSchema(event.tableId());
-        checkArgument(
-                optionalSchema.isPresent(),
-                "Unable to apply DropColumnEvent for table \"%s\" without existing schema",
-                event.tableId());
-        LOG.info("Handling schema change event: {}", event);
-        registerNewSchema(
-                event.tableId(), SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), event));
-    }
-
-    private void handleAddColumnEvent(AddColumnEvent event) {
-        Optional<Schema> optionalSchema = getLatestSchema(event.tableId());
-        checkArgument(
-                optionalSchema.isPresent(),
-                "Unable to apply AddColumnEvent for table \"%s\" without existing schema",
-                event.tableId());
-        LOG.info("Handling schema change event: {}", event);
-        registerNewSchema(
-                event.tableId(), SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), event));
     }
 
     private void registerNewSchema(TableId tableId, Schema newSchema) {
