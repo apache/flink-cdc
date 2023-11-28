@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-com.ververica.cdc.connectors.values.factory.ValuesDataFactory
+com.ververica.cdc.connectors.mysql.factory.MySqlDataSourceFactory
