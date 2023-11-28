@@ -31,7 +31,7 @@ public class PipelineOptions {
     public static final ConfigOption<String> PIPELINE_NAME =
             ConfigOptions.key("pipeline.name")
                     .stringType()
-                    .defaultValue("CDC Pipeline Job")
+                    .defaultValue("Flink CDC Pipeline Job")
                     .withDescription("The name of the pipeline");
 
     public static final ConfigOption<Integer> GLOBAL_PARALLELISM =
