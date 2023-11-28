@@ -33,7 +33,9 @@ import com.ververica.cdc.common.event.FlushEvent;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
+import com.ververica.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
 import com.ververica.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
+import com.ververica.cdc.runtime.operators.schema.event.ReleaseUpstreamResponse;
 import com.ververica.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import com.ververica.cdc.runtime.operators.schema.event.SchemaChangeResponse;
 import org.slf4j.Logger;
@@ -55,12 +57,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     private transient TaskOperatorEventGateway toCoordinator;
 
-    private final int partitionChannelNum;
-
-    public SchemaOperator(int partitionChannelNum) {
-        this.partitionChannelNum = partitionChannelNum;
-    }
-
     @Override
     public void setup(
             StreamTask<?, ?> containingTask,
@@ -74,7 +70,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
      * This method is guaranteed to not be called concurrently with other methods of the operator.
      */
     @Override
-    public void processElement(StreamRecord<Event> streamRecord) throws Exception {
+    public void processElement(StreamRecord<Event> streamRecord) {
         Event event = streamRecord.getValue();
         if (event instanceof SchemaChangeEvent) {
             TableId tableId = ((SchemaChangeEvent) event).tableId();
@@ -91,40 +87,35 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     private void handleSchemaChangeEvent(TableId tableId, SchemaChangeEvent schemaChangeEvent) {
         // The request will need to send a FlushEvent or block until flushing finished
-        SchemaChangeResponse response =
-                (SchemaChangeResponse) requestSchemaChange(tableId, schemaChangeEvent);
+        SchemaChangeResponse response = requestSchemaChange(tableId, schemaChangeEvent);
         if (response.isShouldSendFlushEvent()) {
             LOG.info(
                     "Sending the FlushEvent for table {} in subtask {}.",
                     tableId,
                     getRuntimeContext().getIndexOfThisSubtask());
-            broadcastEvents(new FlushEvent(tableId));
+            output.collect(new StreamRecord<>(new FlushEvent(tableId)));
+            output.collect(new StreamRecord<>(schemaChangeEvent));
             // The request will block until flushing finished in each sink writer
             requestReleaseUpstream();
         }
-        broadcastEvents(schemaChangeEvent);
     }
 
-    // TODO
-    private void broadcastEvents(Event event) {
-        output.collect(new StreamRecord<>(event));
-    }
-
-    private CoordinationResponse requestSchemaChange(
+    private SchemaChangeResponse requestSchemaChange(
             TableId tableId, SchemaChangeEvent schemaChangeEvent) {
         return sendRequestToCoordinator(new SchemaChangeRequest(tableId, schemaChangeEvent));
     }
 
-    private CoordinationResponse requestReleaseUpstream() {
+    private ReleaseUpstreamResponse requestReleaseUpstream() {
         return sendRequestToCoordinator(new ReleaseUpstreamRequest());
     }
 
-    private CoordinationResponse sendRequestToCoordinator(CoordinationRequest request) {
+    private <REQUEST extends CoordinationRequest, RESPONSE extends CoordinationResponse>
+            RESPONSE sendRequestToCoordinator(REQUEST request) {
         try {
             CompletableFuture<CoordinationResponse> responseFuture =
                     toCoordinator.sendRequestToCoordinator(
                             getOperatorID(), new SerializedValue<>(request));
-            return responseFuture.get();
+            return CoordinationResponseUtils.unwrap(responseFuture.get());
         } catch (Exception e) {
             throw new IllegalStateException(
                     "Failed to send request to coordinator: " + request.toString(), e);

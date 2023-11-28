@@ -18,14 +18,14 @@ package com.ververica.cdc.runtime.serializer.event;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 
-import com.ververica.cdc.common.data.GenericRecordData;
-import com.ververica.cdc.common.data.GenericStringData;
 import com.ververica.cdc.common.data.RecordData;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.serializer.SerializerTestBase;
+import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -51,25 +51,31 @@ public class DataChangeEventSerializerTest extends SerializerTestBase<DataChange
     protected DataChangeEvent[] getTestData() {
         Map<String, String> meta = new HashMap<>();
         meta.put("option", "meta1");
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(DataTypes.BIGINT(), DataTypes.STRING(), DataTypes.STRING()));
         RecordData before =
-                GenericRecordData.of(
-                        1L,
-                        GenericStringData.fromString("test"),
-                        GenericStringData.fromString("comment"));
+                generator.generate(
+                        new Object[] {
+                            1L,
+                            BinaryStringData.fromString("test"),
+                            BinaryStringData.fromString("comment")
+                        });
         RecordData after =
-                GenericRecordData.of(1L, null, GenericStringData.fromString("updateComment"));
-        RowType rowType = RowType.of(DataTypes.BIGINT(), DataTypes.STRING(), DataTypes.STRING());
+                generator.generate(
+                        new Object[] {1L, null, BinaryStringData.fromString("updateComment")});
         return new DataChangeEvent[] {
-            DataChangeEvent.insertEvent(TableId.tableId("table"), rowType, after),
-            DataChangeEvent.insertEvent(TableId.tableId("table"), rowType, after, meta),
-            DataChangeEvent.replaceEvent(TableId.tableId("schema", "table"), rowType, after),
-            DataChangeEvent.replaceEvent(TableId.tableId("schema", "table"), rowType, after, meta),
-            DataChangeEvent.deleteEvent(TableId.tableId("table"), rowType, before),
-            DataChangeEvent.deleteEvent(TableId.tableId("table"), rowType, before, meta),
+            DataChangeEvent.insertEvent(TableId.tableId("table"), after),
+            DataChangeEvent.insertEvent(TableId.tableId("table"), after, meta),
+            DataChangeEvent.replaceEvent(TableId.tableId("schema", "table"), after),
+            DataChangeEvent.replaceEvent(TableId.tableId("schema", "table"), after, meta),
+            DataChangeEvent.deleteEvent(TableId.tableId("table"), before),
+            DataChangeEvent.deleteEvent(TableId.tableId("table"), before, meta),
             DataChangeEvent.updateEvent(
-                    TableId.tableId("namespace", "schema", "table"), rowType, before, after),
+                    TableId.tableId("namespace", "schema", "table"), before, after),
             DataChangeEvent.updateEvent(
-                    TableId.tableId("namespace", "schema", "table"), rowType, before, after, meta)
+                    TableId.tableId("namespace", "schema", "table"), before, after, meta)
         };
     }
 }

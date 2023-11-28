@@ -26,13 +26,14 @@ import static com.ververica.cdc.common.configuration.description.TextElement.tex
 /** Configurations for {@link ValuesDataSource}. */
 public class ValuesDataSourceOptions {
 
-    public static final ConfigOption<ValuesDataSourceHelper.SourceEventType> SOURCE_EVENT_TYPE =
-            ConfigOptions.key("source.event.type")
-                    .enumType(ValuesDataSourceHelper.SourceEventType.class)
-                    .defaultValue(ValuesDataSourceHelper.SourceEventType.SINGLE_SPLIT_SINGLE_TABLE)
+    public static final ConfigOption<ValuesDataSourceHelper.EventSetId> EVENT_SET_ID =
+            ConfigOptions.key("event-set.id")
+                    .enumType(ValuesDataSourceHelper.EventSetId.class)
+                    .defaultValue(ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_SINGLE_TABLE)
                     .withDescription(
                             Description.builder()
-                                    .text("Type of creating source change events. ")
+                                    .text(
+                                            "Id for creating source change events from ValuesDataSourceHelper.EventSetId.")
                                     .linebreak()
                                     .add(
                                             ListElement.list(
@@ -40,6 +41,8 @@ public class ValuesDataSourceOptions {
                                                             "SINGLE_SPLIT_SINGLE_TABLE: Default and predetermined case. Creating schema changes of single table and put them into one split."),
                                                     text(
                                                             "SINGLE_SPLIT_MULTI_TABLES: A predetermined case. Creating schema changes of multiple tables and put them into one split."),
+                                                    text(
+                                                            "MULTI_SPLITS_SINGLE_TABLE: A predetermined case. Creating schema changes of single table and put them into multiple splits."),
                                                     text(
                                                             "CUSTOM_SOURCE_EVENTS: Passed change events by the user through calling `setSourceEvents` method.")))
                                     .build());

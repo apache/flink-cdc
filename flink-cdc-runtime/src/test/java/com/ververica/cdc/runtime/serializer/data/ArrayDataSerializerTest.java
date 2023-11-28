@@ -20,8 +20,8 @@ import org.apache.flink.testutils.DeeplyEqualsChecker;
 
 import com.ververica.cdc.common.data.ArrayData;
 import com.ververica.cdc.common.data.GenericArrayData;
-import com.ververica.cdc.common.data.GenericStringData;
 import com.ververica.cdc.common.data.StringData;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.runtime.serializer.SerializerTestBase;
 
@@ -75,7 +75,7 @@ class ArrayDataSerializerTest extends SerializerTestBase<ArrayData> {
         return new ArrayData[] {
             new GenericArrayData(
                     new StringData[] {
-                        GenericStringData.fromString("11"), null, GenericStringData.fromString("ke")
+                        BinaryStringData.fromString("11"), null, BinaryStringData.fromString("ke")
                     })
         };
     }

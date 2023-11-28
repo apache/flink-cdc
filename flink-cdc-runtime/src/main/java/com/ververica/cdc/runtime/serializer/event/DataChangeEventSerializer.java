@@ -22,12 +22,9 @@ import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
-import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.OperationType;
 import com.ververica.cdc.common.event.TableId;
-import com.ververica.cdc.common.types.DataTypes;
-import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.serializer.EnumSerializer;
 import com.ververica.cdc.runtime.serializer.MapSerializer;
 import com.ververica.cdc.runtime.serializer.NullableSerializerWrapper;
@@ -35,7 +32,6 @@ import com.ververica.cdc.runtime.serializer.StringSerializer;
 import com.ververica.cdc.runtime.serializer.TableIdSerializer;
 import com.ververica.cdc.runtime.serializer.TypeSerializerSingleton;
 import com.ververica.cdc.runtime.serializer.data.RecordDataSerializer;
-import com.ververica.cdc.runtime.serializer.schema.RowTypeSerializer;
 
 import java.io.IOException;
 import java.util.Map;
@@ -54,22 +50,18 @@ public class DataChangeEventSerializer extends TypeSerializerSingleton<DataChang
                     new MapSerializer<>(StringSerializer.INSTANCE, StringSerializer.INSTANCE));
     private final EnumSerializer<OperationType> opSerializer =
             new EnumSerializer<>(OperationType.class);
-    private final RowTypeSerializer rowTypeSerializer = RowTypeSerializer.INSTANCE;
+    private final RecordDataSerializer recordDataSerializer = RecordDataSerializer.INSTANCE;
 
     @Override
     public DataChangeEvent createInstance() {
-        return DataChangeEvent.deleteEvent(
-                TableId.tableId("unknown"), DataTypes.ROW(DataTypes.DATE()), null);
+        return DataChangeEvent.deleteEvent(TableId.tableId("unknown"), null);
     }
 
     @Override
     public void serialize(DataChangeEvent event, DataOutputView target) throws IOException {
         opSerializer.serialize(event.op(), target);
         tableIdSerializer.serialize(event.tableId(), target);
-        rowTypeSerializer.serialize(event.getRecordDataType(), target);
 
-        TypeSerializer<RecordData> recordDataSerializer =
-                getRecordDataSerializer(event.getRecordDataType());
         if (event.before() != null) {
             recordDataSerializer.serialize(event.before(), target);
         }
@@ -83,33 +75,27 @@ public class DataChangeEventSerializer extends TypeSerializerSingleton<DataChang
     public DataChangeEvent deserialize(DataInputView source) throws IOException {
         OperationType op = opSerializer.deserialize(source);
         TableId tableId = tableIdSerializer.deserialize(source);
-        RowType recordDataType = rowTypeSerializer.deserialize(source);
 
-        TypeSerializer<RecordData> recordDataSerializer = getRecordDataSerializer(recordDataType);
         switch (op) {
             case DELETE:
                 return DataChangeEvent.deleteEvent(
                         tableId,
-                        recordDataType,
                         recordDataSerializer.deserialize(source),
                         metaSerializer.deserialize(source));
             case INSERT:
                 return DataChangeEvent.insertEvent(
                         tableId,
-                        recordDataType,
                         recordDataSerializer.deserialize(source),
                         metaSerializer.deserialize(source));
             case UPDATE:
                 return DataChangeEvent.updateEvent(
                         tableId,
-                        recordDataType,
                         recordDataSerializer.deserialize(source),
                         recordDataSerializer.deserialize(source),
                         metaSerializer.deserialize(source));
             case REPLACE:
                 return DataChangeEvent.replaceEvent(
                         tableId,
-                        recordDataType,
                         recordDataSerializer.deserialize(source),
                         metaSerializer.deserialize(source));
             default:
@@ -126,41 +112,31 @@ public class DataChangeEventSerializer extends TypeSerializerSingleton<DataChang
     @Override
     public DataChangeEvent copy(DataChangeEvent from) {
         OperationType op = from.op();
-        TypeSerializer<RecordData> recordDataSerializer =
-                getRecordDataSerializer(from.getRecordDataType());
         switch (op) {
             case DELETE:
                 return DataChangeEvent.deleteEvent(
                         tableIdSerializer.copy(from.tableId()),
-                        rowTypeSerializer.copy(from.getRecordDataType()),
                         recordDataSerializer.copy(from.before()),
                         metaSerializer.copy(from.meta()));
             case INSERT:
                 return DataChangeEvent.insertEvent(
                         tableIdSerializer.copy(from.tableId()),
-                        rowTypeSerializer.copy(from.getRecordDataType()),
                         recordDataSerializer.copy(from.after()),
                         metaSerializer.copy(from.meta()));
             case UPDATE:
                 return DataChangeEvent.updateEvent(
                         tableIdSerializer.copy(from.tableId()),
-                        rowTypeSerializer.copy(from.getRecordDataType()),
                         recordDataSerializer.copy(from.before()),
                         recordDataSerializer.copy(from.after()),
                         metaSerializer.copy(from.meta()));
             case REPLACE:
                 return DataChangeEvent.replaceEvent(
                         tableIdSerializer.copy(from.tableId()),
-                        rowTypeSerializer.copy(from.getRecordDataType()),
                         recordDataSerializer.copy(from.after()),
                         metaSerializer.copy(from.meta()));
             default:
                 throw new IllegalArgumentException("Unsupported data change event: " + op);
         }
-    }
-
-    private TypeSerializer<RecordData> getRecordDataSerializer(RowType recordDataType) {
-        return new RecordDataSerializer(recordDataType);
     }
 
     @Override

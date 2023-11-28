@@ -40,8 +40,8 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
 
     @Override
     public DataSource createDataSource(Context context) {
-        ValuesDataSourceHelper.SourceEventType eventType =
-                context.getConfiguration().get(ValuesDataSourceOptions.SOURCE_EVENT_TYPE);
+        ValuesDataSourceHelper.EventSetId eventType =
+                context.getConfiguration().get(ValuesDataSourceOptions.EVENT_SET_ID);
         int failAtPos =
                 context.getConfiguration().get(ValuesDataSourceOptions.FAILURE_INJECTION_INDEX);
         return new ValuesDataSource(eventType, failAtPos);
@@ -66,7 +66,7 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(ValuesDataSourceOptions.SOURCE_EVENT_TYPE);
+        options.add(ValuesDataSourceOptions.EVENT_SET_ID);
         options.add(ValuesDataSourceOptions.FAILURE_INJECTION_INDEX);
         options.add(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY);
         return options;

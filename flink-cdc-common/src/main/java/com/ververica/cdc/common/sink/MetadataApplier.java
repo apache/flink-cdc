@@ -19,9 +19,11 @@ package com.ververica.cdc.common.sink;
 import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 
+import java.io.Serializable;
+
 /** {@code MetadataApplier} is used to apply metadata changes to external systems. */
 @PublicEvolving
-public interface MetadataApplier {
+public interface MetadataApplier extends Serializable {
 
     /** Apply the given {@link SchemaChangeEvent} to external systems. */
     void applySchemaChange(SchemaChangeEvent schemaChangeEvent);

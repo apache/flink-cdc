@@ -29,17 +29,7 @@ import java.util.Set;
 public class DataSinkFactory1 implements DataSinkFactory {
     @Override
     public DataSink createDataSink(Context context) {
-        return new DataSink() {
-            @Override
-            public EventSinkProvider getEventSinkProvider() {
-                return null;
-            }
-
-            @Override
-            public MetadataApplier getMetadataApplier() {
-                return null;
-            }
-        };
+        return new TestDataSink(context.getConfiguration().get(TestOptions.HOST));
     }
 
     @Override
@@ -54,6 +44,32 @@ public class DataSinkFactory1 implements DataSinkFactory {
 
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
-        return new HashSet<>();
+        Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(TestOptions.HOST);
+        return options;
+    }
+
+    /** A dummy {@link DataSink} for testing. */
+    public static class TestDataSink implements DataSink {
+
+        private final String host;
+
+        public TestDataSink(String host) {
+            this.host = host;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        @Override
+        public EventSinkProvider getEventSinkProvider() {
+            return null;
+        }
+
+        @Override
+        public MetadataApplier getMetadataApplier() {
+            return null;
+        }
     }
 }

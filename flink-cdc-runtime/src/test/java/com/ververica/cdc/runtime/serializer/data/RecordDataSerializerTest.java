@@ -16,18 +16,19 @@
 
 package com.ververica.cdc.runtime.serializer.data;
 
-import com.ververica.cdc.common.data.GenericRecordData;
-import com.ververica.cdc.common.data.GenericStringData;
 import com.ververica.cdc.common.data.RecordData;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.types.DataTypes;
+import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.runtime.serializer.SerializerTestBase;
+import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 /** A test for the {@link StringDataSerializer}. */
 public class RecordDataSerializerTest extends SerializerTestBase<RecordData> {
 
     @Override
     protected RecordDataSerializer createSerializer() {
-        return new RecordDataSerializer(DataTypes.BIGINT(), DataTypes.STRING());
+        return RecordDataSerializer.INSTANCE;
     }
 
     @Override
@@ -42,9 +43,12 @@ public class RecordDataSerializerTest extends SerializerTestBase<RecordData> {
 
     @Override
     protected RecordData[] getTestData() {
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.BIGINT(), DataTypes.STRING()));
         return new RecordData[] {
-            GenericRecordData.of(1L, GenericStringData.fromString("test1")),
-            GenericRecordData.of(2L, GenericStringData.fromString("test2"))
+            generator.generate(new Object[] {1L, BinaryStringData.fromString("test1")}),
+            generator.generate(new Object[] {2L, BinaryStringData.fromString("test2")}),
+            generator.generate(new Object[] {3L, null})
         };
     }
 }

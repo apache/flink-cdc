@@ -29,17 +29,7 @@ import java.util.Set;
 public class DataSourceFactory1 implements DataSourceFactory {
     @Override
     public DataSource createDataSource(Context context) {
-        return new DataSource() {
-            @Override
-            public EventSourceProvider getEventSourceProvider() {
-                return null;
-            }
-
-            @Override
-            public MetadataAccessor getMetadataAccessor() {
-                return null;
-            }
-        };
+        return new TestDataSource(context.getConfiguration().get(TestOptions.HOST));
     }
 
     @Override
@@ -54,6 +44,32 @@ public class DataSourceFactory1 implements DataSourceFactory {
 
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
-        return new HashSet<>();
+        Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(TestOptions.HOST);
+        return options;
+    }
+
+    /** A dummy {@link DataSource} for testing. */
+    public static class TestDataSource implements DataSource {
+
+        private final String host;
+
+        public TestDataSource(String host) {
+            this.host = host;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        @Override
+        public EventSourceProvider getEventSourceProvider() {
+            return null;
+        }
+
+        @Override
+        public MetadataAccessor getMetadataAccessor() {
+            return null;
+        }
     }
 }

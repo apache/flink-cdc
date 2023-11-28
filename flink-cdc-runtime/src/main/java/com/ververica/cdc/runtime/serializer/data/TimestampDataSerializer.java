@@ -54,12 +54,12 @@ public class TimestampDataSerializer extends TypeSerializer<TimestampData> {
 
     @Override
     public TimestampData createInstance() {
-        return TimestampData.fromEpochMillis(0, 0);
+        return TimestampData.fromMillis(0, 0);
     }
 
     @Override
     public TimestampData copy(TimestampData from) {
-        return TimestampData.fromEpochMillis(from.getMillisecond(), from.getNanoOfMillisecond());
+        return TimestampData.fromMillis(from.getMillisecond(), from.getNanoOfMillisecond());
     }
 
     @Override
@@ -87,11 +87,11 @@ public class TimestampDataSerializer extends TypeSerializer<TimestampData> {
     public TimestampData deserialize(DataInputView source) throws IOException {
         if (TimestampData.isCompact(precision)) {
             long val = source.readLong();
-            return TimestampData.fromEpochMillis(val, 0);
+            return TimestampData.fromMillis(val, 0);
         } else {
             long longVal = source.readLong();
             int intVal = source.readInt();
-            return TimestampData.fromEpochMillis(longVal, intVal);
+            return TimestampData.fromMillis(longVal, intVal);
         }
     }
 
