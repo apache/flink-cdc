@@ -105,6 +105,22 @@ public class OceanBaseConnection extends JdbcConnection {
                 formatJdbcUrl(jdbcDriver, jdbcProperties), jdbcDriver, classLoader);
     }
 
+    private String getSystemSchema() {
+        return "mysql".equalsIgnoreCase(compatibleMode) ? "oceanbase" : "SYS";
+    }
+
+    /**
+     * Get current timestamp in nanoseconds from GTS (Global Timestamp Service).
+     *
+     * @return the global timestamp.
+     * @throws SQLException If a database access error occurs.
+     */
+    public Long getGlobalTimestamp() throws SQLException {
+        return queryAndMap(
+                String.format("SELECT TS_VALUE FROM %s.V$OB_TIMESTAMP_SERVICE", getSystemSchema()),
+                rs -> rs.next() ? rs.getLong(1) : null);
+    }
+
     /**
      * Get table list by database name pattern and table name pattern.
      *
