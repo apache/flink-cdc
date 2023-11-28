@@ -119,8 +119,8 @@ public class OracleTableSourceFactoryTest {
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
                         null,
-                        JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED
-                                .defaultValue());
+                        JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -155,7 +155,8 @@ public class OracleTableSourceFactoryTest {
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
                         null,
-                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -194,7 +195,8 @@ public class OracleTableSourceFactoryTest {
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
                         null,
-                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -219,6 +221,7 @@ public class OracleTableSourceFactoryTest {
         options.put(SourceOptions.CHUNK_META_GROUP_SIZE.key(), String.valueOf(splitMetaGroupSize));
         options.put(SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.key(), String.valueOf(fetchSize));
         options.put(SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.key(), "true");
+        options.put(SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.key(), "true");
 
         options.put(
                 JdbcSourceOptions.CONNECT_TIMEOUT.key(),
@@ -258,6 +261,7 @@ public class OracleTableSourceFactoryTest {
                         distributionFactorUpper,
                         distributionFactorLower,
                         null,
+                        true,
                         true);
         assertEquals(expectedSource, actualSource);
     }
@@ -294,7 +298,8 @@ public class OracleTableSourceFactoryTest {
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
                         null,
-                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -330,7 +335,8 @@ public class OracleTableSourceFactoryTest {
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
                         null,
-                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -370,7 +376,8 @@ public class OracleTableSourceFactoryTest {
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
                         null,
-                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");
