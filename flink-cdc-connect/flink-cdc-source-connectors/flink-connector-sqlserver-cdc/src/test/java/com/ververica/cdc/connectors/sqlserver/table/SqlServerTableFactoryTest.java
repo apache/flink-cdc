@@ -110,7 +110,8 @@ public class SqlServerTableFactoryTest {
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
                         null,
-                        false);
+                        false,
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -126,6 +127,7 @@ public class SqlServerTableFactoryTest {
         properties.put("connect.timeout", "45s");
         properties.put("scan.incremental.snapshot.chunk.key-column", "testCol");
         properties.put("scan.incremental.close-idle-reader.enabled", "true");
+        properties.put("scan.incremental.snapshot.backfill.skip", "true");
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
@@ -151,6 +153,7 @@ public class SqlServerTableFactoryTest {
                         40.5d,
                         0.01d,
                         "testCol",
+                        true,
                         true);
         assertEquals(expectedSource, actualSource);
     }
@@ -191,7 +194,8 @@ public class SqlServerTableFactoryTest {
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
                         "testCol",
-                        true);
+                        true,
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -230,7 +234,8 @@ public class SqlServerTableFactoryTest {
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
                                 .defaultValue(),
                         null,
-                        false);
+                        false,
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");

@@ -55,7 +55,8 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected int connectionPoolSize = JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue();
     protected Properties dbzProperties;
     protected String chunkKeyColumn;
-    protected boolean skipSnapshotBackfill;
+    protected boolean skipSnapshotBackfill =
+            JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue();
 
     /** Integer port number of the database server. */
     public JdbcSourceConfigFactory hostname(String hostname) {
