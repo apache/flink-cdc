@@ -16,10 +16,25 @@
 
 package com.ververical.cdc.connectors.starrocks.sink;
 
+import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.operators.MailboxExecutor;
+import org.apache.flink.api.common.operators.ProcessingTimeService;
+import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
+import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
+import org.apache.flink.util.SimpleUserCodeClassLoader;
+import org.apache.flink.util.UserCodeClassLoader;
+
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.starrocks.connector.flink.table.data.StarRocksRowData;
+import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
+import com.starrocks.connector.flink.table.sink.v2.DefaultStarRocksSinkContext;
 import com.ververica.cdc.common.data.DecimalData;
 import com.ververica.cdc.common.data.TimestampData;
 import com.ververica.cdc.common.data.binary.BinaryStringData;
@@ -50,6 +65,8 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.OptionalLong;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -65,7 +82,11 @@ public class EventRecordSerializationSchemaTest {
     @Before
     public void setup() {
         this.serializer = new EventRecordSerializationSchema();
-        this.serializer.open();
+        this.serializer.open(
+                new MockInitializationContext(),
+                new DefaultStarRocksSinkContext(
+                        new MockInitContext(),
+                        new StarRocksSinkOptions(new Configuration(), new HashMap<>())));
         this.objectMapper = new ObjectMapper();
     }
 
@@ -240,5 +261,85 @@ public class EventRecordSerializationSchemaTest {
                                 actualRowData.getRow(),
                                 new TypeReference<TreeMap<String, Object>>() {});
         assertEquals(expectMap, actualMap);
+    }
+
+    /** A mock context for serialization schema testing. */
+    private static class MockInitializationContext
+            implements SerializationSchema.InitializationContext {
+
+        @Override
+        public MetricGroup getMetricGroup() {
+            return new UnregisteredMetricsGroup();
+        }
+
+        @Override
+        public UserCodeClassLoader getUserCodeClassLoader() {
+            return SimpleUserCodeClassLoader.create(
+                    MockInitializationContext.class.getClassLoader());
+        }
+    }
+
+    private static class MockInitContext implements Sink.InitContext {
+
+        @Override
+        public UserCodeClassLoader getUserCodeClassLoader() {
+            return SimpleUserCodeClassLoader.create(MockInitContext.class.getClassLoader());
+        }
+
+        @Override
+        public MailboxExecutor getMailboxExecutor() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ProcessingTimeService getProcessingTimeService() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int getSubtaskId() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int getNumberOfParallelSubtasks() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int getAttemptNumber() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public SinkWriterMetricGroup metricGroup() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public OptionalLong getRestoredCheckpointId() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public SerializationSchema.InitializationContext
+                asSerializationSchemaInitializationContext() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean isObjectReuseEnabled() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public <IN> TypeSerializer<IN> createInputSerializer() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public JobID getJobId() {
+            throw new UnsupportedOperationException();
+        }
     }
 }

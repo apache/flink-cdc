@@ -16,9 +16,12 @@
 
 package com.ververica.cdc.connectors.starrocks.sink;
 
+import org.apache.flink.api.common.serialization.SerializationSchema;
+
 import com.starrocks.connector.flink.table.data.DefaultStarRocksRowData;
 import com.starrocks.connector.flink.table.data.StarRocksRowData;
 import com.starrocks.connector.flink.table.sink.v2.RecordSerializationSchema;
+import com.starrocks.connector.flink.table.sink.v2.StarRocksSinkContext;
 import com.starrocks.connector.flink.tools.JsonWrapper;
 import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.event.CreateTableEvent;
@@ -49,7 +52,8 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
     private transient JsonWrapper jsonWrapper;
 
     @Override
-    public void open() {
+    public void open(
+            SerializationSchema.InitializationContext context, StarRocksSinkContext sinkContext) {
         this.tableInfoMap = new HashMap<>();
         this.reusableRowData = new DefaultStarRocksRowData();
         this.jsonWrapper = new JsonWrapper();
