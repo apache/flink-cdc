@@ -100,6 +100,7 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                skipSnapshotBackfill);
     }
 }

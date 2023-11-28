@@ -66,7 +66,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
         SqlServerSourceConfigFactory sourceConfigFactory =
                 getConfigFactory(databaseName, new String[] {tableName}, 10);
         SqlServerSourceConfig sourceConfig = sourceConfigFactory.create(0);
-        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfigFactory.create(0));
+        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfig);
 
         String tableId = databaseName + "." + tableName;
         String[] changingDataSql =
@@ -80,8 +80,15 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                 };
 
         SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
-        hooks.setPostHighWatermarkAction(
-                (dialect, split) -> executeSql(sourceConfig, changingDataSql));
+        hooks.setPostLowWatermarkAction(
+                (config, split) -> {
+                    executeSql((SqlServerSourceConfig) config, changingDataSql);
+                    try {
+                        Thread.sleep(10 * 1000);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
         SqlServerSourceFetchTaskContext sqlServerSourceFetchTaskContext =
                 new SqlServerSourceFetchTaskContext(
                         sourceConfig,
@@ -112,7 +119,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
         List<String> actual =
                 readTableSnapshotSplits(
-                        snapshotSplits, sqlServerSourceFetchTaskContext, 1, dataType);
+                        snapshotSplits, sqlServerSourceFetchTaskContext, 1, dataType, hooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -126,7 +133,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
         SqlServerSourceConfigFactory sourceConfigFactory =
                 getConfigFactory(databaseName, new String[] {tableName}, 10);
         SqlServerSourceConfig sourceConfig = sourceConfigFactory.create(0);
-        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfigFactory.create(0));
+        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfig);
 
         String tableId = databaseName + "." + tableName;
         String[] insertDataSql =
@@ -136,8 +143,15 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                 };
 
         SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
-        hooks.setPostHighWatermarkAction(
-                (dialect, split) -> executeSql(sourceConfig, insertDataSql));
+        hooks.setPreHighWatermarkAction(
+                (config, split) -> {
+                    executeSql((SqlServerSourceConfig) config, insertDataSql);
+                    try {
+                        Thread.sleep(10 * 1000);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
         SqlServerSourceFetchTaskContext sqlServerSourceFetchTaskContext =
                 new SqlServerSourceFetchTaskContext(
                         sourceConfig,
@@ -170,7 +184,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
         List<String> actual =
                 readTableSnapshotSplits(
-                        snapshotSplits, sqlServerSourceFetchTaskContext, 1, dataType);
+                        snapshotSplits, sqlServerSourceFetchTaskContext, 1, dataType, hooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -183,8 +197,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
         SqlServerSourceConfigFactory sourceConfigFactory =
                 getConfigFactory(databaseName, new String[] {tableName}, 10);
-        SqlServerSourceConfig sqlServerSourceConfigs = sourceConfigFactory.create(0);
-        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfigFactory.create(0));
+        SqlServerSourceConfig sourceConfig = sourceConfigFactory.create(0);
+        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfig);
 
         String tableId = databaseName + "." + tableName;
         String[] deleteDataSql =
@@ -195,13 +209,20 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
         SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
         hooks.setPostLowWatermarkAction(
-                (sourceConfig, split) -> executeSql(sqlServerSourceConfigs, deleteDataSql));
+                (config, split) -> {
+                    executeSql((SqlServerSourceConfig) config, deleteDataSql);
+                    try {
+                        Thread.sleep(10 * 1000);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
         SqlServerSourceFetchTaskContext sqlServerSourceFetchTaskContext =
                 new SqlServerSourceFetchTaskContext(
-                        sqlServerSourceConfigs,
+                        sourceConfig,
                         sqlServerDialect,
-                        createSqlServerConnection(sqlServerSourceConfigs.getDbzConnectorConfig()),
-                        createSqlServerConnection(sqlServerSourceConfigs.getDbzConnectorConfig()));
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()),
+                        createSqlServerConnection(sourceConfig.getDbzConnectorConfig()));
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -209,8 +230,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                         DataTypes.FIELD("name", DataTypes.STRING()),
                         DataTypes.FIELD("address", DataTypes.STRING()),
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
-        List<SnapshotSplit> snapshotSplits =
-                getSnapshotSplits(sqlServerSourceConfigs, sqlServerDialect);
+        List<SnapshotSplit> snapshotSplits = getSnapshotSplits(sourceConfig, sqlServerDialect);
 
         String[] expected =
                 new String[] {
@@ -227,16 +247,6 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                 readTableSnapshotSplits(
                         snapshotSplits, sqlServerSourceFetchTaskContext, 1, dataType, hooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
-    }
-
-    private List<String> readTableSnapshotSplits(
-            List<SnapshotSplit> snapshotSplits,
-            SqlServerSourceFetchTaskContext taskContext,
-            int scanSplitsNum,
-            DataType dataType)
-            throws Exception {
-        return readTableSnapshotSplits(
-                snapshotSplits, taskContext, scanSplitsNum, dataType, SnapshotPhaseHooks.empty());
     }
 
     private List<String> readTableSnapshotSplits(
