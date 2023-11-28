@@ -40,7 +40,7 @@ import com.ververica.cdc.common.types.SmallIntType;
 import com.ververica.cdc.common.types.TimestampType;
 import com.ververica.cdc.common.types.VarCharType;
 import com.ververica.cdc.common.utils.SchemaUtils;
-import com.ververica.cdc.connectors.starrocks.sink.EventRecordSerializer;
+import com.ververica.cdc.connectors.starrocks.sink.EventRecordSerializationSchema;
 import com.ververica.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.junit.After;
 import org.junit.Before;
@@ -56,15 +56,15 @@ import java.util.TreeMap;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
-/** Tests for {@link EventRecordSerializer}. */
-public class EventRecordSerializerTest {
+/** Tests for {@link EventRecordSerializationSchema}. */
+public class EventRecordSerializationSchemaTest {
 
-    private EventRecordSerializer serializer;
+    private EventRecordSerializationSchema serializer;
     private ObjectMapper objectMapper;
 
     @Before
     public void setup() {
-        this.serializer = new EventRecordSerializer();
+        this.serializer = new EventRecordSerializationSchema();
         this.serializer.open();
         this.objectMapper = new ObjectMapper();
     }

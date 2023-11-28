@@ -18,7 +18,7 @@ package com.ververica.cdc.connectors.starrocks.sink;
 
 import com.starrocks.connector.flink.table.data.DefaultStarRocksRowData;
 import com.starrocks.connector.flink.table.data.StarRocksRowData;
-import com.starrocks.connector.flink.table.sink.v2.RecordSerializer;
+import com.starrocks.connector.flink.table.sink.v2.RecordSerializationSchema;
 import com.starrocks.connector.flink.tools.JsonWrapper;
 import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.event.CreateTableEvent;
@@ -38,7 +38,7 @@ import java.util.Map;
 import static com.ververica.cdc.connectors.starrocks.sink.StarRocksUtils.createFieldGetter;
 
 /** Serializer for the input {@link Event}. It will serialize a row to a json string. */
-public class EventRecordSerializer implements RecordSerializer<Event> {
+public class EventRecordSerializationSchema implements RecordSerializationSchema<Event> {
 
     private static final long serialVersionUID = 1L;
 

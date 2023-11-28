@@ -54,7 +54,7 @@ public class StarRocksDataSink implements DataSink, Serializable {
     @Override
     public EventSinkProvider getEventSinkProvider() {
         StarRocksSink<Event> starRocksSink =
-                SinkFunctionFactory.createSink(sinkOptions, new EventRecordSerializer());
+                SinkFunctionFactory.createSink(sinkOptions, new EventRecordSerializationSchema());
         return FlinkSinkProvider.of(starRocksSink);
     }
 

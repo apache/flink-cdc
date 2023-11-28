@@ -83,7 +83,14 @@ public class StarRocksMetadataApplier implements MetadataApplier {
         if (!catalog.databaseExists(starRocksTable.getDatabaseName())) {
             catalog.createDatabase(starRocksTable.getDatabaseName(), true);
         }
-        catalog.createTable(starRocksTable, true);
+
+        try {
+            catalog.createTable(starRocksTable, true);
+            LOG.info("Successful to create table, event: {}", createTableEvent);
+        } catch (StarRocksCatalogException e) {
+            LOG.error("Failed to create table, event: {}", createTableEvent.tableId(), e);
+            throw new RuntimeException("Failed to create table, event: " + createTableEvent, e);
+        }
     }
 
     private void applyAddColumn(AddColumnEvent addColumnEvent) {
@@ -119,7 +126,10 @@ public class StarRocksMetadataApplier implements MetadataApplier {
             alterException = e;
         }
 
-        // Check the actual table
+        // Check whether the columns have been actually added to the table.
+        // This is useful for duplicate schema change after failover. Adding
+        // same columns will fail on StarRocks side, but it should be successful
+        // on CDC side
         StarRocksTable table = null;
         try {
             table = catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
@@ -184,7 +194,10 @@ public class StarRocksMetadataApplier implements MetadataApplier {
             alterException = e;
         }
 
-        // Check the actual table
+        // Check whether the columns have been actually dropped from the table.
+        // This is useful for duplicate schema change after failover. Drop
+        // non-existed columns will fail on StarRocks side, but it should be
+        // successful on CDC side
         StarRocksTable table = null;
         try {
             table = catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
