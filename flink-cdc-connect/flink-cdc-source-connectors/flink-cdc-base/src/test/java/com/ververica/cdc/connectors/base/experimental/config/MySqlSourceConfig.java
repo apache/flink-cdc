@@ -18,7 +18,6 @@ package com.ververica.cdc.connectors.base.experimental.config;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
-import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
 
@@ -34,8 +33,6 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
 
     private static final long serialVersionUID = 1L;
 
-    private transient MySqlConnectorConfig dbzMySqlConfig;
-
     public MySqlSourceConfig(
             StartupOptions startupOptions,
             List<String> databaseList,
@@ -47,7 +44,6 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
             boolean includeSchemaChanges,
             boolean closeIdleReaders,
             Properties dbzProperties,
-            Configuration dbzConfiguration,
             String driverClassName,
             String hostname,
             int port,
@@ -70,7 +66,6 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
                 includeSchemaChanges,
                 closeIdleReaders,
                 dbzProperties,
-                dbzConfiguration,
                 driverClassName,
                 hostname,
                 port,

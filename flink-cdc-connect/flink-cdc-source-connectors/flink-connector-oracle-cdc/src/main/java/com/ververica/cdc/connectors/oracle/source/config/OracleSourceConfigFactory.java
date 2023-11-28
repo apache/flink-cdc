@@ -18,7 +18,6 @@ package com.ververica.cdc.connectors.oracle.source.config;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfigFactory;
 import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
-import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnector;
 
 import javax.annotation.Nullable;
@@ -106,7 +105,6 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
             props.putAll(dbzProperties);
         }
 
-        Configuration dbzConfiguration = Configuration.from(props);
         return new OracleSourceConfig(
                 startupOptions,
                 databaseList,
@@ -118,7 +116,6 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
                 includeSchemaChanges,
                 closeIdleReaders,
                 props,
-                dbzConfiguration,
                 DRIVER_ClASS_NAME,
                 url,
                 hostname,

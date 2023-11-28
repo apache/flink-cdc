@@ -18,7 +18,6 @@ package com.ververica.cdc.connectors.sqlserver.source.config;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
-import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 
 import java.time.Duration;
@@ -42,7 +41,6 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
             boolean includeSchemaChanges,
             boolean closeIdleReaders,
             Properties dbzProperties,
-            Configuration dbzConfiguration,
             String driverClassName,
             String hostname,
             int port,
@@ -66,7 +64,6 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
                 includeSchemaChanges,
                 closeIdleReaders,
                 dbzProperties,
-                dbzConfiguration,
                 driverClassName,
                 hostname,
                 port,

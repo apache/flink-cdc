@@ -39,7 +39,6 @@ public abstract class BaseSourceConfig implements SourceConfig {
     // Debezium Configurations
     // --------------------------------------------------------------------------------------------
     protected final Properties dbzProperties;
-    protected transient Configuration dbzConfiguration;
 
     public BaseSourceConfig(
             StartupOptions startupOptions,
@@ -49,8 +48,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
             double distributionFactorLower,
             boolean includeSchemaChanges,
             boolean closeIdleReaders,
-            Properties dbzProperties,
-            Configuration dbzConfiguration) {
+            Properties dbzProperties) {
         this.startupOptions = startupOptions;
         this.splitSize = splitSize;
         this.splitMetaGroupSize = splitMetaGroupSize;
@@ -59,7 +57,6 @@ public abstract class BaseSourceConfig implements SourceConfig {
         this.includeSchemaChanges = includeSchemaChanges;
         this.closeIdleReaders = closeIdleReaders;
         this.dbzProperties = dbzProperties;
-        this.dbzConfiguration = dbzConfiguration;
     }
 
     @Override

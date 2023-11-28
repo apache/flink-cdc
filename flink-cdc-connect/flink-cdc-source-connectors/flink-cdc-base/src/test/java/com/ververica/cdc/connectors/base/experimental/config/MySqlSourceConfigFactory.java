@@ -117,7 +117,6 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
                 includeSchemaChanges,
                 closeIdleReaders,
                 props,
-                dbzConfiguration,
                 driverClassName,
                 hostname,
                 port,

@@ -18,7 +18,6 @@ package com.ververica.cdc.connectors.sqlserver.source.config;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfigFactory;
 import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
-import io.debezium.config.Configuration;
 import io.debezium.connector.sqlserver.SqlServerConnector;
 
 import java.util.Properties;
@@ -77,7 +76,6 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
             props.putAll(dbzProperties);
         }
 
-        Configuration dbzConfiguration = Configuration.from(props);
         return new SqlServerSourceConfig(
                 startupOptions,
                 databaseList,
@@ -89,7 +87,6 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
                 includeSchemaChanges,
                 closeIdleReaders,
                 props,
-                dbzConfiguration,
                 DRIVER_ClASS_NAME,
                 hostname,
                 port,
