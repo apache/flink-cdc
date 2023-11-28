@@ -78,6 +78,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
     private final double distributionFactorLower;
     private final String chunkKeyColumn;
     private final boolean closeIdleReaders;
+    private final boolean skipSnapshotBackfill;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -110,7 +111,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
             double distributionFactorUpper,
             double distributionFactorLower,
             @Nullable String chunkKeyColumn,
-            boolean closeIdleReaders) {
+            boolean closeIdleReaders,
+            boolean skipSnapshotBackfill) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -134,6 +136,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
         this.distributionFactorLower = distributionFactorLower;
         this.chunkKeyColumn = chunkKeyColumn;
         this.closeIdleReaders = closeIdleReaders;
+        this.skipSnapshotBackfill = skipSnapshotBackfill;
     }
 
     @Override
@@ -181,6 +184,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                             .distributionFactorLower(distributionFactorLower)
                             .chunkKeyColumn(chunkKeyColumn)
                             .closeIdleReaders(closeIdleReaders)
+                            .skipSnapshotBackfill(skipSnapshotBackfill)
                             .build();
             return SourceProvider.of(sqlServerChangeEventSource);
         } else {
@@ -240,7 +244,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         distributionFactorUpper,
                         distributionFactorLower,
                         chunkKeyColumn,
-                        closeIdleReaders);
+                        closeIdleReaders,
+                        skipSnapshotBackfill);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -277,7 +282,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(distributionFactorUpper, that.distributionFactorUpper)
                 && Objects.equals(distributionFactorLower, that.distributionFactorLower)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
-                && Objects.equals(closeIdleReaders, that.closeIdleReaders);
+                && Objects.equals(closeIdleReaders, that.closeIdleReaders)
+                && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill);
     }
 
     @Override
@@ -305,7 +311,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 distributionFactorUpper,
                 distributionFactorLower,
                 chunkKeyColumn,
-                closeIdleReaders);
+                closeIdleReaders,
+                skipSnapshotBackfill);
     }
 
     @Override
