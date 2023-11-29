@@ -115,6 +115,11 @@ public final class ZonedTimestampData implements Comparable<ZonedTimestampData> 
         return ZoneId.of(zoneId);
     }
 
+    /** Returns the {@code ZoneId} string of this zoned date-time. */
+    public String getZoneId() {
+        return zoneId;
+    }
+
     @Override
     public int compareTo(ZonedTimestampData that) {
         // converts to instant and then compare
@@ -182,46 +187,15 @@ public final class ZonedTimestampData implements Comparable<ZonedTimestampData> 
     }
 
     /**
-     * Creates an instance of {@link ZonedTimestampData} from epoch milliseconds.
+     * Creates an instance of {@link ZonedTimestampData} from milliseconds and nanos-of-millisecond
+     * with the given zoneId.
      *
-     * <p>The epoch nanos-of-millisecond field will be set to zero.
-     *
-     * @param epochMillisecond the number of epoch milliseconds since epoch {@code 1970-01-01
-     *     00:00:00}; a negative number is the number of epoch milliseconds before epoch {@code
-     *     1970-01-01 00:00:00}
+     * @param millisecond the number of milliseconds
+     * @param nanoOfMillisecond the nanoseconds
+     * @param zoneId the zoneId string
      */
-    public static ZonedTimestampData fromEpochMillis(long epochMillisecond) {
-        return fromEpochMillis(epochMillisecond, 0);
-    }
-
-    /**
-     * Creates an instance of {@link ZonedTimestampData} from epoch milliseconds and a epoch
-     * nanos-of-millisecond.
-     *
-     * @param epochMillisecond the number of epoch milliseconds since epoch {@code 1970-01-01
-     *     00:00:00}; a negative number is the number of epoch milliseconds before epoch {@code
-     *     1970-01-01 00:00:00}
-     * @param epochNanoOfMillisecond the nanoseconds within the epoch millisecond, from 0 to 999,999
-     */
-    public static ZonedTimestampData fromEpochMillis(
-            long epochMillisecond, int epochNanoOfMillisecond) {
-        long epochSecond = epochMillisecond / 1000;
-        int milliOfSecond = (int) (epochMillisecond % 1000);
-        if (milliOfSecond < 0) {
-            --epochSecond;
-            milliOfSecond += 1000;
-        }
-        long nanoAdjustment = milliOfSecond * 1_000_000 + epochNanoOfMillisecond;
-        return fromInstant(Instant.ofEpochSecond(epochSecond, nanoAdjustment));
-    }
-
-    /**
-     * Creates an instance of {@link ZonedTimestampData} from an instance of {@link Instant}.
-     *
-     * @param instant an instance of {@link Instant}
-     */
-    public static ZonedTimestampData fromInstant(Instant instant) {
-        return fromZonedDateTime(ZonedDateTime.from(instant));
+    public static ZonedTimestampData of(long millisecond, int nanoOfMillisecond, String zoneId) {
+        return new ZonedTimestampData(millisecond, nanoOfMillisecond, zoneId);
     }
 
     /**

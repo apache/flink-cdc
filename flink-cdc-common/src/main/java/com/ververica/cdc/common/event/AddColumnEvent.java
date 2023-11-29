@@ -99,16 +99,13 @@ public final class AddColumnEvent implements SchemaChangeEvent {
             if (this == o) {
                 return true;
             }
-            if (o == null || getClass() != o.getClass()) {
+            if (!(o instanceof ColumnWithPosition)) {
                 return false;
             }
-            if (!super.equals(o)) {
-                return false;
-            }
-            ColumnWithPosition that = (ColumnWithPosition) o;
-            return Objects.equals(addColumn, that.addColumn)
-                    && Objects.equals(position, that.position)
-                    && Objects.equals(existingColumn, that.existingColumn);
+            ColumnWithPosition position1 = (ColumnWithPosition) o;
+            return Objects.equals(addColumn, position1.addColumn)
+                    && position == position1.position
+                    && Objects.equals(existingColumn, position1.existingColumn);
         }
 
         @Override
@@ -134,10 +131,7 @@ public final class AddColumnEvent implements SchemaChangeEvent {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        if (!super.equals(o)) {
+        if (!(o instanceof AddColumnEvent)) {
             return false;
         }
         AddColumnEvent that = (AddColumnEvent) o;

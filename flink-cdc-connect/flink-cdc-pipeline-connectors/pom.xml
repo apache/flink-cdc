@@ -25,5 +25,22 @@ under the License.
 
     <artifactId>flink-cdc-pipeline-connectors</artifactId>
     <packaging>pom</packaging>
+    <modules>
+        <module>flink-cdc-pipeline-connector-values</module>
+    </modules>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-common</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-runtime</artifactId>
+            <version>${revision}</version>
+        </dependency>
+    </dependencies>
 
 </project>

@@ -17,13 +17,10 @@
 package com.ververica.cdc.connectors.base.experimental.fetch;
 
 import com.ververica.cdc.connectors.base.experimental.fetch.MySqlStreamFetchTask.MySqlBinlogSplitReadTask;
-import com.ververica.cdc.connectors.base.experimental.offset.BinlogOffset;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
-import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
-import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
-import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
+import com.ververica.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -54,46 +51,22 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Map;
 
 import static com.ververica.cdc.connectors.base.experimental.utils.MySqlConnectionUtils.createMySqlConnection;
-import static com.ververica.cdc.connectors.base.experimental.utils.MySqlConnectionUtils.currentBinlogOffset;
 import static com.ververica.cdc.connectors.base.experimental.utils.MySqlUtils.buildSplitScanQuery;
 import static com.ververica.cdc.connectors.base.experimental.utils.MySqlUtils.readTableSplitDataStatement;
 
 /** The task to work for fetching data of MySQL table snapshot split . */
-public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
-
-    private final SnapshotSplit split;
-    private volatile boolean taskRunning = false;
-
-    private MySqlSnapshotSplitReadTask snapshotSplitReadTask;
+public class MySqlScanFetchTask extends AbstractScanFetchTask {
 
     public MySqlScanFetchTask(SnapshotSplit split) {
-        this.split = split;
+        super(split);
     }
 
     @Override
-    public SnapshotSplit getSplit() {
-        return split;
-    }
-
-    @Override
-    public void close() {
-        taskRunning = false;
-    }
-
-    @Override
-    public boolean isRunning() {
-        return taskRunning;
-    }
-
-    @Override
-    public void execute(Context context) throws Exception {
+    protected void executeDataSnapshot(Context context) throws Exception {
         MySqlSourceFetchTaskContext sourceFetchContext = (MySqlSourceFetchTaskContext) context;
-        taskRunning = true;
-        snapshotSplitReadTask =
+        MySqlSnapshotSplitReadTask snapshotSplitReadTask =
                 new MySqlSnapshotSplitReadTask(
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getOffsetContext(),
@@ -101,54 +74,33 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getDatabaseSchema(),
                         sourceFetchContext.getConnection(),
                         sourceFetchContext.getDispatcher(),
-                        split);
-        SnapshotSplitChangeEventSourceContext changeEventSourceContext =
-                new SnapshotSplitChangeEventSourceContext();
+                        snapshotSplit);
+        MysqlSnapshotSplitChangeEventSourceContext changeEventSourceContext =
+                new MysqlSnapshotSplitChangeEventSourceContext();
+
         SnapshotResult<MySqlOffsetContext> snapshotResult =
                 snapshotSplitReadTask.execute(
                         changeEventSourceContext,
                         sourceFetchContext.getPartition(),
                         sourceFetchContext.getOffsetContext());
 
-        final StreamSplit backfillBinlogSplit = createBackfillBinlogSplit(changeEventSourceContext);
-        // optimization that skip the binlog read when the low watermark equals high
-        // watermark
-        final boolean binlogBackfillRequired =
-                backfillBinlogSplit
-                        .getEndingOffset()
-                        .isAfter(backfillBinlogSplit.getStartingOffset());
-        if (!binlogBackfillRequired) {
-            dispatchBinlogEndEvent(
-                    backfillBinlogSplit,
-                    sourceFetchContext.getPartition().getSourcePartition(),
-                    ((MySqlSourceFetchTaskContext) context).getDispatcher());
-            taskRunning = false;
-            return;
-        }
-        // execute binlog read task
-        if (snapshotResult.isCompletedOrSkipped()) {
-            final MySqlBinlogSplitReadTask backfillBinlogReadTask =
-                    createBackfillBinlogReadTask(backfillBinlogSplit, sourceFetchContext);
-            backfillBinlogReadTask.execute(
-                    new SnapshotBinlogSplitChangeEventSourceContext(),
-                    sourceFetchContext.getPartition(),
-                    sourceFetchContext.getOffsetContext());
-        } else {
+        if (!snapshotResult.isCompletedOrSkipped()) {
             taskRunning = false;
             throw new IllegalStateException(
-                    String.format("Read snapshot for mysql split %s fail", split));
+                    String.format("Read snapshot for mysql split %s fail", snapshotResult));
         }
     }
 
-    private StreamSplit createBackfillBinlogSplit(
-            SnapshotSplitChangeEventSourceContext sourceContext) {
-        return new StreamSplit(
-                split.splitId(),
-                sourceContext.getLowWatermark(),
-                sourceContext.getHighWatermark(),
-                new ArrayList<>(),
-                split.getTableSchemas(),
-                0);
+    @Override
+    protected void executeBackfillTask(Context context, StreamSplit backfillStreamSplit)
+            throws Exception {
+        MySqlSourceFetchTaskContext sourceFetchContext = (MySqlSourceFetchTaskContext) context;
+        MySqlBinlogSplitReadTask backfillBinlogReadTask =
+                createBackfillBinlogReadTask(backfillStreamSplit, sourceFetchContext);
+        backfillBinlogReadTask.execute(
+                new MysqlSnapshotSplitChangeEventSourceContext(),
+                sourceFetchContext.getPartition(),
+                sourceFetchContext.getOffsetContext());
     }
 
     private MySqlBinlogSplitReadTask createBackfillBinlogReadTask(
@@ -159,7 +111,7 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
                 context.getSourceConfig()
                         .getDbzConfiguration()
                         .edit()
-                        .with("table.include.list", split.getTableId().toString())
+                        .with("table.include.list", snapshotSplit.getTableId().toString())
                         // Disable heartbeat event in snapshot split fetcher
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                         .build();
@@ -172,18 +124,6 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
                 context.getTaskContext(),
                 context.getStreamingChangeEventSourceMetrics(),
                 backfillBinlogSplit);
-    }
-
-    private void dispatchBinlogEndEvent(
-            StreamSplit backFillBinlogSplit,
-            Map<String, ?> sourcePartition,
-            JdbcSourceEventDispatcher<MySqlPartition> eventDispatcher)
-            throws InterruptedException {
-        eventDispatcher.dispatchWatermarkEvent(
-                sourcePartition,
-                backFillBinlogSplit,
-                backFillBinlogSplit.getEndingOffset(),
-                WatermarkKind.END);
     }
 
     /** A wrapped task to fetch snapshot split of table. */
@@ -256,33 +196,8 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
                 throws Exception {
             final MySqlSnapshotContext ctx = (MySqlSnapshotContext) snapshotContext;
             ctx.offset = offsetContext;
-
-            final BinlogOffset lowWatermark = currentBinlogOffset(jdbcConnection);
-            LOG.info(
-                    "Snapshot step 1 - Determining low watermark {} for split {}",
-                    lowWatermark,
-                    snapshotSplit);
-            ((SnapshotSplitChangeEventSourceContext) (context)).setLowWatermark(lowWatermark);
-            dispatcher.dispatchWatermarkEvent(
-                    snapshotContext.partition.getSourcePartition(),
-                    snapshotSplit,
-                    lowWatermark,
-                    WatermarkKind.LOW);
-
-            LOG.info("Snapshot step 2 - Snapshotting data");
             createDataEvents(ctx, snapshotSplit.getTableId());
 
-            final BinlogOffset highWatermark = currentBinlogOffset(jdbcConnection);
-            LOG.info(
-                    "Snapshot step 3 - Determining high watermark {} for split {}",
-                    highWatermark,
-                    snapshotSplit);
-            ((SnapshotSplitChangeEventSourceContext) (context)).setHighWatermark(highWatermark);
-            dispatcher.dispatchWatermarkEvent(
-                    snapshotContext.partition.getSourcePartition(),
-                    snapshotSplit,
-                    highWatermark,
-                    WatermarkKind.HIGH);
             return SnapshotResult.completed(ctx.offset);
         }
 
@@ -401,42 +316,10 @@ public class MySqlScanFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     /**
-     * {@link ChangeEventSource.ChangeEventSourceContext} implementation that keeps low/high
-     * watermark for each {@link SnapshotSplit}.
-     */
-    public static class SnapshotSplitChangeEventSourceContext
-            implements ChangeEventSource.ChangeEventSourceContext {
-
-        private BinlogOffset lowWatermark;
-        private BinlogOffset highWatermark;
-
-        public BinlogOffset getLowWatermark() {
-            return lowWatermark;
-        }
-
-        public void setLowWatermark(BinlogOffset lowWatermark) {
-            this.lowWatermark = lowWatermark;
-        }
-
-        public BinlogOffset getHighWatermark() {
-            return highWatermark;
-        }
-
-        public void setHighWatermark(BinlogOffset highWatermark) {
-            this.highWatermark = highWatermark;
-        }
-
-        @Override
-        public boolean isRunning() {
-            return lowWatermark != null && highWatermark != null;
-        }
-    }
-
-    /**
      * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for bounded binlog task
      * of a snapshot split task.
      */
-    public class SnapshotBinlogSplitChangeEventSourceContext
+    public class MysqlSnapshotSplitChangeEventSourceContext
             implements ChangeEventSource.ChangeEventSourceContext {
 
         public void finished() {

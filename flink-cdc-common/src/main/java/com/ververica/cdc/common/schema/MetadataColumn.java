@@ -42,9 +42,19 @@ public class MetadataColumn extends Column {
         return false;
     }
 
+    @Nullable
+    public String getMetadataKey() {
+        return metadataKey;
+    }
+
     @Override
     public Column copy(DataType newType) {
         return new MetadataColumn(name, newType, metadataKey, comment);
+    }
+
+    @Override
+    public Column copy(String newName) {
+        return new MetadataColumn(newName, type, metadataKey, comment);
     }
 
     @Override

@@ -16,18 +16,18 @@
 
 package com.ververica.cdc.cli.utils;
 
-import org.apache.flink.configuration.Configuration;
-
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+
+import com.ververica.cdc.common.configuration.Configuration;
 
 import java.io.FileNotFoundException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
-/** Utilities for handling {@link Configuration} in Flink. */
+/** Utilities for handling {@link Configuration}. */
 public class ConfigurationUtils {
     public static Configuration loadMapFormattedConfig(Path configPath) throws Exception {
         if (!Files.exists(configPath)) {

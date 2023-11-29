@@ -24,7 +24,6 @@ import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
-import com.ververica.cdc.connectors.base.utils.SourceRecordUtils;
 import com.ververica.cdc.connectors.sqlserver.source.config.SqlServerSourceConfig;
 import com.ververica.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
 import com.ververica.cdc.connectors.sqlserver.source.offset.LsnOffset;
@@ -259,16 +258,6 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
     public StreamingChangeEventSourceMetrics<SqlServerPartition>
             getStreamingChangeEventSourceMetrics() {
         return streamingChangeEventSourceMetrics;
-    }
-
-    @Override
-    public TableId getTableId(SourceRecord record) {
-        return SourceRecordUtils.getTableId(record);
-    }
-
-    @Override
-    public boolean isDataChangeRecord(SourceRecord record) {
-        return SourceRecordUtils.isDataChangeRecord(record);
     }
 
     @Override

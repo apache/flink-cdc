@@ -44,7 +44,6 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
 
     private final StreamSplit split;
     private volatile boolean taskRunning = false;
-    private StreamSplitReadTask redoLogSplitReadTask;
 
     public SqlServerStreamFetchTask(StreamSplit split) {
         this.split = split;
@@ -56,7 +55,7 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                 (SqlServerSourceFetchTaskContext) context;
         sourceFetchContext.getOffsetContext().preSnapshotCompletion();
         taskRunning = true;
-        redoLogSplitReadTask =
+        StreamSplitReadTask redoLogSplitReadTask =
                 new StreamSplitReadTask(
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getConnection(),
@@ -141,7 +140,8 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                                 new DebeziumException("Error processing binlog signal event", e));
                     }
                     // tell fetcher the streaming task finished
-                    ((SqlServerScanFetchTask.SnapshotBinlogSplitChangeEventSourceContext) context)
+                    ((SqlServerScanFetchTask.SqlserverSnapshotSplitChangeEventSourceContext)
+                                    context)
                             .finished();
                 }
             }

@@ -203,11 +203,6 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     @Override
-    public boolean isDataChangeRecord(SourceRecord record) {
-        return SourceRecordUtils.isDataChangeRecord(record);
-    }
-
-    @Override
     public boolean isRecordBetween(SourceRecord record, Object[] splitStart, Object[] splitEnd) {
         RowType splitKeyType =
                 getSplitType(getDatabaseSchema().tableFor(SourceRecordUtils.getTableId(record)));
@@ -229,11 +224,6 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                     SourceRecordUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
             return SourceRecordUtils.splitKeyRangeContains(key, splitStart, splitEnd);
         }
-    }
-
-    @Override
-    public TableId getTableId(SourceRecord record) {
-        return SourceRecordUtils.getTableId(record);
     }
 
     @Override

@@ -26,5 +26,5 @@ import com.ververica.cdc.common.source.DataSource;
 public interface DataSourceFactory extends Factory {
 
     /** Creates a {@link DataSource} instance. */
-    DataSource createDataSource();
+    DataSource createDataSource(Context context);
 }
