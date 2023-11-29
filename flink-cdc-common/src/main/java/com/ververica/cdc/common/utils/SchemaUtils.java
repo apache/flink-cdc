@@ -35,7 +35,6 @@ import java.util.stream.Collectors;
 @PublicEvolving
 public class SchemaUtils {
 
-
     /**
      * create a list of {@link RecordData.FieldGetter} from given {@link Schema} to get Object from
      * RecordData.
@@ -47,7 +46,6 @@ public class SchemaUtils {
         }
         return fieldGetters;
     }
-
 
     /** apply SchemaChangeEvent to the old schema and return the schema after changing. */
     public static Schema applySchemaChangeEvent(Schema schema, SchemaChangeEvent event) {
