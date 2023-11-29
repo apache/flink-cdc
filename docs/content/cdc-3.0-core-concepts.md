@@ -48,11 +48,11 @@ Data transformation specifies how to transform the change data for each row in a
 
 ```yml
 transform:
-  - source-table: mydb.app_order_.*
+  - source-table: mydb.app_order_\.*
     projection: id, order_id, TO_UPPER(product_name)
     filter: id > 10 AND order_id > 100
     description: project fields from source table    	# Optional parameter for description purpose
-  - source-table: mydb.web_order_.*
+  - source-table: mydb.app_order_\.*
     projection: CONCAT(id, order_id) as uniq_id, *
     filter: uniq_id > 10
     description: add new uniq_id for each row        	# Optional parameter for description purpose
@@ -68,7 +68,7 @@ Routing, for each change event, specifies the target table ID of the event. The 
 
 ```yml
 route:
-  - source-table: mydb.app_order_.*
+  - source-table: mydb.app_order_\.*
     sink-table: app-order-topic
     description: sync all sharding tables to one destination table
   - source-table: mydb.web_order
