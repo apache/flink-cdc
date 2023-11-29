@@ -54,9 +54,11 @@ public class ValuesDataSourceHelper {
         CUSTOM_SOURCE_EVENTS
     }
 
-    private static final TableId table1 = TableId.tableId("default", "default", "table1");
+    private static final TableId table1 =
+            TableId.tableId("default_namespace", "default_schema", "table1");
 
-    private static final TableId table2 = TableId.tableId("default", "default", "table2");
+    private static final TableId table2 =
+            TableId.tableId("default_namespace", "default_schema", "table2");
 
     /**
      * create events of {@link DataChangeEvent} and {@link SchemaChangeEvent} for {@link

@@ -87,34 +87,40 @@ public class ValuesDataSourceITCase {
     public void testSingleSplitSingleTable() throws Exception {
         executeDataStreamJob(ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_SINGLE_TABLE);
         List<String> results = new ArrayList<>();
-        results.add("default.default.table1:col1=2;newCol3=x");
-        results.add("default.default.table1:col1=3;newCol3=");
+        results.add("default_namespace.default_schema.table1:col1=2;newCol3=x");
+        results.add("default_namespace.default_schema.table1:col1=3;newCol3=");
         Assert.assertEquals(
-                results, ValuesDatabase.getResults(TableId.parse("default.default.table1")));
+                results,
+                ValuesDatabase.getResults(
+                        TableId.parse("default_namespace.default_schema.table1")));
     }
 
     @Test
     public void testSingleSplitMultiTables() throws Exception {
         executeDataStreamJob(ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_MULTI_TABLES);
         List<String> results = new ArrayList<>();
-        results.add("default.default.table1:col1=2;newCol3=x");
-        results.add("default.default.table1:col1=3;newCol3=");
+        results.add("default_namespace.default_schema.table1:col1=2;newCol3=x");
+        results.add("default_namespace.default_schema.table1:col1=3;newCol3=");
         Assert.assertEquals(
-                results, ValuesDatabase.getResults(TableId.parse("default.default.table1")));
+                results,
+                ValuesDatabase.getResults(
+                        TableId.parse("default_namespace.default_schema.table1")));
 
         results.clear();
-        results.add("default.default.table2:col1=1;col2=1");
-        results.add("default.default.table2:col1=2;col2=2");
-        results.add("default.default.table2:col1=3;col2=3");
+        results.add("default_namespace.default_schema.table2:col1=1;col2=1");
+        results.add("default_namespace.default_schema.table2:col1=2;col2=2");
+        results.add("default_namespace.default_schema.table2:col1=3;col2=3");
         Assert.assertEquals(
-                results, ValuesDatabase.getResults(TableId.parse("default.default.table2")));
+                results,
+                ValuesDatabase.getResults(
+                        TableId.parse("default_namespace.default_schema.table2")));
     }
 
     @Test
     public void testCustomSourceEvents() throws Exception {
         List<List<Event>> splits = new ArrayList<>();
         List<Event> split1 = new ArrayList<>();
-        TableId table1 = TableId.tableId("default", "default", "table1");
+        TableId table1 = TableId.tableId("default_namespace", "default_schema", "table1");
         Schema schema =
                 Schema.newBuilder()
                         .physicalColumn("col1", DataTypes.STRING())
@@ -148,20 +154,24 @@ public class ValuesDataSourceITCase {
         executeDataStreamJob(ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
 
         List<String> results = new ArrayList<>();
-        results.add("default.default.table1:col1=1;col2=1");
-        results.add("default.default.table1:col1=2;col2=2");
+        results.add("default_namespace.default_schema.table1:col1=1;col2=1");
+        results.add("default_namespace.default_schema.table1:col1=2;col2=2");
         Assert.assertEquals(
-                results, ValuesDatabase.getResults(TableId.parse("default.default.table1")));
+                results,
+                ValuesDatabase.getResults(
+                        TableId.parse("default_namespace.default_schema.table1")));
     }
 
     @Test
     public void testMultiSplitsSingleTable() throws Exception {
         executeDataStreamJob(ValuesDataSourceHelper.EventSetId.MULTI_SPLITS_SINGLE_TABLE);
         List<String> results = new ArrayList<>();
-        results.add("default.default.table1:col1=1;col2=1;col3=x");
-        results.add("default.default.table1:col1=3;col2=3;col3=x");
-        results.add("default.default.table1:col1=5;col2=5;col3=");
+        results.add("default_namespace.default_schema.table1:col1=1;col2=1;col3=x");
+        results.add("default_namespace.default_schema.table1:col1=3;col2=3;col3=x");
+        results.add("default_namespace.default_schema.table1:col1=5;col2=5;col3=");
         Assert.assertEquals(
-                results, ValuesDatabase.getResults(TableId.parse("default.default.table1")));
+                results,
+                ValuesDatabase.getResults(
+                        TableId.parse("default_namespace.default_schema.table1")));
     }
 }
