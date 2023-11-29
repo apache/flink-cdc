@@ -94,6 +94,12 @@ public class DorisMetadataApplier implements MetadataApplier {
             tableSchema.setKeys(schema.primaryKeys());
             tableSchema.setModel(DataModel.UNIQUE);
         }
+        // Currently, it is not supported to pass the properties of custom tables, so temporarily
+        // hard-code some common ones first.
+        Map<String, String> props = new HashMap<>();
+        props.put("replication_num", "1");
+        props.put("light_schema_change", "true");
+        tableSchema.setProperties(props);
         schemaChangeManager.createTable(tableSchema);
     }
 

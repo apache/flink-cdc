@@ -96,7 +96,9 @@ public class DorisDataSinkFactory implements DataSinkFactory {
         config.getOptional(SINK_ENABLE_BATCH_MODE)
                 .ifPresent(
                         b -> {
-                            if (b) executionBuilder.enableBatchMode();
+                            if (b) {
+                                executionBuilder.enableBatchMode();
+                            }
                         });
         return new DorisDataSink(
                 optionsBuilder.build(),

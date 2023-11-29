@@ -16,9 +16,6 @@
 
 package com.ververica.cdc.connectors.doris.sink;
 
-import org.apache.flink.table.data.GenericRowData;
-import org.apache.flink.table.types.DataType;
-
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -31,10 +28,8 @@ import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
-import com.ververica.cdc.common.types.utils.DataTypeUtils;
 import com.ververica.cdc.common.utils.Preconditions;
 import com.ververica.cdc.common.utils.SchemaUtils;
-import org.apache.doris.flink.deserialization.converter.DorisRowConverter;
 import org.apache.doris.flink.sink.writer.serializer.DorisRecord;
 import org.apache.doris.flink.sink.writer.serializer.DorisRecordSerializer;
 
@@ -46,7 +41,7 @@ import java.util.Map;
 
 import static org.apache.doris.flink.sink.util.DeleteOperation.addDeleteSign;
 
-/** A serializer for Event to Tuple2<String, byte[]>. */
+/** A serializer for Event to DorisRecord. */
 public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     private ObjectMapper objectMapper = new ObjectMapper();
     private Map<TableId, Schema> schemaMaps = new HashMap<>();
@@ -93,6 +88,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             default:
                 throw new UnsupportedOperationException("Unsupport Operation " + op);
         }
+
         return DorisRecord.of(
                 tableId.getSchemaName(),
                 tableId.getTableName(),
@@ -107,27 +103,12 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                 columns.size() == recordData.getArity(),
                 "Column size does not match the data size");
 
-        List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(schema);
-        GenericRowData rowData = toFlinkRowData(recordData, fieldGetters);
         for (int i = 0; i < recordData.getArity(); i++) {
-            DataType dataType = DataTypeUtils.toFlinkDataType(columns.get(i).getType());
             DorisRowConverter.SerializationConverter converter =
-                    DorisRowConverter.createNullableExternalConverter(dataType.getLogicalType());
-            Object field = converter.serialize(i, rowData);
+                    DorisRowConverter.createNullableExternalConverter(columns.get(i).getType());
+            Object field = converter.serialize(i, recordData);
             record.put(columns.get(i).getName(), field);
         }
         return record;
-    }
-
-    /** convert recordData to Flink GenericRowData. */
-    public static GenericRowData toFlinkRowData(
-            RecordData recordData, List<RecordData.FieldGetter> fieldGetters) {
-        Preconditions.checkState(fieldGetters.size() == recordData.getArity());
-        GenericRowData rowData = new GenericRowData(recordData.getArity());
-        for (int i = 0; i < recordData.getArity(); i++) {
-            Object field = fieldGetters.get(i).getFieldOrNull(recordData);
-            rowData.setField(i, field);
-        }
-        return rowData;
     }
 }
