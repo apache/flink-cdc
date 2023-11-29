@@ -12,4 +12,5 @@ sqlserver-tutorial
 tidb-tutorial
 db2-tutorial
 build-real-time-data-lake-tutorial
+datastream-api-package-guidance
 ```

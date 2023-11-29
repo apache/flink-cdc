@@ -16,11 +16,10 @@
 
 package com.ververica.cdc.cli;
 
-import org.apache.flink.configuration.Configuration;
-
 import com.ververica.cdc.cli.utils.ConfigurationUtils;
 import com.ververica.cdc.cli.utils.FlinkEnvironmentUtils;
 import com.ververica.cdc.common.annotation.VisibleForTesting;
+import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.composer.PipelineExecution;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;

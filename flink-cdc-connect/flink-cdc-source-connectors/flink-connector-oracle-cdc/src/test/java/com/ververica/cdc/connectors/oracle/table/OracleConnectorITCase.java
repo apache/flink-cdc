@@ -58,6 +58,7 @@ import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.OR
 import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.assertEqualsInAnyOrder;
 import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.createAndInitialize;
 import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.getJdbcConnection;
+import static com.ververica.cdc.connectors.oracle.source.OracleSourceTestBase.getJdbcConnectionAsDBA;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -142,6 +143,138 @@ public class OracleConnectorITCase {
                         parallelismSnapshot,
                         "debezium",
                         "products");
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " name STRING,"
+                        + " weightSum DECIMAL(10,3),"
+                        + " PRIMARY KEY (name) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT NAME, SUM(WEIGHT) FROM debezium_source GROUP BY NAME");
+
+        // There are 9 records in the table, wait until the snapshot phase finished
+        waitForSinkSize("sink", 9);
+
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
+            statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
+            statement.execute(
+                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)"); // 110
+            statement.execute(
+                    "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
+            statement.execute(
+                    "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
+            statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
+            statement.execute("DELETE FROM debezium.products WHERE ID=112");
+        }
+
+        waitForSinkSize("sink", 20);
+
+        /*
+         * <pre>
+         * The final database table looks like this:
+         *
+         * > SELECT * FROM products;
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | id  | name               | description                                             | weight |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * | 101 | scooter            | Small 2-wheel scooter                                   |   3.14 |
+         * | 102 | car battery        | 12V car battery                                         |    8.1 |
+         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |    0.8 |
+         * | 104 | hammer             | 12oz carpenter's hammer                                 |   0.75 |
+         * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
+         * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
+         * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
+         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
+         * | 111 | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * +-----+--------------------+---------------------------------------------------------+--------+
+         * </pre>
+         */
+
+        String[] expected =
+                new String[] {
+                    "+I[scooter, 3.140]",
+                    "+I[car battery, 8.100]",
+                    "+I[12-pack drill bits, 0.800]",
+                    "+I[hammer, 2.625]",
+                    "+I[rocks, 5.100]",
+                    "+I[jacket, 0.600]",
+                    "+I[spare tire, 22.200]"
+                };
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testSkipNestedTables() throws Exception {
+
+        createAndInitialize("product.sql");
+        // create nested table
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            try (Connection dbaConnection = getJdbcConnectionAsDBA();
+                    Statement dbaStatement = dbaConnection.createStatement()) {
+                dbaStatement.execute("GRANT CREATE ANY TYPE TO debezium");
+            }
+            String embeddingTableDll =
+                    "CREATE OR REPLACE TYPE debezium.embedding_table AS TABLE OF VARCHAR2(128);";
+            statement.execute(embeddingTableDll);
+
+            String nestedTableDdl =
+                    "create table debezium.products_nested_table  ("
+                            + " id numeric(9,0) not null, "
+                            + " c1 int, "
+                            + " c2 debezium.embedding_table , "
+                            + " primary key (id)) "
+                            + " nested table c2 store as nested_embedding_table";
+            statement.execute(nestedTableDdl);
+            statement.execute(
+                    "INSERT INTO debezium.products_nested_table VALUES (1, 25, debezium.embedding_table('test1'))");
+            statement.execute(
+                    "INSERT INTO debezium.products_nested_table VALUES (2, 50, debezium.embedding_table('test2'))");
+        }
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " ID INT NOT NULL,"
+                                + " NAME STRING,"
+                                + " DESCRIPTION STRING,"
+                                + " WEIGHT DECIMAL(10,3)"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '2',"
+                                + " 'database-name' = 'ORCLCDB',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
+                        CONNECTOR_USER,
+                        CONNECTOR_PWD,
+                        parallelismSnapshot,
+                        "debezium",
+                        "(products|products_nested_table)");
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"

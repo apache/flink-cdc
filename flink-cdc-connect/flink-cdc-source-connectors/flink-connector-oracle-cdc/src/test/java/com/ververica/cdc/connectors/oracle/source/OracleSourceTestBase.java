@@ -65,9 +65,10 @@ public class OracleSourceTestBase extends TestLogger {
     public static final String ORACLE_DATABASE = "ORCLCDB";
     public static final String ORACLE_SCHEMA = "DEBEZIUM";
     public static final String CONNECTOR_USER = "dbzuser";
+    public static final String CONNECTOR_PWD = "dbz";
     public static final String TEST_USER = "debezium";
     public static final String TEST_PWD = "dbz";
-    public static final String CONNECTOR_PWD = "dbz";
+    public static final String TOP_SECRET = "top_secret";
 
     public static final OracleContainer ORACLE_CONTAINER =
             new OracleContainer(
@@ -121,6 +122,11 @@ public class OracleSourceTestBase extends TestLogger {
         return DriverManager.getConnection(ORACLE_CONTAINER.getJdbcUrl(), TEST_USER, TEST_PWD);
     }
 
+    public static Connection getJdbcConnectionAsDBA() throws SQLException {
+        return DriverManager.getConnection(
+                ORACLE_CONTAINER.getJdbcUrl(), "sys as sysdba", TOP_SECRET);
+    }
+
     public static void createAndInitialize(String sqlFile) throws Exception {
         final String ddlFile = String.format("ddl/%s", sqlFile);
         final URL ddlTestFile = OracleSourceITCase.class.getClassLoader().getResource(ddlFile);
@@ -172,7 +178,8 @@ public class OracleSourceTestBase extends TestLogger {
         Set<TableId> tableIdSet = new HashSet<>();
         String queryTablesSql =
                 "SELECT OWNER ,TABLE_NAME,TABLESPACE_NAME FROM ALL_TABLES \n"
-                        + "WHERE TABLESPACE_NAME IS NOT NULL AND TABLESPACE_NAME NOT IN ('SYSTEM','SYSAUX')";
+                        + "WHERE TABLESPACE_NAME IS NOT NULL AND TABLESPACE_NAME NOT IN ('SYSTEM','SYSAUX') "
+                        + "AND NESTED = 'NO' AND TABLE_NAME NOT IN (SELECT PARENT_TABLE_NAME FROM ALL_NESTED_TABLES)";
         try {
             ResultSet resultSet = connection.createStatement().executeQuery(queryTablesSql);
             while (resultSet.next()) {

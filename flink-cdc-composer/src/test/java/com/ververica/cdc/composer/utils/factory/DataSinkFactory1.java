@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.composer.utils.factory;
 
-import org.apache.flink.configuration.ConfigOption;
-
+import com.ververica.cdc.common.configuration.ConfigOption;
 import com.ververica.cdc.common.factories.DataSinkFactory;
 import com.ververica.cdc.common.sink.DataSink;
 import com.ververica.cdc.common.sink.EventSinkProvider;
@@ -29,18 +28,8 @@ import java.util.Set;
 /** A dummy {@link DataSinkFactory} for testing. */
 public class DataSinkFactory1 implements DataSinkFactory {
     @Override
-    public DataSink createDataSink() {
-        return new DataSink() {
-            @Override
-            public EventSinkProvider getEventSinkProvider() {
-                return null;
-            }
-
-            @Override
-            public MetadataApplier getMetadataApplier() {
-                return null;
-            }
-        };
+    public DataSink createDataSink(Context context) {
+        return new TestDataSink(context.getConfiguration().get(TestOptions.HOST));
     }
 
     @Override
@@ -55,6 +44,32 @@ public class DataSinkFactory1 implements DataSinkFactory {
 
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
-        return new HashSet<>();
+        Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(TestOptions.HOST);
+        return options;
+    }
+
+    /** A dummy {@link DataSink} for testing. */
+    public static class TestDataSink implements DataSink {
+
+        private final String host;
+
+        public TestDataSink(String host) {
+            this.host = host;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        @Override
+        public EventSinkProvider getEventSinkProvider() {
+            return null;
+        }
+
+        @Override
+        public MetadataApplier getMetadataApplier() {
+            return null;
+        }
     }
 }

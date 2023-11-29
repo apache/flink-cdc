@@ -47,7 +47,6 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
 
     private final StreamSplit split;
     private volatile boolean taskRunning = false;
-    private RedoLogSplitReadTask redoLogSplitReadTask;
 
     public OracleStreamFetchTask(StreamSplit split) {
         this.split = split;
@@ -57,7 +56,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
     public void execute(Context context) throws Exception {
         OracleSourceFetchTaskContext sourceFetchContext = (OracleSourceFetchTaskContext) context;
         taskRunning = true;
-        redoLogSplitReadTask =
+        RedoLogSplitReadTask redoLogSplitReadTask =
                 new RedoLogSplitReadTask(
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getConnection(),
@@ -157,7 +156,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                                 new DebeziumException("Error processing redo log signal event", e));
                     }
                     // tell fetcher the redo log task finished
-                    ((OracleScanFetchTask.SnapshotRedoLogSplitChangeEventSourceContext) context)
+                    ((OracleScanFetchTask.OracleSnapshotRedoLogSplitChangeEventSourceContext)
+                                    context)
                             .finished();
                 }
             }

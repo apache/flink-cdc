@@ -23,7 +23,6 @@ import javax.annotation.Nullable;
 
 import java.io.Serializable;
 import java.util.Objects;
-import java.util.Optional;
 
 import static com.ververica.cdc.common.utils.EncodingUtils.escapeIdentifier;
 import static com.ververica.cdc.common.utils.EncodingUtils.escapeSingleQuotes;
@@ -66,8 +65,9 @@ public class DataField implements Serializable {
         return type;
     }
 
-    public Optional<String> getDescription() {
-        return Optional.ofNullable(description);
+    @Nullable
+    public String getDescription() {
+        return description;
     }
 
     public DataField copy() {

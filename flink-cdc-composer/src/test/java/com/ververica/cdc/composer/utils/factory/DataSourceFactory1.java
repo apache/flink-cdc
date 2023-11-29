@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.composer.utils.factory;
 
-import org.apache.flink.configuration.ConfigOption;
-
+import com.ververica.cdc.common.configuration.ConfigOption;
 import com.ververica.cdc.common.factories.DataSourceFactory;
 import com.ververica.cdc.common.source.DataSource;
 import com.ververica.cdc.common.source.EventSourceProvider;
@@ -29,18 +28,8 @@ import java.util.Set;
 /** A dummy {@link DataSourceFactory} for testing. */
 public class DataSourceFactory1 implements DataSourceFactory {
     @Override
-    public DataSource createDataSource() {
-        return new DataSource() {
-            @Override
-            public EventSourceProvider getEventSourceProvider() {
-                return null;
-            }
-
-            @Override
-            public MetadataAccessor getMetadataAccessor() {
-                return null;
-            }
-        };
+    public DataSource createDataSource(Context context) {
+        return new TestDataSource(context.getConfiguration().get(TestOptions.HOST));
     }
 
     @Override
@@ -55,6 +44,32 @@ public class DataSourceFactory1 implements DataSourceFactory {
 
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
-        return new HashSet<>();
+        Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(TestOptions.HOST);
+        return options;
+    }
+
+    /** A dummy {@link DataSource} for testing. */
+    public static class TestDataSource implements DataSource {
+
+        private final String host;
+
+        public TestDataSource(String host) {
+            this.host = host;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        @Override
+        public EventSourceProvider getEventSourceProvider() {
+            return null;
+        }
+
+        @Override
+        public MetadataAccessor getMetadataAccessor() {
+            return null;
+        }
     }
 }

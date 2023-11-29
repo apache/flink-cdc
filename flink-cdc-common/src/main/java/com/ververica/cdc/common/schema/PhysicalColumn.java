@@ -40,4 +40,9 @@ public class PhysicalColumn extends Column {
     public Column copy(DataType newType) {
         return new PhysicalColumn(name, newType, comment);
     }
+
+    @Override
+    public Column copy(String newName) {
+        return new PhysicalColumn(newName, type, comment);
+    }
 }

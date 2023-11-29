@@ -16,18 +16,23 @@
 
 package com.ververica.cdc.composer.utils;
 
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.common.factories.Factory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 /** Discovery utilities for {@link Factory}. */
+@Internal
 public class FactoryDiscoveryUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(FactoryDiscoveryUtils.class);
@@ -80,9 +85,23 @@ public class FactoryDiscoveryUtils {
     /**
      * Return the path of the jar file that contains the {@link Factory} for the given identifier.
      */
-    public static <T extends Factory> URL getJarPathByIdentifier(
+    public static <T extends Factory> Optional<URL> getJarPathByIdentifier(
             String identifier, Class<T> factoryClass) {
-        Factory factory = getFactoryByIdentifier(identifier, factoryClass);
-        return factory.getClass().getProtectionDomain().getCodeSource().getLocation();
+        try {
+            T factory = getFactoryByIdentifier(identifier, factoryClass);
+            URL url = factory.getClass().getProtectionDomain().getCodeSource().getLocation();
+            if (Files.isDirectory(Paths.get(url.toURI()))) {
+                LOG.warn(
+                        "The factory class \"{}\" is contained by directory \"{}\" instead of JAR. "
+                                + "This might happen in integration test. Will ignore the directory.",
+                        factory.getClass().getCanonicalName(),
+                        url);
+                return Optional.empty();
+            }
+            return Optional.of(url);
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    String.format("Failed to search JAR by factory identifier \"%s\"", identifier));
+        }
     }
 }

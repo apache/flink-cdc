@@ -58,8 +58,7 @@ class FactoryDiscoveryUtilsTest {
     void getJarPathByIdentifier() {
         assertThat(
                         FactoryDiscoveryUtils.getJarPathByIdentifier(
-                                        "data-source-factory-1", Factory.class)
-                                .getPath())
-                .endsWith("/flink-cdc" + "-composer/target/test-classes/");
+                                "data-source-factory-1", Factory.class))
+                .isNotPresent();
     }
 }

@@ -28,9 +28,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.TimeZone;
+import java.util.concurrent.ExecutionException;
 
 import static org.junit.Assert.assertEquals;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
@@ -45,9 +48,9 @@ public class SqlServerTimezoneITCase extends SqlServerTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @Parameterized.Parameter public String localTimeZone;
+    @Parameterized.Parameter public String timeZone;
 
-    @Parameterized.Parameters(name = "localTimeZone: {0}")
+    @Parameterized.Parameters(name = "timeZone: {0}")
     public static List<String> parameters() {
         return Arrays.asList("Asia/Shanghai", "Europe/Berlin", "UTC");
     }
@@ -59,82 +62,137 @@ public class SqlServerTimezoneITCase extends SqlServerTestBase {
     }
 
     @Test
-    public void testTemporalTypesWithTimeZone() throws Exception {
-        initializeSqlServerTable("column_type_test");
+    public void testTimeTypeWithDifferentLocalTimeZones() throws Exception {
+        List<String> actual = getTimestampResult(timeZone, "UTC", "UTC", false);
+        // timestamp_ltz is not determined by timezones, different local timezone with same value.
+        List<String> expected =
+                Collections.singletonList(
+                        "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
 
-        String sourceDDL =
-                String.format(
-                        "CREATE TABLE full_types (\n"
-                                + "    id int NOT NULL,\n"
-                                + "    val_date DATE,\n"
-                                + "    val_time_p2 TIME(0),\n"
-                                + "    val_time TIME(0),\n"
-                                + "    val_datetime2 TIMESTAMP,\n"
-                                + "    val_datetimeoffset TIMESTAMP_LTZ(3),\n"
-                                + "    val_datetime TIMESTAMP,\n"
-                                + "    val_smalldatetime TIMESTAMP\n"
-                                + ") WITH ("
-                                + " 'connector' = 'sqlserver-cdc',"
-                                + " 'hostname' = '%s',"
-                                + " 'port' = '%s',"
-                                + " 'username' = '%s',"
-                                + " 'password' = '%s',"
-                                + " 'database-name' = '%s',"
-                                + " 'table-name' = '%s',"
-                                + " 'server-time-zone'='%s'"
-                                + ")",
-                        MSSQL_SERVER_CONTAINER.getHost(),
-                        MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT),
-                        MSSQL_SERVER_CONTAINER.getUsername(),
-                        MSSQL_SERVER_CONTAINER.getPassword(),
-                        "column_type_test",
-                        "dbo.full_types",
-                        localTimeZone);
-        String sinkDDL =
-                "CREATE TABLE sink (\n"
-                        + "    id int NOT NULL,\n"
-                        + "    val_date DATE,\n"
-                        + "    val_time_p2 TIME(0),\n"
-                        + "    val_time TIME(0),\n"
-                        + "    val_datetime2 TIMESTAMP,\n"
-                        + "    val_datetimeoffset TIMESTAMP_LTZ(3),\n"
-                        + "    val_datetime TIMESTAMP,\n"
-                        + "    val_smalldatetime TIMESTAMP,\n"
-                        + "    PRIMARY KEY (id) NOT ENFORCED"
-                        + ") WITH ("
-                        + " 'connector' = 'values',"
-                        + " 'sink-insert-only' = 'false',"
-                        + " 'sink-expected-messages-num' = '20'"
-                        + ")";
-        tEnv.executeSql(sourceDDL);
-        tEnv.executeSql(sinkDDL);
+        assertEquals(expected, actual);
+    }
 
-        // async submit job
-        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM full_types");
+    @Test
+    public void testTimeTypeWithDifferentServerTimeZones() throws Exception {
+        List<String> actual = getTimestampResult("UTC", timeZone, "UTC", false);
+        // timestamp_ltz is not determined by timezones, different server timeZone with same value.
+        List<String> expected =
+                Collections.singletonList(
+                        "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
+        assertEquals(expected, actual);
+    }
 
-        waitForSnapshotStarted("sink");
+    @Test
+    public void testTimeTypeWithDifferentJVMTimeZones() throws Exception {
+        List<String> actual = getTimestampResult("UTC", "UTC", timeZone, false);
+        // timestamp_ltz is not determined by timezones, different jvm timezone with same value.
+        List<String> expected =
+                Collections.singletonList(
+                        "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
+        assertEquals(expected, actual);
+    }
 
+    @Test
+    public void testTimeTypeLtz2ntz() throws Exception {
+        List<String> actual = getTimestampResult(timeZone, "UTC", "UTC", true);
+
+        // A timestamp value from a same timestamp_ltz value is determined by flink timezone,
+        // different local timezone with different value.
         List<String> expected = null;
-        switch (localTimeZone) {
+        switch (timeZone) {
             case "Asia/Shanghai":
                 expected =
                         Collections.singletonList(
-                                "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T09:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
+                                "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T09:23:45.456, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
                 break;
             case "Europe/Berlin":
                 expected =
                         Collections.singletonList(
-                                "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T03:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
+                                "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T03:23:45.456, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
                 break;
             default:
                 expected =
                         Collections.singletonList(
-                                "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456Z, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
+                                "+I[0, 2018-07-13, 10:23:45.680, 10:23:45.678, 2018-07-13T11:23:45.340, 2018-07-13T01:23:45.456, 2018-07-13T13:23:45.780, 2018-07-13T14:24]");
                 break;
         }
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEquals(expected, actual);
+    }
 
-        result.getJobClient().get().cancel().get();
+    public List<String> getTimestampResult(
+            String localTimeZone,
+            String serverTimeZone,
+            String jvmTimeZone,
+            boolean castTimeStampLtz)
+            throws InterruptedException, ExecutionException {
+
+        TimeZone aDefault = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone(jvmTimeZone));
+            initializeSqlServerTable("column_type_test");
+
+            String sourceDDL =
+                    String.format(
+                            "CREATE TABLE full_types (\n"
+                                    + "    id int NOT NULL,\n"
+                                    + "    val_date DATE,\n"
+                                    + "    val_time_p2 TIME(0),\n"
+                                    + "    val_time TIME(0),\n"
+                                    + "    val_datetime2 TIMESTAMP,\n"
+                                    + "    val_datetimeoffset TIMESTAMP_LTZ(3),\n"
+                                    + "    val_datetime TIMESTAMP,\n"
+                                    + "    val_smalldatetime TIMESTAMP\n"
+                                    + ") WITH ("
+                                    + " 'connector' = 'sqlserver-cdc',"
+                                    + " 'hostname' = '%s',"
+                                    + " 'port' = '%s',"
+                                    + " 'username' = '%s',"
+                                    + " 'password' = '%s',"
+                                    + " 'database-name' = '%s',"
+                                    + " 'table-name' = '%s',"
+                                    + " 'server-time-zone'='%s'"
+                                    + ")",
+                            MSSQL_SERVER_CONTAINER.getHost(),
+                            MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT),
+                            MSSQL_SERVER_CONTAINER.getUsername(),
+                            MSSQL_SERVER_CONTAINER.getPassword(),
+                            "column_type_test",
+                            "dbo.full_types",
+                            serverTimeZone);
+            String sinkDDL =
+                    "CREATE TABLE sink (\n"
+                            + "    id int NOT NULL,\n"
+                            + "    val_date DATE,\n"
+                            + "    val_time_p2 TIME(0),\n"
+                            + "    val_time TIME(0),\n"
+                            + "    val_datetime2 TIMESTAMP,\n"
+                            + (castTimeStampLtz
+                                    ? "    val_datetimeoffset TIMESTAMP(3),\n"
+                                    : "    val_datetimeoffset TIMESTAMP_LTZ(3),\n")
+                            + "    val_datetime TIMESTAMP,\n"
+                            + "    val_smalldatetime TIMESTAMP,\n"
+                            + "    PRIMARY KEY (id) NOT ENFORCED"
+                            + ") WITH ("
+                            + " 'connector' = 'values',"
+                            + " 'sink-insert-only' = 'false',"
+                            + " 'sink-expected-messages-num' = '20'"
+                            + ")";
+            // set table.local-time-zone to serverTimeZone
+            tEnv.getConfig().setLocalTimeZone(ZoneId.of(localTimeZone));
+            tEnv.executeSql(sourceDDL);
+            tEnv.executeSql(sinkDDL);
+
+            // async submit job
+            TableResult result = tEnv.executeSql("INSERT INTO sink SELECT *  FROM full_types");
+
+            waitForSnapshotStarted("sink");
+
+            List<String> actual = TestValuesTableFactory.getRawResults("sink");
+
+            result.getJobClient().get().cancel().get();
+            return actual;
+        } finally {
+            TimeZone.setDefault(aDefault);
+        }
     }
 }
