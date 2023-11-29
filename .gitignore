@@ -24,5 +24,3 @@ build-targetatlassian-ide-plugin.xml
 *.iws
 docs/_build
 **/.flattened-pom.xml
-dist/
-

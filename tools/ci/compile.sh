@@ -40,7 +40,7 @@ echo "==========================================================================
 
 EXIT_CODE=0
 
-run_mvn clean install -Dmaven.javadoc.skip=true -U -DskipTests | tee $MVN_CLEAN_COMPILE_OUT
+run_mvn clean package -Dmaven.javadoc.skip=true -U -DskipTests | tee $MVN_CLEAN_COMPILE_OUT
 
 EXIT_CODE=${PIPESTATUS[0]}
 

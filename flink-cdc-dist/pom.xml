@@ -59,6 +59,25 @@ under the License.
             <optional>${markBundledAsOptional}</optional>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
+            <version>${log4j.version}</version>
+            <optional>${markBundledAsOptional}</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>${log4j.version}</version>
+            <optional>${markBundledAsOptional}</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j.version}</version>
+            <optional>${markBundledAsOptional}</optional>
+        </dependency>
+
     </dependencies>
 
     <profiles>
@@ -80,88 +99,7 @@ under the License.
                         </executions>
                         <configuration>
                             <artifactItems>
-
-                                <artifactItem>
-                                    <groupId>com.ververica</groupId>
-                                    <artifactId>flink-sql-connector-mysql-cdc</artifactId>
-                                    <version>${project.version}</version>
-                                    <destFileName>mysql-cdc-connector.jar</destFileName>
-                                    <type>jar</type>
-                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                                </artifactItem>
-
-                                <artifactItem>
-                                    <groupId>com.ververica</groupId>
-                                    <artifactId>flink-sql-connector-postgres-cdc</artifactId>
-                                    <version>${project.version}</version>
-                                    <destFileName>postgres-cdc-connector.jar</destFileName>
-                                    <type>jar</type>
-                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                                </artifactItem>
-
-                                <artifactItem>
-                                    <groupId>com.ververica</groupId>
-                                    <artifactId>flink-sql-connector-mongodb-cdc</artifactId>
-                                    <version>${project.version}</version>
-                                    <destFileName>mongodb-cdc-connector.jar</destFileName>
-                                    <type>jar</type>
-                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                                </artifactItem>
-
-                                <artifactItem>
-                                    <groupId>com.ververica</groupId>
-                                    <artifactId>flink-sql-connector-oracle-cdc</artifactId>
-                                    <version>${project.version}</version>
-                                    <destFileName>oracle-cdc-connector.jar</destFileName>
-                                    <type>jar</type>
-                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                                </artifactItem>
-
-                                <artifactItem>
-                                    <groupId>com.ververica</groupId>
-                                    <artifactId>flink-sql-connector-sqlserver-cdc</artifactId>
-                                    <version>${project.version}</version>
-                                    <destFileName>sqlserver-cdc-connector.jar</destFileName>
-                                    <type>jar</type>
-                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                                </artifactItem>
-
-                                <artifactItem>
-                                    <groupId>com.ververica</groupId>
-                                    <artifactId>flink-sql-connector-tidb-cdc</artifactId>
-                                    <version>${project.version}</version>
-                                    <destFileName>tidb-cdc-connector.jar</destFileName>
-                                    <type>jar</type>
-                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                                </artifactItem>
-
-                                <artifactItem>
-                                    <groupId>com.ververica</groupId>
-                                    <artifactId>flink-sql-connector-db2-cdc</artifactId>
-                                    <version>${project.version}</version>
-                                    <destFileName>db2-cdc-connector.jar</destFileName>
-                                    <type>jar</type>
-                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                                </artifactItem>
-
-                                <artifactItem>
-                                    <groupId>com.ververica</groupId>
-                                    <artifactId>flink-sql-connector-vitess-cdc</artifactId>
-                                    <version>${project.version}</version>
-                                    <destFileName>vitess-cdc-connector.jar</destFileName>
-                                    <type>jar</type>
-                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                                </artifactItem>
-
-                                <artifactItem>
-                                    <groupId>com.ververica</groupId>
-                                    <artifactId>flink-sql-connector-oceanbase-cdc</artifactId>
-                                    <version>${project.version}</version>
-                                    <destFileName>oceanbase-cdc-connector.jar</destFileName>
-                                    <type>jar</type>
-                                    <outputDirectory>${project.build.directory}/lib</outputDirectory>
-                                </artifactItem>
-
+                                <!-- empty -->
                             </artifactItems>
                         </configuration>
                     </plugin>
@@ -184,23 +122,6 @@ under the License.
                                     <descriptors>
                                         <descriptor>${basedir}/src/main/assembly/assembly.xml</descriptor>
                                     </descriptors>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <artifactId>maven-antrun-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>dist</id>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                                <phase>package</phase>
-                                <configuration>
-                                    <target>
-                                        <copy file="${project.build.directory}/flink-cdc-connectors-${project.version}-bin.tar.gz" tofile="${project.basedir}/../dist/flink-cdc-connectors-${project.version}-bin.tar.gz" overwrite="true" />
-                                    </target>
                                 </configuration>
                             </execution>
                         </executions>
