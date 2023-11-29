@@ -20,6 +20,7 @@ import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.configuration.description.Description;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -76,6 +77,33 @@ public class ConfigOptions {
     public static OptionBuilder key(String key) {
         checkNotNull(key);
         return new OptionBuilder(key);
+    }
+
+    /**
+     * Create option from Flink's {@link org.apache.flink.configuration.ConfigOption}.
+     *
+     * <p>Please note that the {@link Description} part will be ignored for now.
+     */
+    public static <T> ConfigOption<T> fromFlinkOption(
+            org.apache.flink.configuration.ConfigOption<T> flinkOption, boolean isListOption) {
+        List<FallbackKey> fallbackKeys = new ArrayList<>();
+        flinkOption
+                .fallbackKeys()
+                .forEach(
+                        fallbackKey ->
+                                fallbackKeys.add(
+                                        fallbackKey.isDeprecated()
+                                                ? FallbackKey.createDeprecatedKey(
+                                                        fallbackKey.getKey())
+                                                : FallbackKey.createFallbackKey(
+                                                        fallbackKey.getKey())));
+        return new ConfigOption<>(
+                flinkOption.key(),
+                flinkOption.getClass(),
+                Description.builder().build(),
+                flinkOption.defaultValue(),
+                isListOption,
+                fallbackKeys.toArray(fallbackKeys.toArray(new FallbackKey[0])));
     }
 
     // ------------------------------------------------------------------------
