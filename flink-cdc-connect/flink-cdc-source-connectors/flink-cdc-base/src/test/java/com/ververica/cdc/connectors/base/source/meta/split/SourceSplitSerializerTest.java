@@ -43,10 +43,8 @@ public class SourceSplitSerializerTest {
         Tables tables = new Tables();
         Table table = tables.editOrCreateTable(tableId).create();
         HashMap<TableId, TableChanges.TableChange> map = new HashMap<>();
-        TableChanges.TableChange tableChange = new TableChanges.TableChange(
-                TableChanges.TableChangeType.CREATE,
-                table
-        );
+        TableChanges.TableChange tableChange =
+                new TableChanges.TableChange(TableChanges.TableChangeType.CREATE, table);
         map.put(tableId, tableChange);
         SnapshotSplit snapshotSplitBefore =
                 new SnapshotSplit(
@@ -58,8 +56,7 @@ public class SourceSplitSerializerTest {
                         null,
                         null,
                         null,
-                        map
-                        );
+                        map);
 
         SourceSplitSerializer sourceSplitSerializer =
                 new SourceSplitSerializer() {
