@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.doris.sink;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.types.DataType;
 
@@ -36,6 +35,7 @@ import com.ververica.cdc.common.types.utils.DataTypeUtils;
 import com.ververica.cdc.common.utils.Preconditions;
 import com.ververica.cdc.common.utils.SchemaUtils;
 import org.apache.doris.flink.deserialization.converter.DorisRowConverter;
+import org.apache.doris.flink.sink.writer.serializer.DorisRecord;
 import org.apache.doris.flink.sink.writer.serializer.DorisRecordSerializer;
 
 import java.io.IOException;
@@ -52,7 +52,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     private Map<TableId, Schema> schemaMaps = new HashMap<>();
 
     @Override
-    public Tuple2<String, byte[]> serialize(Event event) throws IOException {
+    public DorisRecord serialize(Event event) throws IOException {
         if (event instanceof DataChangeEvent) {
             return applyDataChangeEvent((DataChangeEvent) event);
         } else if (event instanceof SchemaChangeEvent) {
@@ -73,12 +73,10 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
         return null;
     }
 
-    private Tuple2<String, byte[]> applyDataChangeEvent(DataChangeEvent event)
-            throws JsonProcessingException {
+    private DorisRecord applyDataChangeEvent(DataChangeEvent event) throws JsonProcessingException {
         TableId tableId = event.tableId();
         Schema schema = schemaMaps.get(tableId);
         Preconditions.checkNotNull(schema, event.tableId() + " is not existed");
-        String tableKey = String.format("%s.%s", tableId.getSchemaName(), tableId.getTableName());
         Map<String, Object> valueMap;
         OperationType op = event.op();
         switch (op) {
@@ -95,8 +93,9 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             default:
                 throw new UnsupportedOperationException("Unsupport Operation " + op);
         }
-        return Tuple2.of(
-                tableKey,
+        return DorisRecord.of(
+                tableId.getSchemaName(),
+                tableId.getTableName(),
                 objectMapper.writeValueAsString(valueMap).getBytes(StandardCharsets.UTF_8));
     }
 
