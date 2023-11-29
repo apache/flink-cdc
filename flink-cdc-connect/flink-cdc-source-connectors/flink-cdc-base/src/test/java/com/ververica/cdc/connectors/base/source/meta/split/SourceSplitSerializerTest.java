@@ -21,7 +21,10 @@ import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.offset.OffsetFactory;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
+import io.debezium.relational.history.TableChanges;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -36,9 +39,18 @@ public class SourceSplitSerializerTest {
 
     @Test
     public void testSnapshotTableIdSerializeAndDeserialize() throws IOException {
+        TableId tableId = new TableId("cata`log\"", "s\"che`ma", "ta\"ble.1`");
+        Tables tables = new Tables();
+        Table table = tables.editOrCreateTable(tableId).create();
+        HashMap<TableId, TableChanges.TableChange> map = new HashMap<>();
+        TableChanges.TableChange tableChange = new TableChanges.TableChange(
+                TableChanges.TableChangeType.CREATE,
+                table
+        );
+        map.put(tableId, tableChange);
         SnapshotSplit snapshotSplitBefore =
                 new SnapshotSplit(
-                        new TableId("cata`log\"", "s\"che`ma", "ta\"ble.1`"),
+                        tableId,
                         "test",
                         new RowType(
                                 Collections.singletonList(
@@ -46,7 +58,8 @@ public class SourceSplitSerializerTest {
                         null,
                         null,
                         null,
-                        new HashMap<>());
+                        map
+                        );
 
         SourceSplitSerializer sourceSplitSerializer =
                 new SourceSplitSerializer() {
@@ -91,7 +104,7 @@ public class SourceSplitSerializerTest {
                         sourceSplitSerializer.deserialize(
                                 sourceSplitSerializer.getVersion(),
                                 sourceSplitSerializer.serialize(snapshotSplitBefore));
-
-        assertEquals(snapshotSplitBefore.getTableId(), snapshotSplitAfter.getTableId());
+        assertEquals(snapshotSplitBefore, snapshotSplitAfter);
+        assertEquals(snapshotSplitBefore.getTableSchemas(), snapshotSplitAfter.getTableSchemas());
     }
 }
