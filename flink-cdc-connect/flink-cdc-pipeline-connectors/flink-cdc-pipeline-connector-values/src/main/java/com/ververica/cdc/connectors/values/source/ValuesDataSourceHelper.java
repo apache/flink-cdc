@@ -54,10 +54,10 @@ public class ValuesDataSourceHelper {
         CUSTOM_SOURCE_EVENTS
     }
 
-    private static final TableId table1 =
+    public static final TableId TABLE_1 =
             TableId.tableId("default_namespace", "default_schema", "table1");
 
-    private static final TableId table2 =
+    public static final TableId TABLE_2 =
             TableId.tableId("default_namespace", "default_schema", "table2");
 
     /**
@@ -106,7 +106,7 @@ public class ValuesDataSourceHelper {
         }
     }
 
-    private static List<List<Event>> singleSplitSingleTable() {
+    public static List<List<Event>> singleSplitSingleTable() {
         List<List<Event>> eventOfSplits = new ArrayList<>();
         List<Event> split1 = new ArrayList<>();
 
@@ -117,7 +117,7 @@ public class ValuesDataSourceHelper {
                         .physicalColumn("col2", DataTypes.STRING())
                         .primaryKey("col1")
                         .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
         split1.add(createTableEvent);
 
         BinaryRecordDataGenerator generator =
@@ -125,7 +125,7 @@ public class ValuesDataSourceHelper {
         // insert
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
@@ -134,7 +134,7 @@ public class ValuesDataSourceHelper {
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
@@ -143,7 +143,7 @@ public class ValuesDataSourceHelper {
         split1.add(insertEvent2);
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("3"),
@@ -156,20 +156,20 @@ public class ValuesDataSourceHelper {
                 new AddColumnEvent.ColumnWithPosition(
                         Column.physicalColumn("col3", DataTypes.STRING()));
         AddColumnEvent addColumnEvent =
-                new AddColumnEvent(table1, Collections.singletonList(columnWithPosition));
+                new AddColumnEvent(TABLE_1, Collections.singletonList(columnWithPosition));
         split1.add(addColumnEvent);
 
         // rename column
         Map<String, String> nameMapping = new HashMap<>();
         nameMapping.put("col2", "newCol2");
         nameMapping.put("col3", "newCol3");
-        RenameColumnEvent renameColumnEvent = new RenameColumnEvent(table1, nameMapping);
+        RenameColumnEvent renameColumnEvent = new RenameColumnEvent(TABLE_1, nameMapping);
         split1.add(renameColumnEvent);
 
         // drop column
         DropColumnEvent dropColumnEvent =
                 new DropColumnEvent(
-                        table1,
+                        TABLE_1,
                         Collections.singletonList(
                                 Column.physicalColumn("newCol2", DataTypes.STRING())));
         split1.add(dropColumnEvent);
@@ -177,7 +177,7 @@ public class ValuesDataSourceHelper {
         // delete
         split1.add(
                 DataChangeEvent.deleteEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
@@ -187,7 +187,7 @@ public class ValuesDataSourceHelper {
         // update
         split1.add(
                 DataChangeEvent.updateEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
@@ -203,7 +203,7 @@ public class ValuesDataSourceHelper {
         return eventOfSplits;
     }
 
-    private static List<List<Event>> singleSplitMultiTables() {
+    public static List<List<Event>> singleSplitMultiTables() {
         List<List<Event>> eventOfSplits = new ArrayList<>();
         List<Event> split1 = new ArrayList<>();
 
@@ -214,9 +214,9 @@ public class ValuesDataSourceHelper {
                         .physicalColumn("col2", DataTypes.STRING())
                         .primaryKey("col1")
                         .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
         split1.add(createTableEvent);
-        CreateTableEvent createTableEvent2 = new CreateTableEvent(table2, schema);
+        CreateTableEvent createTableEvent2 = new CreateTableEvent(TABLE_2, schema);
         split1.add(createTableEvent2);
 
         BinaryRecordDataGenerator generator =
@@ -224,7 +224,7 @@ public class ValuesDataSourceHelper {
         // insert into table1
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
@@ -233,7 +233,7 @@ public class ValuesDataSourceHelper {
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
@@ -242,7 +242,7 @@ public class ValuesDataSourceHelper {
         split1.add(insertEvent2);
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("3"),
@@ -255,13 +255,13 @@ public class ValuesDataSourceHelper {
                 new AddColumnEvent.ColumnWithPosition(
                         Column.physicalColumn("col3", DataTypes.STRING()));
         AddColumnEvent addColumnEvent =
-                new AddColumnEvent(table1, Collections.singletonList(columnWithPosition));
+                new AddColumnEvent(TABLE_1, Collections.singletonList(columnWithPosition));
         split1.add(addColumnEvent);
 
         // insert into table2
         insertEvent1 =
                 DataChangeEvent.insertEvent(
-                        table2,
+                        TABLE_2,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
@@ -270,7 +270,7 @@ public class ValuesDataSourceHelper {
         split1.add(insertEvent1);
         insertEvent2 =
                 DataChangeEvent.insertEvent(
-                        table2,
+                        TABLE_2,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
@@ -279,7 +279,7 @@ public class ValuesDataSourceHelper {
         split1.add(insertEvent2);
         insertEvent3 =
                 DataChangeEvent.insertEvent(
-                        table2,
+                        TABLE_2,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("3"),
@@ -291,13 +291,13 @@ public class ValuesDataSourceHelper {
         Map<String, String> nameMapping = new HashMap<>();
         nameMapping.put("col2", "newCol2");
         nameMapping.put("col3", "newCol3");
-        RenameColumnEvent renameColumnEvent = new RenameColumnEvent(table1, nameMapping);
+        RenameColumnEvent renameColumnEvent = new RenameColumnEvent(TABLE_1, nameMapping);
         split1.add(renameColumnEvent);
 
         // drop column
         DropColumnEvent dropColumnEvent =
                 new DropColumnEvent(
-                        table1,
+                        TABLE_1,
                         Collections.singletonList(
                                 Column.physicalColumn("newCol2", DataTypes.STRING())));
         split1.add(dropColumnEvent);
@@ -305,7 +305,7 @@ public class ValuesDataSourceHelper {
         // delete
         split1.add(
                 DataChangeEvent.deleteEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
@@ -315,7 +315,7 @@ public class ValuesDataSourceHelper {
         // update
         split1.add(
                 DataChangeEvent.updateEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
@@ -331,7 +331,7 @@ public class ValuesDataSourceHelper {
         return eventOfSplits;
     }
 
-    private static List<List<Event>> multiSplitsSingleTable() {
+    public static List<List<Event>> multiSplitsSingleTable() {
         List<List<Event>> eventOfSplits = new ArrayList<>();
         List<Event> split1 = new ArrayList<>();
         // create table
@@ -341,15 +341,15 @@ public class ValuesDataSourceHelper {
                         .physicalColumn("col2", DataTypes.STRING())
                         .primaryKey("col1")
                         .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
         split1.add(createTableEvent);
         BinaryRecordDataGenerator generator =
                 new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
 
-        // create slit1
+        // create split1
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
@@ -358,7 +358,7 @@ public class ValuesDataSourceHelper {
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
@@ -367,12 +367,12 @@ public class ValuesDataSourceHelper {
         split1.add(insertEvent2);
         eventOfSplits.add(split1);
 
-        // create slit2
+        // create split2
         List<Event> split2 = new ArrayList<>();
         split2.add(createTableEvent);
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("3"),
@@ -381,7 +381,7 @@ public class ValuesDataSourceHelper {
         split2.add(insertEvent3);
         DataChangeEvent insertEvent4 =
                 DataChangeEvent.insertEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("4"),
@@ -390,12 +390,12 @@ public class ValuesDataSourceHelper {
         split2.add(insertEvent4);
         eventOfSplits.add(split2);
 
-        // create slit3
+        // create split3
         List<Event> split3 = new ArrayList<>();
         split3.add(createTableEvent);
         DataChangeEvent insertEvent5 =
                 DataChangeEvent.insertEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("5"),
@@ -404,7 +404,7 @@ public class ValuesDataSourceHelper {
         split3.add(insertEvent5);
         DataChangeEvent insertEvent6 =
                 DataChangeEvent.insertEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("6"),
@@ -413,12 +413,12 @@ public class ValuesDataSourceHelper {
         split3.add(insertEvent6);
         eventOfSplits.add(split3);
 
-        // create slit4
+        // create split4
         List<Event> split4 = new ArrayList<>();
         split4.add(createTableEvent);
         DataChangeEvent deleteEvent1 =
                 DataChangeEvent.deleteEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
@@ -427,7 +427,7 @@ public class ValuesDataSourceHelper {
         split4.add(deleteEvent1);
         DataChangeEvent deleteEvent2 =
                 DataChangeEvent.deleteEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("4"),
@@ -436,7 +436,7 @@ public class ValuesDataSourceHelper {
         split4.add(deleteEvent2);
         DataChangeEvent deleteEvent3 =
                 DataChangeEvent.deleteEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("6"),
@@ -447,14 +447,14 @@ public class ValuesDataSourceHelper {
                 new AddColumnEvent.ColumnWithPosition(
                         Column.physicalColumn("col3", DataTypes.STRING()));
         AddColumnEvent addColumnEvent =
-                new AddColumnEvent(table1, Collections.singletonList(columnWithPosition));
+                new AddColumnEvent(TABLE_1, Collections.singletonList(columnWithPosition));
         split4.add(addColumnEvent);
         generator =
                 new BinaryRecordDataGenerator(
                         RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
         DataChangeEvent updateEvent1 =
                 DataChangeEvent.updateEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
@@ -470,7 +470,7 @@ public class ValuesDataSourceHelper {
         split4.add(updateEvent1);
         DataChangeEvent updateEvent2 =
                 DataChangeEvent.updateEvent(
-                        table1,
+                        TABLE_1,
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("3"),
