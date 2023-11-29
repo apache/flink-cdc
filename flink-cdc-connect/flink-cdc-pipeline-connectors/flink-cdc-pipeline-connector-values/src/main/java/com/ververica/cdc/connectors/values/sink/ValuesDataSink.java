@@ -16,12 +16,12 @@
 
 package com.ververica.cdc.connectors.values.sink;
 
-import org.apache.flink.api.common.functions.util.PrintSinkOutputWriter;
 import org.apache.flink.api.connector.sink2.Sink;
-import org.apache.flink.api.connector.sink2.StatefulSink;
-import org.apache.flink.core.io.SimpleVersionedSerializer;
+import org.apache.flink.api.connector.sink2.SinkWriter;
 
 import com.ververica.cdc.common.annotation.Internal;
+import com.ververica.cdc.common.data.RecordData;
+import com.ververica.cdc.common.event.ChangeEvent;
 import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.DataChangeEvent;
 import com.ververica.cdc.common.event.Event;
@@ -34,12 +34,8 @@ import com.ververica.cdc.common.sink.FlinkSinkProvider;
 import com.ververica.cdc.common.sink.MetadataApplier;
 import com.ververica.cdc.common.utils.SchemaUtils;
 import com.ververica.cdc.connectors.values.ValuesDatabase;
-import com.ververica.cdc.runtime.state.TableSchemaState;
-import com.ververica.cdc.runtime.state.TableSchemaStateSerializer;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,13 +47,16 @@ public class ValuesDataSink implements DataSink, Serializable {
     /** {@link ValuesDataSinkOptions#MATERIALIZED_IN_MEMORY}. */
     private final boolean materializedInMemory;
 
-    public ValuesDataSink(boolean materializedInMemory) {
+    private final boolean print;
+
+    public ValuesDataSink(boolean materializedInMemory, boolean print) {
         this.materializedInMemory = materializedInMemory;
+        this.print = print;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        return FlinkSinkProvider.of(new ValuesSink(materializedInMemory));
+        return FlinkSinkProvider.of(new ValuesSink(materializedInMemory, print));
     }
 
     @Override
@@ -66,42 +65,31 @@ public class ValuesDataSink implements DataSink, Serializable {
     }
 
     /** an e2e {@link Sink} implementation that print all {@link DataChangeEvent} out. */
-    private static class ValuesSink implements StatefulSink<Event, TableSchemaState> {
+    private static class ValuesSink implements Sink<Event> {
 
         private final boolean materializedInMemory;
 
-        public ValuesSink(boolean materializedInMemory) {
+        private final boolean print;
+
+        public ValuesSink(boolean materializedInMemory, boolean print) {
             this.materializedInMemory = materializedInMemory;
+            this.print = print;
         }
 
         @Override
-        public StatefulSinkWriter<Event, TableSchemaState> createWriter(InitContext context) {
-            final ValuesSinkWriter writer = new ValuesSinkWriter(materializedInMemory);
-            writer.open(context.getSubtaskId(), context.getNumberOfParallelSubtasks());
-            return writer;
-        }
-
-        @Override
-        public StatefulSinkWriter<Event, TableSchemaState> restoreWriter(
-                InitContext context, Collection<TableSchemaState> recoveredState) {
-            final ValuesSinkWriter writer = new ValuesSinkWriter(materializedInMemory);
-            writer.initializeState(recoveredState);
-            return writer;
-        }
-
-        @Override
-        public SimpleVersionedSerializer<TableSchemaState> getWriterStateSerializer() {
-            return new TableSchemaStateSerializer();
+        public SinkWriter<Event> createWriter(InitContext context) {
+            return new ValuesSinkWriter(materializedInMemory, print);
         }
     }
 
     /**
      * Print {@link DataChangeEvent} to console, and update table records in {@link ValuesDatabase}.
      */
-    private static class ValuesSinkWriter extends PrintSinkOutputWriter<Event>
-            implements StatefulSink.StatefulSinkWriter<Event, TableSchemaState> {
+    private static class ValuesSinkWriter implements SinkWriter<Event> {
 
         private final boolean materializedInMemory;
+
+        private final boolean print;
 
         /**
          * keep the relationship of TableId and Schema as write method may rely on the schema
@@ -109,48 +97,50 @@ public class ValuesDataSink implements DataSink, Serializable {
          */
         private final Map<TableId, Schema> schemaMaps;
 
-        public ValuesSinkWriter(boolean materializedInMemory) {
+        private final Map<TableId, List<RecordData.FieldGetter>> fieldGetterMaps;
+
+        public ValuesSinkWriter(boolean materializedInMemory, boolean print) {
             super();
             this.materializedInMemory = materializedInMemory;
+            this.print = print;
             schemaMaps = new HashMap<>();
-        }
-
-        private void initializeState(Collection<TableSchemaState> bucketStates) {
-            bucketStates.forEach(
-                    TableSchemaState ->
-                            schemaMaps.put(
-                                    TableSchemaState.getTableId(), TableSchemaState.getSchema()));
+            fieldGetterMaps = new HashMap<>();
         }
 
         @Override
-        public void write(Event event) {
-            super.write(event);
+        public void write(Event event, Context context) {
             if (event instanceof SchemaChangeEvent) {
                 SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
                 TableId tableId = schemaChangeEvent.tableId();
                 if (event instanceof CreateTableEvent) {
-                    schemaMaps.put(tableId, ((CreateTableEvent) event).getSchema());
+                    Schema schema = ((CreateTableEvent) event).getSchema();
+                    schemaMaps.put(tableId, schema);
+                    fieldGetterMaps.put(tableId, SchemaUtils.createFieldGetters(schema));
                 } else {
                     if (!schemaMaps.containsKey(tableId)) {
                         throw new RuntimeException("schema of " + tableId + " is not existed.");
                     }
-                    schemaMaps.put(
-                            tableId,
+                    Schema schema =
                             SchemaUtils.applySchemaChangeEvent(
-                                    schemaMaps.get(tableId), schemaChangeEvent));
+                                    schemaMaps.get(tableId), schemaChangeEvent);
+                    schemaMaps.put(tableId, schema);
+                    fieldGetterMaps.put(tableId, SchemaUtils.createFieldGetters(schema));
                 }
             } else if (materializedInMemory && event instanceof DataChangeEvent) {
                 ValuesDatabase.applyDataChangeEvent((DataChangeEvent) event);
             }
+            if (print) {
+                // print the detail message to console for verification.
+                System.out.println(
+                        ValuesDataSinkHelper.convertEventToStr(
+                                event, fieldGetterMaps.get(((ChangeEvent) event).tableId())));
+            }
         }
 
         @Override
-        public List<TableSchemaState> snapshotState(long checkpointId) {
-            List<TableSchemaState> states = new ArrayList<>();
-            for (Map.Entry<TableId, Schema> entry : schemaMaps.entrySet()) {
-                states.add(new TableSchemaState(entry.getKey(), entry.getValue()));
-            }
-            return states;
-        }
+        public void flush(boolean endOfInput) {}
+
+        @Override
+        public void close() {}
     }
 }
