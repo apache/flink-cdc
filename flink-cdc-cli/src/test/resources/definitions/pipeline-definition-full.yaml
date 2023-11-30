@@ -30,11 +30,11 @@ sink:
   auto-create-table: true
 
 route:
-  - matcher: mydb.default.app_order_.*
-    replace: odsdb.default.app_order
+  - sourceTable: mydb.default.app_order_.*
+    sinkTable: odsdb.default.app_order
     description: sync all sharding tables to one
-  - matcher: mydb.default.web_order
-    replace: odsdb.default.ods_web_order
+  - sourceTable: mydb.default.web_order
+    sinkTable: odsdb.default.ods_web_order
     description: sync table to with given prefix ods_
 
 transform:

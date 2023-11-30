@@ -30,7 +30,6 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -99,11 +98,11 @@ class YamlPipelineDefinitionParserTest {
                                             .build())),
                     Arrays.asList(
                             new RouteDef(
-                                    Pattern.compile("mydb.default.app_order_.*"),
+                                    "mydb.default.app_order_.*",
                                     "odsdb.default.app_order",
                                     "sync all sharding tables to one"),
                             new RouteDef(
-                                    Pattern.compile("mydb.default.web_order"),
+                                    "mydb.default.web_order",
                                     "odsdb.default.ods_web_order",
                                     "sync table to with given prefix ods_")),
                     null,
@@ -143,11 +142,11 @@ class YamlPipelineDefinitionParserTest {
                                             .build())),
                     Arrays.asList(
                             new RouteDef(
-                                    Pattern.compile("mydb.default.app_order_.*"),
+                                    "mydb.default.app_order_.*",
                                     "odsdb.default.app_order",
                                     "sync all sharding tables to one"),
                             new RouteDef(
-                                    Pattern.compile("mydb.default.web_order"),
+                                    "mydb.default.web_order",
                                     "odsdb.default.ods_web_order",
                                     "sync table to with given prefix ods_")),
                     null,
@@ -183,9 +182,7 @@ class YamlPipelineDefinitionParserTest {
                                             .build())),
                     Collections.singletonList(
                             new RouteDef(
-                                    Pattern.compile("mydb.default.app_order_.*"),
-                                    "odsdb.default.app_order",
-                                    null)),
+                                    "mydb.default.app_order_.*", "odsdb.default.app_order", null)),
                     null,
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
