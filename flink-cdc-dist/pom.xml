@@ -30,35 +30,16 @@ under the License.
     </properties>
 
     <dependencies>
-        <!-- Project binaries -->
+
+        <!-- cdc cli -->
         <dependency>
+            <groupId>com.ververica</groupId>
             <artifactId>flink-cdc-cli</artifactId>
-            <groupId>com.ververica</groupId>
             <version>${project.version}</version>
             <optional>${markBundledAsOptional}</optional>
         </dependency>
 
-        <dependency>
-            <artifactId>flink-cdc-common</artifactId>
-            <groupId>com.ververica</groupId>
-            <version>${project.version}</version>
-            <optional>${markBundledAsOptional}</optional>
-        </dependency>
-
-        <dependency>
-            <artifactId>flink-cdc-composer</artifactId>
-            <groupId>com.ververica</groupId>
-            <version>${project.version}</version>
-            <optional>${markBundledAsOptional}</optional>
-        </dependency>
-
-        <dependency>
-            <artifactId>flink-cdc-runtime</artifactId>
-            <groupId>com.ververica</groupId>
-            <version>${project.version}</version>
-            <optional>${markBundledAsOptional}</optional>
-        </dependency>
-
+        <!-- log4j -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-slf4j-impl</artifactId>
@@ -77,6 +58,12 @@ under the License.
             <version>${log4j.version}</version>
             <optional>${markBundledAsOptional}</optional>
         </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-1.2-api</artifactId>
+            <version>${log4j.version}</version>
+            <optional>${markBundledAsOptional}</optional>
+        </dependency>
 
     </dependencies>
 
@@ -87,21 +74,31 @@ under the License.
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-dependency-plugin</artifactId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                        <version>3.2.4</version>
                         <executions>
                             <execution>
-                                <id>copy-jars</id>
+                                <id>dist</id>
                                 <phase>package</phase>
                                 <goals>
-                                    <goal>copy</goal>
+                                    <goal>shade</goal>
                                 </goals>
+                                <configuration>
+                                    <shadeTestJar>false</shadeTestJar>
+                                    <artifactSet>
+                                        <includes>
+                                            <include>com.ververica:flink-cdc-cli</include>
+                                            <include>com.ververica:fink-cdc-common</include>
+                                            <include>com.ververica:flink-cdc-composer</include>
+                                            <include>com.ververica:flink-cdc-runtime</include>
+                                            <include>commons-cli:commons-cli</include>
+                                            <include>org.apache.flink:flink-runtime</include>
+                                            <include>org.apache.flink:flink-shaded-guava</include>
+                                        </includes>
+                                    </artifactSet>
+                                </configuration>
                             </execution>
                         </executions>
-                        <configuration>
-                            <artifactItems>
-                                <!-- empty -->
-                            </artifactItems>
-                        </configuration>
                     </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
@@ -130,6 +127,5 @@ under the License.
             </build>
         </profile>
     </profiles>
-
 
 </project>

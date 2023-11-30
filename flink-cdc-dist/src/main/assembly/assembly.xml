@@ -26,37 +26,46 @@ under the License.
             <scope>runtime</scope>
             <useProjectArtifact>true</useProjectArtifact>
             <outputDirectory>lib</outputDirectory>
+
+            <includes>
+                <include>org.apache.logging.log4j:log4j-api</include>
+                <include>org.apache.logging.log4j:log4j-core</include>
+                <include>org.apache.logging.log4j:log4j-slf4j-impl</include>
+                <include>org.apache.logging.log4j:log4j-1.2-api</include>
+            </includes>
         </dependencySet>
     </dependencySets>
 
     <fileSets>
+        <!-- copy start scripts -->
         <fileSet>
-            <directory>${project.build.directory}/../src/main/assembly/bin</directory>
+            <directory>src/main/cdc-bin/bin</directory>
             <outputDirectory>bin</outputDirectory>
-            <lineEnding>unix</lineEnding>
             <fileMode>0755</fileMode>
         </fileSet>
+
+        <!-- copy conf directory -->
         <fileSet>
-            <directory>${project.build.directory}/../src/main/resources</directory>
+            <directory>src/main/cdc-bin/conf</directory>
             <outputDirectory>conf</outputDirectory>
-            <lineEnding>unix</lineEnding>
-            <fileMode>0755</fileMode>
-            <includes>
-                <include>*.yaml</include>
-            </includes>
+            <fileMode>0644</fileMode>
         </fileSet>
+
+        <!-- copy flink-cdc fat jar -->
         <fileSet>
-            <directory>${project.build.directory}/lib</directory>
+            <directory>src/main/cdc-bin/lib</directory>
             <outputDirectory>lib</outputDirectory>
-            <fileMode>0755</fileMode>
-            <includes>
-                <include>*.jar</include>
-            </includes>
+            <fileMode>0644</fileMode>
         </fileSet>
+
+        <!-- create an empty log directory -->
         <fileSet>
-            <directory>${project.build.directory}/../src/main/assembly/logs</directory>
-            <outputDirectory>logs</outputDirectory>
-            <fileMode>0755</fileMode>
+            <directory>src/main/cdc-bin/</directory>
+            <outputDirectory>log</outputDirectory>
+            <fileMode>0644</fileMode>
+            <excludes>
+                <exclude>**/*</exclude>
+            </excludes>
         </fileSet>
     </fileSets>
 </assembly>
