@@ -113,7 +113,10 @@ public class DorisDataSinkFactory implements DataSinkFactory {
 
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
-        return new HashSet<>();
+        Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(FENODES);
+        options.add(USERNAME);
+        return options;
     }
 
     @Override

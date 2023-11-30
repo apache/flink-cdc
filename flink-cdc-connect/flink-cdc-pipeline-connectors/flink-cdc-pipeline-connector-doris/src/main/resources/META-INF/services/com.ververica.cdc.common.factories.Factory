@@ -14,3 +14,4 @@
 # limitations under the License.
 
 com.ververica.cdc.connectors.doris.factory.DorisDataSinkFactory
+

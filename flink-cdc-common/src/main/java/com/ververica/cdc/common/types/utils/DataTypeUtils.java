@@ -80,6 +80,10 @@ public class DataTypeUtils {
         }
     }
 
+    /**
+     * Convert CDC's {@link DataType} to Flink's internal {@link
+     * org.apache.flink.table.types.DataType}.
+     */
     public static org.apache.flink.table.types.DataType toFlinkDataType(DataType type) {
         // ordered by type root definition
         List<DataType> children = type.getChildren();
