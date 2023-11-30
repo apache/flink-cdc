@@ -154,11 +154,7 @@ public class UniqueDatabase {
         }
     }
 
-    /**
-     * Drop slot from database.
-     *
-     * @param slotName
-     */
+    /** Drop slot from database. */
     public boolean removeSlot(String slotName) {
         String sql = String.format("SELECT pg_drop_replication_slot('%s')", slotName);
         try (Connection connection = PostgresTestBase.getJdbcConnection(container, databaseName);

@@ -55,8 +55,8 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     private static final int USE_POST_LOWWATERMARK_HOOK = 1;
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
 
-    private static String schemaName = "customer";
-    private static String tableName = "customers";
+    private static final String schemaName = "customer";
+    private static final String tableName = "customers";
 
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(
@@ -265,10 +265,9 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
 
             PostgresSourceFetchTaskContext postgresSourceFetchTaskContext =
                     new PostgresSourceFetchTaskContext(sourceConfig, postgresDialect);
-            List<String> actual =
-                    readTableSnapshotSplits(
-                            snapshotSplits, postgresSourceFetchTaskContext, 1, dataType, hooks);
-            return actual;
+
+            return readTableSnapshotSplits(
+                    snapshotSplits, postgresSourceFetchTaskContext, 1, dataType, hooks);
         }
     }
 

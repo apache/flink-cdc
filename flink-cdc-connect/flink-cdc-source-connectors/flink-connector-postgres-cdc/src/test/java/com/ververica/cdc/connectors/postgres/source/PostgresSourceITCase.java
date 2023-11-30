@@ -224,7 +224,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
     @Test
     public void testConsumingTableWithoutPrimaryKey() throws Exception {
-        if (scanStartupMode == DEFAULT_SCAN_STARTUP_MODE) {
+        if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             try {
                 testPostgresParallelSource(
                         1,
@@ -324,12 +324,13 @@ public class PostgresSourceITCase extends PostgresTestBase {
     }
 
     @Test
-    public void testEnableBackfillWithPreHighWaterMark() throws Exception {
-        if (scanStartupMode != DEFAULT_SCAN_STARTUP_MODE) {
+    public void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
+        if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             return;
         }
 
-        List<String> records = getResultOfWithHooks(false, 21, USE_PRE_HIGHWATERMARK_HOOK);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(false, 21, USE_PRE_HIGHWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -360,12 +361,13 @@ public class PostgresSourceITCase extends PostgresTestBase {
     }
 
     @Test
-    public void testEnableBackfillWithPostLowWaterMark() throws Exception {
-        if (scanStartupMode != DEFAULT_SCAN_STARTUP_MODE) {
+    public void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
+        if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             return;
         }
 
-        List<String> records = getResultOfWithHooks(false, 21, USE_POST_LOWWATERMARK_HOOK);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(false, 21, USE_POST_LOWWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -396,12 +398,13 @@ public class PostgresSourceITCase extends PostgresTestBase {
     }
 
     @Test
-    public void testSkipBackfillWithPreHighWaterMark() throws Exception {
-        if (scanStartupMode != DEFAULT_SCAN_STARTUP_MODE) {
+    public void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
+        if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             return;
         }
 
-        List<String> records = getResultOfWithHooks(true, 25, USE_PRE_HIGHWATERMARK_HOOK);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(true, 25, USE_PRE_HIGHWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -436,12 +439,13 @@ public class PostgresSourceITCase extends PostgresTestBase {
     }
 
     @Test
-    public void testSkipBackfillWithPostLowWaterMark() throws Exception {
-        if (scanStartupMode != DEFAULT_SCAN_STARTUP_MODE) {
+    public void testSkipBackfillWithDMLPostLowWaterMark() throws Exception {
+        if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             return;
         }
 
-        List<String> records = getResultOfWithHooks(true, 25, USE_POST_LOWWATERMARK_HOOK);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(true, 25, USE_POST_LOWWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -476,7 +480,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    private List<String> getResultOfWithHooks(
+    private List<String> getResultWithDMLInSnapshotPhase(
             boolean skipSnapshotBackfill, int fetchSize, int hookType) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(1000);
@@ -522,10 +526,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 (sourceConfig, split) -> {
                     PostgresDialect dialect =
                             new PostgresDialect((PostgresSourceConfig) sourceConfig);
-                    PostgresConnection postgresConnection = dialect.openJdbcConnection();
-                    postgresConnection.execute(statements);
-                    postgresConnection.commit();
-                    try {
+                    try (PostgresConnection postgresConnection = dialect.openJdbcConnection()) {
+                        postgresConnection.execute(statements);
+                        postgresConnection.commit();
                         Thread.sleep(500L);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
@@ -539,7 +542,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         }
         source.setSnapshotHooks(hooks);
 
-        List<String> records = new ArrayList<>();
+        List<String> records;
         try (CloseableIterator<RowData> iterator =
                 env.fromSource(source, WatermarkStrategy.noWatermarks(), "Backfill Skipped Source")
                         .executeAndCollect()) {
