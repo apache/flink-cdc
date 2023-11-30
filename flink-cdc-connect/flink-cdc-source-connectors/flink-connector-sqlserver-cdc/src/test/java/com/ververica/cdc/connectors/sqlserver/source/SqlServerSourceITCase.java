@@ -121,9 +121,10 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testEnableBackfillWithPreHighWaterMark() throws Exception {
+    public void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
 
-        List<String> records = getResultOfWithHooks(false, 21, USE_PRE_HIGHWATERMARK_HOOK);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(false, 21, USE_PRE_HIGHWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -154,9 +155,10 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testEnableBackfillWithPostLowWaterMark() throws Exception {
+    public void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
 
-        List<String> records = getResultOfWithHooks(false, 21, USE_POST_LOWWATERMARK_HOOK);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(false, 21, USE_POST_LOWWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -187,9 +189,10 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testSkipBackfillWithPreHighWaterMark() throws Exception {
+    public void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
 
-        List<String> records = getResultOfWithHooks(true, 25, USE_PRE_HIGHWATERMARK_HOOK);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(true, 25, USE_PRE_HIGHWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -224,9 +227,10 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testSkipBackfillWithPostLowWaterMark() throws Exception {
+    public void testSkipBackfillWithDMLPostLowWaterMark() throws Exception {
 
-        List<String> records = getResultOfWithHooks(true, 25, USE_POST_LOWWATERMARK_HOOK);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(true, 25, USE_POST_LOWWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -261,7 +265,7 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    private List<String> getResultOfWithHooks(
+    private List<String> getResultWithDMLInSnapshotPhase(
             boolean skipSnapshotBackfill, int fetchSize, int hookType) throws Exception {
 
         String databaseName = "customer";
