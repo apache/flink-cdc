@@ -102,6 +102,14 @@ public class StarRocksDataSinkFactory implements DataSinkFactory {
                         config ->
                                 sinkConfig.set(StarRocksSinkOptions.SINK_IO_THREAD_COUNT, config));
         cdcConfig
+                .getOptional(SINK_AT_LEAST_ONCE_USE_TRANSACTION_LOAD)
+                .ifPresent(
+                        config ->
+                                sinkConfig.set(
+                                        StarRocksSinkOptions
+                                                .SINK_AT_LEAST_ONCE_USE_TRANSACTION_LOAD,
+                                        config));
+        cdcConfig
                 .getOptional(SINK_METRIC_HISTOGRAM_WINDOW_SIZE)
                 .ifPresent(
                         config ->
@@ -112,6 +120,8 @@ public class StarRocksDataSinkFactory implements DataSinkFactory {
         sinkConfig.set(StarRocksSinkOptions.DATABASE_NAME, "*");
         sinkConfig.set(StarRocksSinkOptions.TABLE_NAME, "*");
         sinkConfig.set(StarRocksSinkOptions.SINK_USE_NEW_SINK_API, true);
+        // currently cdc framework only supports at-least-once
+        sinkConfig.set(StarRocksSinkOptions.SINK_SEMANTIC, "at-least-once");
 
         Map<String, String> streamProperties =
                 getPrefixConfigs(cdcConfig.toMap(), SINK_PROPERTIES_PREFIX);
