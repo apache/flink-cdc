@@ -35,9 +35,15 @@ under the License.
         <dependency>
             <groupId>com.ververica</groupId>
             <artifactId>flink-cdc-common</artifactId>
-            <version>${project.version}</version>
+            <version>${revision}</version>
         </dependency>
-
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-common</artifactId>
+            <version>${revision}</version>
+            <scope>test</scope>
+            <type>test-jar</type>
+        </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-core</artifactId>
