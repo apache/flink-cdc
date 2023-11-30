@@ -32,6 +32,7 @@ import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.sink.DataSink;
 import com.ververica.cdc.common.sink.EventSinkProvider;
+import com.ververica.cdc.common.sink.FlinkSinkFunctionProvider;
 import com.ververica.cdc.common.sink.FlinkSinkProvider;
 import com.ververica.cdc.runtime.operators.sink.DataSinkWriterOperatorFactory;
 
@@ -50,6 +51,16 @@ public class DataSinkTranslator {
             FlinkSinkProvider sinkProvider = (FlinkSinkProvider) eventSinkProvider;
             Sink<Event> sink = sinkProvider.getSink();
             sinkTo(input, sink, schemaOperatorID);
+        } else if (eventSinkProvider instanceof FlinkSinkFunctionProvider) {
+            // SinkFunction
+            FlinkSinkFunctionProvider sinkFunctionProvider =
+                    (FlinkSinkFunctionProvider) eventSinkProvider;
+            input.addSink(sinkFunctionProvider.getSinkFunction());
+        } else {
+            throw new IllegalStateException(
+                    String.format(
+                            "Unsupported EventSinkProvider type \"%s\"",
+                            eventSinkProvider.getClass().getCanonicalName()));
         }
     }
 
