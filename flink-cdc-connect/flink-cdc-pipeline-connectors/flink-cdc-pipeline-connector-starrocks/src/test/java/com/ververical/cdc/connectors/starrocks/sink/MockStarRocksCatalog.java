@@ -39,6 +39,16 @@ public class MockStarRocksCatalog extends StarRocksCatalog {
     }
 
     @Override
+    public void open() throws StarRocksCatalogException {
+        // do nothing
+    }
+
+    @Override
+    public void close() throws StarRocksCatalogException {
+        // do nothing
+    }
+
+    @Override
     public boolean databaseExists(String databaseName) throws StarRocksCatalogException {
         return tables.containsKey(databaseName);
     }

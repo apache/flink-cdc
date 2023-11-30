@@ -16,8 +16,6 @@
 
 package com.ververica.cdc.connectors.starrocks.sink;
 
-import static com.ververica.cdc.connectors.starrocks.sink.StarRocksUtils.toStarRocksDataType;
-
 import com.starrocks.connector.flink.catalog.StarRocksCatalog;
 import com.starrocks.connector.flink.catalog.StarRocksCatalogException;
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
@@ -31,13 +29,14 @@ import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.sink.MetadataApplier;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static com.ververica.cdc.connectors.starrocks.sink.StarRocksUtils.toStarRocksDataType;
 
 /** A {@code MetadataApplier} that applies metadata changes to StarRocks. */
 public class StarRocksMetadataApplier implements MetadataApplier {
@@ -49,6 +48,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
     private final StarRocksCatalog catalog;
     private final TableConfig tableConfig;
     private final SchemaChangeConfig schemaChangeConfig;
+    private boolean isOpened;
 
     public StarRocksMetadataApplier(
             StarRocksCatalog catalog,
@@ -57,10 +57,16 @@ public class StarRocksMetadataApplier implements MetadataApplier {
         this.catalog = catalog;
         this.tableConfig = tableConfig;
         this.schemaChangeConfig = schemaChangeConfig;
+        this.isOpened = false;
     }
 
     @Override
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+        if (!isOpened) {
+            isOpened = true;
+            catalog.open();
+        }
+
         if (schemaChangeEvent instanceof CreateTableEvent) {
             applyCreateTable((CreateTableEvent) schemaChangeEvent);
         } else if (schemaChangeEvent instanceof AddColumnEvent) {
@@ -248,7 +254,8 @@ public class StarRocksMetadataApplier implements MetadataApplier {
     }
 
     private void applyRenameColumn(RenameColumnEvent renameColumnEvent) {
-        // TODO StarRocks plans to support column rename since 3.3 which has not been released. Support it later.
+        // TODO StarRocks plans to support column rename since 3.3 which has not been released.
+        // Support it later.
         throw new UnsupportedOperationException("Rename column is not supported currently");
     }
 
