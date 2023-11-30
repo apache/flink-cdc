@@ -34,7 +34,7 @@ import com.ververica.cdc.common.types.SmallIntType;
 import com.ververica.cdc.common.types.TimestampType;
 import com.ververica.cdc.connectors.starrocks.sink.SchemaChangeConfig;
 import com.ververica.cdc.connectors.starrocks.sink.StarRocksMetadataApplier;
-import com.ververica.cdc.connectors.starrocks.sink.TableConfig;
+import com.ververica.cdc.connectors.starrocks.sink.TableCreateConfig;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -64,10 +64,10 @@ public class StarRocksMetadataApplierTest {
                                 .put("table.create.properties.replication_num", "5")
                                 .build());
         SchemaChangeConfig schemaChangeConfig = SchemaChangeConfig.from(configuration);
-        TableConfig tableConfig = TableConfig.from(configuration);
+        TableCreateConfig tableCreateConfig = TableCreateConfig.from(configuration);
         this.catalog = new MockStarRocksCatalog();
         this.metadataApplier =
-                new StarRocksMetadataApplier(catalog, tableConfig, schemaChangeConfig);
+                new StarRocksMetadataApplier(catalog, tableCreateConfig, schemaChangeConfig);
     }
 
     @Test

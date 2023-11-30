@@ -52,9 +52,9 @@ public class StarRocksDataSinkFactory implements DataSinkFactory {
     @Override
     public DataSink createDataSink(Context context) {
         StarRocksSinkOptions sinkOptions = buildSinkConnectorOptions(context.getConfiguration());
-        TableConfig tableConfig = TableConfig.from(context.getConfiguration());
+        TableCreateConfig tableCreateConfig = TableCreateConfig.from(context.getConfiguration());
         SchemaChangeConfig schemaChangeConfig = SchemaChangeConfig.from(context.getConfiguration());
-        return new StarRocksDataSink(sinkOptions, tableConfig, schemaChangeConfig);
+        return new StarRocksDataSink(sinkOptions, tableCreateConfig, schemaChangeConfig);
     }
 
     private StarRocksSinkOptions buildSinkConnectorOptions(Configuration cdcConfig) {

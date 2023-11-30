@@ -37,17 +37,17 @@ public class StarRocksDataSink implements DataSink, Serializable {
     private final StarRocksSinkOptions sinkOptions;
 
     /** Configurations for creating a StarRocks table. */
-    private final TableConfig tableConfig;
+    private final TableCreateConfig tableCreateConfig;
 
     /** Configurations for schema change. */
     private final SchemaChangeConfig schemaChangeConfig;
 
     public StarRocksDataSink(
             StarRocksSinkOptions sinkOptions,
-            TableConfig tableConfig,
+            TableCreateConfig tableCreateConfig,
             SchemaChangeConfig schemaChangeConfig) {
         this.sinkOptions = sinkOptions;
-        this.tableConfig = tableConfig;
+        this.tableCreateConfig = tableCreateConfig;
         this.schemaChangeConfig = schemaChangeConfig;
     }
 
@@ -65,6 +65,6 @@ public class StarRocksDataSink implements DataSink, Serializable {
                         sinkOptions.getJdbcUrl(),
                         sinkOptions.getUsername(),
                         sinkOptions.getPassword());
-        return new StarRocksMetadataApplier(catalog, tableConfig, schemaChangeConfig);
+        return new StarRocksMetadataApplier(catalog, tableCreateConfig, schemaChangeConfig);
     }
 }

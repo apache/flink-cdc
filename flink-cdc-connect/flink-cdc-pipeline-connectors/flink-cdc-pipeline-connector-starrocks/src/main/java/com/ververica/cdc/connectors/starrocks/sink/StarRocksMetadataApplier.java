@@ -46,16 +46,16 @@ public class StarRocksMetadataApplier implements MetadataApplier {
     private static final Logger LOG = LoggerFactory.getLogger(StarRocksMetadataApplier.class);
 
     private final StarRocksCatalog catalog;
-    private final TableConfig tableConfig;
+    private final TableCreateConfig tableCreateConfig;
     private final SchemaChangeConfig schemaChangeConfig;
     private boolean isOpened;
 
     public StarRocksMetadataApplier(
             StarRocksCatalog catalog,
-            TableConfig tableConfig,
+            TableCreateConfig tableCreateConfig,
             SchemaChangeConfig schemaChangeConfig) {
         this.catalog = catalog;
-        this.tableConfig = tableConfig;
+        this.tableCreateConfig = tableCreateConfig;
         this.schemaChangeConfig = schemaChangeConfig;
         this.isOpened = false;
     }
@@ -86,7 +86,9 @@ public class StarRocksMetadataApplier implements MetadataApplier {
     private void applyCreateTable(CreateTableEvent createTableEvent) {
         StarRocksTable starRocksTable =
                 StarRocksUtils.toStarRocksTable(
-                        createTableEvent.tableId(), createTableEvent.getSchema(), tableConfig);
+                        createTableEvent.tableId(),
+                        createTableEvent.getSchema(),
+                        tableCreateConfig);
         if (!catalog.databaseExists(starRocksTable.getDatabaseName())) {
             catalog.createDatabase(starRocksTable.getDatabaseName(), true);
         }

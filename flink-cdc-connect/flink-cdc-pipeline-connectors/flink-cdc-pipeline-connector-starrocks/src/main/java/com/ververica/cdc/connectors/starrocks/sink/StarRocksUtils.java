@@ -53,7 +53,7 @@ public class StarRocksUtils {
 
     /** Convert a source table to {@link StarRocksTable}. */
     public static StarRocksTable toStarRocksTable(
-            TableId tableId, Schema schema, TableConfig tableConfig) {
+            TableId tableId, Schema schema, TableCreateConfig tableCreateConfig) {
         if (schema.primaryKeys().isEmpty()) {
             throw new RuntimeException(
                     String.format(
@@ -96,10 +96,10 @@ public class StarRocksUtils {
                         // use primary keys as distribution keys by default
                         .setDistributionKeys(schema.primaryKeys())
                         .setComment(schema.comment());
-        if (tableConfig.getNumBuckets().isPresent()) {
-            tableBuilder.setNumBuckets(tableConfig.getNumBuckets().get());
+        if (tableCreateConfig.getNumBuckets().isPresent()) {
+            tableBuilder.setNumBuckets(tableCreateConfig.getNumBuckets().get());
         }
-        tableBuilder.setTableProperties(tableConfig.getProperties());
+        tableBuilder.setTableProperties(tableCreateConfig.getProperties());
         return tableBuilder.build();
     }
 

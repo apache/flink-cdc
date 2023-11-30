@@ -36,7 +36,7 @@ import static com.ververica.cdc.connectors.starrocks.sink.StarRocksDataSinkOptio
  * primary_key_table/#create-a-table">StarRocks Documentation</a> for how to create a StarRocks
  * primary key table.
  */
-public class TableConfig implements Serializable {
+public class TableCreateConfig implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -46,7 +46,7 @@ public class TableConfig implements Serializable {
     /** Properties for the table. */
     private final Map<String, String> properties;
 
-    public TableConfig(@Nullable Integer numBuckets, Map<String, String> properties) {
+    public TableCreateConfig(@Nullable Integer numBuckets, Map<String, String> properties) {
         this.numBuckets = numBuckets;
         this.properties = new HashMap<>(properties);
     }
@@ -59,7 +59,7 @@ public class TableConfig implements Serializable {
         return Collections.unmodifiableMap(properties);
     }
 
-    public static TableConfig from(Configuration config) {
+    public static TableCreateConfig from(Configuration config) {
         Integer numBuckets = config.get(TABLE_CREATE_NUM_BUCKETS);
         Map<String, String> tableProperties =
                 config.toMap().entrySet().stream()
@@ -73,6 +73,6 @@ public class TableConfig implements Serializable {
                                                                         .length())
                                                         .toLowerCase(),
                                         Map.Entry::getValue));
-        return new TableConfig(numBuckets, tableProperties);
+        return new TableCreateConfig(numBuckets, tableProperties);
     }
 }
