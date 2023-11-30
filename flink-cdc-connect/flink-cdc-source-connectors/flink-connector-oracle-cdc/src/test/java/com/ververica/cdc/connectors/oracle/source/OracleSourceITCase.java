@@ -130,9 +130,10 @@ public class OracleSourceITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testEnableBackfillWithPreHighWaterMark() throws Exception {
+    public void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
 
-        List<String> records = getResultOfWithHooks(false, 21, USE_PRE_HIGHWATERMARK_HOOK);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(false, 21, USE_PRE_HIGHWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -157,14 +158,15 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                         "+I[1018, user_19, Shanghai, 123567891234]",
                         "+I[2000, user_21, Pittsburgh, 123567891234]",
                         "+I[15213, user_15213, Shanghai, 123567891234]");
-        // when enable backfill, the wal log between [snapshot_point,  high_watermark) will be
+        // when enable backfill, the wal log between (snapshot,  high_watermark) will be
         // applied as snapshot image
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
     @Test
-    public void testEnableBackfillWithPostLowWaterMark() throws Exception {
-        List<String> records = getResultOfWithHooks(false, 21, USE_POST_LOWWATERMARK_HOOK);
+    public void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(false, 21, USE_POST_LOWWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -189,14 +191,15 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                         "+I[1018, user_19, Shanghai, 123567891234]",
                         "+I[2000, user_21, Pittsburgh, 123567891234]",
                         "+I[15213, user_15213, Shanghai, 123567891234]");
-        // when enable backfill, the wal log between [low_watermark, snapshot_point) will be applied
+        // when enable backfill, the wal log between [low_watermark, snapshot) will be applied
         // as snapshot image
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
     @Test
-    public void testSkipBackfillWithPreHighWaterMark() throws Exception {
-        List<String> records = getResultOfWithHooks(true, 25, USE_PRE_HIGHWATERMARK_HOOK);
+    public void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(true, 25, USE_PRE_HIGHWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -225,15 +228,16 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                         "-U[2000, user_21, Shanghai, 123567891234]",
                         "+U[2000, user_21, Pittsburgh, 123567891234]",
                         "-D[1019, user_20, Shanghai, 123567891234]");
-        // when skip backfill, the wal log between [snapshot_point,  high_watermark) will be seen as
+        // when skip backfill, the wal log between (snapshot,  high_watermark) will be seen as
         // stream event.
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
     @Test
-    public void testSkipBackfillWithPostLowWaterMark() throws Exception {
+    public void testSkipBackfillWithDMLPostLowWaterMark() throws Exception {
 
-        List<String> records = getResultOfWithHooks(true, 25, USE_POST_LOWWATERMARK_HOOK);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(true, 25, USE_POST_LOWWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -262,13 +266,13 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                         "-U[2000, user_21, Shanghai, 123567891234]",
                         "+U[2000, user_21, Pittsburgh, 123567891234]",
                         "-D[1019, user_20, Shanghai, 123567891234]");
-        // when skip backfill, the wal log between [snapshot_point,  high_watermark) will still be
+        // when skip backfill, the wal log between (snapshot,  high_watermark) will still be
         // seen as stream event. This will occur data duplicate. For example, user_20 will be
         // deleted twice, and user_15213 will be inserted twice.
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    private List<String> getResultOfWithHooks(
+    private List<String> getResultWithDMLInSnapshotPhase(
             boolean skipSnapshotBackfill, int fetchSize, int hookType) throws Exception {
         createAndInitialize("customer.sql");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
