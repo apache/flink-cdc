@@ -67,7 +67,7 @@ public class DorisDataSinkOptions {
     public static final ConfigOption<Boolean> SINK_ENABLE_2PC =
             ConfigOptions.key("sink.enable-2pc")
                     .booleanType()
-                    .defaultValue(true)
+                    .defaultValue(false)
                     .withDescription("enable 2PC while loading");
 
     public static final ConfigOption<Integer> SINK_CHECK_INTERVAL =
@@ -105,7 +105,7 @@ public class DorisDataSinkOptions {
     public static final ConfigOption<Boolean> SINK_ENABLE_BATCH_MODE =
             ConfigOptions.key("sink.enable.batch-mode")
                     .booleanType()
-                    .defaultValue(false)
+                    .defaultValue(true)
                     .withDescription("Whether to enable batch write mode");
 
     public static final ConfigOption<Integer> SINK_FLUSH_QUEUE_SIZE =
