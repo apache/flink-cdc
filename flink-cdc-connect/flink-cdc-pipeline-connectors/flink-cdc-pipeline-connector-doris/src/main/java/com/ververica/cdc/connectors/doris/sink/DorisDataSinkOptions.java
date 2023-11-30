@@ -18,11 +18,12 @@ package com.ververica.cdc.connectors.doris.sink;
 
 import com.ververica.cdc.common.configuration.ConfigOption;
 import com.ververica.cdc.common.configuration.ConfigOptions;
+import com.ververica.cdc.common.configuration.Configuration;
 import org.apache.doris.flink.table.DorisConfigOptions;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 
 /** DorisDataSink Options reference {@link DorisConfigOptions}. */
 public class DorisDataSinkOptions {
@@ -152,16 +153,19 @@ public class DorisDataSinkOptions {
 
     // Prefix for Doris StreamLoad specific properties.
     public static final String STREAM_LOAD_PROP_PREFIX = "sink.properties.";
+    // Prefix for Doris Create table.
+    public static final String TABLE_CREATE_PROPERTIES_PREFIX = "table.create.properties.";
 
-    public static Properties getStreamLoadProp(Map<String, String> tableOptions) {
-        final Properties streamLoadProp = new Properties();
+    public static Map<String, String> getPropertiesByPrefix(
+            Configuration tableOptions, String prefix) {
+        final Map<String, String> props = new HashMap<>();
 
-        for (Map.Entry<String, String> entry : tableOptions.entrySet()) {
-            if (entry.getKey().startsWith(STREAM_LOAD_PROP_PREFIX)) {
-                String subKey = entry.getKey().substring(STREAM_LOAD_PROP_PREFIX.length());
-                streamLoadProp.put(subKey, entry.getValue());
+        for (Map.Entry<String, String> entry : tableOptions.toMap().entrySet()) {
+            if (entry.getKey().startsWith(prefix)) {
+                String subKey = entry.getKey().substring(prefix.length());
+                props.put(subKey, entry.getValue());
             }
         }
-        return streamLoadProp;
+        return props;
     }
 }

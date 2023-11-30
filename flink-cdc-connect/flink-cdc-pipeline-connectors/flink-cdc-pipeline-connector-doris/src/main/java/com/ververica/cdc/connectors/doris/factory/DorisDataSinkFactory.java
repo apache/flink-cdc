@@ -22,11 +22,14 @@ import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.factories.DataSinkFactory;
 import com.ververica.cdc.common.sink.DataSink;
 import com.ververica.cdc.connectors.doris.sink.DorisDataSink;
+import com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions;
 import org.apache.doris.flink.cfg.DorisExecutionOptions;
 import org.apache.doris.flink.cfg.DorisOptions;
 import org.apache.doris.flink.cfg.DorisReadOptions;
 
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.AUTO_REDIRECT;
@@ -48,6 +51,7 @@ import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_LABEL_PREFIX;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_MAX_RETRIES;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_USE_CACHE;
+import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.STREAM_LOAD_PROP_PREFIX;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_IDENTIFIER;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.USERNAME;
 
@@ -58,7 +62,7 @@ public class DorisDataSinkFactory implements DataSinkFactory {
     public DataSink createDataSink(Context context) {
         Configuration config = context.getConfiguration();
         DorisOptions.Builder optionsBuilder = DorisOptions.builder();
-        DorisExecutionOptions.Builder executionBuilder = DorisExecutionOptions.builderDefaults();
+        DorisExecutionOptions.Builder executionBuilder = DorisExecutionOptions.builder();
         config.getOptional(FENODES).ifPresent(optionsBuilder::setFenodes);
         config.getOptional(BENODES).ifPresent(optionsBuilder::setBenodes);
         config.getOptional(TABLE_IDENTIFIER).ifPresent(optionsBuilder::setTableIdentifier);
@@ -83,7 +87,6 @@ public class DorisDataSinkFactory implements DataSinkFactory {
         config.getOptional(SINK_USE_CACHE).ifPresent(executionBuilder::setUseCache);
         config.getOptional(SINK_BUFFER_FLUSH_INTERVAL)
                 .ifPresent(v -> executionBuilder.setBufferFlushIntervalMs(v.toMillis()));
-
         config.getOptional(SINK_ENABLE_2PC)
                 .ifPresent(
                         b -> {
@@ -93,17 +96,21 @@ public class DorisDataSinkFactory implements DataSinkFactory {
                                 executionBuilder.disable2PC();
                             }
                         });
-        config.getOptional(SINK_ENABLE_BATCH_MODE)
-                .ifPresent(
-                        b -> {
-                            if (b) {
-                                executionBuilder.enableBatchMode();
-                            }
-                        });
+        // default batch mode
+        executionBuilder.setBatchMode(config.get(SINK_ENABLE_BATCH_MODE));
+
+        // set streamload properties
+        Properties properties = DorisExecutionOptions.defaultsProperties();
+        Map<String, String> streamLoadProp =
+                DorisDataSinkOptions.getPropertiesByPrefix(config, STREAM_LOAD_PROP_PREFIX);
+        properties.putAll(streamLoadProp);
+        executionBuilder.setStreamLoadProp(properties);
+
         return new DorisDataSink(
                 optionsBuilder.build(),
                 DorisReadOptions.builder().build(),
-                executionBuilder.build());
+                executionBuilder.build(),
+                config);
     }
 
     @Override

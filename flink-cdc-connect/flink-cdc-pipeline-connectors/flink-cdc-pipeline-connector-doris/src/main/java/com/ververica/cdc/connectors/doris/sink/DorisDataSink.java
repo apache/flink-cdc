@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.doris.sink;
 
+import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.sink.DataSink;
 import com.ververica.cdc.common.sink.EventSinkProvider;
 import com.ververica.cdc.common.sink.FlinkSinkProvider;
@@ -34,14 +35,17 @@ public class DorisDataSink implements DataSink, Serializable {
     private final DorisOptions dorisOptions;
     private final DorisReadOptions readOptions;
     private final DorisExecutionOptions executionOptions;
+    private Configuration configuration;
 
     public DorisDataSink(
             DorisOptions dorisOptions,
             DorisReadOptions dorisReadOptions,
-            DorisExecutionOptions dorisExecutionOptions) {
+            DorisExecutionOptions dorisExecutionOptions,
+            Configuration configuration) {
         this.dorisOptions = dorisOptions;
         this.readOptions = dorisReadOptions;
         this.executionOptions = dorisExecutionOptions;
+        this.configuration = configuration;
     }
 
     @Override
@@ -65,6 +69,6 @@ public class DorisDataSink implements DataSink, Serializable {
 
     @Override
     public MetadataApplier getMetadataApplier() {
-        return new DorisMetadataApplier(dorisOptions);
+        return new DorisMetadataApplier(dorisOptions, configuration);
     }
 }

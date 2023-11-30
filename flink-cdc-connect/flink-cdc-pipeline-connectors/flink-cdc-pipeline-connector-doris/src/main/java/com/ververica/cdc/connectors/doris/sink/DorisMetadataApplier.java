@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.doris.sink;
 
 import org.apache.flink.util.CollectionUtil;
 
+import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.event.AddColumnEvent;
 import com.ververica.cdc.common.event.AlterColumnTypeEvent;
 import com.ververica.cdc.common.event.CreateTableEvent;
@@ -46,15 +47,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_PROPERTIES_PREFIX;
+
 /** Supports {@link DorisDataSink} to schema evolution. */
 public class DorisMetadataApplier implements MetadataApplier {
     private static final Logger LOG = LoggerFactory.getLogger(DorisMetadataApplier.class);
     private DorisOptions dorisOptions;
     private SchemaChangeManager schemaChangeManager;
+    private Configuration config;
 
-    public DorisMetadataApplier(DorisOptions dorisOptions) {
+    public DorisMetadataApplier(DorisOptions dorisOptions, Configuration config) {
         this.dorisOptions = dorisOptions;
         this.schemaChangeManager = new SchemaChangeManager(dorisOptions);
+        this.config = config;
     }
 
     @Override
@@ -94,12 +99,10 @@ public class DorisMetadataApplier implements MetadataApplier {
             tableSchema.setKeys(schema.primaryKeys());
             tableSchema.setModel(DataModel.UNIQUE);
         }
-        // Currently, it is not supported to pass the properties of custom tables, so temporarily
-        // hard-code some common ones first.
-        Map<String, String> props = new HashMap<>();
-        props.put("replication_num", "1");
-        props.put("light_schema_change", "true");
-        tableSchema.setProperties(props);
+
+        Map<String, String> tableProperties =
+                DorisDataSinkOptions.getPropertiesByPrefix(config, TABLE_CREATE_PROPERTIES_PREFIX);
+        tableSchema.setProperties(tableProperties);
         schemaChangeManager.createTable(tableSchema);
     }
 
