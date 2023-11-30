@@ -70,11 +70,11 @@ public class DorisMetadataApplier implements MetadataApplier {
             } else if (event instanceof RenameColumnEvent) {
                 applyRenameColumnEvent((RenameColumnEvent) event);
             } else if (event instanceof AlterColumnTypeEvent) {
-                LOG.warn("AlterColumnType is not supported, skip.");
+                throw new RuntimeException("Unsupport schema change event, " + event);
             }
         } catch (Exception ex) {
-            // Catch exceptions to avoid affecting the main process
-            LOG.error("Schema change error, skip {}", event);
+            throw new RuntimeException(
+                    "Failed to schema change, " + event + ", reason: " + ex.getMessage());
         }
     }
 
