@@ -148,9 +148,10 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testEnableBackfillWithPreHighWaterMark() throws Exception {
+    public void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
 
-        List<String> records = getResultOfWithHooks(false, 21, USE_PRE_HIGHWATERMARK_HOOK, false);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(false, 21, USE_PRE_HIGHWATERMARK_HOOK, false);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -181,9 +182,10 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testEnableBackfillWithPostLowWaterMark() throws Exception {
+    public void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
 
-        List<String> records = getResultOfWithHooks(false, 21, USE_POST_LOWWATERMARK_HOOK, false);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(false, 21, USE_POST_LOWWATERMARK_HOOK, false);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -214,9 +216,10 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testSkipBackfillWithPreHighWaterMark() throws Exception {
+    public void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
 
-        List<String> records = getResultOfWithHooks(true, 24, USE_PRE_HIGHWATERMARK_HOOK, false);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(true, 24, USE_PRE_HIGHWATERMARK_HOOK, false);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -252,9 +255,10 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testSkipBackfillWithPostLowWaterMark() throws Exception {
+    public void testSkipBackfillWithDMLPostLowWaterMark() throws Exception {
 
-        List<String> records = getResultOfWithHooks(true, 24, USE_POST_LOWWATERMARK_HOOK, false);
+        List<String> records =
+                getResultWithDMLInSnapshotPhase(true, 24, USE_POST_LOWWATERMARK_HOOK, false);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -290,7 +294,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    private List<String> getResultOfWithHooks(
+    private List<String> getResultWithDMLInSnapshotPhase(
             boolean skipBackFill, int fetchSize, int hookType, boolean enableFullDocPrePostImage)
             throws Exception {
         String customerDatabase = CONTAINER.executeCommandFileInSeparateDatabase("customer");
