@@ -33,6 +33,7 @@ import com.ververica.cdc.composer.flink.coordination.OperatorIDGenerator;
 import com.ververica.cdc.composer.flink.translator.DataSinkTranslator;
 import com.ververica.cdc.composer.flink.translator.DataSourceTranslator;
 import com.ververica.cdc.composer.flink.translator.PartitioningTranslator;
+import com.ververica.cdc.composer.flink.translator.RouteTranslator;
 import com.ververica.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import com.ververica.cdc.composer.utils.FactoryDiscoveryUtils;
 
@@ -71,6 +72,10 @@ public class FlinkPipelineComposer implements PipelineComposer {
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
         DataStream<Event> stream =
                 sourceTranslator.translate(pipelineDef.getSource(), env, parallelism);
+
+        // Route
+        RouteTranslator routeTranslator = new RouteTranslator();
+        stream = routeTranslator.translate(stream, pipelineDef.getRoute());
 
         // Create sink in advance as schema operator requires MetadataApplier
         DataSink dataSink = createDataSink(pipelineDef.getSink());
