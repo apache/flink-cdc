@@ -174,9 +174,9 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                         "+I[1016, user_17, Shanghai, 123567891234]",
                         "+I[1017, user_18, Shanghai, 123567891234]",
                         "+I[1018, user_19, Shanghai, 123567891234]",
-                        "+I[2000, user_21, Pittsburgh, 123567891234]", // temp +u
+                        "+I[2000, user_21, Pittsburgh, 123567891234]",
                         "+I[15213, user_15213, Shanghai, 123567891234]");
-        // when enable backfill, the wal log between [snapshot_point,  high_watermark) will be
+        // when enable backfill, the wal log between (snapshot, high_watermark) will be
         // applied as snapshot image
         assertEqualsInAnyOrder(expectedRecords, records);
     }
@@ -208,9 +208,9 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                         "+I[1016, user_17, Shanghai, 123567891234]",
                         "+I[1017, user_18, Shanghai, 123567891234]",
                         "+I[1018, user_19, Shanghai, 123567891234]",
-                        "+I[2000, user_21, Pittsburgh, 123567891234]", // temp +u
+                        "+I[2000, user_21, Pittsburgh, 123567891234]",
                         "+I[15213, user_15213, Shanghai, 123567891234]");
-        // when enable backfill, the wal log between [low_watermark, snapshot_point) will be applied
+        // when enable backfill, the wal log between (low_watermark, snapshot) will be applied
         // as snapshot image
         assertEqualsInAnyOrder(expectedRecords, records);
     }
@@ -249,7 +249,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                         // delete message only contains _id, sql job contain value because of
                         // changelog normalization
                         "-D[0, null, null, null]");
-        // when skip backfill, the wal log between [snapshot_point,  high_watermark) will be seen as
+        // when skip backfill, the wal log between (snapshot, high_watermark) will be seen as
         // stream event.
         assertEqualsInAnyOrder(expectedRecords, records);
     }
@@ -288,7 +288,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                         // delete message only contains _id, sql job contain value because of
                         // changelog normalization
                         "-D[0, null, null, null]");
-        // when skip backfill, the wal log between [snapshot_point,  high_watermark) will still be
+        // when skip backfill, the wal log between (snapshot, high_watermark) will still be
         // seen as stream event. This will occur data duplicate. For example, user_20 will be
         // deleted twice, and user_15213 will be inserted twice.
         assertEqualsInAnyOrder(expectedRecords, records);
