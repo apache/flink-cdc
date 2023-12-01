@@ -11,6 +11,7 @@ content/formats/index
 content/downloads
 content/githublink
 content/cdc-3.0-core-concepts
+content/cdc-3.0-core-concepts(ZH)
 ```
 
 # Indices and Search
