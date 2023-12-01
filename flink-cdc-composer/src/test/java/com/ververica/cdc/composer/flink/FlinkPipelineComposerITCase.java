@@ -42,11 +42,25 @@ import java.util.List;
 
 import static com.ververica.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_1;
 import static com.ververica.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_2;
+import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration test for {@link FlinkPipelineComposer}. */
 class FlinkPipelineComposerITCase {
     private static final int MAX_PARALLELISM = 4;
+
+    // Always use parent-first classloader for CDC classes.
+    // The reason is that ValuesDatabase uses static field for holding data, we need to make sure
+    // the class is loaded by AppClassloader so that we can verify data in the test case.
+    private static final org.apache.flink.configuration.Configuration MINI_CLUSTER_CONFIG =
+            new org.apache.flink.configuration.Configuration();
+
+    static {
+        MINI_CLUSTER_CONFIG.set(
+                ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL,
+                Collections.singletonList("com.ververica.cdc"));
+    }
+
     /**
      * Use {@link MiniClusterExtension} to reduce the overhead of restarting the MiniCluster for
      * every test case.
@@ -57,6 +71,7 @@ class FlinkPipelineComposerITCase {
                     new MiniClusterResourceConfiguration.Builder()
                             .setNumberTaskManagers(1)
                             .setNumberSlotsPerTaskManager(MAX_PARALLELISM)
+                            .setConfiguration(MINI_CLUSTER_CONFIG)
                             .build());
 
     private final PrintStream standardOut = System.out;
