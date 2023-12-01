@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.base.relational.connection;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +52,26 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
             if (!pools.containsKey(poolId)) {
                 LOG.info("Create and register connection pool {}", poolId);
                 pools.put(poolId, jdbcConnectionPoolFactory.createPooledDataSource(sourceConfig));
+            } else {
+                HikariDataSource hikariDataSource = pools.get(poolId);
+                String serverTimeZoneOld =
+                        hikariDataSource
+                                .getDataSourceProperties()
+                                .getProperty(JdbcConnectionPoolFactory.SERVER_TIMEZONE_KEY);
+                String serverTimeZoneNew = sourceConfig.getServerTimeZone();
+                if (hikariDataSource != null
+                        && StringUtils.isNotEmpty(serverTimeZoneOld)
+                        && StringUtils.isNotEmpty(serverTimeZoneNew)) {
+                    long connectTimeoutOld = hikariDataSource.getConnectionTimeout();
+                    long connectTimeoutNew = sourceConfig.getConnectTimeout().toMillis();
+                    if (!StringUtils.equals(serverTimeZoneOld, serverTimeZoneNew)
+                            || connectTimeoutOld != connectTimeoutNew) {
+                        HikariDataSource pooledDataSource =
+                                jdbcConnectionPoolFactory.createPooledDataSource(sourceConfig);
+                        pools.put(poolId, pooledDataSource);
+                        return pooledDataSource;
+                    }
+                }
             }
             return pools.get(poolId);
         }
