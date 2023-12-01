@@ -2329,25 +2329,23 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "INSERT INTO varbinary_base64_table VALUES "
                             + "(7, b'0000010000000100000001000000010000000100000001000000010000000110','2021-03-08', "
                             + "30, 500, 'flink-sql');");
-            statement.execute(
-                    "UPDATE varbinary_base64_table SET quantity=50 WHERE id=6;");
-            statement.execute(
-                    "DELETE FROM varbinary_base64_table WHERE id= 7;");
+            statement.execute("UPDATE varbinary_base64_table SET quantity=50 WHERE id=6;");
+            statement.execute("DELETE FROM varbinary_base64_table WHERE id= 7;");
         }
         String[] expected =
                 new String[] {
-                        // snapshot records
-                        "+I[1, BAQEBAQEBAA=, 2021-03-08, 0, 0, flink]",
-                        "+I[2, BAQEBAQEBAE=, 2021-03-08, 10, 100, flink]",
-                        "+I[3, BAQEBAQEBAI=, 2021-03-08, 20, 200, flink]",
-                        "+I[4, BAQEBAQEBAM=, 2021-03-08, 30, 300, flink]",
-                        "+I[5, BAQEBAQEBAQ=, 2021-03-08, 40, 400, flink]",
-                        // binlog records
-                        "+I[6, BAQEBAQEBAU=, 2021-03-08, 30, 500, flink]",
-                        "+I[7, BAQEBAQEBAY=, 2021-03-08, 30, 500, flink-sql]",
-                        "-U[6, BAQEBAQEBAU=, 2021-03-08, 30, 500, flink]",
-                        "+U[6, BAQEBAQEBAU=, 2021-03-08, 50, 500, flink]",
-                        "-D[7, BAQEBAQEBAY=, 2021-03-08, 30, 500, flink-sql]"
+                    // snapshot records
+                    "+I[1, BAQEBAQEBAA=, 2021-03-08, 0, 0, flink]",
+                    "+I[2, BAQEBAQEBAE=, 2021-03-08, 10, 100, flink]",
+                    "+I[3, BAQEBAQEBAI=, 2021-03-08, 20, 200, flink]",
+                    "+I[4, BAQEBAQEBAM=, 2021-03-08, 30, 300, flink]",
+                    "+I[5, BAQEBAQEBAQ=, 2021-03-08, 40, 400, flink]",
+                    // binlog records
+                    "+I[6, BAQEBAQEBAU=, 2021-03-08, 30, 500, flink]",
+                    "+I[7, BAQEBAQEBAY=, 2021-03-08, 30, 500, flink-sql]",
+                    "-U[6, BAQEBAQEBAU=, 2021-03-08, 30, 500, flink]",
+                    "+U[6, BAQEBAQEBAU=, 2021-03-08, 50, 500, flink]",
+                    "-D[7, BAQEBAQEBAY=, 2021-03-08, 30, 500, flink-sql]"
                 };
         assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();
