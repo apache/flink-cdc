@@ -194,8 +194,8 @@ under the License.
         <dependency>
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
-            <type>jar</type>
             <version>${version.awaitility}</version>
+            <scope>test</scope>
         </dependency>
 
         <dependency>
