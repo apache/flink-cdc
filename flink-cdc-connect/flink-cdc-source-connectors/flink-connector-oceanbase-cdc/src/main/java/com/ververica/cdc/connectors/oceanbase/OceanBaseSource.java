@@ -16,12 +16,12 @@
 
 package com.ververica.cdc.connectors.oceanbase;
 
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
 import com.oceanbase.clogproxy.client.config.ClientConf;
 import com.oceanbase.clogproxy.client.config.ObReaderConfig;
 import com.oceanbase.clogproxy.client.util.ClientIdGenerator;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.connectors.oceanbase.source.OceanBaseRichSourceFunction;
 import com.ververica.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
 import com.ververica.cdc.connectors.oceanbase.table.StartupMode;

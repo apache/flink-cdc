@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.mysql.debezium.reader;
 
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -24,6 +23,7 @@ import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadF
 
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventType;
+import com.ververica.cdc.common.annotation.VisibleForTesting;
 import com.ververica.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;

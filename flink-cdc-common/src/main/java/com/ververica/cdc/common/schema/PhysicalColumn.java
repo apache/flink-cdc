@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.schema;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.types.DataType;
 
 import javax.annotation.Nullable;
@@ -40,5 +39,10 @@ public class PhysicalColumn extends Column {
     @Override
     public Column copy(DataType newType) {
         return new PhysicalColumn(name, newType, comment);
+    }
+
+    @Override
+    public Column copy(String newName) {
+        return new PhysicalColumn(newName, type, comment);
     }
 }

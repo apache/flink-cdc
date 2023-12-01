@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.connectors.base.source.meta.offset;
 
-import org.apache.flink.annotation.Experimental;
-
+import com.ververica.cdc.common.annotation.Experimental;
 import org.apache.kafka.connect.errors.ConnectException;
 
 import java.io.Serializable;

@@ -16,9 +16,9 @@
 
 package com.ververica.cdc.connectors.mysql.source.offset;
 
-import org.apache.flink.annotation.Internal;
-
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+
+import com.ververica.cdc.common.annotation.Internal;
 
 import java.io.IOException;
 import java.util.Map;

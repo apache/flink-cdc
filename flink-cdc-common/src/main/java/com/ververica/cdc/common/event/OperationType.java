@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.common.event;
 
-import org.apache.flink.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 /**
  * Enum {@code OperationType} describes the type of operation that the data change event reports.

@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.common.event;
 
-import org.apache.flink.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 /**
  * Class {@code ChangeEvent} represents the change events of external systems, including {@link

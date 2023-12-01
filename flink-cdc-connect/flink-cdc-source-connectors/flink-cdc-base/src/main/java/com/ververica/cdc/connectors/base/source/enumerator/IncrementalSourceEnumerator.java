@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.connectors.base.source.enumerator;
 
-import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
@@ -24,6 +23,7 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsState;

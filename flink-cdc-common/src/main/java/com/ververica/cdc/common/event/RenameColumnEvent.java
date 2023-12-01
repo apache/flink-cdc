@@ -47,10 +47,7 @@ public class RenameColumnEvent implements SchemaChangeEvent {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        if (!super.equals(o)) {
+        if (!(o instanceof RenameColumnEvent)) {
             return false;
         }
         RenameColumnEvent that = (RenameColumnEvent) o;

@@ -19,8 +19,8 @@ package com.ververica.cdc.connectors.tests;
 import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
-import com.vervetica.cdc.connectors.vitess.VitessTestBase;
-import com.vervetica.cdc.connectors.vitess.container.VitessContainer;
+import com.ververica.cdc.connectors.vitess.VitessTestBase;
+import com.ververica.cdc.connectors.vitess.container.VitessContainer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,8 +43,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static com.vervetica.cdc.connectors.vitess.container.VitessContainer.GRPC_PORT;
-import static com.vervetica.cdc.connectors.vitess.container.VitessContainer.MYSQL_PORT;
+import static com.ververica.cdc.connectors.vitess.container.VitessContainer.GRPC_PORT;
+import static com.ververica.cdc.connectors.vitess.container.VitessContainer.MYSQL_PORT;
 import static org.junit.Assert.assertNotNull;
 
 /** End-to-end test for Vitess CDC connector. */

@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.composer.utils.factory;
 
-import org.apache.flink.configuration.ConfigOption;
-
+import com.ververica.cdc.common.configuration.ConfigOption;
 import com.ververica.cdc.common.factories.DataSourceFactory;
 import com.ververica.cdc.common.source.DataSource;
 import com.ververica.cdc.common.source.EventSourceProvider;
@@ -28,21 +27,6 @@ import java.util.Set;
 
 /** A dummy {@link DataSourceFactory} for testing. */
 public class DataSourceFactory2 implements DataSourceFactory {
-
-    @Override
-    public DataSource createDataSource() {
-        return new DataSource() {
-            @Override
-            public EventSourceProvider getEventSourceProvider() {
-                return null;
-            }
-
-            @Override
-            public MetadataAccessor getMetadataAccessor() {
-                return null;
-            }
-        };
-    }
 
     @Override
     public String identifier() {
@@ -57,5 +41,20 @@ public class DataSourceFactory2 implements DataSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         return new HashSet<>();
+    }
+
+    @Override
+    public DataSource createDataSource(Context context) {
+        return new DataSource() {
+            @Override
+            public EventSourceProvider getEventSourceProvider() {
+                return null;
+            }
+
+            @Override
+            public MetadataAccessor getMetadataAccessor() {
+                return null;
+            }
+        };
     }
 }

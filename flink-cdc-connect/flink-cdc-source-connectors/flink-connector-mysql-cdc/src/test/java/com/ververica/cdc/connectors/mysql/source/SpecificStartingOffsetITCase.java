@@ -163,7 +163,6 @@ public class SpecificStartingOffsetITCase {
                                 savepointDir.toAbsolutePath().toString(),
                                 SavepointFormatType.DEFAULT)
                         .get();
-        jobClient.cancel().get();
 
         // Make some changes after the savepoint
         executeStatements(
@@ -239,7 +238,6 @@ public class SpecificStartingOffsetITCase {
                                 savepointDir.toAbsolutePath().toString(),
                                 SavepointFormatType.DEFAULT)
                         .get();
-        jobClient.cancel().get();
 
         // Make some changes after the savepoint
         executeStatements(
@@ -325,7 +323,6 @@ public class SpecificStartingOffsetITCase {
                                 savepointDir.toAbsolutePath().toString(),
                                 SavepointFormatType.DEFAULT)
                         .get();
-        jobClient.cancel().get();
 
         // Make some changes after the savepoint
         executeStatements(

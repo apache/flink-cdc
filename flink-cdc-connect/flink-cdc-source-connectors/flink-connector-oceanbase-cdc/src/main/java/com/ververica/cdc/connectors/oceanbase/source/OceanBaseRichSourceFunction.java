@@ -55,7 +55,6 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -91,12 +90,10 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final ObReaderConfig obReaderConfig;
     private final OceanBaseDeserializationSchema<T> deserializer;
 
-    private final AtomicBoolean snapshotCompleted = new AtomicBoolean(false);
     private final List<OceanBaseRecord> changeRecordBuffer = new LinkedList<>();
 
     private transient Set<String> tableSet;
     private transient volatile long resolvedTimestamp;
-    private transient volatile long startTimestamp;
     private transient volatile OceanBaseConnection snapshotConnection;
     private transient LogProxyClient logProxyClient;
     private transient ListState<Long> offsetState;
@@ -154,18 +151,22 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             LOG.info("Start to initial table whitelist");
             initTableWhiteList();
 
-            LOG.info("Start readChangeRecords process");
-            readChangeRecords();
-
             if (shouldReadSnapshot()) {
-                LOG.info("Snapshot reading started");
+                Long globalTimestamp = getSnapshotConnection().getGlobalTimestamp();
+                if (globalTimestamp == null || globalTimestamp <= 0) {
+                    throw new RuntimeException("Got invalid global timestamp: " + globalTimestamp);
+                }
+                long startTimestamp = globalTimestamp / 1000_000_000;
+                LOG.info("Snapshot reading started from timestamp: {}", startTimestamp);
                 readSnapshotRecords();
                 LOG.info("Snapshot reading finished");
+                resolvedTimestamp = startTimestamp;
             } else {
                 LOG.info("Snapshot reading skipped");
             }
 
-            logProxyClient.join();
+            LOG.info("Change events reading started");
+            readChangeRecords();
         } finally {
             cancel();
         }
@@ -249,8 +250,6 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                     String[] schema = table.split("\\.");
                     readSnapshotRecordsByTable(schema[0], schema[1]);
                 });
-        snapshotCompleted.set(true);
-        resolvedTimestamp = startTimestamp;
     }
 
     private void readSnapshotRecordsByTable(String databaseName, String tableName) {
@@ -296,7 +295,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     protected void readChangeRecords() throws InterruptedException, TimeoutException {
         if (resolvedTimestamp > 0) {
             obReaderConfig.updateCheckpoint(Long.toString(resolvedTimestamp));
-            LOG.info("Read change events from resolvedTimestamp: {}", resolvedTimestamp);
+            LOG.info("Restore from timestamp: {}", resolvedTimestamp);
         }
 
         logProxyClient =
@@ -316,7 +315,6 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                             case BEGIN:
                                 if (!started) {
                                     started = true;
-                                    startTimestamp = Long.parseLong(message.getSafeTimestamp());
                                     latch.countDown();
                                 }
                                 break;
@@ -332,21 +330,18 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                                 }
                                 break;
                             case COMMIT:
-                                // flush buffer after snapshot completed
-                                if (!shouldReadSnapshot() || snapshotCompleted.get()) {
-                                    changeRecordBuffer.forEach(
-                                            r -> {
-                                                try {
-                                                    deserializer.deserialize(r, outputCollector);
-                                                } catch (Exception e) {
-                                                    throw new FlinkRuntimeException(e);
-                                                }
-                                            });
-                                    changeRecordBuffer.clear();
-                                    long timestamp = Long.parseLong(message.getSafeTimestamp());
-                                    if (timestamp > resolvedTimestamp) {
-                                        resolvedTimestamp = timestamp;
-                                    }
+                                changeRecordBuffer.forEach(
+                                        r -> {
+                                            try {
+                                                deserializer.deserialize(r, outputCollector);
+                                            } catch (Exception e) {
+                                                throw new FlinkRuntimeException(e);
+                                            }
+                                        });
+                                changeRecordBuffer.clear();
+                                long timestamp = Long.parseLong(message.getSafeTimestamp());
+                                if (timestamp > resolvedTimestamp) {
+                                    resolvedTimestamp = timestamp;
                                 }
                                 break;
                             case DDL:
@@ -368,12 +363,19 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                     }
                 });
 
+        LOG.info(
+                "Try to start LogProxyClient with client id: {}, config: {}",
+                logProxyClientConf.getClientId(),
+                obReaderConfig);
         logProxyClient.start();
-        LOG.info("LogProxyClient started");
+
         if (!latch.await(connectTimeout.getSeconds(), TimeUnit.SECONDS)) {
-            throw new TimeoutException("Timeout to receive messages in RecordListener");
+            throw new TimeoutException(
+                    "Timeout to receive log messages in LogProxyClient.RecordListener");
         }
-        LOG.info("LogProxyClient packet processing started from timestamp {}", startTimestamp);
+        LOG.info("LogProxyClient started successfully");
+
+        logProxyClient.join();
     }
 
     private OceanBaseRecord getChangeRecord(LogMessage message) {

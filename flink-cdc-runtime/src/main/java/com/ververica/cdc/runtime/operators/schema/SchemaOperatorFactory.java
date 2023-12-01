@@ -21,22 +21,29 @@ import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.streaming.api.operators.CoordinatedOperatorFactory;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
-import org.apache.flink.streaming.api.operators.StreamOperator;
 
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.common.event.Event;
+import com.ververica.cdc.common.sink.MetadataApplier;
+import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaRegistryProvider;
 
 /** Factory to create {@link SchemaOperator}. */
+@Internal
 public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
         implements CoordinatedOperatorFactory<Event>, OneInputStreamOperatorFactory<Event, Event> {
 
     private static final long serialVersionUID = 1L;
 
-    protected SchemaOperatorFactory(StreamOperator<Event> operator) {
-        super(operator);
+    private final MetadataApplier metadataApplier;
+
+    public SchemaOperatorFactory(MetadataApplier metadataApplier) {
+        super(new SchemaOperator());
+        this.metadataApplier = metadataApplier;
     }
 
     @Override
-    public OperatorCoordinator.Provider getCoordinatorProvider(String s, OperatorID operatorID) {
-        return null;
+    public OperatorCoordinator.Provider getCoordinatorProvider(
+            String operatorName, OperatorID operatorID) {
+        return new SchemaRegistryProvider(operatorID, operatorName, metadataApplier);
     }
 }

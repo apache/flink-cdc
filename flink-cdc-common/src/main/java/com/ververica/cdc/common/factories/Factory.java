@@ -16,9 +16,12 @@
 
 package com.ververica.cdc.common.factories;
 
-import org.apache.flink.annotation.PublicEvolving;
-import org.apache.flink.configuration.ConfigOption;
+import com.ververica.cdc.common.annotation.PublicEvolving;
+import com.ververica.cdc.common.configuration.ConfigOption;
+import com.ververica.cdc.common.configuration.Configuration;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -55,4 +58,28 @@ public interface Factory {
      * addition to {@link #requiredOptions()}.
      */
     Set<ConfigOption<?>> optionalOptions();
+
+    /** Provides session information describing the factory to be accessed. */
+    @PublicEvolving
+    interface Context {
+
+        /** Gives the configuration of the current session. */
+        Configuration getConfiguration();
+
+        /**
+         * Returns the class loader of the current session.
+         *
+         * <p>The class loader is in particular useful for discovering factories.
+         */
+        ClassLoader getClassLoader();
+
+        /**
+         * Returns the options of the current session.
+         *
+         * @return options of the current session.
+         */
+        default Map<String, String> getEnrichmentOptions() {
+            return Collections.emptyMap();
+        }
+    }
 }

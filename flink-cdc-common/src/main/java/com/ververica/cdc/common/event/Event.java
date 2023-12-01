@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.common.event;
 
-import org.apache.flink.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 /**
  * Class {@code Event} is the super interface defines the events of external systems flowing into

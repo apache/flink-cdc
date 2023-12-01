@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.connectors.base.config;
 
-import org.apache.flink.annotation.Experimental;
-
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 
 import java.io.Serializable;

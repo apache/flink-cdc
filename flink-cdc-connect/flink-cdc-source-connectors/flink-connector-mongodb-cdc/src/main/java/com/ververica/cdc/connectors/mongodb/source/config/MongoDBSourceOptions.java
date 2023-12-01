@@ -16,9 +16,10 @@
 
 package com.ververica.cdc.connectors.mongodb.source.config;
 
-import org.apache.flink.annotation.Experimental;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
+
+import com.ververica.cdc.common.annotation.Experimental;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
 

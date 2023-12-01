@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.data;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.types.MapType;
 
 import java.util.Map;

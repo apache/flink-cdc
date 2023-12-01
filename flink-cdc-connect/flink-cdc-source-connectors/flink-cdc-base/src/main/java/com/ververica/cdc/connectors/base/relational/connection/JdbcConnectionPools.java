@@ -16,9 +16,9 @@
 
 package com.ververica.cdc.connectors.base.relational.connection;
 
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import com.ververica.cdc.common.annotation.VisibleForTesting;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;

@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.common.types;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.utils.Preconditions;
 
 import java.util.Collections;

@@ -16,8 +16,7 @@
 
 package com.ververica.cdc.debezium.table;
 
-import org.apache.flink.annotation.Internal;
-
+import com.ververica.cdc.common.annotation.Internal;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.io.Serializable;

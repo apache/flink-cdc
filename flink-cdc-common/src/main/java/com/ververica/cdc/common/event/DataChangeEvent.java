@@ -16,12 +16,12 @@
 
 package com.ververica.cdc.common.event;
 
-import org.apache.flink.annotation.PublicEvolving;
-
+import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.data.RecordData;
 
 import java.io.Serializable;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Class {@code DataChangeEvent} represents the data change events of external systems, such as
@@ -131,5 +131,52 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
     public static DataChangeEvent replaceEvent(
             TableId tableId, RecordData after, Map<String, String> meta) {
         return new DataChangeEvent(tableId, null, after, OperationType.REPLACE, meta);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof DataChangeEvent)) {
+            return false;
+        }
+        DataChangeEvent that = (DataChangeEvent) o;
+        return Objects.equals(tableId, that.tableId)
+                && Objects.equals(before, that.before)
+                && Objects.equals(after, that.after)
+                && op == that.op
+                && Objects.equals(meta, that.meta);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(tableId, before, after, op, meta);
+    }
+
+    /** Creates a string to describe the information of meta. */
+    public String describeMeta() {
+        StringBuilder stringBuilder = new StringBuilder("(");
+        if (meta != null && !meta.isEmpty()) {
+            stringBuilder.append(meta);
+        }
+        stringBuilder.append(")");
+        return stringBuilder.toString();
+    }
+
+    @Override
+    public String toString() {
+        return "DataChangeEvent{"
+                + "tableId="
+                + tableId
+                + ", before="
+                + before
+                + ", after="
+                + after
+                + ", op="
+                + op
+                + ", meta="
+                + describeMeta()
+                + '}';
     }
 }

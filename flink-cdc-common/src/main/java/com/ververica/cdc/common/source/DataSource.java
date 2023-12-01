@@ -16,7 +16,7 @@
 
 package com.ververica.cdc.common.source;
 
-import org.apache.flink.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.PublicEvolving;
 
 /**
  * {@code DataSource} is used to access metadata and read change data from external systems. It can

@@ -19,12 +19,45 @@ package com.ververica.cdc.runtime.operators.schema.event;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
 import com.ververica.cdc.runtime.operators.schema.SchemaOperator;
-import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaOperatorCoordinator;
+import com.ververica.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
+
+import java.util.Objects;
 
 /**
- * The response for {@link SchemaChangeRequest} from {@link SchemaOperatorCoordinator} to {@link
+ * The response for {@link SchemaChangeRequest} from {@link SchemaRegistry} to {@link
  * SchemaOperator}.
  */
 public class SchemaChangeResponse implements CoordinationResponse {
     private static final long serialVersionUID = 1L;
+
+    /**
+     * Whether the SchemaOperator need to buffer data and the SchemaOperatorCoordinator need to wait
+     * for flushing.
+     */
+    private final boolean shouldSendFlushEvent;
+
+    public SchemaChangeResponse(boolean shouldSendFlushEvent) {
+        this.shouldSendFlushEvent = shouldSendFlushEvent;
+    }
+
+    public boolean isShouldSendFlushEvent() {
+        return shouldSendFlushEvent;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof SchemaChangeResponse)) {
+            return false;
+        }
+        SchemaChangeResponse response = (SchemaChangeResponse) o;
+        return shouldSendFlushEvent == response.shouldSendFlushEvent;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(shouldSendFlushEvent);
+    }
 }

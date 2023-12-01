@@ -16,10 +16,10 @@
 
 package com.ververica.cdc.connectors.base.experimental;
 
-import org.apache.flink.annotation.Experimental;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import com.ververica.cdc.connectors.base.experimental.config.MySqlSourceConfig;

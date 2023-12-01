@@ -16,9 +16,9 @@
 
 package com.ververica.cdc.connectors.base.dialect;
 
-import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.common.state.CheckpointListener;
 
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;

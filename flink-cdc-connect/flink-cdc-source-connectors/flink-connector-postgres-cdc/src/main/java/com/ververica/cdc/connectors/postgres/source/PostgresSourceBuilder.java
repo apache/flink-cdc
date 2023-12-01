@@ -16,11 +16,11 @@
 
 package com.ververica.cdc.connectors.postgres.source;
 
-import org.apache.flink.annotation.Experimental;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.options.StartupMode;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.assigner.HybridSplitAssigner;

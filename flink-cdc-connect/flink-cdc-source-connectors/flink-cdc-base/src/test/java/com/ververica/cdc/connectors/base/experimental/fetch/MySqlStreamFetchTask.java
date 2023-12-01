@@ -47,7 +47,6 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
 
     private final StreamSplit split;
     private volatile boolean taskRunning = false;
-    private MySqlBinlogSplitReadTask binlogSplitReadTask;
 
     public MySqlStreamFetchTask(StreamSplit split) {
         this.split = split;
@@ -57,7 +56,7 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
     public void execute(Context context) throws Exception {
         MySqlSourceFetchTaskContext sourceFetchContext = (MySqlSourceFetchTaskContext) context;
         taskRunning = true;
-        binlogSplitReadTask =
+        MySqlBinlogSplitReadTask binlogSplitReadTask =
                 new MySqlBinlogSplitReadTask(
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getConnection(),
@@ -155,7 +154,7 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
                                 new DebeziumException("Error processing binlog signal event", e));
                     }
                     // tell fetcher the binlog task finished
-                    ((MySqlScanFetchTask.SnapshotBinlogSplitChangeEventSourceContext) context)
+                    ((MySqlScanFetchTask.MysqlSnapshotSplitChangeEventSourceContext) context)
                             .finished();
                 }
             }
