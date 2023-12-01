@@ -3,7 +3,7 @@
 ```{toctree}
 :maxdepth: 2
 :caption: Contents
-content/about
+content/overview/index
 content/quickstart/index
 content/快速上手/index
 content/connectors/index
