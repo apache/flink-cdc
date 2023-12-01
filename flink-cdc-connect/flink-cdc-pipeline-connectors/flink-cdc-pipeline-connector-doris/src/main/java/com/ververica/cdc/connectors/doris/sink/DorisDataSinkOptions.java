@@ -37,11 +37,6 @@ public class DorisDataSinkOptions {
                     .stringType()
                     .noDefaultValue()
                     .withDescription("doris be http address.");
-    public static final ConfigOption<String> TABLE_IDENTIFIER =
-            ConfigOptions.key("table.identifier")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("the doris table name.");
     public static final ConfigOption<String> USERNAME =
             ConfigOptions.key("username")
                     .stringType()

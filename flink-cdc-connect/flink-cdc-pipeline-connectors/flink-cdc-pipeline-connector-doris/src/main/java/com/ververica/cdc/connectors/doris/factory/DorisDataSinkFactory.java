@@ -52,7 +52,6 @@ import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_MAX_RETRIES;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_USE_CACHE;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.STREAM_LOAD_PROP_PREFIX;
-import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_IDENTIFIER;
 import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.USERNAME;
 
 /** A dummy {@link DataSinkFactory} to create {@link DorisDataSink}. */
@@ -65,7 +64,6 @@ public class DorisDataSinkFactory implements DataSinkFactory {
         DorisExecutionOptions.Builder executionBuilder = DorisExecutionOptions.builder();
         config.getOptional(FENODES).ifPresent(optionsBuilder::setFenodes);
         config.getOptional(BENODES).ifPresent(optionsBuilder::setBenodes);
-        config.getOptional(TABLE_IDENTIFIER).ifPresent(optionsBuilder::setTableIdentifier);
         config.getOptional(USERNAME).ifPresent(optionsBuilder::setUsername);
         config.getOptional(PASSWORD).ifPresent(optionsBuilder::setPassword);
         config.getOptional(JDBC_URL).ifPresent(optionsBuilder::setJdbcUrl);
@@ -131,7 +129,6 @@ public class DorisDataSinkFactory implements DataSinkFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(FENODES);
         options.add(BENODES);
-        options.add(TABLE_IDENTIFIER);
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(JDBC_URL);
