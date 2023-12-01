@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mysql.source;
 
+import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.Source;
@@ -24,6 +25,7 @@ import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
+import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
@@ -46,7 +48,6 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
-import com.ververica.cdc.connectors.mysql.source.reader.MySqlRecordEmitter;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSourceReaderContext;
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlSplitReader;
@@ -58,6 +59,7 @@ import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.jdbc.JdbcConnection;
 
+import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.function.Supplier;
@@ -102,6 +104,7 @@ public class MySqlSource<T>
 
     private final MySqlSourceConfigFactory configFactory;
     private final DebeziumDeserializationSchema<T> deserializationSchema;
+    private final RecordEmitterSupplier<T> recordEmitterSupplier;
 
     // Actions to perform during the snapshot phase.
     // This field is introduced for testing purpose, for example testing if changes made in the
@@ -122,8 +125,23 @@ public class MySqlSource<T>
     MySqlSource(
             MySqlSourceConfigFactory configFactory,
             DebeziumDeserializationSchema<T> deserializationSchema) {
+        this(
+                configFactory,
+                deserializationSchema,
+                (sourceReaderMetrics, sourceConfig) ->
+                        new MySqlRecordEmitter<>(
+                                deserializationSchema,
+                                sourceReaderMetrics,
+                                sourceConfig.isIncludeSchemaChanges()));
+    }
+
+    MySqlSource(
+            MySqlSourceConfigFactory configFactory,
+            DebeziumDeserializationSchema<T> deserializationSchema,
+            RecordEmitterSupplier<T> recordEmitterSupplier) {
         this.configFactory = configFactory;
         this.deserializationSchema = deserializationSchema;
+        this.recordEmitterSupplier = recordEmitterSupplier;
     }
 
     public MySqlSourceConfigFactory getConfigFactory() {
@@ -163,10 +181,7 @@ public class MySqlSource<T>
         return new MySqlSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,
-                new MySqlRecordEmitter<>(
-                        deserializationSchema,
-                        sourceReaderMetrics,
-                        sourceConfig.isIncludeSchemaChanges()),
+                recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig),
                 readerContext.getConfiguration(),
                 mySqlSourceReaderContext,
                 sourceConfig);
@@ -243,5 +258,14 @@ public class MySqlSource<T>
     @VisibleForTesting
     public void setSnapshotHooks(SnapshotPhaseHooks snapshotHooks) {
         this.snapshotHooks = snapshotHooks;
+    }
+
+    /** Create a {@link RecordEmitter} for {@link MySqlSourceReader}. */
+    @Internal
+    @FunctionalInterface
+    interface RecordEmitterSupplier<T> extends Serializable {
+
+        RecordEmitter<SourceRecords, T, MySqlSplitState> get(
+                MySqlSourceReaderMetrics metrics, MySqlSourceConfig sourceConfig);
     }
 }

@@ -204,14 +204,15 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
                     String newColumnName = parser.parseName(ctx.newColumn);
+
+                    Map<String, DataType> typeMapping = new HashMap<>();
+                    typeMapping.put(column.name(), fromDbzColumn(column));
+                    changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+
                     if (newColumnName != null && !column.name().equalsIgnoreCase(newColumnName)) {
                         Map<String, String> renameMap = new HashMap<>();
                         renameMap.put(column.name(), newColumnName);
                         changes.add(new RenameColumnEvent(currentTable, renameMap));
-                    } else {
-                        Map<String, DataType> typeMapping = new HashMap<>();
-                        typeMapping.put(column.name(), fromDbzColumn(column));
-                        changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
                     }
                     listeners.remove(columnDefinitionListener);
                 },
