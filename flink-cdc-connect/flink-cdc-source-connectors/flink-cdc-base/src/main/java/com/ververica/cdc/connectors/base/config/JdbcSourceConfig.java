@@ -18,7 +18,6 @@ package com.ververica.cdc.connectors.base.config;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.IncrementalSource;
-import io.debezium.config.Configuration;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
 
 import java.time.Duration;
@@ -57,7 +56,6 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             boolean includeSchemaChanges,
             boolean closeIdleReaders,
             Properties dbzProperties,
-            Configuration dbzConfiguration,
             String driverClassName,
             String hostname,
             int port,
@@ -77,8 +75,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
                 distributionFactorLower,
                 includeSchemaChanges,
                 closeIdleReaders,
-                dbzProperties,
-                dbzConfiguration);
+                dbzProperties);
         this.driverClassName = driverClassName;
         this.hostname = hostname;
         this.port = port;

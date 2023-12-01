@@ -111,7 +111,6 @@ public class JdbcConnectionPoolTest {
                 false,
                 true,
                 new Properties(),
-                null,
                 "com.mysql.cj.jdbc.Driver",
                 hostname,
                 port,

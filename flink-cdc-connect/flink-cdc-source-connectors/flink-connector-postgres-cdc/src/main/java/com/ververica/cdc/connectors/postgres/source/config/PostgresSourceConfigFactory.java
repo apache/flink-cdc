@@ -18,7 +18,6 @@ package com.ververica.cdc.connectors.postgres.source.config;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfigFactory;
 import com.ververica.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
-import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.PostgresConnector;
 
 import java.time.Duration;
@@ -101,7 +100,6 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
         // Do not need debezium to do the snapshot work.
         props.put("snapshot.mode", "never");
 
-        Configuration dbzConfiguration = Configuration.from(props);
         return new PostgresSourceConfig(
                 subtaskId,
                 startupOptions,
@@ -115,7 +113,6 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 includeSchemaChanges,
                 closeIdleReaders,
                 props,
-                dbzConfiguration,
                 JDBC_DRIVER,
                 hostname,
                 port,

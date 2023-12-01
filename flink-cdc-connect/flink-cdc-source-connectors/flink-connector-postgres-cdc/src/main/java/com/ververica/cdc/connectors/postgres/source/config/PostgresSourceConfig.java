@@ -18,7 +18,6 @@ package com.ververica.cdc.connectors.postgres.source.config;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
-import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
 
@@ -50,7 +49,6 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             boolean includeSchemaChanges,
             boolean closeIdleReaders,
             Properties dbzProperties,
-            Configuration dbzConfiguration,
             String driverClassName,
             String hostname,
             int port,
@@ -74,7 +72,6 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 includeSchemaChanges,
                 closeIdleReaders,
                 dbzProperties,
-                dbzConfiguration,
                 driverClassName,
                 hostname,
                 port,
