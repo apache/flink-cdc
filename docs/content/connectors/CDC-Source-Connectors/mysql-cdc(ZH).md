@@ -82,8 +82,8 @@ mysql> FLUSH PRIVILEGES;
 MySQL CDC 表可以定义如下：
 
 ```sql
--- 每 3 秒做一次 checkpoint，用于测试，生产配置建议5到10分钟                      
-Flink SQL> SET 'execution.checkpointing.interval' = '3s';   
+-- 每 3 秒做一次 checkpoint，用于测试，生产配置建议5到10分钟
+Flink SQL> SET 'execution.checkpointing.interval' = '3s';
 
 -- 在 Flink SQL中注册 MySQL 表 'orders'
 Flink SQL> CREATE TABLE orders (
@@ -102,7 +102,7 @@ Flink SQL> CREATE TABLE orders (
      'password' = '123456',
      'database-name' = 'mydb',
      'table-name' = 'orders');
-  
+
 -- 从订单表读取全量数据(快照)和增量数据(binlog)
 Flink SQL> SELECT * FROM orders;
 ```
@@ -156,7 +156,7 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>要监视的 MySQL 服务器的数据库名称。数据库名称还支持正则表达式，以监视多个与正则表达式匹配的表。</td>
-    </tr> 
+    </tr>
     <tr>
       <td>table-name</td>
       <td>required</td>
@@ -176,7 +176,7 @@ Flink SQL> SELECT * FROM orders;
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>读取数据使用的 server id，server id 可以是个整数或者一个整数范围，比如 '5400' 或 '5400-5408', 
+      <td>读取数据使用的 server id，server id 可以是个整数或者一个整数范围，比如 '5400' 或 '5400-5408',
       建议在 'scan.incremental.snapshot.enabled' 参数为启用时，配置成整数范围。因为在当前 MySQL 集群中运行的所有 slave 节点，标记每个 salve 节点的 id 都必须是唯一的。 所以当连接器加入 MySQL 集群作为另一个 slave 节点（并且具有唯一 id 的情况下），它就可以读取 binlog。 默认情况下，连接器会在 5400 和 6400 之间生成一个随机数，但是我们建议用户明确指定 Server id。
       </td>
     </tr>
@@ -258,7 +258,7 @@ Flink SQL> SELECT * FROM orders;
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>数据库服务器中的会话时区， 例如： "Asia/Shanghai". 
+      <td>数据库服务器中的会话时区， 例如： "Asia/Shanghai".
           它控制 MYSQL 中的时间戳类型如何转换为字符串。
           更多请参考 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types"> 这里</a>.
           如果没有设置，则使用ZoneId.systemDefault()来确定服务器时区。
@@ -270,7 +270,7 @@ Flink SQL> SELECT * FROM orders;
       <td>optional</td>
       <td style="word-wrap: break-word;">1000</td>
       <td>Integer</td>
-      <td>	
+      <td>
        在快照操作期间，连接器将查询每个包含的表，以生成该表中所有行的读取事件。 此参数确定 MySQL 连接是否将表的所有结果拉入内存（速度很快，但需要大量内存）， 或者结果是否需要流式传输（传输速度可能较慢，但适用于非常大的表）。 该值指定了在连接器对结果进行流式处理之前，表必须包含的最小行数，默认值为1000。将此参数设置为`0`以跳过所有表大小检查，并始终在快照期间对所有结果进行流式处理。</td>
     </tr>
     <tr>
@@ -279,7 +279,7 @@ Flink SQL> SELECT * FROM orders;
           <td style="word-wrap: break-word;">30s</td>
           <td>Duration</td>
           <td>连接器在尝试连接到 MySQL 数据库服务器后超时前应等待的最长时间。</td>
-    </tr>    
+    </tr>
     <tr>
           <td>connect.max-retries</td>
           <td>optional</td>
@@ -315,7 +315,7 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
+          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td>
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -632,7 +632,7 @@ public class MySqlSourceExample {
       .fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySQL Source")
       // 设置 source 节点的并行度为 4
       .setParallelism(4)
-      .print().setParallelism(1); // 设置 sink 节点并行度为 1 
+      .print().setParallelism(1); // 设置 sink 节点并行度为 1
 
     env.execute("Print MySQL Snapshot + Binlog");
   }
@@ -680,8 +680,8 @@ _Step 2_: 更新现有 Flink 作业的表列表选项。
     MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
         .hostname("yourHostname")
         .port(yourPort)
-        .scanNewlyAddedTableEnabled(true) 
-        .databaseList("db") 
+        .scanNewlyAddedTableEnabled(true)
+        .databaseList("db")
         .tableList("db.product, db.user, db.address, db.order, db.custom") // 设置捕获的表 [product, user, address ,order, custom]
         .username("yourUsername")
         .password("yourPassword")
@@ -692,7 +692,7 @@ _Step 2_: 更新现有 Flink 作业的表列表选项。
 _Step 3_: 从 savepoint 还原更新后的 Flink 作业。
 ```shell
 $ ./bin/flink run \
-      --detached \ 
+      --detached \
       --fromSavepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
@@ -930,7 +930,7 @@ $ ./bin/flink run \
         SET
       </td>
       <td>ARRAY&lt;STRING&gt;</td>
-      <td>因为 MySQL 中的 SET 数据类型是一个字符串对象，可以有零个或多个值 
+      <td>因为 MySQL 中的 SET 数据类型是一个字符串对象，可以有零个或多个值
           它应该始终映射到字符串数组。
       </td>
     </tr>
