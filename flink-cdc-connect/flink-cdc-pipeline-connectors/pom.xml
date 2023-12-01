@@ -34,12 +34,14 @@ under the License.
             <groupId>com.ververica</groupId>
             <artifactId>flink-cdc-common</artifactId>
             <version>${revision}</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>com.ververica</groupId>
             <artifactId>flink-cdc-runtime</artifactId>
             <version>${revision}</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
