@@ -15,52 +15,48 @@ under the License.
 <assembly>
     <id>dist</id>
     <formats>
+        <format>dir</format>
         <format>tar.gz</format>
     </formats>
+
     <includeBaseDirectory>true</includeBaseDirectory>
-    <baseDirectory>flink-cdc-connectors-${version}-bin</baseDirectory>
+    <baseDirectory>flink-cdc-${revision}</baseDirectory>
 
-    <dependencySets>
-        <dependencySet>
-            <unpack>false</unpack>
-            <scope>runtime</scope>
-            <useProjectArtifact>true</useProjectArtifact>
+    <files>
+        <!-- copy flink-cdc-dist uber jar -->
+        <file>
+            <source>target/flink-cdc-dist-${revision}.jar</source>
             <outputDirectory>lib</outputDirectory>
-
-            <includes>
-                <include>org.apache.logging.log4j:log4j-api</include>
-                <include>org.apache.logging.log4j:log4j-core</include>
-                <include>org.apache.logging.log4j:log4j-slf4j-impl</include>
-                <include>org.apache.logging.log4j:log4j-1.2-api</include>
-            </includes>
-        </dependencySet>
-    </dependencySets>
+            <destName>flink-cdc-dist-${revision}.jar</destName>
+            <fileMode>0644</fileMode>
+        </file>
+    </files>
 
     <fileSets>
         <!-- copy start scripts -->
         <fileSet>
-            <directory>src/main/cdc-bin/bin</directory>
+            <directory>src/main/flink-cdc-bin/bin</directory>
             <outputDirectory>bin</outputDirectory>
             <fileMode>0755</fileMode>
         </fileSet>
 
         <!-- copy conf directory -->
         <fileSet>
-            <directory>src/main/cdc-bin/conf</directory>
+            <directory>src/main/flink-cdc-bin/conf</directory>
             <outputDirectory>conf</outputDirectory>
             <fileMode>0644</fileMode>
         </fileSet>
 
         <!-- copy flink-cdc fat jar -->
         <fileSet>
-            <directory>src/main/cdc-bin/lib</directory>
+            <directory>src/main/flink-cdc-bin/lib</directory>
             <outputDirectory>lib</outputDirectory>
             <fileMode>0644</fileMode>
         </fileSet>
 
         <!-- create an empty log directory -->
         <fileSet>
-            <directory>src/main/cdc-bin/</directory>
+            <directory>src/main/flink-cdc-bin/</directory>
             <outputDirectory>log</outputDirectory>
             <fileMode>0644</fileMode>
             <excludes>
