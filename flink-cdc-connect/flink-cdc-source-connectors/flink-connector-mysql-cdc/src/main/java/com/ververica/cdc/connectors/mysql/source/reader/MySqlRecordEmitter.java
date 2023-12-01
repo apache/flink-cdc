@@ -52,8 +52,7 @@ import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isWate
  * <p>The {@link RecordEmitter} buffers the snapshot records of split and call the binlog reader to
  * emit records rather than emit the records directly.
  */
-public final class MySqlRecordEmitter<T>
-        implements RecordEmitter<SourceRecords, T, MySqlSplitState> {
+public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, MySqlSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlRecordEmitter.class);
     private static final FlinkJsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
@@ -84,7 +83,7 @@ public final class MySqlRecordEmitter<T>
         }
     }
 
-    private void processElement(
+    protected void processElement(
             SourceRecord element, SourceOutput<T> output, MySqlSplitState splitState)
             throws Exception {
         if (isWatermarkEvent(element)) {

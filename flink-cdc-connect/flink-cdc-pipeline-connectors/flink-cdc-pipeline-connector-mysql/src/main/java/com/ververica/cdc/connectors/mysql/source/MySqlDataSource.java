@@ -17,12 +17,14 @@
 package com.ververica.cdc.connectors.mysql.source;
 
 import com.ververica.cdc.common.annotation.Internal;
+import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.source.DataSource;
 import com.ververica.cdc.common.source.EventSourceProvider;
 import com.ververica.cdc.common.source.FlinkSourceProvider;
 import com.ververica.cdc.common.source.MetadataAccessor;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
+import com.ververica.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEmitter;
 import com.ververica.cdc.debezium.table.DebeziumChangelogMode;
 
 import java.time.ZoneId;
@@ -46,7 +48,16 @@ public class MySqlDataSource implements DataSource {
                         DebeziumChangelogMode.ALL,
                         ZoneId.of(sourceConfig.getServerTimeZone()),
                         sourceConfig.isIncludeSchemaChanges());
-        return FlinkSourceProvider.of(new MySqlSource<>(configFactory, deserializer));
+
+        MySqlSource<Event> source =
+                new MySqlSource<>(
+                        configFactory,
+                        deserializer,
+                        (sourceReaderMetrics, sourceConfig) ->
+                                new MySqlPipelineRecordEmitter(
+                                        deserializer, sourceReaderMetrics, sourceConfig));
+
+        return FlinkSourceProvider.of(source);
     }
 
     @Override

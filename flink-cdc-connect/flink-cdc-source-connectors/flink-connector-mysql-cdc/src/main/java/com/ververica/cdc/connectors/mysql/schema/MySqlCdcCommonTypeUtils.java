@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.mysql.utils;
+package com.ververica.cdc.connectors.mysql.schema;
 
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
 import io.debezium.relational.Column;
 
 /** Utilities for converting from MySQL types to {@link DataType}s. */
-public class MySqlTypeUtils {
+public class MySqlCdcCommonTypeUtils {
 
     // ------ MySQL Type ------
     // https://dev.mysql.com/doc/refman/8.0/en/data-types.html
@@ -182,5 +182,5 @@ public class MySqlTypeUtils {
         }
     }
 
-    private MySqlTypeUtils() {}
+    private MySqlCdcCommonTypeUtils() {}
 }
