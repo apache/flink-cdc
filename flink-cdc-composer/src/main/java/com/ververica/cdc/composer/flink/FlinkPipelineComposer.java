@@ -36,9 +36,17 @@ import com.ververica.cdc.composer.flink.translator.PartitioningTranslator;
 import com.ververica.cdc.composer.flink.translator.RouteTranslator;
 import com.ververica.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import com.ververica.cdc.composer.utils.FactoryDiscoveryUtils;
+import com.ververica.cdc.runtime.serializer.event.EventSerializer;
 
+import java.net.URI;
+import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 /** Composer for translating data pipeline to a Flink DataStream job. */
 @Internal
@@ -102,6 +110,9 @@ public class FlinkPipelineComposer implements PipelineComposer {
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
         sinkTranslator.translate(stream, dataSink, schemaOperatorIDGenerator.generate());
 
+        // Add framework JARs
+        addFrameworkJars();
+
         return new FlinkPipelineExecution(
                 env, pipelineDef.getConfig().get(PipelineOptions.PIPELINE_NAME), isBlocking);
     }
@@ -122,5 +133,36 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         sinkDef.getConfig().toMap(),
                         sinkDef.getConfig(),
                         Thread.currentThread().getContextClassLoader()));
+    }
+
+    private void addFrameworkJars() {
+        try {
+            Set<URI> frameworkJars = new HashSet<>();
+            // Common JAR
+            // We use the core interface (Event) to search the JAR
+            Optional<URL> commonJar = getContainingJar(Event.class);
+            if (commonJar.isPresent()) {
+                frameworkJars.add(commonJar.get().toURI());
+            }
+            // Runtime JAR
+            // We use the serializer of the core interface (EventSerializer) to search the JAR
+            Optional<URL> runtimeJar = getContainingJar(EventSerializer.class);
+            if (runtimeJar.isPresent()) {
+                frameworkJars.add(runtimeJar.get().toURI());
+            }
+            for (URI jar : frameworkJars) {
+                FlinkEnvironmentUtils.addJar(env, jar.toURL());
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to search and add Flink CDC framework JARs", e);
+        }
+    }
+
+    private Optional<URL> getContainingJar(Class<?> clazz) throws Exception {
+        URL container = clazz.getProtectionDomain().getCodeSource().getLocation();
+        if (Files.isDirectory(Paths.get(container.toURI()))) {
+            return Optional.empty();
+        }
+        return Optional.of(container);
     }
 }
