@@ -329,6 +329,17 @@ During a snapshot operation, the connector will query each included table to pro
       <td>Boolean</td>
       <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.</td>
     </tr>
+    <tr>
+      <td>debezium.binary.handling.mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>debezium.binary.handling.mode can be set to one of the following values:
+          none: No processing is performed, and the binary data type is transmitted as a byte array (byte array).
+          base64: The binary data type is converted to a Base64-encoded string and transmitted.
+          hex: The binary data type is converted to a hexadecimal string and transmitted.
+      The default value is none. Depending on your requirements and data types, you can choose the appropriate processing mode. If your database contains a large number of binary data types, it is recommended to use base64 or hex mode to make it easier to handle during transmission.</td> 
+    </tr>
     </tbody>
 </table>
 </div>
@@ -719,6 +730,36 @@ There are two places that need to be taken care of.
 2. The processing semantics of a MySQL CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
   * If no update operation is performed on the specified column, the exactly-once semantics is ensured.
   * If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
+
+### About converting binary type data to base64 encoded data
+
+```sql
+CREATE TABLE products (
+    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    order_id INT,
+    order_date TIMESTAMP(0),
+    customer_name STRING,
+    price DECIMAL(10, 5),
+    product_id INT,
+    order_status BOOLEAN,
+    binary_data STRING,
+    PRIMARY KEY(order_id) NOT ENFORCED
+) WITH (
+    'connector' = 'mysql-cdc',
+    'hostname' = 'localhost',
+    'port' = '3306',
+    'username' = 'root',
+    'password' = '123456',
+    'database-name' = 'test_db',
+    'table-name' = 'test_tb',
+    'debezium.binary.handling.mode' = 'base64'
+);
+```
+
+`binary_data` field in the database is of type VARBINARY(N). In some scenarios, we need to convert binary data to base64 encoded string data. This feature can be enabled by adding the parameter 'debezium.binary.handling.mode'='base64',
+By adding this parameter, we can map the binary field type to 'STRING' in Flink SQL, thereby obtaining base64 encoded string data.
 
 Data Type Mapping
 ----------------

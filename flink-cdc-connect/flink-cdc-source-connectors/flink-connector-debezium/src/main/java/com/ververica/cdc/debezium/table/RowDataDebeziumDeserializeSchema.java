@@ -47,6 +47,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -544,6 +545,10 @@ public final class RowDataDebeziumDeserializeSchema
                     byte[] bytes = new byte[byteBuffer.remaining()];
                     byteBuffer.get(bytes);
                     return bytes;
+                } else if (dbzObj instanceof String) {
+                    // debezium.binary.handling.mode = base64
+                    String data = (String) dbzObj;
+                    return data.getBytes(StandardCharsets.UTF_8);
                 } else {
                     throw new UnsupportedOperationException(
                             "Unsupported BYTES value type: " + dbzObj.getClass().getSimpleName());
