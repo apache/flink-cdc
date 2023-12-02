@@ -24,9 +24,10 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.Properties;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 /** Tests for {@link DebeziumUtils}. */
 public class DebeziumUtilsTest {
@@ -37,7 +38,7 @@ public class DebeziumUtilsTest {
         jdbcProps.setProperty("onlyTest", "test");
         MySqlSourceConfig configWithoutUseSSL = getConfig(jdbcProps);
         MySqlConnection connection0 = DebeziumUtils.createMySqlConnection(configWithoutUseSSL);
-        assertEquals(
+        assertJdbcUrl(
                 "jdbc:mysql://localhost:3306/?useSSL=false&connectTimeout=20000&useInformationSchema=true"
                         + "&nullCatalogMeansCurrent=false&characterSetResults=UTF-8&onlyTest=test"
                         + "&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8&useUnicode=true",
@@ -47,7 +48,7 @@ public class DebeziumUtilsTest {
         jdbcProps.setProperty("useSSL", "false");
         MySqlSourceConfig configNotUseSSL = getConfig(jdbcProps);
         MySqlConnection connection1 = DebeziumUtils.createMySqlConnection(configNotUseSSL);
-        assertEquals(
+        assertJdbcUrl(
                 "jdbc:mysql://localhost:3306/?connectTimeout=20000&useInformationSchema=true"
                         + "&nullCatalogMeansCurrent=false&characterSetResults=UTF-8&useSSL=false&onlyTest=test"
                         + "&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8&useUnicode=true",
@@ -57,7 +58,7 @@ public class DebeziumUtilsTest {
         jdbcProps.setProperty("useSSL", "true");
         MySqlSourceConfig configUseSSL = getConfig(jdbcProps);
         MySqlConnection connection2 = DebeziumUtils.createMySqlConnection(configUseSSL);
-        assertEquals(
+        assertJdbcUrl(
                 "jdbc:mysql://localhost:3306/?connectTimeout=20000&useInformationSchema=true"
                         + "&nullCatalogMeansCurrent=false&characterSetResults=UTF-8&useSSL=true&onlyTest=test"
                         + "&zeroDateTimeBehavior=CONVERT_TO_NULL&characterEncoding=UTF-8&useUnicode=true",
@@ -80,5 +81,14 @@ public class DebeziumUtilsTest {
                 .serverTimeZone(ZoneId.of("UTC").toString())
                 .jdbcProperties(jdbcProperties)
                 .createConfig(0);
+    }
+
+    private void assertJdbcUrl(String expected, String actual) {
+        // Compare after splitting to avoid the orderless jdbc parameters in jdbc url at Java 11
+        String[] expectedParam = expected.split("&");
+        Arrays.sort(expectedParam);
+        String[] actualParam = actual.split("&");
+        Arrays.sort(actualParam);
+        assertArrayEquals(expectedParam, actualParam);
     }
 }
