@@ -58,9 +58,10 @@ public class FactoryDiscoveryUtils {
         if (factoryList.isEmpty()) {
             throw new RuntimeException(
                     String.format(
-                            "No factory found in the classpath.\n\n"
+                            "Cannot find factory with identifier \"%s\" in the classpath.\n\n"
                                     + "Available factory classes are:\n\n"
                                     + "%s",
+                            identifier,
                             StreamSupport.stream(loader.spliterator(), false)
                                     .map(f -> f.getClass().getName())
                                     .sorted()

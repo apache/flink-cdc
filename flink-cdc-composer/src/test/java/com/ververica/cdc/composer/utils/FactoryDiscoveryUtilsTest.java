@@ -43,15 +43,8 @@ class FactoryDiscoveryUtilsTest {
                         () ->
                                 FactoryDiscoveryUtils.getFactoryByIdentifier(
                                         "data-sink-factory-3", Factory.class))
-                .hasMessage(
-                        "No factory found in the classpath.\n"
-                                + "\n"
-                                + "Available factory classes are:\n"
-                                + "\n"
-                                + "com.ververica.cdc.composer.utils.factory.DataSinkFactory1\n"
-                                + "com.ververica.cdc.composer.utils.factory.DataSinkFactory2\n"
-                                + "com.ververica.cdc.composer.utils.factory.DataSourceFactory1\n"
-                                + "com.ververica.cdc.composer.utils.factory.DataSourceFactory2");
+                .hasMessageStartingWith(
+                        "Cannot find factory with identifier \"data-sink-factory-3\" in the classpath");
     }
 
     @Test
