@@ -19,6 +19,7 @@ package com.ververica.cdc.runtime.partitioning;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
@@ -62,6 +63,7 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
     private transient LoadingCache<TableId, HashFunction> cachedHashFunctions;
 
     public PrePartitionOperator(OperatorID schemaOperatorId, int downstreamParallelism) {
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.schemaOperatorId = schemaOperatorId;
         this.downstreamParallelism = downstreamParallelism;
     }
