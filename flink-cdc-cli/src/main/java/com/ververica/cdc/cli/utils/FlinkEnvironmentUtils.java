@@ -48,6 +48,6 @@ public class FlinkEnvironmentUtils {
         }
         String host = flinkConfig.get(FLINK_REST_ADDRESS);
         Integer port = flinkConfig.get(FLINK_REST_PORT);
-        return FlinkPipelineComposer.ofRemoteCluster(host, port, additionalJars);
+        return FlinkPipelineComposer.ofRemoteCluster(host, port, additionalJars, flinkConfig);
     }
 }
