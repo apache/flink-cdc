@@ -44,12 +44,6 @@ under the License.
             <version>${revision}</version>
             <scope>provided</scope>
         </dependency>
-
-        <dependency>
-            <groupId>com.ververica</groupId>
-            <artifactId>flink-cdc-composer</artifactId>
-            <version>${revision}</version>
-        </dependency>
     </dependencies>
 
 </project>

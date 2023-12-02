@@ -26,8 +26,7 @@ under the License.
     <artifactId>flink-cdc-pipeline-connector-starrocks</artifactId>
 
     <properties>
-        <!-- TODO: use snapshot version for development, and replace it with release version finally  -->
-        <starrocks.connector.version>1.2.9_flink-1.18-SNAPSHOT</starrocks.connector.version>
+        <starrocks.connector.version>1.2.9_flink-${flink.major.version}</starrocks.connector.version>
     </properties>
 
     <dependencies>
@@ -35,6 +34,12 @@ under the License.
             <groupId>com.starrocks</groupId>
             <artifactId>flink-connector-starrocks</artifactId>
             <version>${starrocks.connector.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-composer</artifactId>
+            <version>${revision}</version>
         </dependency>
     </dependencies>
 
