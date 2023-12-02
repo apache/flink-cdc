@@ -25,6 +25,7 @@ import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
+import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -91,6 +92,7 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
         this.mailboxExecutor = mailboxExecutor;
         this.schemaOperatorID = schemaOperatorID;
         this.processedTableIds = new HashSet<>();
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
     @Override
