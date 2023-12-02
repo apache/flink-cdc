@@ -33,6 +33,7 @@ import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.sink.DataSink;
 import com.ververica.cdc.common.sink.EventSinkProvider;
 import com.ververica.cdc.common.sink.FlinkSinkProvider;
+import com.ververica.cdc.composer.definition.SinkDef;
 import com.ververica.cdc.runtime.operators.sink.DataSinkWriterOperatorFactory;
 
 /** Translator for building sink into the DataStream. */
@@ -42,18 +43,27 @@ public class DataSinkTranslator {
     private static final String WRITER_OPERATOR_NAME = "Data Sink Writer";
     private static final String COMMITTER_OPERATOR_NAME = "Committer";
 
-    public void translate(DataStream<Event> input, DataSink dataSink, OperatorID schemaOperatorID) {
+    public void translate(
+            SinkDef sinkDef,
+            DataStream<Event> input,
+            DataSink dataSink,
+            OperatorID schemaOperatorID) {
         // Get sink provider
         EventSinkProvider eventSinkProvider = dataSink.getEventSinkProvider();
+        String sinkName = generateSinkName(sinkDef);
         if (eventSinkProvider instanceof FlinkSinkProvider) {
             // Sink V2
             FlinkSinkProvider sinkProvider = (FlinkSinkProvider) eventSinkProvider;
             Sink<Event> sink = sinkProvider.getSink();
-            sinkTo(input, sink, schemaOperatorID);
+            sinkTo(input, sink, sinkName, schemaOperatorID);
         }
     }
 
-    private void sinkTo(DataStream<Event> input, Sink<Event> sink, OperatorID schemaOperatorID) {
+    private void sinkTo(
+            DataStream<Event> input,
+            Sink<Event> sink,
+            String sinkName,
+            OperatorID schemaOperatorID) {
         DataStream<Event> stream = input;
         // Pre write topology
         if (sink instanceof WithPreWriteTopology) {
@@ -61,24 +71,27 @@ public class DataSinkTranslator {
         }
 
         if (sink instanceof TwoPhaseCommittingSink) {
-            addCommittingTopology(sink, stream, schemaOperatorID);
+            addCommittingTopology(sink, stream, sinkName, schemaOperatorID);
         } else {
             input.transform(
-                    WRITER_OPERATOR_NAME,
+                    sinkName,
                     CommittableMessageTypeInfo.noOutput(),
                     new DataSinkWriterOperatorFactory<>(sink, schemaOperatorID));
         }
     }
 
     private <CommT> void addCommittingTopology(
-            Sink<Event> sink, DataStream<Event> inputStream, OperatorID schemaOperatorID) {
+            Sink<Event> sink,
+            DataStream<Event> inputStream,
+            String sinkName,
+            OperatorID schemaOperatorID) {
         TwoPhaseCommittingSink<Event, CommT> committingSink =
                 (TwoPhaseCommittingSink<Event, CommT>) sink;
         TypeInformation<CommittableMessage<CommT>> typeInformation =
                 CommittableMessageTypeInfo.of(committingSink::getCommittableSerializer);
         DataStream<CommittableMessage<CommT>> written =
                 inputStream.transform(
-                        WRITER_OPERATOR_NAME,
+                        sinkName,
                         typeInformation,
                         new DataSinkWriterOperatorFactory<>(sink, schemaOperatorID));
 
@@ -101,5 +114,10 @@ public class DataSinkTranslator {
         if (sink instanceof WithPostCommitTopology) {
             ((WithPostCommitTopology<Event, CommT>) sink).addPostCommitTopology(committed);
         }
+    }
+
+    private String generateSinkName(SinkDef sinkDef) {
+        return sinkDef.getName()
+                .orElse(String.format("Flink CDC Event Sink: %s", sinkDef.getType()));
     }
 }
