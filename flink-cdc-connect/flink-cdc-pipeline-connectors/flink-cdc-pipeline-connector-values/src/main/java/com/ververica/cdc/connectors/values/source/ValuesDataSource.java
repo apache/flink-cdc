@@ -112,7 +112,7 @@ public class ValuesDataSource implements DataSource {
 
         @Override
         public Boundedness getBoundedness() {
-            return Boundedness.BOUNDED;
+            return isInSnapshotPhase ? Boundedness.BOUNDED : Boundedness.CONTINUOUS_UNBOUNDED;
         }
 
         @Override
