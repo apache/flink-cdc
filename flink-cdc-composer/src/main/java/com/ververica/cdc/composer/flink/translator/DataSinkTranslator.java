@@ -39,9 +39,8 @@ import com.ververica.cdc.runtime.operators.sink.DataSinkWriterOperatorFactory;
 /** Translator for building sink into the DataStream. */
 @Internal
 public class DataSinkTranslator {
-
-    private static final String WRITER_OPERATOR_NAME = "Data Sink Writer";
-    private static final String COMMITTER_OPERATOR_NAME = "Committer";
+    private static final String SINK_WRITER_PREFIX = "Sink Writer: ";
+    private static final String SINK_COMMITTER_PREFIX = "Sink Committer: ";
 
     public void translate(
             SinkDef sinkDef,
@@ -74,7 +73,7 @@ public class DataSinkTranslator {
             addCommittingTopology(sink, stream, sinkName, schemaOperatorID);
         } else {
             input.transform(
-                    sinkName,
+                    SINK_WRITER_PREFIX + sinkName,
                     CommittableMessageTypeInfo.noOutput(),
                     new DataSinkWriterOperatorFactory<>(sink, schemaOperatorID));
         }
@@ -91,7 +90,7 @@ public class DataSinkTranslator {
                 CommittableMessageTypeInfo.of(committingSink::getCommittableSerializer);
         DataStream<CommittableMessage<CommT>> written =
                 inputStream.transform(
-                        sinkName,
+                        SINK_WRITER_PREFIX + sinkName,
                         typeInformation,
                         new DataSinkWriterOperatorFactory<>(sink, schemaOperatorID));
 
@@ -106,7 +105,7 @@ public class DataSinkTranslator {
         boolean isCheckpointingEnabled = true;
         DataStream<CommittableMessage<CommT>> committed =
                 preCommitted.transform(
-                        COMMITTER_OPERATOR_NAME,
+                        SINK_COMMITTER_PREFIX + sinkName,
                         typeInformation,
                         new CommitterOperatorFactory<>(
                                 committingSink, isBatchMode, isCheckpointingEnabled));
