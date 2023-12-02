@@ -43,7 +43,6 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -77,7 +76,6 @@ public class FlinkPipelineComposer implements PipelineComposer {
     public PipelineExecution compose(PipelineDef pipelineDef) {
         int parallelism = pipelineDef.getConfig().get(PipelineOptions.GLOBAL_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
-
 
         // Source
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
