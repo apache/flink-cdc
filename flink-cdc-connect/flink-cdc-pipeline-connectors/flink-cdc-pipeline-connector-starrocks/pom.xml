@@ -69,11 +69,4 @@ under the License.
             </plugin>
         </plugins>
     </build>
-
-    <repositories>
-        <repository>
-            <id>ossrh</id>
-            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
-        </repository>
-    </repositories>
 </project>
