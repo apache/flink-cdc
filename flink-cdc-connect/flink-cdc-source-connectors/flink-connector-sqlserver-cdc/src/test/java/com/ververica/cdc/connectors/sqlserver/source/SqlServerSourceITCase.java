@@ -310,12 +310,12 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
                 (sourceConfig, split) -> {
                     SqlServerDialect dialect =
                             new SqlServerDialect((SqlServerSourceConfig) sourceConfig);
-                    JdbcConnection postgresConnection =
+                    JdbcConnection sqlServerConnection =
                             dialect.openJdbcConnection((JdbcSourceConfig) sourceConfig);
-                    postgresConnection.execute(statements);
-                    postgresConnection.commit();
+                    sqlServerConnection.execute(statements);
+                    sqlServerConnection.commit();
                     try {
-                        Thread.sleep(1000L);
+                        Thread.sleep(5000L);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     }
