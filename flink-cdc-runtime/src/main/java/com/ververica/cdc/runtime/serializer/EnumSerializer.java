@@ -16,13 +16,14 @@
 
 package com.ververica.cdc.runtime.serializer;
 
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.util.InstantiationUtil;
+
+import com.ververica.cdc.common.annotation.VisibleForTesting;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -33,9 +34,9 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
-import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.Preconditions.checkState;
+import static com.ververica.cdc.common.utils.Preconditions.checkArgument;
+import static com.ververica.cdc.common.utils.Preconditions.checkNotNull;
+import static com.ververica.cdc.common.utils.Preconditions.checkState;
 
 /** {@link TypeSerializer} for Java enums. */
 public final class EnumSerializer<T extends Enum<T>> extends TypeSerializer<T> {

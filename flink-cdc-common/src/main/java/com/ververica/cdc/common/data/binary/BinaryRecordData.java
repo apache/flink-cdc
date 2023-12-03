@@ -37,7 +37,7 @@ import com.ververica.cdc.common.types.ZonedTimestampType;
 import java.nio.ByteOrder;
 
 import static com.ververica.cdc.common.types.DataTypeRoot.DECIMAL;
-import static org.apache.flink.util.Preconditions.checkArgument;
+import static com.ververica.cdc.common.utils.Preconditions.checkArgument;
 
 /**
  * An implementation of {@link RecordData} which is backed by {@link MemorySegment} instead of
