@@ -104,7 +104,8 @@ public class SchemaRegistryRequestHandler {
             CompletableFuture<CoordinationResponse> response =
                     CompletableFuture.completedFuture(wrap(new SchemaChangeResponse(true)));
             schemaManager.applySchemaChange(request.getSchemaChangeEvent());
-            pendingSchemaChanges.add(new PendingSchemaChange(request, response));
+            this.waitFlushSuccess =
+                    new PendingSchemaChange(request, response).startToWaitForFlushSuccess();
             return response;
         } else {
             LOG.info("There are already processing requests. Wait for processing.");
@@ -116,7 +117,6 @@ public class SchemaRegistryRequestHandler {
 
     /** Handle the {@link ReleaseUpstreamRequest} and wait for all sink subtasks flushing. */
     public CompletableFuture<CoordinationResponse> handleReleaseUpstreamRequest() {
-        this.waitFlushSuccess = pendingSchemaChanges.remove(0).startToWaitForFlushSuccess();
         return waitFlushSuccess.getResponseFuture();
     }
 
@@ -152,19 +152,19 @@ public class SchemaRegistryRequestHandler {
         flushedSinkWriters.clear();
         waitFlushSuccess = null;
         while (!pendingSchemaChanges.isEmpty()) {
-            PendingSchemaChange pendingSchemaChange = pendingSchemaChanges.get(0);
+            PendingSchemaChange pendingSchemaChange = pendingSchemaChanges.remove(0);
             SchemaChangeRequest request = pendingSchemaChange.changeRequest;
             if (request.getSchemaChangeEvent() instanceof CreateTableEvent
                     && schemaManager.schemaExists(request.getTableId())) {
                 pendingSchemaChange
                         .getResponseFuture()
                         .complete(wrap(new SchemaChangeResponse(false)));
-                pendingSchemaChanges.remove(0);
             } else {
                 schemaManager.applySchemaChange(request.getSchemaChangeEvent());
                 pendingSchemaChange
                         .getResponseFuture()
                         .complete(wrap(new SchemaChangeResponse(true)));
+                this.waitFlushSuccess = pendingSchemaChange.startToWaitForFlushSuccess();
                 break;
             }
         }
