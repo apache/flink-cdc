@@ -37,6 +37,15 @@ under the License.
         </dependency>
 
         <dependency>
+            <!-- TODO connector 1.2.9 depends on this, but not package it, so add this dependency here.
+            This dependency can be removed after upgrading connector to 1.2.10 which will not use
+            commons-compress anymore. -->
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>1.21</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.ververica</groupId>
             <artifactId>flink-cdc-composer</artifactId>
             <version>${revision}</version>
@@ -61,8 +70,15 @@ under the License.
                             <artifactSet>
                                 <includes>
                                     <include>com.starrocks:*</include>
+                                    <include>org.apache.commons:commons-compress</include>
                                 </includes>
                             </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache.commons.compress</pattern>
+                                    <shadedPattern>com.starrocks.shade.org.apache.commons.compress</shadedPattern>
+                                </relocation>
+                            </relocations>
                         </configuration>
                     </execution>
                 </executions>
