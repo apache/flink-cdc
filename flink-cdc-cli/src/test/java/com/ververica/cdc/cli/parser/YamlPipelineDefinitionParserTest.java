@@ -31,7 +31,9 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 
+import static com.ververica.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 /** Unit test for {@link YamlPipelineDefinitionParser}. */
 class YamlPipelineDefinitionParserTest {
@@ -64,9 +66,79 @@ class YamlPipelineDefinitionParserTest {
     void testOverridingGlobalConfig() throws Exception {
         URL resource = Resources.getResource("definitions/pipeline-definition-full.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
-        ImmutableMap.<String, String>builder().put("parallelism", "1").put("foo", "bar");
-        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        PipelineDef pipelineDef =
+                parser.parse(
+                        Paths.get(resource.toURI()),
+                        Configuration.fromMap(
+                                ImmutableMap.<String, String>builder()
+                                        .put("parallelism", "1")
+                                        .put("foo", "bar")
+                                        .build()));
         assertThat(pipelineDef).isEqualTo(fullDefWithGlobalConf);
+    }
+
+    @Test
+    void testEvaluateDefaultLocalTimeZone() throws Exception {
+        URL resource = Resources.getResource("definitions/pipeline-definition-minimized.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        assertThat(pipelineDef.getConfig().get(PIPELINE_LOCAL_TIME_ZONE))
+                .isNotEqualTo(PIPELINE_LOCAL_TIME_ZONE.defaultValue());
+    }
+
+    @Test
+    void testValidTimeZone() throws Exception {
+        URL resource = Resources.getResource("definitions/pipeline-definition-minimized.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef =
+                parser.parse(
+                        Paths.get(resource.toURI()),
+                        Configuration.fromMap(
+                                ImmutableMap.<String, String>builder()
+                                        .put(PIPELINE_LOCAL_TIME_ZONE.key(), "Asia/Shanghai")
+                                        .build()));
+        assertThat(pipelineDef.getConfig().get(PIPELINE_LOCAL_TIME_ZONE))
+                .isEqualTo("Asia/Shanghai");
+
+        pipelineDef =
+                parser.parse(
+                        Paths.get(resource.toURI()),
+                        Configuration.fromMap(
+                                ImmutableMap.<String, String>builder()
+                                        .put(PIPELINE_LOCAL_TIME_ZONE.key(), "GMT+08:00")
+                                        .build()));
+        assertThat(pipelineDef.getConfig().get(PIPELINE_LOCAL_TIME_ZONE)).isEqualTo("GMT+08:00");
+
+        pipelineDef =
+                parser.parse(
+                        Paths.get(resource.toURI()),
+                        Configuration.fromMap(
+                                ImmutableMap.<String, String>builder()
+                                        .put(PIPELINE_LOCAL_TIME_ZONE.key(), "UTC")
+                                        .build()));
+        assertThat(pipelineDef.getConfig().get(PIPELINE_LOCAL_TIME_ZONE)).isEqualTo("UTC");
+    }
+
+    @Test
+    void testInvalidTimeZone() throws Exception {
+        URL resource = Resources.getResource("definitions/pipeline-definition-minimized.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        assertThatThrownBy(
+                        () ->
+                                parser.parse(
+                                        Paths.get(resource.toURI()),
+                                        Configuration.fromMap(
+                                                ImmutableMap.<String, String>builder()
+                                                        .put(
+                                                                PIPELINE_LOCAL_TIME_ZONE.key(),
+                                                                "invalid time zone")
+                                                        .build())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "Invalid time zone. The valid value should be a Time Zone Database ID"
+                                + " such as 'America/Los_Angeles' to include daylight saving time. "
+                                + "Fixed offsets are supported using 'GMT-08:00' or 'GMT+08:00'. "
+                                + "Or use 'UTC' without time zone and daylight saving time.");
     }
 
     private final PipelineDef fullDef =
