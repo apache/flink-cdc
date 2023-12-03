@@ -406,6 +406,7 @@ under the License.
                 <configuration>
                     <forkCount>${flink.forkCount}</forkCount>
                     <reuseForks>${flink.reuseForks}</reuseForks>
+                    <trimStackTrace>false</trimStackTrace>
                     <systemPropertyVariables>
                         <forkNumber>0${surefire.forkNumber}</forkNumber>
                     </systemPropertyVariables>
