@@ -140,6 +140,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             byte[] serializedSchemaManager = SchemaManager.SERIALIZER.serialize(schemaManager);
             out.writeInt(serializedSchemaManager.length);
             out.write(serializedSchemaManager);
+            resultFuture.complete(baos.toByteArray());
         }
     }
 
