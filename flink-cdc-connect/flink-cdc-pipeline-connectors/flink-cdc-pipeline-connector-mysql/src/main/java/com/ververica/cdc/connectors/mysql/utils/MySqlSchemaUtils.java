@@ -19,7 +19,6 @@ package com.ververica.cdc.connectors.mysql.utils;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
-import com.ververica.cdc.connectors.mysql.schema.MySqlCdcCommonTypeUtils;
 import com.ververica.cdc.connectors.mysql.schema.MySqlSchema;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -147,7 +146,7 @@ public class MySqlSchemaUtils {
 
     public static Column toColumn(io.debezium.relational.Column column) {
         return Column.physicalColumn(
-                column.name(), MySqlCdcCommonTypeUtils.fromDbzColumn(column), column.comment());
+                column.name(), MySqlTypeUtils.fromDbzColumn(column), column.comment());
     }
 
     public static io.debezium.relational.TableId toDbzTableId(TableId tableId) {
