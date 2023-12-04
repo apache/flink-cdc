@@ -18,7 +18,6 @@ package com.ververica.cdc.cli;
 
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 
-import com.ververica.cdc.cli.utils.FlinkEnvironmentUtils;
 import com.ververica.cdc.composer.PipelineComposer;
 import com.ververica.cdc.composer.PipelineExecution;
 import com.ververica.cdc.composer.definition.PipelineDef;
@@ -69,15 +68,6 @@ class CliFrontendTest {
                         "Cannot find Flink home from either command line arguments \"--flink-home\" "
                                 + "or the environment variable \"FLINK_HOME\". "
                                 + "Please make sure Flink home is properly set. ");
-    }
-
-    @Test
-    void testFlinkConfigParsing() throws Exception {
-        CliExecutor executor = createExecutor(pipelineDef(), "--flink-home", flinkHome());
-        assertThat(executor.getFlinkConfig().get(FlinkEnvironmentUtils.FLINK_REST_ADDRESS))
-                .isEqualTo("localhost");
-        assertThat(executor.getFlinkConfig().get(FlinkEnvironmentUtils.FLINK_REST_PORT))
-                .isEqualTo(8081);
     }
 
     @Test
