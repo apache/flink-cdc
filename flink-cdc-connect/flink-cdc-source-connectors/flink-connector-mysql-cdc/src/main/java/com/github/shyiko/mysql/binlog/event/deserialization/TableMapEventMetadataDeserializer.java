@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
 import com.github.shyiko.mysql.binlog.event.TableMapEventMetadata;
@@ -20,7 +21,12 @@ import com.github.shyiko.mysql.binlog.event.TableMapEventMetadata.DefaultCharset
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -28,7 +34,7 @@ import java.util.logging.Logger;
  * Copied from mysql-binlog-connector-java 0.27.2 to support read the signedness based on the
  * packed.
  *
- * <p>Line 116: The length of the {@link TableMapEventMetadataDeserializer#readBooleanList} is
+ * <p>Line 123: The length of the {@link TableMapEventMetadataDeserializer#readBooleanList} is
  * determined by the length * of the packet header.
  */
 public class TableMapEventMetadataDeserializer {
@@ -98,6 +104,7 @@ public class TableMapEventMetadataDeserializer {
                     break;
                 case ENUM_AND_SET_COLUMN_CHARSET:
                     result.setEnumAndSetColumnCharsets(readIntegers(inputStream));
+                    break;
                 case VISIBILITY:
                     result.setVisibility(readBooleanList(inputStream, nColumns, fieldLength));
                     break;
