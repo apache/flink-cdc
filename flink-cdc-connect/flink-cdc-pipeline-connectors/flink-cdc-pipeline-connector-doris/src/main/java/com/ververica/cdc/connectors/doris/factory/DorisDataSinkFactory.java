@@ -20,6 +20,7 @@ import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.common.configuration.ConfigOption;
 import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.factories.DataSinkFactory;
+import com.ververica.cdc.common.pipeline.PipelineOptions;
 import com.ververica.cdc.common.sink.DataSink;
 import com.ververica.cdc.connectors.doris.sink.DorisDataSink;
 import com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions;
@@ -27,6 +28,7 @@ import org.apache.doris.flink.cfg.DorisExecutionOptions;
 import org.apache.doris.flink.cfg.DorisOptions;
 import org.apache.doris.flink.cfg.DorisReadOptions;
 
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
@@ -59,7 +61,7 @@ import static com.ververica.cdc.connectors.doris.sink.DorisDataSinkOptions.USERN
 public class DorisDataSinkFactory implements DataSinkFactory {
     @Override
     public DataSink createDataSink(Context context) {
-        Configuration config = context.getConfiguration();
+        Configuration config = context.getFactoryConfiguration();
         DorisOptions.Builder optionsBuilder = DorisOptions.builder();
         DorisExecutionOptions.Builder executionBuilder = DorisExecutionOptions.builder();
         config.getOptional(FENODES).ifPresent(optionsBuilder::setFenodes);
@@ -108,7 +110,10 @@ public class DorisDataSinkFactory implements DataSinkFactory {
                 optionsBuilder.build(),
                 DorisReadOptions.builder().build(),
                 executionBuilder.build(),
-                config);
+                config,
+                ZoneId.of(
+                        context.getPipelineConfiguration()
+                                .get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE)));
     }
 
     @Override

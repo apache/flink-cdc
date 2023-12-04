@@ -29,6 +29,7 @@ import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.sink.MetadataApplier;
+import com.ververica.cdc.common.types.LocalZonedTimestampType;
 import com.ververica.cdc.common.types.utils.DataTypeUtils;
 import org.apache.doris.flink.catalog.DorisTypeMapper;
 import org.apache.doris.flink.catalog.doris.DataModel;
@@ -43,7 +44,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -107,15 +108,26 @@ public class DorisMetadataApplier implements MetadataApplier {
     }
 
     private Map<String, FieldSchema> buildFields(Schema schema) {
-        Map<String, FieldSchema> fieldSchemaMap = new HashMap<>();
+        // Guaranteed the order of column
+        Map<String, FieldSchema> fieldSchemaMap = new LinkedHashMap<>();
         List<String> columnNameList = schema.getColumnNames();
         for (String columnName : columnNameList) {
             Column column = schema.getColumn(columnName).get();
-            String dorisTypeStr =
-                    DorisTypeMapper.toDorisType(DataTypeUtils.toFlinkDataType(column.getType()));
+            String typeString;
+            if (column.getType() instanceof LocalZonedTimestampType) {
+                LocalZonedTimestampType localZonedTimestampType =
+                        (LocalZonedTimestampType) column.getType();
+                int precision = localZonedTimestampType.getPrecision();
+                typeString =
+                        String.format("%s(%s)", "DATETIMEV2", Math.min(Math.max(precision, 0), 6));
+            } else {
+                typeString =
+                        DorisTypeMapper.toDorisType(
+                                DataTypeUtils.toFlinkDataType(column.getType()));
+            }
             fieldSchemaMap.put(
                     column.getName(),
-                    new FieldSchema(column.getName(), dorisTypeStr, column.getComment()));
+                    new FieldSchema(column.getName(), typeString, column.getComment()));
         }
         return fieldSchemaMap;
     }
@@ -136,8 +148,18 @@ public class DorisMetadataApplier implements MetadataApplier {
         List<AddColumnEvent.ColumnWithPosition> addedColumns = event.getAddedColumns();
         for (AddColumnEvent.ColumnWithPosition col : addedColumns) {
             Column column = col.getAddColumn();
-            String typeString =
-                    DorisTypeMapper.toDorisType(DataTypeUtils.toFlinkDataType(column.getType()));
+            String typeString;
+            if (column.getType() instanceof LocalZonedTimestampType) {
+                LocalZonedTimestampType localZonedTimestampType =
+                        (LocalZonedTimestampType) column.getType();
+                int precision = localZonedTimestampType.getPrecision();
+                typeString =
+                        String.format("%s(%s)", "DATETIMEV2", Math.min(Math.max(precision, 0), 6));
+            } else {
+                typeString =
+                        DorisTypeMapper.toDorisType(
+                                DataTypeUtils.toFlinkDataType(column.getType()));
+            }
             FieldSchema addFieldSchema =
                     new FieldSchema(column.getName(), typeString, column.getComment());
             schemaChangeManager.addColumn(

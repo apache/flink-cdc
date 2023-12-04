@@ -35,6 +35,9 @@ import org.apache.doris.flink.sink.writer.serializer.DorisRecordSerializer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +48,20 @@ import static org.apache.doris.flink.sink.util.DeleteOperation.addDeleteSign;
 public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     private ObjectMapper objectMapper = new ObjectMapper();
     private Map<TableId, Schema> schemaMaps = new HashMap<>();
+
+    /** Format DATE type data. */
+    public static final SimpleDateFormat DATE_FORMATTER = new SimpleDateFormat("yyyy-MM-dd");
+
+    /** Format timestamp-related type data. */
+    public static DateTimeFormatter DATE_TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
+
+    /** ZoneId from pipeline config to support timestamp with local time zone. */
+    public static ZoneId pipelineZoneId = ZoneId.systemDefault();
+
+    public DorisEventSerializer(ZoneId zoneId) {
+        pipelineZoneId = zoneId;
+    }
 
     @Override
     public DorisRecord serialize(Event event) throws IOException {

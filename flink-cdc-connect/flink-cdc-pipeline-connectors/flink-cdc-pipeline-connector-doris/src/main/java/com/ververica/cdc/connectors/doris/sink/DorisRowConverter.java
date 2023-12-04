@@ -26,7 +26,6 @@ import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.types.DataField;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DecimalType;
-import com.ververica.cdc.common.types.LocalZonedTimestampType;
 import com.ververica.cdc.common.types.RowType;
 import com.ververica.cdc.common.types.TimestampType;
 import com.ververica.cdc.common.types.ZonedTimestampType;
@@ -35,10 +34,15 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static com.ververica.cdc.connectors.doris.sink.DorisEventSerializer.DATE_FORMATTER;
+import static com.ververica.cdc.connectors.doris.sink.DorisEventSerializer.DATE_TIME_FORMATTER;
+import static com.ververica.cdc.connectors.doris.sink.DorisEventSerializer.pipelineZoneId;
 
 /** converter {@link RecordData} type object to doris field. */
 public class DorisRowConverter implements Serializable {
@@ -94,13 +98,24 @@ public class DorisRowConverter implements Serializable {
             case DOUBLE:
                 return (index, val) -> val.getDouble(index);
             case DATE:
-                return (index, val) -> Date.valueOf(LocalDate.ofEpochDay(val.getInt(index)));
+                return (index, val) ->
+                        DATE_FORMATTER.format(
+                                Date.valueOf(LocalDate.ofEpochDay(val.getInt(index))));
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 final int timestampPrecision = ((TimestampType) type).getPrecision();
-                return (index, val) -> val.getTimestamp(index, timestampPrecision).toTimestamp();
+                return (index, val) ->
+                        val.getTimestamp(index, timestampPrecision)
+                                .toLocalDateTime()
+                                .format(DATE_TIME_FORMATTER);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                final int localP = ((LocalZonedTimestampType) type).getPrecision();
-                return (index, val) -> val.getTimestamp(index, localP).toTimestamp();
+                final int timestampPrecisionWithZone = ((TimestampType) type).getPrecision();
+                return (index, val) ->
+                        ZonedDateTime.of(
+                                        val.getTimestamp(index, timestampPrecisionWithZone)
+                                                .toLocalDateTime(),
+                                        pipelineZoneId)
+                                .toLocalDateTime()
+                                .format(DATE_TIME_FORMATTER);
             case TIMESTAMP_WITH_TIME_ZONE:
                 final int zonedP = ((ZonedTimestampType) type).getPrecision();
                 return (index, val) -> val.getTimestamp(index, zonedP).toTimestamp();

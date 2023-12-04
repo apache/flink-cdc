@@ -28,6 +28,7 @@ import org.apache.doris.flink.sink.DorisSink;
 import org.apache.doris.flink.sink.batch.DorisBatchSink;
 
 import java.io.Serializable;
+import java.time.ZoneId;
 
 /** A {@link DataSink} for "Doris" connector. */
 public class DorisDataSink implements DataSink, Serializable {
@@ -36,16 +37,19 @@ public class DorisDataSink implements DataSink, Serializable {
     private final DorisReadOptions readOptions;
     private final DorisExecutionOptions executionOptions;
     private Configuration configuration;
+    private final ZoneId zoneId;
 
     public DorisDataSink(
             DorisOptions dorisOptions,
             DorisReadOptions dorisReadOptions,
             DorisExecutionOptions dorisExecutionOptions,
-            Configuration configuration) {
+            Configuration configuration,
+            ZoneId zoneId) {
         this.dorisOptions = dorisOptions;
         this.readOptions = dorisReadOptions;
         this.executionOptions = dorisExecutionOptions;
         this.configuration = configuration;
+        this.zoneId = zoneId;
     }
 
     @Override
@@ -56,14 +60,14 @@ public class DorisDataSink implements DataSink, Serializable {
                             dorisOptions,
                             readOptions,
                             executionOptions,
-                            new DorisEventSerializer()));
+                            new DorisEventSerializer(zoneId)));
         } else {
             return FlinkSinkProvider.of(
                     new DorisBatchSink<>(
                             dorisOptions,
                             readOptions,
                             executionOptions,
-                            new DorisEventSerializer()));
+                            new DorisEventSerializer(zoneId)));
         }
     }
 
