@@ -38,6 +38,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +54,8 @@ import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtil
 /** Utilities related to Debezium. */
 public class DebeziumUtils {
     private static final String QUOTED_CHARACTER = "`";
+
+    private static final String SERVER_ID_VARIABLE_NAME = "server_id";
 
     private static final Logger LOG = LoggerFactory.getLogger(DebeziumUtils.class);
 
@@ -113,6 +116,7 @@ public class DebeziumUtils {
     /** Fetch current binlog offsets in MySql Server. */
     public static BinlogOffset currentBinlogOffset(JdbcConnection jdbc) {
         final String showMasterStmt = "SHOW MASTER STATUS";
+        long serverId = getServerId(jdbc);
         try {
             return jdbc.queryAndMap(
                     showMasterStmt,
@@ -125,6 +129,7 @@ public class DebeziumUtils {
                             return BinlogOffset.builder()
                                     .setBinlogFilePosition(binlogFilename, binlogPosition)
                                     .setGtidSet(gtidSet)
+                                    .setServerId(serverId)
                                     .build();
                         } else {
                             throw new FlinkRuntimeException(
@@ -205,6 +210,11 @@ public class DebeziumUtils {
                 .equals(
                         readMySqlSystemVariables(connection)
                                 .get(MySqlSystemVariables.LOWER_CASE_TABLE_NAMES));
+    }
+
+    public static long getServerId(JdbcConnection connection) {
+        String serverIdVariable = readMySqlSystemVariables(connection).get(SERVER_ID_VARIABLE_NAME);
+        return StringUtils.isNoneEmpty(serverIdVariable) ? Long.parseLong(serverIdVariable) : 0;
     }
 
     public static Map<String, String> readMySqlSystemVariables(JdbcConnection connection) {
