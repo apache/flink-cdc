@@ -17,10 +17,10 @@
 package com.ververica.cdc.runtime.serializer.data.writer;
 
 import org.apache.flink.core.memory.MemorySegmentFactory;
-import org.apache.flink.table.data.binary.BinarySegmentUtils;
 
 import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.common.data.binary.BinaryRecordData;
+import com.ververica.cdc.common.data.binary.BinarySegmentUtils;
 
 /** Writer for {@link BinaryRecordData}. */
 @Internal

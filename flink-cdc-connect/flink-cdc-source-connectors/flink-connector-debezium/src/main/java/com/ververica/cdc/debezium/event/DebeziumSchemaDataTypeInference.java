@@ -21,8 +21,6 @@ import com.ververica.cdc.common.types.DataField;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
 import io.debezium.data.VariableScaleDecimal;
-import io.debezium.data.geometry.Geometry;
-import io.debezium.data.geometry.Point;
 import io.debezium.time.MicroTime;
 import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
@@ -175,10 +173,6 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
 
     protected DataType inferStruct(Object value, Schema schema) {
         Struct struct = (Struct) value;
-        if (Geometry.LOGICAL_NAME.equals(schema.name())
-                || Point.LOGICAL_NAME.equals(schema.name())) {
-            return DataTypes.STRING();
-        }
         return DataTypes.ROW(
                 schema.fields().stream()
                         .map(
