@@ -16,13 +16,19 @@
 
 package com.ververica.cdc.connectors.mysql.source;
 
+import com.esri.core.geometry.ogc.OGCGeometry;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ververica.cdc.common.annotation.Internal;
+import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.connectors.mysql.source.parser.CustomMySqlAntlrDdlParser;
 import com.ververica.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import com.ververica.cdc.debezium.table.DebeziumChangelogMode;
 import io.debezium.data.Envelope;
+import io.debezium.data.geometry.Geometry;
+import io.debezium.data.geometry.Point;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.HistoryRecord;
 import org.apache.kafka.connect.data.Schema;
@@ -30,10 +36,13 @@ import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.time.ZoneId;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getHistoryRecord;
 
@@ -46,6 +55,8 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     public static final String SCHEMA_CHANGE_EVENT_KEY_NAME =
             "io.debezium.connector.mysql.SchemaChangeKey";
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private final boolean includeSchemaChanges;
 
     private transient Tables tables;
@@ -55,7 +66,7 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
             DebeziumChangelogMode changelogMode,
             ZoneId serverTimeZone,
             boolean includeSchemaChanges) {
-        super(changelogMode, serverTimeZone);
+        super(new MySqlSchemaDataTypeInference(), changelogMode, serverTimeZone);
         this.includeSchemaChanges = includeSchemaChanges;
     }
 
@@ -102,16 +113,44 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
     @Override
     protected TableId getTableId(SourceRecord record) {
-        if (isDataChangeRecord(record)) {
-            String[] parts = record.topic().split("\\.");
-            return TableId.tableId(parts[1], parts[2]);
-        }
-        // TODO: get table id from schema change record
-        return null;
+        String[] parts = record.topic().split("\\.");
+        return TableId.tableId(parts[1], parts[2]);
     }
 
     @Override
     protected Map<String, String> getMetadata(SourceRecord record) {
         return Collections.emptyMap();
+    }
+
+    @Override
+    protected Object convertToString(Object dbzObj, Schema schema) {
+        // the Geometry datatype in MySQL will be converted to
+        // a String with Json format
+        if (Point.LOGICAL_NAME.equals(schema.name())
+                || Geometry.LOGICAL_NAME.equals(schema.name())) {
+            try {
+                Struct geometryStruct = (Struct) dbzObj;
+                byte[] wkb = geometryStruct.getBytes("wkb");
+                String geoJson = OGCGeometry.fromBinary(ByteBuffer.wrap(wkb)).asGeoJson();
+                JsonNode originGeoNode = OBJECT_MAPPER.readTree(geoJson);
+                Optional<Integer> srid = Optional.ofNullable(geometryStruct.getInt32("srid"));
+                Map<String, Object> geometryInfo = new HashMap<>();
+                String geometryType = originGeoNode.get("type").asText();
+                geometryInfo.put("type", geometryType);
+                if (geometryType.equals("GeometryCollection")) {
+                    geometryInfo.put("geometries", originGeoNode.get("geometries"));
+                } else {
+                    geometryInfo.put("coordinates", originGeoNode.get("coordinates"));
+                }
+                geometryInfo.put("srid", srid.orElse(0));
+                return BinaryStringData.fromString(
+                        OBJECT_MAPPER.writer().writeValueAsString(geometryInfo));
+            } catch (Exception e) {
+                throw new IllegalArgumentException(
+                        String.format("Failed to convert %s to geometry JSON.", dbzObj), e);
+            }
+        } else {
+            return BinaryStringData.fromString(dbzObj.toString());
+        }
     }
 }

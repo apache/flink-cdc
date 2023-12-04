@@ -23,13 +23,13 @@ import com.ververica.cdc.common.event.CreateTableEvent;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.DataType;
-import com.ververica.cdc.connectors.mysql.schema.MySqlCdcCommonTypeUtils;
 import com.ververica.cdc.connectors.mysql.schema.MySqlFieldDefinition;
 import com.ververica.cdc.connectors.mysql.schema.MySqlTableDefinition;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.ververica.cdc.connectors.mysql.table.StartupMode;
+import com.ververica.cdc.connectors.mysql.utils.MySqlTypeUtils;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.jdbc.JdbcConnection;
@@ -200,7 +200,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
             Column column = columns.get(i);
 
             String colName = column.name();
-            DataType dataType = MySqlCdcCommonTypeUtils.fromDbzColumn(column);
+            DataType dataType = MySqlTypeUtils.fromDbzColumn(column);
             if (!column.isOptional()) {
                 dataType = dataType.notNull();
             }

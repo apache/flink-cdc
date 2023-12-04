@@ -85,7 +85,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
     @Override
     public DataSource createDataSource(Context context) {
-        final Configuration config = context.getConfiguration();
+        final Configuration config = context.getFactoryConfiguration();
         String hostname = config.get(HOSTNAME);
         int port = config.get(PORT);
 
@@ -103,21 +103,17 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
 
-        double distributionFactorUpper =
-                config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
-        double distributionFactorLower =
-                config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        double distributionFactorUpper = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        double distributionFactorLower = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
 
-        boolean closeIdleReaders =
-                config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        boolean closeIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
 
         Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
 
-        validateIntegerOption(
-                SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
+        validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
         validateIntegerOption(SCAN_SNAPSHOT_FETCH_SIZE, fetchSize, 1);
         validateIntegerOption(CONNECTION_POOL_SIZE, connectionPoolSize, 1);
@@ -154,7 +150,12 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .jdbcProperties(getJdbcProperties(configMap));
 
         Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
-        configFactory.tableList(getTableList(configFactory.createConfig(0), selectors));
+        String[] capturedTables = getTableList(configFactory.createConfig(0), selectors);
+        if (capturedTables.length == 0) {
+            throw new IllegalArgumentException(
+                    "Cannot find any table by the option 'tables' = " + tables);
+        }
+        configFactory.tableList(capturedTables);
 
         return new MySqlDataSource(configFactory);
     }
@@ -232,8 +233,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                 return getSpecificOffset(config);
 
             case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
-                return StartupOptions.timestamp(
-                        config.get(SCAN_STARTUP_TIMESTAMP_MILLIS));
+                return StartupOptions.timestamp(config.get(SCAN_STARTUP_TIMESTAMP_MILLIS));
 
             default:
                 throw new ValidationException(
@@ -250,12 +250,9 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     }
 
     private static void validateSpecificOffset(Configuration config) {
-        Optional<String> gtidSet =
-                config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET);
-        Optional<String> binlogFilename =
-                config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
-        Optional<Long> binlogPosition =
-                config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+        Optional<String> gtidSet = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET);
+        Optional<String> binlogFilename = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
+        Optional<Long> binlogPosition = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
         if (!gtidSet.isPresent() && !(binlogFilename.isPresent() && binlogPosition.isPresent())) {
             throw new ValidationException(
                     String.format(
@@ -274,10 +271,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                 .ifPresent(offsetBuilder::setGtidSet);
 
         // Binlog file + pos
-        Optional<String> binlogFilename =
-                config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
-        Optional<Long> binlogPosition =
-                config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+        Optional<String> binlogFilename = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
+        Optional<Long> binlogPosition = config.getOptional(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
         if (binlogFilename.isPresent() && binlogPosition.isPresent()) {
             offsetBuilder.setBinlogFilePosition(binlogFilename.get(), binlogPosition.get());
         } else {

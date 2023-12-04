@@ -228,5 +228,6 @@ public class MySqlDataSourceOptions {
             ConfigOptions.key("schema-change.enabled")
                     .booleanType()
                     .defaultValue(false)
-                    .withDescription("Whether , by default is false.");
+                    .withDescription(
+                            "Whether send schema change events, by default is false. If set to false, the schema changes will not be sent.");
 }

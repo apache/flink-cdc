@@ -68,10 +68,10 @@ public abstract class SourceRecordEventDeserializer implements EventDeserializer
     protected abstract List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record)
             throws Exception;
 
-    /** Get {@link TableId} from given record. */
+    /** Get {@link TableId} from data change record. */
     protected abstract TableId getTableId(SourceRecord record);
 
-    /** Get metadata from given record. */
+    /** Get metadata from data change record. */
     protected abstract Map<String, String> getMetadata(SourceRecord record);
 
     public static Schema fieldSchema(Schema schema, String fieldName) {

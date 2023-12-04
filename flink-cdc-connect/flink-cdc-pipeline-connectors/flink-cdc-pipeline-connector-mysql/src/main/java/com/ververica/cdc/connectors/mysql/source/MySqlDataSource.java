@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mysql.source;
 
 import com.ververica.cdc.common.annotation.Internal;
+import com.ververica.cdc.common.annotation.VisibleForTesting;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.source.DataSource;
 import com.ververica.cdc.common.source.EventSourceProvider;
@@ -63,5 +64,10 @@ public class MySqlDataSource implements DataSource {
     @Override
     public MetadataAccessor getMetadataAccessor() {
         return new MySqlMetadataAccessor(sourceConfig);
+    }
+
+    @VisibleForTesting
+    public MySqlSourceConfig getSourceConfig() {
+        return sourceConfig;
     }
 }

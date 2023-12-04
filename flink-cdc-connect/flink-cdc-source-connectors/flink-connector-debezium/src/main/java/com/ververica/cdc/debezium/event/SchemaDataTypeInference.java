@@ -14,17 +14,22 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.common.event;
+package com.ververica.cdc.debezium.event;
 
-import com.ververica.cdc.common.annotation.PublicEvolving;
+import com.ververica.cdc.common.annotation.Internal;
+import com.ververica.cdc.common.types.DataType;
+import org.apache.kafka.connect.data.Schema;
 
-import java.io.Serializable;
-import java.util.List;
+/** {@link DataType} inference for kafka connect {@link Schema}. */
+@Internal
+public interface SchemaDataTypeInference {
 
-/** Deserializer to deserialize given record to {@link Event}. */
-@PublicEvolving
-public interface EventDeserializer<T> extends Serializable {
-
-    /** Deserialize given record to {@link Event}s. */
-    List<? extends Event> deserialize(T record) throws Exception;
+    /**
+     * Infer {@link DataType} from {@link Schema}.
+     *
+     * @param value the value corresponding value to SCHEMA
+     * @param schema the kafka connect schema
+     * @return the inferred data type
+     */
+    DataType infer(Object value, Schema schema);
 }

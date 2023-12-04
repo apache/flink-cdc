@@ -27,6 +27,12 @@ public class MySqlTypeUtils {
     // ------ MySQL Type ------
     // https://dev.mysql.com/doc/refman/8.0/en/data-types.html
     private static final String BIT = "BIT";
+    /*
+     * BOOLEAN type will be returned when handling the change event from SQL like:
+     * ALTER TABLE `student` CHANGE COLUMN `is_male` `is_female` BOOLEAN NULL;
+     */
+    private static final String BOOLEAN = "BOOLEAN";
+    private static final String BOOL = "BOOL";
     private static final String TINYINT = "TINYINT";
     private static final String TINYINT_UNSIGNED = "TINYINT UNSIGNED";
     private static final String TINYINT_UNSIGNED_ZEROFILL = "TINYINT UNSIGNED ZEROFILL";
@@ -39,6 +45,9 @@ public class MySqlTypeUtils {
     private static final String INT = "INT";
     private static final String INT_UNSIGNED = "INT UNSIGNED";
     private static final String INT_UNSIGNED_ZEROFILL = "INT UNSIGNED ZEROFILL";
+    private static final String INTEGER = "INTEGER";
+    private static final String INTEGER_UNSIGNED = "INTEGER UNSIGNED";
+    private static final String INTEGER_UNSIGNED_ZEROFILL = "INTEGER UNSIGNED ZEROFILL";
     private static final String BIGINT = "BIGINT";
     private static final String SERIAL = "SERIAL";
     private static final String BIGINT_UNSIGNED = "BIGINT UNSIGNED";
@@ -86,6 +95,14 @@ public class MySqlTypeUtils {
     private static final String SET = "SET";
     private static final String ENUM = "ENUM";
     private static final String GEOMETRY = "GEOMETRY";
+    private static final String POINT = "POINT";
+    private static final String LINESTRING = "LINESTRING";
+    private static final String POLYGON = "POLYGON";
+    private static final String GEOMCOLLECTION = "GEOMCOLLECTION";
+    private static final String GEOMETRYCOLLECTION = "GEOMETRYCOLLECTION";
+    private static final String MULTIPOINT = "MULTIPOINT";
+    private static final String MULTIPOLYGON = "MULTIPOLYGON";
+    private static final String MULTILINESTRING = "MULTILINESTRING";
     private static final String UNKNOWN = "UNKNOWN";
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
@@ -105,6 +122,13 @@ public class MySqlTypeUtils {
     private static DataType convertFromColumn(Column column) {
         String typeName = column.typeName();
         switch (typeName) {
+            case BIT:
+                return column.length() == 1
+                        ? DataTypes.BOOLEAN()
+                        : DataTypes.BINARY(column.length() / 8);
+            case BOOL:
+            case BOOLEAN:
+                return DataTypes.BOOLEAN();
             case TINYINT:
                 // MySQL haven't boolean type, it uses tinyint(1) to represents boolean type
                 // user should not use tinyint(1) to store number although jdbc url parameter
@@ -118,10 +142,14 @@ public class MySqlTypeUtils {
             case SMALLINT_UNSIGNED:
             case SMALLINT_UNSIGNED_ZEROFILL:
             case INT:
+            case INTEGER:
             case MEDIUMINT:
+            case YEAR:
                 return DataTypes.INT();
             case INT_UNSIGNED:
             case INT_UNSIGNED_ZEROFILL:
+            case INTEGER_UNSIGNED:
+            case INTEGER_UNSIGNED_ZEROFILL:
             case MEDIUMINT_UNSIGNED:
             case MEDIUMINT_UNSIGNED_ZEROFILL:
             case BIGINT:
@@ -161,25 +189,49 @@ public class MySqlTypeUtils {
             case DATE:
                 return DataTypes.DATE();
             case DATETIME:
-            case TIMESTAMP:
                 return column.length() >= 0
                         ? DataTypes.TIMESTAMP(column.length())
-                        : DataTypes.TIMESTAMP();
+                        : DataTypes.TIMESTAMP(0);
+            case TIMESTAMP:
+                return column.length() >= 0
+                        ? DataTypes.TIMESTAMP_LTZ(column.length())
+                        : DataTypes.TIMESTAMP_LTZ(0);
             case CHAR:
                 return DataTypes.CHAR(column.length());
             case VARCHAR:
                 return DataTypes.VARCHAR(column.length());
+            case TINYTEXT:
             case TEXT:
+            case MEDIUMTEXT:
+            case LONGTEXT:
+            case JSON:
+            case ENUM:
+            case GEOMETRY:
+            case POINT:
+            case LINESTRING:
+            case POLYGON:
+            case GEOMETRYCOLLECTION:
+            case GEOMCOLLECTION:
+            case MULTIPOINT:
+            case MULTIPOLYGON:
+            case MULTILINESTRING:
                 return DataTypes.STRING();
             case BINARY:
                 return DataTypes.BINARY(column.length());
             case VARBINARY:
                 return DataTypes.VARBINARY(column.length());
+            case TINYBLOB:
             case BLOB:
+            case MEDIUMBLOB:
+            case LONGBLOB:
                 return DataTypes.BYTES();
+            case SET:
+                return DataTypes.ARRAY(DataTypes.STRING());
             default:
                 throw new UnsupportedOperationException(
                         String.format("Don't support MySQL type '%s' yet.", typeName));
         }
     }
+
+    private MySqlTypeUtils() {}
 }
