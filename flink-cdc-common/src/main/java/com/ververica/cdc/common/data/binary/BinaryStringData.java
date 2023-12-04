@@ -138,10 +138,8 @@ public final class BinaryStringData extends LazyBinaryFormat<String> implements 
     @Override
     public String toString() {
         if (javaObject == null) {
-            byte[] bytes =
-                    org.apache.flink.table.data.binary.BinarySegmentUtils.allocateReuseBytes(
-                            binarySection.sizeInBytes);
-            org.apache.flink.table.data.binary.BinarySegmentUtils.copyToBytes(
+            byte[] bytes = BinarySegmentUtils.allocateReuseBytes(binarySection.sizeInBytes);
+            BinarySegmentUtils.copyToBytes(
                     binarySection.segments,
                     binarySection.offset,
                     bytes,
@@ -359,7 +357,7 @@ public final class BinaryStringData extends LazyBinaryFormat<String> implements 
     public BinaryStringData copy() {
         ensureMaterialized();
         byte[] copy =
-                org.apache.flink.table.data.binary.BinarySegmentUtils.copyToBytes(
+                BinarySegmentUtils.copyToBytes(
                         binarySection.segments, binarySection.offset, binarySection.sizeInBytes);
         return new BinaryStringData(
                 new MemorySegment[] {MemorySegmentFactory.wrap(copy)},
@@ -442,7 +440,7 @@ public final class BinaryStringData extends LazyBinaryFormat<String> implements 
 
         if (i > j) {
             return fromBytes(
-                    org.apache.flink.table.data.binary.BinarySegmentUtils.copyToBytes(
+                    BinarySegmentUtils.copyToBytes(
                             binarySection.segments, binarySection.offset + j, i - j));
         } else {
             return EMPTY_UTF8;
@@ -463,7 +461,7 @@ public final class BinaryStringData extends LazyBinaryFormat<String> implements 
             return true;
         }
         int find =
-                org.apache.flink.table.data.binary.BinarySegmentUtils.find(
+                BinarySegmentUtils.find(
                         binarySection.segments,
                         binarySection.offset,
                         binarySection.sizeInBytes,
@@ -586,7 +584,7 @@ public final class BinaryStringData extends LazyBinaryFormat<String> implements 
                 if (byteIdx + str.binarySection.sizeInBytes > binarySection.sizeInBytes) {
                     return -1;
                 }
-                if (org.apache.flink.table.data.binary.BinarySegmentUtils.equals(
+                if (BinarySegmentUtils.equals(
                         binarySection.segments,
                         binarySection.offset + byteIdx,
                         str.binarySection.segments,
@@ -621,7 +619,7 @@ public final class BinaryStringData extends LazyBinaryFormat<String> implements 
             if (byteIdx + str.binarySection.sizeInBytes > binarySection.sizeInBytes) {
                 return -1;
             }
-            if (org.apache.flink.table.data.binary.BinarySegmentUtils.equals(
+            if (BinarySegmentUtils.equals(
                     binarySection.segments,
                     binarySection.offset + byteIdx,
                     str.binarySection.segments,
@@ -743,7 +741,7 @@ public final class BinaryStringData extends LazyBinaryFormat<String> implements 
     private boolean matchAtVarSeg(final BinaryStringData s, int pos) {
         return s.binarySection.sizeInBytes + pos <= binarySection.sizeInBytes
                 && pos >= 0
-                && org.apache.flink.table.data.binary.BinarySegmentUtils.equals(
+                && BinarySegmentUtils.equals(
                         binarySection.segments,
                         binarySection.offset + pos,
                         s.binarySection.segments,
