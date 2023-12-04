@@ -77,12 +77,12 @@
                             "field": "char_c"
                         },
                         {
-                            "type": "double",
+                            "type": "float32",
                             "optional": true,
                             "field": "real_c"
                         },
                         {
-                            "type": "double",
+                            "type": "float32",
                             "optional": true,
                             "field": "float_c"
                         },
@@ -349,12 +349,12 @@
                             "field": "char_c"
                         },
                         {
-                            "type": "double",
+                            "type": "float32",
                             "optional": true,
                             "field": "real_c"
                         },
                         {
-                            "type": "double",
+                            "type": "float32",
                             "optional": true,
                             "field": "float_c"
                         },
@@ -695,9 +695,9 @@
                 "varchar_c": "Hello World",
                 "char_c": "abc",
                 "real_c": 123.102,
-                "float_c": 123.10199737548828,
-                "float_un_c": 123.10299682617188,
-                "float_un_z_c": 123.10399627685547,
+                "float_c": 123.102,
+                "float_un_c": 123.103,
+                "float_un_z_c": 123.104,
                 "double_c": 404.4443,
                 "double_un_c": 404.4444,
                 "double_un_z_c": 404.4445,
@@ -1050,9 +1050,9 @@
                 "varchar_c": "Hello World",
                 "char_c": "abc",
                 "real_c": 123.102,
-                "float_c": 123.10199737548828,
-                "float_un_c": 123.10299682617188,
-                "float_un_z_c": 123.10399627685547,
+                "float_c": 123.102,
+                "float_un_c": 123.103,
+                "float_un_z_c": 123.104,
                 "double_c": 404.4443,
                 "double_un_c": 404.4444,
                 "double_un_z_c": 404.4445,
@@ -1110,9 +1110,9 @@
                 "varchar_c": "Hello World",
                 "char_c": "abc",
                 "real_c": 123.102,
-                "float_c": 123.10199737548828,
-                "float_un_c": 123.10299682617188,
-                "float_un_z_c": 123.10399627685547,
+                "float_c": 123.102,
+                "float_un_c": 123.103,
+                "float_un_z_c": 123.104,
                 "double_c": 404.4443,
                 "double_un_c": 404.4444,
                 "double_un_z_c": 404.4445,
