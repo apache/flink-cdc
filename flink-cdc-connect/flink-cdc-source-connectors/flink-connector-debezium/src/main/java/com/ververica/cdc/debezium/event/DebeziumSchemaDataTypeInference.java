@@ -20,6 +20,8 @@ import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.common.types.DataField;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
+import com.ververica.cdc.common.types.DecimalType;
+import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
 import io.debezium.time.MicroTime;
 import io.debezium.time.MicroTimestamp;
@@ -38,13 +40,15 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
 
-import static com.ververica.cdc.common.types.DecimalType.DEFAULT_PRECISION;
-
 /** {@link DataType} inference for debezium {@link Schema}. */
 @Internal
 public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference, Serializable {
 
     private static final long serialVersionUID = 1L;
+
+    public static final String PRECISION_PARAMETER_KEY = "connect.decimal.precision";
+
+    public static final int DEFAULT_DECIMAL_PRECISION = 20;
 
     @Override
     public DataType infer(Object value, Schema schema) {
@@ -154,25 +158,38 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
             } else {
                 precision = 0;
             }
-            return DataTypes.TIMESTAMP(precision);
+            return DataTypes.TIMESTAMP_LTZ(precision);
         }
         return DataTypes.STRING();
     }
 
     protected DataType inferBytes(Object value, Schema schema) {
-        if (Decimal.LOGICAL_NAME.equals(schema.name())
-                || VariableScaleDecimal.LOGICAL_NAME.equals(schema.name())) {
-            if (value instanceof BigDecimal) {
-                BigDecimal decimal = (BigDecimal) value;
-                return DataTypes.DECIMAL(decimal.precision(), decimal.scale());
+        if (Decimal.LOGICAL_NAME.equals(schema.name())) {
+            int scale =
+                    Optional.ofNullable(schema.parameters().get(Decimal.SCALE_FIELD))
+                            .map(Integer::parseInt)
+                            .orElse(DecimalType.DEFAULT_SCALE);
+
+            int precision =
+                    Optional.ofNullable(schema.parameters().get(PRECISION_PARAMETER_KEY))
+                            .map(Integer::parseInt)
+                            .orElse(DEFAULT_DECIMAL_PRECISION);
+
+            if (precision > DecimalType.MAX_PRECISION) {
+                return DataTypes.STRING();
             }
-            return DataTypes.DECIMAL(DEFAULT_PRECISION, 0);
+            return DataTypes.DECIMAL(precision, scale);
         }
         return DataTypes.BYTES();
     }
 
     protected DataType inferStruct(Object value, Schema schema) {
         Struct struct = (Struct) value;
+        if (VariableScaleDecimal.LOGICAL_NAME.equals(schema.name())) {
+            SpecialValueDecimal decimal = VariableScaleDecimal.toLogical(struct);
+            BigDecimal bigDecimal = decimal.getDecimalValue().orElse(BigDecimal.ZERO);
+            return DataTypes.DECIMAL(bigDecimal.precision(), bigDecimal.scale());
+        }
         return DataTypes.ROW(
                 schema.fields().stream()
                         .map(
