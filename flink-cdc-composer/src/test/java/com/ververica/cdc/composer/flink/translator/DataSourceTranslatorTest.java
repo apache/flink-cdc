@@ -49,8 +49,8 @@ public class DataSourceTranslatorTest {
         DataSource dataSource =
                 sourceFactory.createDataSource(
                         new FactoryHelper.DefaultContext(
-                                sourceDef.getConfig().toMap(),
                                 sourceDef.getConfig(),
+                                new Configuration(),
                                 Thread.currentThread().getContextClassLoader()));
 
         Assert.assertTrue(dataSource instanceof DataSourceFactory1.TestDataSource);

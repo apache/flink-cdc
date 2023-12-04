@@ -53,7 +53,7 @@ public class DataSourceTranslator {
         DataSource dataSource =
                 sourceFactory.createDataSource(
                         new FactoryHelper.DefaultContext(
-                                sourceDef.getConfig().toMap(),
+                                sourceDef.getConfig(),
                                 pipelineConfig,
                                 Thread.currentThread().getContextClassLoader()));
 

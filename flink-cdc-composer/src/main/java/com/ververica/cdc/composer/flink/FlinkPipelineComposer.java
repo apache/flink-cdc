@@ -132,7 +132,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
         // Create data sink
         return sinkFactory.createDataSink(
                 new FactoryHelper.DefaultContext(
-                        sinkDef.getConfig().toMap(),
+                        sinkDef.getConfig(),
                         pipelineConfig,
                         Thread.currentThread().getContextClassLoader()));
     }
