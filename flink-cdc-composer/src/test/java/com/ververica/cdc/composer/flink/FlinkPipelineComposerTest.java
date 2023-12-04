@@ -49,8 +49,8 @@ public class FlinkPipelineComposerTest {
         DataSink dataSink =
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
-                                sinkDef.getConfig().toMap(),
                                 sinkDef.getConfig(),
+                                new Configuration(),
                                 Thread.currentThread().getContextClassLoader()));
 
         Assert.assertTrue(dataSink instanceof DataSinkFactory1.TestDataSink);

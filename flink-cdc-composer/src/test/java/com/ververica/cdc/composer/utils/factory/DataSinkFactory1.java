@@ -29,7 +29,7 @@ import java.util.Set;
 public class DataSinkFactory1 implements DataSinkFactory {
     @Override
     public DataSink createDataSink(Context context) {
-        return new TestDataSink(context.getConfiguration().get(TestOptions.HOST));
+        return new TestDataSink(context.getFactoryConfiguration().get(TestOptions.HOST));
     }
 
     @Override

@@ -19,8 +19,6 @@ package com.ververica.cdc.common.factories;
 import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.configuration.Configuration;
 
-import java.util.Map;
-
 /** A helper for working with {@link Factory}. */
 @PublicEvolving
 public class FactoryHelper {
@@ -28,32 +26,32 @@ public class FactoryHelper {
     /** Default implementation of {@link Factory.Context}. */
     public static class DefaultContext implements Factory.Context {
 
-        private final Map<String, String> enrichmentOptions;
+        private final Configuration factoryConfiguration;
         private final ClassLoader classLoader;
-        private final Configuration configuration;
+        private final Configuration pipelineConfiguration;
 
         public DefaultContext(
-                Map<String, String> enrichmentOptions,
-                Configuration configuration,
+                Configuration factoryConfiguration,
+                Configuration pipelineConfiguration,
                 ClassLoader classLoader) {
-            this.enrichmentOptions = enrichmentOptions;
-            this.configuration = configuration;
+            this.factoryConfiguration = factoryConfiguration;
+            this.pipelineConfiguration = pipelineConfiguration;
             this.classLoader = classLoader;
         }
 
         @Override
-        public Configuration getConfiguration() {
-            return configuration;
+        public Configuration getFactoryConfiguration() {
+            return factoryConfiguration;
+        }
+
+        @Override
+        public Configuration getPipelineConfiguration() {
+            return pipelineConfiguration;
         }
 
         @Override
         public ClassLoader getClassLoader() {
             return classLoader;
-        }
-
-        @Override
-        public Map<String, String> getEnrichmentOptions() {
-            return enrichmentOptions;
         }
     }
 }

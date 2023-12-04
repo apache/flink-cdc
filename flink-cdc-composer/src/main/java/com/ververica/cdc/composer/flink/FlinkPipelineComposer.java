@@ -20,6 +20,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import com.ververica.cdc.common.annotation.Internal;
+import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.factories.DataSinkFactory;
 import com.ververica.cdc.common.factories.FactoryHelper;
@@ -80,14 +81,14 @@ public class FlinkPipelineComposer implements PipelineComposer {
         // Source
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
         DataStream<Event> stream =
-                sourceTranslator.translate(pipelineDef.getSource(), env, parallelism);
+                sourceTranslator.translate(pipelineDef.getSource(), env, pipelineDef.getConfig());
 
         // Route
         RouteTranslator routeTranslator = new RouteTranslator();
         stream = routeTranslator.translate(stream, pipelineDef.getRoute());
 
         // Create sink in advance as schema operator requires MetadataApplier
-        DataSink dataSink = createDataSink(pipelineDef.getSink());
+        DataSink dataSink = createDataSink(pipelineDef.getSink(), pipelineDef.getConfig());
 
         // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
@@ -118,7 +119,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 env, pipelineDef.getConfig().get(PipelineOptions.PIPELINE_NAME), isBlocking);
     }
 
-    private DataSink createDataSink(SinkDef sinkDef) {
+    private DataSink createDataSink(SinkDef sinkDef, Configuration pipelineConfig) {
         // Search the data sink factory
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier(
@@ -131,8 +132,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
         // Create data sink
         return sinkFactory.createDataSink(
                 new FactoryHelper.DefaultContext(
-                        sinkDef.getConfig().toMap(),
                         sinkDef.getConfig(),
+                        pipelineConfig,
                         Thread.currentThread().getContextClassLoader()));
     }
 
