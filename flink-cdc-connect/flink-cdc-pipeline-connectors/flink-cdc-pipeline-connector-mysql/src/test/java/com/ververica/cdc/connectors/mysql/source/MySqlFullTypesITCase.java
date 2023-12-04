@@ -109,7 +109,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     public void testMysql57TimeDataTypes() throws Throwable {
         RowType recordType =
                 RowType.of(
-                        DataTypes.DECIMAL(1, 0).notNull(),
+                        DataTypes.DECIMAL(20, 0).notNull(),
                         DataTypes.INT(),
                         DataTypes.DATE(),
                         DataTypes.TIME(0),
@@ -122,7 +122,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         Object[] expectedSnapshot =
                 new Object[] {
-                    DecimalData.fromBigDecimal(new BigDecimal("1"), 1, 0),
+                    DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
                     2021,
                     18460,
                     64822000,
@@ -139,7 +139,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         Object[] expectedStreamRecord =
                 new Object[] {
-                    DecimalData.fromBigDecimal(new BigDecimal("1"), 1, 0),
+                    DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
                     2021,
                     18460,
                     64822000,
@@ -159,7 +159,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     public void testMysql8TimeDataTypes() throws Throwable {
         RowType recordType =
                 RowType.of(
-                        DataTypes.DECIMAL(1, 0).notNull(),
+                        DataTypes.DECIMAL(20, 0).notNull(),
                         DataTypes.INT(),
                         DataTypes.DATE(),
                         DataTypes.TIME(0),
@@ -174,7 +174,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         Object[] expectedSnapshot =
                 new Object[] {
-                    DecimalData.fromBigDecimal(new BigDecimal("1"), 1, 0),
+                    DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
                     2021,
                     18460,
                     64822000,
@@ -194,7 +194,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         Object[] expectedStreamRecord =
                 new Object[] {
-                    DecimalData.fromBigDecimal(new BigDecimal("1"), 1, 0),
+                    DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
                     2021,
                     18460,
                     64822000,
@@ -241,7 +241,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         Object[] expectedSnapshot =
                 new Object[] {
-                    DecimalData.fromBigDecimal(new BigDecimal("1"), 1, 0),
+                    DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
                     (byte) 127,
                     (short) 255,
                     (short) 255,
@@ -270,8 +270,9 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     DecimalData.fromBigDecimal(new BigDecimal("123.4567"), 8, 4),
                     DecimalData.fromBigDecimal(new BigDecimal("123.4568"), 8, 4),
                     DecimalData.fromBigDecimal(new BigDecimal("123.4569"), 8, 4),
-                    DecimalData.fromBigDecimal(new BigDecimal("345.6"), 6, 0),
-                    DecimalData.fromBigDecimal(new BigDecimal("34567892.1"), 9, 1),
+                    DecimalData.fromBigDecimal(new BigDecimal("346"), 6, 0),
+                    // Decimal precision larger than 38 will be treated as string.
+                    BinaryStringData.fromString("34567892.1"),
                     false,
                     true,
                     true,
@@ -372,7 +373,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
     private static final RowType COMMON_TYPES =
             RowType.of(
-                    DataTypes.DECIMAL(1, 0).notNull(),
+                    DataTypes.DECIMAL(20, 0).notNull(),
                     DataTypes.TINYINT(),
                     DataTypes.SMALLINT(),
                     DataTypes.SMALLINT(),
@@ -402,7 +403,8 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     DataTypes.DECIMAL(8, 4),
                     DataTypes.DECIMAL(8, 4),
                     DataTypes.DECIMAL(6, 0),
-                    DataTypes.DECIMAL(9, 1),
+                    // Decimal precision larger than 38 will be treated as string.
+                    DataTypes.STRING(),
                     DataTypes.BOOLEAN(),
                     DataTypes.BOOLEAN(),
                     DataTypes.BOOLEAN(),

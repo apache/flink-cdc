@@ -21,6 +21,7 @@ import org.apache.flink.util.Collector;
 
 import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.common.data.DecimalData;
+import com.ververica.cdc.common.data.LocalZonedTimestampData;
 import com.ververica.cdc.common.data.RecordData;
 import com.ververica.cdc.common.data.TimestampData;
 import com.ververica.cdc.common.data.binary.BinaryStringData;
@@ -330,7 +331,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
             String str = (String) dbzObj;
             // TIMESTAMP_LTZ type is encoded in string type
             Instant instant = Instant.parse(str);
-            return TimestampData.fromMillis(instant.toEpochMilli(), instant.getNano());
+            return LocalZonedTimestampData.fromInstant(instant);
         }
         throw new IllegalArgumentException(
                 "Unable to convert to TimestampData from unexpected value '"
