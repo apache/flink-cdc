@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.composer.flink;
 
+import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -57,10 +58,26 @@ public class FlinkPipelineComposer implements PipelineComposer {
     private final boolean isBlocking;
 
     public static FlinkPipelineComposer ofRemoteCluster(
-            String host, int port, List<Path> additionalJars) {
-        String[] jarPaths = additionalJars.stream().map(Path::toString).toArray(String[]::new);
-        return new FlinkPipelineComposer(
-                StreamExecutionEnvironment.createRemoteEnvironment(host, port, jarPaths), false);
+            org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
+        org.apache.flink.configuration.Configuration effectiveConfiguration =
+                new org.apache.flink.configuration.Configuration();
+        // Use "remote" as the default target
+        effectiveConfiguration.set(DeploymentOptions.TARGET, "remote");
+        effectiveConfiguration.addAll(flinkConfig);
+        StreamExecutionEnvironment env = new StreamExecutionEnvironment(effectiveConfiguration);
+        additionalJars.forEach(
+                jarPath -> {
+                    try {
+                        FlinkEnvironmentUtils.addJar(env, jarPath.toUri().toURL());
+                    } catch (Exception e) {
+                        throw new RuntimeException(
+                                String.format(
+                                        "Unable to convert JAR path \"%s\" to URL when adding JAR to Flink environment",
+                                        jarPath),
+                                e);
+                    }
+                });
+        return new FlinkPipelineComposer(env, false);
     }
 
     public static FlinkPipelineComposer ofMiniCluster() {
