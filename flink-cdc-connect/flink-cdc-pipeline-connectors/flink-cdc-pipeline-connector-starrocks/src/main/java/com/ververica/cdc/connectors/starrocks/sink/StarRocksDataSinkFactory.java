@@ -22,11 +22,13 @@ import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.factories.DataSinkFactory;
 import com.ververica.cdc.common.sink.DataSink;
 
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 import static com.ververica.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.JDBC_URL;
 import static com.ververica.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.LOAD_URL;
 import static com.ververica.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.PASSWORD;
@@ -57,7 +59,12 @@ public class StarRocksDataSinkFactory implements DataSinkFactory {
                 TableCreateConfig.from(context.getFactoryConfiguration());
         SchemaChangeConfig schemaChangeConfig =
                 SchemaChangeConfig.from(context.getFactoryConfiguration());
-        return new StarRocksDataSink(sinkOptions, tableCreateConfig, schemaChangeConfig);
+        String zoneStr = context.getFactoryConfiguration().get(PIPELINE_LOCAL_TIME_ZONE);
+        ZoneId zoneId =
+                PIPELINE_LOCAL_TIME_ZONE.defaultValue().equals(zoneStr)
+                        ? ZoneId.systemDefault()
+                        : ZoneId.of(zoneStr);
+        return new StarRocksDataSink(sinkOptions, tableCreateConfig, schemaChangeConfig, zoneId);
     }
 
     private StarRocksSinkOptions buildSinkConnectorOptions(Configuration cdcConfig) {

@@ -34,6 +34,7 @@ import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.utils.Preconditions;
 import com.ververica.cdc.common.utils.SchemaUtils;
 
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,11 +46,20 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
 
     private static final long serialVersionUID = 1L;
 
+    /**
+     * The local time zone used when converting from <code>TIMESTAMP WITH LOCAL TIME ZONE</code>.
+     */
+    private final ZoneId zoneId;
+
     /** keep the relationship of TableId and table information. */
     private transient Map<TableId, TableInfo> tableInfoMap;
 
     private transient DefaultStarRocksRowData reusableRowData;
     private transient JsonWrapper jsonWrapper;
+
+    public EventRecordSerializationSchema(ZoneId zoneId) {
+        this.zoneId = zoneId;
+    }
 
     @Override
     public void open(
@@ -88,7 +98,7 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
         tableInfo.fieldGetters = new RecordData.FieldGetter[newSchema.getColumnCount()];
         for (int i = 0; i < newSchema.getColumnCount(); i++) {
             tableInfo.fieldGetters[i] =
-                    createFieldGetter(newSchema.getColumns().get(i).getType(), i);
+                    createFieldGetter(newSchema.getColumns().get(i).getType(), i, zoneId);
         }
         tableInfoMap.put(tableId, tableInfo);
     }

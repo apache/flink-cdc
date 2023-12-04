@@ -27,6 +27,7 @@ import com.ververica.cdc.common.sink.FlinkSinkProvider;
 import com.ververica.cdc.common.sink.MetadataApplier;
 
 import java.io.Serializable;
+import java.time.ZoneId;
 
 /** A {@link DataSink} for StarRocks connector that supports schema evolution. */
 public class StarRocksDataSink implements DataSink, Serializable {
@@ -42,19 +43,27 @@ public class StarRocksDataSink implements DataSink, Serializable {
     /** Configurations for schema change. */
     private final SchemaChangeConfig schemaChangeConfig;
 
+    /**
+     * The local time zone used when converting from <code>TIMESTAMP WITH LOCAL TIME ZONE</code>.
+     */
+    private final ZoneId zoneId;
+
     public StarRocksDataSink(
             StarRocksSinkOptions sinkOptions,
             TableCreateConfig tableCreateConfig,
-            SchemaChangeConfig schemaChangeConfig) {
+            SchemaChangeConfig schemaChangeConfig,
+            ZoneId zoneId) {
         this.sinkOptions = sinkOptions;
         this.tableCreateConfig = tableCreateConfig;
         this.schemaChangeConfig = schemaChangeConfig;
+        this.zoneId = zoneId;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
         StarRocksSink<Event> starRocksSink =
-                SinkFunctionFactory.createSink(sinkOptions, new EventRecordSerializationSchema());
+                SinkFunctionFactory.createSink(
+                        sinkOptions, new EventRecordSerializationSchema(zoneId));
         return FlinkSinkProvider.of(starRocksSink);
     }
 

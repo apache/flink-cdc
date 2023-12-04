@@ -36,6 +36,7 @@ import com.starrocks.connector.flink.table.data.StarRocksRowData;
 import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.starrocks.connector.flink.table.sink.v2.DefaultStarRocksSinkContext;
 import com.ververica.cdc.common.data.DecimalData;
+import com.ververica.cdc.common.data.LocalZonedTimestampData;
 import com.ververica.cdc.common.data.TimestampData;
 import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.common.event.AddColumnEvent;
@@ -51,6 +52,7 @@ import com.ververica.cdc.common.types.DateType;
 import com.ververica.cdc.common.types.DecimalType;
 import com.ververica.cdc.common.types.FloatType;
 import com.ververica.cdc.common.types.IntType;
+import com.ververica.cdc.common.types.LocalZonedTimestampType;
 import com.ververica.cdc.common.types.SmallIntType;
 import com.ververica.cdc.common.types.TimestampType;
 import com.ververica.cdc.common.types.VarCharType;
@@ -64,6 +66,9 @@ import org.junit.Test;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.OptionalLong;
@@ -81,7 +86,7 @@ public class EventRecordSerializationSchemaTest {
 
     @Before
     public void setup() {
-        this.serializer = new EventRecordSerializationSchema();
+        this.serializer = new EventRecordSerializationSchema(ZoneId.of("+08"));
         this.serializer.open(
                 new MockInitializationContext(),
                 new DefaultStarRocksSinkContext(
@@ -201,7 +206,10 @@ public class EventRecordSerializationSchemaTest {
                                 new AddColumnEvent.ColumnWithPosition(
                                         Column.physicalColumn("col4", new DecimalType(20, 5))),
                                 new AddColumnEvent.ColumnWithPosition(
-                                        Column.physicalColumn("col5", new SmallIntType()))));
+                                        Column.physicalColumn("col5", new SmallIntType())),
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn(
+                                                "col6", new LocalZonedTimestampType()))));
         Schema newSchema1 = SchemaUtils.applySchemaChangeEvent(schema1, addColumnEvent);
         BinaryRecordDataGenerator newGenerator1 =
                 new BinaryRecordDataGenerator(
@@ -218,11 +226,14 @@ public class EventRecordSerializationSchemaTest {
                                     TimestampData.fromTimestamp(
                                             Timestamp.valueOf("2023-11-27 21:00:00")),
                                     DecimalData.fromBigDecimal(new BigDecimal("83.23"), 20, 5),
-                                    (short) 9
+                                    (short) 9,
+                                    LocalZonedTimestampData.fromInstant(
+                                            LocalDateTime.of(2023, 11, 27, 21, 0, 0)
+                                                    .toInstant(ZoneOffset.of("+10")))
                                 }));
         verifySerializeResult(
                 table1,
-                "{\"col1\":4,\"col2\":true,\"col3\":\"2023-11-27 21:00:00\",\"col4\":83.23,\"col5\":9,\"__op\":1}",
+                "{\"col1\":4,\"col2\":true,\"col3\":\"2023-11-27 21:00:00\",\"col4\":83.23,\"col5\":9,\"col6\":\"2023-11-27 19:00:00\",\"__op\":1}",
                 serializer.serialize(deleteEvent2));
 
         // 4. drop columns from table2, and insert data

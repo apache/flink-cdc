@@ -41,6 +41,8 @@ import com.ververica.cdc.common.types.VarCharType;
 import java.sql.Date;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -122,8 +124,11 @@ public class StarRocksUtils {
      *
      * @param fieldType the element type of the RecordData
      * @param fieldPos the element position of the RecordData
+     * @param zoneId the time zone used when converting from <code>TIMESTAMP WITH LOCAL TIME ZONE
+     *     </code>
      */
-    public static RecordData.FieldGetter createFieldGetter(DataType fieldType, int fieldPos) {
+    public static RecordData.FieldGetter createFieldGetter(
+            DataType fieldType, int fieldPos, ZoneId zoneId) {
         final RecordData.FieldGetter fieldGetter;
         // ordered by type root definition
         switch (fieldType.getTypeRoot()) {
@@ -177,10 +182,13 @@ public class StarRocksUtils {
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 fieldGetter =
                         record ->
-                                DATETIME_FORMATTER.format(
-                                        record.getLocalZonedTimestampData(
-                                                        fieldPos, getPrecision(fieldType))
-                                                .toInstant());
+                                ZonedDateTime.ofInstant(
+                                                record.getLocalZonedTimestampData(
+                                                                fieldPos, getPrecision(fieldType))
+                                                        .toInstant(),
+                                                zoneId)
+                                        .toLocalDateTime()
+                                        .format(DATETIME_FORMATTER);
                 break;
             default:
                 throw new UnsupportedOperationException(
