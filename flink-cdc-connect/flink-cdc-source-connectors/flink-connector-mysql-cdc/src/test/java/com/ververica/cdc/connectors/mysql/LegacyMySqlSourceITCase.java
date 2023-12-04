@@ -166,6 +166,7 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
     private static boolean dataInJsonIsEquals(String actual, String expect) {
         JSONObject actualJsonObject = JSONObject.parseObject(actual);
         JSONObject expectJsonObject = JSONObject.parseObject(expect);
+
         if (expectJsonObject.getJSONObject("payload") != null
                 && actualJsonObject.getJSONObject("payload") != null) {
             expectJsonObject = expectJsonObject.getJSONObject("payload");
