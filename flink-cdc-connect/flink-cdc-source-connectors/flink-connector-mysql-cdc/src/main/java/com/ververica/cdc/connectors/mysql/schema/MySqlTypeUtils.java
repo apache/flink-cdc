@@ -125,7 +125,7 @@ public class MySqlTypeUtils {
             case BIT:
                 return column.length() == 1
                         ? DataTypes.BOOLEAN()
-                        : DataTypes.BINARY(column.length() / 8);
+                        : DataTypes.BINARY((column.length() + 7) / 8);
             case BOOL:
             case BOOLEAN:
                 return DataTypes.BOOLEAN();

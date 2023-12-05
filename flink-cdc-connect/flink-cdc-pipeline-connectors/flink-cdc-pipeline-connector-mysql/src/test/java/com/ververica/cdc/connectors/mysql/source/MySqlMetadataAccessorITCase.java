@@ -265,6 +265,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                                             // string.
                                             DataTypes.STRING(),
                                             DataTypes.BOOLEAN(),
+                                            DataTypes.BINARY(1),
                                             DataTypes.BOOLEAN(),
                                             DataTypes.BOOLEAN(),
                                             DataTypes.BINARY(16),
@@ -319,6 +320,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                                             "numeric_c",
                                             "big_decimal_c",
                                             "bit1_c",
+                                            "bit3_c",
                                             "tiny1_c",
                                             "boolean_c",
                                             "file_uuid",
