@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import static com.ververica.cdc.runtime.operators.schema.coordinator.SchemaRegistryRequestHandler.RequestStatus.RECEIVED_RELEASE_REQUEST;
 import static com.ververica.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
 
 /** A handler to deal with all requests and events for {@link SchemaRegistry}. */
@@ -53,11 +54,6 @@ public class SchemaRegistryRequestHandler {
     /** Schema manager holding schema for all tables. */
     private final SchemaManager schemaManager;
 
-    /**
-     * Not applied SchemaChangeRequest's future before receiving all flush success events for its
-     * table from sink writers.
-     */
-    private PendingSchemaChange waitFlushSuccess;
     /**
      * Not applied SchemaChangeRequest before receiving all flush success events for its table from
      * sink writers.
@@ -93,7 +89,7 @@ public class SchemaRegistryRequestHandler {
      */
     public CompletableFuture<CoordinationResponse> handleSchemaChangeRequest(
             SchemaChangeRequest request) {
-        if (pendingSchemaChanges.isEmpty() && waitFlushSuccess == null) {
+        if (pendingSchemaChanges.isEmpty()) {
             LOG.info(
                     "Received schema change event request from table {}. Start to buffer requests for others.",
                     request.getTableId().toString());
@@ -104,8 +100,8 @@ public class SchemaRegistryRequestHandler {
             CompletableFuture<CoordinationResponse> response =
                     CompletableFuture.completedFuture(wrap(new SchemaChangeResponse(true)));
             schemaManager.applySchemaChange(request.getSchemaChangeEvent());
-            this.waitFlushSuccess =
-                    new PendingSchemaChange(request, response).startToWaitForFlushSuccess();
+            pendingSchemaChanges.add(new PendingSchemaChange(request, response));
+            pendingSchemaChanges.get(0).startToWaitForReleaseRequest();
             return response;
         } else {
             LOG.info("There are already processing requests. Wait for processing.");
@@ -117,7 +113,13 @@ public class SchemaRegistryRequestHandler {
 
     /** Handle the {@link ReleaseUpstreamRequest} and wait for all sink subtasks flushing. */
     public CompletableFuture<CoordinationResponse> handleReleaseUpstreamRequest() {
-        return waitFlushSuccess.getResponseFuture();
+        CompletableFuture<CoordinationResponse> response =
+                pendingSchemaChanges.get(0).getResponseFuture();
+        if (response.isDone()) {
+            pendingSchemaChanges.remove(0);
+            startNextSchemaChangeRequest();
+        }
+        return response;
     }
 
     /**
@@ -142,29 +144,33 @@ public class SchemaRegistryRequestHandler {
             LOG.info(
                     "All sink subtask have flushed for table {}. Start to apply schema change.",
                     tableId.toString());
+            PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
             applySchemaChange(tableId, waitFlushSuccess.getChangeRequest().getSchemaChangeEvent());
             waitFlushSuccess.getResponseFuture().complete(wrap(new ReleaseUpstreamResponse()));
-            startNextSchemaChangeRequest();
+
+            if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
+                startNextSchemaChangeRequest();
+            }
         }
     }
 
     private void startNextSchemaChangeRequest() {
         flushedSinkWriters.clear();
-        waitFlushSuccess = null;
         while (!pendingSchemaChanges.isEmpty()) {
-            PendingSchemaChange pendingSchemaChange = pendingSchemaChanges.remove(0);
+            PendingSchemaChange pendingSchemaChange = pendingSchemaChanges.get(0);
             SchemaChangeRequest request = pendingSchemaChange.changeRequest;
             if (request.getSchemaChangeEvent() instanceof CreateTableEvent
                     && schemaManager.schemaExists(request.getTableId())) {
                 pendingSchemaChange
                         .getResponseFuture()
                         .complete(wrap(new SchemaChangeResponse(false)));
+                pendingSchemaChanges.remove(0);
             } else {
                 schemaManager.applySchemaChange(request.getSchemaChangeEvent());
                 pendingSchemaChange
                         .getResponseFuture()
                         .complete(wrap(new SchemaChangeResponse(true)));
-                this.waitFlushSuccess = pendingSchemaChange.startToWaitForFlushSuccess();
+                pendingSchemaChange.startToWaitForReleaseRequest();
                 break;
             }
         }
@@ -172,13 +178,15 @@ public class SchemaRegistryRequestHandler {
 
     private static class PendingSchemaChange {
         private final SchemaChangeRequest changeRequest;
-        private final CompletableFuture<CoordinationResponse> responseFuture;
+        private CompletableFuture<CoordinationResponse> responseFuture;
+        private RequestStatus status;
 
         public PendingSchemaChange(
                 SchemaChangeRequest changeRequest,
                 CompletableFuture<CoordinationResponse> responseFuture) {
             this.changeRequest = changeRequest;
             this.responseFuture = responseFuture;
+            this.status = RequestStatus.PENDING;
         }
 
         public SchemaChangeRequest getChangeRequest() {
@@ -189,12 +197,27 @@ public class SchemaRegistryRequestHandler {
             return responseFuture;
         }
 
-        public PendingSchemaChange startToWaitForFlushSuccess() {
+        public RequestStatus getStatus() {
+            return status;
+        }
+
+        public void startToWaitForReleaseRequest() {
             if (!responseFuture.isDone()) {
                 throw new IllegalStateException(
                         "Cannot start to wait for flush success before the SchemaChangeRequest is done.");
             }
-            return new PendingSchemaChange(changeRequest, new CompletableFuture<>());
+            this.responseFuture = new CompletableFuture<>();
+            this.status = RequestStatus.WAIT_RELEASE_REQUEST;
         }
+
+        public void receiveReleaseRequest() {
+            this.status = RECEIVED_RELEASE_REQUEST;
+        }
+    }
+
+    enum RequestStatus {
+        PENDING,
+        WAIT_RELEASE_REQUEST,
+        RECEIVED_RELEASE_REQUEST
     }
 }
