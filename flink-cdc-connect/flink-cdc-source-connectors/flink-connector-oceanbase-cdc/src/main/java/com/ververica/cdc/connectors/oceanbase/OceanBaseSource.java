@@ -28,6 +28,8 @@ import com.ververica.cdc.connectors.oceanbase.table.StartupMode;
 import org.apache.commons.lang3.StringUtils;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -69,6 +71,7 @@ public class OceanBaseSource {
         private String rsList;
         private String configUrl;
         private String workingMode;
+        private Properties obcdcProperties;
 
         private OceanBaseDeserializationSchema<T> deserializer;
 
@@ -177,6 +180,11 @@ public class OceanBaseSource {
             return this;
         }
 
+        public Builder<T> obcdcProperties(Properties obcdcProperties) {
+            this.obcdcProperties = obcdcProperties;
+            return this;
+        }
+
         public Builder<T> deserializer(OceanBaseDeserializationSchema<T> deserializer) {
             this.deserializer = deserializer;
             return this;
@@ -260,6 +268,12 @@ public class OceanBaseSource {
             obReaderConfig.setPassword(password);
             obReaderConfig.setStartTimestamp(startupTimestamp);
             obReaderConfig.setTimezone(serverTimeZone);
+
+            if (obcdcProperties != null && !obcdcProperties.isEmpty()) {
+                Map<String, String> extraConfigs = new HashMap<>();
+                obcdcProperties.forEach((k, v) -> extraConfigs.put(k.toString(), v.toString()));
+                obReaderConfig.setExtraConfigs(extraConfigs);
+            }
 
             return new OceanBaseRichSourceFunction<>(
                     StartupMode.INITIAL.equals(startupMode),

@@ -30,7 +30,9 @@ import com.ververica.cdc.debezium.utils.JdbcUrlUtils;
 
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 import java.util.Set;
 
 /** Factory for creating configured instance of {@link OceanBaseTableSource}. */
@@ -173,11 +175,13 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .withDescription(
                             "The working mode of 'obcdc', can be `storage` (default value, supported from `obcdc` 3.1.3) or `memory`.");
 
+    public static final String OBCDC_PROPERTIES_PREFIX = "obcdc.properties.";
+
     @Override
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
                 FactoryUtil.createTableFactoryHelper(this, context);
-        helper.validateExcept(JdbcUrlUtils.PROPERTIES_PREFIX);
+        helper.validateExcept(JdbcUrlUtils.PROPERTIES_PREFIX, OBCDC_PROPERTIES_PREFIX);
 
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
@@ -233,7 +237,8 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 startupTimestamp,
                 rsList,
                 configUrl,
-                workingMode);
+                workingMode,
+                getProperties(context.getCatalogTable().getOptions(), OBCDC_PROPERTIES_PREFIX));
     }
 
     @Override
@@ -294,5 +299,18 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                         "'config-url' is required for OceanBase Enterprise Edition.");
             }
         }
+    }
+
+    private Properties getProperties(Map<String, String> tableOptions, String prefix) {
+        Properties properties = new Properties();
+        tableOptions.keySet().stream()
+                .filter(key -> key.startsWith(prefix))
+                .forEach(
+                        key -> {
+                            final String value = tableOptions.get(key);
+                            final String subKey = key.substring(prefix.length());
+                            properties.put(subKey, value);
+                        });
+        return properties;
     }
 }
