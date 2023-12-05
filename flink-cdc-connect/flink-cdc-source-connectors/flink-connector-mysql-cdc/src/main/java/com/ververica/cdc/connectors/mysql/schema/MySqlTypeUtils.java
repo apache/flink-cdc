@@ -144,14 +144,14 @@ public class MySqlTypeUtils {
             case INT:
             case INTEGER:
             case MEDIUMINT:
+            case MEDIUMINT_UNSIGNED:
+            case MEDIUMINT_UNSIGNED_ZEROFILL:
             case YEAR:
                 return DataTypes.INT();
             case INT_UNSIGNED:
             case INT_UNSIGNED_ZEROFILL:
             case INTEGER_UNSIGNED:
             case INTEGER_UNSIGNED_ZEROFILL:
-            case MEDIUMINT_UNSIGNED:
-            case MEDIUMINT_UNSIGNED_ZEROFILL:
             case BIGINT:
                 return DataTypes.BIGINT();
             case BIGINT_UNSIGNED:
