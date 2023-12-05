@@ -274,6 +274,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     // Decimal precision larger than 38 will be treated as string.
                     BinaryStringData.fromString("34567892.1"),
                     false,
+                    new byte[] {3},
                     true,
                     true,
                     parseHexBinary("651aed08-390f-4893-b2f1-36923e7b7400".replace("-", "")),
@@ -308,7 +309,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         expectedSnapshot[30] = null;
         // The json string from binlog will remove useless space
-        expectedSnapshot[43] = BinaryStringData.fromString("{\"key1\":\"value1\"}");
+        expectedSnapshot[44] = BinaryStringData.fromString("{\"key1\":\"value1\"}");
         Object[] expectedStreamRecord = expectedSnapshot;
 
         List<Event> streamResults = fetchResults(iterator, 1);
@@ -406,6 +407,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     // Decimal precision larger than 38 will be treated as string.
                     DataTypes.STRING(),
                     DataTypes.BOOLEAN(),
+                    DataTypes.BINARY(1),
                     DataTypes.BOOLEAN(),
                     DataTypes.BOOLEAN(),
                     DataTypes.BINARY(16),
