@@ -46,6 +46,7 @@ public class TableMapEventMetadataDeserializerTest {
         expectedTableMapEventMetadata.setSignedness(bitSet);
         expectedTableMapEventMetadata.setDefaultCharset(result);
 
-        assertThat(tableMapEventMetadata.toString()).isEqualTo(expectedTableMapEventMetadata.toString());
+        assertThat(tableMapEventMetadata.toString())
+                .isEqualTo(expectedTableMapEventMetadata.toString());
     }
 }
