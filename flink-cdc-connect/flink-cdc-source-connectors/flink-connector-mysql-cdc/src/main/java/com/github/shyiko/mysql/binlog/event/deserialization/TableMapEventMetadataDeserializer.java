@@ -35,7 +35,7 @@ import java.util.logging.Logger;
  * packed.
  *
  * <p>Line 123: The length of the {@link TableMapEventMetadataDeserializer#readBooleanList} is
- * determined by the length * of the packet header.
+ * determined by the length of the packet header.
  */
 public class TableMapEventMetadataDeserializer {
 

@@ -21,6 +21,7 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.BitSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,6 +37,15 @@ public class TableMapEventMetadataDeserializerTest {
         TableMapEventMetadata tableMapEventMetadata =
                 metadataDeserializer.deserialize(new ByteArrayInputStream(data), 10, 8);
 
-        assertThat(tableMapEventMetadata.getSignedness().get(1));
+        TableMapEventMetadata expectedTableMapEventMetadata = new TableMapEventMetadata();
+        BitSet bitSet = new BitSet();
+        bitSet.set(1);
+        TableMapEventMetadata.DefaultCharset result = new TableMapEventMetadata.DefaultCharset();
+        result.setCharsetCollations(null);
+        result.setDefaultCharsetCollation(255);
+        expectedTableMapEventMetadata.setSignedness(bitSet);
+        expectedTableMapEventMetadata.setDefaultCharset(result);
+
+        assertThat(tableMapEventMetadata.toString()).isEqualTo(expectedTableMapEventMetadata.toString());
     }
 }
