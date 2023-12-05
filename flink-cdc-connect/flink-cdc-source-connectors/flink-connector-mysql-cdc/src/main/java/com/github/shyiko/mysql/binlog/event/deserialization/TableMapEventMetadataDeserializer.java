@@ -31,16 +31,18 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Copied from mysql-binlog-connector 0.25.3 to fix table metadata deserialization issue #363. Line
- * 66: skip to end of the signedness block so that it won't affect parsing the next table metadata.
+ * Copied from mysql-binlog-connector 0.25.3 to fix table metadata deserialization issue #363.
+ *
+ * <p>Line 74: skip to end of the signedness block so that it won't affect parsing the next table metadata.
+ */
+/**
+ * @author <a href="mailto:ahmedahamid@yahoo.com">Ahmed Abdul Hamid</a>
  */
 public class TableMapEventMetadataDeserializer {
 
     private final Logger logger = Logger.getLogger(getClass().getName());
 
-    public TableMapEventMetadata deserialize(
-            ByteArrayInputStream inputStream, int nColumns, int nNumericColumns)
-            throws IOException {
+    public TableMapEventMetadata deserialize(ByteArrayInputStream inputStream, int nColumns, int nNumericColumns) throws IOException {
         int remainingBytes = inputStream.available();
         if (remainingBytes <= 0) {
             return null;
@@ -54,6 +56,12 @@ public class TableMapEventMetadataDeserializer {
             MetadataFieldType fieldType = MetadataFieldType.byCode(code);
             if (fieldType == null) {
                 throw new IOException("Unsupported table metadata field type " + code);
+            }
+            if (MetadataFieldType.UNKNOWN_METADATA_FIELD_TYPE.equals(fieldType)) {
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.fine("Received metadata field of unknown type");
+                }
+                continue;
             }
 
             int fieldLength = inputStream.readPackedInteger();
@@ -95,15 +103,8 @@ public class TableMapEventMetadataDeserializer {
                     break;
                 case ENUM_AND_SET_COLUMN_CHARSET:
                     result.setEnumAndSetColumnCharsets(readIntegers(inputStream));
-                    result.setVisibility(readBooleanList(inputStream, nColumns));
-                    break;
                 case VISIBILITY:
                     result.setVisibility(readBooleanList(inputStream, nColumns));
-                    break;
-                case UNKNOWN_METADATA_FIELD_TYPE:
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.fine("Received metadata field of unknown type");
-                    }
                     break;
                 default:
                     inputStream.enterBlock(remainingBytes);
@@ -114,11 +115,9 @@ public class TableMapEventMetadataDeserializer {
         return result;
     }
 
-    private static BitSet readBooleanList(ByteArrayInputStream inputStream, int length)
-            throws IOException {
+    private static BitSet readBooleanList(ByteArrayInputStream inputStream, int length) throws IOException {
         BitSet result = new BitSet();
-        // according to MySQL internals the amount of storage required for N columns is INT((N+7)/8)
-        // bytes
+        // according to MySQL internals the amount of storage required for N columns is INT((N+7)/8) bytes
         byte[] bytes = inputStream.read((length + 7) >> 3);
         for (int i = 0; i < length; ++i) {
             if ((bytes[i >> 3] & (1 << (7 - (i % 8)))) != 0) {
@@ -128,8 +127,7 @@ public class TableMapEventMetadataDeserializer {
         return result;
     }
 
-    private static DefaultCharset readDefaultCharset(ByteArrayInputStream inputStream)
-            throws IOException {
+    private static DefaultCharset readDefaultCharset(ByteArrayInputStream inputStream) throws IOException {
         TableMapEventMetadata.DefaultCharset result = new TableMapEventMetadata.DefaultCharset();
         result.setDefaultCharsetCollation(inputStream.readPackedInteger());
         Map<Integer, Integer> charsetCollations = readIntegerPairs(inputStream);
@@ -147,8 +145,7 @@ public class TableMapEventMetadataDeserializer {
         return result;
     }
 
-    private static List<String> readColumnNames(ByteArrayInputStream inputStream)
-            throws IOException {
+    private static List<String> readColumnNames(ByteArrayInputStream inputStream) throws IOException {
         List<String> columnNames = new ArrayList<String>();
         while (inputStream.available() > 0) {
             columnNames.add(inputStream.readLengthEncodedString());
@@ -156,8 +153,7 @@ public class TableMapEventMetadataDeserializer {
         return columnNames;
     }
 
-    private static List<String[]> readTypeValues(ByteArrayInputStream inputStream)
-            throws IOException {
+    private static List<String[]> readTypeValues(ByteArrayInputStream inputStream) throws IOException {
         List<String[]> result = new ArrayList<String[]>();
         while (inputStream.available() > 0) {
             List<String> typeValues = new ArrayList<String>();
@@ -170,8 +166,7 @@ public class TableMapEventMetadataDeserializer {
         return result;
     }
 
-    private static Map<Integer, Integer> readIntegerPairs(ByteArrayInputStream inputStream)
-            throws IOException {
+    private static Map<Integer, Integer> readIntegerPairs(ByteArrayInputStream inputStream) throws IOException {
         Map<Integer, Integer> result = new LinkedHashMap<Integer, Integer>();
         while (inputStream.available() > 0) {
             int columnIndex = inputStream.readPackedInteger();
@@ -182,20 +177,19 @@ public class TableMapEventMetadataDeserializer {
     }
 
     private enum MetadataFieldType {
-        SIGNEDNESS(1), // Signedness of numeric colums
-        DEFAULT_CHARSET(2), // Charsets of character columns
-        COLUMN_CHARSET(3), // Charsets of character columns
-        COLUMN_NAME(4), // Names of columns
-        SET_STR_VALUE(5), // The string values of SET columns
-        ENUM_STR_VALUE(6), // The string values is ENUM columns
-        GEOMETRY_TYPE(7), // The real type of geometry columns
-        SIMPLE_PRIMARY_KEY(8), // The primary key without any prefix
-        PRIMARY_KEY_WITH_PREFIX(9), // The primary key with some prefix
-        ENUM_AND_SET_DEFAULT_CHARSET(10), // Charsets of ENUM and SET columns
-        ENUM_AND_SET_COLUMN_CHARSET(11), // Charsets of ENUM and SET columns
-        VISIBILITY(12), // Column visibility (8.0.23 and newer)
-        UNKNOWN_METADATA_FIELD_TYPE(
-                128); // Returned with binlog-row-metadata=FULL from MySQL 8.0 in some cases
+        SIGNEDNESS(1),                      // Signedness of numeric colums
+        DEFAULT_CHARSET(2),                 // Charsets of character columns
+        COLUMN_CHARSET(3),                  // Charsets of character columns
+        COLUMN_NAME(4),                     // Names of columns
+        SET_STR_VALUE(5),                   // The string values of SET columns
+        ENUM_STR_VALUE(6),                  // The string values is ENUM columns
+        GEOMETRY_TYPE(7),                   // The real type of geometry columns
+        SIMPLE_PRIMARY_KEY(8),              // The primary key without any prefix
+        PRIMARY_KEY_WITH_PREFIX(9),         // The primary key with some prefix
+        ENUM_AND_SET_DEFAULT_CHARSET(10),   // Charsets of ENUM and SET columns
+        ENUM_AND_SET_COLUMN_CHARSET(11),    // Charsets of ENUM and SET columns
+        VISIBILITY(12),                     // Column visibility (8.0.23 and newer)
+        UNKNOWN_METADATA_FIELD_TYPE(128);   // Returned with binlog-row-metadata=FULL from MySQL 8.0 in some cases
 
         private final int code;
 
@@ -203,9 +197,7 @@ public class TableMapEventMetadataDeserializer {
             this.code = code;
         }
 
-        public int getCode() {
-            return code;
-        }
+        public int getCode() { return code; }
 
         private static final Map<Integer, MetadataFieldType> INDEX_BY_CODE;
 
