@@ -20,9 +20,9 @@ import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
-import org.apache.flink.table.data.binary.BinarySegmentUtils;
 
 import com.ververica.cdc.common.data.StringData;
+import com.ververica.cdc.common.data.binary.BinarySegmentUtils;
 import com.ververica.cdc.common.data.binary.BinaryStringData;
 import com.ververica.cdc.runtime.serializer.TypeSerializerSingleton;
 

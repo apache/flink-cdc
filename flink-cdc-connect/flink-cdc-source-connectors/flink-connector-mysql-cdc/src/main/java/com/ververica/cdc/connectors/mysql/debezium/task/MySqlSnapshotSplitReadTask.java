@@ -19,9 +19,11 @@ package com.ververica.cdc.connectors.mysql.debezium.task;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader;
+import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.utils.StatementUtils;
+import com.ververica.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import io.debezium.DebeziumException;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
@@ -68,7 +70,7 @@ public class MySqlSnapshotSplitReadTask
     /** Interval for showing a log statement with the progress while scanning a single table. */
     private static final Duration LOG_INTERVAL = Duration.ofMillis(10_000);
 
-    private final MySqlConnectorConfig connectorConfig;
+    private final MySqlSourceConfig sourceConfig;
     private final MySqlDatabaseSchema databaseSchema;
     private final MySqlConnection jdbcConnection;
     private final EventDispatcherImpl<TableId> dispatcher;
@@ -78,7 +80,11 @@ public class MySqlSnapshotSplitReadTask
     private final EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver;
     private final SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics;
 
+    private final SnapshotPhaseHooks hooks;
+    private final boolean isBackfillSkipped;
+
     public MySqlSnapshotSplitReadTask(
+            MySqlSourceConfig sourceConfig,
             MySqlConnectorConfig connectorConfig,
             SnapshotChangeEventSourceMetrics<MySqlPartition> snapshotChangeEventSourceMetrics,
             MySqlDatabaseSchema databaseSchema,
@@ -87,9 +93,11 @@ public class MySqlSnapshotSplitReadTask
             TopicSelector<TableId> topicSelector,
             EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver,
             Clock clock,
-            MySqlSnapshotSplit snapshotSplit) {
+            MySqlSnapshotSplit snapshotSplit,
+            SnapshotPhaseHooks hooks,
+            boolean isBackfillSkipped) {
         super(connectorConfig, snapshotChangeEventSourceMetrics);
-        this.connectorConfig = connectorConfig;
+        this.sourceConfig = sourceConfig;
         this.databaseSchema = databaseSchema;
         this.jdbcConnection = jdbcConnection;
         this.dispatcher = dispatcher;
@@ -98,6 +106,8 @@ public class MySqlSnapshotSplitReadTask
         this.topicSelector = topicSelector;
         this.snapshotReceiver = snapshotReceiver;
         this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
+        this.hooks = hooks;
+        this.isBackfillSkipped = isBackfillSkipped;
     }
 
     @Override
@@ -139,6 +149,9 @@ public class MySqlSnapshotSplitReadTask
                         topicSelector.topicNameFor(snapshotSplit.getTableId()),
                         dispatcher.getQueue());
 
+        if (hooks.getPreLowWatermarkAction() != null) {
+            hooks.getPreLowWatermarkAction().accept(jdbcConnection, snapshotSplit);
+        }
         final BinlogOffset lowWatermark = currentBinlogOffset(jdbcConnection);
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
@@ -149,10 +162,32 @@ public class MySqlSnapshotSplitReadTask
         signalEventDispatcher.dispatchWatermarkEvent(
                 snapshotSplit, lowWatermark, SignalEventDispatcher.WatermarkKind.LOW);
 
+        if (hooks.getPostLowWatermarkAction() != null) {
+            hooks.getPostLowWatermarkAction().accept(jdbcConnection, snapshotSplit);
+        }
+
         LOG.info("Snapshot step 2 - Snapshotting data");
         createDataEvents(ctx, snapshotSplit.getTableId());
 
-        final BinlogOffset highWatermark = currentBinlogOffset(jdbcConnection);
+        if (hooks.getPreHighWatermarkAction() != null) {
+            hooks.getPreHighWatermarkAction().accept(jdbcConnection, snapshotSplit);
+        }
+
+        BinlogOffset highWatermark;
+        if (isBackfillSkipped) {
+            // Directly set HW = LW if backfill is skipped. Binlog events created during snapshot
+            // phase could be processed later in binlog reading phase.
+            //
+            // Note that this behaviour downgrades the delivery guarantee to at-least-once. We can't
+            // promise that the snapshot is exactly the view of the table at low watermark moment,
+            // so binlog events created during snapshot might be replayed later in binlog reading
+            // phase.
+            highWatermark = lowWatermark;
+        } else {
+            // Get the current binlog offset as HW
+            highWatermark = currentBinlogOffset(jdbcConnection);
+        }
+
         LOG.info(
                 "Snapshot step 3 - Determining high watermark {} for split {}",
                 highWatermark,
@@ -162,6 +197,9 @@ public class MySqlSnapshotSplitReadTask
         ((SnapshotSplitReader.SnapshotSplitChangeEventSourceContextImpl) (context))
                 .setHighWatermark(highWatermark);
 
+        if (hooks.getPostHighWatermarkAction() != null) {
+            hooks.getPostHighWatermarkAction().accept(jdbcConnection, snapshotSplit);
+        }
         return SnapshotResult.completed(ctx.offset);
     }
 
@@ -224,7 +262,7 @@ public class MySqlSnapshotSplitReadTask
                                 snapshotSplit.getSplitStart(),
                                 snapshotSplit.getSplitEnd(),
                                 snapshotSplit.getSplitKeyType().getFieldCount(),
-                                connectorConfig.getQueryFetchSize());
+                                sourceConfig.getFetchSize());
                 ResultSet rs = selectStatement.executeQuery()) {
 
             ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);

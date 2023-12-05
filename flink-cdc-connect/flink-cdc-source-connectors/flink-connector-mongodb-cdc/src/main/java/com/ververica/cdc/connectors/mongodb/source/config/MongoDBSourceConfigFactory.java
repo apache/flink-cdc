@@ -62,6 +62,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     private boolean closeIdleReaders = false;
     private boolean enableFullDocPrePostImage = false;
     private boolean disableCursorTimeout = true;
+    protected boolean skipSnapshotBackfill = false;
 
     /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
     public MongoDBSourceConfigFactory scheme(String scheme) {
@@ -253,6 +254,16 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
+    /**
+     * Whether to backfill the log for each snapshot split in the snapshot phase. Enabling backfill
+     * log can provide exactly once semantics, otherwise only provides at-least once semantics. The
+     * default action is to backfill log in snapshot phase.");
+     */
+    public MongoDBSourceConfigFactory skipSnapshotBackfill(boolean skipSnapshotBackfill) {
+        this.skipSnapshotBackfill = skipSnapshotBackfill;
+        return this;
+    }
+
     /** Creates a new {@link MongoDBSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public MongoDBSourceConfig create(int subtaskId) {
@@ -276,6 +287,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 samplesPerChunk,
                 closeIdleReaders,
                 enableFullDocPrePostImage,
-                disableCursorTimeout);
+                disableCursorTimeout,
+                skipSnapshotBackfill);
     }
 }

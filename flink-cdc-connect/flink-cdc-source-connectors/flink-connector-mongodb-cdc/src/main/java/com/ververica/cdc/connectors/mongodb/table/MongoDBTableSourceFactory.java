@@ -36,6 +36,7 @@ import java.util.Set;
 
 import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_STARTUP_MODE;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static com.ververica.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
@@ -102,6 +103,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         boolean enableCloseIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
 
         int splitSizeMB = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB);
         int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
@@ -140,7 +142,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 samplesPerChunk,
                 enableCloseIdleReaders,
                 enableFullDocumentPrePostImage,
-                noCursorTimeout);
+                noCursorTimeout,
+                skipSnapshotBackfill);
     }
 
     private void checkPrimaryKey(UniqueConstraint pk, String message) {
@@ -215,6 +218,7 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(FULL_DOCUMENT_PRE_POST_IMAGE);
         options.add(SCAN_NO_CURSOR_TIMEOUT);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         return options;
     }
 }

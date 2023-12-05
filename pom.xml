@@ -72,6 +72,7 @@ under the License.
 
         <!-- dependencies versions -->
         <flink.version>1.18.0</flink.version>
+        <flink.major.version>1.18</flink.major.version>
         <debezium.version>1.9.7.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
         <geometry.version>2.2.0</geometry.version>
@@ -194,8 +195,8 @@ under the License.
         <dependency>
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
-            <type>jar</type>
             <version>${version.awaitility}</version>
+            <scope>test</scope>
         </dependency>
 
         <dependency>
@@ -406,6 +407,7 @@ under the License.
                 <configuration>
                     <forkCount>${flink.forkCount}</forkCount>
                     <reuseForks>${flink.reuseForks}</reuseForks>
+                    <trimStackTrace>false</trimStackTrace>
                     <systemPropertyVariables>
                         <forkNumber>0${surefire.forkNumber}</forkNumber>
                     </systemPropertyVariables>

@@ -61,7 +61,8 @@ public class OracleSourceConfig extends JdbcSourceConfig {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
-            String chunkKeyColumn) {
+            String chunkKeyColumn,
+            boolean skipSnapshotBackfill) {
         super(
                 startupOptions,
                 databaseList,
@@ -85,7 +86,8 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                skipSnapshotBackfill);
         this.url = url;
     }
 

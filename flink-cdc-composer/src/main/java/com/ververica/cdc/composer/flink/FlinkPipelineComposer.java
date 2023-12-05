@@ -16,10 +16,12 @@
 
 package com.ververica.cdc.composer.flink;
 
+import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import com.ververica.cdc.common.annotation.Internal;
+import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.factories.DataSinkFactory;
 import com.ververica.cdc.common.factories.FactoryHelper;
@@ -33,11 +35,20 @@ import com.ververica.cdc.composer.flink.coordination.OperatorIDGenerator;
 import com.ververica.cdc.composer.flink.translator.DataSinkTranslator;
 import com.ververica.cdc.composer.flink.translator.DataSourceTranslator;
 import com.ververica.cdc.composer.flink.translator.PartitioningTranslator;
+import com.ververica.cdc.composer.flink.translator.RouteTranslator;
 import com.ververica.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import com.ververica.cdc.composer.utils.FactoryDiscoveryUtils;
+import com.ververica.cdc.runtime.serializer.event.EventSerializer;
 
+import java.net.URI;
+import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 /** Composer for translating data pipeline to a Flink DataStream job. */
 @Internal
@@ -47,14 +58,31 @@ public class FlinkPipelineComposer implements PipelineComposer {
     private final boolean isBlocking;
 
     public static FlinkPipelineComposer ofRemoteCluster(
-            String host, int port, List<Path> additionalJars) {
-        String[] jarPaths = additionalJars.stream().map(Path::toString).toArray(String[]::new);
-        return new FlinkPipelineComposer(
-                StreamExecutionEnvironment.createRemoteEnvironment(host, port, jarPaths), false);
+            org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
+        org.apache.flink.configuration.Configuration effectiveConfiguration =
+                new org.apache.flink.configuration.Configuration();
+        // Use "remote" as the default target
+        effectiveConfiguration.set(DeploymentOptions.TARGET, "remote");
+        effectiveConfiguration.addAll(flinkConfig);
+        StreamExecutionEnvironment env = new StreamExecutionEnvironment(effectiveConfiguration);
+        additionalJars.forEach(
+                jarPath -> {
+                    try {
+                        FlinkEnvironmentUtils.addJar(env, jarPath.toUri().toURL());
+                    } catch (Exception e) {
+                        throw new RuntimeException(
+                                String.format(
+                                        "Unable to convert JAR path \"%s\" to URL when adding JAR to Flink environment",
+                                        jarPath),
+                                e);
+                    }
+                });
+        return new FlinkPipelineComposer(env, false);
     }
 
     public static FlinkPipelineComposer ofMiniCluster() {
-        return new FlinkPipelineComposer(StreamExecutionEnvironment.createLocalEnvironment(), true);
+        return new FlinkPipelineComposer(
+                StreamExecutionEnvironment.getExecutionEnvironment(), true);
     }
 
     private FlinkPipelineComposer(StreamExecutionEnvironment env, boolean isBlocking) {
@@ -70,10 +98,14 @@ public class FlinkPipelineComposer implements PipelineComposer {
         // Source
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
         DataStream<Event> stream =
-                sourceTranslator.translate(pipelineDef.getSource(), env, parallelism);
+                sourceTranslator.translate(pipelineDef.getSource(), env, pipelineDef.getConfig());
+
+        // Route
+        RouteTranslator routeTranslator = new RouteTranslator();
+        stream = routeTranslator.translate(stream, pipelineDef.getRoute());
 
         // Create sink in advance as schema operator requires MetadataApplier
-        DataSink dataSink = createDataSink(pipelineDef.getSink());
+        DataSink dataSink = createDataSink(pipelineDef.getSink(), pipelineDef.getConfig());
 
         // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
@@ -94,13 +126,17 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // Sink
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
-        sinkTranslator.translate(stream, dataSink, schemaOperatorIDGenerator.generate());
+        sinkTranslator.translate(
+                pipelineDef.getSink(), stream, dataSink, schemaOperatorIDGenerator.generate());
+
+        // Add framework JARs
+        addFrameworkJars();
 
         return new FlinkPipelineExecution(
                 env, pipelineDef.getConfig().get(PipelineOptions.PIPELINE_NAME), isBlocking);
     }
 
-    private DataSink createDataSink(SinkDef sinkDef) {
+    private DataSink createDataSink(SinkDef sinkDef, Configuration pipelineConfig) {
         // Search the data sink factory
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier(
@@ -113,8 +149,39 @@ public class FlinkPipelineComposer implements PipelineComposer {
         // Create data sink
         return sinkFactory.createDataSink(
                 new FactoryHelper.DefaultContext(
-                        sinkDef.getConfig().toMap(),
                         sinkDef.getConfig(),
+                        pipelineConfig,
                         Thread.currentThread().getContextClassLoader()));
+    }
+
+    private void addFrameworkJars() {
+        try {
+            Set<URI> frameworkJars = new HashSet<>();
+            // Common JAR
+            // We use the core interface (Event) to search the JAR
+            Optional<URL> commonJar = getContainingJar(Event.class);
+            if (commonJar.isPresent()) {
+                frameworkJars.add(commonJar.get().toURI());
+            }
+            // Runtime JAR
+            // We use the serializer of the core interface (EventSerializer) to search the JAR
+            Optional<URL> runtimeJar = getContainingJar(EventSerializer.class);
+            if (runtimeJar.isPresent()) {
+                frameworkJars.add(runtimeJar.get().toURI());
+            }
+            for (URI jar : frameworkJars) {
+                FlinkEnvironmentUtils.addJar(env, jar.toURL());
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to search and add Flink CDC framework JARs", e);
+        }
+    }
+
+    private Optional<URL> getContainingJar(Class<?> clazz) throws Exception {
+        URL container = clazz.getProtectionDomain().getCodeSource().getLocation();
+        if (Files.isDirectory(Paths.get(container.toURI()))) {
+            return Optional.empty();
+        }
+        return Optional.of(container);
     }
 }

@@ -21,11 +21,12 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
-import org.apache.flink.util.Preconditions;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+
+import static com.ververica.cdc.common.utils.Preconditions.checkNotNull;
 
 /**
  * A serializer for {@link Map}. The serializer relies on a key serializer and a value serializer
@@ -56,10 +57,9 @@ public final class MapSerializer<K, V> extends TypeSerializer<Map<K, V>> {
      * @param valueSerializer The serializer for the values in the map
      */
     public MapSerializer(TypeSerializer<K> keySerializer, TypeSerializer<V> valueSerializer) {
-        this.keySerializer =
-                Preconditions.checkNotNull(keySerializer, "The key serializer cannot be null");
+        this.keySerializer = checkNotNull(keySerializer, "The key serializer cannot be null");
         this.valueSerializer =
-                Preconditions.checkNotNull(valueSerializer, "The value serializer cannot be null.");
+                checkNotNull(valueSerializer, "The value serializer cannot be null.");
     }
 
     // ------------------------------------------------------------------------

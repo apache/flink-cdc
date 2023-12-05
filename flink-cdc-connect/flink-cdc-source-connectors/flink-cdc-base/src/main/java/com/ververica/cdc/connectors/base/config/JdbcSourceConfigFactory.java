@@ -55,6 +55,8 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected int connectionPoolSize = JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue();
     protected Properties dbzProperties;
     protected String chunkKeyColumn;
+    protected boolean skipSnapshotBackfill =
+            JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue();
 
     /** Integer port number of the database server. */
     public JdbcSourceConfigFactory hostname(String hostname) {
@@ -222,6 +224,21 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     public JdbcSourceConfigFactory closeIdleReaders(boolean closeIdleReaders) {
         this.closeIdleReaders = closeIdleReaders;
         return this;
+    }
+
+    /**
+     * Whether to skip backfill in snapshot reading phase.
+     *
+     * <p>If backfill is skipped, changes on captured tables during snapshot phase will be consumed
+     * later in binlog reading phase instead of being merged into the snapshot.
+     *
+     * <p>WARNING: Skipping backfill might lead to data inconsistency because some binlog events
+     * happened within the snapshot phase might be replayed (only at-least-once semantic is
+     * promised). For example updating an already updated value in snapshot, or deleting an already
+     * deleted entry in snapshot. These replayed binlog events should be handled specially.
+     */
+    public void skipSnapshotBackfill(boolean skipSnapshotBackfill) {
+        this.skipSnapshotBackfill = skipSnapshotBackfill;
     }
 
     @Override

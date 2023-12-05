@@ -71,18 +71,22 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
     public void execute(Context context) throws Exception {
 
         PostgresSourceFetchTaskContext ctx = (PostgresSourceFetchTaskContext) context;
+        PostgresSourceConfig sourceConfig = (PostgresSourceConfig) context.getSourceConfig();
         try {
             // create slot here,  because a slot can only read wal-log after its own creation.
-            createSlotForBackFillReadTask(
+            // if skip backfill, no need to create slot here
+            maybeCreateSlotForBackFillReadTask(
                     ctx.getConnection(),
                     ctx.getReplicationConnection(),
-                    ((PostgresSourceConfig) ctx.getSourceConfig()).getSlotNameForBackfillTask(),
-                    ctx.getPluginName());
+                    sourceConfig.getSlotNameForBackfillTask(),
+                    ctx.getPluginName(),
+                    sourceConfig.isSkipSnapshotBackfill());
             super.execute(context);
         } finally {
             // remove slot after snapshot slit finish
-            dropSlotForBackFillReadTask(
-                    (PostgresReplicationConnection) ctx.getReplicationConnection());
+            maybeDropSlotForBackFillReadTask(
+                    (PostgresReplicationConnection) ctx.getReplicationConnection(),
+                    sourceConfig.isSkipSnapshotBackfill());
         }
     }
 
@@ -149,11 +153,17 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
      * Create a slot before snapshot reading so that the slot can track the WAL log during the
      * snapshot reading phase.
      */
-    private void createSlotForBackFillReadTask(
+    private void maybeCreateSlotForBackFillReadTask(
             PostgresConnection jdbcConnection,
             ReplicationConnection replicationConnection,
             String slotName,
-            String pluginName) {
+            String pluginName,
+            boolean skipSnapshotBackfill) {
+        // if skip backfill, no need to create slot here
+        if (skipSnapshotBackfill) {
+            return;
+        }
+
         try {
             SlotState slotInfo = null;
             try {
@@ -180,10 +190,17 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
     }
 
     /** Drop slot for backfill task and close replication connection. */
-    private void dropSlotForBackFillReadTask(PostgresReplicationConnection replicationConnection) {
+    private void maybeDropSlotForBackFillReadTask(
+            PostgresReplicationConnection replicationConnection, boolean skipSnapshotBackfill) {
+        // if skip backfill, no need to create slot here
+        if (skipSnapshotBackfill) {
+            return;
+        }
+
         try {
             replicationConnection.close(true);
         } catch (Throwable t) {
+            LOG.info("here exception occurs");
             throw new FlinkRuntimeException(t);
         }
     }

@@ -149,3 +149,20 @@ VALUES ('', 0, 'flink'),
        ('E', 2, 'flink'),
        ('e', 4, 'flink'),
        ('E', 3, 'flink');
+
+CREATE TABLE `varbinary_base64_table`
+(
+    `id`         int(11) NOT NULL,
+    `order_id`   varbinary(8) NOT NULL,
+    `order_date` date         NOT NULL,
+    `quantity`   int(11) NOT NULL,
+    `product_id` int(11) NOT NULL,
+    `purchaser`  varchar(512) NOT NULL,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+INSERT INTO varbinary_base64_table
+VALUES (1, b'0000010000000100000001000000010000000100000001000000010000000000', '2021-03-08', 0, 0, 'flink'),
+       (2, b'0000010000000100000001000000010000000100000001000000010000000001', '2021-03-08', 10, 100, 'flink'),
+       (3, b'0000010000000100000001000000010000000100000001000000010000000010', '2021-03-08', 20, 200, 'flink'),
+       (4, b'0000010000000100000001000000010000000100000001000000010000000011', '2021-03-08', 30, 300, 'flink'),
+       (5, b'0000010000000100000001000000010000000100000001000000010000000100', '2021-03-08', 40, 400, 'flink');

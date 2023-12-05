@@ -27,8 +27,8 @@ import org.apache.flink.core.memory.DataOutputView;
 import java.io.IOException;
 import java.util.Arrays;
 
-import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
+import static com.ververica.cdc.common.utils.Preconditions.checkArgument;
+import static com.ververica.cdc.common.utils.Preconditions.checkNotNull;
 
 /**
  * A NestedSerializersSnapshotDelegate represents the snapshots of multiple serializers that are

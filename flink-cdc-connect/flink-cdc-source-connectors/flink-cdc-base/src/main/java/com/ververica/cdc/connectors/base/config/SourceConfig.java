@@ -35,6 +35,8 @@ public interface SourceConfig extends Serializable {
 
     boolean isCloseIdleReaders();
 
+    boolean isSkipSnapshotBackfill();
+
     /** Factory for the {@code SourceConfig}. */
     @FunctionalInterface
     interface Factory<C extends SourceConfig> extends Serializable {
