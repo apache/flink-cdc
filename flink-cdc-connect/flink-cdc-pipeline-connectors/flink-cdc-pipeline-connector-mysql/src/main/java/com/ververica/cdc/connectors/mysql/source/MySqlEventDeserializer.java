@@ -37,7 +37,6 @@ import org.apache.kafka.connect.source.SourceRecord;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.time.ZoneId;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -63,10 +62,8 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private transient CustomMySqlAntlrDdlParser customParser;
 
     public MySqlEventDeserializer(
-            DebeziumChangelogMode changelogMode,
-            ZoneId serverTimeZone,
-            boolean includeSchemaChanges) {
-        super(new MySqlSchemaDataTypeInference(), changelogMode, serverTimeZone);
+            DebeziumChangelogMode changelogMode, boolean includeSchemaChanges) {
+        super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
     }
 
