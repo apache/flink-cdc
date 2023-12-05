@@ -30,9 +30,10 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/** Copied from mysql-binlog-connector 0.25.3 to fix table metadata deserialization issue #363.
- * Line 66: skip to end of the signedness block so that it won't affect parsing the next table metadata.
- * */
+/**
+ * Copied from mysql-binlog-connector 0.25.3 to fix table metadata deserialization issue #363. Line
+ * 66: skip to end of the signedness block so that it won't affect parsing the next table metadata.
+ */
 public class TableMapEventMetadataDeserializer {
 
     private final Logger logger = Logger.getLogger(getClass().getName());
