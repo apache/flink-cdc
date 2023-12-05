@@ -70,6 +70,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     private final String rsList;
     private final String configUrl;
     private final String workingMode;
+    private final Properties obcdcProperties;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -103,7 +104,8 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
             Long startupTimestamp,
             String rsList,
             String configUrl,
-            String workingMode) {
+            String workingMode,
+            Properties obcdcProperties) {
         this.physicalSchema = physicalSchema;
         this.startupMode = checkNotNull(startupMode);
         this.username = checkNotNull(username);
@@ -126,6 +128,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
         this.rsList = rsList;
         this.configUrl = configUrl;
         this.workingMode = workingMode;
+        this.obcdcProperties = obcdcProperties;
 
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
@@ -174,6 +177,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         .rsList(rsList)
                         .configUrl(configUrl)
                         .workingMode(workingMode)
+                        .obcdcProperties(obcdcProperties)
                         .deserializer(deserializer);
         return SourceFunctionProvider.of(builder.build(), false);
     }
@@ -233,7 +237,8 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         startupTimestamp,
                         rsList,
                         configUrl,
-                        workingMode);
+                        workingMode,
+                        obcdcProperties);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -270,6 +275,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(this.rsList, that.rsList)
                 && Objects.equals(this.configUrl, that.configUrl)
                 && Objects.equals(this.workingMode, that.workingMode)
+                && Objects.equals(this.obcdcProperties, that.obcdcProperties)
                 && Objects.equals(this.producedDataType, that.producedDataType)
                 && Objects.equals(this.metadataKeys, that.metadataKeys);
     }
@@ -299,6 +305,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 rsList,
                 configUrl,
                 workingMode,
+                obcdcProperties,
                 producedDataType,
                 metadataKeys);
     }
