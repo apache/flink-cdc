@@ -165,7 +165,8 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
                     try {
                         isSuspended = in.readBoolean();
                     } catch (EOFException e) {
-                        // cdc version <= v2.2.0 does not serialize isSuspended value, skip reading it
+                        // cdc version <= v2.2.0 does not serialize isSuspended value, skip reading
+                        // it
                     }
                 }
             }
