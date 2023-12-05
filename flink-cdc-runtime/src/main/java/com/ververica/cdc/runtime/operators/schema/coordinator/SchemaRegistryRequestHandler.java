@@ -116,8 +116,9 @@ public class SchemaRegistryRequestHandler {
         CompletableFuture<CoordinationResponse> response =
                 pendingSchemaChanges.get(0).getResponseFuture();
         if (response.isDone()) {
-            pendingSchemaChanges.remove(0);
             startNextSchemaChangeRequest();
+        } else {
+            pendingSchemaChanges.get(0).receiveReleaseRequest();
         }
         return response;
     }
@@ -155,6 +156,7 @@ public class SchemaRegistryRequestHandler {
     }
 
     private void startNextSchemaChangeRequest() {
+        pendingSchemaChanges.remove(0);
         flushedSinkWriters.clear();
         while (!pendingSchemaChanges.isEmpty()) {
             PendingSchemaChange pendingSchemaChange = pendingSchemaChanges.get(0);
