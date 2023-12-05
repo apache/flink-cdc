@@ -29,17 +29,17 @@ under the License.
         <dependency>
             <groupId>com.ververica</groupId>
             <artifactId>flink-cdc-common</artifactId>
-            <version>${revision}</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.ververica</groupId>
             <artifactId>flink-cdc-runtime</artifactId>
-            <version>${revision}</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.ververica</groupId>
             <artifactId>flink-cdc-pipeline-connector-values</artifactId>
-            <version>${revision}</version>
+            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
