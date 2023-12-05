@@ -426,8 +426,12 @@ public class DataTypes {
         return dataType.accept(LENGTH_EXTRACTOR);
     }
 
-    private static final PrecisionExtractor PRECISION_EXTRACTOR = new PrecisionExtractor();
+    public static OptionalInt getScale(DataType dataType) {
+        return dataType.accept(SCALE_EXTRACTOR);
+    }
 
+    private static final PrecisionExtractor PRECISION_EXTRACTOR = new PrecisionExtractor();
+    private static final ScaleExtractor SCALE_EXTRACTOR = new ScaleExtractor();
     private static final LengthExtractor LENGTH_EXTRACTOR = new LengthExtractor();
 
     private static class PrecisionExtractor extends DataTypeDefaultVisitor<OptionalInt> {
@@ -455,6 +459,18 @@ public class DataTypes {
         @Override
         public OptionalInt visit(ZonedTimestampType zonedTimestampType) {
             return OptionalInt.of(zonedTimestampType.getPrecision());
+        }
+
+        @Override
+        protected OptionalInt defaultMethod(DataType dataType) {
+            return OptionalInt.empty();
+        }
+    }
+
+    private static class ScaleExtractor extends DataTypeDefaultVisitor<OptionalInt> {
+        @Override
+        public OptionalInt visit(DecimalType decimalType) {
+            return OptionalInt.of(decimalType.getScale());
         }
 
         @Override
