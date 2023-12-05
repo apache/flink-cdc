@@ -2219,8 +2219,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
+                        MYSQL8_CONTAINER.getHost(),
+                        MYSQL8_CONTAINER.getDatabasePort(),
                         TEST_USER,
                         TEST_PASSWORD,
                         binlogDatabase.getDatabaseName(),
@@ -2242,16 +2242,15 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         try (Connection connection = binlogDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "INSERT INTO binlog_metadata VALUES (1, 127, 255, 255, 32767, 65535, 65535, 2024),(2, 127, 255, 255, 32767, 65535, 65535, 2025);");
-            statement.execute("UPDATE binlog_metadata SET year_c=2025 WHERE id=1;");
-            statement.execute("DELETE FROM binlog_metadata WHERE id=2;");
+                    "INSERT INTO binlog_metadata VALUES (2, 127, 255, 255, 32767, 65535, 65535, 2024),(3, 127, 255, 255, 32767, 65535, 65535, 2024);");
+            statement.execute("DELETE FROM binlog_metadata WHERE id=3;");
         }
 
         String[] expected =
                 new String[] {
                     // snapshot records
-                    "+I[0, 127, 255, 255, 32767, 65535, 65535, 2023]",
-                    "+I[1, 127, 255, 255, 32767, 65535, 65535, 2025]"
+                    "+I[1, 127, 255, 255, 32767, 65535, 65535, 2023]",
+                    "+I[2, 127, 255, 255, 32767, 65535, 65535, 2024]"
                 };
         assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();

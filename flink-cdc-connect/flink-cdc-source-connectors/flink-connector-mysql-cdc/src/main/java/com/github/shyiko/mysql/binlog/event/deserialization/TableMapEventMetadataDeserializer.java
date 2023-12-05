@@ -31,7 +31,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Copied from mysql-binlog-connector 0.25.3 to fix table metadata deserialization issue #363.
+ * Copied from mysql-binlog-connector 0.27.2 to fix table metadata deserialization issue #363.
  *
  * <p>Line 74: skip to end of the signedness block so that it won't affect parsing the next table metadata.
  */
