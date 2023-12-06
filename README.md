@@ -45,7 +45,7 @@ source:
   port: 3306
   username: admin
   password: pass
-  table: adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*
+  table: db0.commodity, db1.user_table_[0-9]+, [app|web]_order_\.*
 
 sink:
   type: doris
