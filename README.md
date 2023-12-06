@@ -32,8 +32,11 @@ This README is meant as a brief walkthrough on the core features of CDC Connecto
 The example shows how to continuously synchronize data, including snapshot data and incremental data, from multiple business tables in MySQL database to Doris for creating the ODS layer.
 
 1. Download and extract the flink-cdc-3.0.tar file to a local directory.
-2. Download the required CDC Pipeline Connector JAR from Maven and place it in the lib directory (automated pulling using a script can be optimized in the future).
+2. Download the required CDC Pipeline Connector JAR from Maven and place it in the lib directory.
 3. Configure the FLINK_HOME environment variable to load the Flink cluster configuration from the flink-conf.yaml file located in the $FLINK_HOME/conf directory.
+```bash
+export FLINK_HOME=/path/to/your/flink/home
+```
 4. Write Flink CDC task YAML.
 ```yaml
 source:
@@ -58,7 +61,7 @@ pipeline:
 ```bash
 # Submit Pipeline
 $ ./bin/flink-cdc.sh mysql-to-doris.yaml
-Pipeline "mysql-sync-kafka" is submitted with Job ID "DEADBEEF".
+Pipeline "mysql-sync-doris" is submitted with Job ID "DEADBEEF".
 ```
 
 During the execution of the flink-cdc.sh script, the CDC task configuration is parsed and translated into a DataStream job, which is then submitted to the specified Flink cluster.
