@@ -28,7 +28,7 @@ sink:
   password: pass
 
 pipeline:
-   name: MySQL Doris Pipeline
+   name: MySQL to Doris Pipeline
    parallelism: 4
 ```
 
@@ -55,6 +55,13 @@ Pipeline 连接器选项
       <td> MySQL 数据库服务器的 IP 地址或主机名。</td>
     </tr>
     <tr>
+      <td>port</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">3306</td>
+      <td>Integer</td>
+      <td>MySQL 数据库服务器的整数端口号。</td>
+    </tr>
+    <tr>
       <td>username</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -79,17 +86,10 @@ Pipeline 连接器选项
     </tr>
     <tr>
       <td>schema-change.enabled</td>
-      <td>required</td>
+      <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>是否发送模式更改事件，下游 sink 可以响应模式变更事件实现表结构同步，默认为true。</td>
-    </tr>
-    <tr>
-      <td>port</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">3306</td>
-      <td>Integer</td>
-      <td>MySQL 数据库服务器的整数端口号。</td>
     </tr>
     <tr>
       <td>server-id</td>

@@ -28,7 +28,7 @@ sink:
   password: pass
 
 pipeline:
-   name: MySQL Doris Pipeline
+   name: MySQL to Doris Pipeline
    parallelism: 4
 ```
 
@@ -53,6 +53,13 @@ Pipeline Connector Options
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>IP address or hostname of the MySQL database server.</td>
+    </tr>
+    <tr>
+      <td>port</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">3306</td>
+      <td>Integer</td>
+      <td>Integer port number of the MySQL database server.</td>
     </tr>
     <tr>
       <td>username</td>
@@ -80,17 +87,10 @@ Pipeline Connector Options
     </tr>
     <tr>
       <td>schema-change.enabled</td>
-      <td>required</td>
+      <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>Whether to send schema change events, so that downstream sinks can respond to schema changes and achieve table structure synchronization.</td>
-    </tr>
-    <tr>
-      <td>port</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">3306</td>
-      <td>Integer</td>
-      <td>Integer port number of the MySQL database server.</td>
     </tr>
     <tr>
       <td>server-id</td>
