@@ -27,7 +27,7 @@ This README is meant as a brief walkthrough on the core features of CDC Connecto
 
 ## Quick Start
 
-### Usage for Pipeline Connectors
+### Usage for CDC Streaming ELT Framework
 
 The example shows how to continuously synchronize data, including snapshot data and incremental data, from multiple business tables in MySQL database to Doris for creating the ODS layer.
 
