@@ -25,8 +25,8 @@ sink:
   bootstrap-servers: localhost:9092
 
 route:
-  - sourceTable: mydb.default.app_order_.*
-    sinkTable: odsdb.default.app_order
+  - source-table: mydb.default.app_order_.*
+    sink-table: odsdb.default.app_order
 
 pipeline:
   parallelism: 4

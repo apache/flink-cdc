@@ -27,8 +27,8 @@ import java.util.Optional;
  * <p>A router definition contains:
  *
  * <ul>
- *   <li>matcher: a regex pattern for matching input table IDs. Required for the definition.
- *   <li>replace: a string for replacing matched table IDs as output. Required for the definition.
+ *   <li>sourceTable: a regex pattern for matching input table IDs. Required for the definition.
+ *   <li>sinkTable: a string for replacing matched table IDs as output. Required for the definition.
  *   <li>description: description for the router. Optional for the definition.
  * </ul>
  */
@@ -58,9 +58,9 @@ public class RouteDef {
     @Override
     public String toString() {
         return "RouteDef{"
-                + "matcher="
+                + "sourceTable="
                 + sourceTable
-                + ", replace="
+                + ", sinkTable="
                 + sinkTable
                 + ", description='"
                 + description
