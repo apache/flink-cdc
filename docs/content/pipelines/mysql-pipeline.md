@@ -17,7 +17,7 @@ source:
    port: 3306
    username: admin
    password: pass
-   table: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\\.*
+   table: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
    server-id: 5401-5404
 
 sink:
@@ -370,14 +370,14 @@ Data Type Mapping
     <tr>
       <td>TIMESTAMP [(p)]
       </td>
-      <td>TIMESTAMP [(p)]
+      <td>TIMESTAMP_LTZ [(p)]
       </td>
       <td></td>
     </tr>
     <tr>
       <td>DATETIME [(p)]
       </td>
-      <td>TIMESTAMP_LTZ [(p)]
+      <td>TIMESTAMP [(p)]
       </td>
       <td></td>
     </tr>

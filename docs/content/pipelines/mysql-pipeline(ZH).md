@@ -17,7 +17,7 @@ source:
    port: 3306
    username: admin
    password: pass
-   table: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\\.*
+   table: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
    server-id: 5401-5404
 
 sink:
@@ -199,7 +199,7 @@ Pipeline 连接器选项
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
-          For example: <code>'debezium.snapshot.mode' = 'never'</code>.
+          例如: <code>'debezium.snapshot.mode' = 'never'</code>.
           查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
     </tr>
     <tr>
@@ -362,14 +362,14 @@ Pipeline 连接器选项
     <tr>
       <td>TIMESTAMP [(p)]
       </td>
-      <td>TIMESTAMP [(p)]
+      <td>TIMESTAMP_LTZ [(p)]
       </td>
       <td></td>
     </tr>
     <tr>
       <td>DATETIME [(p)]
       </td>
-      <td>TIMESTAMP_LTZ [(p)]
+      <td>TIMESTAMP [(p)]
       </td>
       <td></td>
     </tr>
