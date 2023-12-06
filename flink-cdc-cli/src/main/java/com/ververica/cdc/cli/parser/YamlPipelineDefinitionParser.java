@@ -148,7 +148,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     }
 
     private Configuration toPipelineConfig(JsonNode pipelineConfigNode) {
-        if (pipelineConfigNode == null) {
+        if (pipelineConfigNode == null || pipelineConfigNode.isNull()) {
             return new Configuration();
         }
         Map<String, String> pipelineConfigMap =
