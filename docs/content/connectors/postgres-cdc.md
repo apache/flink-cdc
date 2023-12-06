@@ -206,6 +206,13 @@ Connector Options
               Please see <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a>section for more detailed information.
           </td>
     </tr>
+    <tr>
+      <td>scan.incremental.close-idle-reader.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' (If the flink version is greater than or equal to 1.15, the default value has been changed to true, so it does not need to be explicitly configured) is set to true.</td>
+    </tr>
     </tbody>
     </table>
 </div>

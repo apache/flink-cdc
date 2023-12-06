@@ -327,7 +327,7 @@ During a snapshot operation, the connector will query each included table to pro
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.</td>
+      <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' (If the flink version is greater than or equal to 1.15, the default value has been changed to true, so it does not need to be explicitly configured) is set to true.</td>
     </tr>
     <tr>
       <td>debezium.binary.handling.mode</td>
@@ -920,7 +920,7 @@ Data Type Mapping
       <td>
         BIT(n)
       </td>
-      <td>BINARY(⌈n/8⌉)</td>
+      <td>BINARY(⌈(n + 7) / 8⌉)</td>
       <td></td>
     </tr>
     <tr>
