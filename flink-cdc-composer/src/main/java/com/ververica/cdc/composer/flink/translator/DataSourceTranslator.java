@@ -62,7 +62,7 @@ public class DataSourceTranslator {
                 .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
 
         // Get source provider
-        final int sourceParallelism = pipelineConfig.get(PipelineOptions.GLOBAL_PARALLELISM);
+        final int sourceParallelism = pipelineConfig.get(PipelineOptions.PIPELINE_PARALLELISM);
         EventSourceProvider eventSourceProvider = dataSource.getEventSourceProvider();
         if (eventSourceProvider instanceof FlinkSourceProvider) {
             // Source
