@@ -27,13 +27,14 @@ This README is meant as a brief walkthrough on the core features of CDC Connecto
 
 ## Quick Start
 
+### Usage for Pipeline Connectors
+
 The example shows how to continuously synchronize data, including snapshot data and incremental data, from multiple business tables in MySQL database to Doris for creating the ODS layer.
 
-1. Install Flink CDC and required dependencies.
-   1. Download and extract the flink-cdc-3.0.tar file to a local directory.
-   2. Download the required CDC Pipeline Connector JAR from Maven and place it in the lib directory (automated pulling using a script can be optimized in the future).
-   3. Configure the FLINK_HOME environment variable to load the Flink cluster configuration from the flink-conf.yaml file located in the $FLINK_HOME/conf directory.
-2. Write Flink CDC task YAML. 
+1. Download and extract the flink-cdc-3.0.tar file to a local directory.
+2. Download the required CDC Pipeline Connector JAR from Maven and place it in the lib directory (automated pulling using a script can be optimized in the future).
+3. Configure the FLINK_HOME environment variable to load the Flink cluster configuration from the flink-conf.yaml file located in the $FLINK_HOME/conf directory.
+4. Write Flink CDC task YAML.
 ```yaml
 source:
   type: mysql
@@ -53,7 +54,7 @@ pipeline:
   name: mysql-sync-doris
   parallelism: 4
 ```
-3. Submit the job to Flink cluster.
+5. Submit the job to Flink cluster.
 ```bash
 # Submit Pipeline
 $ ./bin/flink-cdc.sh mysql-to-doris.yaml
@@ -61,6 +62,88 @@ Pipeline "mysql-sync-kafka" is submitted with Job ID "DEADBEEF".
 ```
 
 During the execution of the flink-cdc.sh script, the CDC task configuration is parsed and translated into a DataStream job, which is then submitted to the specified Flink cluster.
+
+### Usage for Source Connectors
+
+#### Usage for Table/SQL API
+
+We need several steps to setup a Flink cluster with the provided connector.
+
+1. Setup a Flink cluster with version 1.14+ and Java 8+ installed.
+2. Download the connector SQL jars from the [Download](https://github.com/ververica/flink-cdc-connectors/releases) page (or [build yourself](#building-from-source)).
+3. Put the downloaded jars under `FLINK_HOME/lib/`.
+4. Restart the Flink cluster.
+
+The example shows how to create a MySQL CDC source in [Flink SQL Client](https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/table/sqlclient/) and execute queries on it.
+
+```sql
+-- creates a mysql cdc table source
+CREATE TABLE mysql_binlog (
+ id INT NOT NULL,
+ name STRING,
+ description STRING,
+ weight DECIMAL(10,3)
+) WITH (
+ 'connector' = 'mysql-cdc',
+ 'hostname' = 'localhost',
+ 'port' = '3306',
+ 'username' = 'flinkuser',
+ 'password' = 'flinkpw',
+ 'database-name' = 'inventory',
+ 'table-name' = 'products'
+);
+
+-- read snapshot and binlog data from mysql, and do some transformation, and show on the client
+SELECT id, UPPER(name), description, weight FROM mysql_binlog;
+```
+
+#### Usage for DataStream API
+
+Include following Maven dependency (available through Maven Central):
+
+```
+<dependency>
+  <groupId>com.ververica</groupId>
+  <!-- add the dependency matching your database -->
+  <artifactId>flink-connector-mysql-cdc</artifactId>
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself. -->
+  <version>2.5-SNAPSHOT</version>
+</dependency>
+```
+
+```java
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.mysql.source.MySqlSource;
+
+public class MySqlSourceExample {
+  public static void main(String[] args) throws Exception {
+    MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
+            .hostname("yourHostname")
+            .port(yourPort)
+            .databaseList("yourDatabaseName") // set captured database
+            .tableList("yourDatabaseName.yourTableName") // set captured table
+            .username("yourUsername")
+            .password("yourPassword")
+            .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+            .build();
+
+    StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+    // enable checkpoint
+    env.enableCheckpointing(3000);
+
+    env
+      .fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySQL Source")
+      // set 4 parallel source tasks
+      .setParallelism(4)
+      .print().setParallelism(1); // use parallelism 1 for sink to keep message ordering
+
+    env.execute("Print MySQL Snapshot + Binlog");
+  }
+}
+```
 
 ## Building from source
 
