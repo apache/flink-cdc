@@ -430,13 +430,6 @@ Pipeline 连接器选项
     </tr>
     <tr>
       <td>
-        YEAR
-      </td>
-      <td>INT</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>
         ENUM
       </td>
       <td>STRING</td>

@@ -1,6 +1,6 @@
 # MySQL CDC Pipeline Connector
 
-The MySQL CDC connector allows for reading snapshot data and incremental data from MySQL database and provides end-to-end full-database data synchronization capabilities.
+The MySQL CDC Pipeline Connector allows for reading snapshot data and incremental data from MySQL database and provides end-to-end full-database data synchronization capabilities.
 This document describes how to setup the MySQL CDC Pipeline connector.
 
 
@@ -435,13 +435,6 @@ Data Type Mapping
       </td>
       <td>BYTES</td>
       <td>Currently, for BLOB data type in MySQL, only the blob whose length isn't greater than 2,147,483,647(2 ** 31 - 1) is supported. </td>
-    </tr>
-    <tr>
-      <td>
-        YEAR
-      </td>
-      <td>INT</td>
-      <td></td>
     </tr>
     <tr>
       <td>
