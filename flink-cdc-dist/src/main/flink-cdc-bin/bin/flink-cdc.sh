@@ -44,6 +44,7 @@ FLINK_CONF_DIR=$FLINK_HOME/conf
 # Define Flink CDC directories
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 FLINK_CDC_HOME="$SCRIPT_DIR"/..
+export FLINK_CDC_HOME=$FLINK_CDC_HOME
 FLINK_CDC_CONF="$FLINK_CDC_HOME"/conf
 FLINK_CDC_LIB="$FLINK_CDC_HOME"/lib
 FLINK_CDC_LOG="$FLINK_CDC_HOME"/log

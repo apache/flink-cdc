@@ -289,6 +289,17 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     new AddColumnEvent.ColumnWithPosition(
                                             Column.physicalColumn(
                                                     "cols4", DataTypes.VARCHAR(55))))));
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`products` ADD COLUMN `cols5` BIT NULL;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            tableId,
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn("cols5", DataTypes.BOOLEAN())))));
         }
         List<Event> actual = fetchResults(events, expected.size());
         assertThat(actual).isEqualTo(expected);

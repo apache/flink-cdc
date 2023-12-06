@@ -225,11 +225,14 @@ public class StarRocksUtils {
     public static final String DATETIME = "DATETIME";
     public static final String JSON = "JSON";
 
+    /** Max size of char type of StarRocks. */
+    public static final int MAX_CHAR_SIZE = 255;
+
     /** Max size of varchar type of StarRocks. */
     public static final int MAX_VARCHAR_SIZE = 1048576;
 
     /** Transforms CDC {@link DataType} to StarRocks data type. */
-    private static class CdcDataTypeTransformer
+    public static class CdcDataTypeTransformer
             extends DataTypeDefaultVisitor<StarRocksColumn.Builder> {
 
         private final StarRocksColumn.Builder builder;
@@ -298,17 +301,37 @@ public class StarRocksUtils {
 
         @Override
         public StarRocksColumn.Builder visit(CharType charType) {
-            builder.setDataType(CHAR);
-            builder.setNullable(charType.isNullable());
-            builder.setColumnSize(charType.getLength());
+            // CDC and StarRocks use different units for the length. It's the number
+            // of characters in CDC, and the number of bytes in StarRocks. One chinese
+            // character will use 3 bytes because it uses UTF-8, so the length of StarRocks
+            // char type should be three times as that of CDC char type. Specifically, if
+            // the length of StarRocks exceeds the MAX_CHAR_SIZE, map CDC char type to StarRocks
+            // varchar type
+            int length = charType.getLength();
+            long starRocksLength = length * 3L;
+            if (starRocksLength <= MAX_CHAR_SIZE) {
+                builder.setDataType(CHAR);
+                builder.setNullable(charType.isNullable());
+                builder.setColumnSize((int) starRocksLength);
+            } else {
+                builder.setDataType(VARCHAR);
+                builder.setNullable(charType.isNullable());
+                builder.setColumnSize((int) Math.min(starRocksLength, MAX_VARCHAR_SIZE));
+            }
             return builder;
         }
 
         @Override
         public StarRocksColumn.Builder visit(VarCharType varCharType) {
+            // CDC and StarRocks use different units for the length. It's the number
+            // of characters in CDC, and the number of bytes in StarRocks. One chinese
+            // character will use 3 bytes because it uses UTF-8, so the length of StarRocks
+            // varchar type should be three times as that of CDC varchar type.
+            int length = varCharType.getLength();
+            long starRocksLength = length * 3L;
             builder.setDataType(VARCHAR);
             builder.setNullable(varCharType.isNullable());
-            builder.setColumnSize(Math.min(varCharType.getLength(), MAX_VARCHAR_SIZE));
+            builder.setColumnSize((int) Math.min(starRocksLength, MAX_VARCHAR_SIZE));
             return builder;
         }
 

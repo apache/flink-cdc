@@ -28,8 +28,6 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory
 import com.ververica.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEmitter;
 import com.ververica.cdc.debezium.table.DebeziumChangelogMode;
 
-import java.time.ZoneId;
-
 /** A {@link DataSource} for mysql cdc connector. */
 @Internal
 public class MySqlDataSource implements DataSource {
@@ -46,9 +44,7 @@ public class MySqlDataSource implements DataSource {
     public EventSourceProvider getEventSourceProvider() {
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
-                        DebeziumChangelogMode.ALL,
-                        ZoneId.of(sourceConfig.getServerTimeZone()),
-                        sourceConfig.isIncludeSchemaChanges());
+                        DebeziumChangelogMode.ALL, sourceConfig.isIncludeSchemaChanges());
 
         MySqlSource<Event> source =
                 new MySqlSource<>(

@@ -140,6 +140,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
                 new GenericContainer<>(getFlinkDockerImageTag())
                         .withCommand("jobmanager")
                         .withNetwork(NETWORK)
+                        .withExtraHost("host.docker.internal", "host-gateway")
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
                         .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
@@ -147,6 +148,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
         taskManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
                         .withCommand("taskmanager")
+                        .withExtraHost("host.docker.internal", "host-gateway")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
                         .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)

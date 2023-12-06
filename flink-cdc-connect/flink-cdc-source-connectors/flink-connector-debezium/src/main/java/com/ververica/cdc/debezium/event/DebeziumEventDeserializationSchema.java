@@ -57,8 +57,6 @@ import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -83,16 +81,10 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     /** Changelog Mode to use for encoding changes in Flink internal data structure. */
     protected final DebeziumChangelogMode changelogMode;
 
-    /** The session time zone in database server. */
-    protected final ZoneId serverTimeZone;
-
     public DebeziumEventDeserializationSchema(
-            SchemaDataTypeInference schemaDataTypeInference,
-            DebeziumChangelogMode changelogMode,
-            ZoneId serverTimeZone) {
+            SchemaDataTypeInference schemaDataTypeInference, DebeziumChangelogMode changelogMode) {
         this.schemaDataTypeInference = schemaDataTypeInference;
         this.changelogMode = changelogMode;
-        this.serverTimeZone = serverTimeZone;
     }
 
     @Override
@@ -322,8 +314,11 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                     return TimestampData.fromMillis(nano / 1000_000, (int) (nano % 1000_000));
             }
         }
-        LocalDateTime localDateTime = TemporalConversions.toLocalDateTime(dbzObj, serverTimeZone);
-        return TimestampData.fromLocalDateTime(localDateTime);
+        throw new IllegalArgumentException(
+                "Unable to convert to TIMESTAMP from unexpected value '"
+                        + dbzObj
+                        + "' of type "
+                        + dbzObj.getClass().getName());
     }
 
     protected Object convertToLocalTimeZoneTimestamp(Object dbzObj, Schema schema) {
@@ -334,7 +329,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
             return LocalZonedTimestampData.fromInstant(instant);
         }
         throw new IllegalArgumentException(
-                "Unable to convert to TimestampData from unexpected value '"
+                "Unable to convert to TIMESTAMP_LTZ from unexpected value '"
                         + dbzObj
                         + "' of type "
                         + dbzObj.getClass().getName());
