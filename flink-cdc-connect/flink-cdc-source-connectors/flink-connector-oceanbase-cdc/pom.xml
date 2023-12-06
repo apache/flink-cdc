@@ -19,7 +19,7 @@ under the License.
     <parent>
         <artifactId>flink-cdc-source-connectors</artifactId>
         <groupId>com.ververica</groupId>
-        <version>${revision}</version>
+        <version>3.0.0</version>
     </parent>
     <properties>
         <!-- Because of oceanbase docker image can not expose port quickly, so we need to specify testcontainers version to 1.15.3 -->

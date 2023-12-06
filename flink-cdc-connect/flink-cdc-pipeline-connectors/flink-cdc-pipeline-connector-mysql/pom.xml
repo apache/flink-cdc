@@ -21,7 +21,7 @@
     <parent>
         <groupId>com.ververica</groupId>
         <artifactId>flink-cdc-pipeline-connectors</artifactId>
-        <version>${revision}</version>
+        <version>3.0.0</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 

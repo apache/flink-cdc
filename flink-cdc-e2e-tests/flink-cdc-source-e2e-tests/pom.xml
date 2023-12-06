@@ -19,7 +19,7 @@ under the License.
     <parent>
         <artifactId>flink-cdc-e2e-tests</artifactId>
         <groupId>com.ververica</groupId>
-        <version>${revision}</version>
+        <version>3.0.0</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
