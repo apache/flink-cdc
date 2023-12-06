@@ -17,7 +17,7 @@ source:
    port: 3306
    username: admin
    password: pass
-   table: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
+   tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
    server-id: 5401-5404
 
 sink:
