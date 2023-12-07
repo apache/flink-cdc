@@ -7,6 +7,7 @@ content/overview/index
 content/quickstart/index
 content/快速上手/index
 content/connectors/index
+content/pipelines/index
 content/formats/index
 content/downloads
 content/githublink
