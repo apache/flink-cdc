@@ -61,7 +61,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
-            @Nullable String chunkKeyColumn) {
+            @Nullable String chunkKeyColumn,
+            boolean skipSnapshotBackfill) {
         super(
                 startupOptions,
                 databaseList,
@@ -85,7 +86,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                skipSnapshotBackfill);
         this.subtaskId = subtaskId;
     }
 

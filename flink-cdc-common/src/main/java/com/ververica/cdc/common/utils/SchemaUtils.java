@@ -89,7 +89,11 @@ public class SchemaUtils {
                         Preconditions.checkNotNull(
                                 columnWithPosition.getExistingColumn(),
                                 "existingColumn could not be null in BEFORE type AddColumnEvent");
-                        int index = columns.indexOf(columnWithPosition.getExistingColumn());
+                        List<String> columnNames =
+                                columns.stream().map(Column::getName).collect(Collectors.toList());
+                        int index =
+                                columnNames.indexOf(
+                                        columnWithPosition.getExistingColumn().getName());
                         if (index < 0) {
                             throw new IllegalArgumentException(
                                     columnWithPosition.getExistingColumn().getName()
@@ -103,7 +107,11 @@ public class SchemaUtils {
                         Preconditions.checkNotNull(
                                 columnWithPosition.getExistingColumn(),
                                 "existingColumn could not be null in AFTER type AddColumnEvent");
-                        int index = columns.indexOf(columnWithPosition.getExistingColumn());
+                        List<String> columnNames =
+                                columns.stream().map(Column::getName).collect(Collectors.toList());
+                        int index =
+                                columnNames.indexOf(
+                                        columnWithPosition.getExistingColumn().getName());
                         if (index < 0) {
                             throw new IllegalArgumentException(
                                     columnWithPosition.getExistingColumn().getName()

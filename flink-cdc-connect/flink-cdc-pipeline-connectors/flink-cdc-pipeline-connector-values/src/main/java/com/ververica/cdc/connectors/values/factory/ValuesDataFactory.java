@@ -41,17 +41,18 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
     @Override
     public DataSource createDataSource(Context context) {
         ValuesDataSourceHelper.EventSetId eventType =
-                context.getConfiguration().get(ValuesDataSourceOptions.EVENT_SET_ID);
+                context.getFactoryConfiguration().get(ValuesDataSourceOptions.EVENT_SET_ID);
         int failAtPos =
-                context.getConfiguration().get(ValuesDataSourceOptions.FAILURE_INJECTION_INDEX);
+                context.getFactoryConfiguration()
+                        .get(ValuesDataSourceOptions.FAILURE_INJECTION_INDEX);
         return new ValuesDataSource(eventType, failAtPos);
     }
 
     @Override
     public DataSink createDataSink(Context context) {
         return new ValuesDataSink(
-                context.getConfiguration().get(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY),
-                context.getConfiguration().get(ValuesDataSinkOptions.PRINT_ENABLED));
+                context.getFactoryConfiguration().get(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY),
+                context.getFactoryConfiguration().get(ValuesDataSinkOptions.PRINT_ENABLED));
     }
 
     @Override

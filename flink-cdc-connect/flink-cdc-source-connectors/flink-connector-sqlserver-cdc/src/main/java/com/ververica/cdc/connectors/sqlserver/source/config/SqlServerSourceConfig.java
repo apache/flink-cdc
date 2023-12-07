@@ -53,7 +53,8 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
-            String chunkKeyColumn) {
+            String chunkKeyColumn,
+            boolean skipSnapshotBackfill) {
         super(
                 startupOptions,
                 databaseList,
@@ -77,7 +78,8 @@ public class SqlServerSourceConfig extends JdbcSourceConfig {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                skipSnapshotBackfill);
     }
 
     @Override

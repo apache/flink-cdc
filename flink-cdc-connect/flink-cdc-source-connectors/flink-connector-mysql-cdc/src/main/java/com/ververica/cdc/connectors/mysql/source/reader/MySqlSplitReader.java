@@ -33,6 +33,7 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlRecords;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
+import com.ververica.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import io.debezium.connector.mysql.MySqlConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,18 +60,24 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
     private final int subtaskId;
     private final MySqlSourceReaderContext context;
 
+    private final SnapshotPhaseHooks snapshotHooks;
+
     @Nullable private String currentSplitId;
     @Nullable private DebeziumReader<SourceRecords, MySqlSplit> currentReader;
     @Nullable private SnapshotSplitReader reusedSnapshotReader;
     @Nullable private BinlogSplitReader reusedBinlogReader;
 
     public MySqlSplitReader(
-            MySqlSourceConfig sourceConfig, int subtaskId, MySqlSourceReaderContext context) {
+            MySqlSourceConfig sourceConfig,
+            int subtaskId,
+            MySqlSourceReaderContext context,
+            SnapshotPhaseHooks snapshotHooks) {
         this.sourceConfig = sourceConfig;
         this.subtaskId = subtaskId;
         this.snapshotSplits = new ArrayDeque<>();
         this.binlogSplits = new ArrayDeque<>(1);
         this.context = context;
+        this.snapshotHooks = snapshotHooks;
     }
 
     @Override
@@ -231,7 +238,8 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
                     createBinaryClient(sourceConfig.getDbzConfiguration());
             final StatefulTaskContext statefulTaskContext =
                     new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
-            reusedSnapshotReader = new SnapshotSplitReader(statefulTaskContext, subtaskId);
+            reusedSnapshotReader =
+                    new SnapshotSplitReader(statefulTaskContext, subtaskId, snapshotHooks);
         }
         return reusedSnapshotReader;
     }

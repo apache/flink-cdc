@@ -28,7 +28,6 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.oracle.source.assigner.splitter.OracleChunkSplitter;
 import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
-import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import com.ververica.cdc.connectors.oracle.source.reader.fetch.OracleScanFetchTask;
 import com.ververica.cdc.connectors.oracle.source.reader.fetch.OracleSourceFetchTaskContext;
 import com.ververica.cdc.connectors.oracle.source.reader.fetch.OracleStreamFetchTask;
@@ -52,14 +51,7 @@ import static com.ververica.cdc.connectors.oracle.source.utils.OracleConnectionU
 public class OracleDialect implements JdbcDataSourceDialect {
 
     private static final long serialVersionUID = 1L;
-    private final OracleSourceConfigFactory configFactory;
-    private final OracleSourceConfig sourceConfig;
     private transient OracleSchema oracleSchema;
-
-    public OracleDialect(OracleSourceConfigFactory configFactory) {
-        this.configFactory = configFactory;
-        this.sourceConfig = configFactory.create(0);
-    }
 
     @Override
     public String getName() {

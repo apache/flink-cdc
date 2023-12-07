@@ -106,6 +106,9 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     private final UniqueDatabase inventoryDatabase8 =
             new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
 
+    private final UniqueDatabase binlogDatabase =
+            new UniqueDatabase(MYSQL8_CONTAINER, "binlog_metadata_test", TEST_USER, TEST_PASSWORD);
+
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
     private final StreamTableEnvironment tEnv =
@@ -2186,6 +2189,73 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         }
     }
 
+    @Test
+    public void testBinlogTableMetadataDeserialization() throws Exception {
+        if (!incrementalSnapshot) {
+            return;
+        }
+        binlogDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE binlog_metadata (\n"
+                                + "    id BIGINT NOT NULL,\n"
+                                + "    tiny_c TINYINT,\n"
+                                + "    tiny_un_c SMALLINT ,\n"
+                                + "    tiny_un_z_c SMALLINT ,\n"
+                                + "    small_c SMALLINT,\n"
+                                + "    small_un_c INT,\n"
+                                + "    small_un_z_c INT,\n"
+                                + "    year_c INT,\n"
+                                + " PRIMARY KEY(id) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL8_CONTAINER.getHost(),
+                        MYSQL8_CONTAINER.getDatabasePort(),
+                        TEST_USER,
+                        TEST_PASSWORD,
+                        binlogDatabase.getDatabaseName(),
+                        "binlog_metadata",
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM binlog_metadata");
+
+        // wait for the source startup, we don't have a better way to wait it, use sleep for now
+        do {
+            Thread.sleep(5000L);
+        } while (result.getJobClient().get().getJobStatus().get() != RUNNING);
+
+        CloseableIterator<Row> iterator = result.collect();
+
+        try (Connection connection = binlogDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO binlog_metadata VALUES (2, 127, 255, 255, 32767, 65535, 65535, 2024),(3, 127, 255, 255, 32767, 65535, 65535, 2024);");
+            statement.execute("DELETE FROM binlog_metadata WHERE id=3;");
+        }
+
+        String[] expected =
+                new String[] {
+                    // snapshot records
+                    "+I[1, 127, 255, 255, 32767, 65535, 65535, 2023]",
+                    "+I[2, 127, 255, 255, 32767, 65535, 65535, 2024]"
+                };
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        result.getJobClient().get().cancel().get();
+    }
+
     // ------------------------------------------------------------------------------------
 
     private String getServerId() {
@@ -2268,5 +2338,86 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         while (!iterator.hasNext()) {
             Thread.sleep(100);
         }
+    }
+
+    @Test
+    public void testBinaryHandlingModeWithBase64() throws Exception {
+        if (!incrementalSnapshot) {
+            return;
+        }
+        inventoryDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE varbinary_base64_table ("
+                                + " id INT,"
+                                + " order_id STRING,"
+                                + " order_date DATE,"
+                                + " quantity INT,"
+                                + " product_id INT,"
+                                + " purchaser STRING,"
+                                + " PRIMARY KEY(id) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s',"
+                                + " 'debezium.binary.handling.mode' = 'base64'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        TEST_USER,
+                        TEST_PASSWORD,
+                        inventoryDatabase.getDatabaseName(),
+                        "varbinary_base64_table",
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM varbinary_base64_table");
+
+        // wait for the source startup, we don't have a better way to wait it, use sleep for now
+        do {
+            Thread.sleep(5000L);
+        } while (result.getJobClient().get().getJobStatus().get() != RUNNING);
+
+        CloseableIterator<Row> iterator = result.collect();
+
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO varbinary_base64_table VALUES "
+                            + "(6, b'0000010000000100000001000000010000000100000001000000010000000101','2021-03-08', "
+                            + "30, 500, 'flink');");
+            statement.execute(
+                    "INSERT INTO varbinary_base64_table VALUES "
+                            + "(7, b'0000010000000100000001000000010000000100000001000000010000000110','2021-03-08', "
+                            + "30, 500, 'flink-sql');");
+            statement.execute("UPDATE varbinary_base64_table SET quantity=50 WHERE id=6;");
+            statement.execute("DELETE FROM varbinary_base64_table WHERE id= 7;");
+        }
+        String[] expected =
+                new String[] {
+                    // snapshot records
+                    "+I[1, BAQEBAQEBAA=, 2021-03-08, 0, 0, flink]",
+                    "+I[2, BAQEBAQEBAE=, 2021-03-08, 10, 100, flink]",
+                    "+I[3, BAQEBAQEBAI=, 2021-03-08, 20, 200, flink]",
+                    "+I[4, BAQEBAQEBAM=, 2021-03-08, 30, 300, flink]",
+                    "+I[5, BAQEBAQEBAQ=, 2021-03-08, 40, 400, flink]",
+                    // binlog records
+                    "+I[6, BAQEBAQEBAU=, 2021-03-08, 30, 500, flink]",
+                    "+I[7, BAQEBAQEBAY=, 2021-03-08, 30, 500, flink-sql]",
+                    "-U[6, BAQEBAQEBAU=, 2021-03-08, 30, 500, flink]",
+                    "+U[6, BAQEBAQEBAU=, 2021-03-08, 50, 500, flink]",
+                    "-D[7, BAQEBAQEBAY=, 2021-03-08, 30, 500, flink-sql]"
+                };
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        result.getJobClient().get().cancel().get();
     }
 }

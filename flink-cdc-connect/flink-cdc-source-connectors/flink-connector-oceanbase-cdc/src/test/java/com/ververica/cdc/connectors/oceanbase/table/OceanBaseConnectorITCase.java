@@ -374,7 +374,8 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " 'logproxy.port' = '%s',"
                                 + " 'rootserver-list' = '%s',"
                                 + " 'working-mode' = 'memory',"
-                                + " 'jdbc.properties.useSSL' = 'false'"
+                                + " 'jdbc.properties.useSSL' = 'false',"
+                                + " 'obcdc.properties.sort_trans_participants' = '1'"
                                 + ")",
                         getUsername(),
                         getPassword(),

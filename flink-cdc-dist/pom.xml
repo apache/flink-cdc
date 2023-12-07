@@ -24,42 +24,95 @@ under the License.
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>flink-cdc-dist</artifactId>
-    <packaging>jar</packaging>
 
     <properties>
         <japicmp.skip>true</japicmp.skip>
     </properties>
 
     <dependencies>
-        <!-- Project binaries -->
         <dependency>
-            <artifactId>flink-cdc-cli</artifactId>
             <groupId>com.ververica</groupId>
-            <version>${project.version}</version>
-            <optional>${markBundledAsOptional}</optional>
-        </dependency>
-
-        <dependency>
             <artifactId>flink-cdc-common</artifactId>
-            <groupId>com.ververica</groupId>
             <version>${project.version}</version>
-            <optional>${markBundledAsOptional}</optional>
         </dependency>
-
         <dependency>
-            <artifactId>flink-cdc-composer</artifactId>
             <groupId>com.ververica</groupId>
-            <version>${project.version}</version>
-            <optional>${markBundledAsOptional}</optional>
-        </dependency>
-
-        <dependency>
             <artifactId>flink-cdc-runtime</artifactId>
-            <groupId>com.ververica</groupId>
             <version>${project.version}</version>
-            <optional>${markBundledAsOptional}</optional>
         </dependency>
-
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-cli</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-composer</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>shade-dist</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <shadeTestJar>false</shadeTestJar>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <finalName>${project.artifactId}-${revision}</finalName>
+                            <artifactSet>
+                                <includes>
+                                    <include>*</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache.commons.cli</pattern>
+                                    <shadedPattern>com.ververica.cdc.shaded.com.apache.commons.cli</shadedPattern>
+                                </relocation>
+                            </relocations>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>dist</id>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <tarLongFileMode>gnu</tarLongFileMode>
+                            <appendAssemblyId>false</appendAssemblyId>
+                            <attach>false</attach>
+                            <finalName>flink-cdc-${project.version}-bin</finalName>
+                            <descriptors>
+                                <descriptor>${basedir}/src/main/assembly/assembly.xml</descriptor>
+                            </descriptors>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

@@ -78,7 +78,11 @@ public class ValuesDataSink implements DataSink, Serializable {
 
         @Override
         public SinkWriter<Event> createWriter(InitContext context) {
-            return new ValuesSinkWriter(materializedInMemory, print);
+            return new ValuesSinkWriter(
+                    materializedInMemory,
+                    print,
+                    context.getSubtaskId(),
+                    context.getNumberOfParallelSubtasks());
         }
     }
 
@@ -91,6 +95,10 @@ public class ValuesDataSink implements DataSink, Serializable {
 
         private final boolean print;
 
+        private final int subtaskIndex;
+
+        private final int numSubtasks;
+
         /**
          * keep the relationship of TableId and Schema as write method may rely on the schema
          * information of DataChangeEvent.
@@ -99,10 +107,13 @@ public class ValuesDataSink implements DataSink, Serializable {
 
         private final Map<TableId, List<RecordData.FieldGetter>> fieldGetterMaps;
 
-        public ValuesSinkWriter(boolean materializedInMemory, boolean print) {
+        public ValuesSinkWriter(
+                boolean materializedInMemory, boolean print, int subtaskIndex, int numSubtasks) {
             super();
             this.materializedInMemory = materializedInMemory;
             this.print = print;
+            this.subtaskIndex = subtaskIndex;
+            this.numSubtasks = numSubtasks;
             schemaMaps = new HashMap<>();
             fieldGetterMaps = new HashMap<>();
         }
@@ -130,10 +141,13 @@ public class ValuesDataSink implements DataSink, Serializable {
                 ValuesDatabase.applyDataChangeEvent((DataChangeEvent) event);
             }
             if (print) {
+                String prefix = numSubtasks > 1 ? subtaskIndex + "> " : "";
                 // print the detail message to console for verification.
                 System.out.println(
-                        ValuesDataSinkHelper.convertEventToStr(
-                                event, fieldGetterMaps.get(((ChangeEvent) event).tableId())));
+                        prefix
+                                + ValuesDataSinkHelper.convertEventToStr(
+                                        event,
+                                        fieldGetterMaps.get(((ChangeEvent) event).tableId())));
             }
         }
 

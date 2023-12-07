@@ -16,8 +16,6 @@
 
 package com.ververica.cdc.cli.utils;
 
-import com.ververica.cdc.common.configuration.ConfigOption;
-import com.ververica.cdc.common.configuration.ConfigOptions;
 import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.composer.flink.FlinkPipelineComposer;
 
@@ -30,12 +28,6 @@ public class FlinkEnvironmentUtils {
     private static final String FLINK_CONF_DIR = "conf";
     private static final String FLINK_CONF_FILENAME = "flink-conf.yaml";
 
-    public static final ConfigOption<String> FLINK_REST_ADDRESS =
-            ConfigOptions.key("rest.address").stringType().noDefaultValue();
-
-    public static final ConfigOption<Integer> FLINK_REST_PORT =
-            ConfigOptions.key("rest.port").intType().defaultValue(8081);
-
     public static Configuration loadFlinkConfiguration(Path flinkHome) throws Exception {
         Path flinkConfPath = flinkHome.resolve(FLINK_CONF_DIR).resolve(FLINK_CONF_FILENAME);
         return ConfigurationUtils.loadMapFormattedConfig(flinkConfPath);
@@ -46,8 +38,8 @@ public class FlinkEnvironmentUtils {
         if (useMiniCluster) {
             return FlinkPipelineComposer.ofMiniCluster();
         }
-        String host = flinkConfig.get(FLINK_REST_ADDRESS);
-        Integer port = flinkConfig.get(FLINK_REST_PORT);
-        return FlinkPipelineComposer.ofRemoteCluster(host, port, additionalJars);
+        return FlinkPipelineComposer.ofRemoteCluster(
+                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap()),
+                additionalJars);
     }
 }

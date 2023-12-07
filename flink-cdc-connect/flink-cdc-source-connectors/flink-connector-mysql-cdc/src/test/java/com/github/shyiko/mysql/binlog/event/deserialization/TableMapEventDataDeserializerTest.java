@@ -22,7 +22,9 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.BitSet;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -95,6 +97,66 @@ public class TableMapEventDataDeserializerTest {
         assertThat(eventData.toString()).isEqualTo(getExpectedEventData().toString());
     }
 
+    @Test
+    public void testDeserializeMetadata() throws IOException {
+        byte[] data = {
+            // SIGNEDNESS
+            1,
+            // SIGNEDNESS length
+            5,
+            // 5 bytes for SIGNEDNESS
+            -74,
+            -39,
+            -101,
+            97,
+            0,
+            // COLUMN_CHARSET
+            3,
+            // COLUMN_CHARSET length
+            32,
+            // remaining 32 bytes for COLUMN_CHARSET
+            33,
+            33,
+            63,
+            33,
+            63,
+            63,
+            63,
+            63,
+            -4,
+            -1,
+            0,
+            -4,
+            -1,
+            0,
+            -4,
+            -1,
+            0,
+            -4,
+            -1,
+            0,
+            -4,
+            -1,
+            0,
+            -4,
+            -1,
+            0,
+            -4,
+            -1,
+            0,
+            -4,
+            -1,
+            0
+        };
+
+        TableMapEventMetadataDeserializer deserializer = new TableMapEventMetadataDeserializer();
+
+        TableMapEventMetadata metadata =
+                deserializer.deserialize(new ByteArrayInputStream(data), 59, 32);
+
+        assertThat(metadata.toString()).isEqualTo(getExpectedTableMapEventMetaData().toString());
+    }
+
     private TableMapEventData getExpectedEventData() {
         TableMapEventData eventData = new TableMapEventData();
         // table_id
@@ -122,5 +184,24 @@ public class TableMapEventDataDeserializerTest {
         metadata.setDefaultCharset(charset);
         eventData.setEventMetadata(metadata);
         return eventData;
+    }
+
+    private TableMapEventMetadata getExpectedTableMapEventMetaData() {
+        // optional metadata fields
+        TableMapEventMetadata metadata = new TableMapEventMetadata();
+        BitSet signedness = new BitSet();
+
+        List<Integer> signedBits =
+                Arrays.asList(0, 2, 3, 5, 6, 8, 9, 11, 12, 15, 16, 19, 20, 22, 23, 25, 26, 31);
+
+        for (Integer signedBit : signedBits) {
+            signedness.set(signedBit);
+        }
+
+        metadata.setSignedness(signedness);
+        metadata.setColumnCharsets(
+                Arrays.asList(
+                        33, 33, 63, 33, 63, 63, 63, 63, 255, 255, 255, 255, 255, 255, 255, 255));
+        return metadata;
     }
 }

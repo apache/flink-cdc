@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.runtime.serializer.data;
 
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
@@ -25,6 +24,7 @@ import org.apache.flink.api.java.typeutils.runtime.DataOutputViewStream;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
+import com.ververica.cdc.common.annotation.VisibleForTesting;
 import com.ververica.cdc.common.data.ArrayData;
 import com.ververica.cdc.common.data.GenericArrayData;
 import com.ververica.cdc.common.types.DataType;

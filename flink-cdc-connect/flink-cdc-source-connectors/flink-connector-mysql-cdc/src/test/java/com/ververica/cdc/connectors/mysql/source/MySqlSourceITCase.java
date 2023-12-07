@@ -47,8 +47,12 @@ import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.Collector;
 
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
+import com.ververica.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHook;
+import com.ververica.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import com.ververica.cdc.connectors.mysql.table.MySqlDeserializationConverterFactory;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
+import com.ververica.cdc.connectors.mysql.testutils.TestTable;
+import com.ververica.cdc.connectors.mysql.testutils.TestTableSchemas;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.table.MetadataConverter;
@@ -84,6 +88,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
@@ -152,6 +157,9 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     @Parameterized.Parameter(1)
     public String chunkColumnName;
 
+    private static final int USE_POST_LOWWATERMARK_HOOK = 1;
+    private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
+
     @Parameterized.Parameters(name = "table: {0}, chunkColumn: {1}")
     public static Collection<Object[]> parameters() {
         return Arrays.asList(
@@ -164,6 +172,18 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     public void testReadSingleTableWithSingleParallelism() throws Exception {
         testMySqlParallelSource(
                 1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {tableName});
+    }
+
+    @Test
+    public void testReadSingleTableWithSingleParallelismAndSkipBackFill() throws Exception {
+        testMySqlParallelSource(
+                1,
+                DEFAULT_SCAN_STARTUP_MODE,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {tableName},
+                RestartStrategies.fixedDelayRestart(1, 0),
+                true);
     }
 
     @Test
@@ -330,6 +350,205 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         testStartingOffset(StartupOptions.latest(), Collections.emptyList());
     }
 
+    @Test
+    public void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
+
+        List<String> records = testBackfillWhenWritingEvents(false, 21, USE_PRE_HIGHWATERMARK_HOOK);
+
+        List<String> expectedRecords =
+                Arrays.asList(
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[109, user_4, Shanghai, 123567891234]",
+                        "+I[110, user_5, Shanghai, 123567891234]",
+                        "+I[111, user_6, Shanghai, 123567891234]",
+                        "+I[118, user_7, Shanghai, 123567891234]",
+                        "+I[121, user_8, Shanghai, 123567891234]",
+                        "+I[123, user_9, Shanghai, 123567891234]",
+                        "+I[1009, user_10, Shanghai, 123567891234]",
+                        "+I[1010, user_11, Shanghai, 123567891234]",
+                        "+I[1011, user_12, Shanghai, 123567891234]",
+                        "+I[1012, user_13, Shanghai, 123567891234]",
+                        "+I[1013, user_14, Shanghai, 123567891234]",
+                        "+I[1014, user_15, Shanghai, 123567891234]",
+                        "+I[1015, user_16, Shanghai, 123567891234]",
+                        "+I[1016, user_17, Shanghai, 123567891234]",
+                        "+I[1017, user_18, Shanghai, 123567891234]",
+                        "+I[1018, user_19, Shanghai, 123567891234]",
+                        "+I[2000, user_21, Pittsburgh, 123567891234]",
+                        "+I[15213, user_15213, Shanghai, 123567891234]");
+        // when enable backfill, the wal log between (snapshot, high_watermark) will be
+        // applied as snapshot image
+        assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    @Test
+    public void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
+
+        List<String> records = testBackfillWhenWritingEvents(false, 21, USE_POST_LOWWATERMARK_HOOK);
+
+        List<String> expectedRecords =
+                Arrays.asList(
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[109, user_4, Shanghai, 123567891234]",
+                        "+I[110, user_5, Shanghai, 123567891234]",
+                        "+I[111, user_6, Shanghai, 123567891234]",
+                        "+I[118, user_7, Shanghai, 123567891234]",
+                        "+I[121, user_8, Shanghai, 123567891234]",
+                        "+I[123, user_9, Shanghai, 123567891234]",
+                        "+I[1009, user_10, Shanghai, 123567891234]",
+                        "+I[1010, user_11, Shanghai, 123567891234]",
+                        "+I[1011, user_12, Shanghai, 123567891234]",
+                        "+I[1012, user_13, Shanghai, 123567891234]",
+                        "+I[1013, user_14, Shanghai, 123567891234]",
+                        "+I[1014, user_15, Shanghai, 123567891234]",
+                        "+I[1015, user_16, Shanghai, 123567891234]",
+                        "+I[1016, user_17, Shanghai, 123567891234]",
+                        "+I[1017, user_18, Shanghai, 123567891234]",
+                        "+I[1018, user_19, Shanghai, 123567891234]",
+                        "+I[2000, user_21, Pittsburgh, 123567891234]",
+                        "+I[15213, user_15213, Shanghai, 123567891234]");
+        // when enable backfill, the wal log between (low_watermark, snapshot) will be applied
+        // as snapshot image
+        assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    @Test
+    public void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
+
+        List<String> records = testBackfillWhenWritingEvents(true, 25, USE_PRE_HIGHWATERMARK_HOOK);
+
+        List<String> expectedRecords =
+                Arrays.asList(
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[109, user_4, Shanghai, 123567891234]",
+                        "+I[110, user_5, Shanghai, 123567891234]",
+                        "+I[111, user_6, Shanghai, 123567891234]",
+                        "+I[118, user_7, Shanghai, 123567891234]",
+                        "+I[121, user_8, Shanghai, 123567891234]",
+                        "+I[123, user_9, Shanghai, 123567891234]",
+                        "+I[1009, user_10, Shanghai, 123567891234]",
+                        "+I[1010, user_11, Shanghai, 123567891234]",
+                        "+I[1011, user_12, Shanghai, 123567891234]",
+                        "+I[1012, user_13, Shanghai, 123567891234]",
+                        "+I[1013, user_14, Shanghai, 123567891234]",
+                        "+I[1014, user_15, Shanghai, 123567891234]",
+                        "+I[1015, user_16, Shanghai, 123567891234]",
+                        "+I[1016, user_17, Shanghai, 123567891234]",
+                        "+I[1017, user_18, Shanghai, 123567891234]",
+                        "+I[1018, user_19, Shanghai, 123567891234]",
+                        "+I[1019, user_20, Shanghai, 123567891234]",
+                        "+I[2000, user_21, Shanghai, 123567891234]",
+                        "+I[15213, user_15213, Shanghai, 123567891234]",
+                        "-U[2000, user_21, Shanghai, 123567891234]",
+                        "+U[2000, user_21, Pittsburgh, 123567891234]",
+                        "-D[1019, user_20, Shanghai, 123567891234]");
+        // when skip backfill, the wal log between (snapshot, high_watermark) will be seen as
+        // stream event.
+        assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    @Test
+    public void testSkipBackfillWithDMLPostLowWaterMark() throws Exception {
+
+        List<String> records = testBackfillWhenWritingEvents(true, 25, USE_POST_LOWWATERMARK_HOOK);
+
+        List<String> expectedRecords =
+                Arrays.asList(
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[109, user_4, Shanghai, 123567891234]",
+                        "+I[110, user_5, Shanghai, 123567891234]",
+                        "+I[111, user_6, Shanghai, 123567891234]",
+                        "+I[118, user_7, Shanghai, 123567891234]",
+                        "+I[121, user_8, Shanghai, 123567891234]",
+                        "+I[123, user_9, Shanghai, 123567891234]",
+                        "+I[1009, user_10, Shanghai, 123567891234]",
+                        "+I[1010, user_11, Shanghai, 123567891234]",
+                        "+I[1011, user_12, Shanghai, 123567891234]",
+                        "+I[1012, user_13, Shanghai, 123567891234]",
+                        "+I[1013, user_14, Shanghai, 123567891234]",
+                        "+I[1014, user_15, Shanghai, 123567891234]",
+                        "+I[1015, user_16, Shanghai, 123567891234]",
+                        "+I[1016, user_17, Shanghai, 123567891234]",
+                        "+I[1017, user_18, Shanghai, 123567891234]",
+                        "+I[1018, user_19, Shanghai, 123567891234]",
+                        "+I[2000, user_21, Pittsburgh, 123567891234]",
+                        "+I[15213, user_15213, Shanghai, 123567891234]",
+                        "+I[15213, user_15213, Shanghai, 123567891234]",
+                        "-U[2000, user_21, Shanghai, 123567891234]",
+                        "+U[2000, user_21, Pittsburgh, 123567891234]",
+                        "-D[1019, user_20, Shanghai, 123567891234]");
+        // when skip backfill, the wal log between (snapshot, high_watermark) will still be
+        // seen as stream event. This will occur data duplicate. For example, user_20 will be
+        // deleted twice, and user_15213 will be inserted twice.
+        assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    private List<String> testBackfillWhenWritingEvents(
+            boolean skipSnapshotBackfill, int fetchSize, int hookType) throws Exception {
+        customDatabase.createAndInitialize();
+        TestTable customerTable =
+                new TestTable(customDatabase, "customers", TestTableSchemas.CUSTOMERS);
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        MySqlSource<RowData> source =
+                MySqlSource.<RowData>builder()
+                        .hostname(customDatabase.getHost())
+                        .port(customDatabase.getDatabasePort())
+                        .username(customDatabase.getUsername())
+                        .password(customDatabase.getPassword())
+                        .serverTimeZone("UTC")
+                        .databaseList(customDatabase.getDatabaseName())
+                        .tableList(customerTable.getTableId())
+                        .deserializer(customerTable.getDeserializer())
+                        .skipSnapshotBackfill(skipSnapshotBackfill)
+                        .build();
+
+        String[] statements =
+                new String[] {
+                    String.format(
+                            "INSERT INTO %s VALUES (15213, 'user_15213', 'Shanghai', '123567891234')",
+                            customerTable.getTableId()),
+                    String.format(
+                            "UPDATE %s SET address='Pittsburgh' WHERE id=2000",
+                            customerTable.getTableId()),
+                    String.format("DELETE FROM %s WHERE id=1019", customerTable.getTableId())
+                };
+
+        SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
+        SnapshotPhaseHook snapshotPhaseHook =
+                (connection, split) -> {
+                    connection.setAutoCommit(false);
+                    connection.execute(statements);
+                    connection.commit();
+                    try {
+                        Thread.sleep(500L);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                };
+        if (hookType == USE_PRE_HIGHWATERMARK_HOOK) {
+            hooks.setPreHighWatermarkAction(snapshotPhaseHook);
+        } else if (hookType == USE_POST_LOWWATERMARK_HOOK) {
+            hooks.setPostLowWatermarkAction(snapshotPhaseHook);
+        }
+
+        source.setSnapshotHooks(hooks);
+        try (CloseableIterator<RowData> iterator =
+                env.fromSource(source, WatermarkStrategy.noWatermarks(), "Backfill Skipped Source")
+                        .executeAndCollect()) {
+            List<String> records = fetchRowData(iterator, fetchSize, customerTable::stringify);
+            return records;
+        }
+    }
+
     private void testStartingOffset(
             StartupOptions startupOptions, List<String> expectedChangelogAfterStart)
             throws Exception {
@@ -470,6 +689,25 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             String[] captureCustomerTables,
             RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration)
             throws Exception {
+        testMySqlParallelSource(
+                parallelism,
+                scanStartupMode,
+                failoverType,
+                failoverPhase,
+                captureCustomerTables,
+                restartStrategyConfiguration,
+                false);
+    }
+
+    private void testMySqlParallelSource(
+            int parallelism,
+            String scanStartupMode,
+            FailoverType failoverType,
+            FailoverPhase failoverPhase,
+            String[] captureCustomerTables,
+            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            boolean skipSnapshotBackfill)
+            throws Exception {
         customDatabase.createAndInitialize();
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
@@ -498,6 +736,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'scan.incremental.snapshot.backfill.skip' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + " %s"
@@ -509,6 +748,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         customDatabase.getDatabaseName(),
                         getTableNameRegex(captureCustomerTables),
                         scanStartupMode,
+                        skipSnapshotBackfill,
                         getServerId(),
                         chunkColumnName == null
                                 ? ""
@@ -646,6 +886,17 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             size--;
         }
         return rows;
+    }
+
+    private List<String> fetchRowData(
+            Iterator<RowData> iter, int size, Function<RowData, String> stringifier) {
+        List<RowData> rows = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            RowData row = iter.next();
+            rows.add(row);
+            size--;
+        }
+        return rows.stream().map(stringifier).collect(Collectors.toList());
     }
 
     private static List<String> fetchRowData(Iterator<RowData> iter, int size) {

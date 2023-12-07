@@ -29,7 +29,7 @@ import java.util.Set;
 public class DataSourceFactory1 implements DataSourceFactory {
     @Override
     public DataSource createDataSource(Context context) {
-        return new TestDataSource(context.getConfiguration().get(TestOptions.HOST));
+        return new TestDataSource(context.getFactoryConfiguration().get(TestOptions.HOST));
     }
 
     @Override

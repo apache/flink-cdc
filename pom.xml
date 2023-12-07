@@ -72,6 +72,8 @@ under the License.
 
         <!-- dependencies versions -->
         <flink.version>1.18.0</flink.version>
+        <flink.major.version>1.18</flink.major.version>
+        <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.7.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
         <geometry.version>2.2.0</geometry.version>
@@ -148,11 +150,17 @@ under the License.
             <version>${slf4j.version}</version>
         </dependency>
 
-        <!--  Use fixed version 30.1.1-jre-16.1 of flink shaded guava  -->
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-shaded-guava</artifactId>
-            <version>31.1-jre-17.0</version>
+            <version>31.1-jre-${flink.shaded.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-shaded-force-shading</artifactId>
+            <version>${flink.shaded.version}</version>
+            <optional>true</optional>
         </dependency>
 
         <!-- test dependencies -->
@@ -194,8 +202,8 @@ under the License.
         <dependency>
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
-            <type>jar</type>
             <version>${version.awaitility}</version>
+            <scope>test</scope>
         </dependency>
 
         <dependency>
@@ -406,6 +414,7 @@ under the License.
                 <configuration>
                     <forkCount>${flink.forkCount}</forkCount>
                     <reuseForks>${flink.reuseForks}</reuseForks>
+                    <trimStackTrace>false</trimStackTrace>
                     <systemPropertyVariables>
                         <forkNumber>0${surefire.forkNumber}</forkNumber>
                     </systemPropertyVariables>
@@ -433,9 +442,6 @@ under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
                             <createDependencyReducedPom>true</createDependencyReducedPom>
-                            <dependencyReducedPomLocation>
-                                ${project.basedir}/target/dependency-reduced-pom.xml
-                            </dependencyReducedPomLocation>
                             <filters combine.children="append">
                                 <filter>
                                     <artifact>*:*</artifact>
@@ -449,8 +455,13 @@ under the License.
                             </filters>
                             <artifactSet>
                                 <includes>
-                                    <!-- include nothing -->
-                                    <include></include>
+                                    <!--
+                                        We need the next line to enforce all submodules to execute shade and generate
+                                        dependency-reduced-pom.xml, to erase all properties defined in parent pom and
+                                        pin them to a fixed value. For example in the dependency-reduced-pom.xml of
+                                        submodules, ${flink.version} will be resolved as the actual Flink version.
+                                    -->
+                                    <include>org.apache.flink:flink-shaded-force-shading</include>
                                 </includes>
                             </artifactSet>
                         </configuration>

@@ -243,6 +243,22 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
+     * Whether to skip backfill in snapshot reading phase.
+     *
+     * <p>If backfill is skipped, changes on captured tables during snapshot phase will be consumed
+     * later in binlog reading phase instead of being merged into the snapshot.
+     *
+     * <p>WARNING: Skipping backfill might lead to data inconsistency because some binlog events
+     * happened within the snapshot phase might be replayed (only at-least-once semantic is
+     * promised). For example updating an already updated value in snapshot, or deleting an already
+     * deleted entry in snapshot. These replayed binlog events should be handled specially.
+     */
+    public MongoDBSourceBuilder<T> skipSnapshotBackfill(boolean skipSnapshotBackfill) {
+        this.configFactory.skipSnapshotBackfill(skipSnapshotBackfill);
+        return this;
+    }
+
+    /**
      * Build the {@link MongoDBSource}.
      *
      * @return a MongoDBParallelSource with the settings made for this builder.

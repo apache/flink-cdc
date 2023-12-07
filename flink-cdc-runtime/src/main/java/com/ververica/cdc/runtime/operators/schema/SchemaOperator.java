@@ -21,6 +21,7 @@ import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -56,6 +57,10 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private static final Logger LOG = LoggerFactory.getLogger(SchemaOperator.class);
 
     private transient TaskOperatorEventGateway toCoordinator;
+
+    public SchemaOperator() {
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
+    }
 
     @Override
     public void setup(

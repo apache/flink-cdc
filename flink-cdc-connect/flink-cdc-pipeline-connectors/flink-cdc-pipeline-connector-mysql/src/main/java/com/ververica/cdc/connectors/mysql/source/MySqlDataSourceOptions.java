@@ -1,0 +1,233 @@
+/*
+ * Copyright 2023 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.ververica.cdc.connectors.mysql.source;
+
+import com.ververica.cdc.common.annotation.Experimental;
+import com.ververica.cdc.common.annotation.PublicEvolving;
+import com.ververica.cdc.common.configuration.ConfigOption;
+import com.ververica.cdc.common.configuration.ConfigOptions;
+
+import java.time.Duration;
+
+/** Configurations for {@link MySqlDataSource}. */
+@PublicEvolving
+public class MySqlDataSourceOptions {
+
+    public static final ConfigOption<String> HOSTNAME =
+            ConfigOptions.key("hostname")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("IP address or hostname of the MySQL database server.");
+
+    public static final ConfigOption<Integer> PORT =
+            ConfigOptions.key("port")
+                    .intType()
+                    .defaultValue(3306)
+                    .withDescription("Integer port number of the MySQL database server.");
+
+    public static final ConfigOption<String> USERNAME =
+            ConfigOptions.key("username")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Name of the MySQL database to use when connecting to the MySQL database server.");
+
+    public static final ConfigOption<String> PASSWORD =
+            ConfigOptions.key("password")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Password to use when connecting to the MySQL database server.");
+    public static final ConfigOption<String> TABLES =
+            ConfigOptions.key("tables")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Table names of the MySQL tables to monitor. Regular expressions are supported. "
+                                    + "It is important to note that the dot (.) is treated as a delimiter for database and table names. "
+                                    + "If there is a need to use a dot (.) in a regular expression to match any character, "
+                                    + "it is necessary to escape the dot with a backslash."
+                                    + "eg. db0.\\.*, db1.user_table_[0-9]+, db[1-2].[app|web]_order_\\.*");
+
+    public static final ConfigOption<String> SERVER_TIME_ZONE =
+            ConfigOptions.key("server-time-zone")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The session time zone in database server. If not set, then "
+                                    + "ZoneId.systemDefault() is used to determine the server time zone.");
+
+    public static final ConfigOption<String> SERVER_ID =
+            ConfigOptions.key("server-id")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "A numeric ID or a numeric ID range of this database client, "
+                                    + "The numeric ID syntax is like '5400', the numeric ID range syntax "
+                                    + "is like '5400-5408', The numeric ID range syntax is recommended when "
+                                    + "'scan.incremental.snapshot.enabled' enabled. Every ID must be unique across all "
+                                    + "currently-running database processes in the MySQL cluster. This connector"
+                                    + " joins the MySQL  cluster as another server (with this unique ID) "
+                                    + "so it can read the binlog. By default, a random number is generated between"
+                                    + " 5400 and 6400, though we recommend setting an explicit value.");
+
+    public static final ConfigOption<Integer> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE =
+            ConfigOptions.key("scan.incremental.snapshot.chunk.size")
+                    .intType()
+                    .defaultValue(8096)
+                    .withDescription(
+                            "The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.");
+
+    public static final ConfigOption<Integer> SCAN_SNAPSHOT_FETCH_SIZE =
+            ConfigOptions.key("scan.snapshot.fetch.size")
+                    .intType()
+                    .defaultValue(1024)
+                    .withDescription(
+                            "The maximum fetch size for per poll when read table snapshot.");
+
+    public static final ConfigOption<Duration> CONNECT_TIMEOUT =
+            ConfigOptions.key("connect.timeout")
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(30))
+                    .withDescription(
+                            "The maximum time that the connector should wait after trying to connect to the MySQL database server before timing out.");
+
+    public static final ConfigOption<Integer> CONNECTION_POOL_SIZE =
+            ConfigOptions.key("connection.pool.size")
+                    .intType()
+                    .defaultValue(20)
+                    .withDescription("The connection pool size.");
+
+    public static final ConfigOption<Integer> CONNECT_MAX_RETRIES =
+            ConfigOptions.key("connect.max-retries")
+                    .intType()
+                    .defaultValue(3)
+                    .withDescription(
+                            "The max retry times that the connector should retry to build MySQL database server connection.");
+
+    public static final ConfigOption<String> SCAN_STARTUP_MODE =
+            ConfigOptions.key("scan.startup.mode")
+                    .stringType()
+                    .defaultValue("initial")
+                    .withDescription(
+                            "Optional startup mode for MySQL CDC consumer, valid enumerations are "
+                                    + "\"initial\", \"earliest-offset\", \"latest-offset\", \"timestamp\"\n"
+                                    + "or \"specific-offset\"");
+
+    public static final ConfigOption<String> SCAN_STARTUP_SPECIFIC_OFFSET_FILE =
+            ConfigOptions.key("scan.startup.specific-offset.file")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Optional binlog file name used in case of \"specific-offset\" startup mode");
+
+    public static final ConfigOption<Long> SCAN_STARTUP_SPECIFIC_OFFSET_POS =
+            ConfigOptions.key("scan.startup.specific-offset.pos")
+                    .longType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Optional binlog file position used in case of \"specific-offset\" startup mode");
+
+    public static final ConfigOption<String> SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET =
+            ConfigOptions.key("scan.startup.specific-offset.gtid-set")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Optional GTID set used in case of \"specific-offset\" startup mode");
+
+    public static final ConfigOption<Long> SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS =
+            ConfigOptions.key("scan.startup.specific-offset.skip-events")
+                    .longType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Optional number of events to skip after the specific starting offset");
+
+    public static final ConfigOption<Long> SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS =
+            ConfigOptions.key("scan.startup.specific-offset.skip-rows")
+                    .longType()
+                    .noDefaultValue()
+                    .withDescription("Optional number of rows to skip after the specific offset");
+
+    public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP_MILLIS =
+            ConfigOptions.key("scan.startup.timestamp-millis")
+                    .longType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Optional timestamp used in case of \"timestamp\" startup mode");
+
+    public static final ConfigOption<Duration> HEARTBEAT_INTERVAL =
+            ConfigOptions.key("heartbeat.interval")
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(30))
+                    .withDescription(
+                            "Optional interval of sending heartbeat event for tracing the latest available binlog offsets");
+
+    // ----------------------------------------------------------------------------
+    // experimental options, won't add them to documentation
+    // ----------------------------------------------------------------------------
+    @Experimental
+    public static final ConfigOption<Integer> CHUNK_META_GROUP_SIZE =
+            ConfigOptions.key("chunk-meta.group.size")
+                    .intType()
+                    .defaultValue(1000)
+                    .withDescription(
+                            "The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.");
+
+    @Experimental
+    public static final ConfigOption<Double> CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND =
+            ConfigOptions.key("chunk-key.even-distribution.factor.upper-bound")
+                    .doubleType()
+                    .defaultValue(1000.0d)
+                    .withFallbackKeys("split-key.even-distribution.factor.upper-bound")
+                    .withDescription(
+                            "The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the"
+                                    + " table is evenly distribution or not."
+                                    + " The table chunks would use evenly calculation optimization when the data distribution is even,"
+                                    + " and the query MySQL for splitting would happen when it is uneven."
+                                    + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
+
+    @Experimental
+    public static final ConfigOption<Double> CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND =
+            ConfigOptions.key("chunk-key.even-distribution.factor.lower-bound")
+                    .doubleType()
+                    .defaultValue(0.05d)
+                    .withFallbackKeys("split-key.even-distribution.factor.lower-bound")
+                    .withDescription(
+                            "The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the"
+                                    + " table is evenly distribution or not."
+                                    + " The table chunks would use evenly calculation optimization when the data distribution is even,"
+                                    + " and the query MySQL for splitting would happen when it is uneven."
+                                    + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED =
+            ConfigOptions.key("scan.incremental.close-idle-reader.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to close idle readers at the end of the snapshot phase. This feature depends on "
+                                    + "FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be "
+                                    + "greater than or equal to 1.14 when enabling this feature.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCHEMA_CHANGE_ENABLED =
+            ConfigOptions.key("schema-change.enabled")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Whether send schema change events, by default is true. If set to false, the schema changes will not be sent.");
+}

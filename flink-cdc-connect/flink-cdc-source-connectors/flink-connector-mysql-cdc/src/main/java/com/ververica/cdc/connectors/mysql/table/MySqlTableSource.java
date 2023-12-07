@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -81,6 +82,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final Properties jdbcProperties;
     private final Duration heartbeatInterval;
     private final String chunkKeyColumn;
+    final boolean skipSnapshotBackFill;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -117,7 +119,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             boolean closeIdleReaders,
             Properties jdbcProperties,
             Duration heartbeatInterval,
-            @Nullable String chunkKeyColumn) {
+            @Nullable String chunkKeyColumn,
+            boolean skipSnapshotBackFill) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -146,6 +149,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.metadataKeys = Collections.emptyList();
         this.heartbeatInterval = heartbeatInterval;
         this.chunkKeyColumn = chunkKeyColumn;
+        this.skipSnapshotBackFill = skipSnapshotBackFill;
     }
 
     @Override
@@ -200,6 +204,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .jdbcProperties(jdbcProperties)
                             .heartbeatInterval(heartbeatInterval)
                             .chunkKeyColumn(new ObjectPath(database, tableName), chunkKeyColumn)
+                            .skipSnapshotBackfill(skipSnapshotBackFill)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -240,10 +245,14 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
 
     @Override
     public Map<String, DataType> listReadableMetadata() {
+        // Return metadata in a fixed order
         return Stream.of(MySqlReadableMetadata.values())
                 .collect(
                         Collectors.toMap(
-                                MySqlReadableMetadata::getKey, MySqlReadableMetadata::getDataType));
+                                MySqlReadableMetadata::getKey,
+                                MySqlReadableMetadata::getDataType,
+                                (existingValue, newValue) -> newValue,
+                                LinkedHashMap::new));
     }
 
     @Override
@@ -280,7 +289,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         closeIdleReaders,
                         jdbcProperties,
                         heartbeatInterval,
-                        chunkKeyColumn);
+                        chunkKeyColumn,
+                        skipSnapshotBackFill);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -321,7 +331,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(metadataKeys, that.metadataKeys)
                 && Objects.equals(jdbcProperties, that.jdbcProperties)
                 && Objects.equals(heartbeatInterval, that.heartbeatInterval)
-                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn);
+                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
+                && Objects.equals(skipSnapshotBackFill, that.skipSnapshotBackFill);
     }
 
     @Override
@@ -353,7 +364,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 closeIdleReaders,
                 jdbcProperties,
                 heartbeatInterval,
-                chunkKeyColumn);
+                chunkKeyColumn,
+                skipSnapshotBackFill);
     }
 
     @Override

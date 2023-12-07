@@ -83,6 +83,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final boolean closeIdlerReaders;
     private final boolean enableFullDocPrePostImage;
     private final boolean noCursorTimeout;
+    private final boolean skipSnapshotBackfill;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -116,7 +117,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             @Nullable Integer samplesPerChunk,
             boolean closeIdlerReaders,
             boolean enableFullDocPrePostImage,
-            boolean noCursorTimeout) {
+            boolean noCursorTimeout,
+            boolean skipSnapshotBackfill) {
         this.physicalSchema = physicalSchema;
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
@@ -141,6 +143,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.closeIdlerReaders = closeIdlerReaders;
         this.enableFullDocPrePostImage = enableFullDocPrePostImage;
         this.noCursorTimeout = noCursorTimeout;
+        this.skipSnapshotBackfill = skipSnapshotBackfill;
     }
 
     @Override
@@ -197,6 +200,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                             .closeIdleReaders(closeIdlerReaders)
                             .scanFullChangelog(enableFullDocPrePostImage)
                             .startupOptions(startupOptions)
+                            .skipSnapshotBackfill(skipSnapshotBackfill)
                             .deserializer(deserializer)
                             .disableCursorTimeout(noCursorTimeout);
 
@@ -296,7 +300,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         samplesPerChunk,
                         closeIdlerReaders,
                         enableFullDocPrePostImage,
-                        noCursorTimeout);
+                        noCursorTimeout,
+                        skipSnapshotBackfill);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -334,7 +339,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(metadataKeys, that.metadataKeys)
                 && Objects.equals(closeIdlerReaders, that.closeIdlerReaders)
                 && Objects.equals(enableFullDocPrePostImage, that.enableFullDocPrePostImage)
-                && Objects.equals(noCursorTimeout, that.noCursorTimeout);
+                && Objects.equals(noCursorTimeout, that.noCursorTimeout)
+                && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill);
     }
 
     @Override
@@ -363,7 +369,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 metadataKeys,
                 closeIdlerReaders,
                 enableFullDocPrePostImage,
-                noCursorTimeout);
+                noCursorTimeout,
+                skipSnapshotBackfill);
     }
 
     @Override

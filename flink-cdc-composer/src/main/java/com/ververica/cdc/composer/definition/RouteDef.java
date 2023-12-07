@@ -20,7 +20,6 @@ import javax.annotation.Nullable;
 
 import java.util.Objects;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 /**
  * Definition of a router.
@@ -28,28 +27,28 @@ import java.util.regex.Pattern;
  * <p>A router definition contains:
  *
  * <ul>
- *   <li>matcher: a regex pattern for matching input table IDs. Required for the definition.
- *   <li>replace: a string for replacing matched table IDs as output. Required for the definition.
+ *   <li>sourceTable: a regex pattern for matching input table IDs. Required for the definition.
+ *   <li>sinkTable: a string for replacing matched table IDs as output. Required for the definition.
  *   <li>description: description for the router. Optional for the definition.
  * </ul>
  */
 public class RouteDef {
-    private final Pattern matcher;
-    private final String replace;
+    private final String sourceTable;
+    private final String sinkTable;
     @Nullable private final String description;
 
-    public RouteDef(Pattern matcher, String replace, @Nullable String description) {
-        this.matcher = matcher;
-        this.replace = replace;
+    public RouteDef(String sourceTable, String sinkTable, @Nullable String description) {
+        this.sourceTable = sourceTable;
+        this.sinkTable = sinkTable;
         this.description = description;
     }
 
-    public Pattern getMatcher() {
-        return matcher;
+    public String getSourceTable() {
+        return sourceTable;
     }
 
-    public String getReplace() {
-        return replace;
+    public String getSinkTable() {
+        return sinkTable;
     }
 
     public Optional<String> getDescription() {
@@ -59,10 +58,10 @@ public class RouteDef {
     @Override
     public String toString() {
         return "RouteDef{"
-                + "matcher="
-                + matcher
-                + ", replace="
-                + replace
+                + "sourceTable="
+                + sourceTable
+                + ", sinkTable="
+                + sinkTable
                 + ", description='"
                 + description
                 + '\''
@@ -78,13 +77,13 @@ public class RouteDef {
             return false;
         }
         RouteDef routeDef = (RouteDef) o;
-        return Objects.equals(matcher.pattern(), routeDef.matcher.pattern())
-                && Objects.equals(replace, routeDef.replace)
+        return Objects.equals(sourceTable, routeDef.sourceTable)
+                && Objects.equals(sinkTable, routeDef.sinkTable)
                 && Objects.equals(description, routeDef.description);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(matcher, replace, description);
+        return Objects.hash(sourceTable, sinkTable, description);
     }
 }

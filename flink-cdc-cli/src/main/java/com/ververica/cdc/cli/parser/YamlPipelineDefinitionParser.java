@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 import static com.ververica.cdc.common.utils.Preconditions.checkNotNull;
 
@@ -50,9 +49,9 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String NAME_KEY = "name";
 
     // Route keys
-    private static final String MATCHER_KEY = "matcher";
-    private static final String REPLACE_KEY = "replace";
-    private static final String DESCRIPTION_KEY = "description";
+    private static final String ROUTE_SOURCE_TABLE_KEY = "source-table";
+    private static final String ROUTE_SINK_TABLE_KEY = "sink-table";
+    private static final String ROUTE_DESCRIPTION_KEY = "description";
 
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
@@ -129,27 +128,27 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     }
 
     private RouteDef toRouteDef(JsonNode routeNode) {
-        String matcher =
+        String sourceTable =
                 checkNotNull(
-                                routeNode.get(MATCHER_KEY),
+                                routeNode.get(ROUTE_SOURCE_TABLE_KEY),
                                 "Missing required field \"%s\" in route configuration",
-                                MATCHER_KEY)
+                                ROUTE_SOURCE_TABLE_KEY)
                         .asText();
-        String replace =
+        String sinkTable =
                 checkNotNull(
-                                routeNode.get(REPLACE_KEY),
+                                routeNode.get(ROUTE_SINK_TABLE_KEY),
                                 "Missing required field \"%s\" in route configuration",
-                                REPLACE_KEY)
+                                ROUTE_SINK_TABLE_KEY)
                         .asText();
         String description =
-                Optional.ofNullable(routeNode.get(DESCRIPTION_KEY))
+                Optional.ofNullable(routeNode.get(ROUTE_DESCRIPTION_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
-        return new RouteDef(Pattern.compile(matcher), replace, description);
+        return new RouteDef(sourceTable, sinkTable, description);
     }
 
     private Configuration toPipelineConfig(JsonNode pipelineConfigNode) {
-        if (pipelineConfigNode == null) {
+        if (pipelineConfigNode == null || pipelineConfigNode.isNull()) {
             return new Configuration();
         }
         Map<String, String> pipelineConfigMap =

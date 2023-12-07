@@ -235,7 +235,7 @@ public class MySqlSourceBuilder<T> {
      */
     public MySqlIncrementalSource<T> build() {
         this.offsetFactory = new BinlogOffsetFactory();
-        this.dialect = new MySqlDialect(configFactory);
+        this.dialect = new MySqlDialect(configFactory.create(0));
         return new MySqlIncrementalSource<>(
                 configFactory, checkNotNull(deserializer), offsetFactory, dialect);
     }

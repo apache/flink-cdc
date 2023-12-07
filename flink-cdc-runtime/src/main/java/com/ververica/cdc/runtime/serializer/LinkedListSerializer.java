@@ -16,7 +16,6 @@
 
 package com.ververica.cdc.runtime.serializer;
 
-import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.typeutils.CompositeTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
@@ -24,10 +23,12 @@ import org.apache.flink.api.java.typeutils.runtime.MaskUtils;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
+import com.ververica.cdc.common.annotation.Internal;
+
 import java.io.IOException;
 import java.util.LinkedList;
 
-import static org.apache.flink.util.Preconditions.checkNotNull;
+import static com.ververica.cdc.common.utils.Preconditions.checkNotNull;
 
 /**
  * A serializer for {@link LinkedList}. The serializer relies on an element serializer for the
