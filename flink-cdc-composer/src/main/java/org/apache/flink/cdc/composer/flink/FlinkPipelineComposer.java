@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.composer.flink;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
@@ -58,12 +59,12 @@ public class FlinkPipelineComposer implements PipelineComposer {
     private final boolean isBlocking;
 
     public static FlinkPipelineComposer ofRemoteCluster(
-            org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
+            org.apache.flink.configuration.Configuration envConfig, List<Path> additionalJars) {
         org.apache.flink.configuration.Configuration effectiveConfiguration =
                 new org.apache.flink.configuration.Configuration();
         // Use "remote" as the default target
         effectiveConfiguration.set(DeploymentOptions.TARGET, "remote");
-        effectiveConfiguration.addAll(flinkConfig);
+        effectiveConfiguration.addAll(envConfig);
         StreamExecutionEnvironment env = new StreamExecutionEnvironment(effectiveConfiguration);
         additionalJars.forEach(
                 jarPath -> {
@@ -80,14 +81,20 @@ public class FlinkPipelineComposer implements PipelineComposer {
         return new FlinkPipelineComposer(env, false);
     }
 
-    public static FlinkPipelineComposer ofMiniCluster() {
+    public static FlinkPipelineComposer ofMiniCluster(
+            org.apache.flink.configuration.Configuration envConfig) {
         return new FlinkPipelineComposer(
-                StreamExecutionEnvironment.getExecutionEnvironment(), true);
+                StreamExecutionEnvironment.getExecutionEnvironment(envConfig), true);
     }
 
     private FlinkPipelineComposer(StreamExecutionEnvironment env, boolean isBlocking) {
         this.env = env;
         this.isBlocking = isBlocking;
+    }
+
+    @VisibleForTesting
+    public StreamExecutionEnvironment getEnv() {
+        return env;
     }
 
     @Override

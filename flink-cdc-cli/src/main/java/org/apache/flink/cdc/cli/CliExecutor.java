@@ -60,7 +60,7 @@ public class CliExecutor {
                 pipelineDefinitionParser.parse(pipelineDefPath, globalPipelineConfig);
 
         // Create composer
-        PipelineComposer composer = getComposer(flinkConfig);
+        PipelineComposer composer = getComposer(flinkConfig, pipelineDef.getConfig());
 
         // Compose pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
@@ -69,10 +69,10 @@ public class CliExecutor {
         return execution.execute();
     }
 
-    private PipelineComposer getComposer(Configuration flinkConfig) {
+    private PipelineComposer getComposer(Configuration flinkConfig, Configuration pipelineConfig) {
         if (composer == null) {
             return FlinkEnvironmentUtils.createComposer(
-                    useMiniCluster, flinkConfig, additionalJars);
+                    useMiniCluster, flinkConfig, pipelineConfig, additionalJars);
         }
         return composer;
     }

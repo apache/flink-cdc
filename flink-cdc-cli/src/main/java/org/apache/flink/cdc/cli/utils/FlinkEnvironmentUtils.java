@@ -22,6 +22,7 @@ import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 /** Utilities for handling Flink configuration and environment. */
 public class FlinkEnvironmentUtils {
@@ -35,12 +36,30 @@ public class FlinkEnvironmentUtils {
     }
 
     public static FlinkPipelineComposer createComposer(
-            boolean useMiniCluster, Configuration flinkConfig, List<Path> additionalJars) {
+            boolean useMiniCluster,
+            Configuration flinkConfig,
+            Configuration pipelineConfig,
+            List<Path> additionalJars) {
+
+        org.apache.flink.configuration.Configuration envConfig =
+                new org.apache.flink.configuration.Configuration();
+        Optional.ofNullable(flinkConfig)
+                .ifPresent(
+                        configuration ->
+                                envConfig.addAll(
+                                        org.apache.flink.configuration.Configuration.fromMap(
+                                                configuration.toMap())));
+        Optional.ofNullable(pipelineConfig)
+                .ifPresent(
+                        configuration ->
+                                envConfig.addAll(
+                                        org.apache.flink.configuration.Configuration.fromMap(
+                                                configuration.toMap())));
+
         if (useMiniCluster) {
-            return FlinkPipelineComposer.ofMiniCluster();
+            return FlinkPipelineComposer.ofMiniCluster(envConfig);
         }
-        return FlinkPipelineComposer.ofRemoteCluster(
-                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap()),
-                additionalJars);
+
+        return FlinkPipelineComposer.ofRemoteCluster(envConfig, additionalJars);
     }
 }
