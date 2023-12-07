@@ -614,7 +614,7 @@ Data Type Mapping
             </tr>
             <tr>
                 <td>BIT(n)</td>
-                <td>BINARY(⌈n/8⌉)</td>
+                <td>BINARY(⌈(n + 7) / 8⌉)</td>
                 <td></td>
             </tr>
             <tr>
