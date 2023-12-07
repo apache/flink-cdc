@@ -2,7 +2,7 @@
 
 ```{toctree}
 :maxdepth: 2
-
+mysql-doris-pipeline-tutorial
 mysql-postgres-tutorial
 mongodb-tutorial
 oceanbase-tutorial
