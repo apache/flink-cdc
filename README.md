@@ -56,6 +56,10 @@ sink:
 pipeline:
   name: mysql-sync-doris
   parallelism: 4
+
+flink-config:
+  execution.checkpointing.interval: 30000
+  execution.checkpointing.mode: EXACTLY_ONC
 ```
 5. Submit the job to Flink cluster.
 ```bash
