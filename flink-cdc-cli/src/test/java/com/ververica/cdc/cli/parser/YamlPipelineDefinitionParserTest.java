@@ -120,7 +120,7 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
-    void testInvalidTimeZone() throws Exception {
+    void testInvalidTimeZone() {
         URL resource = Resources.getResource("definitions/pipeline-definition-minimized.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         assertThatThrownBy(
@@ -183,6 +183,11 @@ class YamlPipelineDefinitionParserTest {
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
                                     .put("enable-schema-evolution", "false")
+                                    .build()),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("execution.checkpointing.interval", "10000")
+                                    .put("execution.checkpointing.mode", "EXACTLY_ONCE")
                                     .build()));
 
     private final PipelineDef fullDefWithGlobalConf =
@@ -228,6 +233,11 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "4")
                                     .put("enable-schema-evolution", "false")
                                     .put("foo", "bar")
+                                    .build()),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("execution.checkpointing.interval", "10000")
+                                    .put("execution.checkpointing.mode", "EXACTLY_ONCE")
                                     .build()));
 
     private final PipelineDef defWithOptional =
@@ -257,9 +267,8 @@ class YamlPipelineDefinitionParserTest {
                                     "mydb.default.app_order_.*", "odsdb.default.app_order", null)),
                     null,
                     Configuration.fromMap(
-                            ImmutableMap.<String, String>builder()
-                                    .put("parallelism", "4")
-                                    .build()));
+                            ImmutableMap.<String, String>builder().put("parallelism", "4").build()),
+                    new Configuration());
 
     private final PipelineDef minimizedDef =
             new PipelineDef(
@@ -267,5 +276,6 @@ class YamlPipelineDefinitionParserTest {
                     new SinkDef("kafka", null, new Configuration()),
                     Collections.emptyList(),
                     null,
+                    new Configuration(),
                     new Configuration());
 }

@@ -17,6 +17,7 @@
 package com.ververica.cdc.composer.flink;
 
 import org.apache.flink.configuration.DeploymentOptions;
+import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -94,6 +95,12 @@ public class FlinkPipelineComposer implements PipelineComposer {
     public PipelineExecution compose(PipelineDef pipelineDef) {
         int parallelism = pipelineDef.getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
+
+        // Flink config
+        Configuration flinkConfig = pipelineDef.getFlinkConfig();
+        ReadableConfig flinkConfigOptions =
+                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap());
+        env.configure(flinkConfigOptions, Thread.currentThread().getContextClassLoader());
 
         // Source
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();

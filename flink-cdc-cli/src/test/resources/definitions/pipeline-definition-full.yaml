@@ -51,3 +51,7 @@ pipeline:
   name: source-database-sync-pipe
   parallelism: 4
   enable-schema-evolution: false
+
+flink-config:
+  execution.checkpointing.interval: 10000
+  execution.checkpointing.mode: EXACTLY_ONCE

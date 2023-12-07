@@ -53,18 +53,21 @@ public class PipelineDef {
     private final List<RouteDef> routes;
     private final List<TransformDef> transforms;
     private final Configuration config;
+    private final Configuration flinkConfig;
 
     public PipelineDef(
             SourceDef source,
             SinkDef sink,
             List<RouteDef> routes,
             List<TransformDef> transforms,
-            Configuration config) {
+            Configuration config,
+            Configuration flinkConfig) {
         this.source = source;
         this.sink = sink;
         this.routes = routes;
         this.transforms = transforms;
         this.config = evaluatePipelineTimeZone(config);
+        this.flinkConfig = flinkConfig;
     }
 
     public SourceDef getSource() {
@@ -87,6 +90,10 @@ public class PipelineDef {
         return config;
     }
 
+    public Configuration getFlinkConfig() {
+        return flinkConfig;
+    }
+
     @Override
     public String toString() {
         return "PipelineDef{"
@@ -100,6 +107,8 @@ public class PipelineDef {
                 + transforms
                 + ", config="
                 + config
+                + ", flinkConfig="
+                + flinkConfig
                 + '}';
     }
 
@@ -116,12 +125,13 @@ public class PipelineDef {
                 && Objects.equals(sink, that.sink)
                 && Objects.equals(routes, that.routes)
                 && Objects.equals(transforms, that.transforms)
-                && Objects.equals(config, that.config);
+                && Objects.equals(config, that.config)
+                && Objects.equals(flinkConfig, that.flinkConfig);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(source, sink, routes, transforms, config);
+        return Objects.hash(source, sink, routes, transforms, config, flinkConfig);
     }
 
     // ------------------------------------------------------------------------

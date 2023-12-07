@@ -43,6 +43,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String SINK_KEY = "sink";
     private static final String ROUTE_KEY = "route";
     private static final String PIPELINE_KEY = "pipeline";
+    private static final String FLINK_CONFIG_KEY = "flink-config";
 
     // Source / sink keys
     private static final String TYPE_KEY = "type";
@@ -85,12 +86,15 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // Pipeline configs are optional
         Configuration userPipelineConfig = toPipelineConfig(root.get(PIPELINE_KEY));
 
+        // Flink configs are optional
+        Configuration flinkConfig = toFlinkConfig(root.get(FLINK_CONFIG_KEY));
+
         // Merge user config into global config
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.addAll(globalPipelineConfig);
         pipelineConfig.addAll(userPipelineConfig);
 
-        return new PipelineDef(sourceDef, sinkDef, routeDefs, null, pipelineConfig);
+        return new PipelineDef(sourceDef, sinkDef, routeDefs, null, pipelineConfig, flinkConfig);
     }
 
     private SourceDef toSourceDef(JsonNode sourceNode) {
@@ -145,6 +149,15 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                         .map(JsonNode::asText)
                         .orElse(null);
         return new RouteDef(sourceTable, sinkTable, description);
+    }
+
+    private Configuration toFlinkConfig(JsonNode flinkConfigNode) {
+        if (flinkConfigNode == null || flinkConfigNode.isNull()) {
+            return new Configuration();
+        }
+        Map<String, String> flinkConfigMap =
+                mapper.convertValue(flinkConfigNode, new TypeReference<Map<String, String>>() {});
+        return Configuration.fromMap(flinkConfigMap);
     }
 
     private Configuration toPipelineConfig(JsonNode pipelineConfigNode) {
