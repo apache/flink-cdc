@@ -20,7 +20,7 @@ sink:
   table.create.properties.replication_num: 1
 
 pipeline:
-  pipeline.global.parallelism: 1
+  parallelism: 1
 
 ```
 
@@ -104,26 +104,26 @@ pipeline:
       <td> 是否使用攒批方式写入Doris </td>
     </tr>
     <tr>
-          <td>sink.flush.queue-size</td>
-          <td>optional</td>
-          <td style="word-wrap: break-word;">2</td>
-          <td>Integer</td>
-          <td> 攒批写入的队列大小
-          </td>
+      <td>sink.flush.queue-size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">2</td>
+      <td>Integer</td>
+      <td> 攒批写入的队列大小
+      </td>
     </tr>
     <tr>
-          <td>sink.buffer-flush.max-rows</td>
-          <td>optional</td>
-          <td style="word-wrap: break-word;">50000</td>
-          <td>Integer</td>
-          <td>单个批次最大Flush的记录数</td>
+      <td>sink.buffer-flush.max-rows</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">50000</td>
+      <td>Integer</td>
+      <td>单个批次最大Flush的记录数</td>
     </tr>
     <tr>
-          <td>sink.buffer-flush.max-bytes</td>
-          <td>optional</td>
-          <td style="word-wrap: break-word;">10485760(10MB)</td>
-          <td>Integer</td>
-          <td>单个批次最大Flush的字节数</td>
+      <td>sink.buffer-flush.max-bytes</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">10485760(10MB)</td>
+      <td>Integer</td>
+      <td>单个批次最大Flush的字节数</td>
     </tr>
     <tr>
       <td>sink.buffer-flush.interval</td>
