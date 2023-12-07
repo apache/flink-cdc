@@ -16,6 +16,9 @@
 
 package com.ververica.cdc.cli;
 
+import org.apache.flink.configuration.PipelineOptions;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 
 import com.ververica.cdc.composer.PipelineComposer;
@@ -28,9 +31,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.PrintStream;
+import java.lang.reflect.Field;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -90,7 +96,14 @@ class CliFrontendTest {
         CliExecutor executor =
                 createExecutor(
                         pipelineDef(), "--flink-home", flinkHome(), "--jar", aJar, "--jar", bJar);
-        assertThat(executor.getAdditionalJars()).contains(Paths.get(aJar), Paths.get(bJar));
+        PipelineComposer composer = executor.getComposer();
+        Field field = composer.getClass().getDeclaredField("env");
+        field.setAccessible(true);
+        StreamExecutionEnvironment env = (StreamExecutionEnvironment) field.get(composer);
+        List<String> jars = env.getConfiguration().get(PipelineOptions.JARS);
+        String aJarPath = new File(aJar).toURI().toString();
+        String bJarPath = new File(bJar).toURI().toString();
+        assertThat(jars).contains(aJarPath, bJarPath);
     }
 
     @Test

@@ -17,10 +17,8 @@
 package com.ververica.cdc.cli.utils;
 
 import com.ververica.cdc.common.configuration.Configuration;
-import com.ververica.cdc.composer.flink.FlinkPipelineComposer;
 
 import java.nio.file.Path;
-import java.util.List;
 
 /** Utilities for handling Flink configuration and environment. */
 public class FlinkEnvironmentUtils {
@@ -31,15 +29,5 @@ public class FlinkEnvironmentUtils {
     public static Configuration loadFlinkConfiguration(Path flinkHome) throws Exception {
         Path flinkConfPath = flinkHome.resolve(FLINK_CONF_DIR).resolve(FLINK_CONF_FILENAME);
         return ConfigurationUtils.loadMapFormattedConfig(flinkConfPath);
-    }
-
-    public static FlinkPipelineComposer createComposer(
-            boolean useMiniCluster, Configuration flinkConfig, List<Path> additionalJars) {
-        if (useMiniCluster) {
-            return FlinkPipelineComposer.ofMiniCluster();
-        }
-        return FlinkPipelineComposer.ofRemoteCluster(
-                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap()),
-                additionalJars);
     }
 }
