@@ -97,5 +97,5 @@ For example, we can use this yaml file to define a pipeline:
 ```yaml
 pipeline:
   name: mysql-to-kafka-pipeline
-  pipeline.global.parallelism: 1
+  parallelism: 1
 ```
