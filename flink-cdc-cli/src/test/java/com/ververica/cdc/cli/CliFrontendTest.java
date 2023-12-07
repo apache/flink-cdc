@@ -84,16 +84,6 @@ class CliFrontendTest {
     }
 
     @Test
-    void testAdditionalJar() throws Exception {
-        String aJar = "/foo/jar/a.jar";
-        String bJar = "/foo/jar/b.jar";
-        CliExecutor executor =
-                createExecutor(
-                        pipelineDef(), "--flink-home", flinkHome(), "--jar", aJar, "--jar", bJar);
-        assertThat(executor.getAdditionalJars()).contains(Paths.get(aJar), Paths.get(bJar));
-    }
-
-    @Test
     void testPipelineExecuting() throws Exception {
         CliExecutor executor =
                 createExecutor(

@@ -20,7 +20,9 @@ import com.ververica.cdc.cli.utils.ConfigurationUtils;
 import com.ververica.cdc.cli.utils.FlinkEnvironmentUtils;
 import com.ververica.cdc.common.annotation.VisibleForTesting;
 import com.ververica.cdc.common.configuration.Configuration;
+import com.ververica.cdc.composer.PipelineComposer;
 import com.ververica.cdc.composer.PipelineExecution;
+import com.ververica.cdc.composer.flink.FlinkPipelineComposer;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -84,6 +86,18 @@ public class CliFrontend {
         // Global pipeline configuration
         Configuration globalPipelineConfig = getGlobalConfig(commandLine);
 
+        // Create pipeline composer
+        boolean useMiniCluster = commandLine.hasOption(CliFrontendOptions.USE_MINI_CLUSTER);
+        PipelineComposer composer =
+                useMiniCluster
+                        ? FlinkPipelineComposer.ofMiniCluster()
+                        : createRemoteComposer(commandLine);
+
+        // Build executor
+        return new CliExecutor(pipelineDefPath, globalPipelineConfig, composer);
+    }
+
+    private static PipelineComposer createRemoteComposer(CommandLine commandLine) throws Exception {
         // Load Flink environment
         Path flinkHome = getFlinkHome(commandLine);
         Configuration flinkConfig = FlinkEnvironmentUtils.loadFlinkConfiguration(flinkHome);
@@ -97,12 +111,8 @@ public class CliFrontend {
                         .map(Paths::get)
                         .collect(Collectors.toList());
 
-        // Build executor
-        return new CliExecutor(
-                pipelineDefPath,
-                flinkConfig,
-                globalPipelineConfig,
-                commandLine.hasOption(CliFrontendOptions.USE_MINI_CLUSTER),
+        return FlinkPipelineComposer.ofRemoteCluster(
+                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap()),
                 additionalJars);
     }
 
