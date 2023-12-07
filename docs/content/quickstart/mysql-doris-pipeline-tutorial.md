@@ -165,37 +165,38 @@ This command automatically starts all the containers defined in the Docker Compo
 
 3. Write task configuration yaml file 
   Here is an example file for synchronizing the entire database `mysql-to-doris.yaml`：
+
    ```yaml
    ################################################################################
    # Description: Sync MySQL all tables to Doris
    ################################################################################
    source:
-   type: mysql
-   hostname: localhost
-   port: 3306
-   username: root
-   password: 123456
-   tables: app_db.\.*
-   server-id: 5400-5404
-   server-time-zone: UTC
+     type: mysql
+     hostname: localhost
+     port: 3306
+     username: root
+     password: 123456
+     tables: app_db.\.*
+     server-id: 5400-5404
+     server-time-zone: UTC
    
    sink:
-   type: doris
-   fenodes: 127.0.0.1:8030
-   benodes: 127.0.0.1:8040
-   username: root
-   password: ""
-   table.create.properties.light_schema_change: true
-   table.create.properties.replication_num: 1
+     type: doris
+     fenodes: 127.0.0.1:8030
+     username: root
+     password: ""
+     table.create.properties.light_schema_change: true
+     table.create.properties.replication_num: 1
    
    pipeline:
-   name: Sync MySQL Database to Doris
-   parallelism: 2
+     name: Sync MySQL Database to Doris
+     parallelism: 2
    
    ```
+   
 Notice that:  
 `tables: app_db.\.*` in source synchronize all tables in `app_db` through Regular Matching.   
-`table.create.properties.replication_num` in sink is because there is only one Doris be node in the Docker image.
+`table.create.properties.replication_num` in sink is because there is only one Doris BE node in the Docker image.
 
 4. Finally, submit job to Flink Standalone cluster using Cli.
    ```shell
@@ -261,35 +262,35 @@ Here is an example file for using `route` feature:
    # Description: Sync MySQL all tables to Doris
    ################################################################################
    source:
-   type: mysql
-   hostname: localhost
-   port: 3306
-   username: root
-   password: 123456
-   tables: app_db.\.*
-   server-id: 5400-5404
-   server-time-zone: UTC
-   
+      type: mysql
+      hostname: localhost
+      port: 3306
+      username: root
+      password: 123456
+      tables: app_db.\.*
+      server-id: 5400-5404
+      server-time-zone: UTC
+
    sink:
-   type: doris
-   fenodes: 127.0.0.1:8030
-   benodes: 127.0.0.1:8040
-   username: root
-   password: ""
-   table.create.properties.light_schema_change: true
-   table.create.properties.replication_num: 1
+      type: doris
+      fenodes: 127.0.0.1:8030
+      benodes: 127.0.0.1:8040
+      username: root
+      password: ""
+      table.create.properties.light_schema_change: true
+      table.create.properties.replication_num: 1
 
    route:
-   - source-table: app_db.orders
-     sink-table: ods_db.ods_orders
-   - source-table: app_db.shipments
-   sink-table: ods_db.ods_shipments
-   - source-table: app_db.products
-   sink-table: ods_db.ods_products
+      - source-table: app_db.orders
+        sink-table: ods_db.ods_orders
+      - source-table: app_db.shipments
+        sink-table: ods_db.ods_shipments
+      - source-table: app_db.products
+        sink-table: ods_db.ods_products
 
    pipeline:
-   name: Sync MySQL Database to Doris
-   parallelism: 2
+      name: Sync MySQL Database to Doris
+      parallelism: 2
    ```
 
 Using the upper `route` configuration, we can synchronize the table schema and data of `app_db.orders` to `ods_db.ods_orders`, thus achieving the function of database migration.   
@@ -297,8 +298,8 @@ Specifically, `source-table` support regular expression matching with multiple t
 
    ```yaml
    route:
-   - source-table: app_db.order.*
-     sink-table: ods_db.ods_orders
+     - source-table: app_db.order.*
+       sink-table: ods_db.ods_orders
    ```
 
 In this way, we can synchronize sharding tables like `app_db.order01`、`app_db.order02`、`app_db.order03` into one ods_db.ods_orders tables.      

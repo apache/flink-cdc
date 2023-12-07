@@ -167,37 +167,38 @@ flink-cdc-3.0.0 下会包含 bin、lib、log、conf 四个目录。
 
 3. 编写任务配置 yaml 文件  
 下面给出了一个整库同步的示例文件 mysql-to-doris.yaml：
+
    ```yaml
    ################################################################################
    # Description: Sync MySQL all tables to Doris
    ################################################################################
    source:
-   type: mysql
-   hostname: localhost
-   port: 3306
-   username: root
-   password: 123456
-   tables: app_db.\.*
-   server-id: 5400-5404
-   server-time-zone: UTC
+     type: mysql
+     hostname: localhost
+     port: 3306
+     username: root
+     password: 123456
+     tables: app_db.\.*
+     server-id: 5400-5404
+     server-time-zone: UTC
    
    sink:
-   type: doris
-   fenodes: 127.0.0.1:8030
-   benodes: 127.0.0.1:8040
-   username: root
-   password: ""
-   table.create.properties.light_schema_change: true
-   table.create.properties.replication_num: 1
+     type: doris
+     fenodes: 127.0.0.1:8030
+     username: root
+     password: ""
+     table.create.properties.light_schema_change: true
+     table.create.properties.replication_num: 1
    
    pipeline:
-   name: Sync MySQL Database to Doris
-   parallelism: 2
+     name: Sync MySQL Database to Doris
+     parallelism: 2
    
    ```
+   
 其中：  
 source 中的 `tables: app_db.\.*` 通过正则匹配同步 `app_db` 下的所有表。   
-sink 添加 `table.create.properties.replication_num` 参数是由于 Docker 镜像中只有一个 Doris be 节点。
+sink 添加 `table.create.properties.replication_num` 参数是由于 Docker 镜像中只有一个 Doris BE 节点。
    
 4. 最后，通过命令行提交任务到 Flink Standalone cluster 
    ```shell
@@ -263,35 +264,35 @@ Flink CDC 提供了将源表的表结构/数据路由到其他表名的配置，
    # Description: Sync MySQL all tables to Doris
    ################################################################################
    source:
-   type: mysql
-   hostname: localhost
-   port: 3306
-   username: root
-   password: 123456
-   tables: app_db.\.*
-   server-id: 5400-5404
-   server-time-zone: UTC
+     type: mysql
+     hostname: localhost
+     port: 3306
+     username: root
+     password: 123456
+     tables: app_db.\.*
+     server-id: 5400-5404
+     server-time-zone: UTC
    
    sink:
-   type: doris
-   fenodes: 127.0.0.1:8030
-   benodes: 127.0.0.1:8040
-   username: root
-   password: ""
-   table.create.properties.light_schema_change: true
-   table.create.properties.replication_num: 1
+     type: doris
+     fenodes: 127.0.0.1:8030
+     benodes: 127.0.0.1:8040
+     username: root
+     password: ""
+     table.create.properties.light_schema_change: true
+     table.create.properties.replication_num: 1
 
    route:
-   - source-table: app_db.orders
-     sink-table: ods_db.ods_orders
-   - source-table: app_db.shipments
-   sink-table: ods_db.ods_shipments
-   - source-table: app_db.products
-   sink-table: ods_db.ods_products
+     - source-table: app_db.orders
+       sink-table: ods_db.ods_orders
+     - source-table: app_db.shipments
+       sink-table: ods_db.ods_shipments
+     - source-table: app_db.products
+       sink-table: ods_db.ods_products
 
    pipeline:
-   name: Sync MySQL Database to Doris
-   parallelism: 2
+     name: Sync MySQL Database to Doris
+     parallelism: 2
    ```
 
 通过上面的 `route` 配置，会将 `app_db.orders` 表的结构和数据同步到 `ods_db.ods_orders`中。从而实现数据库迁移的功能。   
@@ -299,8 +300,8 @@ Flink CDC 提供了将源表的表结构/数据路由到其他表名的配置，
 
    ```yaml
       route:
-      - source-table: app_db.order.*
-        sink-table: ods_db.ods_orders
+        - source-table: app_db.order.*
+          sink-table: ods_db.ods_orders
    ```
 
 这样，就可以将诸如 `app_db.order01`、`app_db.order02`、`app_db.order03` 的表汇总到 ods_db.ods_orders 中。注意，目前还不支持多表中存在相同主键数据的场景，将在后续版本支持。
