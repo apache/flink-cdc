@@ -103,8 +103,8 @@ public class SqlServerTableFactoryTest {
                         SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
                         SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
-                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
                         JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
@@ -148,8 +148,8 @@ public class SqlServerTableFactoryTest {
                         3000,
                         100,
                         Duration.ofSeconds(45),
-                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
                         JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
                         40.5d,
                         0.01d,
                         "testCol",
@@ -187,8 +187,8 @@ public class SqlServerTableFactoryTest {
                         SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue(),
                         SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
                         JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue(),
-                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
                         JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue(),
+                        JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
                                 .defaultValue(),
                         JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
