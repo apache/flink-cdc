@@ -84,7 +84,7 @@ public class DorisRowConverterTest {
             row.add(converter.serialize(i, recordData));
         }
         Assert.assertEquals(
-                "[true, 1.2, 1.2345, 1, 32, 64, 128, 2021-01-01 08:00:00, 2021-01-01, a, doris]",
+                "[true, 1.2, 1.2345, 1, 32, 64, 128, 2021-01-01 08:00:00.0, 2021-01-01, a, doris]",
                 row.toString());
     }
 }
