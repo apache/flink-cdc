@@ -26,4 +26,4 @@ sink:
   name: Values Sink
 
 pipeline:
-  pipeline.global.parallelism: 1
+  parallelism: 1
