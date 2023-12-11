@@ -312,13 +312,9 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
                             new SqlServerDialect((SqlServerSourceConfig) sourceConfig);
                     JdbcConnection sqlServerConnection =
                             dialect.openJdbcConnection((JdbcSourceConfig) sourceConfig);
+                    sqlServerConnection.setAutoCommit(false);
                     sqlServerConnection.execute(statements);
                     sqlServerConnection.commit();
-                    try {
-                        Thread.sleep(5000L);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
                 };
 
         if (hookType == USE_POST_LOWWATERMARK_HOOK) {

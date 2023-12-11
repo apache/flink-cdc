@@ -345,11 +345,6 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                     mongoCollection.updateOne(
                             Filters.eq("cid", 2000L), Updates.set("address", "Pittsburgh"));
                     mongoCollection.deleteOne(Filters.eq("cid", 1019L));
-                    try {
-                        Thread.sleep(500L);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
                 };
 
         if (hookType == USE_POST_LOWWATERMARK_HOOK) {

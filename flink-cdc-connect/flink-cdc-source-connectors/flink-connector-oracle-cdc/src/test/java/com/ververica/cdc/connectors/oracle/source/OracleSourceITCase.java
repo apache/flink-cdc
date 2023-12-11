@@ -325,10 +325,9 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                                     .build();
                     try (OracleConnection oracleConnection =
                             OracleConnectionUtils.createOracleConnection(configuration)) {
+                        oracleConnection.setAutoCommit(false);
                         oracleConnection.execute(statements);
-                        Thread.sleep(500L);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
+                        oracleConnection.commit();
                     }
                 };
 

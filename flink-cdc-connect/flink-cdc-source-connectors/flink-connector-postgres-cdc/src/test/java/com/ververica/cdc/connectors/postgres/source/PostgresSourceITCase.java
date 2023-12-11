@@ -523,11 +523,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     PostgresDialect dialect =
                             new PostgresDialect((PostgresSourceConfig) sourceConfig);
                     try (PostgresConnection postgresConnection = dialect.openJdbcConnection()) {
+                        postgresConnection.setAutoCommit(false);
                         postgresConnection.execute(statements);
                         postgresConnection.commit();
-                        Thread.sleep(500L);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
                     }
                 };
 
