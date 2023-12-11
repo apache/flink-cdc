@@ -37,6 +37,7 @@ import java.lang.reflect.Field;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -74,6 +75,16 @@ class CliFrontendTest {
                         "Cannot find Flink home from either command line arguments \"--flink-home\" "
                                 + "or the environment variable \"FLINK_HOME\". "
                                 + "Please make sure Flink home is properly set. ");
+    }
+
+    @Test
+    void testMissingFlinkHomeWhenUseMiniCluster() throws Exception {
+        CliExecutor executor =
+                createExecutor(
+                        pipelineDef(),
+                        "--use-mini-cluster",
+                        "true");
+       assertThat(Objects.nonNull(executor.getComposer())).isTrue();
     }
 
     @Test
