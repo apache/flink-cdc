@@ -155,6 +155,110 @@ pipeline:
     </tbody>
 </table>
 </div>
+## 数据类型映射
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left" style="width:10%;">CDC type</th>
+        <th class="text-left" style="width:30%;">Doris type<a href="https://doris.apache.org/docs/dev/sql-manual/sql-reference/Data-Types/BOOLEAN/"></a></th>
+        <th class="text-left" style="width:60%;">NOTE</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td>TINYINT</td>
+      <td>TINYINT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>SMALLINT</td>
+      <td>SMALLINT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>INT</td>
+      <td>INT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>BIGINT</td>
+      <td>BIGINT</td>
+      <td></td>
+    </tr>
+   <tr>
+      <td>DECIMAL</td>
+      <td>DECIMAL</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>FLOAT</td>
+      <td>FLOAT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>DOUBLE</td>
+      <td>DOUBLE</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>BOOLEAN</td>
+      <td>BOOLEAN</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>DATE</td>
+      <td>DATE</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>TIMESTAMP [(p)]</td>
+      <td>DATETIME [(p)]</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>TIMESTAMP_LTZ [(p)]
+      </td>
+      <td>DATETIME [(p)]
+      </td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>CHAR(n)</td>
+      <td>CHAR(n*3)</td>
+      <td>在Doris中，字符串是以UTF-8编码存储的，所以英文字符占1个字节，中文字符占3个字节。这里的长度统一乘3，CHAR最大的长度是255，超过后会自动转为VARCHAR类型</td>
+    </tr>
+    <tr>
+      <td>VARCHAR(n)</td>
+      <td>VARCHAR(n*3)</td>
+      <td>同上，这里的长度统一乘3，VARCHAR最大的长度是65533，超过后会自动转为STRING类型</td>
+    </tr>
+    <tr>
+      <td>
+        BINARY(n)
+      </td>
+      <td>STRING</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        VARBINARY(N)
+      </td>
+      <td>STRING</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>STRING</td>
+      <td>STRING</td>
+      <td></td>
+    </tr>
+    </tbody>
+</table>
+</div>
+
+
+
 
 
 ## 常见问题

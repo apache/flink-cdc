@@ -5,4 +5,6 @@
 
 mysql-pipeline
 mysql-pipeline(ZH)
+doris-pipeline
+doris-pipeline(ZH)
 ```

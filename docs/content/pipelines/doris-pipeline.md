@@ -154,6 +154,113 @@ pipeline:
      </tbody>
 </table>
 </div>
+## Data Type Mapping
+
+----------------
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left" style="width:10%;">CDC type</th>
+        <th class="text-left" style="width:30%;">Doris type<a href="https://doris.apache.org/docs/dev/sql-manual/sql-reference/Data-Types/BOOLEAN/"></a></th>
+        <th class="text-left" style="width:60%;">NOTE</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td>TINYINT</td>
+      <td>TINYINT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>SMALLINT</td>
+      <td>SMALLINT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>INT</td>
+      <td>INT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>BIGINT</td>
+      <td>BIGINT</td>
+      <td></td>
+    </tr>
+   <tr>
+      <td>DECIMAL</td>
+      <td>DECIMAL</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>FLOAT</td>
+      <td>FLOAT</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>DOUBLE</td>
+      <td>DOUBLE</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>BOOLEAN</td>
+      <td>BOOLEAN</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>DATE</td>
+      <td>DATE</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>TIMESTAMP [(p)]</td>
+      <td>DATETIME [(p)]</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>TIMESTAMP_LTZ [(p)]
+      </td>
+      <td>DATETIME [(p)]
+      </td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>CHAR(n)</td>
+      <td>CHAR(n*3)</td>
+      <td>In Doris, strings are stored in UTF-8 encoding, so English characters occupy 1 byte and Chinese characters occupy 3 bytes. The length here is multiplied by 3. The maximum length of CHAR is 255. Once exceeded, it will automatically be converted to VARCHAR type.</td>
+    </tr>
+    <tr>
+      <td>VARCHAR(n)</td>
+      <td>VARCHAR(n*3)</td>
+      <td>Same as above. The length here is multiplied by 3. The maximum length of VARCHAR is 65533. Once exceeded, it will automatically be converted to STRING type.</td>
+    </tr>
+    <tr>
+      <td>
+        BINARY(n)
+      </td>
+      <td>STRING</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        VARBINARY(N)
+      </td>
+      <td>STRING</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>STRING</td>
+      <td>STRING</td>
+      <td></td>
+    </tr>
+    </tbody>
+</table>
+</div>
+
+
+
+
 
 
 ## FAQ
