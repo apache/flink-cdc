@@ -5,4 +5,6 @@
 
 mysql-pipeline
 mysql-pipeline(ZH)
+starrocks-pipeline
+starrocks-pipeline(ZH)
 ```
