@@ -1,0 +1,19 @@
+name: 'Get Workflow Origin'
+description: 'Gets origin of Workflow Runs.'
+author: 'potiuk'
+inputs:
+  token:
+    description: The GITHUB_TOKEN secret of the repository
+    required: true
+  sourceRunId:
+    description: |
+      The run that triggered the action. It should be set to
+      `$\{\{ github.event.workflow_run.id` variable \}\}` if used in `workflow_run` triggered run if
+      you want to act on source workflow rather than the triggered run.
+    required: true
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
+branding:
+  icon: 'play'
+  color: 'blue'

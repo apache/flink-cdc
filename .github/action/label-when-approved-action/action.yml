@@ -1,0 +1,35 @@
+name: 'Set Label When Approved'
+description: 'Set label when PR is approved.'
+author: 'TobKed'
+inputs:
+  token:
+    description: 'The GITHUB_TOKEN secret of the repository'
+    required: true
+  label:
+    description: 'A label to be checked/added/removed'
+    required: false
+  require_committers_approval:
+    description: 'Is approval from person with write access to repo required'
+    required: false
+  remove_label_when_approval_missing:
+    description: 'Should label be removed when approval is missing'
+    required: false
+  comment:
+    description: 'Comment to be added to Pull Request if approved'
+    required: false
+  pullRequestNumber:
+    description: 'Pull request number if triggered  by "worfklow_run"'
+    required: false
+outputs:
+  isApproved:
+    description: 'Is Pull Request approved'
+  labelSet:
+    description: 'Was label set'
+  labelRemoved:
+    description: 'Was label removed'
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
+branding:
+  icon: 'play'
+  color: 'blue'
