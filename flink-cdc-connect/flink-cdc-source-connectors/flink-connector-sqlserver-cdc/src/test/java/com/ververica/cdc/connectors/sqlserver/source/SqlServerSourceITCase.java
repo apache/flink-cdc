@@ -272,7 +272,7 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
         env.enableCheckpointing(1000);
         env.setParallelism(1);
 
-        ResolvedSchema customersSchame =
+        ResolvedSchema customersSchema =
                 new ResolvedSchema(
                         Arrays.asList(
                                 physical("id", BIGINT().notNull()),
@@ -281,7 +281,7 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
                                 physical("phone_number", STRING())),
                         new ArrayList<>(),
                         UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
-        TestTable customerTable = new TestTable(databaseName, "dbo", "customers", customersSchame);
+        TestTable customerTable = new TestTable(databaseName, "dbo", "customers", customersSchema);
         String tableId = customerTable.getTableId();
 
         SqlServerSourceBuilder.SqlServerIncrementalSource source =

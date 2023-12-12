@@ -93,6 +93,7 @@ public class MySqlDialect implements JdbcDataSourceDialect {
             throw new FlinkRuntimeException("Read the binlog offset error", e);
         }
     }
+    // read snapshot data as a tamperory state
 
     @Override
     public boolean isDataCollectionIdCaseSensitive(JdbcSourceConfig sourceConfig) {
