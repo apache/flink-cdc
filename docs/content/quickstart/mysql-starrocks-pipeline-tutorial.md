@@ -1,6 +1,6 @@
-# Streaming ELT from MySQL to Starrocks using Flink CDC 3.0
+# Streaming ELT from MySQL to StarRocks using Flink CDC 3.0
 
-This tutorial is to show how to quickly build a Streaming ELT job from MySQL to Starrocks using Flink CDC 3.0，including the feature of sync all table of one database, schema change evolution and sync sharding tables into one table.  
+This tutorial is to show how to quickly build a Streaming ELT job from MySQL to StarRocks using Flink CDC 3.0，including the feature of sync all table of one database, schema change evolution and sync sharding tables into one table.  
 All exercises in this tutorial are performed in the Flink CDC CLI, and the entire process uses standard SQL syntax, without a single line of Java/Scala code or IDE installation.
 
 ## Preparation
@@ -39,13 +39,13 @@ Create a `docker-compose.yml` file using the content provided below:
    ```yaml
    version: '2.1'
    services:
-      starrocks:
+      StarRocks:
          image: registry.starrocks.io/starrocks/allin1-ubuntu
          ports:
             - "8030:8030"
             - "8040:8040"
             - "9030:9030"
-      mysql:
+      MySQL:
          image: debezium/example-mysql:1.1
          ports:
             - "3306:3306"
@@ -57,7 +57,7 @@ Create a `docker-compose.yml` file using the content provided below:
 
 The Docker Compose should include the following services (containers):
 - MySQL: include a database named `app_db`
-- Starrocks: to store tables from MySQL
+- StarRocks: to store tables from MySQL
 
 To start all containers, run the following command in the directory that contains the `docker-compose.yml` file.
 
@@ -65,7 +65,7 @@ To start all containers, run the following command in the directory that contain
    docker-compose up -d
    ```
 
-This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run docker ps to check whether these containers are running properly. You can also visit [http://localhost:8030/](http://localhost:8030/) to check whether Starrocks is running.
+This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run docker ps to check whether these containers are running properly. You can also visit [http://localhost:8030/](http://localhost:8030/) to check whether StarRocks is running.
 #### Prepare records for MySQL
 1. Enter MySQL container
 
@@ -115,23 +115,7 @@ This command automatically starts all the containers defined in the Docker Compo
    INSERT INTO `products` (`id`, `product`) VALUES (2, 'Cap');
    INSERT INTO `products` (`id`, `product`) VALUES (3, 'Peanut');
     ```
-
-#### Create database in Starrocks
-`Starrocks` connector currently does not support automatic database creation and needs to first create a database corresponding to the write table.
-1. Enter Starrocks Web UI。  
-   [http://localhost:8030/](http://localhost:8030/)  
-   The default username is `root`, and the default password is empty.
-
-   ![Starrocks UI](/_static/fig/mysql-Starrocks-tutorial/Starrocks-ui.png "Starrocks UI")
-
-2. Create `app_db` database through Web UI.
-
-    ```sql
-   create database app_db;
-    ```
-
-   ![Starrocks create_table](/_static/fig/mysql-Starrocks-tutorial/Starrocks-create-table.png "Starrocks create table")
-
+   
 ## Submit job using FlinkCDC cli
 1. Download the binary compressed packages listed below and extract them to the directory ` flink cdc-3.0.0 '`：    
    [flink-cdc-3.0.0-bin.tar.gz](https://github.com/ververica/flink-cdc-connectors/releases/download/release-3.0.0/flink-cdc-3.0.0-bin.tar.gz)
@@ -140,14 +124,14 @@ This command automatically starts all the containers defined in the Docker Compo
 2. Download the connector package listed below and move it to the `lib` directory  
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself.**
     - [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
-    - [Starrocks pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-starrocks/3.0.0/flink-cdc-pipeline-connector-starrocks-3.0.0.jar)
+    - [StarRocks pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-starrocks/3.0.0/flink-cdc-pipeline-connector-starrocks-3.0.0.jar)
 
-3. Write task configuration yaml file
+3. Write task configuration yaml file.
    Here is an example file for synchronizing the entire database `mysql-to-starrocks.yaml`：
 
    ```yaml
    ################################################################################
-   # Description: Sync MySQL all tables to Starrocks
+   # Description: Sync MySQL all tables to StarRocks
    ################################################################################
    source:
      type: mysql
@@ -161,21 +145,22 @@ This command automatically starts all the containers defined in the Docker Compo
    
    sink:
      type: starrocks
-     name: Starrocks Sink
+     name: StarRocks Sink
      jdbc-url: jdbc:mysql://127.0.0.1:9030
      load-url: 127.0.0.1:8030
      username: root
      password: ""
+     table.create.properties.replication_num: 1
    
    pipeline:
-     name: Sync MySQL Database to Starrocks
+     name: Sync MySQL Database to StarRocks
      parallelism: 2
    
    ```
 
 Notice that:  
-`tables: app_db.\.*` in source synchronize all tables in `app_db` through Regular Matching.   
-`table.create.properties.replication_num` in sink is because there is only one Starrocks BE node in the Docker image.
+* `tables: app_db.\.*` in source synchronize all tables in `app_db` through Regular Matching.   
+* `table.create.properties.replication_num` in sink is because there is only one StarRocks BE node in the Docker image.
 
 4. Finally, submit job to Flink Standalone cluster using Cli.
 
@@ -188,16 +173,16 @@ After successful submission, the return information is as follows：
    ```shell
    Pipeline has been submitted to cluster.
    Job ID: 02a31c92f0e7bc9a1f4c0051980088a0
-   Job Description: Sync MySQL Database to Starrocks
+   Job Description: Sync MySQL Database to StarRocks
    ```
 
-We can find a job  named `Sync MySQL Database to Doris` is running through Flink Web UI.
+We can find a job  named `Sync MySQL Database to StarRocks` is running through Flink Web UI.
 
-![MySQL-to-Starrocks](/_static/fig/mysql-Starrocks-tutorial/mysql-to-starrocks.png "MySQL-to-Starrocks")
+![MySQL-to-StarRocks](/_static/fig/mysql-Starrocks-tutorial/mysql-to-starrocks.png "MySQL-to-StarRocks")
 
-Connect to jdbc through database connection tools such as Dbeaver mysql://127.0.0.1:9030 You can view the data written to three tables in Starlocks.
+Connect to jdbc through database connection tools such as Dbeaver using `mysql://127.0.0.1:9030`. You can view the data written to three tables in StarRocks.
 
-![Starrocks-dispaly-data](/_static/fig/mysql-Starrocks-tutorial/starrocks-display-data.png "Starrocks-dispaly-data")
+![StarRocks-display-data](/_static/fig/mysql-Starrocks-tutorial/starrocks-display-data.png "StarRocks-display-data")
 
 ### Synchronize Schema and Data changes
 Enter MySQL container
@@ -206,7 +191,7 @@ Enter MySQL container
     docker-compose exec mysql mysql -uroot -p123456
     ```
 
-Then, modify schema and record in MySQL, and the tables of Starrocks will change the same in real time：
+Then, modify schema and record in MySQL, and the tables of StarRocks will change the same in real time：
 1. insert one record in `orders` from MySQL:
 
    ```sql
@@ -230,11 +215,11 @@ Then, modify schema and record in MySQL, and the tables of Starrocks will change
    DELETE FROM app_db.orders WHERE id=2;
    ```
 
-Refresh the Starrocks Web UI every time you execute a step, and you can see that the `orders` table displayed in Starrocks will be updated in real-time, like the following：
+Refresh the Dbeaver every time you execute a step, and you can see that the `orders` table displayed in StarRocks will be updated in real-time, like the following：
 
-![Starrocks-display-result](/_static/fig/mysql-doris-tutorial/starrocks_display_result.png "Starrocks-display-result")
+![StarRockss-display-result](/_static/fig/mysql-doris-tutorial/starrocks_display_result.png "StarRocks-display-result")
 
-Similarly, by modifying the 'shipments' and' products' tables, you can also see the results of synchronized changes in real-time in Starrocks.
+Similarly, by modifying the `shipments` and `products` tables, you can also see the results of synchronized changes in real-time in StarRocks.
 
 ### Route the changes
 Flink CDC provides the configuration to route the table structure/data of the source table to other table names.   
@@ -242,7 +227,7 @@ With this ability, we can achieve functions such as table name, database name re
 Here is an example file for using `route` feature:
    ```yaml
    ################################################################################
-   # Description: Sync MySQL all tables to Starrocks
+   # Description: Sync MySQL all tables to StarRocks
    ################################################################################
    source:
       type: mysql
@@ -255,12 +240,11 @@ Here is an example file for using `route` feature:
       server-time-zone: UTC
 
    sink:
-      type: Starrocks
+      type: starrocks
       fenodes: 127.0.0.1:8030
       benodes: 127.0.0.1:8040
       username: root
       password: ""
-      table.create.properties.light_schema_change: true
       table.create.properties.replication_num: 1
 
    route:
@@ -272,7 +256,7 @@ Here is an example file for using `route` feature:
         sink-table: ods_db.ods_products
 
    pipeline:
-      name: Sync MySQL Database to Starrocks
+      name: Sync MySQL Database to StarRocks
       parallelism: 2
    ```
 

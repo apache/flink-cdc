@@ -1,6 +1,6 @@
-# 基于 Flink CDC 3.0 构建 MySQL 到 Starrocks 的 Streaming ELT
+# 基于 Flink CDC 3.0 构建 MySQL 到 StarRocks 的 Streaming ELT
 
-这篇教程将展示如何基于 Flink CDC 快速构建 MySQL 到 Starrocks 的 Streaming ELT 作业，包含整库同步、表结构变更同步和分库分表同步的功能。  
+这篇教程将展示如何基于 Flink CDC 快速构建 MySQL 到 StarRocks 的 Streaming ELT 作业，包含整库同步、表结构变更同步和分库分表同步的功能。  
 本教程的演示都将在 Flink CDC CLI 中进行，无需一行 Java/Scala 代码，也无需安装 IDE。
 
 ## 准备阶段
@@ -38,13 +38,13 @@
    ```yaml
    version: '2.1'
    services:
-     starrocks:
+     StarRocks:
        image: registry.starrocks.io/starrocks/allin1-ubuntu
        ports:
          - "8030:8030"
          - "8040:8040"
          - "9030:9030"
-     mysql:
+     MySQL:
        image: debezium/example-mysql:1.1
        ports:
          - "3306:3306"
@@ -56,7 +56,7 @@
 
 该 Docker Compose 中包含的容器有：
 - MySQL: 包含商品信息的数据库 `app_db`
-- Starrocks: 存储从 MySQL 中根据规则映射过来的结果表
+- StarRocks: 存储从 MySQL 中根据规则映射过来的结果表
 
 在 `docker-compose.yml` 所在目录下执行下面的命令来启动本教程需要的组件：
 
@@ -64,7 +64,7 @@
    docker-compose up -d
    ```
 
-该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过 docker ps 来观察上述的容器是否正常启动了，也可以通过访问 [http://localhost:8030/](http://localhost:8030/) 来查看 Starrocks 是否运行正常。
+该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过 docker ps 来观察上述的容器是否正常启动了，也可以通过访问 [http://localhost:8030/](http://localhost:8030/) 来查看 StarRocks 是否运行正常。
 #### 在 MySQL 数据库中准备数据
 1. 进入 MySQL 容器
 
@@ -123,14 +123,14 @@
 2. 下载下面列出的 connector 包，并且移动到 lib 目录下  
    **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译**
     - [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
-    - [Starrocks pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-starrocks/3.0.0/flink-cdc-pipeline-connector-starrocks-3.0.0.jar)
+    - [StarRocks pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-starrocks/3.0.0/flink-cdc-pipeline-connector-starrocks-3.0.0.jar)
 
 3. 编写任务配置 yaml 文件  
    下面给出了一个整库同步的示例文件 mysql-to-starrocks.yaml：
 
    ```yaml
    ################################################################################
-   # Description: Sync MySQL all tables to Starrocks
+   # Description: Sync MySQL all tables to StarRocks
    ################################################################################
    source:
      type: mysql
@@ -144,20 +144,22 @@
    
    sink:
      type: starrocks
-     name: Starrocks Sink
+     name: StarRocks Sink
      jdbc-url: jdbc:mysql://127.0.0.1:9030
      load-url: 127.0.0.1:8030
      username: root
      password: ""
+     table.create.properties.replication_num: 1
    
    pipeline:
-     name: Sync MySQL Database to Starrocks
+     name: Sync MySQL Database to StarRocks
      parallelism: 2
    
    ```
 
 其中：  
-source 中的 `tables: app_db.\.*` 通过正则匹配同步 `app_db` 下的所有表。   
+* source 中的 `tables: app_db.\.*` 通过正则匹配同步 `app_db` 下的所有表。 
+* sink 添加 `table.create.properties.replication_num` 参数是由于 Docker 镜像中只有一个 StarRocks BE 节点。
 
 4. 最后，通过命令行提交任务到 Flink Standalone cluster
 
@@ -170,16 +172,16 @@ source 中的 `tables: app_db.\.*` 通过正则匹配同步 `app_db` 下的所�
    ```shell
    Pipeline has been submitted to cluster.
    Job ID: 02a31c92f0e7bc9a1f4c0051980088a0
-   Job Description: Sync MySQL Database to Starrocks
+   Job Description: Sync MySQL Database to StarRocks
    ```
 
-在 Flink Web UI，可以看到一个名为 `Sync MySQL Database to Starrocks` 的任务正在运行。
+在 Flink Web UI，可以看到一个名为 `Sync MySQL Database to StarRocks` 的任务正在运行。
 
-![MySQL-to-Starrocks](/_static/fig/mysql-Starrocks-tutorial/mysql-to-starrocks.png "MySQL-to-Starrocks")
+![MySQL-to-StarRocks](/_static/fig/mysql-Starrocks-tutorial/mysql-to-starrocks.png "MySQL-to-StarRocks")
 
-通过数据库连接工具例如 Dbeaver 等连接到 jdbc:mysql://127.0.0.1:9030 可以查看 Starrocks 中写入了三张表的数据。
+通过数据库连接工具例如 Dbeaver 等连接到 jdbc:mysql://127.0.0.1:9030， 可以查看 StarRocks 中写入了三张表的数据。
 
-![Starrocks-dispaly-data](/_static/fig/mysql-Starrocks-tutorial/starrocks-display-data.png "Starrocks-dispaly-data")
+![StarRocks-dispaly-data](/_static/fig/mysql-Starrocks-tutorial/starrocks-display-data.png "StarRocks-dispaly-data")
 
 ### 同步变更
 进入 MySQL 容器
@@ -188,7 +190,7 @@ source 中的 `tables: app_db.\.*` 通过正则匹配同步 `app_db` 下的所�
     docker-compose exec mysql mysql -uroot -p123456
     ```
 
-接下来，修改 MySQL 数据库中表的数据，Starrocks 中显示的订单数据也将实时更新：
+接下来，修改 MySQL 数据库中表的数据，StarRocks 中显示的订单数据也将实时更新：
 1. 在 MySQL 的 `orders` 表中插入一条数据
 
    ```sql
@@ -213,18 +215,18 @@ source 中的 `tables: app_db.\.*` 通过正则匹配同步 `app_db` 下的所�
    DELETE FROM app_db.orders WHERE id=2;
    ```
 
-通过连接工具，我们可以看到 Starrocks 上也在实时发生着这些变更：
+通过连接工具，我们可以看到 StarRocks 上也在实时发生着这些变更：
 
-![Starrocks-dispaly-result](/_static/fig/mysql-Starrocks-tutorial/starrocks-display-result.png "Starrocks-dispaly-result")
+![StarRocks-display-result](/_static/fig/mysql-Starrocks-tutorial/starrocks-display-result.png "StarRocks-display-result")
 
-同样的，去修改 `shipments`, `products` 表，也能在 Starrocks 中实时看到同步变更的结果。
+同样的，去修改 `shipments`, `products` 表，也能在 StarRocks 中实时看到同步变更的结果。
 
 ### 路由变更
 Flink CDC 提供了将源表的表结构/数据路由到其他表名的配置，借助这种能力，我们能够实现表名库名替换，整库同步等功能。   
 下面提供一个配置文件说明：
    ```yaml
    ################################################################################
-   # Description: Sync MySQL all tables to Starrocks
+   # Description: Sync MySQL all tables to StarRocks
    ################################################################################
    source:
      type: mysql
@@ -238,11 +240,12 @@ Flink CDC 提供了将源表的表结构/数据路由到其他表名的配置，
 
    sink:
       type: starrocks
-      name: Starrocks Sink
+      name: StarRocks Sink
       jdbc-url: jdbc:mysql://127.0.0.1:9030
       load-url: 127.0.0.1:8030
       username: root
       password: ""
+      table.create.properties.replication_num: 1
 
    route:
      - source-table: app_db.orders
@@ -253,11 +256,11 @@ Flink CDC 提供了将源表的表结构/数据路由到其他表名的配置，
        sink-table: ods_db.ods_products
 
    pipeline:
-     name: Sync MySQL Database to Starrocks
+     name: Sync MySQL Database to StarRocks
      parallelism: 2
    ```
 
-通过上面的 `route` 配置，会将 `app_db.orders` 表的结构和数据同步到 `ods_db.ods_orders`中。从而实现数据库迁移的功能。   
+通过上面的 `route` 配置，会将 `app_db.orders` 表的结构和数据同步到 `ods_db.ods_orders` 中。从而实现数据库迁移的功能。   
 特别地，source-table 支持正则表达式匹配多表，从而实现分库分表同步的功能，例如下面的配置：
 
    ```yaml
