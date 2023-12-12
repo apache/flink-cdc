@@ -197,10 +197,23 @@ public class SqlServerUtils {
         return new LsnOffset(changeLsn, commitLsn, null);
     }
 
-    /** Fetch current largest log sequence number (LSN) of the database. */
+    /**
+     * Fetch current largest log sequence number (LSN) of the database. todo: note:
+     * io.debezium.connector.sqlserver.SqlServerConnection#getMaxTransactionLsn(java.lang.String)
+     * can not do it
+     */
     public static LsnOffset currentLsn(SqlServerConnection connection) {
         try {
-            Lsn maxLsn = connection.getMaxTransactionLsn(connection.database());
+            String sql = "SELECT max([Current LSN]) FROM fn_dblog(NULL, NULL)";
+            Lsn maxLsn =
+                    connection.queryAndMap(
+                            sql,
+                            connection.singleResultMapper(
+                                    rs -> {
+                                        final Lsn ret = Lsn.valueOf(rs.getBytes(1));
+                                        return ret;
+                                    },
+                                    "Max LSN query of the transaction log file  must return exactly one value"));
             return new LsnOffset(maxLsn, maxLsn, null);
         } catch (SQLException e) {
             throw new FlinkRuntimeException(e.getMessage(), e);
