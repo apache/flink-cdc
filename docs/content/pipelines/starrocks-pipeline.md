@@ -33,7 +33,7 @@ sink:
 
 pipeline:
    name: MySQL to StarRocks Pipeline
-   parallelism: 4
+   parallelism: 2
 ```
 
 Pipeline Connector Options
@@ -167,18 +167,18 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Integer</td>
-      <td>Number of buckets when creating a StarRocks table automatically. If not set, StarRocks will determine the number
-            of buckets automatically. For how StarRocks does it,
-            see <a href="https://docs.starrocks.io/docs/table_design/Data_distribution/#determine-the-number-of-buckets">
-            Determine the number of buckets</a>.</td>
+      <td>Number of buckets when creating a StarRocks table automatically. For StarRocks 2.5 or later, it's not required
+            to set the option because StarRocks can 
+            <a href="https://docs.starrocks.io/docs/table_design/Data_distribution/#determine-the-number-of-buckets">
+            determine the number of buckets automatically</a>. For StarRocks prior to 2.5, you must set this option. </td>
     </tr>
     <tr>
-      <td>table.create.properties.</td>
+      <td>table.create.properties.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Properties used for creating a StarRocks table. For example: <code>'table.create.properties.fast_schema_evolution' = 'true'</code>
-          will enable fast sechema evolution if you are using StarRocks 3.2 or later. For more information, 
+          will enable fast schema evolution if you are using StarRocks 3.2 or later. For more information, 
           see <a href="https://docs.starrocks.io/docs/table_design/table_types/primary_key_table">how to create a primary key table</a>.</td> 
     </tr>
     <tr>
@@ -211,8 +211,8 @@ Usage Notes
 * For schema change synchronization
   * only supports add/drop columns
   * the new column will always be added to the last position
-  * if your StarRocks version is 3.2 or later, you can set `table.create.properties.fast_schema_evolution`
-    to `true` to speed up the schema change.
+  * if your StarRocks version is 3.2 or later, and using the connector to create table automatically,
+    you can set `table.create.properties.fast_schema_evolution` to `true` to speed up the schema change.
 
 * For data synchronization, the pipeline connector uses [StarRocks Sink Connector](https://github.com/StarRocks/starrocks-connector-for-apache-flink)
   to write data to StarRocks. You can see [sink documentation](https://github.com/StarRocks/starrocks-connector-for-apache-flink/blob/main/docs/content/connector-sink.md)
@@ -288,21 +288,21 @@ Data Type Mapping
     <tr>
       <td>CHAR(n) where n <= 85</td>
       <td>CHAR(n * 3)</td>
-      <td>CDC defines the length by characters, but StarRocks defines it by bytes. According to UTF-8, one Chinese 
+      <td>CDC defines the length by characters, and StarRocks defines it by bytes. According to UTF-8, one Chinese 
         character is equal to three bytes, so the length for StarRocks is n * 3. Because the max length of StarRocks
         CHAR is 255, map CDC CHAR to StarRocks CHAR only when the CDC length is no larger than 85.</td>
     </tr>
     <tr>
       <td>CHAR(n) where n > 85</td>
       <td>VARCHAR(n * 3)</td>
-      <td>CDC defines the length by characters, but StarRocks defines it by bytes. According to UTF-8, one Chinese 
+      <td>CDC defines the length by characters, and StarRocks defines it by bytes. According to UTF-8, one Chinese 
         character is equal to three bytes, so the length for StarRocks is n * 3. Because the max length of StarRocks
         CHAR is 255, map CDC CHAR to StarRocks VARCHAR if the CDC length is larger than 85.</td>
     </tr>
     <tr>
       <td>VARCHAR(n)</td>
       <td>VARCHAR(n * 3)</td>
-      <td>CDC defines the length by characters, but StarRocks defines it by bytes. According to UTF-8, one Chinese 
+      <td>CDC defines the length by characters, and StarRocks defines it by bytes. According to UTF-8, one Chinese 
         character is equal to three bytes, so the length for StarRocks is n * 3.</td>
     </tr>
     </tbody>
