@@ -2,7 +2,9 @@
 
 ```{toctree}
 :maxdepth: 2
+
 mysql-doris-pipeline-tutorial-zh
+mysql-starrocks-pipeline-tutorial-zh
 mysql-postgres-tutorial-zh
 mongodb-tutorial-zh
 oceanbase-tutorial-zh
