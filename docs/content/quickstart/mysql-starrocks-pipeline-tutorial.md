@@ -241,8 +241,8 @@ Here is an example file for using `route` feature:
 
    sink:
       type: starrocks
-      fenodes: 127.0.0.1:8030
-      benodes: 127.0.0.1:8040
+      jdbc-url: jdbc:mysql://127.0.0.1:9030
+      load-url: 127.0.0.1:8030
       username: root
       password: ""
       table.create.properties.replication_num: 1
