@@ -28,7 +28,7 @@ Prepare a Linux or MacOS computer with Docker installed.
 
 If successfully started, you can access the Flink Web UI at [http://localhost:8081/](http://localhost:8081/), as shown below.
 
-![Flink UI](/_static/fig/mysql-Starrocks-tutorial/flink-ui.png "Flink UI")
+![Flink UI](/_static/fig/mysql-starrocks-tutorial/flink-ui.png "Flink UI")
 
 Executing `start-cluster.sh` multiple times can start multiple `TaskManager`s.
 
@@ -178,11 +178,11 @@ After successful submission, the return information is as follows：
 
 We can find a job  named `Sync MySQL Database to StarRocks` is running through Flink Web UI.
 
-![MySQL-to-StarRocks](/_static/fig/mysql-Starrocks-tutorial/mysql-to-starrocks.png "MySQL-to-StarRocks")
+![MySQL-to-StarRocks](/_static/fig/mysql-starrocks-tutorial/mysql-to-starrocks.png "MySQL-to-StarRocks")
 
 Connect to jdbc through database connection tools such as Dbeaver using `mysql://127.0.0.1:9030`. You can view the data written to three tables in StarRocks.
 
-![StarRocks-display-data](/_static/fig/mysql-Starrocks-tutorial/starrocks-display-data.png "StarRocks-display-data")
+![StarRocks-display-data](/_static/fig/mysql-starrocks-tutorial/starrocks-display-data.png "StarRocks-display-data")
 
 ### Synchronize Schema and Data changes
 Enter MySQL container
@@ -217,7 +217,7 @@ Then, modify schema and record in MySQL, and the tables of StarRocks will change
 
 Refresh the Dbeaver every time you execute a step, and you can see that the `orders` table displayed in StarRocks will be updated in real-time, like the following：
 
-![StarRockss-display-result](/_static/fig/mysql-doris-tutorial/starrocks_display_result.png "StarRocks-display-result")
+![StarRockss-display-result](/_static/fig/mysql-starrocks-tutorial/starrocks-display-result.png "StarRocks-display-result")
 
 Similarly, by modifying the `shipments` and `products` tables, you can also see the results of synchronized changes in real-time in StarRocks.
 
