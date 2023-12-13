@@ -104,7 +104,8 @@ Flink SQL> CREATE TABLE products (
      ID INT NOT NULL,
      NAME STRING,
      DESCRIPTION STRING,
-     WEIGHT DECIMAL(10,3)
+     WEIGHT DECIMAL(10,3),
+     PRIMARY KEY(ID) NOT ENFORCED
      ) WITH (
      'connector' = 'db2-cdc',
      'hostname' = 'localhost',
@@ -112,10 +113,9 @@ Flink SQL> CREATE TABLE products (
      'username' = 'root',
      'password' = '123456',
      'database-name' = 'mydb',
-     'schema-name' = 'myschema',
-     'table-name' = 'products');
+     'table-name' = 'myschema.products');
   
--- read snapshot and binlogs from products table
+-- read snapshot and redo logs from products table
 Flink SQL> SELECT * FROM products;
 ```
 
@@ -168,20 +168,13 @@ Connector Options
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Database name of the Db2 server to monitor.</td>
-    </tr> 
-    <tr>
-      <td>schema-name</td>
-      <td>required</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Schema name of the Db2 database to monitor.</td>
     </tr>
     <tr>
       <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table name of the Db2 database to monitor.</td>
+      <td>Table name of the Db2 database to monitor, e.g.: "db1.table1"</td>
     </tr>
     <tr>
       <td>port</td>
@@ -211,6 +204,46 @@ for more detailed information.</td>
       </td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Whether enable parallelism snapshot.</td>
+    </tr>
+    <tr>
+      <td>chunk-meta.group.size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">1000</td>
+      <td>Integer</td>
+      <td>The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.</td>
+    </tr>
+    <tr>
+      <td>chunk-key.even-distribution.factor.lower-bound</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">0.05d</td>
+      <td>Double</td>
+      <td>The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
+          The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
+          The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+    </tr> 
+    <tr>
+      <td>chunk-key.even-distribution.factor.upper-bound</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">1000.0d</td>
+      <td>Double</td>
+      <td>The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
+          The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
+          The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+    </tr>
+    <tr>
+          <td>scan.incremental.snapshot.chunk.key-column</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">(none)</td>
+          <td>String</td>
+          <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
+            By default, the chunk key is the first column of the primary key. This column must be a column of the primary key.</td>
+    </tr>
+    <tr>
       <td>debezium.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -220,9 +253,57 @@ Db2 server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
           See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/db2.html#db2-connector-properties">Debezium's Db2 Connector properties</a></td> 
     </tr>
+    <tr>
+      <td>scan.incremental.close-idle-reader.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to close idle readers at the end of the snapshot phase. <br>
+          The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.<br>
+          If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
+          so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
+
+Available Metadata
+----------------
+
+The following format metadata can be exposed as read-only (VIRTUAL) columns in a table definition.
+
+<table class="colwidths-auto docutils">
+  <thead>
+     <tr>
+       <th class="text-left" style="width: 15%">Key</th>
+       <th class="text-left" style="width: 30%">DataType</th>
+       <th class="text-left" style="width: 55%">Description</th>
+     </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>table_name</td>
+      <td>STRING NOT NULL</td>
+      <td>Name of the table that contain the row.</td>
+    </tr>
+    <tr>
+      <td>schema_name</td>
+      <td>STRING NOT NULL</td>
+      <td>Name of the schema that contain the row.</td>
+    </tr>    
+    <tr>
+      <td>database_name</td>
+      <td>STRING NOT NULL</td>
+      <td>Name of the database that contain the row.</td>
+    </tr>
+    <tr>
+      <td>op_ts</td>
+      <td>TIMESTAMP_LTZ(3) NOT NULL</td>
+      <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
+    </tr>
+  </tbody>
+</table>
 
 Features
 --------
@@ -230,9 +311,9 @@ Features
 
 The config option `scan.startup.mode` specifies the startup mode for DB2 CDC consumer. The valid enumerations are:
 
-- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest binlog.
+- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest redo logs.
 - `latest-offset`: Never to perform snapshot on the monitored database tables upon first startup, just read from
-  the end of the binlog which means only have the changes since the connector was started.
+  the end of the redo logs which means only have the changes since the connector was started.
 
 _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not using them together. If you speicifying both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
 
@@ -269,6 +350,46 @@ public class Db2SourceExample {
             .setParallelism(1); // use parallelism 1 for sink to keep message ordering
 
     env.execute("Print Db2 Snapshot + Change Stream");
+  }
+}
+```
+
+The DB2 CDC incremental connector (after 3.1.0) can be used as the following shows:
+```java
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.cdc.connectors.db2.source.Db2SourceBuilder;
+import org.apache.flink.cdc.connectors.db2.source.Db2SourceBuilder.Db2IncrementalSource;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+
+public class Db2ParallelSourceExample {
+
+  public static void main(String[] args) throws Exception {
+
+    Db2IncrementalSource<String> sqlServerSource =
+            new Db2SourceBuilder()
+                    .hostname("localhost")
+                    .port(50000)
+                    .databaseList("TESTDB")
+                    .tableList("DB2INST1.CUSTOMERS")
+                    .username("flink")
+                    .password("flinkpw")
+                    .deserializer(new JsonDebeziumDeserializationSchema())
+                    .startupOptions(StartupOptions.initial())
+                    .build();
+
+    StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+    // enable checkpoint
+    env.enableCheckpointing(3000);
+    // set the source parallelism to 2
+    env.fromSource(sqlServerSource, WatermarkStrategy.noWatermarks(), "Db2IncrementalSource")
+            .setParallelism(2)
+            .print()
+            .setParallelism(1);
+
+    env.execute("Print DB2 Snapshot + Change Stream");
   }
 }
 ```
