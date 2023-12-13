@@ -28,7 +28,7 @@
 
 启动成功的话，可以在 [http://localhost:8081/](http://localhost:8081/) 访问到 Flink Web UI，如下所示：
 
-![Flink UI](/_static/fig/mysql-Starrocks-tutorial/flink-ui.png "Flink UI")
+![Flink UI](/_static/fig/mysql-starrocks-tutorial/flink-ui.png "Flink UI")
 
 多次执行 start-cluster.sh 可以拉起多个 TaskManager。
 
@@ -177,11 +177,11 @@
 
 在 Flink Web UI，可以看到一个名为 `Sync MySQL Database to StarRocks` 的任务正在运行。
 
-![MySQL-to-StarRocks](/_static/fig/mysql-Starrocks-tutorial/mysql-to-starrocks.png "MySQL-to-StarRocks")
+![MySQL-to-StarRocks](/_static/fig/mysql-starrocks-tutorial/mysql-to-starrocks.png "MySQL-to-StarRocks")
 
 通过数据库连接工具例如 Dbeaver 等连接到 jdbc:mysql://127.0.0.1:9030， 可以查看 StarRocks 中写入了三张表的数据。
 
-![StarRocks-dispaly-data](/_static/fig/mysql-Starrocks-tutorial/starrocks-display-data.png "StarRocks-dispaly-data")
+![StarRocks-dispaly-data](/_static/fig/mysql-starrocks-tutorial/starrocks-display-data.png "StarRocks-dispaly-data")
 
 ### 同步变更
 进入 MySQL 容器
@@ -217,7 +217,7 @@
 
 通过连接工具，我们可以看到 StarRocks 上也在实时发生着这些变更：
 
-![StarRocks-display-result](/_static/fig/mysql-Starrocks-tutorial/starrocks-display-result.png "StarRocks-display-result")
+![StarRocks-display-result](/_static/fig/mysql-starrocks-tutorial/starrocks-display-result.png "StarRocks-display-result")
 
 同样的，去修改 `shipments`, `products` 表，也能在 StarRocks 中实时看到同步变更的结果。
 
