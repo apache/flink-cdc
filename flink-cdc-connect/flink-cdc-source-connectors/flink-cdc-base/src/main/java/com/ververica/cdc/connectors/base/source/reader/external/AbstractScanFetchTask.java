@@ -55,7 +55,7 @@ public abstract class AbstractScanFetchTask implements FetchTask {
         if (snapshotPhaseHooks.getPreLowWatermarkAction() != null) {
             snapshotPhaseHooks.getPreLowWatermarkAction().accept(sourceConfig, snapshotSplit);
         }
-        final Offset lowWatermark = dialect.displayCurrentOffset(sourceConfig);
+        final Offset lowWatermark = getLowWaterMark(dialect, sourceConfig);
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
                 lowWatermark,
@@ -81,7 +81,7 @@ public abstract class AbstractScanFetchTask implements FetchTask {
         Offset highWatermark =
                 context.getSourceConfig().isSkipSnapshotBackfill()
                         ? lowWatermark
-                        : dialect.displayCurrentOffset(sourceConfig);
+                        : getHighWaterMark(dialect, sourceConfig);
         LOG.info(
                 "Snapshot step 3 - Determining high watermark {} for split {}",
                 highWatermark,
@@ -121,6 +121,14 @@ public abstract class AbstractScanFetchTask implements FetchTask {
                 new ArrayList<>(),
                 snapshotSplit.getTableSchemas(),
                 0);
+    }
+
+    protected Offset getLowWaterMark(DataSourceDialect dialect, SourceConfig sourceConfig) {
+        return dialect.displayCurrentOffset(sourceConfig);
+    }
+
+    protected Offset getHighWaterMark(DataSourceDialect dialect, SourceConfig sourceConfig) {
+        return dialect.displayCurrentOffset(sourceConfig);
     }
 
     protected abstract void executeBackfillTask(Context context, StreamSplit backfillStreamSplit)

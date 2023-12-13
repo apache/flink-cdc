@@ -16,10 +16,15 @@
 
 package com.ververica.cdc.connectors.sqlserver.source.reader.fetch;
 
+import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
+import com.ververica.cdc.connectors.base.config.SourceConfig;
+import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
+import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
+import com.ververica.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
 import com.ververica.cdc.connectors.sqlserver.source.reader.fetch.SqlServerStreamFetchTask.StreamSplitReadTask;
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
@@ -108,6 +113,12 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                 new SqlserverSnapshotSplitChangeEventSourceContext(),
                 sourceFetchContext.getPartition(),
                 streamOffsetContext);
+    }
+
+    @Override
+    protected Offset getHighWaterMark(DataSourceDialect dialect, SourceConfig sourceConfig) {
+        return ((SqlServerDialect) dialect)
+                .displayCurrentOffsetOfLog((JdbcSourceConfig) sourceConfig);
     }
 
     private StreamSplitReadTask createBackFillLsnSplitReadTask(

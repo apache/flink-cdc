@@ -43,6 +43,7 @@ import java.util.Map;
 
 import static com.ververica.cdc.connectors.sqlserver.source.utils.SqlServerConnectionUtils.createSqlServerConnection;
 import static com.ververica.cdc.connectors.sqlserver.source.utils.SqlServerUtils.currentLsn;
+import static com.ververica.cdc.connectors.sqlserver.source.utils.SqlServerUtils.currentLsnOfLog;
 
 /** The {@link JdbcDataSourceDialect} implementation for SqlServer datasource. */
 @Experimental
@@ -65,6 +66,14 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
     public Offset displayCurrentOffset(JdbcSourceConfig sourceConfig) {
         try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
             return currentLsn((SqlServerConnection) jdbcConnection);
+        } catch (Exception e) {
+            throw new FlinkRuntimeException("Read the redoLog offset error", e);
+        }
+    }
+
+    public Offset displayCurrentOffsetOfLog(JdbcSourceConfig sourceConfig) {
+        try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
+            return currentLsnOfLog((SqlServerConnection) jdbcConnection);
         } catch (Exception e) {
             throw new FlinkRuntimeException("Read the redoLog offset error", e);
         }
