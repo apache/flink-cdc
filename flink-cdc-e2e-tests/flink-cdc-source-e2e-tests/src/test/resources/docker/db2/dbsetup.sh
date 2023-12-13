@@ -56,11 +56,12 @@ db2 -tvmf /asncdctools/src/asncdctables.sql
 db2 -tvmf /asncdctools/src/asncdcaddremove.sql
 
 
-# create sample table and data
-db2 -tvmf /asncdctools/src/inventory.sql
-db2 -tvmf /asncdctools/src/column_type_test.sql
+
+
+# startup-agent
 db2 -tvmf /asncdctools/src/startup-agent.sql
-sleep 10
-db2 -tvmf /asncdctools/src/startup-cdc-demo.sql
+
+
+
 
 echo "db2 setup done"
