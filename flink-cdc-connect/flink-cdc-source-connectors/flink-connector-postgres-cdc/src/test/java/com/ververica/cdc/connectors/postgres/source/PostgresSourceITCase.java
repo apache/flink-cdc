@@ -482,7 +482,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         env.enableCheckpointing(1000);
         env.setParallelism(1);
 
-        ResolvedSchema customersSchame =
+        ResolvedSchema customersSchema =
                 new ResolvedSchema(
                         Arrays.asList(
                                 physical("id", BIGINT().notNull()),
@@ -492,7 +492,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         new ArrayList<>(),
                         UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
         TestTable customerTable =
-                new TestTable(customDatabase, "customer", "customers", customersSchame);
+                new TestTable(customDatabase, "customer", "customers", customersSchema);
         String tableId = customerTable.getTableId();
 
         PostgresSourceBuilder.PostgresIncrementalSource source =
@@ -525,9 +525,6 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     try (PostgresConnection postgresConnection = dialect.openJdbcConnection()) {
                         postgresConnection.execute(statements);
                         postgresConnection.commit();
-                        Thread.sleep(500L);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
                     }
                 };
 

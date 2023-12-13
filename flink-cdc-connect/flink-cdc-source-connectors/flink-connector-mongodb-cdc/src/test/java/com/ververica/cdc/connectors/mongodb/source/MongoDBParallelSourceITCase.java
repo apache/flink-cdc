@@ -302,7 +302,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
         env.enableCheckpointing(1000);
         env.setParallelism(1);
 
-        ResolvedSchema customersSchame =
+        ResolvedSchema customersSchema =
                 new ResolvedSchema(
                         Arrays.asList(
                                 physical("cid", BIGINT().notNull()),
@@ -311,7 +311,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                                 physical("phone_number", STRING())),
                         new ArrayList<>(),
                         UniqueConstraint.primaryKey("pk", Collections.singletonList("cid")));
-        TestTable customerTable = new TestTable(customerDatabase, "customers", customersSchame);
+        TestTable customerTable = new TestTable(customerDatabase, "customers", customersSchema);
         MongoDBSource source =
                 new MongoDBSourceBuilder()
                         .hosts(CONTAINER.getHostAndPort())
@@ -345,11 +345,6 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                     mongoCollection.updateOne(
                             Filters.eq("cid", 2000L), Updates.set("address", "Pittsburgh"));
                     mongoCollection.deleteOne(Filters.eq("cid", 1019L));
-                    try {
-                        Thread.sleep(500L);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
                 };
 
         if (hookType == USE_POST_LOWWATERMARK_HOOK) {
