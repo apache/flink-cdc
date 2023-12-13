@@ -130,8 +130,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.fetchSize = fetchSize;
         this.connectTimeout = connectTimeout;
-        this.connectionPoolSize = connectionPoolSize;
         this.connectMaxRetries = connectMaxRetries;
+        this.connectionPoolSize = connectionPoolSize;
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.chunkKeyColumn = chunkKeyColumn;
@@ -178,8 +178,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                             .splitMetaGroupSize(splitMetaGroupSize)
                             .fetchSize(fetchSize)
                             .connectTimeout(connectTimeout)
-                            .connectionPoolSize(connectionPoolSize)
                             .connectMaxRetries(connectMaxRetries)
+                            .connectionPoolSize(connectionPoolSize)
                             .distributionFactorUpper(distributionFactorUpper)
                             .distributionFactorLower(distributionFactorLower)
                             .chunkKeyColumn(chunkKeyColumn)
@@ -239,8 +239,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         splitMetaGroupSize,
                         fetchSize,
                         connectTimeout,
-                        connectionPoolSize,
                         connectMaxRetries,
+                        connectionPoolSize,
                         distributionFactorUpper,
                         distributionFactorLower,
                         chunkKeyColumn,
