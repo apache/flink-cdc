@@ -89,7 +89,6 @@ public class Db2ConnectorITCase extends Db2TestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         DB2_CONTAINER.getHost(),
@@ -97,8 +96,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
                         DB2_CONTAINER.getUsername(),
                         DB2_CONTAINER.getPassword(),
                         DB2_CONTAINER.getDatabaseName(),
-                        "DB2INST1",
-                        "PRODUCTS");
+                        "DB2INST1.PRODUCTS");
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -209,7 +207,6 @@ public class Db2ConnectorITCase extends Db2TestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         DB2_CONTAINER.getHost(),
@@ -217,8 +214,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
                         DB2_CONTAINER.getUsername(),
                         DB2_CONTAINER.getPassword(),
                         DB2_CONTAINER.getDatabaseName(),
-                        "DB2INST1",
-                        "FULL_TYPES");
+                        "DB2INST1.FULL_TYPES");
         String sinkDDL =
                 "CREATE TABLE sink (\n"
                         + "    id INTEGER NOT NULL,\n"
@@ -292,8 +288,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
                         DB2_CONTAINER.getUsername(),
                         DB2_CONTAINER.getPassword(),
                         DB2_CONTAINER.getDatabaseName(),
-                        "DB2INST1",
-                        "PRODUCTS1");
+                        "DB2INST1.PRODUCTS1");
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -355,7 +350,6 @@ public class Db2ConnectorITCase extends Db2TestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         DB2_CONTAINER.getHost(),
@@ -363,8 +357,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
                         DB2_CONTAINER.getUsername(),
                         DB2_CONTAINER.getPassword(),
                         DB2_CONTAINER.getDatabaseName(),
-                        "DB2INST1",
-                        "PRODUCTS2");
+                        "DB2INST1.PRODUCTS2");
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " database_name STRING,"

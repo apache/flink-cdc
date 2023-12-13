@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.tests.utils.TestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Db2Container;
@@ -41,6 +42,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
@@ -68,6 +70,20 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
     private static boolean db2AsnAgentRunning = false;
 
     private static Db2Container db2Container;
+
+    @Parameterized.Parameter(1)
+    public boolean parallelismSnapshot;
+
+    @Parameterized.Parameters(name = "flinkVersion: {0}, parallelismSnapshot: {1}")
+    public static List<Object[]> parameters() {
+        final List<String> flinkVersions = getFlinkVersion();
+        List<Object[]> params = new ArrayList<>();
+        for (String flinkVersion : flinkVersions) {
+            params.add(new Object[] {flinkVersion, true});
+            params.add(new Object[] {flinkVersion, false});
+        }
+        return params;
+    }
 
     @Before
     public void before() {
@@ -132,16 +148,18 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
                                         + " 'username' = '%s',"
                                         + " 'password' = '%s',"
                                         + " 'database-name' = '%s',"
-                                        + " 'schema-name' = '%s',"
-                                        + " 'table-name' = '%s'"
+                                        + " 'table-name' = '%s',"
+                                        + " 'scan.incremental.snapshot.enabled' = '"
+                                        + parallelismSnapshot
+                                        + "',"
+                                        + " 'scan.incremental.snapshot.chunk.size' = '4'"
                                         + ");",
                                 INTER_CONTAINER_DB2_ALIAS,
                                 DB2_PORT,
                                 db2Container.getUsername(),
                                 db2Container.getPassword(),
                                 db2Container.getDatabaseName(),
-                                "DB2INST1",
-                                "PRODUCTS"),
+                                "DB2INST1.PRODUCTS"),
                         "CREATE TABLE products_sink (",
                         " `id` INT NOT NULL,",
                         " name STRING,",

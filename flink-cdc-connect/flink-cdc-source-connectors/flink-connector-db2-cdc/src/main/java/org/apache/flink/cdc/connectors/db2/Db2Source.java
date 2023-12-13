@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.connectors.db2;
 
-import org.apache.flink.cdc.connectors.db2.table.StartupOptions;
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
 import org.apache.flink.cdc.debezium.Validator;

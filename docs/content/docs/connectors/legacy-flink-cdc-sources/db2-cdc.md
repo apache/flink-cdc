@@ -92,8 +92,7 @@ Flink SQL> CREATE TABLE products (
      'username' = 'root',
      'password' = '123456',
      'database-name' = 'mydb',
-     'schema-name' = 'myschema',
-     'table-name' = 'products');
+     'table-name' = 'myschema.products');
   
 -- read snapshot and binlogs from products table
 Flink SQL> SELECT * FROM products;
@@ -148,20 +147,13 @@ Connector Options
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Database name of the Db2 server to monitor.</td>
-    </tr> 
-    <tr>
-      <td>schema-name</td>
-      <td>required</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>String</td>
-      <td>Schema name of the Db2 database to monitor.</td>
     </tr>
     <tr>
       <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table name of the Db2 database to monitor.</td>
+      <td>Table name of the Db2 database to monitor, e.g.: "db1.table1"</td>
     </tr>
     <tr>
       <td>port</td>
@@ -189,6 +181,38 @@ for more detailed information.</td>
           See more <a href="https://debezium.io/documentation/reference/1.9/connectors/db2.html#db2-temporal-types">here</a>.
           If not set, then ZoneId.systemDefault() is used to determine the server time zone.
       </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Whether enable parallelism snapshot.</td>
+    </tr>
+    <tr>
+      <td>chunk-meta.group.size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">1000</td>
+      <td>Integer</td>
+      <td>The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.</td>
+    </tr>
+    <tr>
+      <td>chunk-key.even-distribution.factor.lower-bound</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">0.05d</td>
+      <td>Double</td>
+      <td>The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
+          The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
+          The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
+    </tr> 
+    <tr>
+      <td>chunk-key.even-distribution.factor.upper-bound</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">1000.0d</td>
+      <td>Double</td>
+      <td>The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the table is evenly distribution or not. 
+          The table chunks would use evenly calculation optimization when the data distribution is even, and the query for splitting would happen when it is uneven. 
+          The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.</td>
     </tr>
     <tr>
       <td>debezium.*</td>
@@ -252,6 +276,48 @@ public class Db2SourceExample {
   }
 }
 ```
+
+The DB2 CDC incremental connector (after 3.1.0) can be used as the following shows:
+```java
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.cdc.connectors.db2.source.Db2SourceBuilder;
+import org.apache.flink.cdc.connectors.db2.source.Db2SourceBuilder.Db2IncrementalSource;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+
+public class Db2ParallelSourceExample {
+
+  public static void main(String[] args) throws Exception {
+
+    Db2IncrementalSource<String> sqlServerSource =
+            new Db2SourceBuilder()
+                    .hostname("localhost")
+                    .port(50000)
+                    .databaseList("TESTDB")
+                    .tableList("DB2INST1.CUSTOMERS")
+                    .username("flink")
+                    .password("flinkpw")
+                    .deserializer(new JsonDebeziumDeserializationSchema())
+                    .startupOptions(StartupOptions.initial())
+                    .build();
+
+    StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+    // enable checkpoint
+    env.enableCheckpointing(3000);
+    // set the source parallelism to 2
+    env.fromSource(sqlServerSource, WatermarkStrategy.noWatermarks(), "Db2IncrementalSource")
+            .setParallelism(2)
+            .print()
+            .setParallelism(1);
+
+    env.execute("Print DB2 Snapshot + Change Stream");
+  }
+}
+```
+
+**Note:** Please refer [Deserialization](../about.html#deserialization) for more details about the JSON deserialization.
 
 Data Type Mapping
 ----------------
