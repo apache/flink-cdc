@@ -96,7 +96,6 @@ public class BinaryRecordDataSerializer extends TypeSerializerSingleton<BinaryRe
                 segments == null || (segments.length == 1 && reuse.getOffset() == 0),
                 "Reuse BinaryRecordData should have no segments or only one segment and offset start at 0.");
 
-        int arity = source.readInt();
         int length = source.readInt();
         if (segments == null || segments[0].size() < length) {
             segments = new MemorySegment[] {MemorySegmentFactory.wrap(new byte[length])};
