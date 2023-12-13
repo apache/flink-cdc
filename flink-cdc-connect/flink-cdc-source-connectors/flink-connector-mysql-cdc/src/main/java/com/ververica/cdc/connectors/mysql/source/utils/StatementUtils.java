@@ -176,7 +176,7 @@ public class StatementUtils {
                     tableId, limitSize, "*", Optional.ofNullable(condition), Optional.empty());
         } else {
             final String orderBy =
-                    pkRowType.getFieldNames().stream().collect(Collectors.joining(", "));
+                    String.join(", ", pkRowType.getFieldNames());
             return buildSelectWithBoundaryRowLimits(
                     tableId,
                     limitSize,

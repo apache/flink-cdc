@@ -289,7 +289,7 @@ public class MySqlSnapshotSplitReadTask
                     logTimer = getTableScanLogTimer();
                 }
                 dispatcher.dispatchSnapshotEvent(
-                        (MySqlPartition) snapshotContext.partition,
+                        snapshotContext.partition,
                         table.id(),
                         getChangeRecordEmitter(snapshotContext, table.id(), row),
                         snapshotReceiver);
