@@ -70,7 +70,8 @@ public class Db2SourceTest extends Db2TestBase {
 
     @Test
     public void testConsumingAllEvents() throws Exception {
-        DebeziumSourceFunction<SourceRecord> source = createDb2Source("DB2INST1.PRODUCTS1");
+        initializeDb2Table("inventory", "PRODUCTS");
+        DebeziumSourceFunction<SourceRecord> source = createDb2Source("DB2INST1.PRODUCTS");
         TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
 
         setupSource(source);
@@ -94,12 +95,12 @@ public class Db2SourceTest extends Db2TestBase {
             }
 
             statement.execute(
-                    "INSERT INTO DB2INST1.PRODUCTS1 VALUES (default,'robot','Toy robot',1.304)"); // 110
+                    "INSERT INTO DB2INST1.PRODUCTS VALUES (default,'robot','Toy robot',1.304)"); // 110
             records = drain(sourceContext, 1);
             assertInsert(records.get(0), "ID", 110);
 
             statement.execute(
-                    "INSERT INTO DB2INST1.PRODUCTS1 VALUES (1001,'roy','old robot',1234.56)"); // 1001
+                    "INSERT INTO DB2INST1.PRODUCTS VALUES (1001,'roy','old robot',1234.56)"); // 1001
             records = drain(sourceContext, 1);
             assertInsert(records.get(0), "ID", 1001);
 
@@ -108,7 +109,7 @@ public class Db2SourceTest extends Db2TestBase {
             // (TOMBSTONE is dropped)
             // ---------------------------------------------------------------------------------------------------------------
             statement.execute(
-                    "UPDATE DB2INST1.PRODUCTS1 SET ID=2001, DESCRIPTION='really old robot' WHERE ID=1001");
+                    "UPDATE DB2INST1.PRODUCTS SET ID=2001, DESCRIPTION='really old robot' WHERE ID=1001");
             records = drain(sourceContext, 2);
             assertDelete(records.get(0), "ID", 1001);
             assertInsert(records.get(1), "ID", 2001);
@@ -116,7 +117,7 @@ public class Db2SourceTest extends Db2TestBase {
             // ---------------------------------------------------------------------------------------------------------------
             // Simple UPDATE (with no schema changes)
             // ---------------------------------------------------------------------------------------------------------------
-            statement.execute("UPDATE DB2INST1.PRODUCTS1 SET WEIGHT=1345.67 WHERE ID=2001");
+            statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT=1345.67 WHERE ID=2001");
             records = drain(sourceContext, 1);
             assertUpdate(records.get(0), "ID", 2001);
 
@@ -126,8 +127,8 @@ public class Db2SourceTest extends Db2TestBase {
             // Add a column with default to the 'products' table and explicitly update one record
             // ...
             statement.execute(
-                    "ALTER TABLE DB2INST1.PRODUCTS1 ADD COLUMN VOLUME FLOAT ADD COLUMN ALIAS VARCHAR(30) NULL");
-            statement.execute("UPDATE DB2INST1.PRODUCTS1 SET VOLUME=13.5 WHERE ID=2001");
+                    "ALTER TABLE DB2INST1.PRODUCTS ADD COLUMN VOLUME FLOAT ADD COLUMN ALIAS VARCHAR(30) NULL");
+            statement.execute("UPDATE DB2INST1.PRODUCTS SET VOLUME=13.5 WHERE ID=2001");
             records = drain(sourceContext, 1);
             assertUpdate(records.get(0), "ID", 2001);
 
@@ -139,6 +140,7 @@ public class Db2SourceTest extends Db2TestBase {
 
     @Test
     public void testCheckpointAndRestore() throws Exception {
+        initializeDb2Table("inventory", "PRODUCTS");
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
         String prevLsn = "";
@@ -147,7 +149,7 @@ public class Db2SourceTest extends Db2TestBase {
             // Step-1: start the source from empty state
             // ---------------------------------------------------------------------------
             final DebeziumSourceFunction<SourceRecord> source =
-                    createDb2Source("DB2INST1.PRODUCTS2");
+                    createDb2Source("DB2INST1.PRODUCTS");
             // we use blocking context to block the source to emit before last snapshot record
             final BlockingSourceContext<SourceRecord> sourceContext =
                     new BlockingSourceContext<>(8);
@@ -207,7 +209,7 @@ public class Db2SourceTest extends Db2TestBase {
             // Step-3: restore the source from state
             // ---------------------------------------------------------------------------
             final DebeziumSourceFunction<SourceRecord> source2 =
-                    createDb2Source("DB2INST1.PRODUCTS2");
+                    createDb2Source("DB2INST1.PRODUCTS");
             final TestSourceContext<SourceRecord> sourceContext2 = new TestSourceContext<>();
             setupSource(source2, 1L, offsetState, historyState, true, 0, 1);
             final CheckedThread runThread2 =
@@ -226,7 +228,7 @@ public class Db2SourceTest extends Db2TestBase {
                     Statement statement = connection.createStatement()) {
 
                 statement.execute(
-                        "INSERT INTO DB2INST1.PRODUCTS2 VALUES (default,'robot','Toy robot',1.304)"); // 110
+                        "INSERT INTO DB2INST1.PRODUCTS VALUES (default,'robot','Toy robot',1.304)"); // 110
                 List<SourceRecord> records = drain(sourceContext2, 1);
                 assertEquals(1, records.size());
                 assertInsert(records.get(0), "ID", 110);
@@ -245,10 +247,10 @@ public class Db2SourceTest extends Db2TestBase {
                 String lsn = JsonPath.read(state, "$.sourceOffset.commit_lsn");
                 assertTrue(lsn.compareTo(prevLsn) > 0);
 
-                // execute 2 more DMLs to have more binlog
+                // execute 2 more DMLs to have more redo logs
                 statement.execute(
-                        "INSERT INTO DB2INST1.PRODUCTS2 VALUES (1001,'roy','old robot',1234.56)"); // 1001
-                statement.execute("UPDATE DB2INST1.PRODUCTS2 SET WEIGHT=1345.67 WHERE ID=1001");
+                        "INSERT INTO DB2INST1.PRODUCTS VALUES (1001,'roy','old robot',1234.56)"); // 1001
+                statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT=1345.67 WHERE ID=1001");
             }
 
             // cancel the source
@@ -261,7 +263,7 @@ public class Db2SourceTest extends Db2TestBase {
             // Step-5: restore the source from checkpoint-2
             // ---------------------------------------------------------------------------
             final DebeziumSourceFunction<SourceRecord> source3 =
-                    createDb2Source("DB2INST1.PRODUCTS2");
+                    createDb2Source("DB2INST1.PRODUCTS");
             final TestSourceContext<SourceRecord> sourceContext3 = new TestSourceContext<>();
             setupSource(source3, 2L, offsetState, historyState, true, 0, 1);
 
@@ -275,7 +277,7 @@ public class Db2SourceTest extends Db2TestBase {
                     };
             runThread3.start();
 
-            // consume the unconsumed binlog
+            // consume the unconsumed redo logs
             List<SourceRecord> records = drain(sourceContext3, 2);
             assertInsert(records.get(0), "ID", 1001);
             assertUpdate(records.get(1), "ID", 1001);
@@ -286,7 +288,7 @@ public class Db2SourceTest extends Db2TestBase {
             // can continue to receive new events
             try (Connection connection = getJdbcConnection();
                     Statement statement = connection.createStatement()) {
-                statement.execute("DELETE FROM DB2INST1.PRODUCTS2 WHERE ID=1001");
+                statement.execute("DELETE FROM DB2INST1.PRODUCTS WHERE ID=1001");
             }
             records = drain(sourceContext3, 1);
             assertDelete(records.get(0), "ID", 1001);

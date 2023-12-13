@@ -19,30 +19,43 @@ package org.apache.flink.cdc.connectors.tests;
 
 import org.apache.flink.cdc.common.test.utils.JdbcProxy;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
+import org.apache.flink.cdc.connectors.db2.Db2TestBase;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 
+import org.awaitility.Awaitility;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Db2Container;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.shaded.org.awaitility.core.ConditionTimeoutException;
 import org.testcontainers.utility.DockerImageName;
 
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.Assert.assertNotNull;
@@ -60,22 +73,41 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
 
     public static final String DB2_IMAGE = "ibmcom/db2";
     public static final String DB2_CUSTOM_IMAGE = "custom/db2-cdc:1.4";
-    private static final DockerImageName DEBEZIUM_DOCKER_IMAGE_NAME =
-            DockerImageName.parse(
-                            new ImageFromDockerfile(DB2_CUSTOM_IMAGE)
-                                    .withDockerfile(getFilePath("docker/db2/Dockerfile"))
-                                    .get())
-                    .asCompatibleSubstituteFor(DB2_IMAGE);
+    private static DockerImageName debeziumDockerImageName;
     private static boolean db2AsnAgentRunning = false;
-
     private static Db2Container db2Container;
+    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
+
+    @Parameterized.Parameter(1)
+    public boolean parallelismSnapshot;
+
+    @Parameterized.Parameters(name = "flinkVersion: {0}, parallelismSnapshot: {1}")
+    public static List<Object[]> parameters() {
+        final List<String> flinkVersions = getFlinkVersion();
+        List<Object[]> params = new ArrayList<>();
+        for (String flinkVersion : flinkVersions) {
+            params.add(new Object[] {flinkVersion, true});
+            params.add(new Object[] {flinkVersion, false});
+        }
+        return params;
+    }
+
+    @BeforeClass
+    public static void beforeClass() {
+        debeziumDockerImageName =
+                DockerImageName.parse(
+                                new ImageFromDockerfile(DB2_CUSTOM_IMAGE)
+                                        .withDockerfile(getFilePath("docker/db2/Dockerfile"))
+                                        .get())
+                        .asCompatibleSubstituteFor(DB2_IMAGE);
+    }
 
     @Before
     public void before() {
         super.before();
         LOG.info("Starting db2 containers...");
         db2Container =
-                new Db2Container(DEBEZIUM_DOCKER_IMAGE_NAME)
+                new Db2Container(debeziumDockerImageName)
                         .withDatabaseName("testdb")
                         .withUsername("db2inst1")
                         .withPassword("flinkpw")
@@ -118,6 +150,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
 
     @Test
     public void testDb2CDC() throws Exception {
+        initializeDb2Table("inventory", "PRODUCTS");
         List<String> sqlLines =
                 Arrays.asList(
                         String.format(
@@ -125,7 +158,8 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
                                         + " ID INT NOT NULL,"
                                         + " NAME STRING,"
                                         + " DESCRIPTION STRING,"
-                                        + " WEIGHT DECIMAL(10,3)"
+                                        + " WEIGHT DECIMAL(10,3),"
+                                        + " primary key (`ID`) not enforced"
                                         + ") WITH ("
                                         + " 'connector' = 'db2-cdc',"
                                         + " 'hostname' = '%s',"
@@ -133,16 +167,18 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
                                         + " 'username' = '%s',"
                                         + " 'password' = '%s',"
                                         + " 'database-name' = '%s',"
-                                        + " 'schema-name' = '%s',"
-                                        + " 'table-name' = '%s'"
+                                        + " 'table-name' = '%s',"
+                                        + " 'scan.incremental.snapshot.enabled' = '"
+                                        + parallelismSnapshot
+                                        + "',"
+                                        + " 'scan.incremental.snapshot.chunk.size' = '4'"
                                         + ");",
                                 INTER_CONTAINER_DB2_ALIAS,
                                 DB2_PORT,
                                 db2Container.getUsername(),
                                 db2Container.getPassword(),
                                 db2Container.getDatabaseName(),
-                                "DB2INST1",
-                                "PRODUCTS"),
+                                "DB2INST1.PRODUCTS"),
                         "CREATE TABLE products_sink (",
                         " `id` INT NOT NULL,",
                         " name STRING,",
@@ -226,5 +262,103 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
             LOG.error("Cannot get path from URI.", e);
         }
         return path;
+    }
+
+    private static void dropTestTable(Connection connection, String tableName) {
+
+        try {
+            Awaitility.await(String.format("cdc remove table %s", tableName))
+                    .atMost(60, TimeUnit.SECONDS)
+                    .until(
+                            () -> {
+                                try {
+                                    String sql =
+                                            String.format(
+                                                    "CALL ASNCDC.REMOVETABLE('DB2INST1', '%s')",
+                                                    tableName);
+                                    connection.createStatement().execute(sql);
+                                    return true;
+                                } catch (SQLException e) {
+                                    LOG.warn(
+                                            String.format(
+                                                    "cdc remove TABLE %s failed (will be retried): {}",
+                                                    tableName),
+                                            e.getMessage());
+                                    return false;
+                                }
+                            });
+        } catch (ConditionTimeoutException e) {
+            throw new IllegalStateException("Failed to cdc remove test table", e);
+        }
+
+        try {
+            Awaitility.await(String.format("Dropping table %s", tableName))
+                    .atMost(60, TimeUnit.SECONDS)
+                    .until(
+                            () -> {
+                                try {
+                                    String sql = String.format("DROP TABLE DB2INST1.%s", tableName);
+                                    connection.createStatement().execute(sql);
+                                    connection.commit();
+                                    return true;
+                                } catch (SQLException e) {
+                                    LOG.warn(
+                                            String.format(
+                                                    "DROP TABLE %s failed (will be retried): {}",
+                                                    tableName),
+                                            e.getMessage());
+                                    return false;
+                                }
+                            });
+        } catch (ConditionTimeoutException e) {
+            throw new IllegalStateException("Failed to drop test database", e);
+        }
+    }
+
+    /**
+     * Executes a JDBC statement using the default jdbc config without autocommitting the
+     * connection.
+     */
+    protected void initializeDb2Table(String sqlFile, String tableName) {
+        final String ddlFile = String.format("docker/db2/%s.sql", sqlFile);
+        final URL ddlTestFile = Db2TestBase.class.getClassLoader().getResource(ddlFile);
+        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        try (Connection connection = getDb2Connection();
+                Statement statement = connection.createStatement()) {
+            String tableExistSql =
+                    String.format(
+                            "SELECT COUNT(*) FROM SYSCAT.TABLES WHERE TABNAME = '%s' AND "
+                                    + "TABSCHEMA = 'DB2INST1';",
+                            tableName);
+            ResultSet resultSet = statement.executeQuery(tableExistSql);
+            int count = 0;
+            if (resultSet.next()) {
+                count = resultSet.getInt(1);
+            }
+            if (count == 1) {
+                LOG.info("{} table exist", tableName);
+                dropTestTable(connection, tableName.toUpperCase(Locale.ROOT));
+            }
+            final List<String> statements =
+                    Arrays.stream(
+                                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
+                                            .map(String::trim)
+                                            .filter(x -> !x.startsWith("--") && !x.isEmpty())
+                                            .map(
+                                                    x -> {
+                                                        final Matcher m =
+                                                                COMMENT_PATTERN.matcher(x);
+                                                        return m.matches() ? m.group(1) : x;
+                                                    })
+                                            .collect(Collectors.joining("\n"))
+                                            .split(";"))
+                            .collect(Collectors.toList());
+            for (String stmt : statements) {
+                statement.execute(stmt);
+                Thread.sleep(500);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

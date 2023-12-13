@@ -209,6 +209,9 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
 
         @Override
         public void schemaChangeEvent(SchemaChangeEvent event) throws InterruptedException {
+            if (SchemaChangeEvent.SchemaChangeEventType.DROP.equals(event.getType())) {
+                LOG.info("Received drop table event " + event + " at offset: " + event.getOffset());
+            }
             historizedSchema.applySchemaChange(event);
             if (connectorConfig.isSchemaChangesHistoryEnabled()) {
                 try {

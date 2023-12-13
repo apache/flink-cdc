@@ -73,7 +73,9 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     @AfterClass
     public static void stopContainers() {
         LOG.info("Stopping containers...");
-        MYSQL_CONTAINER.stop();
+        if (MYSQL_CONTAINER != null) {
+            MYSQL_CONTAINER.stop();
+        }
         LOG.info("Containers are stopped.");
     }
 
