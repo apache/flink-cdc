@@ -89,13 +89,16 @@ public class BinaryRecordDataSerializer extends TypeSerializerSingleton<BinaryRe
     }
 
     @Override
+    @SuppressWarnings("unused")
     public BinaryRecordData deserialize(BinaryRecordData reuse, DataInputView source)
             throws IOException {
         MemorySegment[] segments = reuse.getSegments();
         checkArgument(
                 segments == null || (segments.length == 1 && reuse.getOffset() == 0),
                 "Reuse BinaryRecordData should have no segments or only one segment and offset start at 0.");
-
+        // Note: arity is not used in BinaryRecordData, so we can ignore it here.But we still need
+        // to read it.
+        int arity = source.readInt();
         int length = source.readInt();
         if (segments == null || segments[0].size() < length) {
             segments = new MemorySegment[] {MemorySegmentFactory.wrap(new byte[length])};
