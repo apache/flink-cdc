@@ -20,7 +20,6 @@ import com.mongodb.client.model.changestream.FullDocument;
 import com.mongodb.kafka.connect.source.MongoSourceConfig;
 import com.mongodb.kafka.connect.source.MongoSourceConfig.ErrorTolerance;
 import com.mongodb.kafka.connect.source.MongoSourceConfig.OutputFormat;
-import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.mongodb.internal.MongoDBConnectorSourceConnector;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
@@ -55,7 +54,7 @@ import static org.apache.flink.util.Preconditions.checkArgument;
  * A builder to build a SourceFunction which can read snapshot and continue to consume change stream
  * events.
  */
-@PublicEvolving
+@Deprecated
 public class MongoDBSource {
 
     public static final String FULL_DOCUMENT_UPDATE_LOOKUP = FullDocument.UPDATE_LOOKUP.getValue();
