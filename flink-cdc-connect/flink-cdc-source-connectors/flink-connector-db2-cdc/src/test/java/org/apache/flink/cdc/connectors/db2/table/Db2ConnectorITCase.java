@@ -279,7 +279,6 @@ public class Db2ConnectorITCase extends Db2TestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s' ,"
                                 + " 'scan.startup.mode' = 'latest-offset'"
                                 + ")",
