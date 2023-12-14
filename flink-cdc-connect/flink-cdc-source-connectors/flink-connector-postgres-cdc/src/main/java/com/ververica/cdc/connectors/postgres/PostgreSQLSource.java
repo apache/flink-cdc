@@ -30,6 +30,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * A builder to build a SourceFunction which can read snapshot and continue to consume binlog for
  * PostgreSQL.
  */
+@Deprecated
 public class PostgreSQLSource {
 
     private static final long DEFAULT_HEARTBEAT_MS = Duration.ofMinutes(5).toMillis();
