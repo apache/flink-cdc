@@ -54,6 +54,14 @@ import java.util.concurrent.atomic.AtomicLong;
  * {@link JdbcConnection} connection extension used for connecting to Postgres instances.
  *
  * @author Horia Chiorean
+ *     <p>Copied from Debezium 1.9.2-Final with two additional methods:
+ *     <ul>
+ *       <li>Constructor PostgresConnection( Configuration config, PostgresValueConverterBuilder
+ *           valueConverterBuilder, ConnectionFactory factory) to allow passing a custom
+ *           ConnectionFactory
+ *       <li>override connection() to return a unwrapped PgConnection (otherwise, it will complain
+ *           about HikariProxyConnection cannot be cast to class org.postgresql.core.BaseConnection)
+ *     </ul>
  */
 public class PostgresConnection extends JdbcConnection {
 
