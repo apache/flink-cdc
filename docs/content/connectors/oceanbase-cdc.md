@@ -22,7 +22,7 @@ If you want to use OceanBase JDBC driver to connect to the enterprise edition da
 <dependency>
    <groupId>com.oceanbase</groupId>
    <artifactId>oceanbase-client</artifactId>
-   <version>2.4.2</version>
+   <version>2.4.8</version>
 </dependency>
 ```
 
@@ -32,9 +32,9 @@ If you want to use OceanBase JDBC driver to connect to the enterprise edition da
 
 Download [flink-sql-connector-oceanbase-cdc-3.0-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/3.0-SNAPSHOT/flink-sql-connector-oceanbase-cdc-3.0-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-oceanbase-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-oceanbase-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oceanbase-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-oceanbase-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, and the released version will be available in the [Maven Central](https://central.sonatype.com/artifact/com.ververica/flink-sql-connector-oceanbase-cdc/versions).
 
-For JDBC driver, the cdc jar above already contains MySQL JDBC driver 5.1.47, which is our recommended version. Due to the license issue, we can not include the OceanBase JDBC driver in the cdc jar. If you need to use it, you can download it from [here](https://repo1.maven.org/maven2/com/oceanbase/oceanbase-client/2.4.2/oceanbase-client-2.4.2.jar) and put it under `<FLINK_HOME>/lib/`, you also need to set the start option `jdbc.driver` to `com.oceanbase.jdbc.Driver`.
+For JDBC driver, the cdc jar above already contains MySQL JDBC driver 5.1.47, which is our recommended version. Due to the license issue, we can not include the OceanBase JDBC driver in the cdc jar. If you need to use it, you can download it from [here](https://central.sonatype.com/artifact/com.oceanbase/oceanbase-client/versions) and put it under `<FLINK_HOME>/lib/`, you also need to set the start option `jdbc.driver` to `com.oceanbase.jdbc.Driver`.
 
 Setup OceanBase and LogProxy Server
 ----------------------
@@ -51,7 +51,7 @@ Setup OceanBase and LogProxy Server
    mysql> GRANT ALL PRIVILEGES ON *.* TO ${sys_username} WITH GRANT OPTION;
    ```
 
-3. Create a user in the tenant you want to monitor, this is used to read data for snapshot and change event.
+3. Create a user in the non-sys tenant you want to monitor, this is used to read data for snapshot and change event.
 
 4. For users of OceanBase Community Edition, you need to get the `rootserver-list`. You can use the following command to get the value:
 
@@ -65,7 +65,7 @@ Setup OceanBase and LogProxy Server
     mysql> show parameters like 'obconfig_url';
     ```
 
-5. Setup OceanBase LogProxy. For users of OceanBase Community Edition, you can follow the [quick start](https://github.com/oceanbase/oblogproxy#getting-started).
+5. Setup OceanBase LogProxy (CDC mode) follow the [docs](https://www.oceanbase.com/docs/oblogproxy-doc).
 
 How to create a OceanBase CDC table
 ----------------
@@ -135,15 +135,15 @@ Flink SQL> CREATE TABLE orders (
 );
 ```
 
-You can also try the quickstart tutorial that sync data from OceanBase to Elasticsearch, please refer [Flink CDC Tutorial](https://ververica.github.io/flink-cdc-connectors/release-2.3//content/quickstart/oceanbase-tutorial.html) for more information.
+You can also try the quickstart tutorial that sync data from OceanBase to Elasticsearch, please refer [Flink CDC Tutorial](../quickstart/oceanbase-tutorial.md) for more information.
 
 Connector Options
 ----------------
 
 The OceanBase CDC Connector contains some options for both sql and stream api as the following sheet. 
 
-*Note*: The connector supports two ways to specify the table list to listen to, and will get the union of the results when both way are used at the same time.
-1. Use `database-name` and `table-name` to match database and table names in regex. As the `obcdc` (former `liboblog`) only supports `fnmatch` now, we can't use regex directly to filter change events, so these two options can only be used in `initial` startup mode.
+*Note*: The connector supports two ways to specify the table list to monitor, and will get the union of the results when both way are used at the same time.
+1. Use `database-name` and `table-name` to match database and table names in regex. 
 2. Use `table-list` to match the exact value of database and table names.
 
 <div class="highlight">
@@ -207,14 +207,14 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
                 <td>optional</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Database name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.</td>
+                <td>Database name of OceanBase to monitor, should be regular expression.</td>
             </tr>
             <tr>
                 <td>table-name</td>
                 <td>optional</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Table name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.</td>
+                <td>Table name of OceanBase to monitor, should be regular expression.</td>
             </tr>
             <tr>
                 <td>table-list</td>
@@ -225,14 +225,14 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
             </tr>
             <tr>
                 <td>hostname</td>
-                <td>optional</td>
+                <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
                 <td>IP address or hostname of the OceanBase database server or OceanBase Proxy server.</td>
             </tr>
             <tr>
                 <td>port</td>
-                <td>optional</td>
+                <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>Integer</td>
                 <td>Integer port number to connect to OceanBase. It can be the SQL port of OceanBase server, which is 2881 by default, or the port of OceanBase proxy service, which is 2883 by default.</td>
@@ -249,7 +249,7 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
                 <td>optional</td>
                 <td style="word-wrap: break-word;">+00:00</td>
                 <td>String</td>
-                <td>The session timezone which controls how temporal types are converted to STRING in OceanBase. Can be UTC offset in format "±hh:mm", or named time zones if the time zone information tables in the mysql database have been created and populated.</td>
+                <td>The session timezone which controls how temporal types are converted to STRING in OceanBase. Can be named time zone or UTC offset in format "±hh:mm".</td>
             </tr>
             <tr>
                 <td>logproxy.host</td>
@@ -320,6 +320,19 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
                 <td>Option to pass custom configurations to the <code>libobcdc</code>, eg: 'obcdc.properties.sort_trans_participants' = '1'. Please refer to <a href="https://en.oceanbase.com/docs/common-oceanbase-database-10000000000872541">obcdc parameters</a> for more details.</td>
+            </tr>
+            <tr>
+                <td>debezium.*</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">(none)</td>
+                <td>String</td>
+                <td>
+                    Debezium properties, now only following properties are supported:<br>
+                        <li><code>debezium.decimal.handling.mode</code></li>
+                        <li><code>debezium.time.precision.mode</code></li>
+                        <li><code>debezium.binary.handling.mode</code></li>
+                    You can refer to the docs of debezium <a href="https://debezium.io/documentation/reference/nightly/connectors/mysql.html">mysql</a> or <a href="https://debezium.io/documentation/reference/nightly/connectors/oracle.html">oracle</a> connector for more details.
+                </td>
             </tr>
         </tbody>
     </table>
@@ -421,49 +434,18 @@ The OceanBase CDC Connector using [oblogclient](https://github.com/oceanbase/obl
 The OceanBase CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:
 
 ```java
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.catalog.Column;
-import org.apache.flink.table.catalog.ResolvedSchema;
-import org.apache.flink.table.catalog.UniqueConstraint;
-import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
-import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.oceanbase.OceanBaseSource;
-import com.ververica.cdc.connectors.oceanbase.source.RowDataOceanBaseDeserializationSchema;
-import com.ververica.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
 import com.ververica.cdc.connectors.oceanbase.table.StartupMode;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 
-import java.time.ZoneId;
-import java.util.Arrays;
-import java.util.Collections;
+import java.time.Duration;
 
 public class OceanBaseSourceExample {
    public static void main(String[] args) throws Exception {
-      ResolvedSchema resolvedSchema =
-              new ResolvedSchema(
-                      Arrays.asList(
-                              Column.physical("id", DataTypes.INT().notNull()),
-                              Column.physical("name", DataTypes.STRING().notNull())),
-                      Collections.emptyList(),
-                      UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
-
-      RowType physicalDataType =
-              (RowType) resolvedSchema.toPhysicalRowDataType().getLogicalType();
-      TypeInformation<RowData> resultTypeInfo = InternalTypeInfo.of(physicalDataType);
-      String serverTimeZone = "+00:00";
-
-      OceanBaseDeserializationSchema<RowData> deserializer =
-              RowDataOceanBaseDeserializationSchema.newBuilder()
-                      .setPhysicalRowType(physicalDataType)
-                      .setResultTypeInfo(resultTypeInfo)
-                      .setServerTimeZone(ZoneId.of(serverTimeZone))
-                      .build();
-
-      SourceFunction<RowData> oceanBaseSource =
+      SourceFunction<String> oceanBaseSource =
               OceanBaseSource.<RowData>builder()
                       .rsList("127.0.0.1:2882:2881")
                       .startupMode(StartupMode.INITIAL)
@@ -478,8 +460,8 @@ public class OceanBaseSourceExample {
                       .jdbcDriver("com.mysql.jdbc.Driver")
                       .logProxyHost("127.0.0.1")
                       .logProxyPort(2983)
-                      .serverTimeZone(serverTimeZone)
-                      .deserializer(deserializer)
+                      .serverTimeZone("+00:00")
+                      .deserializer(new JsonDebeziumDeserializationSchema())
                       .build();
 
       StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -593,13 +575,11 @@ Data Type Mapping
                 <td></td>
             </tr>
             <tr>
-                <td>DATETIME [(p)]</td>
+                <td>
+                    DATETIME [(p)]<br>
+                    TIMESTAMP [(p)]
+                </td>
                 <td>TIMESTAMP [(p)]</td>
-                <td></td>
-            </tr>
-            <tr>
-                <td>TIMESTAMP [(p)]</td>
-                <td>TIMESTAMP_LTZ [(p)]</td>
                 <td></td>
             </tr>
             <tr>
@@ -747,7 +727,6 @@ Data Type Mapping
                 <td>
                     CHAR(n)<br>
                     NCHAR(n)<br>
-                    VARCHAR(n)<br>
                     VARCHAR2(n)<br>
                     NVARCHAR2(n)<br>
                     CLOB<br>
@@ -756,11 +735,7 @@ Data Type Mapping
                 <td></td>
             </tr>
             <tr>
-                <td>
-                    RAW<br>
-                    BLOB<br>
-                    ROWID
-                </td>
+                <td>BLOB</td>
                 <td>BYTES</td>
                 <td></td>
             </tr>

@@ -28,7 +28,10 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 
 import com.ververica.cdc.connectors.oceanbase.OceanBaseSource;
-import com.ververica.cdc.connectors.oceanbase.source.RowDataOceanBaseDeserializationSchema;
+import com.ververica.cdc.connectors.oceanbase.source.OceanBaseDeserializationConverterFactory;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.table.MetadataConverter;
+import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -71,6 +74,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     private final String configUrl;
     private final String workingMode;
     private final Properties obcdcProperties;
+    private final Properties debeziumProperties;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -105,7 +109,8 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
             String rsList,
             String configUrl,
             String workingMode,
-            Properties obcdcProperties) {
+            Properties obcdcProperties,
+            Properties debeziumProperties) {
         this.physicalSchema = physicalSchema;
         this.startupMode = checkNotNull(startupMode);
         this.username = checkNotNull(username);
@@ -129,6 +134,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
         this.configUrl = configUrl;
         this.workingMode = workingMode;
         this.obcdcProperties = obcdcProperties;
+        this.debeziumProperties = debeziumProperties;
 
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
@@ -143,15 +149,20 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext context) {
         RowType physicalDataType =
                 (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
-        OceanBaseMetadataConverter[] metadataConverters = getMetadataConverters();
+        MetadataConverter[] metadataConverters = getMetadataConverters();
         TypeInformation<RowData> resultTypeInfo = context.createTypeInformation(producedDataType);
 
-        RowDataOceanBaseDeserializationSchema deserializer =
-                RowDataOceanBaseDeserializationSchema.newBuilder()
+        DebeziumDeserializationSchema<RowData> deserializer =
+                RowDataDebeziumDeserializeSchema.newBuilder()
                         .setPhysicalRowType(physicalDataType)
                         .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(resultTypeInfo)
-                        .setServerTimeZone(ZoneId.of(serverTimeZone))
+                        .setServerTimeZone(
+                                serverTimeZone == null
+                                        ? ZoneId.systemDefault()
+                                        : ZoneId.of(serverTimeZone))
+                        .setUserDefinedConverterFactory(
+                                OceanBaseDeserializationConverterFactory.instance())
                         .build();
 
         OceanBaseSource.Builder<RowData> builder =
@@ -178,13 +189,14 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         .configUrl(configUrl)
                         .workingMode(workingMode)
                         .obcdcProperties(obcdcProperties)
+                        .debeziumProperties(debeziumProperties)
                         .deserializer(deserializer);
         return SourceFunctionProvider.of(builder.build(), false);
     }
 
-    protected OceanBaseMetadataConverter[] getMetadataConverters() {
+    protected MetadataConverter[] getMetadataConverters() {
         if (metadataKeys.isEmpty()) {
-            return new OceanBaseMetadataConverter[0];
+            return new MetadataConverter[0];
         }
         return metadataKeys.stream()
                 .map(
@@ -194,7 +206,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                                         .findFirst()
                                         .orElseThrow(IllegalStateException::new))
                 .map(OceanBaseReadableMetadata::getConverter)
-                .toArray(OceanBaseMetadataConverter[]::new);
+                .toArray(MetadataConverter[]::new);
     }
 
     @Override
@@ -238,7 +250,8 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         rsList,
                         configUrl,
                         workingMode,
-                        obcdcProperties);
+                        obcdcProperties,
+                        debeziumProperties);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -276,6 +289,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(this.configUrl, that.configUrl)
                 && Objects.equals(this.workingMode, that.workingMode)
                 && Objects.equals(this.obcdcProperties, that.obcdcProperties)
+                && Objects.equals(this.debeziumProperties, that.debeziumProperties)
                 && Objects.equals(this.producedDataType, that.producedDataType)
                 && Objects.equals(this.metadataKeys, that.metadataKeys);
     }
@@ -306,6 +320,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 configUrl,
                 workingMode,
                 obcdcProperties,
+                debeziumProperties,
                 producedDataType,
                 metadataKeys);
     }

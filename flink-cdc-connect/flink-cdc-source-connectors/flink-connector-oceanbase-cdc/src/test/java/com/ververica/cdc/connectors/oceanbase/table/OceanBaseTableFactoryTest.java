@@ -112,8 +112,8 @@ public class OceanBaseTableFactoryTest {
                         TABLE_LIST,
                         SERVER_TIME_ZONE,
                         Duration.parse("PT" + CONNECT_TIMEOUT),
-                        null,
-                        null,
+                        HOSTNAME,
+                        PORT,
                         COMPATIBLE_MODE,
                         DRIVER_CLASS,
                         new Properties(),
@@ -124,6 +124,7 @@ public class OceanBaseTableFactoryTest {
                         RS_LIST,
                         null,
                         WORKING_MODE,
+                        new Properties(),
                         new Properties());
         assertEquals(expectedSource, actualSource);
     }
@@ -135,8 +136,6 @@ public class OceanBaseTableFactoryTest {
         options.put("database-name", DATABASE_NAME);
         options.put("table-name", TABLE_NAME);
         options.put("table-list", TABLE_LIST);
-        options.put("hostname", HOSTNAME);
-        options.put("port", String.valueOf(PORT));
         options.put("compatible-mode", COMPATIBLE_MODE);
         options.put("jdbc.driver", DRIVER_CLASS);
         options.put("logproxy.client.id", LOG_PROXY_CLIENT_ID);
@@ -155,8 +154,8 @@ public class OceanBaseTableFactoryTest {
                         TABLE_LIST,
                         SERVER_TIME_ZONE,
                         Duration.parse("PT" + CONNECT_TIMEOUT),
-                        "127.0.0.1",
-                        2881,
+                        HOSTNAME,
+                        PORT,
                         COMPATIBLE_MODE,
                         DRIVER_CLASS,
                         new Properties(),
@@ -167,6 +166,7 @@ public class OceanBaseTableFactoryTest {
                         RS_LIST,
                         null,
                         WORKING_MODE,
+                        new Properties(),
                         new Properties());
         assertEquals(expectedSource, actualSource);
     }
@@ -198,8 +198,8 @@ public class OceanBaseTableFactoryTest {
                         TABLE_LIST,
                         SERVER_TIME_ZONE,
                         Duration.parse("PT" + CONNECT_TIMEOUT),
-                        null,
-                        null,
+                        HOSTNAME,
+                        PORT,
                         COMPATIBLE_MODE,
                         DRIVER_CLASS,
                         new Properties(),
@@ -210,6 +210,7 @@ public class OceanBaseTableFactoryTest {
                         RS_LIST,
                         null,
                         WORKING_MODE,
+                        new Properties(),
                         new Properties());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
@@ -240,6 +241,8 @@ public class OceanBaseTableFactoryTest {
         options.put("username", USERNAME);
         options.put("password", PASSWORD);
         options.put("tenant-name", TENANT_NAME);
+        options.put("hostname", HOSTNAME);
+        options.put("port", String.valueOf(PORT));
         options.put("logproxy.host", LOG_PROXY_HOST);
         options.put("logproxy.port", String.valueOf(LOG_PROXY_PORT));
         return options;

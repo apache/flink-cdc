@@ -35,16 +35,30 @@ import com.oceanbase.clogproxy.client.config.ClientConf;
 import com.oceanbase.clogproxy.client.config.ObReaderConfig;
 import com.oceanbase.clogproxy.client.exception.LogProxyClientException;
 import com.oceanbase.clogproxy.client.listener.RecordListener;
+import com.oceanbase.oms.logmessage.DataMessage;
 import com.oceanbase.oms.logmessage.LogMessage;
-import com.ververica.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
-import com.ververica.cdc.connectors.oceanbase.table.OceanBaseRecord;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import io.debezium.config.CommonConnectorConfig;
+import io.debezium.jdbc.TemporalPrecisionMode;
+import io.debezium.relational.CustomConverterRegistry;
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
+import io.debezium.relational.TableId;
+import io.debezium.relational.TableSchema;
+import io.debezium.relational.TableSchemaBuilder;
+import io.debezium.relational.history.TableChanges;
+import io.debezium.util.SchemaNameAdjuster;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.connect.data.Field;
+import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaBuilder;
+import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -78,6 +92,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final String databaseName;
     private final String tableName;
     private final String tableList;
+    private final String serverTimeZone;
     private final Duration connectTimeout;
     private final String hostname;
     private final Integer port;
@@ -88,11 +103,13 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private final int logProxyPort;
     private final ClientConf logProxyClientConf;
     private final ObReaderConfig obReaderConfig;
-    private final OceanBaseDeserializationSchema<T> deserializer;
+    private final Properties debeziumProperties;
+    private final DebeziumDeserializationSchema<T> deserializer;
 
-    private final List<OceanBaseRecord> changeRecordBuffer = new LinkedList<>();
+    private final List<SourceRecord> changeRecordBuffer = new LinkedList<>();
 
     private transient Set<String> tableSet;
+    private transient OceanBaseSchema obSchema;
     private transient volatile long resolvedTimestamp;
     private transient volatile OceanBaseConnection snapshotConnection;
     private transient LogProxyClient logProxyClient;
@@ -107,6 +124,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             String databaseName,
             String tableName,
             String tableList,
+            String serverTimeZone,
             Duration connectTimeout,
             String hostname,
             Integer port,
@@ -117,7 +135,8 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             int logProxyPort,
             ClientConf logProxyClientConf,
             ObReaderConfig obReaderConfig,
-            OceanBaseDeserializationSchema<T> deserializer) {
+            Properties debeziumProperties,
+            DebeziumDeserializationSchema<T> deserializer) {
         this.snapshot = checkNotNull(snapshot);
         this.username = checkNotNull(username);
         this.password = checkNotNull(password);
@@ -125,16 +144,18 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         this.databaseName = databaseName;
         this.tableName = tableName;
         this.tableList = tableList;
+        this.serverTimeZone = checkNotNull(serverTimeZone);
         this.connectTimeout = checkNotNull(connectTimeout);
-        this.hostname = hostname;
-        this.port = port;
-        this.compatibleMode = compatibleMode;
-        this.jdbcDriver = jdbcDriver;
+        this.hostname = checkNotNull(hostname);
+        this.port = checkNotNull(port);
+        this.compatibleMode = checkNotNull(compatibleMode);
+        this.jdbcDriver = checkNotNull(jdbcDriver);
         this.jdbcProperties = jdbcProperties;
         this.logProxyHost = checkNotNull(logProxyHost);
         this.logProxyPort = checkNotNull(logProxyPort);
         this.logProxyClientConf = checkNotNull(logProxyClientConf);
         this.obReaderConfig = checkNotNull(obReaderConfig);
+        this.debeziumProperties = debeziumProperties;
         this.deserializer = checkNotNull(deserializer);
     }
 
@@ -240,6 +261,65 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         this.obReaderConfig.setTableWhiteList(String.format("%s.*.*", tenantName));
     }
 
+    private TableSchema getTableSchema(TableId tableId) {
+        if (obSchema == null) {
+            obSchema = new OceanBaseSchema();
+        }
+        TableChanges.TableChange tableChange =
+                obSchema.getTableSchema(getSnapshotConnection(), tableId);
+
+        OceanBaseValueConverters valueConverters =
+                debeziumProperties == null
+                        ? new OceanBaseValueConverters(serverTimeZone, compatibleMode)
+                        : new OceanBaseValueConverters(
+                                serverTimeZone,
+                                compatibleMode,
+                                RelationalDatabaseConnectorConfig.DecimalHandlingMode.parse(
+                                                debeziumProperties.getProperty(
+                                                        "decimal.handling.mode", "precise"))
+                                        .asDecimalMode(),
+                                TemporalPrecisionMode.parse(
+                                        debeziumProperties.getProperty(
+                                                "time.precision.mode",
+                                                "adaptive_time_microseconds")),
+                                CommonConnectorConfig.BinaryHandlingMode.parse(
+                                        debeziumProperties.getProperty(
+                                                "binary.handling.mode", "bytes")));
+        return new TableSchemaBuilder(
+                        valueConverters,
+                        SchemaNameAdjuster.create(),
+                        new CustomConverterRegistry(null),
+                        sourceSchema(),
+                        false,
+                        false)
+                .create(null, tableId.identifier(), tableChange.getTable(), null, null, null);
+    }
+
+    private Schema sourceSchema() {
+        return SchemaBuilder.struct()
+                .field("tenant", Schema.STRING_SCHEMA)
+                .field("db", Schema.OPTIONAL_STRING_SCHEMA)
+                .field("schema", Schema.OPTIONAL_STRING_SCHEMA)
+                .field("table", Schema.STRING_SCHEMA)
+                .field("timestamp", Schema.OPTIONAL_STRING_SCHEMA)
+                .build();
+    }
+
+    private Struct sourceStruct(TableId tableId, String ts) {
+        Struct struct =
+                new Struct(sourceSchema()).put("tenant", tenantName).put("table", tableId.table());
+        if (tableId.catalog() != null) {
+            struct.put("db", tableId.catalog());
+        }
+        if (tableId.schema() != null) {
+            struct.put("schema", tableId.schema());
+        }
+        if (ts != null) {
+            struct.put("timestamp", ts);
+        }
+        return struct;
+    }
+
     protected void readSnapshotRecords() {
         tableSet.forEach(
                 table -> {
@@ -249,32 +329,50 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     }
 
     private void readSnapshotRecordsByTable(String databaseName, String tableName) {
-        OceanBaseRecord.SourceInfo sourceInfo =
-                new OceanBaseRecord.SourceInfo(
-                        tenantName, databaseName, tableName, resolvedTimestamp);
-        String fullName;
+        String fullName, catalog, schema;
         if ("mysql".equalsIgnoreCase(compatibleMode)) {
             fullName = String.format("`%s`.`%s`", databaseName, tableName);
+            catalog = databaseName;
+            schema = null;
         } else {
             fullName = String.format("%s.%s", databaseName, tableName);
+            catalog = null;
+            schema = databaseName;
         }
+        TableId tableId = new TableId(catalog, schema, tableName);
         try {
             LOG.info("Start to read snapshot from {}", fullName);
             getSnapshotConnection()
                     .query(
                             "SELECT * FROM " + fullName,
                             rs -> {
-                                ResultSetMetaData metaData = rs.getMetaData();
+                                TableSchema tableSchema = getTableSchema(tableId);
+                                List<Field> fields = tableSchema.valueSchema().fields();
                                 while (rs.next()) {
-                                    Map<String, Object> fieldMap = new HashMap<>();
-                                    for (int i = 0; i < metaData.getColumnCount(); i++) {
-                                        fieldMap.put(
-                                                metaData.getColumnName(i + 1), rs.getObject(i + 1));
+                                    Object[] fieldValues = new Object[fields.size()];
+                                    for (Field field : fields) {
+                                        fieldValues[field.index()] = rs.getObject(field.name());
                                     }
-                                    OceanBaseRecord record =
-                                            new OceanBaseRecord(sourceInfo, fieldMap);
+                                    Struct value = tableSchema.valueFromColumnData(fieldValues);
+                                    Struct struct =
+                                            tableSchema
+                                                    .getEnvelopeSchema()
+                                                    .read(
+                                                            value,
+                                                            sourceStruct(tableId, null),
+                                                            Instant.now());
                                     try {
-                                        deserializer.deserialize(record, outputCollector);
+                                        deserializer.deserialize(
+                                                new SourceRecord(
+                                                        null,
+                                                        null,
+                                                        tableId.identifier(),
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        struct.schema(),
+                                                        struct),
+                                                outputCollector);
                                     } catch (Exception e) {
                                         LOG.error("Deserialize snapshot record failed ", e);
                                         throw new FlinkRuntimeException(e);
@@ -320,7 +418,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
                                 if (!started) {
                                     break;
                                 }
-                                OceanBaseRecord record = getChangeRecord(message);
+                                SourceRecord record = getChangeRecord(message);
                                 if (record != null) {
                                     changeRecordBuffer.add(record);
                                 }
@@ -374,18 +472,85 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         logProxyClient.join();
     }
 
-    private OceanBaseRecord getChangeRecord(LogMessage message) {
+    private SourceRecord getChangeRecord(LogMessage message) {
         String databaseName = message.getDbName().replace(tenantName + ".", "");
         if (!tableSet.contains(String.format("%s.%s", databaseName, message.getTableName()))) {
             return null;
         }
-        OceanBaseRecord.SourceInfo sourceInfo =
-                new OceanBaseRecord.SourceInfo(
-                        tenantName,
-                        databaseName,
-                        message.getTableName(),
-                        Long.parseLong(message.getSafeTimestamp()));
-        return new OceanBaseRecord(sourceInfo, message.getOpt(), message.getFieldList());
+        String catalog, schema;
+        if ("mysql".equalsIgnoreCase(compatibleMode)) {
+            catalog = databaseName;
+            schema = null;
+        } else {
+            catalog = null;
+            schema = databaseName;
+        }
+        TableId tableId = new TableId(catalog, schema, message.getTableName());
+        TableSchema tableSchema = getTableSchema(tableId);
+        Struct source = sourceStruct(tableId, message.getSafeTimestamp());
+        Struct struct;
+        Schema valueSchema = tableSchema.valueSchema();
+        List<Field> fields = valueSchema.fields();
+        Struct before, after;
+        Object[] beforeFieldValues, afterFieldValues;
+        Map<String, Object> beforeValueMap = new HashMap<>();
+        Map<String, Object> afterValueMap = new HashMap<>();
+        message.getFieldList()
+                .forEach(
+                        field -> {
+                            if (field.isPrev()) {
+                                beforeValueMap.put(field.getFieldname(), getFieldValue(field));
+                            } else {
+                                afterValueMap.put(field.getFieldname(), getFieldValue(field));
+                            }
+                        });
+        switch (message.getOpt()) {
+            case INSERT:
+                afterFieldValues = new Object[fields.size()];
+                for (Field field : fields) {
+                    afterFieldValues[field.index()] = afterValueMap.get(field.name());
+                }
+                after = tableSchema.valueFromColumnData(afterFieldValues);
+                struct = tableSchema.getEnvelopeSchema().create(after, source, Instant.now());
+                break;
+            case DELETE:
+                beforeFieldValues = new Object[fields.size()];
+                for (Field field : fields) {
+                    beforeFieldValues[field.index()] = beforeValueMap.get(field.name());
+                }
+                before = tableSchema.valueFromColumnData(beforeFieldValues);
+                struct = tableSchema.getEnvelopeSchema().delete(before, source, Instant.now());
+                break;
+            case UPDATE:
+                beforeFieldValues = new Object[fields.size()];
+                afterFieldValues = new Object[fields.size()];
+                for (Field field : fields) {
+                    beforeFieldValues[field.index()] = beforeValueMap.get(field.name());
+                    afterFieldValues[field.index()] = afterValueMap.get(field.name());
+                }
+                before = tableSchema.valueFromColumnData(beforeFieldValues);
+                after = tableSchema.valueFromColumnData(afterFieldValues);
+                struct =
+                        tableSchema
+                                .getEnvelopeSchema()
+                                .update(before, after, source, Instant.now());
+                break;
+            default:
+                throw new UnsupportedOperationException();
+        }
+        return new SourceRecord(
+                null, null, tableId.identifier(), null, null, null, struct.schema(), struct);
+    }
+
+    private Object getFieldValue(DataMessage.Record.Field field) {
+        if (field.getValue() == null) {
+            return null;
+        }
+        String encoding = field.getEncoding();
+        if ("binary".equalsIgnoreCase(encoding)) {
+            return field.getValue().getBytes();
+        }
+        return field.getValue().toString(encoding);
     }
 
     @Override

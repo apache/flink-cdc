@@ -23,8 +23,8 @@ import com.oceanbase.clogproxy.client.config.ObReaderConfig;
 import com.oceanbase.clogproxy.client.util.ClientIdGenerator;
 import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.connectors.oceanbase.source.OceanBaseRichSourceFunction;
-import com.ververica.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
 import com.ververica.cdc.connectors.oceanbase.table.StartupMode;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.commons.lang3.StringUtils;
 
 import java.time.Duration;
@@ -72,8 +72,9 @@ public class OceanBaseSource {
         private String configUrl;
         private String workingMode;
         private Properties obcdcProperties;
+        private Properties debeziumProperties;
 
-        private OceanBaseDeserializationSchema<T> deserializer;
+        private DebeziumDeserializationSchema<T> deserializer;
 
         public Builder<T> startupMode(StartupMode startupMode) {
             this.startupMode = startupMode;
@@ -185,7 +186,12 @@ public class OceanBaseSource {
             return this;
         }
 
-        public Builder<T> deserializer(OceanBaseDeserializationSchema<T> deserializer) {
+        public Builder<T> debeziumProperties(Properties debeziumProperties) {
+            this.debeziumProperties = debeziumProperties;
+            return this;
+        }
+
+        public Builder<T> deserializer(DebeziumDeserializationSchema<T> deserializer) {
             this.deserializer = deserializer;
             return this;
         }
@@ -193,15 +199,6 @@ public class OceanBaseSource {
         public SourceFunction<T> build() {
             switch (startupMode) {
                 case INITIAL:
-                    checkNotNull(hostname, "hostname shouldn't be null on startup mode 'initial'");
-                    checkNotNull(port, "port shouldn't be null on startup mode 'initial'");
-                    checkNotNull(
-                            compatibleMode,
-                            "compatibleMode shouldn't be null on startup mode 'initial'");
-                    checkNotNull(
-                            jdbcDriver, "jdbcDriver shouldn't be null on startup mode 'initial'");
-                    startupTimestamp = 0L;
-                    break;
                 case LATEST_OFFSET:
                     startupTimestamp = 0L;
                     break;
@@ -215,12 +212,11 @@ public class OceanBaseSource {
                             startupMode + " mode is not supported.");
             }
 
-            if (!startupMode.equals(StartupMode.INITIAL)
-                    && (StringUtils.isNotEmpty(databaseName)
-                            || StringUtils.isNotEmpty(tableName))) {
-                throw new IllegalArgumentException(
-                        "If startup mode is not 'INITIAL', 'database-name' and 'table-name' must not be configured");
-            }
+            checkNotNull(hostname, "hostname shouldn't be null");
+            checkNotNull(port, "port shouldn't be null");
+            checkNotNull(compatibleMode, "compatibleMode shouldn't be null");
+            checkNotNull(jdbcDriver, "jdbcDriver shouldn't be null");
+
             if (StringUtils.isNotEmpty(databaseName) || StringUtils.isNotEmpty(tableName)) {
                 if (StringUtils.isEmpty(databaseName) || StringUtils.isEmpty(tableName)) {
                     throw new IllegalArgumentException(
@@ -283,6 +279,7 @@ public class OceanBaseSource {
                     databaseName,
                     tableName,
                     tableList,
+                    serverTimeZone,
                     connectTimeout,
                     hostname,
                     port,
@@ -293,6 +290,7 @@ public class OceanBaseSource {
                     logProxyPort,
                     clientConf,
                     obReaderConfig,
+                    debeziumProperties,
                     deserializer);
         }
     }

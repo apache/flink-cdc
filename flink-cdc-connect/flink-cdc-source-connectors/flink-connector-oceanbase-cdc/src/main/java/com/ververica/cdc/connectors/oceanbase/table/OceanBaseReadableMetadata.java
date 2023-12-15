@@ -21,6 +21,11 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
 
+import com.ververica.cdc.debezium.table.MetadataConverter;
+import io.debezium.data.Envelope;
+import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.source.SourceRecord;
+
 /** Defines the supported metadata columns for {@link OceanBaseTableSource}. */
 public enum OceanBaseReadableMetadata {
 
@@ -28,25 +33,43 @@ public enum OceanBaseReadableMetadata {
     TENANT(
             "tenant_name",
             DataTypes.STRING().notNull(),
-            new OceanBaseMetadataConverter() {
+            new MetadataConverter() {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(OceanBaseRecord record) {
-                    return StringData.fromString(record.getSourceInfo().getTenant());
+                public Object read(SourceRecord record) {
+                    Struct messageStruct = (Struct) record.value();
+                    Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+                    return StringData.fromString(sourceStruct.getString("tenant"));
                 }
             }),
 
     /** Name of the database that contains the row. */
     DATABASE(
             "database_name",
-            DataTypes.STRING().notNull(),
-            new OceanBaseMetadataConverter() {
+            DataTypes.STRING().nullable(),
+            new MetadataConverter() {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(OceanBaseRecord record) {
-                    return StringData.fromString(record.getSourceInfo().getDatabase());
+                public Object read(SourceRecord record) {
+                    Struct messageStruct = (Struct) record.value();
+                    Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+                    return StringData.fromString(sourceStruct.getString("db"));
+                }
+            }),
+
+    SCHEMA(
+            "schema_name",
+            DataTypes.STRING().nullable(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record) {
+                    Struct messageStruct = (Struct) record.value();
+                    Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+                    return StringData.fromString(sourceStruct.getString("schema"));
                 }
             }),
 
@@ -54,12 +77,14 @@ public enum OceanBaseReadableMetadata {
     TABLE(
             "table_name",
             DataTypes.STRING().notNull(),
-            new OceanBaseMetadataConverter() {
+            new MetadataConverter() {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(OceanBaseRecord record) {
-                    return StringData.fromString(record.getSourceInfo().getTable());
+                public Object read(SourceRecord record) {
+                    Struct messageStruct = (Struct) record.value();
+                    Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+                    return StringData.fromString(sourceStruct.getString("table"));
                 }
             }),
 
@@ -70,13 +95,16 @@ public enum OceanBaseReadableMetadata {
     OP_TS(
             "op_ts",
             DataTypes.TIMESTAMP_LTZ(3).notNull(),
-            new OceanBaseMetadataConverter() {
+            new MetadataConverter() {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(OceanBaseRecord record) {
-                    return TimestampData.fromEpochMillis(
-                            record.getSourceInfo().getTimestampS() * 1000);
+                public Object read(SourceRecord record) {
+                    Struct messageStruct = (Struct) record.value();
+                    Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+                    String timestamp = sourceStruct.getString("timestamp");
+                    long ts = timestamp == null ? 0 : Long.parseLong(timestamp) * 1000;
+                    return TimestampData.fromEpochMillis(ts);
                 }
             });
 
@@ -84,9 +112,9 @@ public enum OceanBaseReadableMetadata {
 
     private final DataType dataType;
 
-    private final OceanBaseMetadataConverter converter;
+    private final MetadataConverter converter;
 
-    OceanBaseReadableMetadata(String key, DataType dataType, OceanBaseMetadataConverter converter) {
+    OceanBaseReadableMetadata(String key, DataType dataType, MetadataConverter converter) {
         this.key = key;
         this.dataType = dataType;
         this.converter = converter;
@@ -100,7 +128,7 @@ public enum OceanBaseReadableMetadata {
         return dataType;
     }
 
-    public OceanBaseMetadataConverter getConverter() {
+    public MetadataConverter getConverter() {
         return converter;
     }
 }

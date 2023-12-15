@@ -26,6 +26,7 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
 import com.ververica.cdc.connectors.oceanbase.utils.OptionUtils;
+import com.ververica.cdc.debezium.table.DebeziumOptions;
 import com.ververica.cdc.debezium.utils.JdbcUrlUtils;
 
 import java.time.Duration;
@@ -181,7 +182,10 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
                 FactoryUtil.createTableFactoryHelper(this, context);
-        helper.validateExcept(JdbcUrlUtils.PROPERTIES_PREFIX, OBCDC_PROPERTIES_PREFIX);
+        helper.validateExcept(
+                JdbcUrlUtils.PROPERTIES_PREFIX,
+                OBCDC_PROPERTIES_PREFIX,
+                DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX);
 
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
@@ -238,7 +242,8 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                 rsList,
                 configUrl,
                 workingMode,
-                getProperties(context.getCatalogTable().getOptions(), OBCDC_PROPERTIES_PREFIX));
+                getProperties(context.getCatalogTable().getOptions(), OBCDC_PROPERTIES_PREFIX),
+                DebeziumOptions.getDebeziumProperties(context.getCatalogTable().getOptions()));
     }
 
     @Override
@@ -253,6 +258,8 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(TENANT_NAME);
+        options.add(HOSTNAME);
+        options.add(PORT);
         options.add(LOG_PROXY_HOST);
         options.add(LOG_PROXY_PORT);
         return options;
@@ -265,8 +272,6 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(DATABASE_NAME);
         options.add(TABLE_NAME);
         options.add(TABLE_LIST);
-        options.add(HOSTNAME);
-        options.add(PORT);
         options.add(COMPATIBLE_MODE);
         options.add(JDBC_DRIVER);
         options.add(CONNECT_TIMEOUT);
@@ -279,25 +284,19 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
     }
 
     private void validate(ReadableConfig config) {
-        String startupMode = config.get(SCAN_STARTUP_MODE);
-        if (StartupMode.getStartupMode(startupMode).equals(StartupMode.INITIAL)) {
-            String compatibleMode =
-                    Objects.requireNonNull(
-                            config.get(COMPATIBLE_MODE),
-                            "'compatible-mode' is required for 'initial' startup mode.");
-            String jdbcDriver =
-                    Objects.requireNonNull(
-                            config.get(JDBC_DRIVER),
-                            "'jdbc.driver' is required for 'initial' startup mode.");
-            if (compatibleMode.equalsIgnoreCase("oracle")) {
-                if (!jdbcDriver.toLowerCase().contains("oceanbase")) {
-                    throw new IllegalArgumentException(
-                            "OceanBase JDBC driver is required for OceanBase Enterprise Edition.");
-                }
+        String compatibleMode =
                 Objects.requireNonNull(
-                        config.get(CONFIG_URL),
-                        "'config-url' is required for OceanBase Enterprise Edition.");
+                        config.get(COMPATIBLE_MODE), "'compatible-mode' is required.");
+        String jdbcDriver =
+                Objects.requireNonNull(config.get(JDBC_DRIVER), "'jdbc.driver' is required.");
+        if (compatibleMode.equalsIgnoreCase("oracle")) {
+            if (!jdbcDriver.toLowerCase().contains("oceanbase")) {
+                throw new IllegalArgumentException(
+                        "OceanBase JDBC driver is required for OceanBase Enterprise Edition.");
             }
+            Objects.requireNonNull(
+                    config.get(CONFIG_URL),
+                    "'config-url' is required for OceanBase Enterprise Edition.");
         }
     }
 
