@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.base.source.enumerator;
 
+import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
@@ -66,14 +67,18 @@ public class IncrementalSourceEnumerator
     private final TreeSet<Integer> readersAwaitingSplit;
     private List<List<FinishedSnapshotSplitInfo>> finishedSnapshotSplitMeta;
 
+    private Boundedness boundedness;
+
     public IncrementalSourceEnumerator(
             SplitEnumeratorContext<SourceSplitBase> context,
             SourceConfig sourceConfig,
-            SplitAssigner splitAssigner) {
+            SplitAssigner splitAssigner,
+            Boundedness boundedness) {
         this.context = context;
         this.sourceConfig = sourceConfig;
         this.splitAssigner = splitAssigner;
         this.readersAwaitingSplit = new TreeSet<>();
+        this.boundedness = boundedness;
     }
 
     @Override
@@ -163,7 +168,7 @@ public class IncrementalSourceEnumerator
                 continue;
             }
 
-            if (splitAssigner.isStreamSplitAssigned() && sourceConfig.isCloseIdleReaders()) {
+            if (shouldCloseIdleReader()) {
                 // close idle readers when snapshot phase finished.
                 context.signalNoMoreSplits(nextAwaiting);
                 awaitingReader.remove();
@@ -182,6 +187,17 @@ public class IncrementalSourceEnumerator
                 break;
             }
         }
+    }
+
+    private boolean shouldCloseIdleReader() {
+        // When no unassigned split anymore, Signal NoMoreSplitsEvent to awaiting reader in two
+        // situations:
+        // 1. When Set StartupMode = snapshot mode(also bounded), there's no more splits in the
+        // assigner.
+        // 2. When set scan.incremental.close-idle-reader.enabled = true, there's no more splits in
+        // the assigner.
+        return splitAssigner.noMoreSplits()
+                && (boundedness == Boundedness.BOUNDED || (sourceConfig.isCloseIdleReaders()));
     }
 
     private int[] getRegisteredReader() {
