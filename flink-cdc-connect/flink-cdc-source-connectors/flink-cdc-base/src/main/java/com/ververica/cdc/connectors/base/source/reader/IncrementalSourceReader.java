@@ -141,6 +141,10 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     protected void onSplitFinished(Map<String, SourceSplitState> finishedSplitIds) {
         for (SourceSplitState splitState : finishedSplitIds.values()) {
             SourceSplitBase sourceSplit = splitState.toSourceSplit();
+            if (sourceConfig.getStartupOptions().isSnapshotOnly() && sourceSplit.isStreamSplit()) {
+                // when startupMode = SNAPSHOT_ONLY. the stream split could finish.
+                continue;
+            }
             checkState(
                     sourceSplit.isSnapshotSplit(),
                     String.format(

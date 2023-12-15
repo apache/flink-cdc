@@ -315,7 +315,11 @@ public class PostgresSourceBuilder<T> {
             }
 
             return new PostgresSourceEnumerator(
-                    enumContext, sourceConfig, splitAssigner, (PostgresDialect) dataSourceDialect);
+                    enumContext,
+                    sourceConfig,
+                    splitAssigner,
+                    (PostgresDialect) dataSourceDialect,
+                    this.getBoundedness());
         }
 
         public static <T> PostgresSourceBuilder<T> builder() {

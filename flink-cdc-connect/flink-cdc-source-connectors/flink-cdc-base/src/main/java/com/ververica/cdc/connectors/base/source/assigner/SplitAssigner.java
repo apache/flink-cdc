@@ -55,10 +55,8 @@ public interface SplitAssigner {
      */
     boolean waitingForFinishedSplits();
 
-    /** Whether the split assigner is finished stream split assigning. */
-    default boolean isStreamSplitAssigned() {
-        throw new UnsupportedOperationException("Not support to assigning StreamSplit.");
-    }
+    /** Indicates there is no more splits available in this assigner. */
+    boolean noMoreSplits();
 
     /**
      * Gets the finished splits' information. This is useful metadata to generate a stream split

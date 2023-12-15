@@ -46,6 +46,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     private static final String STREAM_SPLIT_ID = "stream-split";
 
     private final int splitMetaGroupSize;
+    private final C sourceConfig;
 
     private boolean isStreamSplitAssigned;
 
@@ -61,6 +62,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
             DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this(
+                sourceConfig,
                 new SnapshotSplitAssigner<>(
                         sourceConfig,
                         currentParallelism,
@@ -80,6 +82,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
             DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this(
+                sourceConfig,
                 new SnapshotSplitAssigner<>(
                         sourceConfig,
                         currentParallelism,
@@ -92,10 +95,12 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     }
 
     private HybridSplitAssigner(
+            C sourceConfig,
             SnapshotSplitAssigner<C> snapshotSplitAssigner,
             boolean isStreamSplitAssigned,
             int splitMetaGroupSize,
             OffsetFactory offsetFactory) {
+        this.sourceConfig = sourceConfig;
         this.snapshotSplitAssigner = snapshotSplitAssigner;
         this.isStreamSplitAssigned = isStreamSplitAssigned;
         this.splitMetaGroupSize = splitMetaGroupSize;
@@ -179,8 +184,8 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     }
 
     @Override
-    public boolean isStreamSplitAssigned() {
-        return isStreamSplitAssigned;
+    public boolean noMoreSplits() {
+        return snapshotSplitAssigner.noMoreSplits() && isStreamSplitAssigned;
     }
 
     @Override
@@ -199,13 +204,17 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
         Map<String, Offset> splitFinishedOffsets = snapshotSplitAssigner.getSplitFinishedOffsets();
         final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
 
-        Offset minOffset = null;
+        Offset minOffset = null, maxOffset = null;
         for (SchemalessSnapshotSplit split : assignedSnapshotSplit) {
-            // find the min offset of change log
+            // find the min and max offset of change log
             Offset changeLogOffset = splitFinishedOffsets.get(split.splitId());
             if (minOffset == null || changeLogOffset.isBefore(minOffset)) {
                 minOffset = changeLogOffset;
             }
+            if (maxOffset == null || changeLogOffset.isAfter(maxOffset)) {
+                maxOffset = changeLogOffset;
+            }
+
             finishedSnapshotSplitInfos.add(
                     new FinishedSnapshotSplitInfo(
                             split.getTableId(),
@@ -216,14 +225,21 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                             offsetFactory));
         }
 
+        // If the source is running in snapshot mode, we use the highest watermark among
+        // snapshot splits as the ending offset to provide a consistent snapshot view at the moment
+        // of high watermark.
+        Offset stoppingOffset = offsetFactory.createNoStoppingOffset();
+        if (sourceConfig.getStartupOptions().isSnapshotOnly()) {
+            stoppingOffset = maxOffset;
+        }
+
         // the finishedSnapshotSplitInfos is too large for transmission, divide it to groups and
         // then transfer them
-
         boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
         return new StreamSplit(
                 STREAM_SPLIT_ID,
                 minOffset == null ? offsetFactory.createInitialOffset() : minOffset,
-                offsetFactory.createNoStoppingOffset(),
+                stoppingOffset,
                 divideMetaToGroups ? new ArrayList<>() : finishedSnapshotSplitInfos,
                 new HashMap<>(),
                 finishedSnapshotSplitInfos.size());
