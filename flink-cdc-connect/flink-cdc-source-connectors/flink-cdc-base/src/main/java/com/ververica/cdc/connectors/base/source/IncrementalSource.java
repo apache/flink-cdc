@@ -33,7 +33,6 @@ import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.common.annotation.VisibleForTesting;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
-import com.ververica.cdc.connectors.base.options.StartupMode;
 import com.ververica.cdc.connectors.base.source.assigner.HybridSplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.StreamSplitAssigner;
@@ -101,7 +100,12 @@ public class IncrementalSource<T, C extends SourceConfig>
 
     @Override
     public Boundedness getBoundedness() {
-        return Boundedness.CONTINUOUS_UNBOUNDED;
+        C sourceConfig = configFactory.create(0);
+        if (sourceConfig.getStartupOptions().isSnapshotOnly()) {
+            return Boundedness.BOUNDED;
+        } else {
+            return Boundedness.CONTINUOUS_UNBOUNDED;
+        }
     }
 
     @Override
@@ -139,7 +143,7 @@ public class IncrementalSource<T, C extends SourceConfig>
             SplitEnumeratorContext<SourceSplitBase> enumContext) {
         C sourceConfig = configFactory.create(0);
         final SplitAssigner splitAssigner;
-        if (sourceConfig.getStartupOptions().startupMode == StartupMode.INITIAL) {
+        if (!sourceConfig.getStartupOptions().isStreamOnly()) {
             try {
                 final List<TableId> remainingTables =
                         dataSourceDialect.discoverDataCollections(sourceConfig);
@@ -161,7 +165,8 @@ public class IncrementalSource<T, C extends SourceConfig>
             splitAssigner = new StreamSplitAssigner(sourceConfig, dataSourceDialect, offsetFactory);
         }
 
-        return new IncrementalSourceEnumerator(enumContext, sourceConfig, splitAssigner);
+        return new IncrementalSourceEnumerator(
+                enumContext, sourceConfig, splitAssigner, getBoundedness());
     }
 
     @Override
@@ -189,7 +194,8 @@ public class IncrementalSource<T, C extends SourceConfig>
             throw new UnsupportedOperationException(
                     "Unsupported restored PendingSplitsState: " + checkpoint);
         }
-        return new IncrementalSourceEnumerator(enumContext, sourceConfig, splitAssigner);
+        return new IncrementalSourceEnumerator(
+                enumContext, sourceConfig, splitAssigner, getBoundedness());
     }
 
     @Override

@@ -290,7 +290,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     @Override
     public void close() {}
 
-    /** Indicates there is no more splits available in this assigner. */
+    @Override
     public boolean noMoreSplits() {
         return remainingTables.isEmpty() && remainingSplits.isEmpty();
     }

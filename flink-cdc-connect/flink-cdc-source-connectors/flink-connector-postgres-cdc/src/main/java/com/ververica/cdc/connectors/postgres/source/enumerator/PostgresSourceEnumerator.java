@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.postgres.source.enumerator;
 
+import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -40,8 +41,9 @@ public class PostgresSourceEnumerator extends IncrementalSourceEnumerator {
             SplitEnumeratorContext<SourceSplitBase> context,
             PostgresSourceConfig sourceConfig,
             SplitAssigner splitAssigner,
-            PostgresDialect postgresDialect) {
-        super(context, sourceConfig, splitAssigner);
+            PostgresDialect postgresDialect,
+            Boundedness boundedness) {
+        super(context, sourceConfig, splitAssigner, boundedness);
         this.postgresDialect = postgresDialect;
     }
 
