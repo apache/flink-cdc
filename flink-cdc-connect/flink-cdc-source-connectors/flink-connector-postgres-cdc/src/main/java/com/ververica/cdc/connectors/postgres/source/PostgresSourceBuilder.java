@@ -21,7 +21,6 @@ import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.common.annotation.Experimental;
-import com.ververica.cdc.connectors.base.options.StartupMode;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.assigner.HybridSplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
@@ -291,7 +290,7 @@ public class PostgresSourceBuilder<T> {
                 SplitEnumeratorContext<SourceSplitBase> enumContext) {
             final SplitAssigner splitAssigner;
             PostgresSourceConfig sourceConfig = (PostgresSourceConfig) configFactory.create(0);
-            if (sourceConfig.getStartupOptions().startupMode == StartupMode.INITIAL) {
+            if (!sourceConfig.getStartupOptions().isStreamOnly()) {
                 try {
                     final List<TableId> remainingTables =
                             dataSourceDialect.discoverDataCollections(sourceConfig);
