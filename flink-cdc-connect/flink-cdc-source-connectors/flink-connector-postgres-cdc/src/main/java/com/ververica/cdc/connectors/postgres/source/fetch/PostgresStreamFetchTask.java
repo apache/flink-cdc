@@ -90,8 +90,8 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getTaskContext(),
                         sourceFetchContext.getReplicationConnection(),
                         split);
-        StreamSplitChangeEventSourceContext changeEventSourceContext =
-                new StreamSplitChangeEventSourceContext();
+        StoppableChangeEventSourceContext changeEventSourceContext =
+                new StoppableChangeEventSourceContext();
         streamSplitReadTask.execute(
                 changeEventSourceContext,
                 sourceFetchContext.getPartition(),
@@ -102,7 +102,8 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
     public void close() {
         LOG.debug("stopping StreamFetchTask for split: {}", split);
         if (streamSplitReadTask != null) {
-            ((StreamSplitChangeEventSourceContext) streamSplitReadTask.context).finished();
+            ((StoppableChangeEventSourceContext) (streamSplitReadTask.context))
+                    .stopChangeEventSource();
         }
         stopped = true;
         taskRunning = false;
@@ -141,19 +142,6 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                         streamSplitReadTask.streamSplit);
                 streamSplitReadTask.commitOffset(offsets);
             }
-        }
-    }
-
-    private class StreamSplitChangeEventSourceContext
-            implements ChangeEventSource.ChangeEventSourceContext {
-
-        public void finished() {
-            taskRunning = false;
-        }
-
-        @Override
-        public boolean isRunning() {
-            return taskRunning;
         }
     }
 
@@ -228,7 +216,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                             new FlinkRuntimeException("Error processing WAL signal event", e));
                 }
 
-                ((PostgresScanFetchTask.PostgresChangeEventSourceContext) context).finished();
+                ((StoppableChangeEventSourceContext) context).stopChangeEventSource();
             }
         }
 
