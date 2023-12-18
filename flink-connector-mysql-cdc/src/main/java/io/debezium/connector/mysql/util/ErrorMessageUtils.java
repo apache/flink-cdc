@@ -16,6 +16,8 @@
 
 package io.debezium.connector.mysql.util;
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.util.regex.Pattern;
 
 /** This util tries to optimize error message for some exceptions. */
@@ -32,7 +34,7 @@ public class ErrorMessageUtils {
 
     /** Add more error details for some exceptions. */
     public static String optimizeErrorMessage(String msg) {
-        if (msg == null) {
+        if (StringUtils.isEmpty(msg)) {
             return null;
         }
         if (SERVER_ID_CONFLICT.matcher(msg).matches()) {
