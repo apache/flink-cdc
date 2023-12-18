@@ -63,11 +63,11 @@ This command automatically starts all the containers defined in the Docker Compo
 We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kibana is running normally.
 
 ### Preparing Flink and JAR package required
-1. Download [Flink 1.17.0](https://archive.apache.org/dist/flink/flink-1.17.0/flink-1.17.0-bin-scala_2.12.tgz) and unzip it to the directory `flink-1.17.0`
-2. Download following JAR package required and put them under `flink-1.17.0/lib/`:
+1. Download [Flink 1.18.0](https://archive.apache.org/dist/flink/flink-1.18.0/flink-1.18.0-bin-scala_2.12.tgz) and unzip it to the directory `flink-1.18.0`
+2. Download following JAR package required and put them under `flink-1.18.0/lib/`:
 
-   **Download links are available only for stable releases, SNAPSHOT dependency need build by yourself. **
-    - [flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.5-SNAPSHOT/flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar)
+   **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself.**
+    - flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar
     - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
    
 ### Preparing data in databases
@@ -116,7 +116,7 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
 
 1. Use the following command to change to the Flink directory:
     ```
-    cd flink-1.17.0
+    cd flink-1.18.0
     ```
    
 2. Use the following command to start a Flink cluster:
@@ -255,7 +255,7 @@ After finishing the tutorial, run the following command to stop all containers i
 ```shell
 docker-compose down
 ```
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.17.0`:
+Run the following command to stop the Flink cluster in the directory of Flink `flink-1.18.0`:
 ```shell
 ./bin/stop-cluster.sh
 ```

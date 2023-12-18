@@ -13,7 +13,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-postgres-cdc</artifactId>
-  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself. -->
   <version>2.5-SNAPSHOT</version>
 </dependency>
 ```
@@ -22,7 +22,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-postgres-cdc/2.5-SNAPSHOT/flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** flink-sql-connector-postgres-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-postgres-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-postgres-cdc), the released version will be available in the Maven central warehouse.
 
@@ -205,6 +205,17 @@ Connector Options
                 (3) source doesn't need to acquire global read lock (FLUSH TABLES WITH READ LOCK) before snapshot reading.
               Please see <a href="#incremental-snapshot-reading ">Incremental Snapshot Reading</a>section for more detailed information.
           </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.close-idle-reader.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to close idle readers at the end of the snapshot phase. <br>
+          The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.<br>
+          If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
+          so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
+      </td>
     </tr>
     </tbody>
     </table>

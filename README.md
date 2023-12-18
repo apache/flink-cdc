@@ -25,16 +25,59 @@ This README is meant as a brief walkthrough on the core features of CDC Connecto
 2. CDC connectors for DataStream API, users can consume changes on multiple databases and tables in a single job without Debezium and Kafka deployed.
 3. CDC connectors for Table/SQL API, users can use SQL DDL to create a CDC source to monitor changes on a single table.
 
-## Usage for Table/SQL API
+## Quick Start
+
+### Usage for CDC Streaming ELT Framework
+
+The example shows how to continuously synchronize data, including snapshot data and incremental data, from multiple business tables in MySQL database to Doris for creating the ODS layer.
+
+1. Download and extract the flink-cdc-3.0.tar file to a local directory.
+2. Download the required CDC Pipeline Connector JAR from Maven and place it in the lib directory.
+3. Configure the FLINK_HOME environment variable to load the Flink cluster configuration from the flink-conf.yaml file located in the $FLINK_HOME/conf directory.
+```bash
+export FLINK_HOME=/path/to/your/flink/home
+```
+4. Write Flink CDC task YAML.
+```yaml
+source:
+  type: mysql
+  host: localhost
+  port: 3306
+  username: admin
+  password: pass
+  tables: db0.commodity, db1.user_table_[0-9]+, [app|web]_order_\.*
+
+sink:
+  type: doris
+  fenodes: FE_IP:HTTP_PORT
+  username: admin
+  password: pass
+
+pipeline:
+  name: mysql-sync-doris
+  parallelism: 4
+```
+5. Submit the job to Flink cluster.
+```bash
+# Submit Pipeline
+$ ./bin/flink-cdc.sh mysql-to-doris.yaml
+Pipeline "mysql-sync-doris" is submitted with Job ID "DEADBEEF".
+```
+
+During the execution of the flink-cdc.sh script, the CDC task configuration is parsed and translated into a DataStream job, which is then submitted to the specified Flink cluster.
+
+### Usage for Source Connectors
+
+#### Usage for Table/SQL API
 
 We need several steps to setup a Flink cluster with the provided connector.
 
-1. Setup a Flink cluster with version 1.12+ and Java 8+ installed.
+1. Setup a Flink cluster with version 1.14+ and Java 8+ installed.
 2. Download the connector SQL jars from the [Download](https://github.com/ververica/flink-cdc-connectors/releases) page (or [build yourself](#building-from-source)).
 3. Put the downloaded jars under `FLINK_HOME/lib/`.
 4. Restart the Flink cluster.
 
-The example shows how to create a MySQL CDC source in [Flink SQL Client](https://ci.apache.org/projects/flink/flink-docs-release-1.13/dev/table/sqlClient.html) and execute queries on it.
+The example shows how to create a MySQL CDC source in [Flink SQL Client](https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/table/sqlclient/) and execute queries on it.
 
 ```sql
 -- creates a mysql cdc table source
@@ -57,7 +100,7 @@ CREATE TABLE mysql_binlog (
 SELECT id, UPPER(name), description, weight FROM mysql_binlog;
 ```
 
-## Usage for DataStream API
+#### Usage for DataStream API
 
 Include following Maven dependency (available through Maven Central):
 
@@ -66,7 +109,7 @@ Include following Maven dependency (available through Maven Central):
   <groupId>com.ververica</groupId>
   <!-- add the dependency matching your database -->
   <artifactId>flink-connector-mysql-cdc</artifactId>
-  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself. -->
   <version>2.5-SNAPSHOT</version>
 </dependency>
 ```
@@ -127,6 +170,79 @@ The code in this repository is licensed under the [Apache Software License 2](ht
 ## Contributing
 
 CDC Connectors for Apache Flink<sup>®</sup> welcomes anyone that wants to help out in any way, whether that includes reporting problems, helping with documentation, or contributing code changes to fix bugs, add tests, or implement new features. You can report problems to request features in the [GitHub Issues](https://github.com/ververica/flink-cdc-connectors/issues).
+
+### Code Contribute
+
+1. Left comment under the issue that you want to take
+2. Fork Flink CDC project to your GitHub repositories
+3. Clone and compile your Flink CDC project
+```bash
+git clone https://github.com/your_name/flink-cdc-connectors.git
+cd flink-cdc-connectors
+mvn clean install -DskipTests
+```
+4. Check to a new branch and start your work
+```bash
+git checkout -b my_feature
+-- develop and commit
+```
+5. Push your branch to your github
+```bash
+git push origin my_feature
+```
+6. Open a PR to https://github.com/ververica/flink-cdc-connectors
+
+### Code Style
+
+#### Code Formatting
+
+You need to install the google-java-format plugin. Spotless together with google-java-format is used to format the codes.
+
+It is recommended to automatically format your code by applying the following settings:
+
+1. Go to "Settings" → "Other Settings" → "google-java-format Settings".
+2. Tick the checkbox to enable the plugin.
+3. Change the code style to "Android Open Source Project (AOSP) style".
+4. Go to "Settings" → "Tools" → "Actions on Save".
+5. Under "Formatting Actions", select "Optimize imports" and "Reformat file".
+6. From the "All file types list" next to "Reformat code", select "Java".
+
+For earlier IntelliJ IDEA versions, the step 4 to 7 will be changed as follows.
+
+- 4.Go to "Settings" → "Other Settings" → "Save Actions".
+- 5.Under "General", enable your preferred settings for when to format the code, e.g. "Activate save actions on save".
+- 6.Under "Formatting Actions", select "Optimize imports" and "Reformat file".
+- 7.Under "File Path Inclusions", add an entry for `.*\.java` to avoid formatting other file types.
+Then the whole project could be formatted by command `mvn spotless:apply`.
+
+#### Checkstyle
+
+Checkstyle is used to enforce static coding guidelines.
+
+1. Go to "Settings" → "Tools" → "Checkstyle".
+2. Set "Scan Scope" to "Only Java sources (including tests)".
+3. For "Checkstyle Version" select "8.14".
+4. Under "Configuration File" click the "+" icon to add a new configuration.
+5. Set "Description" to "Flink cdc".
+6. Select "Use a local Checkstyle file" and link it to the file `tools/maven/checkstyle.xml` which is located within your cloned repository.
+7. Select "Store relative to project location" and click "Next".
+8. Configure the property `checkstyle.suppressions.file` with the value `suppressions.xml` and click "Next".
+9. Click "Finish".
+10. Select "Flink cdc" as the only active configuration file and click "Apply".
+
+You can now import the Checkstyle configuration for the Java code formatter.
+
+1. Go to "Settings" → "Editor" → "Code Style" → "Java".
+2. Click the gear icon next to "Scheme" and select "Import Scheme" → "Checkstyle Configuration".
+3. Navigate to and select `tools/maven/checkstyle.xml` located within your cloned repository.
+
+Then you could click "View" → "Tool Windows" → "Checkstyle" and find the "Check Module" button in the opened tool window to validate checkstyle. Or you can use the command `mvn clean compile checkstyle:checkstyle` to validate.
+
+### Documentation Contribute
+
+Flink cdc documentations locates at `docs/content`.
+
+The contribution step is the same as the code contribution. We use markdown as the source code of the document.
 
 ## Community
 

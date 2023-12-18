@@ -311,6 +311,13 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
                 <td>String</td>
                 <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'。</td>
             </tr>
+            <tr>
+                <td>obcdc.properties.*</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>传递参数到<code>libobcdc</code>，如 'obcdc.properties.sort_trans_participants' = '1'。更多参数信息见 <a href="https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000000221094">obcdc 配置项说明</a>。</td>
+            </tr>
         </tbody>
     </table>
 </div>

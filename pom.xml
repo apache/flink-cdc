@@ -27,8 +27,18 @@ under the License.
 
     <groupId>com.ververica</groupId>
     <artifactId>flink-cdc-connectors</artifactId>
-    <version>2.5-SNAPSHOT</version>
+    <version>${revision}</version>
     <packaging>pom</packaging>
+
+    <modules>
+        <module>flink-cdc-cli</module>
+        <module>flink-cdc-common</module>
+        <module>flink-cdc-composer</module>
+        <module>flink-cdc-dist</module>
+        <module>flink-cdc-connect</module>
+        <module>flink-cdc-runtime</module>
+        <module>flink-cdc-e2e-tests</module>
+    </modules>
 
     <licenses>
         <license>
@@ -50,30 +60,56 @@ under the License.
     </distributionManagement>
 
     <properties>
-        <flink.version>1.17.0</flink.version>
-        <debezium.version>1.9.7.Final</debezium.version>
-        <tikv.version>3.2.0</tikv.version>
-        <geometry.version>2.2.0</geometry.version>
-        <!-- OracleE2eITCase will report "container cannot be accessed" error when running in Azure Pipeline with 1.16.1 testconainters.
-          This might be a conflicts with "wnameless/oracle-xe-11g-r2" and 1.16 testcontainers.
-          We may need to upgrade our Oracle base image to "gvenzl/oracle-xe" which is the default image of 1.16 testcontainers.
-          See more https://github.com/testcontainers/testcontainers-java/issues/4297. -->
-        <testcontainers.version>1.15.3</testcontainers.version>
+        <revision>3.0-SNAPSHOT</revision>
         <java.version>1.8</java.version>
         <scala.binary.version>2.12</scala.binary.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
-        <hamcrest.version>1.3</hamcrest.version>
-        <version.awaitility>4.0.1</version.awaitility>
-        <slf4j.version>1.7.15</slf4j.version>
-        <log4j.version>2.17.1</log4j.version>
-        <spotless.version>2.4.2</spotless.version>
-        <oblogclient.version>1.1.0</oblogclient.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
         <flink.forkCount>1</flink.forkCount>
         <flink.reuseForks>true</flink.reuseForks>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- dependencies versions -->
+        <flink.version>1.18.0</flink.version>
+        <flink.major.version>1.18</flink.major.version>
+        <flink.shaded.version>17.0</flink.shaded.version>
+        <debezium.version>1.9.7.Final</debezium.version>
+        <tikv.version>3.2.0</tikv.version>
+        <geometry.version>2.2.0</geometry.version>
+        <testcontainers.version>1.18.3</testcontainers.version>
+        <hamcrest.version>1.3</hamcrest.version>
+        <version.awaitility>4.2.0</version.awaitility>
+        <slf4j.version>1.7.36</slf4j.version>
+        <log4j.version>2.17.1</log4j.version>
+        <spotless.version>2.4.2</spotless.version>
+        <oblogclient.version>1.1.0</oblogclient.version>
+        <commons-lang3.version>3.12.0</commons-lang3.version>
+        <json-path.version>2.7.0</json-path.version>
+        <junit5.version>5.10.1</junit5.version>
+        <junit4.version>4.13.2</junit4.version>
+        <assertj.version>3.24.2</assertj.version>
+        <markBundledAsOptional>true</markBundledAsOptional>
+        <flatten-maven-plugin.version>1.5.0</flatten-maven-plugin.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit5.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>${junit4.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- Apache Flink dependencies -->
@@ -114,11 +150,17 @@ under the License.
             <version>${slf4j.version}</version>
         </dependency>
 
-        <!--  Use fixed version 30.1.1-jre-16.1 of flink shaded guava  -->
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-shaded-guava</artifactId>
-            <version>30.1.1-jre-16.1</version>
+            <version>31.1-jre-${flink.shaded.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-shaded-force-shading</artifactId>
+            <version>${flink.shaded.version}</version>
+            <optional>true</optional>
         </dependency>
 
         <!-- test dependencies -->
@@ -160,8 +202,27 @@ under the License.
         <dependency>
             <groupId>org.awaitility</groupId>
             <artifactId>awaitility</artifactId>
-            <type>jar</type>
             <version>${version.awaitility}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>${assertj.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -213,7 +274,6 @@ under the License.
                                 implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
                             <licenseFamilyCategory>AL2</licenseFamilyCategory>
                             <licenseFamilyName>Apache License 2.0</licenseFamilyName>
-                            <notes/>
                             <patterns>
                                 <pattern>Copyright 2023 Ververica Inc.
                                 </pattern>
@@ -246,8 +306,12 @@ under the License.
                         <exclude>docs/site/**</exclude>
                         <!-- Tests -->
                         <exclude>**/*.txt</exclude>
-                        <exclude>flink-connector-mysql-cdc/src/test/resources/file/*.json</exclude>
-                        <exclude>flink-connector-db2-cdc/src/test/resources/db2_server/Dockerfile</exclude>
+                        <exclude>
+                            flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc/src/test/resources/file/*.json
+                        </exclude>
+                        <exclude>
+                            flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc/src/test/resources/db2_server/Dockerfile
+                        </exclude>
                     </excludes>
                 </configuration>
             </plugin>
@@ -317,14 +381,7 @@ under the License.
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.22.0</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.apache.maven.surefire</groupId>
-                        <artifactId>surefire-junit47</artifactId>
-                        <version>2.22.0</version>
-                    </dependency>
-                </dependencies>
+                <version>3.0.0-M5</version>
                 <executions>
                     <execution>
                         <id>default-test</id>
@@ -357,6 +414,7 @@ under the License.
                 <configuration>
                     <forkCount>${flink.forkCount}</forkCount>
                     <reuseForks>${flink.reuseForks}</reuseForks>
+                    <trimStackTrace>false</trimStackTrace>
                     <systemPropertyVariables>
                         <forkNumber>0${surefire.forkNumber}</forkNumber>
                     </systemPropertyVariables>
@@ -384,9 +442,6 @@ under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
                             <createDependencyReducedPom>true</createDependencyReducedPom>
-                            <dependencyReducedPomLocation>
-                                ${project.basedir}/target/dependency-reduced-pom.xml
-                            </dependencyReducedPomLocation>
                             <filters combine.children="append">
                                 <filter>
                                     <artifact>*:*</artifact>
@@ -400,8 +455,13 @@ under the License.
                             </filters>
                             <artifactSet>
                                 <includes>
-                                    <!-- include nothing -->
-                                    <include></include>
+                                    <!--
+                                        We need the next line to enforce all submodules to execute shade and generate
+                                        dependency-reduced-pom.xml, to erase all properties defined in parent pom and
+                                        pin them to a fixed value. For example in the dependency-reduced-pom.xml of
+                                        submodules, ${flink.version} will be resolved as the actual Flink version.
+                                    -->
+                                    <include>org.apache.flink:flink-shaded-force-shading</include>
                                 </includes>
                             </artifactSet>
                         </configuration>
@@ -450,66 +510,88 @@ under the License.
                     <doclint>none</doclint>
                 </configuration>
             </plugin>
+
+            <!-- This plugin takes effect for Maven version upper more than 3.5.0 -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>${flatten-maven-plugin.version}</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                        <phase>process-resources</phase>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                        <phase>clean</phase>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
     <profiles>
         <profile>
-            <id>default</id>
+            <id>fast</id>
             <activation>
-                <activeByDefault>true</activeByDefault>
+                <property>
+                    <name>fast</name>
+                </property>
             </activation>
-            <modules>
-                <module>flink-cdc-base</module>
-                <module>flink-connector-debezium</module>
-                <module>flink-connector-test-util</module>
-                <module>flink-connector-mysql-cdc</module>
-                <module>flink-connector-postgres-cdc</module>
-                <module>flink-connector-oracle-cdc</module>
-                <module>flink-connector-mongodb-cdc</module>
-                <module>flink-connector-oceanbase-cdc</module>
-                <module>flink-connector-sqlserver-cdc</module>
-                <module>flink-connector-tidb-cdc</module>
-                <module>flink-connector-db2-cdc</module>
-                <module>flink-connector-vitess-cdc</module>
-                <module>flink-sql-connector-mysql-cdc</module>
-                <module>flink-sql-connector-postgres-cdc</module>
-                <module>flink-sql-connector-mongodb-cdc</module>
-                <module>flink-sql-connector-oracle-cdc</module>
-                <module>flink-sql-connector-oceanbase-cdc</module>
-                <module>flink-sql-connector-sqlserver-cdc</module>
-                <module>flink-sql-connector-tidb-cdc</module>
-                <module>flink-sql-connector-db2-cdc</module>
-                <module>flink-sql-connector-vitess-cdc</module>
-                <module>flink-cdc-e2e-tests</module>
-            </modules>
+            <build>
+                <pluginManagement>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.rat</groupId>
+                            <artifactId>apache-rat-plugin</artifactId>
+                            <configuration>
+                                <skip>true</skip>
+                            </configuration>
+                        </plugin>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-checkstyle-plugin</artifactId>
+                            <configuration>
+                                <skip>true</skip>
+                            </configuration>
+                        </plugin>
+                        <plugin>
+                            <groupId>com.diffplug.spotless</groupId>
+                            <artifactId>spotless-maven-plugin</artifactId>
+                            <configuration>
+                                <skip>true</skip>
+                            </configuration>
+                        </plugin>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-enforcer-plugin</artifactId>
+                            <configuration>
+                                <skip>true</skip>
+                            </configuration>
+                        </plugin>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-javadoc-plugin</artifactId>
+                            <configuration>
+                                <skip>true</skip>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </pluginManagement>
+            </build>
         </profile>
         <profile>
             <id>release</id>
-            <modules>
-                <module>flink-cdc-base</module>
-                <module>flink-connector-debezium</module>
-                <module>flink-connector-test-util</module>
-                <module>flink-connector-mysql-cdc</module>
-                <module>flink-connector-postgres-cdc</module>
-                <module>flink-connector-oracle-cdc</module>
-                <module>flink-connector-mongodb-cdc</module>
-                <module>flink-connector-oceanbase-cdc</module>
-                <module>flink-connector-sqlserver-cdc</module>
-                <module>flink-connector-tidb-cdc</module>
-                <module>flink-connector-db2-cdc</module>
-                <module>flink-connector-vitess-cdc</module>
-                <module>flink-sql-connector-mysql-cdc</module>
-                <module>flink-sql-connector-postgres-cdc</module>
-                <module>flink-sql-connector-mongodb-cdc</module>
-                <module>flink-sql-connector-oracle-cdc</module>
-                <module>flink-sql-connector-oceanbase-cdc</module>
-                <module>flink-sql-connector-sqlserver-cdc</module>
-                <module>flink-sql-connector-tidb-cdc</module>
-                <module>flink-sql-connector-db2-cdc</module>
-                <module>flink-sql-connector-vitess-cdc</module>
-                <module>flink-cdc-e2e-tests</module>
-            </modules>
             <build>
                 <plugins>
                     <plugin>
@@ -611,16 +693,6 @@ under the License.
                     </plugins>
                 </pluginManagement>
             </build>
-        </profile>
-        <profile>
-            <id>self-hosted-pipeline</id>
-            <modules>
-                <module>flink-cdc-base</module>
-                <module>flink-connector-debezium</module>
-                <module>flink-connector-test-util</module>
-                <module>flink-connector-oceanbase-cdc</module>
-                <module>flink-sql-connector-oceanbase-cdc</module>
-            </modules>
         </profile>
     </profiles>
 </project>

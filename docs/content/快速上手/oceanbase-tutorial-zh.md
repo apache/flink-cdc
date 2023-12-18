@@ -136,7 +136,7 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 
 ### 下载所需要的依赖包
 
-```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译```
+```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译```
 
 - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
 - [flink-sql-connector-oceanbase-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.5-SNAPSHOT/flink-sql-connector-oceanbase-cdc-2.5-SNAPSHOT.jar)

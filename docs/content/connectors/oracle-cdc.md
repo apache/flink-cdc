@@ -13,7 +13,7 @@ In order to setup the Oracle CDC connector, the following table provides depende
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-oracle-cdc</artifactId>
-  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself. -->
   <version>2.5-SNAPSHOT</version>
 </dependency>
 ```
@@ -209,11 +209,11 @@ Flink SQL> CREATE TABLE products (
      'port' = '1521',
      'username' = 'flinkuser',
      'password' = 'flinkpw',
-     'database-name' = 'XE',
+     'database-name' = 'ORCLCDB',
      'schema-name' = 'inventory',
      'table-name' = 'products');
   
--- read snapshot and binlogs from products table
+-- read snapshot and redo logs from products table
 Flink SQL> SELECT * FROM products;
 ```
 **Note:**
@@ -362,7 +362,11 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.</td>
+      <td>Whether to close idle readers at the end of the snapshot phase. <br>
+          The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.<br>
+          If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
+          so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
+      </td>
     </tr>
     </tbody>
 </table>    
@@ -436,7 +440,7 @@ CREATE TABLE products (
     'port' = '1521',
     'username' = 'flinkuser',
     'password' = 'flinkpw',
-    'database-name' = 'XE',
+    'database-name' = 'ORCLCDB',
     'schema-name' = 'inventory',
     'table-name' = 'products',
     'debezium.log.mining.strategy' = 'online_catalog',
@@ -457,7 +461,7 @@ The Oracle CDC connector is a Flink Source connector which will read database sn
 
 The config option `scan.startup.mode` specifies the startup mode for Oracle CDC consumer. The valid enumerations are:
 
-- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest binlog.
+- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest redo log.
 - `latest-offset`: Never to perform a snapshot on the monitored database tables upon first startup, just read from
   the change since the connector was started.
 
@@ -491,13 +495,12 @@ public class OracleParallelSourceExample {
     public static void main(String[] args) throws Exception {
         Properties debeziumProperties = new Properties();
         debeziumProperties.setProperty("log.mining.strategy", "online_catalog");
-        debeziumProperties.setProperty("log.mining.continuous.mine", "true");
 
         JdbcIncrementalSource<String> oracleChangeEventSource =
                 new OracleSourceBuilder()
                         .hostname("host")
                         .port(1521)
-                        .databaseList("XE")
+                        .databaseList("ORCLCDB")
                         .schemaList("DEBEZIUM")
                         .tableList("DEBEZIUM.PRODUCTS")
                         .username("username")
@@ -538,7 +541,7 @@ public class OracleSourceExample {
      SourceFunction<String> sourceFunction = OracleSource.<String>builder()
              .url("jdbc:oracle:thin:@{hostname}:{port}:{database}")
              .port(1521)
-             .database("XE") // monitor XE database
+             .database("ORCLCDB") // monitor XE database
              .schemaList("inventory") // monitor inventory schema
              .tableList("inventory.products") // monitor products table
              .username("flinkuser")

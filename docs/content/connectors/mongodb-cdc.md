@@ -12,7 +12,7 @@ In order to setup the MongoDB CDC connector, the following table provides depend
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mongodb-cdc</artifactId>
-  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself. -->
   <version>2.5-SNAPSHOT</version>
 </dependency>
 ```
@@ -277,11 +277,22 @@ Connector Options
       <td>The chunk size mb of incremental snapshot.</td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.chunk.samples</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">20</td>
+      <td>Integer</td>
+      <td>The samples count per chunk when using sample partition strategy during incremental snapshot.</td>
+    </tr>
+    <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.</td>
+      <td>Whether to close idle readers at the end of the snapshot phase. <br>
+          The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.<br>
+          If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
+          so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
+      </td>
     </tr>
     <tr>
       <td>scan.cursor.no-timeout</td>

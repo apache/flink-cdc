@@ -13,7 +13,7 @@ In order to setup the SQLServer CDC connector, the following table provides depe
 <dependency>
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-sqlserver-cdc</artifactId>
-  <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+  <!-- The dependency is available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself. -->
   <version>2.5-SNAPSHOT</version>
 </dependency>
 ```
@@ -205,7 +205,11 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.</td>
+      <td>Whether to close idle readers at the end of the snapshot phase. <br>
+          The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.<br>
+          If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
+          so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
+      </td>
     </tr>
     </tbody>
 </table>    

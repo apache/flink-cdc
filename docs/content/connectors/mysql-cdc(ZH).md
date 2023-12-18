@@ -28,7 +28,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
-下载 [flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.5-SNAPSHOT/flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar) 到 `<FLINK_HOME>/lib/` 目录下。
+下载 flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar 到 `<FLINK_HOME>/lib/` 目录下。
 
 **注意:** flink-sql-connector-mysql-cdc-XXX-SNAPSHOT 版本是开发分支`release-XXX`对应的快照版本，快照版本用户需要下载源代码并编译相应的 jar。用户应使用已经发布的版本，例如 [flink-sql-connector-mysql-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
@@ -314,7 +314,7 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
-          For example: <code>'debezium.snapshot.mode' = 'never'</code>.
+          例如: <code>'debezium.snapshot.mode' = 'never'</code>.
           查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
     </tr>
     <tr>
@@ -322,7 +322,19 @@ Flink SQL> SELECT * FROM orders;
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。</td>
+      <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。<br>
+          若 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 默认值变更为 true，可以不用显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = true。</td>
+    </tr>
+    <tr>
+      <td>debezium.binary.handling.mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>debezium.binary.handling.mode 参数可以设置为以下值：
+           none：不进行任何处理，直接将二进制数据类型作为字节数组（byte array）传输。
+           base64：将二进制数据类型转换为 Base64 编码的字符串，然后传输。
+           hex：将二进制数据类型转换为十六进制编码的字符串，然后传输。
+      默认值为 none。根据您的需求和数据类型，您可以选择合适的处理模式。如果您的数据库中包含大量二进制数据类型，建议使用 base64 或 hex 模式，以便在传输过程中更容易处理。
     </tr>
     </tbody>
 </table>
@@ -709,6 +721,36 @@ $ ./bin/flink run \
   * 如果指定的列不存在更新操作，此时可以保证 Exactly once 语义。
   * 如果指定的列存在更新操作，此时只能保证 At least once 语义。但可以结合下游，通过指定下游主键，结合幂等性操作来保证数据的正确性。
 
+### 关于二进制类型数据转换为base64编码数据
+
+```sql
+CREATE TABLE products (
+    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
+    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    order_id INT,
+    order_date TIMESTAMP(0),
+    customer_name STRING,
+    price DECIMAL(10, 5),
+    product_id INT,
+    order_status BOOLEAN,
+    binary_data STRING,
+    PRIMARY KEY(order_id) NOT ENFORCED
+) WITH (
+    'connector' = 'mysql-cdc',
+    'hostname' = 'localhost',
+    'port' = '3306',
+    'username' = 'root',
+    'password' = '123456',
+    'database-name' = 'test_db',
+    'table-name' = 'test_tb',
+    'debezium.binary.handling.mode' = 'base64'
+);
+```
+
+`binary_data`字段， 在数据库中的类型是VARBINARY(N)，我们在有些场景需要将二进制数据转换为base64编码的字符串数据，可以通过添加参数'debezium.binary.handling.mode' = 'base64'来开启这个功能，
+添加此参数的情况下，我们就可以在flink sql中将该字段类型映射为`STRING`，从而获取base64编码的字符串数据。
+
 数据类型映射
 ----------------
 
@@ -820,7 +862,7 @@ $ ./bin/flink run \
         where 38 < p <= 65<br>
       </td>
       <td>STRING</td>
-      <td>在 MySQL 中，十进制数据类型的精度高达 65，但在 Flink 中，十进制数据类型的精度仅限于 38。所以，如果定义精度大于 38 的十进制列，则应将其映射到字符串以避免精度损失。在 MySQL 中，十进制数据类型的精度高达65，但在Flink中，十进制数据类型的精度仅限于38。所以，如果定义精度大于 38 的十进制列，则应将其映射到字符串以避免精度损失。</td>
+      <td>在 MySQL 中，十进制数据类型的精度高达 65，但在 Flink 中，十进制数据类型的精度仅限于 38。所以，如果定义精度大于 38 的十进制列，则应将其映射到字符串以避免精度损失。</td>
     </tr>
     <tr>
       <td>
@@ -867,7 +909,7 @@ $ ./bin/flink run \
       <td>
         BIT(n)
       </td>
-      <td>BINARY(⌈n/8⌉)</td>
+      <td>BINARY(⌈(n + 7) / 8⌉)</td>
       <td></td>
     </tr>
     <tr>
