@@ -216,7 +216,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     private void captureNewlyAddedTables() {
-        if (sourceConfig.isScanNewlyAddedTableEnabled()) {
+        // Don't scan newly added table in snapshot mode.
+        if (sourceConfig.isScanNewlyAddedTableEnabled()
+                || !sourceConfig.getStartupOptions().isSnapshotOnly()) {
             // check whether we got newly added tables
             try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
                 final List<TableId> currentCapturedTables =
@@ -517,7 +519,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     /** Indicates there is no more splits available in this assigner. */
-    public boolean noMoreSnapshotSplits() {
+    public boolean noMoreSplits() {
         return !needToDiscoveryTables() && remainingTables.isEmpty() && remainingSplits.isEmpty();
     }
 
@@ -547,7 +549,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
      * are finished.
      */
     private boolean allSnapshotSplitsFinished() {
-        return noMoreSnapshotSplits() && assignedSplits.size() == splitFinishedOffsets.size();
+        return noMoreSplits() && assignedSplits.size() == splitFinishedOffsets.size();
     }
 
     private void splitChunksForRemainingTables() {

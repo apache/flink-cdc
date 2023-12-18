@@ -51,6 +51,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     private static final String BINLOG_SPLIT_ID = "binlog-split";
 
     private final int splitMetaGroupSize;
+    private final MySqlSourceConfig sourceConfig;
 
     private boolean isBinlogSplitAssigned;
 
@@ -62,6 +63,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive) {
         this(
+                sourceConfig,
                 new MySqlSnapshotSplitAssigner(
                         sourceConfig, currentParallelism, remainingTables, isTableIdCaseSensitive),
                 false,
@@ -73,6 +75,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
             int currentParallelism,
             HybridPendingSplitsState checkpoint) {
         this(
+                sourceConfig,
                 new MySqlSnapshotSplitAssigner(
                         sourceConfig, currentParallelism, checkpoint.getSnapshotPendingSplits()),
                 checkpoint.isBinlogSplitAssigned(),
@@ -80,9 +83,11 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     }
 
     private MySqlHybridSplitAssigner(
+            MySqlSourceConfig sourceConfig,
             MySqlSnapshotSplitAssigner snapshotSplitAssigner,
             boolean isBinlogSplitAssigned,
             int splitMetaGroupSize) {
+        this.sourceConfig = sourceConfig;
         this.snapshotSplitAssigner = snapshotSplitAssigner;
         this.isBinlogSplitAssigned = isBinlogSplitAssigned;
         this.splitMetaGroupSize = splitMetaGroupSize;
@@ -99,7 +104,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
             // do not assign split until the adding table process finished
             return Optional.empty();
         }
-        if (snapshotSplitAssigner.noMoreSnapshotSplits()) {
+        if (snapshotSplitAssigner.noMoreSplits()) {
             // binlog split assigning
             if (isBinlogSplitAssigned) {
                 // no more splits for the assigner
@@ -127,11 +132,6 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     @Override
     public boolean waitingForFinishedSplits() {
         return snapshotSplitAssigner.waitingForFinishedSplits();
-    }
-
-    @Override
-    public boolean isStreamSplitAssigned() {
-        return isBinlogSplitAssigned;
     }
 
     @Override
@@ -175,6 +175,11 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
+    public boolean noMoreSplits() {
+        return snapshotSplitAssigner.noMoreSplits() && isBinlogSplitAssigned;
+    }
+
+    @Override
     public void startAssignNewlyAddedTables() {
         snapshotSplitAssigner.startAssignNewlyAddedTables();
     }
@@ -187,10 +192,6 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     @Override
     public void close() {
         snapshotSplitAssigner.close();
-    }
-
-    public boolean noMoreSnapshotSplits() {
-        return snapshotSplitAssigner.noMoreSnapshotSplits();
     }
 
     // --------------------------------------------------------------------------------------------
@@ -206,12 +207,17 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
 
         BinlogOffset minBinlogOffset = null;
+        BinlogOffset maxBinlogOffset = null;
         for (MySqlSchemalessSnapshotSplit split : assignedSnapshotSplit) {
-            // find the min binlog offset
+            // find the min and max binlog offset
             BinlogOffset binlogOffset = splitFinishedOffsets.get(split.splitId());
             if (minBinlogOffset == null || binlogOffset.isBefore(minBinlogOffset)) {
                 minBinlogOffset = binlogOffset;
             }
+            if (maxBinlogOffset == null || binlogOffset.isAfter(maxBinlogOffset)) {
+                maxBinlogOffset = binlogOffset;
+            }
+
             finishedSnapshotSplitInfos.add(
                     new FinishedSnapshotSplitInfo(
                             split.getTableId(),
@@ -221,14 +227,21 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
                             binlogOffset));
         }
 
+        // If the source is running in snapshot mode, we use the highest watermark among
+        // snapshot splits as the ending offset to provide a consistent snapshot view at the moment
+        // of high watermark.
+        BinlogOffset stoppingOffset = BinlogOffset.ofNonStopping();
+        if (sourceConfig.getStartupOptions().isSnapshotOnly()) {
+            stoppingOffset = maxBinlogOffset;
+        }
+
         // the finishedSnapshotSplitInfos is too large for transmission, divide it to groups and
         // then transfer them
-
         boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
         return new MySqlBinlogSplit(
                 BINLOG_SPLIT_ID,
                 minBinlogOffset == null ? BinlogOffset.ofEarliest() : minBinlogOffset,
-                BinlogOffset.ofNonStopping(),
+                stoppingOffset,
                 divideMetaToGroups ? new ArrayList<>() : finishedSnapshotSplitInfos,
                 new HashMap<>(),
                 finishedSnapshotSplitInfos.size());

@@ -37,7 +37,6 @@ import com.ververica.cdc.connectors.mysql.source.utils.RecordUtils;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.DataChangeEvent;
-import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import org.apache.kafka.connect.data.Struct;
@@ -87,6 +86,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
     private final Set<TableId> pureBinlogPhaseTables;
     private Tables.TableFilter capturedTableFilter;
+    private final StoppableChangeEventSourceContext changeEventSourceContext =
+            new StoppableChangeEventSourceContext();
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
 
@@ -124,27 +125,20 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                 () -> {
                     try {
                         binlogSplitReadTask.execute(
-                                new BinlogSplitChangeEventSourceContextImpl(),
+                                changeEventSourceContext,
                                 statefulTaskContext.getMySqlPartition(),
                                 statefulTaskContext.getOffsetContext());
                     } catch (Exception e) {
-                        currentTaskRunning = false;
                         LOG.error(
                                 String.format(
                                         "Execute binlog read task for mysql split %s fail",
                                         currentBinlogSplit),
                                 e);
                         readException = e;
+                    } finally {
+                        stopBinlogReadTask();
                     }
                 });
-    }
-
-    private class BinlogSplitChangeEventSourceContextImpl
-            implements ChangeEventSource.ChangeEventSourceContext {
-        @Override
-        public boolean isRunning() {
-            return currentTaskRunning;
-        }
     }
 
     @Override
@@ -191,9 +185,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             if (statefulTaskContext.getBinaryLogClient() != null) {
                 statefulTaskContext.getBinaryLogClient().disconnect();
             }
-            // set currentTaskRunning to false to terminate the
-            // while loop in MySqlStreamingChangeEventSource's execute method
-            currentTaskRunning = false;
+
+            stopBinlogReadTask();
             if (executorService != null) {
                 executorService.shutdown();
                 if (!executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
@@ -328,7 +321,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     }
 
     public void stopBinlogReadTask() {
-        this.currentTaskRunning = false;
+        currentTaskRunning = false;
+        // Terminate the while loop in MySqlStreamingChangeEventSource's execute method
+        changeEventSourceContext.stopChangeEventSource();
     }
 
     @VisibleForTesting

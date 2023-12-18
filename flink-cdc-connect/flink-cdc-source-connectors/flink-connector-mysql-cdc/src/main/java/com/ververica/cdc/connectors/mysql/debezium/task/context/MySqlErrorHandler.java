@@ -18,7 +18,6 @@ package com.ververica.cdc.connectors.mysql.debezium.task.context;
 
 import com.ververica.cdc.connectors.mysql.debezium.task.context.exception.SchemaOutOfSyncException;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
-import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import io.debezium.DebeziumException;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlConnector;
@@ -102,13 +101,6 @@ public class MySqlErrorHandler extends ErrorHandler {
                         .getMessage()
                         .endsWith(
                                 "internal schema representation is probably out of sync with real database schema")
-                && isSettingStartingOffset();
-    }
-
-    private boolean isSettingStartingOffset() {
-        StartupMode startupMode = sourceConfig.getStartupOptions().startupMode;
-        return startupMode == StartupMode.EARLIEST_OFFSET
-                || startupMode == StartupMode.TIMESTAMP
-                || startupMode == StartupMode.SPECIFIC_OFFSETS;
+                && sourceConfig.getStartupOptions().isStreamOnly();
     }
 }
