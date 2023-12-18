@@ -1,4 +1,4 @@
-# Doris Pipeline
+# Doris Pipeline Connector
 
 This article introduces of Doris Pipeline Connector
 
