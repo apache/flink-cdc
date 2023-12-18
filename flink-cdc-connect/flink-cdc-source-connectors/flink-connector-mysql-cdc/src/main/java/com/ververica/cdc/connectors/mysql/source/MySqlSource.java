@@ -56,7 +56,6 @@ import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplitState;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
-import com.ververica.cdc.connectors.mysql.table.StartupMode;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import io.debezium.jdbc.JdbcConnection;
 
@@ -151,7 +150,12 @@ public class MySqlSource<T>
 
     @Override
     public Boundedness getBoundedness() {
-        return Boundedness.CONTINUOUS_UNBOUNDED;
+        MySqlSourceConfig sourceConfig = configFactory.createConfig(0);
+        if (sourceConfig.getStartupOptions().isSnapshotOnly()) {
+            return Boundedness.BOUNDED;
+        } else {
+            return Boundedness.CONTINUOUS_UNBOUNDED;
+        }
     }
 
     @Override
@@ -197,7 +201,7 @@ public class MySqlSource<T>
         validator.validate();
 
         final MySqlSplitAssigner splitAssigner;
-        if (sourceConfig.getStartupOptions().startupMode == StartupMode.INITIAL) {
+        if (!sourceConfig.getStartupOptions().isStreamOnly()) {
             try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
                 boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
                 splitAssigner =
@@ -214,7 +218,8 @@ public class MySqlSource<T>
             splitAssigner = new MySqlBinlogSplitAssigner(sourceConfig);
         }
 
-        return new MySqlSourceEnumerator(enumContext, sourceConfig, splitAssigner);
+        return new MySqlSourceEnumerator(
+                enumContext, sourceConfig, splitAssigner, getBoundedness());
     }
 
     @Override
@@ -238,7 +243,8 @@ public class MySqlSource<T>
             throw new UnsupportedOperationException(
                     "Unsupported restored PendingSplitsState: " + checkpoint);
         }
-        return new MySqlSourceEnumerator(enumContext, sourceConfig, splitAssigner);
+        return new MySqlSourceEnumerator(
+                enumContext, sourceConfig, splitAssigner, getBoundedness());
     }
 
     @Override

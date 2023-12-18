@@ -41,6 +41,14 @@ public final class StartupOptions implements Serializable {
     }
 
     /**
+     * Performs an initial snapshot on the monitored database tables upon first startup, and not
+     * read the binlog anymore .
+     */
+    public static StartupOptions snapshot() {
+        return new StartupOptions(StartupMode.SNAPSHOT, null);
+    }
+
+    /**
      * Never to perform snapshot on the monitored database tables upon first startup, just read from
      * the beginning of the binlog. This should be used with care, as it is only valid when the
      * binlog is guaranteed to contain the entire history of the database.
@@ -92,10 +100,21 @@ public final class StartupOptions implements Serializable {
     private StartupOptions(StartupMode startupMode, BinlogOffset binlogOffset) {
         this.startupMode = startupMode;
         this.binlogOffset = binlogOffset;
-        if (startupMode != StartupMode.INITIAL) {
+        if (isStreamOnly()) {
             checkNotNull(
                     binlogOffset, "Binlog offset is required if startup mode is %s", startupMode);
         }
+    }
+
+    public boolean isStreamOnly() {
+        return startupMode == StartupMode.EARLIEST_OFFSET
+                || startupMode == StartupMode.LATEST_OFFSET
+                || startupMode == StartupMode.SPECIFIC_OFFSETS
+                || startupMode == StartupMode.TIMESTAMP;
+    }
+
+    public boolean isSnapshotOnly() {
+        return startupMode == StartupMode.SNAPSHOT;
     }
 
     @Override
