@@ -92,6 +92,9 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
     public AtomicBoolean hasNextElement;
     public AtomicBoolean reachEnd;
 
+    private final StoppableChangeEventSourceContext changeEventSourceContext =
+            new StoppableChangeEventSourceContext();
+
     private static final long READER_CLOSE_TIMEOUT = 30L;
 
     public SnapshotSplitReader(
@@ -153,7 +156,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                     } catch (Exception e) {
                         setReadException(e);
                     } finally {
-                        currentTaskRunning = false;
+                        stopCurrentTask();
                     }
                 });
     }
@@ -175,6 +178,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         // Dispatch BINLOG_END event directly is backfill is not required
         if (!isBackfillRequired(backfillBinlogSplit)) {
             dispatchBinlogEndEvent(backfillBinlogSplit);
+            stopCurrentTask();
             return;
         }
 
@@ -188,7 +192,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                     loader.load(backfillBinlogSplit.getStartingOffset().getOffset());
 
             backfillBinlogReadTask.execute(
-                    new SnapshotBinlogSplitChangeEventSourceContextImpl(),
+                    changeEventSourceContext,
                     statefulTaskContext.getMySqlPartition(),
                     mySqlOffsetContext);
         } else {
@@ -362,7 +366,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
     }
 
     private void setReadException(Throwable throwable) {
-        currentTaskRunning = false;
+        stopCurrentTask();
         LOG.error(
                 String.format(
                         "Execute snapshot read task for mysql split %s fail", currentSnapshotSplit),
@@ -377,6 +381,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
     @Override
     public void close() {
         try {
+            stopCurrentTask();
             if (statefulTaskContext.getConnection() != null) {
                 statefulTaskContext.getConnection().close();
             }
@@ -397,6 +402,11 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         } catch (Exception e) {
             LOG.error("Close snapshot reader error", e);
         }
+    }
+
+    private void stopCurrentTask() {
+        currentTaskRunning = false;
+        changeEventSourceContext.stopChangeEventSource();
     }
 
     @VisibleForTesting
@@ -433,23 +443,6 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         @Override
         public boolean isRunning() {
             return lowWatermark != null && highWatermark != null;
-        }
-    }
-
-    /**
-     * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for bounded binlog task
-     * of a snapshot split task.
-     */
-    public class SnapshotBinlogSplitChangeEventSourceContextImpl
-            implements ChangeEventSource.ChangeEventSourceContext {
-
-        public void finished() {
-            currentTaskRunning = false;
-        }
-
-        @Override
-        public boolean isRunning() {
-            return currentTaskRunning;
         }
     }
 }

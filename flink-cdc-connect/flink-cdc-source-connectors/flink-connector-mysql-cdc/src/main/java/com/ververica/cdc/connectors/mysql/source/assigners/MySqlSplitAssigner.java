@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.mysql.source.assigners;
 
 import org.apache.flink.api.common.state.CheckpointListener;
 
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
@@ -32,6 +33,7 @@ import java.util.Optional;
  * The {@code MySqlSplitAssigner} is responsible for deciding what split should be processed. It
  * determines split processing order.
  */
+@Internal
 public interface MySqlSplitAssigner {
 
     /**
@@ -52,11 +54,6 @@ public interface MySqlSplitAssigner {
      * #onFinishedSplits(Map)}.
      */
     boolean waitingForFinishedSplits();
-
-    /** Whether the split assigner is finished stream split assigning. */
-    default boolean isStreamSplitAssigned() {
-        throw new UnsupportedOperationException("Not support to assigning StreamSplit.");
-    }
 
     /**
      * Gets the finished splits' information. This is useful metadata to generate a binlog split
@@ -109,6 +106,9 @@ public interface MySqlSplitAssigner {
 
     /** Starts assign newly added tables. */
     void startAssignNewlyAddedTables();
+
+    /** Indicates there is no more splits available in this assigner. */
+    boolean noMoreSplits();
 
     /**
      * Callback to handle the binlog split has been updated in the newly added tables process. This
