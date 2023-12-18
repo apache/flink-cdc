@@ -192,6 +192,12 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** Whether the {@link MySqlIncrementalSource} should scan the newly added tables or not. */
+    public MySqlSourceBuilder<T> scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
+        this.configFactory.scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
+        return this;
+    }
+
     /** Specifies the startup options. */
     public MySqlSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
         this.configFactory.startupOptions(startupOptions);

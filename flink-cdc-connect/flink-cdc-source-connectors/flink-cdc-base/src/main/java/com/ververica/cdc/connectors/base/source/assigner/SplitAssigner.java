@@ -104,6 +104,18 @@ public interface SplitAssigner {
      */
     void notifyCheckpointComplete(long checkpointId);
 
+    /** Gets the split assigner status, see {@code AssignerStatus}. */
+    AssignerStatus getAssignerStatus();
+
+    /**
+     * Suspends the assigner under {@link AssignerStatus#INITIAL_ASSIGNING_FINISHED} or {@link
+     * AssignerStatus#NEWLY_ADDED_ASSIGNING_FINISHED}.
+     */
+    void suspend();
+
+    /** Wakes up the assigner under {@link AssignerStatus#SUSPENDED}. */
+    void wakeup();
+
     /**
      * Called to close the assigner, in case it holds on to any resources, like threads or network
      * connections.

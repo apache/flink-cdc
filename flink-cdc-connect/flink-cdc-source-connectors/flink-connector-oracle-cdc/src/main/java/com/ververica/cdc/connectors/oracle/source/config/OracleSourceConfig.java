@@ -87,7 +87,8 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 connectMaxRetries,
                 connectionPoolSize,
                 chunkKeyColumn,
-                skipSnapshotBackfill);
+                skipSnapshotBackfill,
+                false);
         this.url = url;
     }
 
