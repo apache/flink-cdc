@@ -54,7 +54,7 @@ public class AddColumnEventSerializerTest extends SerializerTestBase<AddColumnEv
                             new AddColumnEvent.ColumnWithPosition(
                                     Column.physicalColumn("testCol2", DataTypes.DOUBLE(), "desc"),
                                     AddColumnEvent.ColumnPosition.AFTER,
-                                    Column.physicalColumn("testCol1", DataTypes.TIMESTAMP())))),
+                                    "testCol1"))),
             new AddColumnEvent(
                     TableId.tableId("schema", "table"),
                     Arrays.asList(
@@ -65,7 +65,7 @@ public class AddColumnEventSerializerTest extends SerializerTestBase<AddColumnEv
                             new AddColumnEvent.ColumnWithPosition(
                                     Column.metadataColumn("testCol2", DataTypes.DOUBLE(), "mKey"),
                                     AddColumnEvent.ColumnPosition.BEFORE,
-                                    Column.metadataColumn("testCol1", DataTypes.TIMESTAMP())))),
+                                    "testCol1"))),
             new AddColumnEvent(
                     TableId.tableId("namespace", "schema", "table"),
                     Arrays.asList(
@@ -77,7 +77,7 @@ public class AddColumnEventSerializerTest extends SerializerTestBase<AddColumnEv
                                     Column.metadataColumn(
                                             "testCol2", DataTypes.DOUBLE(), "mKey", "desc"),
                                     AddColumnEvent.ColumnPosition.BEFORE,
-                                    Column.physicalColumn("testCol1", DataTypes.TIMESTAMP()))))
+                                    "testCol1")))
         };
     }
 }

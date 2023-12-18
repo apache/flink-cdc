@@ -157,7 +157,7 @@ public class RouteFunction extends RichMapFunction<Event, Event> {
         }
         if (schemaChangeEvent instanceof DropColumnEvent) {
             DropColumnEvent dropColumnEvent = (DropColumnEvent) schemaChangeEvent;
-            return new DropColumnEvent(tableId, dropColumnEvent.getDroppedColumns());
+            return new DropColumnEvent(tableId, dropColumnEvent.getDroppedColumnNames());
         }
         if (schemaChangeEvent instanceof AddColumnEvent) {
             AddColumnEvent addColumnEvent = (AddColumnEvent) schemaChangeEvent;

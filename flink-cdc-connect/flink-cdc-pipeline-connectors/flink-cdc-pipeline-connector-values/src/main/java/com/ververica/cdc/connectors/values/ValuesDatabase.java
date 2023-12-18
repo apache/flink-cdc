@@ -45,6 +45,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -186,6 +187,8 @@ public class ValuesDatabase {
 
         private final LinkedList<Column> columns;
 
+        private final LinkedList<String> columnNames;
+
         private final List<String> primaryKeys;
 
         // indexes of primaryKeys in columns
@@ -195,6 +198,7 @@ public class ValuesDatabase {
             this.tableId = tableId;
             this.lock = new Object();
             this.columns = new LinkedList<>(schema.getColumns());
+            this.columnNames = new LinkedList<>(schema.getColumnNames());
             this.records = new HashMap<>();
             this.primaryKeys = new LinkedList<>(schema.primaryKeys());
             this.primaryKeyIndexes = new ArrayList<>();
@@ -278,7 +282,7 @@ public class ValuesDatabase {
         }
 
         private void updatePrimaryKeyIndexes() {
-            Preconditions.checkArgument(primaryKeys.size() > 0, "primaryKeys couldn't be empty");
+            Preconditions.checkArgument(!primaryKeys.isEmpty(), "primaryKeys couldn't be empty");
             primaryKeyIndexes.clear();
             for (String primaryKey : primaryKeys) {
                 for (int i = 0; i < columns.size(); i++) {
@@ -322,23 +326,29 @@ public class ValuesDatabase {
                     case FIRST:
                         {
                             columns.addFirst(columnWithPosition.getAddColumn());
+                            columnNames.addFirst(columnWithPosition.getAddColumn().getName());
                             break;
                         }
                     case LAST:
                         {
                             columns.addLast(columnWithPosition.getAddColumn());
+                            columnNames.addLast(columnWithPosition.getAddColumn().getName());
                             break;
                         }
                     case BEFORE:
                         {
-                            int index = columns.indexOf(columnWithPosition.getExistingColumn());
+                            int index =
+                                    columnNames.indexOf(columnWithPosition.getExistedColumnName());
                             columns.add(index, columnWithPosition.getAddColumn());
+                            columnNames.add(index, columnWithPosition.getAddColumn().getName());
                             break;
                         }
                     case AFTER:
                         {
-                            int index = columns.indexOf(columnWithPosition.getExistingColumn());
+                            int index =
+                                    columnNames.indexOf(columnWithPosition.getExistedColumnName());
                             columns.add(index + 1, columnWithPosition.getAddColumn());
+                            columnNames.add(index + 1, columnWithPosition.getAddColumn().getName());
                             break;
                         }
                 }
@@ -346,12 +356,22 @@ public class ValuesDatabase {
         }
 
         private void applyDropColumnEvent(DropColumnEvent event) {
-            for (Column column : event.getDroppedColumns()) {
-                if (!columns.remove(column)) {
-                    throw new IllegalArgumentException(column.getName() + " is not existed");
+            for (String columnName : event.getDroppedColumnNames()) {
+                if (!removeColumn(columnName)) {
+                    throw new IllegalArgumentException(columnName + " is not existed");
                 }
-                records.forEach((key, record) -> record.remove(column.getName()));
+                records.forEach((key, record) -> record.remove(columnName));
             }
+        }
+
+        private boolean removeColumn(String columnName) {
+            int index = columnNames.indexOf(columnName);
+            if (index == -1) {
+                return false;
+            }
+
+            return Objects.nonNull(columnNames.remove(index))
+                    && Objects.nonNull(columns.remove(index));
         }
 
         private void applyRenameColumnEvent(RenameColumnEvent event) {
@@ -364,6 +384,7 @@ public class ValuesDatabase {
                                         columns.set(
                                                 i,
                                                 Column.physicalColumn(afterName, column.getType()));
+                                        columnNames.set(i, afterName);
                                     }
                                 }
 

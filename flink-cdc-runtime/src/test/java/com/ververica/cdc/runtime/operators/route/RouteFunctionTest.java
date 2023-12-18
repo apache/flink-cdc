@@ -164,12 +164,12 @@ class RouteFunctionTest {
 
         // DropColumnEvent
         PhysicalColumn droppedColumn = Column.physicalColumn("address", DataTypes.STRING());
-        List<Column> droppedColumns = Collections.singletonList(droppedColumn);
+        List<String> droppedColumns = Collections.singletonList(droppedColumn.getName());
         DropColumnEvent dropColumnEvent = new DropColumnEvent(CUSTOMERS, droppedColumns);
         assertThat(router.map(dropColumnEvent))
                 .asSchemaChangeEvent()
                 .asDropColumnEvent()
-                .containsDroppedColumns(droppedColumn)
+                .containsDroppedColumns(droppedColumn.getName())
                 .hasTableId(NEW_CUSTOMERS);
 
         // RenameColumnEvent

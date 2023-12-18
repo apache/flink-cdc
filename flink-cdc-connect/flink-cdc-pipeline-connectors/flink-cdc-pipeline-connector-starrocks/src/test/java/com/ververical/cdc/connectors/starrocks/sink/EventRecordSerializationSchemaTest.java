@@ -71,6 +71,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -234,15 +235,11 @@ public class EventRecordSerializationSchemaTest {
         verifySerializeResult(
                 table1,
                 "{\"col1\":4,\"col2\":true,\"col3\":\"2023-11-27 21:00:00\",\"col4\":83.23,\"col5\":9,\"col6\":\"2023-11-27 19:00:00\",\"__op\":1}",
-                serializer.serialize(deleteEvent2));
+                Objects.requireNonNull(serializer.serialize(deleteEvent2)));
 
         // 4. drop columns from table2, and insert data
         DropColumnEvent dropColumnEvent =
-                new DropColumnEvent(
-                        table2,
-                        Arrays.asList(
-                                Column.physicalColumn("col2", new FloatType()),
-                                Column.physicalColumn("col3", new VarCharType(20))));
+                new DropColumnEvent(table2, Arrays.asList("col2", "col3"));
         Schema newSchema2 = SchemaUtils.applySchemaChangeEvent(schema2, dropColumnEvent);
         BinaryRecordDataGenerator newGenerator2 =
                 new BinaryRecordDataGenerator(
@@ -255,7 +252,9 @@ public class EventRecordSerializationSchemaTest {
                         newGenerator2.generate(
                                 new Object[] {(int) LocalDate.of(2023, 11, 28).toEpochDay()}));
         verifySerializeResult(
-                table2, "{\"col1\":\"2023-11-28\",\"__op\":0}", serializer.serialize(insertEvent3));
+                table2,
+                "{\"col1\":\"2023-11-28\",\"__op\":0}",
+                Objects.requireNonNull(serializer.serialize(insertEvent3)));
     }
 
     private void verifySerializeResult(

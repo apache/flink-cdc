@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.starrocks.sink.StarRocksUtils.toStarRocksDataType;
 
@@ -187,10 +186,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
     }
 
     private void applyDropColumn(DropColumnEvent dropColumnEvent) {
-        List<String> dropColumns =
-                dropColumnEvent.getDroppedColumns().stream()
-                        .map(Column::getName)
-                        .collect(Collectors.toList());
+        List<String> dropColumns = dropColumnEvent.getDroppedColumnNames();
         TableId tableId = dropColumnEvent.tableId();
         StarRocksCatalogException alterException = null;
         try {
