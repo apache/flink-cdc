@@ -39,6 +39,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isInitialAssigningFinished;
+import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isNewlyAddedAssigningFinished;
+import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isSuspended;
+
 /** Assigner for Hybrid split which contains snapshot splits and stream splits. */
 public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigner {
 
@@ -109,6 +113,10 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
 
     @Override
     public Optional<SourceSplitBase> getNext() {
+        if (isSuspended(getAssignerStatus())) {
+            // do not assign split until the assigner received SuspendBinlogReaderAckEvent
+            return Optional.empty();
+        }
         if (snapshotSplitAssigner.noMoreSplits()) {
             // stream split assigning
             if (isStreamSplitAssigned) {
@@ -116,7 +124,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                 LOG.trace(
                         "No more splits for the SnapshotSplitAssigner. StreamSplit is already assigned.");
                 return Optional.empty();
-            } else if (snapshotSplitAssigner.isFinished()) {
+            } else if (isInitialAssigningFinished(snapshotSplitAssigner.getAssignerStatus())) {
                 // we need to wait snapshot-assigner to be finished before
                 // assigning the stream split. Otherwise, records emitted from stream split
                 // might be out-of-order in terms of same primary key with snapshot splits.
@@ -126,6 +134,10 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                         "SnapshotSplitAssigner is finished: creating a new stream split {}",
                         streamSplit);
                 return Optional.of(streamSplit);
+            } else if (isNewlyAddedAssigningFinished(snapshotSplitAssigner.getAssignerStatus())) {
+                // do not need to create binlog, but send event to wake up the binlog reader
+                isStreamSplitAssigned = true;
+                return Optional.empty();
             } else {
                 // stream split is not ready by now
                 LOG.trace(
@@ -181,6 +193,21 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     @Override
     public boolean isStreamSplitAssigned() {
         return isStreamSplitAssigned;
+    }
+
+    @Override
+    public AssignerStatus getAssignerStatus() {
+        return snapshotSplitAssigner.getAssignerStatus();
+    }
+
+    @Override
+    public void suspend() {
+        snapshotSplitAssigner.suspend();
+    }
+
+    @Override
+    public void wakeup() {
+        snapshotSplitAssigner.wakeup();
     }
 
     @Override

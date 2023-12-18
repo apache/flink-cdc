@@ -49,6 +49,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSerializer
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitState;
 import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReaderContext;
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceRecordEmitter;
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceSplitReader;
 import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
@@ -116,19 +117,22 @@ public class IncrementalSource<T, C extends SourceConfig>
                 new SourceReaderMetrics(readerContext.metricGroup());
 
         sourceReaderMetrics.registerMetrics();
+        IncrementalSourceReaderContext sourceReaderContext =
+                new IncrementalSourceReaderContext(readerContext);
         Supplier<IncrementalSourceSplitReader<C>> splitReaderSupplier =
                 () ->
                         new IncrementalSourceSplitReader<>(
                                 readerContext.getIndexOfSubtask(),
                                 dataSourceDialect,
                                 sourceConfig,
-                                snapshotHooks);
+                                snapshotHooks,
+                                sourceReaderContext);
         return new IncrementalSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,
                 createRecordEmitter(sourceConfig, sourceReaderMetrics),
                 readerContext.getConfiguration(),
-                readerContext,
+                sourceReaderContext,
                 sourceConfig,
                 sourceSplitSerializer,
                 dataSourceDialect);
