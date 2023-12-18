@@ -53,7 +53,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceSplitReader.class);
     private final Queue<SourceSplitBase> splits;
     private final int subtaskId;
-
+    private final IncrementalSourceReaderContext context;
     @Nullable private Fetcher<SourceRecords, SourceSplitBase> currentFetcher;
     @Nullable private String currentSplitId;
     private final DataSourceDialect<C> dataSourceDialect;
@@ -65,18 +65,22 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
             int subtaskId,
             DataSourceDialect<C> dataSourceDialect,
             C sourceConfig,
-            SnapshotPhaseHooks snapshotHooks) {
+            SnapshotPhaseHooks snapshotHooks,
+            IncrementalSourceReaderContext context) {
         this.subtaskId = subtaskId;
         this.splits = new ArrayDeque<>();
         this.dataSourceDialect = dataSourceDialect;
         this.sourceConfig = sourceConfig;
         this.snapshotHooks = snapshotHooks;
+        this.context = context;
     }
 
     @Override
     public RecordsWithSplitIds<SourceRecords> fetch() throws IOException {
         checkSplitOrStartNext();
-        Iterator<SourceRecords> dataIt = null;
+        checkNeedStopSplitReader();
+
+        Iterator<SourceRecords> dataIt;
         try {
             dataIt = currentFetcher.pollSplitRecords();
         } catch (InterruptedException e) {
@@ -86,6 +90,18 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
         return dataIt == null
                 ? finishedSplit()
                 : ChangeEventRecords.forRecords(currentSplitId, dataIt);
+    }
+
+    private void checkNeedStopSplitReader() {
+        if (currentFetcher instanceof IncrementalSourceStreamFetcher
+                && context.needStopStreamSplitReader()
+                && !currentFetcher.isFinished()) {
+            try {
+                ((IncrementalSourceStreamFetcher) currentFetcher).stopReadTask();
+            } catch (Exception e) {
+                LOG.error("Couldn't stop fetcher: ", e);
+            }
+        }
     }
 
     @Override
@@ -114,20 +130,21 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
     }
 
     protected void checkSplitOrStartNext() throws IOException {
-        // the stream fetcher should keep alive
-        if (currentFetcher instanceof IncrementalSourceStreamFetcher) {
-            return;
-        }
-
         if (canAssignNextSplit()) {
             final SourceSplitBase nextSplit = splits.poll();
 
             if (nextSplit == null) {
-                throw new IOException("Cannot fetch from another split - no split remaining.");
+                return;
             }
             currentSplitId = nextSplit.splitId();
             FetchTask fetchTask = dataSourceDialect.createFetchTask(nextSplit);
             if (nextSplit.isSnapshotSplit()) {
+                if (currentFetcher instanceof IncrementalSourceStreamFetcher) {
+                    LOG.info(
+                            "This is the point from stream split reading change to snapshot split reading");
+                    currentFetcher.close();
+                    currentFetcher = null;
+                }
                 if (currentFetcher == null) {
                     final FetchTask.Context taskContext =
                             dataSourceDialect.createFetchTaskContext(nextSplit, sourceConfig);

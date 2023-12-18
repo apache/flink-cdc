@@ -35,6 +35,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
     protected final boolean includeSchemaChanges;
     protected final boolean closeIdleReaders;
     protected final boolean skipSnapshotBackfill;
+    protected final boolean scanNewlyAddedTableEnabled;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -52,7 +53,8 @@ public abstract class BaseSourceConfig implements SourceConfig {
             boolean closeIdleReaders,
             boolean skipSnapshotBackfill,
             Properties dbzProperties,
-            Configuration dbzConfiguration) {
+            Configuration dbzConfiguration,
+            boolean scanNewlyAddedTableEnabled) {
         this.startupOptions = startupOptions;
         this.splitSize = splitSize;
         this.splitMetaGroupSize = splitMetaGroupSize;
@@ -63,6 +65,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.dbzProperties = dbzProperties;
         this.dbzConfiguration = dbzConfiguration;
+        this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
     }
 
     @Override
@@ -96,6 +99,11 @@ public abstract class BaseSourceConfig implements SourceConfig {
     @Override
     public boolean isCloseIdleReaders() {
         return closeIdleReaders;
+    }
+
+    @Override
+    public boolean isScanNewlyAddedTableEnabled() {
+        return scanNewlyAddedTableEnabled;
     }
 
     public Properties getDbzProperties() {

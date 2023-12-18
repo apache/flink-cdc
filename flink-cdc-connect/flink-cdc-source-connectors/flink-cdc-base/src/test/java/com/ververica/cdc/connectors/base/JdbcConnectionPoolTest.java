@@ -121,7 +121,8 @@ public class JdbcConnectionPoolTest {
                 "UTC",
                 Duration.ofSeconds(10),
                 2,
-                3);
+                3,
+                false);
     }
 
     private static class MockConnectionPoolFactory extends JdbcConnectionPoolFactory {

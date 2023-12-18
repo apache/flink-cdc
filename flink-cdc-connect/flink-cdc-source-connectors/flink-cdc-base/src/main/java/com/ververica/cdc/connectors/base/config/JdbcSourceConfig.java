@@ -69,7 +69,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             int connectMaxRetries,
             int connectionPoolSize,
             String chunkKeyColumn,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            boolean scanNewlyAddedTableEnabled) {
         super(
                 startupOptions,
                 splitSize,
@@ -80,7 +81,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
                 closeIdleReaders,
                 skipSnapshotBackfill,
                 dbzProperties,
-                dbzConfiguration);
+                dbzConfiguration,
+                scanNewlyAddedTableEnabled);
         this.driverClassName = driverClassName;
         this.hostname = hostname;
         this.port = port;

@@ -20,6 +20,7 @@ import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 
+import com.ververica.cdc.connectors.base.source.assigner.AssignerStatus;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
@@ -42,7 +43,7 @@ import static com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSer
 /** The {@link SimpleVersionedSerializer Serializer} for the {@link PendingSplitsState}. */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
-    private static final int VERSION = 5;
+    private static final int VERSION = 6;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -102,6 +103,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             case 3:
             case 4:
             case 5:
+            case 6:
                 return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -152,7 +154,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         writeRemainingSplits(state.getRemainingSplits(), out);
         writeAssignedSnapshotSplits(state.getAssignedSplits(), out);
         writeFinishedOffsets(state.getSplitFinishedOffsets(), out);
-        out.writeBoolean(state.isAssignerFinished());
+        out.writeInt(state.getSnapshotAssignerStatus().getStatusCode());
         writeTableIds(state.getRemainingTables(), out);
         out.writeBoolean(state.isTableIdCaseSensitive());
         writeTableSchemas(state.getTableSchemas(), out);
@@ -198,14 +200,20 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                                     entry.getKey(), entry.getValue().toSchemalessSnapshotSplit());
                         });
         Map<String, Offset> finishedOffsets = readFinishedOffsets(splitVersion, in);
+        AssignerStatus assignerStatus;
         boolean isAssignerFinished = in.readBoolean();
+        if (isAssignerFinished) {
+            assignerStatus = AssignerStatus.INITIAL_ASSIGNING_FINISHED;
+        } else {
+            assignerStatus = AssignerStatus.INITIAL_ASSIGNING;
+        }
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
                 remainingSchemalessSplits,
                 assignedSchemalessSnapshotSplits,
                 tableSchemas,
                 finishedOffsets,
-                isAssignerFinished,
+                assignerStatus,
                 new ArrayList<>(),
                 false,
                 false);
@@ -226,7 +234,17 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         Map<String, SnapshotSplit> assignedSnapshotSplits =
                 readAssignedSnapshotSplits(splitVersion, in);
         Map<String, Offset> finishedOffsets = readFinishedOffsets(splitVersion, in);
-        boolean isAssignerFinished = in.readBoolean();
+        AssignerStatus assignerStatus;
+        if (version >= 6) {
+            assignerStatus = AssignerStatus.fromStatusCode(in.readInt());
+        } else {
+            boolean isAssignerFinished = in.readBoolean();
+            if (isAssignerFinished) {
+                assignerStatus = AssignerStatus.INITIAL_ASSIGNING_FINISHED;
+            } else {
+                assignerStatus = AssignerStatus.INITIAL_ASSIGNING;
+            }
+        }
         List<TableId> remainingTableIds = readTableIds(version, in);
         boolean isTableIdCaseSensitive = in.readBoolean();
         final List<SchemalessSnapshotSplit> remainingSchemalessSplits = new ArrayList<>();
@@ -255,7 +273,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 assignedSchemalessSnapshotSplits,
                 tableSchemas,
                 finishedOffsets,
-                isAssignerFinished,
+                assignerStatus,
                 remainingTableIds,
                 isTableIdCaseSensitive,
                 true);
