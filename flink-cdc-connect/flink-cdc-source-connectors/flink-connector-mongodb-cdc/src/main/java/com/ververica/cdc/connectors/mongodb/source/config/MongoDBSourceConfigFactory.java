@@ -164,6 +164,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         checkNotNull(startupOptions);
         switch (startupOptions.startupMode) {
             case INITIAL:
+            case SNAPSHOT:
             case LATEST_OFFSET:
             case TIMESTAMP:
                 this.startupOptions = startupOptions;
