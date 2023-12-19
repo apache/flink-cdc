@@ -206,6 +206,10 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
 
             LOG.info("Execute StreamSplitReadTask for split: {}", streamSplit);
 
+            // If setStreamingStoppingLsn during the streaming phase, any event with an LSN less
+            // than the stopping LSN will be processed and once the stopping LSN is reached, the
+            // streaming phase will end.
+            // Thus, PostgresStreamFetchTask determined bounded after super.execute()
             offsetContext.setStreamingStoppingLsn(
                     ((PostgresOffset) streamSplit.getEndingOffset()).getLsn());
             super.execute(context, partition, offsetContext);

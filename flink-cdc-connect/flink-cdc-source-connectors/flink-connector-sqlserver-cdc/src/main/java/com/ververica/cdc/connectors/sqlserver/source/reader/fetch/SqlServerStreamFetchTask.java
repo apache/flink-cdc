@@ -24,7 +24,6 @@ import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.sqlserver.source.offset.LsnOffset;
 import io.debezium.DebeziumException;
-import io.debezium.connector.sqlserver.Lsn;
 import io.debezium.connector.sqlserver.SqlServerConnection;
 import io.debezium.connector.sqlserver.SqlServerConnectorConfig;
 import io.debezium.connector.sqlserver.SqlServerDatabaseSchema;
@@ -120,11 +119,20 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
             this.errorHandler = errorHandler;
         }
 
+        private boolean isBoundedRead() {
+            return !NO_STOPPING_OFFSET.equals(lsnSplit.getEndingOffset());
+        }
+
         @Override
-        public void afterHandleLsn(SqlServerPartition partition, Lsn toLsn) {
+        public boolean executeIteration(
+                ChangeEventSourceContext context,
+                SqlServerPartition partition,
+                SqlServerOffsetContext offsetContext)
+                throws InterruptedException {
+            this.context = context;
             // check do we need to stop for fetch binlog for snapshot split.
             if (isBoundedRead()) {
-                LsnOffset currentLsnOffset = new LsnOffset(null, toLsn, null);
+                LsnOffset currentLsnOffset = LsnOffset.of(offsetContext.getOffset());
                 Offset endingOffset = lsnSplit.getEndingOffset();
                 if (currentLsnOffset.isAtOrAfter(endingOffset)) {
                     // send streaming end event
@@ -145,20 +153,8 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                             .finished();
                 }
             }
-        }
 
-        private boolean isBoundedRead() {
-            return !NO_STOPPING_OFFSET.equals(lsnSplit.getEndingOffset());
-        }
-
-        @Override
-        public void execute(
-                ChangeEventSourceContext context,
-                SqlServerPartition partition,
-                SqlServerOffsetContext offsetContext)
-                throws InterruptedException {
-            this.context = context;
-            super.execute(context, partition, offsetContext);
+            return super.executeIteration(context, partition, offsetContext);
         }
     }
 

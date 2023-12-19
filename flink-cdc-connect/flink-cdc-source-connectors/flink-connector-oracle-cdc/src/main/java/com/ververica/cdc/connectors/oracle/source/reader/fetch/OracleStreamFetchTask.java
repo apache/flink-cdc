@@ -125,18 +125,12 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
         }
 
         @Override
-        public void execute(
+        public boolean executeIteration(
                 ChangeEventSourceContext context,
                 OraclePartition partition,
-                OracleOffsetContext offsetContext) {
+                OracleOffsetContext offsetContext)
+                throws InterruptedException {
             this.context = context;
-            super.execute(context, partition, offsetContext);
-        }
-
-        @Override
-        protected void afterHandleScn(
-                OraclePartition partition, OracleOffsetContext offsetContext) {
-            super.afterHandleScn(partition, offsetContext);
             // check do we need to stop for fetch redo log for snapshot split.
             if (isBoundedRead()) {
                 final RedoLogOffset currentRedoLogOffset =
@@ -161,6 +155,7 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                             .finished();
                 }
             }
+            return super.executeIteration(context, partition, offsetContext);
         }
 
         private boolean isBoundedRead() {

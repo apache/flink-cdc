@@ -171,10 +171,6 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                     }
                 }
 
-                if (changeRecord != null) {
-                    queue.enqueue(new DataChangeEvent(changeRecord));
-                }
-
                 if (isBoundedRead()) {
                     ChangeStreamOffset currentOffset;
                     if (changeRecord != null) {
@@ -198,6 +194,10 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                         queue.enqueue(new DataChangeEvent(watermark));
                         break;
                     }
+                }
+
+                if (changeRecord != null) {
+                    queue.enqueue(new DataChangeEvent(changeRecord));
                 }
             }
         } catch (Exception e) {

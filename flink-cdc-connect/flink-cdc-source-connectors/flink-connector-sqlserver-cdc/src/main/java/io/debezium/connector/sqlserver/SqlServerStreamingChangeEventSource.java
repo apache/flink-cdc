@@ -37,9 +37,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Copied from Debezium project(1.9.7.final) to add method {@link
- * SqlServerStreamingChangeEventSource#afterHandleLsn(SqlServerPartition, Lsn)}. Also implemented
- * {@link SqlServerStreamingChangeEventSource#execute( ChangeEventSourceContext, SqlServerPartition,
+ * Copied from Debezium project(1.9.7.final) to implemented {@link
+ * SqlServerStreamingChangeEventSource#execute( ChangeEventSourceContext, SqlServerPartition,
  * SqlServerOffsetContext)}. A {@link StreamingChangeEventSource} based on SQL Server change data
  * capture functionality. A main loop polls database DDL change and change data tables and turns
  * them into change events.
@@ -448,8 +447,6 @@ public class SqlServerStreamingChangeEventSource
                             TxLogPosition.valueOf(toLsn));
                     // Terminate the transaction otherwise CDC could not be disabled for tables
                     dataConnection.rollback();
-                    // Determine whether to continue streaming in sqlserver cdc snapshot phase
-                    afterHandleLsn(partition, toLsn);
                 } catch (SQLException e) {
                     tablesSlot.set(
                             processErrorFromChangeTableQuery(databaseName, e, tablesSlot.get()));
@@ -623,10 +620,5 @@ public class SqlServerStreamingChangeEventSource
 
         return connection.getNthTransactionLsnFromLast(
                 databaseName, fromLsn, maxTransactionsPerIteration);
-    }
-
-    /** expose control to the user to stop the connector. */
-    protected void afterHandleLsn(SqlServerPartition partition, Lsn toLsn) {
-        // do nothing
     }
 }

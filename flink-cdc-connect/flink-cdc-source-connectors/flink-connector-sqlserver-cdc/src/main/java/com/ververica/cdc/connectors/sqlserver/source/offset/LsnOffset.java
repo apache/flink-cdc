@@ -31,6 +31,10 @@ public class LsnOffset extends Offset {
     public static final LsnOffset NO_STOPPING_OFFSET =
             new LsnOffset(Lsn.valueOf(new byte[] {Byte.MAX_VALUE}));
 
+    public LsnOffset(Map<String, String> offset) {
+        this.offset = offset;
+    }
+
     public LsnOffset(Lsn scn, Lsn commitScn, Long eventSerialNo) {
         Map<String, String> offsetMap = new HashMap<>();
 
@@ -49,6 +53,16 @@ public class LsnOffset extends Offset {
 
     public LsnOffset(Lsn changeLsn) {
         this(changeLsn, null, null);
+    }
+
+    public static LsnOffset of(Map<String, ?> offsetMap) {
+        Map<String, String> offsetStrMap = new HashMap<>();
+        for (Map.Entry<String, ?> entry : offsetMap.entrySet()) {
+            offsetStrMap.put(
+                    entry.getKey(), entry.getValue() == null ? null : entry.getValue().toString());
+        }
+
+        return new LsnOffset(offsetStrMap);
     }
 
     @Override
