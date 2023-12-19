@@ -1,4 +1,4 @@
-# Doris Pipeline
+# Doris Pipeline 连接器
 
 本文介绍了Pipeline Doris Connector的使用
 
