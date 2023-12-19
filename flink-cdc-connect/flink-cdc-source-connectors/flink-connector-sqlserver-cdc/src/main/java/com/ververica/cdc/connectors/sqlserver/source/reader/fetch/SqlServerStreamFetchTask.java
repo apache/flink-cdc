@@ -151,6 +151,7 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                     ((SqlServerScanFetchTask.SqlserverSnapshotSplitChangeEventSourceContext)
                                     context)
                             .finished();
+                    return true;
                 }
             }
 

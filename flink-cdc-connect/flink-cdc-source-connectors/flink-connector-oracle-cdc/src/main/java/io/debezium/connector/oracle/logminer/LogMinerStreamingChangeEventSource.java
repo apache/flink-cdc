@@ -63,7 +63,7 @@ import static io.debezium.connector.oracle.logminer.LogMinerHelper.logError;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.setLogFilesForMining;
 
 /**
- * Copied from Debezium 1.9.7. Diff: added afterHandleScn() method. A {@link
+ * Copied from Debezium 1.9.7. Diff: added beforeHandleScn() method. A {@link
  * StreamingChangeEventSource} based on Oracle's LogMiner utility. The event handler loop is
  * executed in a separate executor.
  */
@@ -238,6 +238,7 @@ public class LogMinerStreamingChangeEventSource
                             sw = Stopwatch.accumulating().start();
                         }
 
+                        beforeHandleScn(partition, offsetContext);
                         if (context.isRunning()) {
                             if (!startMiningSession(
                                     jdbcConnection, startScn, endScn, retryAttempts)) {
@@ -251,8 +252,6 @@ public class LogMinerStreamingChangeEventSource
                             }
                             pauseBetweenMiningSessions();
                         }
-
-                        afterHandleScn(partition, offsetContext);
                     }
                 }
             }
@@ -266,7 +265,7 @@ public class LogMinerStreamingChangeEventSource
         }
     }
 
-    protected void afterHandleScn(OraclePartition partition, OracleOffsetContext offsetContext) {}
+    protected void beforeHandleScn(OraclePartition partition, OracleOffsetContext offsetContext) {}
 
     /**
      * Computes the start SCN for the first mining session.

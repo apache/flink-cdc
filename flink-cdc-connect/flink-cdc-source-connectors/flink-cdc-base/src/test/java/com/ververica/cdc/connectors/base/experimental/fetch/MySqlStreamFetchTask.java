@@ -134,7 +134,6 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
         @Override
         protected void handleEvent(
                 MySqlPartition partition, MySqlOffsetContext offsetContext, Event event) {
-            super.handleEvent(partition, offsetContext, event);
             // check do we need to stop for fetch binlog for snapshot split.
             if (isBoundedRead()) {
                 final BinlogOffset currentBinlogOffset =
@@ -156,8 +155,10 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
                     // tell fetcher the binlog task finished
                     ((MySqlScanFetchTask.MysqlSnapshotSplitChangeEventSourceContext) context)
                             .finished();
+                    return;
                 }
             }
+            super.handleEvent(partition, offsetContext, event);
         }
 
         private boolean isBoundedRead() {

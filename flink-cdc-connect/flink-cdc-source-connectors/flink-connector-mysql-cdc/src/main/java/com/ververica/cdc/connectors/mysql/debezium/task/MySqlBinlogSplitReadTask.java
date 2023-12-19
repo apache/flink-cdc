@@ -109,6 +109,7 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
                 }
                 // tell reader the binlog task finished
                 ((SnapshotBinlogSplitChangeEventSourceContextImpl) context).finished();
+                return;
             }
         }
 
