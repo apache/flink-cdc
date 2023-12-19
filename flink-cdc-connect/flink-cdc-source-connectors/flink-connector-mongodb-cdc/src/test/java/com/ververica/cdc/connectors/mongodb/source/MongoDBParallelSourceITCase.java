@@ -67,6 +67,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     private static final int USE_POST_LOWWATERMARK_HOOK = 1;
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
+    private static final int USE_POST_HIGHWATERMARK_HOOK = 3;
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
@@ -150,8 +151,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     @Test
     public void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
 
-        List<String> records =
-                testBackfillWhenWritingEvents(false, 21, USE_PRE_HIGHWATERMARK_HOOK, false);
+        List<String> records = testBackfillWhenWritingEvents(false, 21, USE_PRE_HIGHWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -184,8 +184,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     @Test
     public void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
 
-        List<String> records =
-                testBackfillWhenWritingEvents(false, 21, USE_POST_LOWWATERMARK_HOOK, false);
+        List<String> records = testBackfillWhenWritingEvents(false, 21, USE_POST_LOWWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -216,10 +215,45 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
+    public void testEnableBackfillWithDMLPostHighWaterMark() throws Exception {
 
         List<String> records =
-                testBackfillWhenWritingEvents(true, 24, USE_PRE_HIGHWATERMARK_HOOK, false);
+                testBackfillWhenWritingEvents(false, 24, USE_POST_HIGHWATERMARK_HOOK);
+        List<String> expectedRecords =
+                Arrays.asList(
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[109, user_4, Shanghai, 123567891234]",
+                        "+I[110, user_5, Shanghai, 123567891234]",
+                        "+I[111, user_6, Shanghai, 123567891234]",
+                        "+I[118, user_7, Shanghai, 123567891234]",
+                        "+I[121, user_8, Shanghai, 123567891234]",
+                        "+I[123, user_9, Shanghai, 123567891234]",
+                        "+I[1009, user_10, Shanghai, 123567891234]",
+                        "+I[1010, user_11, Shanghai, 123567891234]",
+                        "+I[1011, user_12, Shanghai, 123567891234]",
+                        "+I[1012, user_13, Shanghai, 123567891234]",
+                        "+I[1013, user_14, Shanghai, 123567891234]",
+                        "+I[1014, user_15, Shanghai, 123567891234]",
+                        "+I[1015, user_16, Shanghai, 123567891234]",
+                        "+I[1016, user_17, Shanghai, 123567891234]",
+                        "+I[1017, user_18, Shanghai, 123567891234]",
+                        "+I[1018, user_19, Shanghai, 123567891234]",
+                        "+I[1019, user_20, Shanghai, 123567891234]",
+                        "+I[2000, user_21, Shanghai, 123567891234]",
+                        "+I[15213, user_15213, Shanghai, 123567891234]",
+                        "+U[2000, user_21, Pittsburgh, 123567891234]",
+                        // delete message only contains _id, sql job contain value because of
+                        // changelog normalization
+                        "-D[0, null, null, null]");
+        assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    @Test
+    public void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
+
+        List<String> records = testBackfillWhenWritingEvents(true, 24, USE_PRE_HIGHWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -257,8 +291,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     @Test
     public void testSkipBackfillWithDMLPostLowWaterMark() throws Exception {
 
-        List<String> records =
-                testBackfillWhenWritingEvents(true, 24, USE_POST_LOWWATERMARK_HOOK, false);
+        List<String> records = testBackfillWhenWritingEvents(true, 24, USE_POST_LOWWATERMARK_HOOK);
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -295,8 +328,7 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     }
 
     private List<String> testBackfillWhenWritingEvents(
-            boolean skipBackFill, int fetchSize, int hookType, boolean enableFullDocPrePostImage)
-            throws Exception {
+            boolean skipBackFill, int fetchSize, int hookType) throws Exception {
         String customerDatabase = CONTAINER.executeCommandFileInSeparateDatabase("customer");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(1000);
@@ -319,11 +351,11 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                         .username(FLINK_USER)
                         .password(FLINK_USER_PASSWORD)
                         .startupOptions(StartupOptions.initial())
-                        .scanFullChangelog(enableFullDocPrePostImage)
+                        .scanFullChangelog(false)
                         .collectionList(
                                 getCollectionNameRegex(
                                         customerDatabase, new String[] {"customers"}))
-                        .deserializer(customerTable.getDeserializer(enableFullDocPrePostImage))
+                        .deserializer(customerTable.getDeserializer(false))
                         .skipSnapshotBackfill(skipBackFill)
                         .build();
 
@@ -347,10 +379,16 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                     mongoCollection.deleteOne(Filters.eq("cid", 1019L));
                 };
 
-        if (hookType == USE_POST_LOWWATERMARK_HOOK) {
-            hooks.setPostLowWatermarkAction(snapshotPhaseHook);
-        } else if (hookType == USE_PRE_HIGHWATERMARK_HOOK) {
-            hooks.setPreHighWatermarkAction(snapshotPhaseHook);
+        switch (hookType) {
+            case USE_POST_LOWWATERMARK_HOOK:
+                hooks.setPostLowWatermarkAction(snapshotPhaseHook);
+                break;
+            case USE_PRE_HIGHWATERMARK_HOOK:
+                hooks.setPreHighWatermarkAction(snapshotPhaseHook);
+                break;
+            case USE_POST_HIGHWATERMARK_HOOK:
+                hooks.setPostHighWatermarkAction(snapshotPhaseHook);
+                break;
         }
         source.setSnapshotHooks(hooks);
 
