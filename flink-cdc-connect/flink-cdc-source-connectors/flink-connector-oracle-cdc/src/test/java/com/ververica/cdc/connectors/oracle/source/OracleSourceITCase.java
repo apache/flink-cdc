@@ -275,7 +275,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         env.enableCheckpointing(200L);
         env.setParallelism(1);
 
-        ResolvedSchema customersSchame =
+        ResolvedSchema customersSchema =
                 new ResolvedSchema(
                         Arrays.asList(
                                 physical("ID", BIGINT().notNull()),
@@ -285,7 +285,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                         new ArrayList<>(),
                         UniqueConstraint.primaryKey("pk", Collections.singletonList("ID")));
         TestTable customerTable =
-                new TestTable(ORACLE_DATABASE, ORACLE_SCHEMA, "CUSTOMERS", customersSchame);
+                new TestTable(ORACLE_DATABASE, ORACLE_SCHEMA, "CUSTOMERS", customersSchema);
         String tableId = customerTable.getTableId();
 
         OracleSourceBuilder.OracleIncrementalSource source =
@@ -326,9 +326,6 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                     try (OracleConnection oracleConnection =
                             OracleConnectionUtils.createOracleConnection(configuration)) {
                         oracleConnection.execute(statements);
-                        Thread.sleep(500L);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
                     }
                 };
 
