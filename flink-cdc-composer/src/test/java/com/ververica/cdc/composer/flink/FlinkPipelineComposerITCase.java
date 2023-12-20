@@ -130,7 +130,7 @@ class FlinkPipelineComposerITCase {
                         "default_namespace.default_schema.table1:col1=3;newCol3=");
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(System.getProperty("line.separator"));
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
@@ -190,7 +190,7 @@ class FlinkPipelineComposerITCase {
                         "default_namespace.default_schema.table2:col1=3;col2=3");
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(System.getProperty("line.separator"));
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
