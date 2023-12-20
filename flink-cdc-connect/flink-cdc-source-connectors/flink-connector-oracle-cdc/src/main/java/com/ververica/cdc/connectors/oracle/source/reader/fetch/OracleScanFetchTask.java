@@ -31,7 +31,6 @@ import io.debezium.connector.oracle.logminer.LogMinerOracleOffsetContextLoader;
 import io.debezium.heartbeat.Heartbeat;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
-import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
 import io.debezium.pipeline.spi.SnapshotResult;
@@ -75,8 +74,8 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                         sourceFetchContext.getConnection(),
                         sourceFetchContext.getDispatcher(),
                         snapshotSplit);
-        OracleSnapshotRedoLogSplitChangeEventSourceContext changeEventSourceContext =
-                new OracleSnapshotRedoLogSplitChangeEventSourceContext();
+        StoppableChangeEventSourceContext changeEventSourceContext =
+                new StoppableChangeEventSourceContext();
         SnapshotResult<OracleOffsetContext> snapshotResult =
                 snapshotSplitReadTask.execute(
                         changeEventSourceContext,
@@ -103,7 +102,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
         final OracleOffsetContext oracleOffsetContext =
                 loader.load(backfillStreamSplit.getStartingOffset().getOffset());
         backfillRedoLogReadTask.execute(
-                new OracleSnapshotRedoLogSplitChangeEventSourceContext(),
+                new StoppableChangeEventSourceContext(),
                 sourceFetchContext.getPartition(),
                 oracleOffsetContext);
     }
@@ -332,23 +331,6 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
 
         private Threads.Timer getTableScanLogTimer() {
             return Threads.timer(clock, LOG_INTERVAL);
-        }
-    }
-
-    /**
-     * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for bounded redo log
-     * task of a snapshot split task.
-     */
-    public class OracleSnapshotRedoLogSplitChangeEventSourceContext
-            implements ChangeEventSource.ChangeEventSourceContext {
-
-        public void finished() {
-            taskRunning = false;
-        }
-
-        @Override
-        public boolean isRunning() {
-            return taskRunning;
         }
     }
 }
