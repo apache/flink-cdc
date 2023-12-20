@@ -26,6 +26,7 @@ services:
     network_mode: "host"
   oblogproxy:
     image: whhe/oblogproxy:1.1.3_4x
+    container_name: oblogproxy
     environment:
       - 'OB_SYS_USERNAME=root'
       - 'OB_SYS_PASSWORD=pswd'
