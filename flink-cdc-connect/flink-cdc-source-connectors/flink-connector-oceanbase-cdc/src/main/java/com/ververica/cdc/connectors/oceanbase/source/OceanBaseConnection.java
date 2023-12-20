@@ -20,19 +20,25 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /** {@link JdbcConnection} extension to be used with OceanBase server. */
 public class OceanBaseConnection extends JdbcConnection {
+
+    private static final Logger LOG = LoggerFactory.getLogger(OceanBaseConnection.class);
 
     private static final String QUOTED_CHARACTER = "`";
     private static final Properties DEFAULT_JDBC_PROPERTIES = initializeDefaultJdbcProperties();
@@ -105,20 +111,42 @@ public class OceanBaseConnection extends JdbcConnection {
                 formatJdbcUrl(jdbcDriver, jdbcProperties), jdbcDriver, classLoader);
     }
 
-    private String getSystemSchema() {
-        return "mysql".equalsIgnoreCase(compatibleMode) ? "oceanbase" : "SYS";
-    }
-
     /**
-     * Get current timestamp in nanoseconds from GTS (Global Timestamp Service).
+     * Get current timestamp number in seconds.
      *
-     * @return the global timestamp.
+     * @return current timestamp number.
      * @throws SQLException If a database access error occurs.
      */
-    public Long getGlobalTimestamp() throws SQLException {
+    public long getCurrentTimestampS() throws SQLException {
+        try {
+            long globalTimestamp = getGlobalTimestamp();
+            LOG.info("Global timestamp: {}", globalTimestamp);
+            return Long.parseLong(String.valueOf(globalTimestamp).substring(0, 10));
+        } catch (Exception e) {
+            LOG.warn("Failed to get global timestamp, use local timestamp instead");
+        }
+        return getCurrentTimestamp()
+                .orElseThrow(IllegalStateException::new)
+                .toInstant()
+                .getEpochSecond();
+    }
+
+    private long getGlobalTimestamp() throws SQLException {
+        String schema = "mysql".equalsIgnoreCase(compatibleMode) ? "oceanbase" : "SYS";
+        return querySingleValue(
+                connection(),
+                "SELECT TS_VALUE FROM " + schema + ".V$OB_TIMESTAMP_SERVICE",
+                ps -> {},
+                rs -> rs.getLong(1));
+    }
+
+    @Override
+    public Optional<Timestamp> getCurrentTimestamp() throws SQLException {
         return queryAndMap(
-                String.format("SELECT TS_VALUE FROM %s.V$OB_TIMESTAMP_SERVICE", getSystemSchema()),
-                rs -> rs.next() ? rs.getLong(1) : null);
+                "mysql".equalsIgnoreCase(compatibleMode)
+                        ? "SELECT CURRENT_TIMESTAMP"
+                        : "SELECT CURRENT_TIMESTAMP FROM DUAL",
+                rs -> rs.next() ? Optional.of(rs.getTimestamp(1)) : Optional.empty());
     }
 
     /**
