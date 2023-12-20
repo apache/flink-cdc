@@ -55,6 +55,8 @@ class FlinkPipelineComposerITCase {
     private static final org.apache.flink.configuration.Configuration MINI_CLUSTER_CONFIG =
             new org.apache.flink.configuration.Configuration();
 
+    private static final String LINE_SEPARATOR = System.getProperty("line.separator");
+
     static {
         MINI_CLUSTER_CONFIG.set(
                 ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL,
@@ -130,7 +132,7 @@ class FlinkPipelineComposerITCase {
                         "default_namespace.default_schema.table1:col1=3;newCol3=");
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split(System.getProperty("line.separator"));
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
@@ -190,7 +192,7 @@ class FlinkPipelineComposerITCase {
                         "default_namespace.default_schema.table2:col1=3;col2=3");
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split(System.getProperty("line.separator"));
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
