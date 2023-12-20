@@ -74,7 +74,7 @@ under the License.
         <flink.version>1.18.0</flink.version>
         <flink.major.version>1.18</flink.major.version>
         <flink.shaded.version>17.0</flink.shaded.version>
-        <debezium.version>1.9.7.Final</debezium.version>
+        <debezium.version>1.9.8.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
         <geometry.version>2.2.0</geometry.version>
         <testcontainers.version>1.18.3</testcontainers.version>

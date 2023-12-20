@@ -36,7 +36,7 @@ flink 1.17.2  flink mysql cdc 2.4.2
         <flink.version>1.17.2</flink.version>
         <slf4j.version>1.7.15</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
-        <debezium.version>1.9.7.Final</debezium.version>
+        <debezium.version>1.9.8.Final</debezium.version>
     </properties>
     <dependencies>
         <dependency>
