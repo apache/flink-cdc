@@ -48,7 +48,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-import java.util.Map;
 import java.util.Optional;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.CLUSTER_TIME_FIELD;
@@ -170,8 +169,7 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                             LOG.info("Ignored {} record: {}", operationType, changeStreamDocument);
                     }
                 }
-
-                if (changeRecord != null) {
+                if (changeRecord != null && !isBoundedRead()) {
                     queue.enqueue(new DataChangeEvent(changeRecord));
                 }
 
@@ -179,6 +177,11 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                     ChangeStreamOffset currentOffset;
                     if (changeRecord != null) {
                         currentOffset = new ChangeStreamOffset(getResumeToken(changeRecord));
+                        // The log after the high watermark won't emit.
+                        if (currentOffset.isAtOrBefore(streamSplit.getEndingOffset())) {
+                            queue.enqueue(new DataChangeEvent(changeRecord));
+                        }
+
                     } else {
                         // Heartbeat is not turned on or there is no update event
                         currentOffset = new ChangeStreamOffset(getCurrentClusterTime(mongoClient));
@@ -227,8 +230,7 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     private MongoChangeStreamCursor<BsonDocument> openChangeStreamCursor(
             ChangeStreamDescriptor changeStreamDescriptor) {
         ChangeStreamOffset offset =
-                new ChangeStreamOffset(
-                        (Map<String, String>) streamSplit.getStartingOffset().getOffset());
+                new ChangeStreamOffset(streamSplit.getStartingOffset().getOffset());
         ChangeStreamIterable<Document> changeStreamIterable =
                 getChangeStreamIterable(sourceConfig, changeStreamDescriptor);
 
