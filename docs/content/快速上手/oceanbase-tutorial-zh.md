@@ -12,16 +12,20 @@
 
 配置 `docker-compose.yml`。
 
+*注意*：本示例需要使用`host`网络，所以只能在 Linux 系统上运行，更多信息见 [network-tutorial-host](https://docs.docker.com/network/network-tutorial-host/)。
+
 ```yaml
 version: '2.1'
 services:
   observer:
-    image: oceanbase/oceanbase-ce:4.0.0.0
+    image: oceanbase/oceanbase-ce:4.2.0.0
     container_name: observer
+    environment:
+      - 'MODE=slim'
+      - 'OB_ROOT_PASSWORD=pswd'
     network_mode: "host"
   oblogproxy:
-    image: whhe/oblogproxy:1.1.0_4x
-    container_name: oblogproxy
+    image: whhe/oblogproxy:1.1.3_4x
     environment:
       - 'OB_SYS_USERNAME=root'
       - 'OB_SYS_PASSWORD=pswd'
@@ -60,20 +64,6 @@ docker-compose up -d
 ```
 
 ### 设置密码
-
-OceanBase 中 root 用户默认是没有密码的，但是 oblogproxy 需要配置一个使用非空密码的系统租户用户，因此这里我们需要先为 root@sys 用户设置一个密码。
-
-登陆 sys 租户的 root 用户：
-
-```shell
-docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@sys
-```
-
-设置密码，注意这里的密码需要与上一步中 oblogproxy 服务的环境变量 'OB_SYS_PASSWORD' 保持一样。
-
-```mysql
-ALTER USER root IDENTIFIED BY 'pswd';
-```
 
 OceanBase 从社区版 4.0.0.0 开始只支持对非 sys 租户的增量数据拉取，这里我们使用 test 租户的 root 用户作为示例。
 
