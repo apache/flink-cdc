@@ -152,11 +152,7 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
             initTableWhiteList();
 
             if (shouldReadSnapshot()) {
-                Long globalTimestamp = getSnapshotConnection().getGlobalTimestamp();
-                if (globalTimestamp == null || globalTimestamp <= 0) {
-                    throw new RuntimeException("Got invalid global timestamp: " + globalTimestamp);
-                }
-                long startTimestamp = globalTimestamp / 1000_000_000;
+                long startTimestamp = getSnapshotConnection().getCurrentTimestampS();
                 LOG.info("Snapshot reading started from timestamp: {}", startTimestamp);
                 readSnapshotRecords();
                 LOG.info("Snapshot reading finished");
