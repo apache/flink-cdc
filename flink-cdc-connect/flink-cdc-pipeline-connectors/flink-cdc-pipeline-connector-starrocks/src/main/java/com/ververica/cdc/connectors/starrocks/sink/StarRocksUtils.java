@@ -76,6 +76,7 @@ public class StarRocksUtils {
             }
         }
 
+        int primaryKeyCount = schema.primaryKeys().size();
         List<StarRocksColumn> starRocksColumns = new ArrayList<>();
         for (int i = 0; i < orderedColumns.size(); i++) {
             Column column = orderedColumns.get(i);
@@ -84,7 +85,7 @@ public class StarRocksUtils {
                             .setColumnName(column.getName())
                             .setOrdinalPosition(i)
                             .setColumnComment(column.getComment());
-            toStarRocksDataType(column, builder);
+            toStarRocksDataType(column, i < primaryKeyCount, builder);
             starRocksColumns.add(builder.build());
         }
 
@@ -106,8 +107,10 @@ public class StarRocksUtils {
     }
 
     /** Convert CDC data type to StarRocks data type. */
-    public static void toStarRocksDataType(Column cdcColumn, StarRocksColumn.Builder builder) {
-        CdcDataTypeTransformer dataTypeTransformer = new CdcDataTypeTransformer(builder);
+    public static void toStarRocksDataType(
+            Column cdcColumn, boolean isPrimaryKeys, StarRocksColumn.Builder builder) {
+        CdcDataTypeTransformer dataTypeTransformer =
+                new CdcDataTypeTransformer(isPrimaryKeys, builder);
         cdcColumn.getType().accept(dataTypeTransformer);
     }
 
@@ -236,8 +239,10 @@ public class StarRocksUtils {
             extends DataTypeDefaultVisitor<StarRocksColumn.Builder> {
 
         private final StarRocksColumn.Builder builder;
+        private final boolean isPrimaryKeys;
 
-        public CdcDataTypeTransformer(StarRocksColumn.Builder builder) {
+        public CdcDataTypeTransformer(boolean isPrimaryKeys, StarRocksColumn.Builder builder) {
+            this.isPrimaryKeys = isPrimaryKeys;
             this.builder = builder;
         }
 
@@ -309,7 +314,11 @@ public class StarRocksUtils {
             // varchar type
             int length = charType.getLength();
             long starRocksLength = length * 3L;
-            if (starRocksLength <= MAX_CHAR_SIZE) {
+            // In the StarRocks, The primary key columns can be any of the following data types:
+            // BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, LARGEINT, STRING, VARCHAR, DATE, and
+            // DATETIME, But it doesn't include CHAR. When a char type appears in the primary key of
+            // MySQL, creating a table in StarRocks requires conversion to varchar type.
+            if (starRocksLength <= MAX_CHAR_SIZE && !isPrimaryKeys) {
                 builder.setDataType(CHAR);
                 builder.setNullable(charType.isNullable());
                 builder.setColumnSize((int) starRocksLength);
