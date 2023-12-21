@@ -16,13 +16,11 @@
 
 package com.ververica.cdc.connectors.oracle.source.reader.fetch;
 
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
-import com.ververica.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
-import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
-import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
@@ -31,18 +29,15 @@ import io.debezium.connector.oracle.OracleOffsetContext;
 import io.debezium.connector.oracle.OraclePartition;
 import io.debezium.connector.oracle.OracleStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.logminer.LogMinerStreamingChangeEventSource;
+import io.debezium.connector.oracle.logminer.processor.LogMinerEventProcessor;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import static com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset.NO_STOPPING_OFFSET;
-
 /** The task to work for fetching data of Oracle table stream split. */
+@Internal
 public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
 
     private final StreamSplit split;
@@ -100,6 +95,12 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
         private final JdbcSourceEventDispatcher<OraclePartition> dispatcher;
         private final ErrorHandler errorHandler;
         private ChangeEventSourceContext context;
+        private final OracleConnectorConfig connectorConfig;
+        private final OracleConnection connection;
+
+        private final OracleDatabaseSchema schema;
+
+        private final OracleStreamingChangeEventSourceMetrics metrics;
 
         public RedoLogSplitReadTask(
                 OracleConnectorConfig connectorConfig,
@@ -122,6 +123,10 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
             this.redoLogSplit = redoLogSplit;
             this.dispatcher = dispatcher;
             this.errorHandler = errorHandler;
+            this.connectorConfig = connectorConfig;
+            this.connection = connection;
+            this.metrics = metrics;
+            this.schema = schema;
         }
 
         @Override
@@ -133,48 +138,26 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
             super.execute(context, partition, offsetContext);
         }
 
+        /**
+         * Delegate {@link EventProcessorFactory} to produce a LogMinerEventProcessor with enhanced
+         * processRow method to distinguish whether is bounded.
+         */
         @Override
-        protected void afterHandleScn(
-                OraclePartition partition, OracleOffsetContext offsetContext) {
-            super.afterHandleScn(partition, offsetContext);
-            // check do we need to stop for fetch redo log for snapshot split.
-            if (isBoundedRead()) {
-                final RedoLogOffset currentRedoLogOffset =
-                        getCurrentRedoLogOffset(offsetContext.getOffset());
-                // reach the high watermark, the redo log fetcher should be finished
-                if (currentRedoLogOffset.isAtOrAfter(redoLogSplit.getEndingOffset())) {
-                    // send redo log end event
-                    try {
-                        dispatcher.dispatchWatermarkEvent(
-                                partition.getSourcePartition(),
-                                redoLogSplit,
-                                currentRedoLogOffset,
-                                WatermarkKind.END);
-                    } catch (InterruptedException e) {
-                        LOG.error("Send signal event error.", e);
-                        errorHandler.setProducerThrowable(
-                                new DebeziumException("Error processing redo log signal event", e));
-                    }
-                    // tell fetcher the redo log task finished
-                    ((OracleScanFetchTask.OracleSnapshotRedoLogSplitChangeEventSourceContext)
-                                    context)
-                            .finished();
-                }
-            }
-        }
-
-        private boolean isBoundedRead() {
-            return !NO_STOPPING_OFFSET.equals(redoLogSplit.getEndingOffset());
-        }
-
-        public static RedoLogOffset getCurrentRedoLogOffset(Map<String, ?> offset) {
-            Map<String, String> offsetStrMap = new HashMap<>();
-            for (Map.Entry<String, ?> entry : offset.entrySet()) {
-                offsetStrMap.put(
-                        entry.getKey(),
-                        entry.getValue() == null ? null : entry.getValue().toString());
-            }
-            return new RedoLogOffset(offsetStrMap);
+        protected LogMinerEventProcessor createProcessor(
+                ChangeEventSourceContext context,
+                OraclePartition partition,
+                OracleOffsetContext offsetContext) {
+            return EventProcessorFactory.createProcessor(
+                    context,
+                    connectorConfig,
+                    connection,
+                    dispatcher,
+                    partition,
+                    offsetContext,
+                    schema,
+                    metrics,
+                    errorHandler,
+                    redoLogSplit);
         }
     }
 
