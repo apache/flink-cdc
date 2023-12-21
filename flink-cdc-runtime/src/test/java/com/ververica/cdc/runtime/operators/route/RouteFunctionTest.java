@@ -191,4 +191,17 @@ class RouteFunctionTest {
                 .containsTypeMapping(typeMapping)
                 .hasTableId(NEW_CUSTOMERS);
     }
+
+    @Test
+    void testSchemaChangeRouting() throws Exception {
+        // The test only modified schema and the table name remains unchanged
+        TableId route = TableId.tableId("my_new_company", "my_new_branch", "<>");
+        TableId target = TableId.tableId("my_new_company", "my_new_branch", "customers");
+        RouteFunction router =
+                RouteFunction.newBuilder().addRoute("my_company.my_branch.\\.*", route).build();
+        router.open(new Configuration());
+        // CreateTableEvent
+        CreateTableEvent createTableEvent = new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA);
+        assertThat(router.map(createTableEvent)).asSchemaChangeEvent().hasTableId(target);
+    }
 }

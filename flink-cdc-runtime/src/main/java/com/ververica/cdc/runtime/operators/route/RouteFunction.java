@@ -96,6 +96,15 @@ public class RouteFunction extends RichMapFunction<Event, Event> {
             Selectors selectors = route.f0;
             TableId replaceBy = route.f1;
             if (selectors.isMatch(tableId)) {
+                // Add a rule that when configuring * in tablename,
+                // only the namespace name and schemaName name needs to be changed
+                if (replaceBy.getTableName().equalsIgnoreCase("<>")) {
+                    replaceBy =
+                            TableId.parse(
+                                    replaceBy.getNamespace(),
+                                    replaceBy.getSchemaName(),
+                                    tableId.getTableName());
+                }
                 return recreateChangeEvent(changeEvent, replaceBy);
             }
         }
