@@ -47,8 +47,9 @@ public class BinlogOffsetUtils {
         BinlogOffsetKind offsetKind = offset.getOffsetKind();
         switch (offsetKind) {
             case EARLIEST:
-            case TIMESTAMP:
                 return BinlogOffset.ofBinlogFilePosition("", 0);
+            case TIMESTAMP:
+                return DebeziumUtils.findBinlogOffset(offset.getTimestampSec() * 1000, connection);
             case LATEST:
                 return DebeziumUtils.currentBinlogOffset(connection);
             default:

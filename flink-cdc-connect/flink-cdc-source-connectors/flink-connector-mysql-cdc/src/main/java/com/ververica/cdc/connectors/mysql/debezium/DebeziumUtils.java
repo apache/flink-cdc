@@ -19,6 +19,7 @@ package com.ververica.cdc.connectors.mysql.debezium;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.ververica.cdc.connectors.mysql.debezium.listener.FindOffsetListener;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.connection.JdbcConnectionFactory;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -42,6 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -232,5 +234,114 @@ public class DebeziumUtils {
         }
 
         return variables;
+    }
+
+    public static BinlogOffset findBinlogOffset(long targetMs, MySqlConnection connection) {
+        MySqlConnection.MySqlConnectionConfiguration config = connection.connectionConfig();
+        BinaryLogClient client =
+                new BinaryLogClient(
+                        config.hostname(), config.port(), config.username(), config.password());
+
+        List<String> binlogFiles = new ArrayList<>();
+        JdbcConnection.ResultSetConsumer rsc =
+                rs -> {
+                    while (rs.next()) {
+                        String fileName = rs.getString(1);
+                        long fileSize = rs.getLong(2);
+                        if (fileSize > 0) {
+                            binlogFiles.add(fileName);
+                        }
+                    }
+                };
+
+        try {
+            connection.query("SHOW BINARY LOGS", rsc);
+            LOG.info("Total search binlog: {}", binlogFiles);
+
+            if (binlogFiles.isEmpty()) {
+                return BinlogOffset.ofBinlogFilePosition("", 0);
+            }
+
+            int startIdx = 0;
+            int endIdx = binlogFiles.size() - 1;
+
+            BinlogOffset binlogOffset =
+                    searchBinlogOffset(client, targetMs, binlogFiles, startIdx, endIdx);
+            return binlogOffset;
+        } catch (Exception e) {
+            throw new FlinkRuntimeException(e);
+        }
+    }
+
+    public static BinlogOffset searchBinlogOffset(
+            BinaryLogClient client,
+            long targetMs,
+            List<String> binlogFiles,
+            int startIdx,
+            int endIdx) {
+        if (endIdx <= startIdx) {
+            return BinlogOffset.ofBinlogFilePosition(binlogFiles.get(endIdx), 0);
+        }
+
+        FindOffsetListener startBinlog = getBinlogOffsetListener(binlogFiles, startIdx, client);
+        long startMs = startBinlog.getFirstEventTs();
+        if (targetMs <= startMs) {
+            String startFile = binlogFiles.get(startIdx);
+            LOG.info(
+                    "find targetSec {} < startSec {} in binlog[{}] {}",
+                    targetMs,
+                    startMs,
+                    startIdx,
+                    startFile);
+            return BinlogOffset.ofBinlogFilePosition(binlogFiles.get(startIdx), 0);
+        }
+
+        FindOffsetListener endBinlog = getBinlogOffsetListener(binlogFiles, endIdx, client);
+        long endMs = endBinlog.getFirstEventTs();
+        if (targetMs >= endMs) {
+            String endFile = binlogFiles.get(endIdx);
+            LOG.info(
+                    "find targetSec {} > endSec {} in binlog[{}] {}",
+                    targetMs,
+                    endMs,
+                    endIdx,
+                    endFile);
+            return BinlogOffset.ofBinlogFilePosition(binlogFiles.get(endIdx), 0);
+        }
+
+        int midIdx = (startIdx + endIdx + 1) / 2;
+        FindOffsetListener midBinlog = getBinlogOffsetListener(binlogFiles, midIdx, client);
+        LOG.info(
+                "find midBinlog[{}]: binlog {}, eventTs:{}",
+                midIdx,
+                binlogFiles.get(midIdx),
+                midBinlog.getFirstEventTs());
+
+        if (targetMs < midBinlog.getFirstEventTs()) {
+            return searchBinlogOffset(client, targetMs, binlogFiles, startIdx, midIdx - 1);
+        } else {
+            return searchBinlogOffset(client, targetMs, binlogFiles, midIdx, endIdx);
+        }
+    }
+
+    public static FindOffsetListener getBinlogOffsetListener(
+            List<String> binlogFiles, int startId, BinaryLogClient client) {
+        String binlogFile = binlogFiles.get(startId);
+        FindOffsetListener findOffsetListener = new FindOffsetListener();
+        client.registerEventListener(findOffsetListener);
+        client.setBinlogFilename(binlogFile);
+        client.setBinlogPosition(0);
+
+        try {
+            LOG.info("begin parse binlog: {}", binlogFile);
+            client.connect();
+        } catch (Throwable e) {
+            LOG.info(
+                    "end parse binlog: {}, eventTs: {}",
+                    binlogFile,
+                    findOffsetListener.getFirstEventTs());
+        }
+        client.unregisterEventListener(findOffsetListener);
+        return findOffsetListener;
     }
 }
