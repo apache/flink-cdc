@@ -16,8 +16,11 @@
 
 package com.ververica.cdc.connectors.mysql.source.utils;
 
+import io.debezium.jdbc.JdbcConnection;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.sql.SQLException;
 
 /** Utilities for operation on {@link Object}. */
 public class ObjectUtils {
@@ -85,6 +88,43 @@ public class ObjectUtils {
             return ((Comparable) obj1).compareTo(obj2);
         } else {
             return obj1.toString().compareTo(obj2.toString());
+        }
+    }
+
+    /**
+     * Compares two comparable objects.
+     * When the compared objects are not instance of {@link Comparable} or not <i>mutually comparable</i> (for example, strings and integers),
+     * we will compare them in db, ignore the charset of table effects the table-split result
+     * exmaple:
+     *   primaryKey: ['0000','1111','2222','3333','4444','aaaa','bbbb','cccc','dddd']
+     *   when chunkSize = 3
+     *   we want :
+     *      split1: ['0000','1111']
+     *      split2: ['3333','4444']
+     *      split3: ['aaaa','bbbb']
+     *      split3: ['cccc','dddd']
+     *   but if we use a table with COLLATE='utf8mb4_general_ci' and compare them with {@link ObjectUtils#compare(Object, Object)},
+     *   we whill get:
+     *      split1: ['0000','1111']
+     *      split2: ['3333','4444']
+     *      split3: ['aaaa','bbbb','cccc','dddd'....]
+     *   the split3 whill contains all of the remain rows
+     *
+     * @return The value {@code 0} if {@code num1} is equal to the {@code num2}; a value less than
+     *     {@code 0} if the {@code num1} is numerically less than the {@code num2}; and a value
+     *     greater than {@code 0} if the {@code num1} is numerically greater than the {@code num2}.
+     * @throws ClassCastException if the compared objects are not instance of {@link Comparable} or
+     *     not <i>mutually comparable</i> (for example, strings and integers).
+     */
+    @SuppressWarnings("unchecked")
+    public static int compare(Object obj1, Object obj2, JdbcConnection jdbcConnection) throws SQLException {
+        if(obj1 instanceof String && obj2 instanceof String){
+            return StatementUtils.compareStringValueByQuery(jdbcConnection, obj1.toString(), obj2.toString());
+        }
+        if (obj1 instanceof Comparable && obj1.getClass().equals(obj2.getClass())) {
+            return ((Comparable) obj1).compareTo(obj2);
+        } else {
+            return StatementUtils.compareStringValueByQuery(jdbcConnection, obj1.toString(), obj2.toString());
         }
     }
 

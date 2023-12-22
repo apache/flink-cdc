@@ -321,4 +321,22 @@ public class StatementUtils {
     private static String quotedTableIdString(TableId tableId) {
         return tableId.toQuotedString('`');
     }
+
+    public static int compareStringValueByQuery(JdbcConnection jdbc, String str1, String str2) throws SQLException {
+        final String compareQueryTemplate = "SELECT " +
+                "CASE WHEN '%s' > '%s' THEN 1 " +
+                "WHEN '%s' < '%s' THEN -1 " +
+                "ELSE 0 END";
+        String compareQuery = String.format(compareQueryTemplate, str1, str2, str1, str2);
+        return jdbc.queryAndMap(
+                compareQuery,
+                rs -> {
+                    if(!rs.next()){
+                        throw new SQLException(
+                                String.format("No result returned for query: %s",
+                                        compareQuery));
+                    }
+                    return rs.getInt(1);
+                });
+    }
 }
