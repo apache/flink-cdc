@@ -17,11 +17,13 @@
 package com.ververica.cdc.connectors.mysql.table;
 
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
 
 import com.ververica.cdc.debezium.table.MetadataConverter;
+import com.ververica.cdc.debezium.table.MetadataWithRowDataConverter;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
 import org.apache.kafka.connect.data.Struct;
@@ -77,6 +79,22 @@ public enum MySqlReadableMetadata {
                     Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
                     return TimestampData.fromEpochMillis(
                             (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY));
+                }
+            }),
+
+    /**
+     * It indicates the operation type of the row. '+I' means INSERT message, '-D' means DELETE
+     * message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message
+     */
+    OP_TYPE(
+            "op",
+            DataTypes.STRING().notNull(),
+            new MetadataWithRowDataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record, RowData rowData) {
+                    return StringData.fromString(rowData.getRowKind().shortString());
                 }
             });
 

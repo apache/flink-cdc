@@ -377,6 +377,11 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the binlog, the value is always 0.</td>
     </tr>
+    <tr>
+      <td>op</td>
+      <td>STRING NOT NULL</td>
+      <td>It indicates the operation type of the row. <br>'+I' means INSERT message, '-D' means DELETE message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -386,6 +391,7 @@ CREATE TABLE products (
     db_name STRING METADATA FROM 'database_name' VIRTUAL,
     table_name STRING METADATA  FROM 'table_name' VIRTUAL,
     operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation STRING METADATA FROM 'op' VIRTUAL,
     order_id INT,
     order_date TIMESTAMP(0),
     customer_name STRING,
@@ -410,6 +416,7 @@ CREATE TABLE products (
     db_name STRING METADATA FROM 'database_name' VIRTUAL,
     table_name STRING METADATA  FROM 'table_name' VIRTUAL,
     operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation STRING METADATA FROM 'op' VIRTUAL,
     order_id INT,
     order_date TIMESTAMP(0),
     customer_name STRING,
