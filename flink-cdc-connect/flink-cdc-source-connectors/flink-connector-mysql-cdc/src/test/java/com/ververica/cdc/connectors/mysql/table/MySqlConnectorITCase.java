@@ -933,6 +933,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                         "CREATE TABLE mysql_users ("
                                 + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
                                 + " table_name STRING METADATA VIRTUAL,"
+                                + " op STRING METADATA FROM 'op' VIRTUAL,"
                                 + " `id` DECIMAL(20, 0) NOT NULL,"
                                 + " name STRING,"
                                 + " address STRING,"
@@ -967,6 +968,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                 "CREATE TABLE sink ("
                         + " database_name STRING,"
                         + " table_name STRING,"
+                        + " op STRING,"
                         + " `id` DECIMAL(20, 0) NOT NULL,"
                         + " name STRING,"
                         + " address STRING,"
@@ -1004,15 +1006,15 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
 
         List<String> expected =
                 Stream.of(
-                                "+I[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
-                                "+I[%s, user_table_1_2, 121, user_121, Shanghai, 123567891234, null, null]",
-                                "+I[%s, user_table_1_2, 200, user_200, Wuhan, 123567891234, null, null]",
-                                "+I[%s, user_table_1_1, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
-                                "+U[%s, user_table_1_1, 300, user_300, Beijing, 123567891234, user_300@foo.com, null]",
-                                "+U[%s, user_table_1_2, 121, user_121, Shanghai, 88888888, null, null]",
-                                "-D[%s, user_table_1_1, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
-                                "-U[%s, user_table_1_1, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
-                                "-U[%s, user_table_1_2, 121, user_121, Shanghai, 123567891234, null, null]")
+                                "+I[%s, user_table_1_1, +I, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
+                                "+I[%s, user_table_1_2, +I, 121, user_121, Shanghai, 123567891234, null, null]",
+                                "+I[%s, user_table_1_2, +I, 200, user_200, Wuhan, 123567891234, null, null]",
+                                "+I[%s, user_table_1_1, +I, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
+                                "+U[%s, user_table_1_1, +U, 300, user_300, Beijing, 123567891234, user_300@foo.com, null]",
+                                "+U[%s, user_table_1_2, +U, 121, user_121, Shanghai, 88888888, null, null]",
+                                "-D[%s, user_table_1_1, -D, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
+                                "-U[%s, user_table_1_1, -U, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
+                                "-U[%s, user_table_1_2, -U, 121, user_121, Shanghai, 123567891234, null, null]")
                         .map(s -> String.format(s, userDatabase1.getDatabaseName()))
                         .sorted()
                         .collect(Collectors.toList());
