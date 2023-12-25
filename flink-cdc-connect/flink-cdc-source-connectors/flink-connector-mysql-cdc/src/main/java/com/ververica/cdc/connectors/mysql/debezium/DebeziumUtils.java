@@ -262,14 +262,15 @@ public class DebeziumUtils {
                 return BinlogOffset.ofBinlogFilePosition("", 0);
             }
 
-            BinlogOffset binlogOffset = searchBinlogOffset(client, targetMs, binlogFiles);
-            return binlogOffset;
+            int index = searchBinlogOffset(client, targetMs, binlogFiles);
+            String binlogName = binlogFiles.get(index);
+            return BinlogOffset.ofBinlogFilePosition(binlogName, 0);
         } catch (Exception e) {
             throw new FlinkRuntimeException(e);
         }
     }
 
-    public static BinlogOffset searchBinlogOffset(
+    public static int searchBinlogOffset(
             BinaryLogClient client, long targetMs, List<String> binlogFiles) {
         int startIdx = 0;
         int endIdx = binlogFiles.size() - 1;
@@ -282,11 +283,12 @@ public class DebeziumUtils {
                 startIdx = mid + 1;
             } else if (targetMs < midTs) {
                 endIdx = mid - 1;
+            } else {
+                return mid;
             }
         }
 
-        String targetBinlog = binlogFiles.get(endIdx);
-        return BinlogOffset.ofBinlogFilePosition(targetBinlog, 0);
+        return endIdx;
     }
 
     public static FindOffsetListener getBinlogOffsetListener(
