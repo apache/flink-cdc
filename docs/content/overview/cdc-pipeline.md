@@ -11,6 +11,22 @@ CDC Streaming ELT Framework is a stream data integration framework that aims to 
 * ✅ Synchronization of entire databases 
 * ✅ Schema evolution capability
 
+
+## Supported Connectors
+
+| Connector                                                | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver                   |
+|----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------|
+| [doris-pipeline](../pipelines/doris-pipeline.md)         | <li> [Doris](https://doris.apache.org/): 1.x, 2.x                                                                                                                                                                                                                                                                                                                                                  | Doris Driver: 1.5.0      |
+| [mysql-pipeline](../pipelines/mysql-pipeline.md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.28      |
+| [starrocks-pipeline](../pipelines/starrocks-pipeline.md) | <li> [Starrocks](https://www.starrocks.io/): 2.x                                                                                                                                                                                                                                                                                                                                                       | Starrocks Driver: 1.1.14 |
+
+## Supported Flink Versions
+The following table shows the version mapping between Flink<sup>®</sup> CDC Pipeline and Flink<sup>®</sup>:
+
+|    Flink<sup>®</sup> CDC Version    |                                                                                                      Flink<sup>®</sup> Version                                                                                                      |
+|:-----------------------------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
+| <font color="DarkCyan">3.0.*</font> | <font color="MediumVioletRed">1.14.\*</font>, <font color="MediumVioletRed">1.15.\*</font>, <font color="MediumVioletRed">1.16.\*</font>, <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font> |
+
 ## Core Concepts
 ![CDC Design](/_static/fig/design.png "CDC Design")
 
