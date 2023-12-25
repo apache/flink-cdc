@@ -262,11 +262,7 @@ public class DebeziumUtils {
                 return BinlogOffset.ofBinlogFilePosition("", 0);
             }
 
-            int startIdx = 0;
-            int endIdx = binlogFiles.size() - 1;
-
-            BinlogOffset binlogOffset =
-                    searchBinlogOffset(client, targetMs, binlogFiles, startIdx, endIdx);
+            BinlogOffset binlogOffset = searchBinlogOffset(client, targetMs, binlogFiles);
             return binlogOffset;
         } catch (Exception e) {
             throw new FlinkRuntimeException(e);
@@ -274,54 +270,23 @@ public class DebeziumUtils {
     }
 
     public static BinlogOffset searchBinlogOffset(
-            BinaryLogClient client,
-            long targetMs,
-            List<String> binlogFiles,
-            int startIdx,
-            int endIdx) {
-        if (endIdx <= startIdx) {
-            return BinlogOffset.ofBinlogFilePosition(binlogFiles.get(endIdx), 0);
+            BinaryLogClient client, long targetMs, List<String> binlogFiles) {
+        int startIdx = 0;
+        int endIdx = binlogFiles.size() - 1;
+
+        while (startIdx <= endIdx) {
+            int mid = startIdx + (endIdx - startIdx) / 2;
+            FindOffsetListener midBinlog = getBinlogOffsetListener(binlogFiles, mid, client);
+            long midTs = midBinlog.getFirstEventTs();
+            if (midTs < targetMs) {
+                startIdx = mid + 1;
+            } else if (targetMs < midTs) {
+                endIdx = mid - 1;
+            }
         }
 
-        FindOffsetListener startBinlog = getBinlogOffsetListener(binlogFiles, startIdx, client);
-        long startMs = startBinlog.getFirstEventTs();
-        if (targetMs <= startMs) {
-            String startFile = binlogFiles.get(startIdx);
-            LOG.info(
-                    "find targetSec {} < startSec {} in binlog[{}] {}",
-                    targetMs,
-                    startMs,
-                    startIdx,
-                    startFile);
-            return BinlogOffset.ofBinlogFilePosition(binlogFiles.get(startIdx), 0);
-        }
-
-        FindOffsetListener endBinlog = getBinlogOffsetListener(binlogFiles, endIdx, client);
-        long endMs = endBinlog.getFirstEventTs();
-        if (targetMs >= endMs) {
-            String endFile = binlogFiles.get(endIdx);
-            LOG.info(
-                    "find targetSec {} > endSec {} in binlog[{}] {}",
-                    targetMs,
-                    endMs,
-                    endIdx,
-                    endFile);
-            return BinlogOffset.ofBinlogFilePosition(binlogFiles.get(endIdx), 0);
-        }
-
-        int midIdx = (startIdx + endIdx + 1) / 2;
-        FindOffsetListener midBinlog = getBinlogOffsetListener(binlogFiles, midIdx, client);
-        LOG.info(
-                "find midBinlog[{}]: binlog {}, eventTs:{}",
-                midIdx,
-                binlogFiles.get(midIdx),
-                midBinlog.getFirstEventTs());
-
-        if (targetMs < midBinlog.getFirstEventTs()) {
-            return searchBinlogOffset(client, targetMs, binlogFiles, startIdx, midIdx - 1);
-        } else {
-            return searchBinlogOffset(client, targetMs, binlogFiles, midIdx, endIdx);
-        }
+        String targetBinlog = binlogFiles.get(endIdx);
+        return BinlogOffset.ofBinlogFilePosition(targetBinlog, 0);
     }
 
     public static FindOffsetListener getBinlogOffsetListener(
