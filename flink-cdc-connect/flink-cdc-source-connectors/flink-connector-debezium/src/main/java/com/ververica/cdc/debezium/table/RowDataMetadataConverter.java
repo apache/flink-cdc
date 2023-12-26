@@ -18,17 +18,11 @@ package com.ververica.cdc.debezium.table;
 
 import org.apache.flink.table.data.RowData;
 
-import org.apache.kafka.connect.source.SourceRecord;
+import com.ververica.cdc.common.annotation.Internal;
 
-/**
- * A converter converts {@link SourceRecord} metadata and {@link RowData} into Flink internal data
- * structures.
- */
-public interface MetadataWithRowDataConverter extends MetadataConverter {
-    Object read(SourceRecord record, RowData rowData);
+/** A converter converts {@link RowData} metadata into Flink internal data structures. */
+@Internal
+public interface RowDataMetadataConverter extends MetadataConverter {
 
-    default Object read(SourceRecord record) {
-        throw new UnsupportedOperationException(
-                "This method should never be called, please call the read(SourceRecord, RowData) method instead.");
-    }
+    Object read(RowData rowData);
 }

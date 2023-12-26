@@ -46,10 +46,8 @@ public final class AppendMetadataCollector implements Collector<RowData>, Serial
         for (int i = 0; i < metadataConverters.length; i++) {
             MetadataConverter metadataConverter = metadataConverters[i];
             Object meta;
-            if (metadataConverter instanceof MetadataWithRowDataConverter) {
-                meta =
-                        ((MetadataWithRowDataConverter) metadataConverter)
-                                .read(inputRecord, physicalRow);
+            if (metadataConverter instanceof RowDataMetadataConverter) {
+                meta = ((RowDataMetadataConverter) metadataConverter).read(physicalRow);
             } else {
                 meta = metadataConverter.read(inputRecord);
             }

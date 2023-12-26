@@ -23,7 +23,7 @@ import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
 
 import com.ververica.cdc.debezium.table.MetadataConverter;
-import com.ververica.cdc.debezium.table.MetadataWithRowDataConverter;
+import com.ververica.cdc.debezium.table.RowDataMetadataConverter;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
 import org.apache.kafka.connect.data.Struct;
@@ -83,18 +83,24 @@ public enum MySqlReadableMetadata {
             }),
 
     /**
-     * It indicates the operation type of the row. '+I' means INSERT message, '-D' means DELETE
+     * It indicates the row kind of the changelog. '+I' means INSERT message, '-D' means DELETE
      * message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message
      */
-    OP_TYPE(
-            "op",
+    ROW_KIND(
+            "row_kind",
             DataTypes.STRING().notNull(),
-            new MetadataWithRowDataConverter() {
+            new RowDataMetadataConverter() {
                 private static final long serialVersionUID = 1L;
 
                 @Override
-                public Object read(SourceRecord record, RowData rowData) {
+                public Object read(RowData rowData) {
                     return StringData.fromString(rowData.getRowKind().shortString());
+                }
+
+                @Override
+                public Object read(SourceRecord record) {
+                    throw new UnsupportedOperationException(
+                            "Please call read(RowData rowData) method instead.");
                 }
             });
 
