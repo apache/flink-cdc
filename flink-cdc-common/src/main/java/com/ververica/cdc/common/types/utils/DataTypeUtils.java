@@ -112,7 +112,7 @@ public class DataTypeUtils {
             case DATE:
                 return org.apache.flink.table.api.DataTypes.DATE();
             case TIME_WITHOUT_TIME_ZONE:
-                return org.apache.flink.table.api.DataTypes.TIME(length);
+                return org.apache.flink.table.api.DataTypes.TIME(precision);
             case BIGINT:
                 return org.apache.flink.table.api.DataTypes.BIGINT();
             case FLOAT:
@@ -120,13 +120,13 @@ public class DataTypeUtils {
             case DOUBLE:
                 return org.apache.flink.table.api.DataTypes.DOUBLE();
             case TIMESTAMP_WITHOUT_TIME_ZONE:
-                return org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_TIME_ZONE(length);
-            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(length);
             case TIMESTAMP_WITH_TIME_ZONE:
-                return org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_TIME_ZONE(length);
+                return org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_TIME_ZONE(precision);
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(
+                        precision);
             case ARRAY:
-                Preconditions.checkState(children != null && children.size() > 0);
+                Preconditions.checkState(children != null && !children.isEmpty());
                 return org.apache.flink.table.api.DataTypes.ARRAY(toFlinkDataType(children.get(0)));
             case MAP:
                 Preconditions.checkState(children != null && children.size() > 1);
