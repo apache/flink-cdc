@@ -171,8 +171,8 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
                                 INTER_CONTAINER_MYSQL_ALIAS,
                                 mysqlInventoryDatabase.getDatabaseName()),
                         " 'table-name' = 'products_sink',",
-                        " 'username' = '" + MYSQL_TEST_USER + "',",
-                        " 'password' = '" + MYSQL_TEST_PASSWORD + "'",
+                        " 'username' = '" + mysqlInventoryDatabase.getUsername() + "',",
+                        " 'password' = '" + mysqlInventoryDatabase.getPassword() + "'",
                         ");",
                         "INSERT INTO products_sink",
                         "SELECT * FROM tidb_source;");
@@ -210,12 +210,15 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
         String mysqlJdbcUrl =
                 String.format(
                         "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
+                        mysqlInventoryDatabase.getHost(),
+                        mysqlInventoryDatabase.getDatabasePort(),
                         mysqlInventoryDatabase.getDatabaseName());
         JdbcProxy proxy =
                 new JdbcProxy(
-                        mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, MYSQL_DRIVER_CLASS);
+                        mysqlJdbcUrl,
+                        mysqlInventoryDatabase.getUsername(),
+                        mysqlInventoryDatabase.getPassword(),
+                        MYSQL_DRIVER_CLASS);
         List<String> expectResult =
                 Arrays.asList(
                         "101,scooter,Small 2-wheel scooter,3.14",

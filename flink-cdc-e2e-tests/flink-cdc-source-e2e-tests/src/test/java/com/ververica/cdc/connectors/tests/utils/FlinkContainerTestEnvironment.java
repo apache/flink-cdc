@@ -27,6 +27,7 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.TestLogger;
 
 import com.github.dockerjava.api.DockerClient;
+import com.ververica.cdc.connectors.mysql.MySqlTestUtils;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -93,8 +94,6 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     // ------------------------------------------------------------------------------------------
     // MySQL Variables (we always use MySQL as the sink for easier verifying)
     // ------------------------------------------------------------------------------------------
-    protected static final String MYSQL_TEST_USER = "mysqluser";
-    protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
 
@@ -107,19 +106,13 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     @ClassRule
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
-                    new MySqlContainer(
-                                    MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
-                            .withConfigurationOverride("docker/mysql/my.cnf")
+                    MySqlTestUtils.createMySqlContainer(MySqlVersion.V8_0, "docker/mysql/my.cnf")
                             .withSetupSQL("docker/mysql/setup.sql")
-                            .withDatabaseName("flink-test")
-                            .withUsername("flinkuser")
-                            .withPassword("flinkpw")
                             .withNetwork(NETWORK)
-                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
-                            .withLogConsumer(new Slf4jLogConsumer(LOG));
+                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS);
 
     protected final UniqueDatabase mysqlInventoryDatabase =
-            new UniqueDatabase(MYSQL, "mysql_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+            new UniqueDatabase(MYSQL, "mysql_inventory");
     protected Path jdbcJar;
 
     private GenericContainer<?> jobManager;

@@ -28,7 +28,7 @@ import org.junit.Test;
 public class LegacyMySqlSourceExampleTest extends LegacyMySqlTestBase {
 
     private final UniqueDatabase inventoryDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory");
 
     @Test
     @Ignore("Test ignored because it won't stop and is used for manual test")
@@ -36,8 +36,8 @@ public class LegacyMySqlSourceExampleTest extends LegacyMySqlTestBase {
         inventoryDatabase.createAndInitialize();
         SourceFunction<String> sourceFunction =
                 MySqlSource.<String>builder()
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .hostname(inventoryDatabase.getHost())
+                        .port(inventoryDatabase.getDatabasePort())
                         // monitor all tables under inventory database
                         .databaseList(inventoryDatabase.getDatabaseName())
                         .username(inventoryDatabase.getUsername())

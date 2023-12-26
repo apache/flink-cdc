@@ -60,8 +60,8 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
                         " 'connector' = 'mysql-cdc',",
                         " 'hostname' = '" + INTER_CONTAINER_MYSQL_ALIAS + "',",
                         " 'port' = '3306',",
-                        " 'username' = '" + MYSQL_TEST_USER + "',",
-                        " 'password' = '" + MYSQL_TEST_PASSWORD + "',",
+                        " 'username' = '" + mysqlInventoryDatabase.getUsername() + "',",
+                        " 'password' = '" + mysqlInventoryDatabase.getPassword() + "',",
                         " 'database-name' = '" + mysqlInventoryDatabase.getDatabaseName() + "',",
                         " 'table-name' = 'products_source',",
                         " 'server-time-zone' = 'UTC',",
@@ -87,8 +87,8 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
                                 INTER_CONTAINER_MYSQL_ALIAS,
                                 mysqlInventoryDatabase.getDatabaseName()),
                         " 'table-name' = 'products_sink',",
-                        " 'username' = '" + MYSQL_TEST_USER + "',",
-                        " 'password' = '" + MYSQL_TEST_PASSWORD + "'",
+                        " 'username' = '" + mysqlInventoryDatabase.getUsername() + "',",
+                        " 'password' = '" + mysqlInventoryDatabase.getPassword() + "'",
                         ");",
                         "INSERT INTO products_sink",
                         "SELECT * FROM products_source;");
@@ -100,11 +100,14 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
         String jdbcUrl =
                 String.format(
                         "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
+                        mysqlInventoryDatabase.getHost(),
+                        mysqlInventoryDatabase.getDatabasePort(),
                         mysqlInventoryDatabase.getDatabaseName());
         try (Connection conn =
-                        DriverManager.getConnection(jdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                        DriverManager.getConnection(
+                                jdbcUrl,
+                                mysqlInventoryDatabase.getUsername(),
+                                mysqlInventoryDatabase.getPassword());
                 Statement stat = conn.createStatement()) {
             stat.execute(
                     "UPDATE products_source SET description='18oz carpenter hammer' WHERE id=106;");
@@ -124,7 +127,11 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
 
         // assert final results
         JdbcProxy proxy =
-                new JdbcProxy(jdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, MYSQL_DRIVER_CLASS);
+                new JdbcProxy(
+                        jdbcUrl,
+                        mysqlInventoryDatabase.getUsername(),
+                        mysqlInventoryDatabase.getPassword(),
+                        MYSQL_DRIVER_CLASS);
         List<String> expectResult =
                 Arrays.asList(
                         "101,scooter,Small 2-wheel scooter,3.14,red,{\"key1\": \"value1\"},{\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}",

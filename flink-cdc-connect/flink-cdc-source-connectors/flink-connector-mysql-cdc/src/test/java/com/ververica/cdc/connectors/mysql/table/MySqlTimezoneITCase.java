@@ -23,8 +23,10 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import com.ververica.cdc.connectors.mysql.MySqlTestUtils;
 import com.ververica.cdc.connectors.mysql.MySqlValidatorTest;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.junit.Before;
 import org.junit.Test;
@@ -33,7 +35,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
 import java.io.File;
@@ -109,21 +110,14 @@ public class MySqlTimezoneITCase {
 
     private void testTemporalTypesWithMySqlServerTimezone(String timezone) throws Exception {
         MySqlContainer mySqlContainer =
-                (MySqlContainer)
-                        new MySqlContainer()
-                                .withConfigurationOverride(buildMySqlConfigWithTimezone(timezone))
-                                .withSetupSQL("docker/setup.sql")
-                                .withDatabaseName("flink-test")
-                                .withUsername("flinkuser")
-                                .withPassword("flinkpw")
-                                .withLogConsumer(new Slf4jLogConsumer(LOG));
+                MySqlTestUtils.createMySqlContainer(
+                        MySqlVersion.V5_7, buildMySqlConfigWithTimezone(timezone));
 
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(mySqlContainer)).join();
         LOG.info("Containers are started.");
 
-        UniqueDatabase fullTypesDatabase =
-                new UniqueDatabase(mySqlContainer, "column_type_test", "mysqluser", "mysqlpw");
+        UniqueDatabase fullTypesDatabase = new UniqueDatabase(mySqlContainer, "column_type_test");
         fullTypesDatabase.createAndInitialize();
 
         String sourceDDL =
@@ -165,8 +159,8 @@ public class MySqlTimezoneITCase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s',"
                                 + " 'server-time-zone'='%s'"
                                 + ")",
-                        mySqlContainer.getHost(),
-                        mySqlContainer.getDatabasePort(),
+                        fullTypesDatabase.getHost(),
+                        fullTypesDatabase.getDatabasePort(),
                         fullTypesDatabase.getUsername(),
                         fullTypesDatabase.getPassword(),
                         fullTypesDatabase.getDatabaseName(),

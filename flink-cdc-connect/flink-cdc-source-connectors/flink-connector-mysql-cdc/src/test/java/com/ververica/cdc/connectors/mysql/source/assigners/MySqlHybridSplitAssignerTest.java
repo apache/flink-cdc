@@ -56,7 +56,7 @@ import static org.junit.Assert.assertTrue;
 public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "customer");
 
     @BeforeClass
     public static void init() {
@@ -192,8 +192,8 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                 .startupOptions(startupOptions)
                 .databaseList(customerDatabase.getDatabaseName())
                 .tableList(captureTableIds)
-                .hostname(MYSQL_CONTAINER.getHost())
-                .port(MYSQL_CONTAINER.getDatabasePort())
+                .hostname(customerDatabase.getHost())
+                .port(customerDatabase.getDatabasePort())
                 .username(customerDatabase.getUsername())
                 .password(customerDatabase.getPassword())
                 .serverTimeZone(ZoneId.of("UTC").toString())

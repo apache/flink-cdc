@@ -121,8 +121,8 @@ public class VitessE2eITCase extends FlinkContainerTestEnvironment {
                                 + ");",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         mysqlInventoryDatabase.getDatabaseName(),
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD);
+                        mysqlInventoryDatabase.getUsername(),
+                        mysqlInventoryDatabase.getPassword());
         List<String> sqlLines =
                 Arrays.asList(
                         sourceDDL,
@@ -161,11 +161,15 @@ public class VitessE2eITCase extends FlinkContainerTestEnvironment {
         String mysqlUrl =
                 String.format(
                         "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
+                        mysqlInventoryDatabase.getHost(),
+                        mysqlInventoryDatabase.getDatabasePort(),
                         mysqlInventoryDatabase.getDatabaseName());
         JdbcProxy proxy =
-                new JdbcProxy(mysqlUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, MYSQL_DRIVER_CLASS);
+                new JdbcProxy(
+                        mysqlUrl,
+                        mysqlInventoryDatabase.getUsername(),
+                        mysqlInventoryDatabase.getPassword(),
+                        MYSQL_DRIVER_CLASS);
         List<String> expectResult =
                 Arrays.asList(
                         "101,scooter,Small 2-wheel scooter,3.14",

@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mysql.testutils;
 
+import com.ververica.cdc.connectors.utils.TestEnvUtils;
 import org.testcontainers.containers.ContainerLaunchException;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -49,6 +50,20 @@ public class MySqlContainer extends JdbcDatabaseContainer {
     public MySqlContainer(MySqlVersion version) {
         super(DockerImageName.parse(IMAGE + ":" + version.getVersion()));
         addExposedPort(MYSQL_PORT);
+    }
+
+    @Override
+    public void start() {
+        if (TestEnvUtils.useContainer()) {
+            super.start();
+        }
+    }
+
+    @Override
+    public void stop() {
+        if (TestEnvUtils.useContainer()) {
+            super.stop();
+        }
     }
 
     @Override

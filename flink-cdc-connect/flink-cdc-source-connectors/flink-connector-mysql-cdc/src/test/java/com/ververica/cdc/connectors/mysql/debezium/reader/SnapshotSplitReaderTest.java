@@ -57,10 +57,10 @@ import static org.junit.Assert.fail;
 public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "customer");
 
     private static final UniqueDatabase customer3_0Database =
-            new UniqueDatabase(MYSQL_CONTAINER, "customer3.0", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "customer3.0");
 
     private static BinaryLogClient binaryLogClient;
     private static MySqlConnection mySqlConnection;
@@ -662,8 +662,8 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 .databaseList(database.getDatabaseName())
                 .tableList(captureTableIds)
                 .serverId("1001-1002")
-                .hostname(MYSQL_CONTAINER.getHost())
-                .port(MYSQL_CONTAINER.getDatabasePort())
+                .hostname(database.getHost())
+                .port(database.getDatabasePort())
                 .username(database.getUsername())
                 .splitSize(splitSize)
                 .fetchSize(2)

@@ -34,10 +34,12 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.test.junit5.MiniClusterExtension;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import com.ververica.cdc.connectors.mysql.MySqlTestUtils;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import com.ververica.cdc.connectors.mysql.testutils.TestTable;
 import com.ververica.cdc.connectors.mysql.testutils.TestTableSchemas;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -50,7 +52,6 @@ import org.junit.rules.TemporaryFolder;
 import org.locationtech.jts.util.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 
 import java.io.File;
 import java.lang.reflect.Field;
@@ -81,19 +82,11 @@ public class SpecificStartingOffsetITCase {
 
     @SuppressWarnings("unchecked")
     private final MySqlContainer mysql =
-            (MySqlContainer)
-                    new MySqlContainer()
-                            .withConfigurationOverride(
-                                    buildMySqlConfigWithTimezone(
-                                            getResourceFolder(), getSystemTimeZone()))
-                            .withSetupSQL("docker/setup.sql")
-                            .withDatabaseName("flink-test")
-                            .withUsername("flinkuser")
-                            .withPassword("flinkpw")
-                            .withLogConsumer(new Slf4jLogConsumer(LOG));
+            MySqlTestUtils.createMySqlContainer(
+                    MySqlVersion.V5_7,
+                    buildMySqlConfigWithTimezone(getResourceFolder(), getSystemTimeZone()));
 
-    private final UniqueDatabase customDatabase =
-            new UniqueDatabase(mysql, "customer", "mysqluser", "mysqlpw");
+    private final UniqueDatabase customDatabase = new UniqueDatabase(mysql, "customer");
     private final TestTable customers =
             new TestTable(customDatabase, "customers", TestTableSchemas.CUSTOMERS);
 
@@ -419,8 +412,8 @@ public class SpecificStartingOffsetITCase {
 
     private MySqlSourceBuilder<RowData> getSourceBuilder() {
         return MySqlSource.<RowData>builder()
-                .hostname(mysql.getHost())
-                .port(mysql.getDatabasePort())
+                .hostname(customDatabase.getHost())
+                .port(customDatabase.getDatabasePort())
                 .username(customDatabase.getUsername())
                 .password(customDatabase.getPassword())
                 .databaseList(customDatabase.getDatabaseName())
@@ -430,8 +423,8 @@ public class SpecificStartingOffsetITCase {
 
     private MySqlConnection getConnection() {
         Map<String, String> properties = new HashMap<>();
-        properties.put("database.hostname", mysql.getHost());
-        properties.put("database.port", String.valueOf(mysql.getDatabasePort()));
+        properties.put("database.hostname", customDatabase.getHost());
+        properties.put("database.port", String.valueOf(customDatabase.getDatabasePort()));
         properties.put("database.user", customDatabase.getUsername());
         properties.put("database.password", customDatabase.getPassword());
         io.debezium.config.Configuration configuration =

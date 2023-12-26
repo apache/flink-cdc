@@ -25,7 +25,6 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.jayway.jsonpath.JsonPath;
 import com.ververica.cdc.connectors.mysql.MySqlTestUtils.TestingListState;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
-import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.connectors.utils.TestSourceContext;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
@@ -82,8 +81,7 @@ import static org.junit.Assert.fail;
 @RunWith(Parameterized.class)
 public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
 
-    private final UniqueDatabase database =
-            new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
+    private final UniqueDatabase database = new UniqueDatabase(MYSQL_CONTAINER, "inventory");
 
     @Override
     public String getTempFilePath(String fileName) throws IOException {
@@ -593,8 +591,7 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
         }
 
         Tuple2<String, Integer> offset =
-                currentMySqlLatestOffset(
-                        MYSQL_CONTAINER, database, "products", 10, useLegacyImplementation);
+                currentMySqlLatestOffset(database, "products", 10, useLegacyImplementation);
         final String offsetFile = offset.f0;
         final int offsetPos = offset.f1;
         final TestingListState<byte[]> offsetState = new TestingListState<>();
@@ -1061,7 +1058,6 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
 
     /** Gets the latest offset of current MySQL server. */
     public static Tuple2<String, Integer> currentMySqlLatestOffset(
-            MySqlContainer container,
             UniqueDatabase database,
             String table,
             int expectedRecordCount,
@@ -1069,12 +1065,12 @@ public class LegacyMySqlSourceTest extends LegacyMySqlTestBase {
             throws Exception {
         DebeziumSourceFunction<SourceRecord> source =
                 MySqlSource.<SourceRecord>builder()
-                        .hostname(container.getHost())
-                        .port(container.getDatabasePort())
+                        .hostname(database.getHost())
+                        .port(database.getDatabasePort())
                         .databaseList(database.getDatabaseName())
                         .tableList(database.getDatabaseName() + "." + table)
-                        .username(container.getUsername())
-                        .password(container.getPassword())
+                        .username(database.getUsername())
+                        .password(database.getPassword())
                         .deserializer(new MySqlTestUtils.ForwardDeserializeSchema())
                         .debeziumProperties(createDebeziumProperties(useLegacyImplementation))
                         .build();

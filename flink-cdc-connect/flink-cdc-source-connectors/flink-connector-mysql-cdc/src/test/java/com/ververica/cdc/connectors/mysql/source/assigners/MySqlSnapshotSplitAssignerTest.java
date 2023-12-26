@@ -58,7 +58,7 @@ import static org.junit.Assert.fail;
 public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "customer");
 
     @BeforeClass
     public static void init() {
@@ -632,8 +632,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                 .startupOptions(StartupOptions.initial())
                 .databaseList(database.getDatabaseName())
                 .tableList(fullNames)
-                .hostname(MYSQL_CONTAINER.getHost())
-                .port(MYSQL_CONTAINER.getDatabasePort())
+                .hostname(database.getHost())
+                .port(database.getDatabasePort())
                 .splitSize(splitSize)
                 .fetchSize(2)
                 .distributionFactorUpper(distributionFactorUpper)

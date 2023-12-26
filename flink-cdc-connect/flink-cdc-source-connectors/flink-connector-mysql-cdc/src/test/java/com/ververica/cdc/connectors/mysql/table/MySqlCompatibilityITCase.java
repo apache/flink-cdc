@@ -23,6 +23,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import com.ververica.cdc.connectors.mysql.MySqlTestUtils;
 import com.ververica.cdc.connectors.mysql.MySqlValidatorTest;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
@@ -32,7 +33,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
 import java.io.File;
@@ -119,22 +119,14 @@ public class MySqlCompatibilityITCase {
     private void testDifferentMySqlVersion(MySqlVersion version, boolean enableGtid)
             throws Exception {
         final MySqlContainer mySqlContainer =
-                (MySqlContainer)
-                        new MySqlContainer(version)
-                                .withConfigurationOverride(
-                                        buildCustomMySqlConfig(version, enableGtid))
-                                .withSetupSQL("docker/setup.sql")
-                                .withDatabaseName("flink-test")
-                                .withUsername("flinkuser")
-                                .withPassword("flinkpw")
-                                .withLogConsumer(new Slf4jLogConsumer(LOG));
+                MySqlTestUtils.createMySqlContainer(
+                        version, buildCustomMySqlConfig(version, enableGtid));
 
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(mySqlContainer)).join();
         LOG.info("Containers are started.");
 
-        UniqueDatabase testDatabase =
-                new UniqueDatabase(mySqlContainer, "inventory", "mysqluser", "mysqlpw");
+        UniqueDatabase testDatabase = new UniqueDatabase(mySqlContainer, "inventory");
         testDatabase.createAndInitialize();
 
         String sourceDDL =
@@ -156,8 +148,8 @@ public class MySqlCompatibilityITCase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
-                        mySqlContainer.getHost(),
-                        mySqlContainer.getDatabasePort(),
+                        testDatabase.getHost(),
+                        testDatabase.getDatabasePort(),
                         testDatabase.getUsername(),
                         testDatabase.getPassword(),
                         testDatabase.getDatabaseName(),

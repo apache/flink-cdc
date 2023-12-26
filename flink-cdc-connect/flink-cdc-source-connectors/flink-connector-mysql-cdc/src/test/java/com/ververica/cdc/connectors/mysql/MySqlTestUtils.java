@@ -34,11 +34,16 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.SupplierWithException;
 
+import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import com.ververica.cdc.connectors.utils.TestSourceContext;
 import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.DebeziumSourceFunction;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +58,20 @@ import static org.junit.Assert.assertTrue;
 
 /** Utils to help test. */
 public class MySqlTestUtils {
+
+    protected static final Logger LOG = LoggerFactory.getLogger(MySqlTestUtils.class);
+
+    @SuppressWarnings("unchecked")
+    public static MySqlContainer createMySqlContainer(MySqlVersion version, String configPath) {
+        return (MySqlContainer)
+                new MySqlContainer(version)
+                        .withConfigurationOverride(configPath)
+                        .withSetupSQL("docker/setup.sql")
+                        .withDatabaseName("flink-test")
+                        .withUsername("flinkuser")
+                        .withPassword("flinkpw")
+                        .withLogConsumer(new Slf4jLogConsumer(LOG));
+    }
 
     public static MySqlSource.Builder<SourceRecord> basicSourceBuilder(
             UniqueDatabase database, String serverTimezone, boolean useLegacyImplementation) {

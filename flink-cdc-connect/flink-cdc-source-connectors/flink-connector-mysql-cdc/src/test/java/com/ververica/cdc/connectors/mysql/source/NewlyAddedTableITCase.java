@@ -85,8 +85,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
-    private final UniqueDatabase customDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
+    private final UniqueDatabase customDatabase = new UniqueDatabase(MYSQL_CONTAINER, "customer");
 
     private final ScheduledExecutorService mockBinlogExecutor = Executors.newScheduledThreadPool(1);
 
@@ -407,8 +406,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             // Build source
             MySqlSource<RowData> mySqlSource =
                     MySqlSource.<RowData>builder()
-                            .hostname(MYSQL_CONTAINER.getHost())
-                            .port(MYSQL_CONTAINER.getDatabasePort())
+                            .hostname(customDatabase.getHost())
+                            .port(customDatabase.getDatabasePort())
                             .databaseList(customDatabase.getDatabaseName())
                             .serverTimeZone("UTC")
                             .tableList(
@@ -897,8 +896,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         + " 'scan.newly-added-table.enabled' = 'true'"
                         + " %s"
                         + ")",
-                MYSQL_CONTAINER.getHost(),
-                MYSQL_CONTAINER.getDatabasePort(),
+                customDatabase.getHost(),
+                customDatabase.getDatabasePort(),
                 customDatabase.getUsername(),
                 customDatabase.getPassword(),
                 customDatabase.getDatabaseName(),
@@ -1066,8 +1065,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
 
     private MySqlConnection getConnection() {
         Map<String, String> properties = new HashMap<>();
-        properties.put("database.hostname", MYSQL_CONTAINER.getHost());
-        properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        properties.put("database.hostname", customDatabase.getHost());
+        properties.put("database.port", String.valueOf(customDatabase.getDatabasePort()));
         properties.put("database.user", customDatabase.getUsername());
         properties.put("database.password", customDatabase.getPassword());
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());

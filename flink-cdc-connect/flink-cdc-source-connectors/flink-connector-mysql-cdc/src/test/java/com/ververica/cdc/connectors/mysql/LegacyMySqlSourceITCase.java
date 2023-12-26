@@ -51,7 +51,7 @@ import static org.junit.Assert.assertTrue;
 public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
 
     private final UniqueDatabase fullTypesDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "column_type_test");
 
     @Test
     public void testConsumingAllEventsWithJsonFormatIncludeSchema() throws Exception {
@@ -84,8 +84,8 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
                                 includeSchema, customConverterConfigs);
         SourceFunction<String> sourceFunction =
                 MySqlSource.<String>builder()
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .hostname(fullTypesDatabase.getHost())
+                        .port(fullTypesDatabase.getDatabasePort())
                         // monitor all tables under column_type_test database
                         .databaseList(fullTypesDatabase.getDatabaseName())
                         .username(fullTypesDatabase.getUsername())

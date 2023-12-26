@@ -31,8 +31,6 @@ import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.P
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
-import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
-import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -40,16 +38,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
 
     private final UniqueDatabase inventoryDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory");
 
     @Test
     public void testCreateSource() {
         inventoryDatabase.createAndInitialize();
         Map<String, String> options = new HashMap<>();
-        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
-        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
-        options.put(USERNAME.key(), TEST_USER);
-        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(HOSTNAME.key(), inventoryDatabase.getHost());
+        options.put(PORT.key(), String.valueOf(inventoryDatabase.getDatabasePort()));
+        options.put(USERNAME.key(), inventoryDatabase.getUsername());
+        options.put(PASSWORD.key(), inventoryDatabase.getPassword());
         options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
         Factory.Context context = new MockContext(Configuration.fromMap(options));
 
@@ -63,10 +61,10 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
     public void testNoMatchedTable() {
         inventoryDatabase.createAndInitialize();
         Map<String, String> options = new HashMap<>();
-        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
-        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
-        options.put(USERNAME.key(), TEST_USER);
-        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(HOSTNAME.key(), inventoryDatabase.getHost());
+        options.put(PORT.key(), String.valueOf(inventoryDatabase.getDatabasePort()));
+        options.put(USERNAME.key(), inventoryDatabase.getUsername());
+        options.put(PASSWORD.key(), inventoryDatabase.getPassword());
         String tables = inventoryDatabase.getDatabaseName() + ".test";
         options.put(TABLES.key(), tables);
         Factory.Context context = new MockContext(Configuration.fromMap(options));

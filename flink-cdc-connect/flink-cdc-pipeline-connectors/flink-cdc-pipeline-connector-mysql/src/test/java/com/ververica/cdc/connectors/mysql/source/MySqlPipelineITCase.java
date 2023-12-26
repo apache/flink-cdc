@@ -61,8 +61,6 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCHEMA_CHANGE_ENABLED;
-import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
-import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.fetchResults;
 import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.getServerId;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -74,7 +72,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
             createMySqlContainer(MySqlVersion.V8_0);
 
     private final UniqueDatabase inventoryDatabase =
-            new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL8_CONTAINER, "inventory");
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -106,10 +104,10 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         inventoryDatabase.createAndInitialize();
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
-                        .hostname(MYSQL8_CONTAINER.getHost())
-                        .port(MYSQL8_CONTAINER.getDatabasePort())
-                        .username(TEST_USER)
-                        .password(TEST_PASSWORD)
+                        .hostname(inventoryDatabase.getHost())
+                        .port(inventoryDatabase.getDatabasePort())
+                        .username(inventoryDatabase.getUsername())
+                        .password(inventoryDatabase.getPassword())
                         .databaseList(inventoryDatabase.getDatabaseName())
                         .tableList(inventoryDatabase.getDatabaseName() + "\\.products")
                         .startupOptions(StartupOptions.initial())
@@ -234,10 +232,10 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         inventoryDatabase.createAndInitialize();
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
-                        .hostname(MYSQL8_CONTAINER.getHost())
-                        .port(MYSQL8_CONTAINER.getDatabasePort())
-                        .username(TEST_USER)
-                        .password(TEST_PASSWORD)
+                        .hostname(inventoryDatabase.getHost())
+                        .port(inventoryDatabase.getDatabasePort())
+                        .username(inventoryDatabase.getUsername())
+                        .password(inventoryDatabase.getPassword())
                         .databaseList(inventoryDatabase.getDatabaseName())
                         .tableList(inventoryDatabase.getDatabaseName() + "\\.products")
                         .startupOptions(StartupOptions.latest())

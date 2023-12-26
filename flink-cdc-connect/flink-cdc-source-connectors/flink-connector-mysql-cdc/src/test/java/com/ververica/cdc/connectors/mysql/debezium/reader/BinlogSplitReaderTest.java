@@ -22,6 +22,7 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.util.ExceptionUtils;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.ververica.cdc.connectors.mysql.MySqlTestUtils;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import com.ververica.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
@@ -88,17 +89,16 @@ import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link BinlogSplitReader}. */
 public class BinlogSplitReaderTest extends MySqlSourceTestBase {
-    private static final String TEST_USER = "mysqluser";
-    private static final String TEST_PASSWORD = "mysqlpw";
+
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
-    private final UniqueDatabase customerDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
+    private final UniqueDatabase customerDatabase = new UniqueDatabase(MYSQL_CONTAINER, "customer");
 
     private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
+            MySqlTestUtils.createMySqlContainer(
+                    MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
     private final UniqueDatabase inventoryDatabase8 =
-            new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL8_CONTAINER, "inventory");
 
     private BinaryLogClient binaryLogClient;
     private MySqlConnection mySqlConnection;
@@ -748,7 +748,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         // Create config and initializer client and connections
         MySqlSourceConfig sourceConfig =
-                getConfigFactory(MYSQL_CONTAINER, customerDatabase, new String[] {"customers"})
+                getConfigFactory(customerDatabase, new String[] {"customers"})
                         .startupOptions(StartupOptions.latest())
                         .heartbeatInterval(heartbeatInterval)
                         .debeziumProperties(dbzProps)
@@ -786,7 +786,7 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Preparations
         inventoryDatabase8.createAndInitialize();
         MySqlSourceConfig connectionConfig =
-                getConfig(MYSQL8_CONTAINER, inventoryDatabase8, new String[] {"products"});
+                getConfig(inventoryDatabase8, new String[] {"products"});
         binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
 
@@ -796,7 +796,6 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Create a new config to start reading from the offset captured above
         MySqlSourceConfig sourceConfig =
                 getConfig(
-                        MYSQL8_CONTAINER,
                         inventoryDatabase8,
                         StartupOptions.specificOffset(startingOffset.getGtidSet()),
                         new String[] {"products"});
@@ -1148,30 +1147,26 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
     }
 
     private MySqlSourceConfig getConfig(StartupOptions startupOptions, String[] captureTables) {
-        return getConfig(MYSQL_CONTAINER, customerDatabase, startupOptions, captureTables);
+        return getConfig(customerDatabase, startupOptions, captureTables);
     }
 
     private MySqlSourceConfig getConfig(
-            MySqlContainer container,
-            UniqueDatabase database,
-            StartupOptions startupOptions,
-            String[] captureTables) {
-        return getConfigFactory(container, database, captureTables)
+            UniqueDatabase database, StartupOptions startupOptions, String[] captureTables) {
+        return getConfigFactory(database, captureTables)
                 .startupOptions(startupOptions)
                 .createConfig(0);
     }
 
     private MySqlSourceConfig getConfig(String[] captureTables) {
-        return getConfig(MYSQL_CONTAINER, customerDatabase, captureTables);
+        return getConfig(customerDatabase, captureTables);
     }
 
-    private MySqlSourceConfig getConfig(
-            MySqlContainer container, UniqueDatabase database, String[] captureTables) {
-        return getConfigFactory(container, database, captureTables).createConfig(0);
+    private MySqlSourceConfig getConfig(UniqueDatabase database, String[] captureTables) {
+        return getConfigFactory(database, captureTables).createConfig(0);
     }
 
     private MySqlSourceConfigFactory getConfigFactory(
-            MySqlContainer container, UniqueDatabase database, String[] captureTables) {
+            UniqueDatabase database, String[] captureTables) {
         String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> database.getDatabaseName() + "." + tableName)
@@ -1180,8 +1175,8 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         return new MySqlSourceConfigFactory()
                 .databaseList(database.getDatabaseName())
                 .tableList(captureTableIds)
-                .hostname(container.getHost())
-                .port(container.getDatabasePort())
+                .hostname(database.getHost())
+                .port(database.getDatabasePort())
                 .username(database.getUsername())
                 .splitSize(4)
                 .fetchSize(2)

@@ -24,9 +24,6 @@ import java.util.Random;
 /** Test utilities for MySQL event source. */
 public class MySqSourceTestUtils {
 
-    public static final String TEST_USER = "mysqluser";
-    public static final String TEST_PASSWORD = "mysqlpw";
-
     public static <T> List<T> fetchResults(Iterator<T> iter, int size) {
         List<T> result = new ArrayList<>(size);
         while (size > 0 && iter.hasNext()) {

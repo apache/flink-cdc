@@ -41,6 +41,7 @@ import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -90,8 +91,15 @@ public class MySqlChangeEventSourceExampleTest {
         LOG.info("Containers are started.");
     }
 
+    @AfterClass
+    public static void stopContainers() {
+        LOG.info("Stopping containers...");
+        MYSQL_CONTAINER.stop();
+        LOG.info("Containers are stopped.");
+    }
+
     private final UniqueDatabase inventoryDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory");
 
     @Test
     @Ignore("Test ignored because it won't stop and is used for manual test")
@@ -99,8 +107,8 @@ public class MySqlChangeEventSourceExampleTest {
         inventoryDatabase.createAndInitialize();
         MySqlSourceBuilder.MySqlIncrementalSource<String> mySqlChangeEventSource =
                 new MySqlSourceBuilder<String>()
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .hostname(inventoryDatabase.getHost())
+                        .port(inventoryDatabase.getDatabasePort())
                         .databaseList(inventoryDatabase.getDatabaseName())
                         .tableList(inventoryDatabase.getDatabaseName() + ".products")
                         .username(inventoryDatabase.getUsername())
@@ -139,8 +147,8 @@ public class MySqlChangeEventSourceExampleTest {
         final String tableId = inventoryDatabase.getDatabaseName() + ".products";
         MySqlSourceBuilder.MySqlIncrementalSource<RowData> mySqlChangeEventSource =
                 new MySqlSourceBuilder<RowData>()
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .hostname(inventoryDatabase.getHost())
+                        .port(inventoryDatabase.getDatabasePort())
                         .databaseList(inventoryDatabase.getDatabaseName())
                         .tableList(tableId)
                         .username(inventoryDatabase.getUsername())
@@ -232,8 +240,8 @@ public class MySqlChangeEventSourceExampleTest {
 
     private MySqlConnection getConnection() {
         Map<String, String> properties = new HashMap<>();
-        properties.put("database.hostname", MYSQL_CONTAINER.getHost());
-        properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        properties.put("database.hostname", inventoryDatabase.getHost());
+        properties.put("database.port", String.valueOf(inventoryDatabase.getDatabasePort()));
         properties.put("database.user", inventoryDatabase.getUsername());
         properties.put("database.password", inventoryDatabase.getPassword());
         properties.put("database.serverTimezone", ZoneId.of("UTC").toString());

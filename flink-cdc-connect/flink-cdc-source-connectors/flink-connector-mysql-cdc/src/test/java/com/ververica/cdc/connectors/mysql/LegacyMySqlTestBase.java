@@ -19,11 +19,11 @@ package com.ververica.cdc.connectors.mysql;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
 import java.util.stream.Stream;
@@ -37,14 +37,7 @@ public abstract class LegacyMySqlTestBase extends AbstractTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(LegacyMySqlTestBase.class);
 
     protected static final MySqlContainer MYSQL_CONTAINER =
-            (MySqlContainer)
-                    new MySqlContainer()
-                            .withConfigurationOverride("docker/server/my.cnf")
-                            .withSetupSQL("docker/setup.sql")
-                            .withDatabaseName("flink-test")
-                            .withUsername("flinkuser")
-                            .withPassword("flinkpw")
-                            .withLogConsumer(new Slf4jLogConsumer(LOG));
+            MySqlTestUtils.createMySqlContainer(MySqlVersion.V5_7, "docker/server/my.cnf");
 
     @BeforeClass
     public static void startContainers() {

@@ -16,6 +16,8 @@
 
 package com.ververica.cdc.connectors.mysql.testutils;
 
+import com.ververica.cdc.connectors.utils.TestEnvUtils;
+
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -49,41 +51,35 @@ public class UniqueDatabase {
     private static final String DROP_DATABASE_DDL = "DROP DATABASE IF EXISTS `$DBNAME$`;";
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
+    private static final String TEST_USER = "mysqluser";
+    private static final String TEST_PASSWORD = "mysqlpw";
+
     private final MySqlContainer container;
     private final String databaseName;
     private final String templateName;
-    private final String username;
-    private final String password;
 
-    public UniqueDatabase(
-            MySqlContainer container, String databaseName, String username, String password) {
-        this(
-                container,
-                databaseName,
-                Integer.toUnsignedString(new Random().nextInt(), 36),
-                username,
-                password);
+    public UniqueDatabase(MySqlContainer container, String databaseName) {
+        this(container, databaseName, Integer.toUnsignedString(new Random().nextInt(), 36));
     }
 
-    private UniqueDatabase(
-            MySqlContainer container,
-            String databaseName,
-            final String identifier,
-            String username,
-            String password) {
+    private UniqueDatabase(MySqlContainer container, String databaseName, final String identifier) {
         this.container = container;
         this.databaseName = databaseName + "_" + identifier;
         this.templateName = databaseName;
-        this.username = username;
-        this.password = password;
     }
 
     public String getHost() {
-        return container.getHost();
+        if (TestEnvUtils.useContainer()) {
+            return container.getHost();
+        }
+        return TestEnvUtils.getHost();
     }
 
     public int getDatabasePort() {
-        return container.getDatabasePort();
+        if (TestEnvUtils.useContainer()) {
+            return container.getDatabasePort();
+        }
+        return TestEnvUtils.getPort();
     }
 
     public String getDatabaseName() {
@@ -91,11 +87,24 @@ public class UniqueDatabase {
     }
 
     public String getUsername() {
-        return username;
+        if (TestEnvUtils.useContainer()) {
+            return TEST_USER;
+        }
+        return TestEnvUtils.getUser();
     }
 
     public String getPassword() {
-        return password;
+        if (TestEnvUtils.useContainer()) {
+            return TEST_PASSWORD;
+        }
+        return TestEnvUtils.getPassword();
+    }
+
+    protected String getJdbcUrl(String databaseName) {
+        if (TestEnvUtils.useContainer()) {
+            return container.getJdbcUrl(databaseName);
+        }
+        return "jdbc:mysql://" + getHost() + ":" + getDatabasePort() + "/" + databaseName;
     }
 
     /** @return Fully qualified table name <code>&lt;databaseName&gt;.&lt;tableName&gt;</code> */
@@ -111,7 +120,7 @@ public class UniqueDatabase {
         try {
             try (Connection connection =
                             DriverManager.getConnection(
-                                    container.getJdbcUrl(), username, password);
+                                    getJdbcUrl(""), getUsername(), getPassword());
                     Statement statement = connection.createStatement()) {
                 final List<String> statements =
                         Arrays.stream(
@@ -147,7 +156,7 @@ public class UniqueDatabase {
         try {
             try (Connection connection =
                             DriverManager.getConnection(
-                                    container.getJdbcUrl(), username, password);
+                                    getJdbcUrl(""), getUsername(), getPassword());
                     Statement statement = connection.createStatement()) {
                 final String dropDatabaseStatement = convertSQL(DROP_DATABASE_DDL);
                 statement.execute(dropDatabaseStatement);
@@ -158,7 +167,7 @@ public class UniqueDatabase {
     }
 
     public Connection getJdbcConnection() throws SQLException {
-        return DriverManager.getConnection(container.getJdbcUrl(databaseName), username, password);
+        return DriverManager.getConnection(getJdbcUrl(databaseName), getUsername(), getPassword());
     }
 
     private String convertSQL(final String sql) {

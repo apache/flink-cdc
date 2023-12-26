@@ -44,11 +44,8 @@ import java.util.Random;
 @RunWith(Parameterized.class)
 public class MysqlConnectorCharsetITCase extends MySqlSourceTestBase {
 
-    private static final String TEST_USER = "mysqluser";
-    private static final String TEST_PASSWORD = "mysqlpw";
-
     private static final UniqueDatabase charsetTestDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "charset_test", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL_CONTAINER, "charset_test");
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -360,8 +357,8 @@ public class MysqlConnectorCharsetITCase extends MySqlSourceTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         testName,
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
+                        charsetTestDatabase.getHost(),
+                        charsetTestDatabase.getDatabasePort(),
                         charsetTestDatabase.getUsername(),
                         charsetTestDatabase.getPassword(),
                         charsetTestDatabase.getDatabaseName(),

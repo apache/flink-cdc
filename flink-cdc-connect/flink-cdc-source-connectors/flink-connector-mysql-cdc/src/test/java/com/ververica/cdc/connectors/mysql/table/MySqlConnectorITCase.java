@@ -33,6 +33,7 @@ import org.apache.flink.util.ExceptionUtils;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
+import com.ververica.cdc.connectors.mysql.MySqlTestUtils;
 import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
 import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
@@ -78,36 +79,30 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlConnectorITCase.class);
 
-    private static final String TEST_USER = "mysqluser";
-    private static final String TEST_PASSWORD = "mysqlpw";
-
     private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
+            MySqlTestUtils.createMySqlContainer(
+                    MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
 
     private final UniqueDatabase inventoryDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory");
 
     private final UniqueDatabase fullTypesMySql57Database =
-            new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL_CONTAINER, "column_type_test");
     private final UniqueDatabase fullTypesMySql8Database =
-            new UniqueDatabase(
-                    MYSQL8_CONTAINER, "column_type_test_mysql8", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL8_CONTAINER, "column_type_test_mysql8");
 
-    private final UniqueDatabase customerDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
+    private final UniqueDatabase customerDatabase = new UniqueDatabase(MYSQL_CONTAINER, "customer");
     private static final UniqueDatabase customer3_0Database =
-            new UniqueDatabase(MYSQL_CONTAINER, "customer3.0", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL_CONTAINER, "customer3.0");
 
-    private final UniqueDatabase userDatabase1 =
-            new UniqueDatabase(MYSQL_CONTAINER, "user_1", TEST_USER, TEST_PASSWORD);
-    private final UniqueDatabase userDatabase2 =
-            new UniqueDatabase(MYSQL_CONTAINER, "user_2", TEST_USER, TEST_PASSWORD);
+    private final UniqueDatabase userDatabase1 = new UniqueDatabase(MYSQL_CONTAINER, "user_1");
+    private final UniqueDatabase userDatabase2 = new UniqueDatabase(MYSQL_CONTAINER, "user_2");
 
     private final UniqueDatabase inventoryDatabase8 =
-            new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL8_CONTAINER, "inventory");
 
     private final UniqueDatabase binlogDatabase =
-            new UniqueDatabase(MYSQL8_CONTAINER, "binlog_metadata_test", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL8_CONTAINER, "binlog_metadata_test");
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -189,10 +184,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + " %s"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
+                        inventoryDatabase.getHost(),
+                        inventoryDatabase.getDatabasePort(),
+                        inventoryDatabase.getUsername(),
+                        inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         incrementalSnapshot,
@@ -315,10 +310,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '2'"
                                 + " %s"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
+                        inventoryDatabase.getHost(),
+                        inventoryDatabase.getDatabasePort(),
+                        inventoryDatabase.getUsername(),
+                        inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         getServerId(),
                         otherTableOptions);
@@ -445,10 +440,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
+                        inventoryDatabase.getHost(),
+                        inventoryDatabase.getDatabasePort(),
+                        inventoryDatabase.getUsername(),
+                        inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         incrementalSnapshot,
@@ -504,16 +499,15 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
 
     @Test
     public void testMysql57AllDataTypes() throws Throwable {
-        testAllDataTypes(MYSQL_CONTAINER, fullTypesMySql57Database);
+        testAllDataTypes(fullTypesMySql57Database);
     }
 
     @Test
     public void testMySql8AllDataTypes() throws Throwable {
-        testAllDataTypes(MYSQL8_CONTAINER, fullTypesMySql8Database);
+        testAllDataTypes(fullTypesMySql8Database);
     }
 
-    public void testAllDataTypes(MySqlContainer mySqlContainer, UniqueDatabase database)
-            throws Throwable {
+    public void testAllDataTypes(UniqueDatabase database) throws Throwable {
         database.createAndInitialize();
         String sourceDDL =
                 String.format(
@@ -590,8 +584,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        mySqlContainer.getHost(),
-                        mySqlContainer.getDatabasePort(),
+                        database.getHost(),
+                        database.getDatabasePort(),
                         database.getUsername(),
                         database.getPassword(),
                         database.getDatabaseName(),
@@ -799,8 +793,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
+                        fullTypesMySql57Database.getHost(),
+                        fullTypesMySql57Database.getDatabasePort(),
                         fullTypesMySql57Database.getUsername(),
                         fullTypesMySql57Database.getPassword(),
                         fullTypesMySql57Database.getDatabaseName(),
@@ -874,8 +868,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
+                        fullTypesMySql57Database.getHost(),
+                        fullTypesMySql57Database.getDatabasePort(),
                         fullTypesMySql57Database.getUsername(),
                         fullTypesMySql57Database.getPassword(),
                         fullTypesMySql57Database.getDatabaseName(),
@@ -954,8 +948,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
+                        userDatabase1.getHost(),
+                        userDatabase1.getDatabasePort(),
                         userDatabase1.getUsername(),
                         userDatabase1.getPassword(),
                         userDatabase1.getDatabaseName(),
@@ -1052,10 +1046,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
+                        inventoryDatabase.getHost(),
+                        inventoryDatabase.getDatabasePort(),
+                        inventoryDatabase.getUsername(),
+                        inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         incrementalSnapshot,
@@ -1126,10 +1120,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
+                        inventoryDatabase.getHost(),
+                        inventoryDatabase.getDatabasePort(),
+                        inventoryDatabase.getUsername(),
+                        inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "varbinary_pk_table",
                         getServerId(),
@@ -1201,8 +1195,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getHost(),
+                        customerDatabase.getDatabasePort(),
                         customerDatabase.getUsername(),
                         customerDatabase.getPassword(),
                         customerDatabase.getDatabaseName(),
@@ -1271,8 +1265,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
+                        customer3_0Database.getHost(),
+                        customer3_0Database.getDatabasePort(),
                         customer3_0Database.getUsername(),
                         customer3_0Database.getPassword(),
                         customer3_0Database.getDatabaseName(),
@@ -1336,8 +1330,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getHost(),
+                        customerDatabase.getDatabasePort(),
                         customerDatabase.getUsername(),
                         customerDatabase.getPassword(),
                         // The regular regex from database-name and table-name will be
@@ -1412,8 +1406,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getHost(),
+                        customerDatabase.getDatabasePort(),
                         customerDatabase.getUsername(),
                         customerDatabase.getPassword(),
                         customerDatabase.getDatabaseName(),
@@ -1550,8 +1544,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getHost(),
+                        customerDatabase.getDatabasePort(),
                         customerDatabase.getUsername(),
                         customerDatabase.getPassword(),
                         customerDatabase.getDatabaseName(),
@@ -1618,8 +1612,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
+                        userDatabase1.getHost(),
+                        userDatabase1.getDatabasePort(),
                         userDatabase1.getUsername(),
                         userDatabase1.getPassword(),
                         String.format(
@@ -1674,7 +1668,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
         }
         Tuple2<String, Integer> offset =
-                currentMySqlLatestOffset(MYSQL_CONTAINER, inventoryDatabase, "products", 9, false);
+                currentMySqlLatestOffset(inventoryDatabase, "products", 9, false);
 
         String sourceDDL =
                 String.format(
@@ -1698,10 +1692,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'scan.startup.specific-offset.pos' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
+                        inventoryDatabase.getHost(),
+                        inventoryDatabase.getDatabasePort(),
+                        inventoryDatabase.getUsername(),
+                        inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         offset.f0,
@@ -1770,10 +1764,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     DebeziumUtils.currentBinlogOffset(
                             DebeziumUtils.createMySqlConnection(
                                     new MySqlSourceConfigFactory()
-                                            .hostname(MYSQL_CONTAINER.getHost())
-                                            .port(MYSQL_CONTAINER.getDatabasePort())
-                                            .username(TEST_USER)
-                                            .password(TEST_PASSWORD)
+                                            .hostname(inventoryDatabase.getHost())
+                                            .port(inventoryDatabase.getDatabasePort())
+                                            .username(inventoryDatabase.getUsername())
+                                            .password(inventoryDatabase.getPassword())
                                             .databaseList(inventoryDatabase.getDatabaseName())
                                             .tableList("products")
                                             .createConfig(0)));
@@ -1800,10 +1794,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'scan.startup.specific-offset.gtid-set' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
+                        inventoryDatabase.getHost(),
+                        inventoryDatabase.getDatabasePort(),
+                        inventoryDatabase.getUsername(),
+                        inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         offset.getGtidSet(),
@@ -1873,10 +1867,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'scan.startup.mode' = 'earliest-offset',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
+                        inventoryDatabase.getHost(),
+                        inventoryDatabase.getDatabasePort(),
+                        inventoryDatabase.getUsername(),
+                        inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         incrementalSnapshot);
@@ -1959,10 +1953,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'scan.startup.timestamp-millis' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
+                        inventoryDatabase.getHost(),
+                        inventoryDatabase.getDatabasePort(),
+                        inventoryDatabase.getUsername(),
+                        inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "products",
                         System.currentTimeMillis(),
@@ -2029,8 +2023,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getHost(),
+                        customerDatabase.getDatabasePort(),
                         customerDatabase.getUsername(),
                         customerDatabase.getPassword(),
                         customerDatabase.getDatabaseName(),
@@ -2086,10 +2080,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
+                        inventoryDatabase.getHost(),
+                        inventoryDatabase.getDatabasePort(),
+                        inventoryDatabase.getUsername(),
+                        inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "multi_max_table",
                         getServerId(),
@@ -2155,8 +2149,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                         + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                         + ")",
                                 i,
-                                MYSQL_CONTAINER.getHost(),
-                                MYSQL_CONTAINER.getDatabasePort(),
+                                customerDatabase.getHost(),
+                                customerDatabase.getDatabasePort(),
                                 customerDatabase.getUsername(),
                                 customerDatabase.getPassword(),
                                 customerDatabase.getDatabaseName(),
@@ -2221,10 +2215,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL8_CONTAINER.getHost(),
-                        MYSQL8_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
+                        binlogDatabase.getHost(),
+                        binlogDatabase.getDatabasePort(),
+                        binlogDatabase.getUsername(),
+                        binlogDatabase.getPassword(),
                         binlogDatabase.getDatabaseName(),
                         "binlog_metadata",
                         getServerId(),
@@ -2371,10 +2365,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s',"
                                 + " 'debezium.binary.handling.mode' = 'base64'"
                                 + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
-                        TEST_USER,
-                        TEST_PASSWORD,
+                        inventoryDatabase.getHost(),
+                        inventoryDatabase.getDatabasePort(),
+                        inventoryDatabase.getUsername(),
+                        inventoryDatabase.getPassword(),
                         inventoryDatabase.getDatabaseName(),
                         "varbinary_base64_table",
                         getServerId(),

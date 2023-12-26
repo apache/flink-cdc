@@ -28,7 +28,7 @@ import org.junit.Test;
 public class MySqlSourceExampleTest extends MySqlSourceTestBase {
 
     private final UniqueDatabase inventoryDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory");
 
     @Test
     @Ignore("Test ignored because it won't stop and is used for manual test")
@@ -36,8 +36,8 @@ public class MySqlSourceExampleTest extends MySqlSourceTestBase {
         inventoryDatabase.createAndInitialize();
         MySqlSource<String> mySqlSource =
                 MySqlSource.<String>builder()
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .hostname(inventoryDatabase.getHost())
+                        .port(inventoryDatabase.getDatabasePort())
                         .databaseList(inventoryDatabase.getDatabaseName())
                         .tableList(inventoryDatabase.getDatabaseName() + ".products")
                         .username(inventoryDatabase.getUsername())

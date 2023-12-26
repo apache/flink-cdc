@@ -25,6 +25,7 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.util.TestLogger;
 
+import com.ververica.cdc.connectors.mysql.MySqlTestUtils;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
 import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.junit.AfterClass;
@@ -32,7 +33,6 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
 import java.util.List;
@@ -77,18 +77,7 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     }
 
     protected static MySqlContainer createMySqlContainer(MySqlVersion version) {
-        return createMySqlContainer(version, "docker/server-gtids/my.cnf");
-    }
-
-    protected static MySqlContainer createMySqlContainer(MySqlVersion version, String configPath) {
-        return (MySqlContainer)
-                new MySqlContainer(version)
-                        .withConfigurationOverride(configPath)
-                        .withSetupSQL("docker/setup.sql")
-                        .withDatabaseName("flink-test")
-                        .withUsername("flinkuser")
-                        .withPassword("flinkpw")
-                        .withLogConsumer(new Slf4jLogConsumer(LOG));
+        return MySqlTestUtils.createMySqlContainer(version, "docker/server-gtids/my.cnf");
     }
 
     // ------------------------------------------------------------------------

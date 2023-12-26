@@ -148,19 +148,13 @@ public class MySqlValidatorTest {
     }
 
     private void doValidate(MySqlVersion version, String configPath, String exceptionMessage) {
-        try (MySqlContainer container =
-                new MySqlContainer(version).withConfigurationOverride(configPath)) {
+        try (MySqlContainer container = MySqlTestUtils.createMySqlContainer(version, configPath)) {
 
             LOG.info("Starting containers...");
             Startables.deepStart(Stream.of(container)).join();
             LOG.info("Containers are started.");
 
-            UniqueDatabase database =
-                    new UniqueDatabase(
-                            container,
-                            "inventory",
-                            container.getUsername(),
-                            container.getPassword());
+            UniqueDatabase database = new UniqueDatabase(container, "inventory");
 
             try {
                 startSource(database);

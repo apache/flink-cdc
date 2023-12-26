@@ -107,10 +107,9 @@ import static org.junit.Assert.fail;
 /** Tests for {@link MySqlSourceReader}. */
 public class MySqlSourceReaderTest extends MySqlSourceTestBase {
 
-    private final UniqueDatabase customerDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
+    private final UniqueDatabase customerDatabase = new UniqueDatabase(MYSQL_CONTAINER, "customer");
     private final UniqueDatabase inventoryDatabase =
-            new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory");
 
     @After
     public void clear() {
@@ -296,10 +295,10 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         .databaseList(inventoryDatabase.getDatabaseName())
                         .tableList(getTableNameRegex(tableNames.toArray(new String[0])))
                         .includeSchemaChanges(false)
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
-                        .username(customerDatabase.getUsername())
-                        .password(customerDatabase.getPassword())
+                        .hostname(inventoryDatabase.getHost())
+                        .port(inventoryDatabase.getDatabasePort())
+                        .username(inventoryDatabase.getUsername())
+                        .password(inventoryDatabase.getPassword())
                         .serverTimeZone(ZoneId.of("UTC").toString())
                         .createConfig(0);
         final MySqlSnapshotSplitAssigner assigner =
@@ -326,10 +325,10 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         .tableList(
                                 getTableNameRegex(tableNames.subList(0, 1).toArray(new String[0])))
                         .includeSchemaChanges(false)
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
-                        .username(customerDatabase.getUsername())
-                        .password(customerDatabase.getPassword())
+                        .hostname(inventoryDatabase.getHost())
+                        .port(inventoryDatabase.getDatabasePort())
+                        .username(inventoryDatabase.getUsername())
+                        .password(inventoryDatabase.getPassword())
                         .serverTimeZone(ZoneId.of("UTC").toString())
                         .createConfig(0);
         MySqlSourceReader<SourceRecord> reader = createReader(sourceConfig4Reader, 1);
@@ -351,10 +350,10 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         .databaseList(inventoryDatabase.getDatabaseName())
                         .tableList(tableName)
                         .includeSchemaChanges(false)
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
-                        .username(customerDatabase.getUsername())
-                        .password(customerDatabase.getPassword())
+                        .hostname(inventoryDatabase.getHost())
+                        .port(inventoryDatabase.getDatabasePort())
+                        .username(inventoryDatabase.getUsername())
+                        .password(inventoryDatabase.getPassword())
                         .serverTimeZone(ZoneId.of("UTC").toString())
                         .createConfig(0);
         final MySqlSnapshotSplitAssigner assigner =
@@ -517,8 +516,8 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                 .databaseList(customerDatabase.getDatabaseName())
                 .tableList(captureTableIds)
                 .includeSchemaChanges(false)
-                .hostname(MYSQL_CONTAINER.getHost())
-                .port(MYSQL_CONTAINER.getDatabasePort())
+                .hostname(customerDatabase.getHost())
+                .port(customerDatabase.getDatabasePort())
                 .splitSize(10)
                 .fetchSize(2)
                 .username(customerDatabase.getUsername())

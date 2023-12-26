@@ -24,6 +24,7 @@ import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.DataType;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.common.types.RowType;
+import com.ververica.cdc.connectors.mysql.MySqlTestUtils;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
@@ -42,8 +43,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
-import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -51,14 +50,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
 
     private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
+            MySqlTestUtils.createMySqlContainer(
+                    MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
 
     private final UniqueDatabase fullTypesMySql57Database =
-            new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL_CONTAINER, "column_type_test");
 
     private final UniqueDatabase fullTypesMySql8Database =
-            new UniqueDatabase(
-                    MYSQL8_CONTAINER, "column_type_test_mysql8", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL8_CONTAINER, "column_type_test_mysql8");
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
