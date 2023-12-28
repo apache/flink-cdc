@@ -57,7 +57,8 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
         return Column.physicalColumn(
                 stringSerializer.copy(from.getName()),
                 dataTypeSerializer.copy(from.getType()),
-                stringSerializer.copy(from.getComment()));
+                stringSerializer.copy(from.getComment()),
+                stringSerializer.copy(from.getDefaultValueExpression()));
     }
 
     @Override
@@ -75,6 +76,7 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
         stringSerializer.serialize(record.getName(), target);
         dataTypeSerializer.serialize(record.getType(), target);
         stringSerializer.serialize(record.getComment(), target);
+        stringSerializer.serialize(record.getDefaultValueExpression(), target);
     }
 
     @Override
@@ -82,7 +84,8 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
         String name = stringSerializer.deserialize(source);
         DataType dataType = dataTypeSerializer.deserialize(source);
         String comment = stringSerializer.deserialize(source);
-        return Column.physicalColumn(name, dataType, comment);
+        String defaultValue = stringSerializer.deserialize(source);
+        return Column.physicalColumn(name, dataType, comment, defaultValue);
     }
 
     @Override
