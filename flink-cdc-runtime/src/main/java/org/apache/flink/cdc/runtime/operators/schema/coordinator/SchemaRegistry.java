@@ -214,6 +214,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                         break;
                     }
                 case 1:
+                case 2:
                     {
                         int length = in.readInt();
                         byte[] serializedSchemaManager = new byte[length];

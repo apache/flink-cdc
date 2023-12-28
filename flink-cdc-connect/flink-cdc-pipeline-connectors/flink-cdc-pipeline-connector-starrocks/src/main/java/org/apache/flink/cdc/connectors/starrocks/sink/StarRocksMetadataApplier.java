@@ -37,6 +37,8 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksUtils.toStarRocksDataType;
+
 /** A {@code MetadataApplier} that applies metadata changes to StarRocks. */
 public class StarRocksMetadataApplier implements MetadataApplier {
 
@@ -117,8 +119,9 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                     new StarRocksColumn.Builder()
                             .setColumnName(column.getName())
                             .setOrdinalPosition(-1)
-                            .setColumnComment(column.getComment());
-            StarRocksUtils.toStarRocksDataType(column, false, builder);
+                            .setColumnComment(column.getComment())
+                            .setDefaultValue(column.getDefaultValueExpression());
+            toStarRocksDataType(column, false, builder);
             addColumns.add(builder.build());
         }
 

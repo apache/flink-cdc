@@ -355,7 +355,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                 tableId,
                 Schema.newBuilder()
                         .physicalColumn("id", DataTypes.INT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
                         .physicalColumn("description", DataTypes.VARCHAR(512))
                         .physicalColumn("weight", DataTypes.FLOAT())
                         .primaryKey(Collections.singletonList("id"))

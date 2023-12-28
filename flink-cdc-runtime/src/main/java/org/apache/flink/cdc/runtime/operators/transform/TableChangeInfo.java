@@ -109,7 +109,7 @@ public class TableChangeInfo {
     /** Serializer for {@link TableChangeInfo}. */
     public static class Serializer implements SimpleVersionedSerializer<TableChangeInfo> {
 
-        public static final int CURRENT_VERSION = 1;
+        public static final int CURRENT_VERSION = 2;
 
         @Override
         public int getVersion() {
