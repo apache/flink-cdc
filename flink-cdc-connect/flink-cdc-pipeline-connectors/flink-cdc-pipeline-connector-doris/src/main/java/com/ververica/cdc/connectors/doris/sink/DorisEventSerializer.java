@@ -35,9 +35,7 @@ import org.apache.doris.flink.sink.writer.serializer.DorisRecordSerializer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,13 +46,6 @@ import static org.apache.doris.flink.sink.util.DeleteOperation.addDeleteSign;
 public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     private ObjectMapper objectMapper = new ObjectMapper();
     private Map<TableId, Schema> schemaMaps = new HashMap<>();
-
-    /** Format DATE type data. */
-    public static final SimpleDateFormat DATE_FORMATTER = new SimpleDateFormat("yyyy-MM-dd");
-
-    /** Format timestamp-related type data. */
-    public static final DateTimeFormatter DATE_TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /** ZoneId from pipeline config to support timestamp with local time zone. */
     public final ZoneId pipelineZoneId;
@@ -125,7 +116,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                     DorisRowConverter.createNullableExternalConverter(
                             columns.get(i).getType(), pipelineZoneId);
             Object field = converter.serialize(i, recordData);
-            record.put(columns.get(i).getName(), field);
+            record.put(columns.get(i).getName(), field == null ? null : field.toString());
         }
         return record;
     }

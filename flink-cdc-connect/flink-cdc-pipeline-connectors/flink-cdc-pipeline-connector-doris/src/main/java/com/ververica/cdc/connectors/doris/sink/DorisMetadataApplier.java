@@ -29,12 +29,6 @@ import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.sink.MetadataApplier;
-import com.ververica.cdc.common.types.DataTypeChecks;
-import com.ververica.cdc.common.types.LocalZonedTimestampType;
-import com.ververica.cdc.common.types.TimestampType;
-import com.ververica.cdc.common.types.ZonedTimestampType;
-import com.ververica.cdc.common.types.utils.DataTypeUtils;
-import org.apache.doris.flink.catalog.DorisTypeMapper;
 import org.apache.doris.flink.catalog.doris.DataModel;
 import org.apache.doris.flink.catalog.doris.FieldSchema;
 import org.apache.doris.flink.catalog.doris.TableSchema;
@@ -116,18 +110,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         List<String> columnNameList = schema.getColumnNames();
         for (String columnName : columnNameList) {
             Column column = schema.getColumn(columnName).get();
-            String typeString;
-            if (column.getType() instanceof LocalZonedTimestampType
-                    || column.getType() instanceof TimestampType
-                    || column.getType() instanceof ZonedTimestampType) {
-                int precision = DataTypeChecks.getPrecision(column.getType());
-                typeString =
-                        String.format("%s(%s)", "DATETIMEV2", Math.min(Math.max(precision, 0), 6));
-            } else {
-                typeString =
-                        DorisTypeMapper.toDorisType(
-                                DataTypeUtils.toFlinkDataType(column.getType()));
-            }
+            String typeString = DorisTypeMapper.toDorisType(column.getType());
             fieldSchemaMap.put(
                     column.getName(),
                     new FieldSchema(column.getName(), typeString, column.getComment()));
@@ -151,18 +134,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         List<AddColumnEvent.ColumnWithPosition> addedColumns = event.getAddedColumns();
         for (AddColumnEvent.ColumnWithPosition col : addedColumns) {
             Column column = col.getAddColumn();
-            String typeString;
-            if (column.getType() instanceof LocalZonedTimestampType
-                    || column.getType() instanceof TimestampType
-                    || column.getType() instanceof ZonedTimestampType) {
-                int precision = DataTypeChecks.getPrecision(column.getType());
-                typeString =
-                        String.format("%s(%s)", "DATETIMEV2", Math.min(Math.max(precision, 0), 6));
-            } else {
-                typeString =
-                        DorisTypeMapper.toDorisType(
-                                DataTypeUtils.toFlinkDataType(column.getType()));
-            }
+            String typeString = DorisTypeMapper.toDorisType(column.getType());
             FieldSchema addFieldSchema =
                     new FieldSchema(column.getName(), typeString, column.getComment());
             schemaChangeManager.addColumn(
