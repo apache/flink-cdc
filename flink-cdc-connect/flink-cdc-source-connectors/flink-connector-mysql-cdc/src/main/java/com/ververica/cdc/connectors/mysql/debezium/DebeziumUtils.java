@@ -277,7 +277,7 @@ public class DebeziumUtils {
 
         while (startIdx <= endIdx) {
             int mid = startIdx + (endIdx - startIdx) / 2;
-            FindOffsetListener midBinlog = getBinlogOffsetListener(binlogFiles, mid, client);
+            FindOffsetListener midBinlog = getBinlogOffsetListener(client, binlogFiles.get(mid));
             long midTs = midBinlog.getFirstEventTs();
             if (midTs < targetMs) {
                 startIdx = mid + 1;
@@ -292,8 +292,7 @@ public class DebeziumUtils {
     }
 
     public static FindOffsetListener getBinlogOffsetListener(
-            List<String> binlogFiles, int startId, BinaryLogClient client) {
-        String binlogFile = binlogFiles.get(startId);
+            BinaryLogClient client, String binlogFile) {
         FindOffsetListener findOffsetListener = new FindOffsetListener();
         client.registerEventListener(findOffsetListener);
         client.setBinlogFilename(binlogFile);
