@@ -253,7 +253,10 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
 
     private org.apache.flink.cdc.common.schema.Column toCdcColumn(Column dbzColumn) {
         return org.apache.flink.cdc.common.schema.Column.physicalColumn(
-                dbzColumn.name(), fromDbzColumn(dbzColumn), dbzColumn.comment());
+                dbzColumn.name(),
+                fromDbzColumn(dbzColumn),
+                dbzColumn.comment(),
+                dbzColumn.defaultValueExpression().orElse(null));
     }
 
     private org.apache.flink.cdc.common.event.TableId toCdcTableId(TableId dbzTableId) {
