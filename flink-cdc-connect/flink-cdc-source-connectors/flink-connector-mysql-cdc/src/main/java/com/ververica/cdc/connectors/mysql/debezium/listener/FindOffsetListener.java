@@ -18,14 +18,22 @@ package com.ververica.cdc.connectors.mysql.debezium.listener;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.event.Event;
-import com.github.shyiko.mysql.binlog.event.EventHeader;
+import com.github.shyiko.mysql.binlog.event.EventData;
+import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
+import com.github.shyiko.mysql.binlog.event.RotateEventData;
+
+import java.io.IOException;
 
 /** FindOffsetListener. */
 public class FindOffsetListener implements BinaryLogClient.EventListener {
 
     private long firstEventTs = 0L;
 
-    public FindOffsetListener() {}
+    private final BinaryLogClient client;
+
+    public FindOffsetListener(BinaryLogClient client) {
+        this.client = client;
+    }
 
     public long getFirstEventTs() {
         return this.firstEventTs;
@@ -33,19 +41,22 @@ public class FindOffsetListener implements BinaryLogClient.EventListener {
 
     @Override
     public void onEvent(Event event) {
-        EventHeader eventHeader = event.getHeader();
-        long ts = eventHeader.getTimestamp();
-        if (ts != 0) {
-            this.firstEventTs = ts;
-            throw sneakyThrow(new BinlogListenerThrowable());
+        EventData data = event.getData();
+        if (data instanceof RotateEventData) {
+            // We skip RotateEventData because it does not contain the timestamp we are interested
+            // in.
+            return;
         }
-    }
 
-    public static RuntimeException sneakyThrow(Throwable t) {
-        return sneakyThrow0(t);
-    }
-
-    private static <T extends Throwable> T sneakyThrow0(Throwable t) throws T {
-        throw (T) t;
+        EventHeaderV4 header = event.getHeader();
+        long timestamp = header.getTimestamp();
+        if (timestamp > 0) {
+            this.firstEventTs = timestamp;
+            try {
+                client.disconnect();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 }

@@ -42,6 +42,7 @@ import io.debezium.util.SchemaNameAdjuster;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -271,7 +272,7 @@ public class DebeziumUtils {
     }
 
     public static int searchBinlogOffset(
-            BinaryLogClient client, long targetMs, List<String> binlogFiles) {
+            BinaryLogClient client, long targetMs, List<String> binlogFiles) throws IOException {
         int startIdx = 0;
         int endIdx = binlogFiles.size() - 1;
 
@@ -292,22 +293,18 @@ public class DebeziumUtils {
     }
 
     public static FindOffsetListener getBinlogOffsetListener(
-            BinaryLogClient client, String binlogFile) {
-        FindOffsetListener findOffsetListener = new FindOffsetListener();
-        client.registerEventListener(findOffsetListener);
-        client.setBinlogFilename(binlogFile);
-        client.setBinlogPosition(0);
-
+            BinaryLogClient client, String binlogFile) throws IOException {
+        FindOffsetListener findOffsetListener = new FindOffsetListener(client);
         try {
+            client.registerEventListener(findOffsetListener);
+            client.setBinlogFilename(binlogFile);
+            client.setBinlogPosition(0);
+
             LOG.info("begin parse binlog: {}", binlogFile);
             client.connect();
-        } catch (Throwable e) {
-            LOG.info(
-                    "end parse binlog: {}, eventTs: {}",
-                    binlogFile,
-                    findOffsetListener.getFirstEventTs());
+        } finally {
+            client.unregisterEventListener(findOffsetListener);
         }
-        client.unregisterEventListener(findOffsetListener);
         return findOffsetListener;
     }
 }

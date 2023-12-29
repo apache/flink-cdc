@@ -311,6 +311,10 @@ public class SpecificStartingOffsetITCase {
         Assert.equals(
                 DebeziumUtils.findBinlogOffset(t3, connection),
                 BinlogOffset.ofBinlogFilePosition("mysql-bin.000007", 0));
+        // would return the correct binlog
+        Assert.equals(
+                DebeziumUtils.findBinlogOffset(t3 - 500, connection),
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000007", 0));
         Assert.equals(
                 DebeziumUtils.findBinlogOffset(t4, connection),
                 BinlogOffset.ofBinlogFilePosition("mysql-bin.000008", 0));
