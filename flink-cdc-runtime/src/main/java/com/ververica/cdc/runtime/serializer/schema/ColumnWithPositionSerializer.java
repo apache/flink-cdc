@@ -44,7 +44,7 @@ public class ColumnWithPositionSerializer
     private final TypeSerializer<Column> addColumnSerializer =
             new NullableSerializerWrapper<>(ColumnSerializer.INSTANCE);
 
-    private final TypeSerializer<String> existedColumnSerializer = new StringSerializer();
+    private final TypeSerializer<String> existedColumnNameSerializer = StringSerializer.INSTANCE;
 
     private final EnumSerializer<AddColumnEvent.ColumnPosition> positionEnumSerializer =
             new EnumSerializer<>(AddColumnEvent.ColumnPosition.class);
@@ -65,7 +65,7 @@ public class ColumnWithPositionSerializer
         return new AddColumnEvent.ColumnWithPosition(
                 addColumnSerializer.copy(from.getAddColumn()),
                 from.getPosition(),
-                existedColumnSerializer.copy(from.getExistedColumnName()));
+                existedColumnNameSerializer.copy(from.getExistedColumnName()));
     }
 
     @Override
@@ -84,23 +84,15 @@ public class ColumnWithPositionSerializer
             throws IOException {
         addColumnSerializer.serialize(record.getAddColumn(), target);
         positionEnumSerializer.serialize(record.getPosition(), target);
-        if (record.getExistedColumnName() == null) {
-            target.writeInt(0);
-        } else {
-            target.writeInt(1);
-            existedColumnSerializer.serialize(record.getExistedColumnName(), target);
-        }
+        existedColumnNameSerializer.serialize(record.getExistedColumnName(), target);
     }
 
     @Override
     public AddColumnEvent.ColumnWithPosition deserialize(DataInputView source) throws IOException {
         Column addColumn = addColumnSerializer.deserialize(source);
         AddColumnEvent.ColumnPosition position = positionEnumSerializer.deserialize(source);
-        if (source.readInt() == 1) {
-            return new AddColumnEvent.ColumnWithPosition(
-                    addColumn, position, existedColumnSerializer.deserialize(source));
-        }
-        return new AddColumnEvent.ColumnWithPosition(addColumn, position, null);
+        return new AddColumnEvent.ColumnWithPosition(
+                addColumn, position, existedColumnNameSerializer.deserialize(source));
     }
 
     @Override
