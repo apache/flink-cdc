@@ -21,6 +21,7 @@ import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.types.LocalZonedTimestampType;
 
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.TimeZone;
@@ -51,6 +52,7 @@ public class PipelineDef {
     private final SourceDef source;
     private final SinkDef sink;
     private final List<RouteDef> routes;
+    private final List<SchemaRouteDef> schemeRoutes;
     private final List<TransformDef> transforms;
     private final Configuration config;
 
@@ -63,6 +65,22 @@ public class PipelineDef {
         this.source = source;
         this.sink = sink;
         this.routes = routes;
+        this.schemeRoutes = new ArrayList<>();
+        this.transforms = transforms;
+        this.config = evaluatePipelineTimeZone(config);
+    }
+
+    public PipelineDef(
+            SourceDef source,
+            SinkDef sink,
+            List<RouteDef> routes,
+            List<SchemaRouteDef> schemeRoutes,
+            List<TransformDef> transforms,
+            Configuration config) {
+        this.source = source;
+        this.sink = sink;
+        this.routes = routes;
+        this.schemeRoutes = schemeRoutes;
         this.transforms = transforms;
         this.config = evaluatePipelineTimeZone(config);
     }
@@ -77,6 +95,10 @@ public class PipelineDef {
 
     public List<RouteDef> getRoute() {
         return routes;
+    }
+
+    public List<SchemaRouteDef> getSchemeRoute() {
+        return schemeRoutes;
     }
 
     public List<TransformDef> getTransforms() {

@@ -21,6 +21,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.composer.definition.RouteDef;
+import com.ververica.cdc.composer.definition.SchemaRouteDef;
 import com.ververica.cdc.runtime.operators.route.RouteFunction;
 import com.ververica.cdc.runtime.typeutils.EventTypeInfo;
 
@@ -28,14 +29,22 @@ import java.util.List;
 
 /** Translator for router. */
 public class RouteTranslator {
-    public DataStream<Event> translate(DataStream<Event> input, List<RouteDef> routes) {
-        if (routes.isEmpty()) {
+    public DataStream<Event> translate(
+            DataStream<Event> input, List<RouteDef> routes, List<SchemaRouteDef> schemeRoutes) {
+        if (routes.isEmpty() && schemeRoutes.isEmpty()) {
             return input;
         }
         RouteFunction.Builder routeFunctionBuilder = RouteFunction.newBuilder();
         for (RouteDef route : routes) {
             routeFunctionBuilder.addRoute(
                     route.getSourceTable(), TableId.parse(route.getSinkTable()));
+        }
+        for (SchemaRouteDef schemaRoute : schemeRoutes) {
+            routeFunctionBuilder.addSchemaRoute(
+                    schemaRoute.getSourceDatabase(),
+                    schemaRoute.getSinkDatabase(),
+                    schemaRoute.getTablePrefix().orElse(null),
+                    schemaRoute.getTableSuffix().orElse(null));
         }
         return input.map(routeFunctionBuilder.build(), new EventTypeInfo()).name("Route");
     }

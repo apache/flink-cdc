@@ -102,7 +102,9 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // Route
         RouteTranslator routeTranslator = new RouteTranslator();
-        stream = routeTranslator.translate(stream, pipelineDef.getRoute());
+        stream =
+                routeTranslator.translate(
+                        stream, pipelineDef.getRoute(), pipelineDef.getSchemeRoute());
 
         // Create sink in advance as schema operator requires MetadataApplier
         DataSink dataSink = createDataSink(pipelineDef.getSink(), pipelineDef.getConfig());

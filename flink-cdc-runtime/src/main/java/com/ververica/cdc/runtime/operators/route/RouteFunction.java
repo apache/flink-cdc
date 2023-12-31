@@ -18,6 +18,7 @@ package com.ververica.cdc.runtime.operators.route;
 
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.configuration.Configuration;
 
 import com.ververica.cdc.common.event.AddColumnEvent;
@@ -32,8 +33,7 @@ import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Selectors;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.common.utils.Preconditions.checkState;
@@ -41,6 +41,7 @@ import static com.ververica.cdc.common.utils.Preconditions.checkState;
 /** A map function that applies user-defined routing logics. */
 public class RouteFunction extends RichMapFunction<Event, Event> {
     private final List<Tuple2<String, TableId>> routingRules;
+    private final List<Tuple4<String, String, String, String>> schemaRoutes;
     private transient List<Tuple2<Selectors, TableId>> routes;
 
     public static Builder newBuilder() {
@@ -50,19 +51,32 @@ public class RouteFunction extends RichMapFunction<Event, Event> {
     /** Builder of {@link RouteFunction}. */
     public static class Builder {
         private final List<Tuple2<String, TableId>> routingRules = new ArrayList<>();
+        private final List<Tuple4<String, String, String, String>> schemaRoutes = new ArrayList<>();
 
         public Builder addRoute(String tableInclusions, TableId replaceBy) {
             routingRules.add(Tuple2.of(tableInclusions, replaceBy));
             return this;
         }
 
+        public Builder addSchemaRoute(
+                String sourceDatabase,
+                String sinkDatabase,
+                String tablePrefix,
+                String tableSuffix) {
+            schemaRoutes.add(Tuple4.of(sourceDatabase, sinkDatabase, tablePrefix, tableSuffix));
+            return this;
+        }
+
         public RouteFunction build() {
-            return new RouteFunction(routingRules);
+            return new RouteFunction(routingRules, schemaRoutes);
         }
     }
 
-    private RouteFunction(List<Tuple2<String, TableId>> routingRules) {
+    private RouteFunction(
+            List<Tuple2<String, TableId>> routingRules,
+            List<Tuple4<String, String, String, String>> schemaRoutes) {
         this.routingRules = routingRules;
+        this.schemaRoutes = schemaRoutes;
     }
 
     @Override
@@ -91,7 +105,7 @@ public class RouteFunction extends RichMapFunction<Event, Event> {
                         event.getClass().getCanonicalName()));
         ChangeEvent changeEvent = (ChangeEvent) event;
         TableId tableId = changeEvent.tableId();
-
+        // priority table route
         for (Tuple2<Selectors, TableId> route : routes) {
             Selectors selectors = route.f0;
             TableId replaceBy = route.f1;
@@ -99,6 +113,28 @@ public class RouteFunction extends RichMapFunction<Event, Event> {
                 return recreateChangeEvent(changeEvent, replaceBy);
             }
         }
+
+        // then schema route
+        for (Tuple4<String, String, String, String> schemaRoute : schemaRoutes) {
+            if (schemaRoute.f0.equals(tableId.getSchemaName())) {
+                // database mapping, table add prefix and suffix mapping
+                String replaceIdentifier;
+                String replaceTableName =
+                        Optional.ofNullable(schemaRoute.f2).orElse("")
+                                + tableId.getTableName()
+                                + Optional.ofNullable(schemaRoute.f3).orElse("");
+                if (tableId.getNamespace() != null) {
+                    replaceIdentifier =
+                            String.join(
+                                    ".", tableId.getNamespace(), schemaRoute.f1, replaceTableName);
+                } else {
+                    replaceIdentifier = String.join(".", schemaRoute.f1, replaceTableName);
+                }
+
+                return recreateChangeEvent(changeEvent, TableId.parse(replaceIdentifier));
+            }
+        }
+
         return event;
     }
 

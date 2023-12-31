@@ -49,6 +49,12 @@ class RouteFunctionTest {
             TableId.tableId("my_company", "my_branch", "customers");
     private static final TableId NEW_CUSTOMERS =
             TableId.tableId("my_new_company", "my_new_branch", "customers");
+
+    private static final TableId ORDERS = TableId.tableId("my_source", "my_app", "orders");
+
+    private static final TableId NEW_ORDERS =
+            TableId.tableId("my_source", "ods_db", "my_new_orders");
+
     private static final Schema CUSTOMERS_SCHEMA =
             Schema.newBuilder()
                     .physicalColumn("id", DataTypes.INT())
@@ -62,6 +68,7 @@ class RouteFunctionTest {
         RouteFunction router =
                 RouteFunction.newBuilder()
                         .addRoute("my_company.\\.+.customers", NEW_CUSTOMERS)
+                        .addSchemaRoute("my_app", "ods_db", "my_new_", null)
                         .build();
         router.open(new Configuration());
         BinaryRecordDataGenerator recordDataGenerator =
@@ -76,6 +83,21 @@ class RouteFunctionTest {
         assertThat(router.map(insertEvent))
                 .asDataChangeEvent()
                 .hasTableId(NEW_CUSTOMERS)
+                .hasOperationType(OperationType.INSERT)
+                .withAfterRecordData()
+                .hasArity(3)
+                .withSchema(CUSTOMERS_SCHEMA)
+                .hasFields(1, new BinaryStringData("Alice"), 12345678L);
+
+        // Insert
+        DataChangeEvent insertEventWithSchemaRouting =
+                DataChangeEvent.insertEvent(
+                        ORDERS,
+                        recordDataGenerator.generate(
+                                new Object[] {1, new BinaryStringData("Alice"), 12345678L}));
+        assertThat(router.map(insertEventWithSchemaRouting))
+                .asDataChangeEvent()
+                .hasTableId(NEW_ORDERS)
                 .hasOperationType(OperationType.INSERT)
                 .withAfterRecordData()
                 .hasArity(3)
