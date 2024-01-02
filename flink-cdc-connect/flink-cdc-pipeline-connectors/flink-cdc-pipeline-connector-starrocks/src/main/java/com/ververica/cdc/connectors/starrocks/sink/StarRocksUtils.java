@@ -38,8 +38,6 @@ import com.ververica.cdc.common.types.TimestampType;
 import com.ververica.cdc.common.types.TinyIntType;
 import com.ververica.cdc.common.types.VarCharType;
 
-import java.sql.Date;
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -112,7 +110,8 @@ public class StarRocksUtils {
     }
 
     /** Format DATE type data. */
-    private static final SimpleDateFormat DATE_FORMATTER = new SimpleDateFormat("yyyy-MM-dd");
+    private static final DateTimeFormatter DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     /** Format timestamp-related type data. */
     private static final DateTimeFormatter DATETIME_FORMATTER =
@@ -168,9 +167,8 @@ public class StarRocksUtils {
             case DATE:
                 fieldGetter =
                         record ->
-                                DATE_FORMATTER.format(
-                                        Date.valueOf(
-                                                LocalDate.ofEpochDay(record.getInt(fieldPos))));
+                                LocalDate.ofEpochDay(record.getInt(fieldPos))
+                                        .format(DATE_FORMATTER);
                 break;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 fieldGetter =
