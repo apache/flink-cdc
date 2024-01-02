@@ -19,7 +19,6 @@ package com.ververica.cdc.connectors.mysql.debezium;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
-import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
@@ -52,6 +51,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.function.Predicate;
 
 import static com.ververica.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
@@ -274,8 +274,9 @@ public class DebeziumUtils {
         }
     }
 
-    public static int searchBinlogOffset(
-            BinaryLogClient client, long targetMs, List<String> binlogFiles) throws IOException {
+    private static int searchBinlogOffset(
+            BinaryLogClient client, long targetMs, List<String> binlogFiles)
+            throws IOException, InterruptedException {
         int startIdx = 0;
         int endIdx = binlogFiles.size() - 1;
 
@@ -294,10 +295,30 @@ public class DebeziumUtils {
         return endIdx;
     }
 
-    public static long getBinlogTimestamp(BinaryLogClient client, String binlogFile)
-            throws IOException {
+    private static long getBinlogTimestamp(BinaryLogClient client, String binlogFile)
+            throws IOException, InterruptedException {
 
-        FindOffsetListener eventListener = new FindOffsetListener(client);
+        ArrayBlockingQueue<Long> binlogTimestamps = new ArrayBlockingQueue<>(1);
+        BinaryLogClient.EventListener eventListener =
+                event -> {
+                    EventData data = event.getData();
+                    if (data instanceof RotateEventData) {
+                        // We skip RotateEventData because it does not contain the timestamp we are
+                        // interested in.
+                        return;
+                    }
+
+                    EventHeaderV4 header = event.getHeader();
+                    long timestamp = header.getTimestamp();
+                    if (timestamp > 0) {
+                        binlogTimestamps.add(timestamp);
+                        try {
+                            client.disconnect();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                };
 
         try {
             client.registerEventListener(eventListener);
@@ -309,42 +330,6 @@ public class DebeziumUtils {
         } finally {
             client.unregisterEventListener(eventListener);
         }
-        return eventListener.getFirstEventTs();
-    }
-
-    private static class FindOffsetListener implements BinaryLogClient.EventListener {
-        private long firstEventTs = 0L;
-
-        private final BinaryLogClient client;
-
-        public FindOffsetListener(BinaryLogClient client) {
-            this.client = client;
-        }
-
-        public long getFirstEventTs() {
-            return this.firstEventTs;
-        }
-
-        @Override
-        public void onEvent(Event event) {
-            EventData data = event.getData();
-            if (data instanceof RotateEventData) {
-                // We skip RotateEventData because it does not contain the timestamp we are
-                // interested
-                // in.
-                return;
-            }
-
-            EventHeaderV4 header = event.getHeader();
-            long timestamp = header.getTimestamp();
-            if (timestamp > 0) {
-                this.firstEventTs = timestamp;
-                try {
-                    client.disconnect();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        }
+        return binlogTimestamps.take();
     }
 }
