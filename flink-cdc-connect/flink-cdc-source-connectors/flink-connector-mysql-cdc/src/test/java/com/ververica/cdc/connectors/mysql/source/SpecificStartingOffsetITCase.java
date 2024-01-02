@@ -262,6 +262,10 @@ public class SpecificStartingOffsetITCase {
         // Purge binary log at first
         purgeBinaryLogs();
 
+        Assert.equals(
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000004", 0),
+                DebeziumUtils.findBinlogOffset(System.currentTimeMillis(), connection));
+
         executeStatements(
                 String.format(
                         "INSERT INTO %s VALUES (15213, 'Alice', 'Rome', '123456987');",
@@ -303,24 +307,25 @@ public class SpecificStartingOffsetITCase {
         flushLogs();
 
         Assert.equals(
-                DebeziumUtils.findBinlogOffset(t1, connection),
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000005", 0));
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000005", 0),
+                DebeziumUtils.findBinlogOffset(t1, connection));
         Assert.equals(
-                DebeziumUtils.findBinlogOffset(t2, connection),
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000006", 0));
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000006", 0),
+                DebeziumUtils.findBinlogOffset(t2, connection));
         Assert.equals(
-                DebeziumUtils.findBinlogOffset(t3, connection),
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000007", 0));
-        // would return the correct binlog
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000007", 0),
+                DebeziumUtils.findBinlogOffset(t3, connection));
         Assert.equals(
-                DebeziumUtils.findBinlogOffset(t3 - 500, connection),
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000007", 0));
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000008", 0),
+                DebeziumUtils.findBinlogOffset(t4, connection));
         Assert.equals(
-                DebeziumUtils.findBinlogOffset(t4, connection),
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000008", 0));
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000009", 0),
+                DebeziumUtils.findBinlogOffset(t5, connection));
+
+        purgeBinaryLogs();
         Assert.equals(
-                DebeziumUtils.findBinlogOffset(t5, connection),
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000009", 0));
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000009", 0),
+                DebeziumUtils.findBinlogOffset(t3, connection));
     }
 
     @Test

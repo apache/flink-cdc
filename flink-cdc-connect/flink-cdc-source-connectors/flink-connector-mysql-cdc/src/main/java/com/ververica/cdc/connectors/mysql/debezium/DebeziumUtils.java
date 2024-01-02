@@ -266,15 +266,14 @@ public class DebeziumUtils {
                 return BinlogOffset.ofBinlogFilePosition("", 0);
             }
 
-            int index = searchBinlogOffset(client, targetMs, binlogFiles);
-            String binlogName = binlogFiles.get(index);
+            String binlogName = searchBinlogName(client, targetMs, binlogFiles);
             return BinlogOffset.ofBinlogFilePosition(binlogName, 0);
         } catch (Exception e) {
             throw new FlinkRuntimeException(e);
         }
     }
 
-    private static int searchBinlogOffset(
+    private static String searchBinlogName(
             BinaryLogClient client, long targetMs, List<String> binlogFiles)
             throws IOException, InterruptedException {
         int startIdx = 0;
@@ -288,11 +287,11 @@ public class DebeziumUtils {
             } else if (targetMs < midTs) {
                 endIdx = mid - 1;
             } else {
-                return mid;
+                return binlogFiles.get(mid);
             }
         }
 
-        return endIdx;
+        return endIdx < 0 ? binlogFiles.get(0) : binlogFiles.get(endIdx);
     }
 
     private static long getBinlogTimestamp(BinaryLogClient client, String binlogFile)
@@ -311,7 +310,7 @@ public class DebeziumUtils {
                     EventHeaderV4 header = event.getHeader();
                     long timestamp = header.getTimestamp();
                     if (timestamp > 0) {
-                        binlogTimestamps.add(timestamp);
+                        binlogTimestamps.offer(timestamp);
                         try {
                             client.disconnect();
                         } catch (IOException e) {
