@@ -32,7 +32,6 @@ import com.ververica.cdc.common.types.ZonedTimestampType;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.sql.Date;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -100,8 +99,7 @@ public class DorisRowConverter implements Serializable {
                 return (index, val) -> val.getDouble(index);
             case DATE:
                 return (index, val) ->
-                        DATE_FORMATTER.format(
-                                Date.valueOf(LocalDate.ofEpochDay(val.getInt(index))));
+                        LocalDate.ofEpochDay(val.getInt(index)).format(DATE_FORMATTER);
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return (index, val) ->
                         val.getTimestamp(index, DataTypeChecks.getPrecision(type))
