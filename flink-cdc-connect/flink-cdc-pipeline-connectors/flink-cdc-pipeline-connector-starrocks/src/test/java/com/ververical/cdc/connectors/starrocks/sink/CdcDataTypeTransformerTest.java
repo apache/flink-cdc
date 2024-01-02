@@ -33,7 +33,8 @@ public class CdcDataTypeTransformerTest {
         // map to char of StarRocks if CDC length <= StarRocksUtils.MAX_CHAR_SIZE
         StarRocksColumn.Builder smallLengthBuilder =
                 new StarRocksColumn.Builder().setColumnName("small_char").setOrdinalPosition(0);
-        new CharType(1).accept(new StarRocksUtils.CdcDataTypeTransformer(smallLengthBuilder));
+        new CharType(1)
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(false, smallLengthBuilder));
         StarRocksColumn smallLengthColumn = smallLengthBuilder.build();
         assertEquals("small_char", smallLengthColumn.getColumnName());
         assertEquals(0, smallLengthColumn.getOrdinalPosition());
@@ -45,7 +46,7 @@ public class CdcDataTypeTransformerTest {
         StarRocksColumn.Builder largeLengthBuilder =
                 new StarRocksColumn.Builder().setColumnName("large_char").setOrdinalPosition(1);
         new CharType(StarRocksUtils.MAX_CHAR_SIZE)
-                .accept(new StarRocksUtils.CdcDataTypeTransformer(largeLengthBuilder));
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(false, largeLengthBuilder));
         StarRocksColumn largeLengthColumn = largeLengthBuilder.build();
         assertEquals("large_char", largeLengthColumn.getColumnName());
         assertEquals(1, largeLengthColumn.getOrdinalPosition());
@@ -57,12 +58,27 @@ public class CdcDataTypeTransformerTest {
     }
 
     @Test
+    public void testCharTypeForPrimaryKey() {
+        // map to varchar of StarRocks if column is primary key
+        StarRocksColumn.Builder smallLengthBuilder =
+                new StarRocksColumn.Builder().setColumnName("primary_key").setOrdinalPosition(0);
+        new CharType(1).accept(new StarRocksUtils.CdcDataTypeTransformer(true, smallLengthBuilder));
+        StarRocksColumn smallLengthColumn = smallLengthBuilder.build();
+        assertEquals("primary_key", smallLengthColumn.getColumnName());
+        assertEquals(0, smallLengthColumn.getOrdinalPosition());
+        assertEquals(StarRocksUtils.VARCHAR, smallLengthColumn.getDataType());
+        assertEquals(Integer.valueOf(3), smallLengthColumn.getColumnSize().orElse(null));
+        assertTrue(smallLengthColumn.isNullable());
+    }
+
+    @Test
     public void testVarCharType() {
         // the length fo StarRocks should be 3 times as that of CDC if CDC length * 3 <=
         // StarRocksUtils.MAX_VARCHAR_SIZE
         StarRocksColumn.Builder smallLengthBuilder =
                 new StarRocksColumn.Builder().setColumnName("small_varchar").setOrdinalPosition(0);
-        new VarCharType(3).accept(new StarRocksUtils.CdcDataTypeTransformer(smallLengthBuilder));
+        new VarCharType(3)
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(false, smallLengthBuilder));
         StarRocksColumn smallLengthColumn = smallLengthBuilder.build();
         assertEquals("small_varchar", smallLengthColumn.getColumnName());
         assertEquals(0, smallLengthColumn.getOrdinalPosition());
@@ -75,7 +91,7 @@ public class CdcDataTypeTransformerTest {
         StarRocksColumn.Builder largeLengthBuilder =
                 new StarRocksColumn.Builder().setColumnName("large_varchar").setOrdinalPosition(1);
         new CharType(StarRocksUtils.MAX_VARCHAR_SIZE + 1)
-                .accept(new StarRocksUtils.CdcDataTypeTransformer(largeLengthBuilder));
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(false, largeLengthBuilder));
         StarRocksColumn largeLengthColumn = largeLengthBuilder.build();
         assertEquals("large_varchar", largeLengthColumn.getColumnName());
         assertEquals(1, largeLengthColumn.getOrdinalPosition());

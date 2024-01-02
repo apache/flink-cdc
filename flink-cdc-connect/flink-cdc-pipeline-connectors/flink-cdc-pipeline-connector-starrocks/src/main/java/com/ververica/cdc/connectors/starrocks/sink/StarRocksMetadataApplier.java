@@ -119,7 +119,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                             .setColumnName(column.getName())
                             .setOrdinalPosition(-1)
                             .setColumnComment(column.getComment());
-            toStarRocksDataType(column, builder);
+            toStarRocksDataType(column, false, builder);
             addColumns.add(builder.build());
         }
 
