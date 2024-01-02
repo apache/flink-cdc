@@ -142,7 +142,7 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
         if (ZonedTimestamp.SCHEMA_NAME.equals(schema.name())) {
             int nano =
                     Optional.ofNullable((String) value)
-                            .map(Instant::parse)
+                            .map(s -> ZonedTimestamp.FORMATTER.parse(s, Instant::from))
                             .map(Instant::getNano)
                             .orElse(0);
 
