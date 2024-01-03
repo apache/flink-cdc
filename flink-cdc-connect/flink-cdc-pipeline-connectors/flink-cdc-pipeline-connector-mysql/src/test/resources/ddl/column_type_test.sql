@@ -106,6 +106,7 @@ CREATE TABLE time_types
     datetime3_c          DATETIME(3),
     datetime6_c          DATETIME(6),
     timestamp_c          TIMESTAMP NULL,
+    timestamp_def_c      TIMESTAMP NULL DEFAULT '2000-01-01 00:00:00',
     PRIMARY KEY (id)
 ) DEFAULT CHARSET=utf8;
 
@@ -119,4 +120,5 @@ VALUES (DEFAULT,
         '2020-07-17 18:00:22',
         '2020-07-17 18:00:22.123',
         '2020-07-17 18:00:22.123456',
-        '2020-07-17 18:00:22');
+        '2020-07-17 18:00:22',
+        NULL);

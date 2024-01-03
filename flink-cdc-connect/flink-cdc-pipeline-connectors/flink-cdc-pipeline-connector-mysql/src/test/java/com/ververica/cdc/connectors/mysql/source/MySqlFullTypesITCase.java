@@ -45,6 +45,7 @@ import org.testcontainers.lifecycle.Startables;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Arrays;
@@ -118,6 +119,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                         DataTypes.TIMESTAMP(0),
                         DataTypes.TIMESTAMP(3),
                         DataTypes.TIMESTAMP(6),
+                        DataTypes.TIMESTAMP_LTZ(0),
                         DataTypes.TIMESTAMP_LTZ(0));
 
         Object[] expectedSnapshot =
@@ -134,7 +136,8 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     TimestampData.fromMillis(1595008822000L),
                     TimestampData.fromMillis(1595008822123L),
                     TimestampData.fromMillis(1595008822123L, 456000),
-                    LocalZonedTimestampData.fromEpochMillis(1595008822000L, 0)
+                    LocalZonedTimestampData.fromEpochMillis(1595008822000L, 0),
+                    null
                 };
 
         Object[] expectedStreamRecord =
@@ -148,7 +151,12 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     TimestampData.fromMillis(1595008822000L),
                     TimestampData.fromMillis(1595008822123L),
                     TimestampData.fromMillis(1595008822123L, 456000),
-                    LocalZonedTimestampData.fromEpochMillis(1595008822000L, 0)
+                    LocalZonedTimestampData.fromEpochMillis(1595008822000L, 0),
+                    LocalZonedTimestampData.fromInstant(
+                            Timestamp.valueOf("2000-01-01 00:00:00")
+                                    .toLocalDateTime()
+                                    .atZone(ZoneId.of("UTC"))
+                                    .toInstant())
                 };
 
         testTimeDataTypes(
@@ -170,7 +178,8 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                         DataTypes.TIMESTAMP(6),
                         DataTypes.TIMESTAMP_LTZ(0),
                         DataTypes.TIMESTAMP_LTZ(3),
-                        DataTypes.TIMESTAMP_LTZ(6));
+                        DataTypes.TIMESTAMP_LTZ(6),
+                        DataTypes.TIMESTAMP_LTZ(0));
 
         Object[] expectedSnapshot =
                 new Object[] {
@@ -189,7 +198,8 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     LocalZonedTimestampData.fromInstant(Instant.parse("2020-07-17T18:00:22Z")),
                     LocalZonedTimestampData.fromInstant(Instant.parse("2020-07-17T18:00:22.123Z")),
                     LocalZonedTimestampData.fromInstant(
-                            Instant.parse("2020-07-17T18:00:22.123456Z"))
+                            Instant.parse("2020-07-17T18:00:22.123456Z")),
+                    null
                 };
 
         Object[] expectedStreamRecord =
@@ -206,7 +216,12 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     LocalZonedTimestampData.fromInstant(Instant.parse("2020-07-17T18:00:22Z")),
                     LocalZonedTimestampData.fromInstant(Instant.parse("2020-07-17T18:00:22.123Z")),
                     LocalZonedTimestampData.fromInstant(
-                            Instant.parse("2020-07-17T18:00:22.123456Z"))
+                            Instant.parse("2020-07-17T18:00:22.123456Z")),
+                    LocalZonedTimestampData.fromInstant(
+                            Timestamp.valueOf("2000-01-01 00:00:00")
+                                    .toLocalDateTime()
+                                    .atZone(ZoneId.of("UTC"))
+                                    .toInstant())
                 };
 
         testTimeDataTypes(
@@ -340,7 +355,8 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         try (Connection connection = database.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-            statement.execute("UPDATE time_types SET time_6_c = null WHERE id = 1;");
+            statement.execute(
+                    "UPDATE time_types SET time_6_c = null, timestamp_def_c = default WHERE id = 1;");
         }
 
         List<Event> streamResults = fetchResults(iterator, 1);
