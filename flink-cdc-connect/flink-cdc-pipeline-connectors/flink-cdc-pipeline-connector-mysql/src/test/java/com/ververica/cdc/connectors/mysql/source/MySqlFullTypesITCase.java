@@ -133,10 +133,10 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     // Because Flink's BinaryWriter force write int value for TIME(6).
                     // See BinaryWriter#write for detail.
                     64822123,
-                    TimestampData.fromMillis(1595008822000L),
-                    TimestampData.fromMillis(1595008822123L),
-                    TimestampData.fromMillis(1595008822123L, 456000),
-                    LocalZonedTimestampData.fromEpochMillis(1595008822000L, 0),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123456")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
                     null
                 };
 
@@ -148,15 +148,11 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     64822000,
                     64822123,
                     null,
-                    TimestampData.fromMillis(1595008822000L),
-                    TimestampData.fromMillis(1595008822123L),
-                    TimestampData.fromMillis(1595008822123L, 456000),
-                    LocalZonedTimestampData.fromEpochMillis(1595008822000L, 0),
-                    LocalZonedTimestampData.fromInstant(
-                            Timestamp.valueOf("2000-01-01 00:00:00")
-                                    .toLocalDateTime()
-                                    .atZone(ZoneId.of("UTC"))
-                                    .toInstant())
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123456")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2000-01-01 00:00:00"))
                 };
 
         testTimeDataTypes(
@@ -192,13 +188,12 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     // Because Flink's BinaryWriter force write int value for TIME(6).
                     // See BinaryWriter#write for detail.
                     64822123,
-                    TimestampData.fromMillis(1595008822000L),
-                    TimestampData.fromMillis(1595008822123L),
-                    TimestampData.fromMillis(1595008822123L, 456000),
-                    LocalZonedTimestampData.fromInstant(Instant.parse("2020-07-17T18:00:22Z")),
-                    LocalZonedTimestampData.fromInstant(Instant.parse("2020-07-17T18:00:22.123Z")),
-                    LocalZonedTimestampData.fromInstant(
-                            Instant.parse("2020-07-17T18:00:22.123456Z")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123456")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22.123")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22.123456")),
                     null
                 };
 
@@ -210,18 +205,13 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     64822000,
                     64822123,
                     null,
-                    TimestampData.fromMillis(1595008822000L),
-                    TimestampData.fromMillis(1595008822123L),
-                    TimestampData.fromMillis(1595008822123L, 456000),
-                    LocalZonedTimestampData.fromInstant(Instant.parse("2020-07-17T18:00:22Z")),
-                    LocalZonedTimestampData.fromInstant(Instant.parse("2020-07-17T18:00:22.123Z")),
-                    LocalZonedTimestampData.fromInstant(
-                            Instant.parse("2020-07-17T18:00:22.123456Z")),
-                    LocalZonedTimestampData.fromInstant(
-                            Timestamp.valueOf("2000-01-01 00:00:00")
-                                    .toLocalDateTime()
-                                    .atZone(ZoneId.of("UTC"))
-                                    .toInstant())
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123456")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22.123")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22.123456")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2000-01-01 00:00:00"))
                 };
 
         testTimeDataTypes(
@@ -330,6 +320,10 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         List<Event> streamResults = fetchResults(iterator, 1);
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
         assertThat(recordFields(streamRecord, COMMON_TYPES)).isEqualTo(expectedStreamRecord);
+    }
+
+    private Instant toInstant(String ts) {
+        return Timestamp.valueOf(ts).toLocalDateTime().atZone(ZoneId.of("UTC")).toInstant();
     }
 
     private void testTimeDataTypes(
