@@ -300,7 +300,7 @@ Flink CDC 提供了将源表的表结构/数据路由到其他表名的配置，
 
    ```yaml
       route:
-        - source-table: app_db.order.*
+        - source-table: app_db.order\.*
           sink-table: ods_db.ods_orders
    ```
 
