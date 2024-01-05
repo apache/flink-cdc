@@ -46,6 +46,7 @@ public class RouteFunction extends RichMapFunction<Event, Event> {
     public static Builder newBuilder() {
         return new Builder();
     }
+    private final String tableNameReplaceSymbol = "<>";
 
     /** Builder of {@link RouteFunction}. */
     public static class Builder {
@@ -96,14 +97,15 @@ public class RouteFunction extends RichMapFunction<Event, Event> {
             Selectors selectors = route.f0;
             TableId replaceBy = route.f1;
             if (selectors.isMatch(tableId)) {
-                // Add a rule that when configuring * in tablename,
-                // only the namespace name and schemaName name needs to be changed
-                if (replaceBy.getTableName().equalsIgnoreCase("<>")) {
+                // Add a rule that when configuring tableNameReplaceSymbol in tablename,
+                // the namespace name and schemaName name needs to be changed
+                // the tableNameReplaceSymbol needs to be replaced by the table name of the event
+                if (replaceBy.getTableName().contains(tableNameReplaceSymbol)) {
                     replaceBy =
                             TableId.parse(
                                     replaceBy.getNamespace(),
                                     replaceBy.getSchemaName(),
-                                    tableId.getTableName());
+                                    replaceBy.getTableName().replace(tableNameReplaceSymbol, tableId.getTableName()));
                 }
                 return recreateChangeEvent(changeEvent, replaceBy);
             }

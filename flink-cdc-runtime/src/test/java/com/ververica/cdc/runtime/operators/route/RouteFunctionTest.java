@@ -204,4 +204,18 @@ class RouteFunctionTest {
         CreateTableEvent createTableEvent = new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA);
         assertThat(router.map(createTableEvent)).asSchemaChangeEvent().hasTableId(target);
     }
+
+    @Test
+    void testTableNameChangeRouting() throws Exception {
+        // The test only modified schema and the table name remains unchanged
+        TableId route = TableId.tableId("my_new_company", "my_new_branch", "db_target_<>_1");
+        TableId target =
+                TableId.tableId("my_new_company", "my_new_branch", "db_target_customers_1");
+        RouteFunction router =
+                RouteFunction.newBuilder().addRoute("my_company.my_branch.\\.*", route).build();
+        router.open(new Configuration());
+        // CreateTableEvent
+        CreateTableEvent createTableEvent = new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA);
+        assertThat(router.map(createTableEvent)).asSchemaChangeEvent().hasTableId(target);
+    }
 }
