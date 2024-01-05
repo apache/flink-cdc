@@ -265,7 +265,7 @@ Specifically, `source-table` support regular expression matching with multiple t
 
    ```yaml
    route:
-     - source-table: app_db.order.*
+     - source-table: app_db.order\.*
        sink-table: ods_db.ods_orders
    ```
 
