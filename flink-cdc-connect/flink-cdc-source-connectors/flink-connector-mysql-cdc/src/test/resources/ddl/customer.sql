@@ -324,3 +324,34 @@ CREATE TABLE default_value_test (
 INSERT INTO default_value_test
 VALUES (1,'user1','Shanghai',123567),
        (2,'user2','Shanghai',123567);
+
+-- create a table to test unevently-split a table with varchar primary key
+CREATE TABLE unevenly_shopping_cart_utf8_bin (
+                                    pk_varchar varchar(100) NOT NULL PRIMARY KEY,
+                                    name VARCHAR(255) NOT NULL DEFAULT 'flink',
+                                    address VARCHAR(1024),
+                                    phone_number INTEGER DEFAULT ' 123 '
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+INSERT INTO unevenly_shopping_cart_utf8_bin
+VALUES ('1111','user1','Shanghai',123567),
+       ('2222','user2','Shanghai',123567),
+       ('3333','user1','Shanghai',123567),
+       ('aaaa','user2','Shanghai',123567),
+       ('cccc','user1','Shanghai',123567),
+       ('zzzz','user2','Shanghai',123567);
+
+CREATE TABLE unevenly_shopping_cart_utf8_ci (
+                                                 pk_varchar varchar(100) NOT NULL PRIMARY KEY,
+                                                 name VARCHAR(255) NOT NULL DEFAULT 'flink',
+                                                 address VARCHAR(1024),
+                                                 phone_number INTEGER DEFAULT ' 123 '
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT INTO unevenly_shopping_cart_utf8_ci
+VALUES ('1111','user1','Shanghai',123567),
+       ('2222','user2','Shanghai',123567),
+       ('3333','user1','Shanghai',123567),
+       ('aaaa','user2','Shanghai',123567),
+       ('cccc','user1','Shanghai',123567),
+       ('zzzz','user2','Shanghai',123567);
