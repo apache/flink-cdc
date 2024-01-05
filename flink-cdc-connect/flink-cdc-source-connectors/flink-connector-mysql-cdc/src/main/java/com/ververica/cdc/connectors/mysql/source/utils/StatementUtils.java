@@ -321,4 +321,67 @@ public class StatementUtils {
     private static String quotedTableIdString(TableId tableId) {
         return tableId.toQuotedString('`');
     }
+
+    /**
+     * query 'collate' of the column
+     *
+     * @param jdbc
+     * @param tableId
+     * @param columnName
+     * @return
+     * @throws SQLException
+     */
+    private static String queryColumnCollation(
+            JdbcConnection jdbc, TableId tableId, String columnName) throws SQLException {
+        final String template = "SHOW FULL COLUMNS FROM %s WHERE Field = '%s';";
+        String querySql = String.format(template, quotedTableIdString(tableId), columnName);
+        return jdbc.queryAndMap(
+                querySql,
+                rs -> {
+                    if (rs.next()) {
+                        return rs.getString("collation");
+                    }
+                    throw new SQLException(
+                            String.format("No result returned for query: %s", querySql));
+                });
+    }
+
+    /**
+     * @param jdbc
+     * @param o1
+     * @param o2
+     * @return the value {@code 0} if {@code str1} is equal to the {@code str2} in mysql; a value
+     *     {@code -1} if the {@code str1} is less than the {@code str2} in mysql; and a value {@code
+     *     1} if the {@code str1} is numerically greater than the {@code str2} in mysql.
+     * @throws SQLException
+     */
+    public static int compareValueByQuery(
+            Object o1, Object o2, JdbcConnection jdbc, TableId tableId, String splitColumn)
+            throws SQLException {
+        // if str1.equals(str2) we don't need to query mysql
+        if (o1 != null && o1.equals(o2)) return 0;
+        String columnCollation = queryColumnCollation(jdbc, tableId, splitColumn);
+        final String compareQueryTemplate =
+                "SELECT "
+                        + "CASE WHEN ? > ? COLLATE %s THEN 1 "
+                        + "WHEN ? < ? COLLATE %s THEN -1 "
+                        + "ELSE 0 END";
+        String compareSql = String.format(compareQueryTemplate, columnCollation, columnCollation);
+
+        return jdbc.prepareQueryAndMap(
+                compareSql,
+                (preparedStatement) -> {
+                    preparedStatement.setObject(1, o1);
+                    preparedStatement.setObject(2, o2);
+                    preparedStatement.setObject(3, o1);
+                    preparedStatement.setObject(4, o2);
+                },
+                rs -> {
+                    if (!rs.next()) {
+                        throw new SQLException(
+                                String.format("No result returned for query: %s", compareSql));
+                    }
+                    return rs.getInt(1);
+                });
+    }
 }
