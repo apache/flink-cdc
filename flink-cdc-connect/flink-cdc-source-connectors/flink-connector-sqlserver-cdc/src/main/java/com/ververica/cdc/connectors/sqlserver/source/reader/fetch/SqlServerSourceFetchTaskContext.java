@@ -49,6 +49,7 @@ import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
 import io.debezium.pipeline.metrics.StreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.OffsetContext;
+import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables.TableFilter;
@@ -205,7 +206,8 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
 
     @Override
     public RowType getSplitType(Table table) {
-        return SqlServerUtils.getSplitType(table);
+        Column splitColumn = SqlServerUtils.getSplitColumn(table, sourceConfig.getChunkKeyColumn());
+        return SqlServerUtils.getSplitType(splitColumn);
     }
 
     @Override

@@ -472,4 +472,67 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
     }
+
+    @Test
+    public void testCompositePkTableSplitsUnevenlyWithChunkKeyColumn()
+            throws InterruptedException, ExecutionException {
+        if (parallelismSnapshot) {
+            testUseChunkColumn("product_kind");
+        }
+    }
+
+    @Test
+    public void testCompositePkTableSplitsEvenlyWithChunkKeyColumn()
+            throws ExecutionException, InterruptedException {
+        if (parallelismSnapshot) {
+            testUseChunkColumn("product_no");
+        }
+    }
+
+    private void testUseChunkColumn(String chunkColumn)
+            throws InterruptedException, ExecutionException {
+        initializeSqlServerTable("customer");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE evenly_shopping_cart (\n"
+                                + "    product_no INT NOT NULL,\n"
+                                + "    product_kind VARCHAR(255),\n"
+                                + "    user_id VARCHAR(255) NOT NULL,\n"
+                                + "    description VARCHAR(255) NOT NULL\n"
+                                + ") WITH ("
+                                + " 'connector' = 'sqlserver-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.key-column' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        MSSQL_SERVER_CONTAINER.getHost(),
+                        MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT),
+                        MSSQL_SERVER_CONTAINER.getUsername(),
+                        MSSQL_SERVER_CONTAINER.getPassword(),
+                        parallelismSnapshot,
+                        chunkColumn,
+                        4,
+                        "customer",
+                        "dbo.evenly_shopping_cart");
+        String sinkDDL =
+                "CREATE TABLE sink "
+                        + " WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ") LIKE evenly_shopping_cart (EXCLUDING OPTIONS)";
+
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM evenly_shopping_cart");
+        waitForSinkSize("sink", 12);
+        result.getJobClient().get().cancel().get();
+    }
 }

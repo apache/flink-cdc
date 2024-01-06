@@ -211,6 +211,14 @@ Connector Options
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
     </tr>
+      <tr>
+          <td>scan.incremental.snapshot.chunk.key-column</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">(none)</td>
+          <td>String</td>
+          <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
+            By default, the chunk key is the first column of the primary key. This column must be a column of the primary key.</td>
+    </tr>
     </tbody>
 </table>    
 </div>

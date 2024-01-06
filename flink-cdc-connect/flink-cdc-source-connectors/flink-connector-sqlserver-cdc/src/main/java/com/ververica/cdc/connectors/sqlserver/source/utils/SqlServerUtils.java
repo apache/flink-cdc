@@ -37,6 +37,8 @@ import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
 
+import javax.annotation.Nullable;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -158,7 +160,7 @@ public class SqlServerUtils {
                 });
     }
 
-    public static Column getSplitColumn(Table table) {
+    public static Column getSplitColumn(Table table, @Nullable String chunkKeyColumn) {
         List<Column> primaryKeys = table.primaryKeyColumns();
         if (primaryKeys.isEmpty()) {
             throw new ValidationException(
@@ -168,15 +170,27 @@ public class SqlServerUtils {
                             table.id()));
         }
 
+        if (chunkKeyColumn != null) {
+            Optional<Column> targetPkColumn =
+                    primaryKeys.stream()
+                            .filter(col -> chunkKeyColumn.equals(col.name()))
+                            .findFirst();
+            if (targetPkColumn.isPresent()) {
+                return targetPkColumn.get();
+            }
+            throw new ValidationException(
+                    String.format(
+                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
+                            chunkKeyColumn,
+                            primaryKeys.stream().map(Column::name).collect(Collectors.joining(",")),
+                            table.id()));
+        }
+
         // use first field in primary key as the split key
         return primaryKeys.get(0);
     }
 
-    public static RowType getSplitType(Table table) {
-        return getSplitType(getSplitColumn(table));
-    }
-
-    private static RowType getSplitType(Column splitColumn) {
+    public static RowType getSplitType(Column splitColumn) {
         return (RowType)
                 ROW(FIELD(splitColumn.name(), SqlServerTypeUtils.fromDbzColumn(splitColumn)))
                         .getLogicalType();
