@@ -30,6 +30,7 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 import static com.ververica.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -168,15 +169,7 @@ class YamlPipelineDefinitionParserTest {
                                             .put("bootstrap-servers", "localhost:9092")
                                             .put("auto-create-table", "true")
                                             .build())),
-                    Arrays.asList(
-                            new RouteDef(
-                                    "mydb.default.app_order_.*",
-                                    "odsdb.default.app_order",
-                                    "sync all sharding tables to one"),
-                            new RouteDef(
-                                    "mydb.default.web_order",
-                                    "odsdb.default.ods_web_order",
-                                    "sync table to with given prefix ods_")),
+                    getRouteDefList(),
                     null,
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
@@ -212,15 +205,7 @@ class YamlPipelineDefinitionParserTest {
                                             .put("bootstrap-servers", "localhost:9092")
                                             .put("auto-create-table", "true")
                                             .build())),
-                    Arrays.asList(
-                            new RouteDef(
-                                    "mydb.default.app_order_.*",
-                                    "odsdb.default.app_order",
-                                    "sync all sharding tables to one"),
-                            new RouteDef(
-                                    "mydb.default.web_order",
-                                    "odsdb.default.ods_web_order",
-                                    "sync table to with given prefix ods_")),
+                    getRouteDefList(),
                     null,
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
@@ -229,6 +214,30 @@ class YamlPipelineDefinitionParserTest {
                                     .put("enable-schema-evolution", "false")
                                     .put("foo", "bar")
                                     .build()));
+
+    private static List<RouteDef> getRouteDefList() {
+        return Arrays.asList(
+                new RouteDef(
+                        "mydb.default.app_order_.*",
+                        "odsdb.default.app_order",
+                        null,
+                        "sync all sharding tables to one"),
+                new RouteDef(
+                        "mydb.default.web_order",
+                        "odsdb.default.ods_web_order",
+                        null,
+                        "sync table to with given prefix ods_"),
+                new RouteDef(
+                        "mydb.sharding.sharding_order",
+                        "odsdb.default.<>",
+                        null,
+                        "sync table to different schema with original table name"),
+                new RouteDef(
+                        "mydb.sharding.busi_cust_info",
+                        "odsdb.default.dim_c<>",
+                        "c<>",
+                        "sync table to different schema with customized replace symbol"));
+    }
 
     private final PipelineDef defWithOptional =
             new PipelineDef(
@@ -254,7 +263,7 @@ class YamlPipelineDefinitionParserTest {
                                             .build())),
                     Collections.singletonList(
                             new RouteDef(
-                                    "mydb.default.app_order_.*", "odsdb.default.app_order", null)),
+                                    "mydb.default.app_order_.*", "odsdb.default.app_order", null,null)),
                     null,
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
