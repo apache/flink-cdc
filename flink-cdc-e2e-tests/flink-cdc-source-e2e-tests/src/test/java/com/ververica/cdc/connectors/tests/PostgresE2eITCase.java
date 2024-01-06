@@ -20,6 +20,7 @@ import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -104,6 +105,16 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
     @After
     public void after() {
         super.after();
+    }
+
+    @AfterClass
+    public static void afterClass() {
+        // Cleanup the postgres image, because it's too large and will cause the next test to fail.
+        POSTGRES.getDockerClient()
+                .listImagesCmd()
+                .withImageNameFilter("debezium/postgres:9.6")
+                .exec()
+                .forEach(image -> POSTGRES.getDockerClient().removeImageCmd(image.getId()).exec());
     }
 
     public static String getSlotName(String prefix) {

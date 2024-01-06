@@ -30,6 +30,7 @@ import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runners.Parameterized;
@@ -60,7 +61,7 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
     private static final Path mongoCdcJar = TestUtils.getResource("mongodb-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    private MongoDBContainer container;
+    private static MongoDBContainer container;
 
     private MongoClient mongoClient;
 
@@ -120,6 +121,17 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
         if (container != null) {
             container.stop();
         }
+    }
+
+    @AfterClass
+    public static void afterClass() {
+        // Cleanup the mongo image, because it's too large and will cause the next test to fail.
+        container
+                .getDockerClient()
+                .listImagesCmd()
+                .withImageNameFilter("mongo:6.0.9")
+                .exec()
+                .forEach(image -> container.getDockerClient().removeImageCmd(image.getId()).exec());
     }
 
     @Test

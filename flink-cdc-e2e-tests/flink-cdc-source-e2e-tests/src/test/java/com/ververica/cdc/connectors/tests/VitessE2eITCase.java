@@ -22,6 +22,7 @@ import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import com.ververica.cdc.connectors.vitess.VitessTestBase;
 import com.ververica.cdc.connectors.vitess.container.VitessContainer;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -79,6 +80,22 @@ public class VitessE2eITCase extends FlinkContainerTestEnvironment {
         LOG.info("Stopping Vitess container...");
         VITESS_CONTAINER.stop();
         LOG.info("Vitess container is stopped.");
+    }
+
+    @AfterClass
+    public static void afterClass() {
+        // Cleanup the Vitess image, because it's too large and will cause the next test to fail.
+        VITESS_CONTAINER
+                .getDockerClient()
+                .listImagesCmd()
+                .withImageNameFilter("vitess/vttestserver")
+                .exec()
+                .forEach(
+                        image ->
+                                VITESS_CONTAINER
+                                        .getDockerClient()
+                                        .removeImageCmd(image.getId())
+                                        .exec());
     }
 
     @Test
