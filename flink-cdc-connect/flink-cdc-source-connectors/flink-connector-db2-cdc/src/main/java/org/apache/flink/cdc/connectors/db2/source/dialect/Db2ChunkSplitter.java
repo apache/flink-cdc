@@ -50,7 +50,9 @@ import java.util.Objects;
 
 import static org.apache.flink.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 
-/** The {@code ChunkSplitter} used to split Db2 table into a set of chunks for JDBC data source. */
+/**
+ * The splitter to split the table into chunks using primary-key (by default) or a given split key.
+ */
 public class Db2ChunkSplitter implements JdbcSourceChunkSplitter {
 
     private static final Logger LOG = LoggerFactory.getLogger(Db2ChunkSplitter.class);
@@ -87,7 +89,7 @@ public class Db2ChunkSplitter implements JdbcSourceChunkSplitter {
             long start = System.currentTimeMillis();
 
             Table table = dialect.queryTableSchema(jdbc, tableId).getTable();
-            Column splitColumn = Db2Utils.getSplitColumn(table);
+            Column splitColumn = Db2Utils.getSplitColumn(table, sourceConfig.getChunkKeyColumn());
             final List<ChunkRange> chunks;
             try {
                 chunks = splitTableIntoChunks(jdbc, tableId, splitColumn);

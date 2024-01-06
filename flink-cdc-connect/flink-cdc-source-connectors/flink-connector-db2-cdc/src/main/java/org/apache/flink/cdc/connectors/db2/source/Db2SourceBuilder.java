@@ -92,6 +92,7 @@ public class Db2SourceBuilder<T> {
     /**
      * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
      * TIMESTAMP type in Db2 converted to STRING. See more
+     * https://debezium.io/documentation/reference/1.9/connectors/db2.html#db2-temporal-types
      */
     public Db2SourceBuilder<T> serverTimeZone(String timeZone) {
         this.configFactory.serverTimeZone(timeZone);

@@ -39,41 +39,44 @@ public class Db2TypeUtils {
 
     /**
      * Returns a corresponding Flink data type from a debezium {@link Column} with nullable always
-     * be true.
+     * be true.copy from io.debezium.connector.db2.Db2ValueConverters#converte.
      */
     private static DataType convertFromColumn(Column column) {
         switch (column.jdbcType()) {
             case Types.CHAR:
             case Types.VARCHAR:
             case Types.SQLXML:
-                return DataTypes.STRING();
             case Types.CLOB:
+                return DataTypes.STRING();
             case Types.BLOB:
             case Types.BINARY:
             case Types.VARBINARY:
                 return DataTypes.BYTES();
-            case Types.INTEGER:
+            case Types.TINYINT:
             case Types.SMALLINT:
+                return DataTypes.SMALLINT();
+            case Types.INTEGER:
                 return DataTypes.INT();
             case Types.BIGINT:
                 return DataTypes.BIGINT();
             case Types.FLOAT:
             case Types.REAL:
+                return DataTypes.FLOAT();
             case Types.DOUBLE:
+                return DataTypes.DOUBLE();
             case Types.DECIMAL:
             case Types.NUMERIC:
                 return DataTypes.DECIMAL(column.length(), column.scale().orElse(0));
             case Types.DATE:
                 return DataTypes.DATE();
             case Types.TIMESTAMP:
-            case Types.TIMESTAMP_WITH_TIMEZONE:
                 return column.length() >= 0
                         ? DataTypes.TIMESTAMP(column.length())
                         : DataTypes.TIMESTAMP();
             default:
                 throw new UnsupportedOperationException(
                         String.format(
-                                "Don't support SqlSever type '%s' yet, jdbcType:'%s'.",
+                                "Don't support DB2 type '%s' yet, jdbcType:'%s'.",
                                 column.typeName(), column.jdbcType()));
         }
     }

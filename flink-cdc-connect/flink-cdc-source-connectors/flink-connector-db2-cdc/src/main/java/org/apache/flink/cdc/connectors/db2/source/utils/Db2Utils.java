@@ -37,6 +37,8 @@ import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
 
+import javax.annotation.Nullable;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -84,7 +86,7 @@ public class Db2Utils {
                 String.format(
                         "SELECT CARD\n"
                                 + "FROM SYSCAT.TABLES\n"
-                                + "where TABSCHEMA='%s' and TABNAME='%s';",
+                                + "WHERE TABSCHEMA='%s' and TABNAME='%s';",
                         tableId.schema(), tableId.table());
         return jdbc.queryAndMap(
                 rowCountQuery,
@@ -136,7 +138,7 @@ public class Db2Utils {
                 String.format(
                         "SELECT MAX(%s) FROM ("
                                 + "SELECT %s FROM %s WHERE %s >= ? ORDER BY %s ASC "
-                                + " fetch first %s rows only ) AS T",
+                                + " FETCH FIRST %S ROWS ONLY ) AS T",
                         quotedColumn,
                         quotedColumn,
                         quote(tableId),
@@ -157,7 +159,7 @@ public class Db2Utils {
                 });
     }
 
-    public static Column getSplitColumn(Table table) {
+    public static Column getSplitColumn(Table table, @Nullable String chunkKeyColumn) {
         List<Column> primaryKeys = table.primaryKeyColumns();
         if (primaryKeys.isEmpty()) {
             throw new ValidationException(
@@ -167,15 +169,27 @@ public class Db2Utils {
                             table.id()));
         }
 
+        if (chunkKeyColumn != null) {
+            Optional<Column> targetPkColumn =
+                    primaryKeys.stream()
+                            .filter(col -> chunkKeyColumn.equals(col.name()))
+                            .findFirst();
+            if (targetPkColumn.isPresent()) {
+                return targetPkColumn.get();
+            }
+            throw new ValidationException(
+                    String.format(
+                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
+                            chunkKeyColumn,
+                            primaryKeys.stream().map(Column::name).collect(Collectors.joining(",")),
+                            table.id()));
+        }
+
         // use first field in primary key as the split key
         return primaryKeys.get(0);
     }
 
-    public static RowType getSplitType(Table table) {
-        return getSplitType(getSplitColumn(table));
-    }
-
-    private static RowType getSplitType(Column splitColumn) {
+    public static RowType getSplitType(Column splitColumn) {
         return (RowType)
                 ROW(FIELD(splitColumn.name(), Db2TypeUtils.fromDbzColumn(splitColumn)))
                         .getLogicalType();
@@ -362,7 +376,7 @@ public class Db2Utils {
             sql.append(" ORDER BY ").append(orderBy.get());
         }
         if (limit > 0) {
-            sql.append(" fetch first ").append(limit).append(" rows only ");
+            sql.append(" FETCH FIRST ").append(limit).append(" ROWS ONLY ");
         }
         return sql.toString();
     }
@@ -415,7 +429,7 @@ public class Db2Utils {
             sql.append(" WHERE ").append(condition.get());
         }
         sql.append(" ORDER BY ").append(orderBy);
-        sql.append("fetch first ").append(limit).append(" rows only ");
+        sql.append("FETCH FIRST ").append(limit).append(" ROWS ONLY ");
         sql.append(") T");
         return sql.toString();
     }
