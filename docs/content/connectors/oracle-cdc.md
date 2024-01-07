@@ -96,6 +96,7 @@ You have to enable log archiving for Oracle database and define an Oracle user w
      GRANT EXECUTE_CATALOG_ROLE TO flinkuser;
      GRANT SELECT ANY TRANSACTION TO flinkuser;
      GRANT LOGMINING TO flinkuser;
+     GRANT ANALYZE ANY TO flinkuser;
 
      GRANT CREATE TABLE TO flinkuser;
      -- need not to execute if set scan.incremental.snapshot.enabled=true(default)
