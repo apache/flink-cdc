@@ -109,6 +109,7 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
 
     @AfterClass
     public static void afterClass() {
+        POSTGRES.stop();
         // Cleanup the postgres image, because it's too large and will cause the next test to fail.
         POSTGRES.getDockerClient()
                 .listImagesCmd()
