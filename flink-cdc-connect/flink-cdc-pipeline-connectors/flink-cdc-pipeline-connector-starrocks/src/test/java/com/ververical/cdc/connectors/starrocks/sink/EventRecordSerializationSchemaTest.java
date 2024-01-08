@@ -16,6 +16,8 @@
 
 package com.ververical.cdc.connectors.starrocks.sink;
 
+import com.ververica.cdc.common.types.BinaryType;
+import com.ververica.cdc.common.types.VarBinaryType;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
@@ -71,6 +73,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -256,6 +259,35 @@ public class EventRecordSerializationSchemaTest {
                                 new Object[] {(int) LocalDate.of(2023, 11, 28).toEpochDay()}));
         verifySerializeResult(
                 table2, "{\"col1\":\"2023-11-28\",\"__op\":0}", serializer.serialize(insertEvent3));
+
+        // 5. create table3, and check data type
+        TableId table3 = TableId.parse("test.tbl3");
+        Schema schema3 =
+                Schema.newBuilder()
+                        .physicalColumn("col1", new IntType())
+                        .physicalColumn("col2", new BinaryType())
+                        .physicalColumn("col3", new VarBinaryType())
+                        .primaryKey("col1")
+                        .build();
+        CreateTableEvent createTableEvent3 = new CreateTableEvent(table3, schema3);
+        assertNull(serializer.serialize(createTableEvent3));
+
+        BinaryRecordDataGenerator generator3 =
+                new BinaryRecordDataGenerator(
+                        schema3.getColumnDataTypes().toArray(new DataType[0]));
+        DataChangeEvent insertEvent4 =
+                DataChangeEvent.insertEvent(
+                        table3,
+                        generator3.generate(
+                                new Object[] {
+                                        1,
+                                        "blob1".getBytes(),
+                                        "blob2".getBytes()
+                                }));
+        verifySerializeResult(
+                table3,
+                "{\"col1\":1,\"col2\":\"YmxvYjE=\",\"col3\":\"YmxvYjI=\",\"__op\":0}",
+                Objects.requireNonNull(serializer.serialize(insertEvent4)));
     }
 
     private void verifySerializeResult(
