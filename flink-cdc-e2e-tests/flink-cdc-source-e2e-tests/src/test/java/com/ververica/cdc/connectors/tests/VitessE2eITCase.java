@@ -85,17 +85,7 @@ public class VitessE2eITCase extends FlinkContainerTestEnvironment {
     @AfterClass
     public static void afterClass() {
         // Cleanup the Vitess image, because it's too large and will cause the next test to fail.
-        VITESS_CONTAINER
-                .getDockerClient()
-                .listImagesCmd()
-                .withImageNameFilter("vitess/vttestserver")
-                .exec()
-                .forEach(
-                        image ->
-                                VITESS_CONTAINER
-                                        .getDockerClient()
-                                        .removeImageCmd(image.getId())
-                                        .exec());
+        removeContainer(VITESS_CONTAINER, "vitess/vttestserver");
     }
 
     @Test

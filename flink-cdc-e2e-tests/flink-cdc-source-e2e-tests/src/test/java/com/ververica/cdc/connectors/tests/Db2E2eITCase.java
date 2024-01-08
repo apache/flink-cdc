@@ -118,17 +118,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
     public static void afterClass() {
         // Cleanup the db2 image, because it's too large and will cause the next test to fail.
         db2Container.getDockerClient().removeImageCmd(DB2_CUSTOM_IMAGE).exec();
-        db2Container
-                .getDockerClient()
-                .listImagesCmd()
-                .withImageNameFilter(DB2_IMAGE)
-                .exec()
-                .forEach(
-                        image ->
-                                db2Container
-                                        .getDockerClient()
-                                        .removeImageCmd(image.getId())
-                                        .exec());
+        removeContainer(db2Container, DB2_IMAGE);
     }
 
     @Test

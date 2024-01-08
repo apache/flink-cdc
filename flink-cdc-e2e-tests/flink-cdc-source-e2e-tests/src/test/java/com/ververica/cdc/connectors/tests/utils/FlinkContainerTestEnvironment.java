@@ -40,6 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
@@ -178,6 +179,21 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     public void overrideFlinkProperties(String properties) {
         jobManager.withEnv("FLINK_PROPERTIES", properties);
         taskManager.withEnv("FLINK_PROPERTIES", properties);
+    }
+
+    public static void removeContainer(
+            JdbcDatabaseContainer jdbcDatabaseContainer, String imageName) {
+        jdbcDatabaseContainer
+                .getDockerClient()
+                .listImagesCmd()
+                .withImageNameFilter(imageName)
+                .exec()
+                .forEach(
+                        image ->
+                                jdbcDatabaseContainer
+                                        .getDockerClient()
+                                        .removeImageCmd(image.getId())
+                                        .exec());
     }
 
     /**

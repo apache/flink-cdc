@@ -111,11 +111,7 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
     public static void afterClass() {
         POSTGRES.stop();
         // Cleanup the postgres image, because it's too large and will cause the next test to fail.
-        POSTGRES.getDockerClient()
-                .listImagesCmd()
-                .withImageNameFilter("debezium/postgres:9.6")
-                .exec()
-                .forEach(image -> POSTGRES.getDockerClient().removeImageCmd(image.getId()).exec());
+        removeContainer(POSTGRES, "debezium/postgres:9.6");
     }
 
     public static String getSlotName(String prefix) {

@@ -87,11 +87,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     @AfterClass
     public static void afterClass() {
         // Cleanup the oracle image, because it's too large and will cause the next test to fail.
-        oracle.getDockerClient()
-                .listImagesCmd()
-                .withImageNameFilter(ORACLE_IMAGE)
-                .exec()
-                .forEach(image -> oracle.getDockerClient().removeImageCmd(image.getId()).exec());
+        removeContainer(oracle, ORACLE_IMAGE);
     }
 
     @Test
