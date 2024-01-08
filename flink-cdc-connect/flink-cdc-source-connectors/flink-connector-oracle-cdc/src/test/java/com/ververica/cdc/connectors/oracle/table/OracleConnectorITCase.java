@@ -356,6 +356,10 @@ public class OracleConnectorITCase {
     public void testConsumingAllEventsByChunkKeyColumn() throws Exception {
 
         createAndInitialize("product.sql");
+        try (Connection dbaConnection = getJdbcConnectionAsDBA();
+                Statement dbaStatement = dbaConnection.createStatement()) {
+            dbaStatement.execute("GRANT ANALYZE ANY TO " + ORACLE_CONTAINER.getUsername());
+        }
         if (!parallelismSnapshot) {
             return;
         }
@@ -383,8 +387,8 @@ public class OracleConnectorITCase {
                                 + ")",
                         ORACLE_CONTAINER.getHost(),
                         ORACLE_CONTAINER.getOraclePort(),
-                        "dbzuser",
-                        "dbz",
+                        ORACLE_CONTAINER.getUsername(),
+                        ORACLE_CONTAINER.getPassword(),
                         parallelismSnapshot,
                         "debezium",
                         "products");
