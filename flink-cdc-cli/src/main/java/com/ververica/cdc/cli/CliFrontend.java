@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 public class CliFrontend {
     private static final Logger LOG = LoggerFactory.getLogger(CliFrontend.class);
     private static final String FLINK_HOME_ENV_VAR = "FLINK_HOME";
+    private static final String FLINK_CDC_HOME_ENV_VAR = "FLINK_CDC_HOME";
 
     public static void main(String[] args) throws Exception {
         Options cliOptions = CliFrontendOptions.initializeOptions();
@@ -127,11 +128,27 @@ public class CliFrontend {
     }
 
     private static Configuration getGlobalConfig(CommandLine commandLine) throws Exception {
+        // Try to get global config path from command line
         String globalConfig = commandLine.getOptionValue(CliFrontendOptions.GLOBAL_CONFIG);
-        if (globalConfig == null) {
-            return new Configuration();
+        if (globalConfig != null) {
+            Path globalConfigPath = Paths.get(globalConfig);
+            LOG.info("Using global config in command line: {}", globalConfigPath);
+            return ConfigurationUtils.loadMapFormattedConfig(globalConfigPath);
         }
-        return ConfigurationUtils.loadMapFormattedConfig(Paths.get(globalConfig));
+
+        // Fallback to Flink CDC home
+        String flinkCdcHome = System.getenv(FLINK_CDC_HOME_ENV_VAR);
+        if (flinkCdcHome != null) {
+            Path globalConfigPath =
+                    Paths.get(flinkCdcHome).resolve("conf").resolve("flink-cdc.yaml");
+            LOG.info("Using global config in FLINK_CDC_HOME: {}", globalConfigPath);
+            return ConfigurationUtils.loadMapFormattedConfig(globalConfigPath);
+        }
+
+        // Fallback to empty configuration
+        LOG.warn(
+                "Cannot find global configuration in command-line or FLINK_CDC_HOME. Will use empty global configuration.");
+        return new Configuration();
     }
 
     private static void printExecutionInfo(PipelineExecution.ExecutionInfo info) {

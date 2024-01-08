@@ -16,10 +16,16 @@
 
 package com.ververica.cdc.composer.definition;
 
+import com.ververica.cdc.common.annotation.VisibleForTesting;
 import com.ververica.cdc.common.configuration.Configuration;
+import com.ververica.cdc.common.types.LocalZonedTimestampType;
 
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
+import java.util.TimeZone;
+
+import static com.ververica.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 
 /**
  * Definition of a pipeline.
@@ -58,7 +64,7 @@ public class PipelineDef {
         this.sink = sink;
         this.routes = routes;
         this.transforms = transforms;
-        this.config = config;
+        this.config = evaluatePipelineTimeZone(config);
     }
 
     public SourceDef getSource() {
@@ -116,5 +122,51 @@ public class PipelineDef {
     @Override
     public int hashCode() {
         return Objects.hash(source, sink, routes, transforms, config);
+    }
+
+    // ------------------------------------------------------------------------
+    //  Utilities
+    // ------------------------------------------------------------------------
+
+    /**
+     * Returns the current session time zone id. It is used when converting to/from {@code TIMESTAMP
+     * WITH LOCAL TIME ZONE}.
+     *
+     * @see LocalZonedTimestampType
+     */
+    @VisibleForTesting
+    private static Configuration evaluatePipelineTimeZone(Configuration configuration) {
+        final String zone = configuration.get(PIPELINE_LOCAL_TIME_ZONE);
+        ZoneId zoneId;
+        if (PIPELINE_LOCAL_TIME_ZONE.defaultValue().equals(zone)) {
+            zoneId = ZoneId.systemDefault();
+        } else {
+            validateTimeZone(zone);
+            zoneId = ZoneId.of(zone);
+        }
+        configuration.set(PIPELINE_LOCAL_TIME_ZONE, zoneId.toString());
+        return configuration;
+    }
+
+    /**
+     * Validates a time zone is valid or not.
+     *
+     * @param zone given time zone
+     */
+    private static void validateTimeZone(String zone) {
+        boolean isValid;
+        try {
+            isValid = TimeZone.getTimeZone(zone).toZoneId().equals(ZoneId.of(zone));
+        } catch (Exception ignore) {
+            isValid = false;
+        }
+
+        if (!isValid) {
+            throw new IllegalArgumentException(
+                    "Invalid time zone. The valid value should be a Time Zone Database ID "
+                            + "such as 'America/Los_Angeles' to include daylight saving time. "
+                            + "Fixed offsets are supported using 'GMT-08:00' or 'GMT+08:00'. "
+                            + "Or use 'UTC' without time zone and daylight saving time.");
+        }
     }
 }

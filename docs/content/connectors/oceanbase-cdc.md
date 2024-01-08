@@ -314,6 +314,13 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
                 <td>String</td>
                 <td>Option to pass custom JDBC URL properties. User can pass custom properties like 'jdbc.properties.useSSL' = 'false'.</td>
             </tr>
+            <tr>
+                <td>obcdc.properties.*</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">(none)</td>
+                <td>String</td>
+                <td>Option to pass custom configurations to the <code>libobcdc</code>, eg: 'obcdc.properties.sort_trans_participants' = '1'. Please refer to <a href="https://en.oceanbase.com/docs/common-oceanbase-database-10000000000872541">obcdc parameters</a> for more details.</td>
+            </tr>
         </tbody>
     </table>
 </div>
@@ -607,7 +614,7 @@ Data Type Mapping
             </tr>
             <tr>
                 <td>BIT(n)</td>
-                <td>BINARY(⌈n/8⌉)</td>
+                <td>BINARY(⌈(n + 7) / 8⌉)</td>
                 <td></td>
             </tr>
             <tr>

@@ -314,7 +314,7 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
-          For example: <code>'debezium.snapshot.mode' = 'never'</code>.
+          例如: <code>'debezium.snapshot.mode' = 'never'</code>.
           查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
     </tr>
     <tr>
@@ -322,7 +322,8 @@ Flink SQL> SELECT * FROM orders;
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。</td>
+      <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。<br>
+          若 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 默认值变更为 true，可以不用显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = true。</td>
     </tr>
     <tr>
       <td>debezium.binary.handling.mode</td>
@@ -368,55 +369,68 @@ Flink SQL> SELECT * FROM orders;
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是 binlog 读取记录，该值将始终为0。</td>
     </tr>
+    <tr>
+      <td>row_kind</td>
+      <td>STRING NOT NULL</td>
+      <td>当前记录对应的 changelog 类型。注意：当 Source 算子选择为每条记录输出 row_kind 字段后，下游 SQL 算子在处理消息撤回时会因为这个字段不同而比对失败，
+建议只在简单的同步作业中引用该元数据列。<br>'+I' 表示 INSERT 数据，'-D' 表示 DELETE 数据，'-U' 表示 UPDATE_BEFORE 数据，'+U' 表示 UPDATE_AFTER 数据。
+</td>
+    </tr>
   </tbody>
 </table>
 
 下述创建表示例展示元数据列的用法：
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    order_id INT,
-    order_date TIMESTAMP(0),
+CREATE TABLE products
+(
+    db_name       STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name    STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts  TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
+    order_id      INT,
+    order_date    TIMESTAMP(0),
     customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    price         DECIMAL(10, 5),
+    product_id    INT,
+    order_status  BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'mysql-cdc',
-    'hostname' = 'localhost',
-    'port' = '3306',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = 'mydb',
-    'table-name' = 'orders'
-);
+      'connector' = 'mysql-cdc',
+      'hostname' = 'localhost',
+      'port' = '3306',
+      'username' = 'root',
+      'password' = '123456',
+      'database-name' = 'mydb',
+      'table-name' = 'orders'
+      );
 ```
 
 下述创建表示例展示使用正则表达式匹配多张库表的用法：
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    order_id INT,
-    order_date TIMESTAMP(0),
+CREATE TABLE products
+(
+    db_name       STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name    STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts  TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
+    order_id      INT,
+    order_date    TIMESTAMP(0),
     customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    price         DECIMAL(10, 5),
+    product_id    INT,
+    order_status  BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'mysql-cdc',
-    'hostname' = 'localhost',
-    'port' = '3306',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
-    'table-name' = '(t[5-8]|tt)'
-);
+      'connector' = 'mysql-cdc',
+      'hostname' = 'localhost',
+      'port' = '3306',
+      'username' = 'root',
+      'password' = '123456',
+      'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
+      'table-name' = '(t[5-8]|tt)'
+      );
 ```
 <table class="colwidths-auto docutils">
   <thead>
@@ -908,7 +922,7 @@ CREATE TABLE products (
       <td>
         BIT(n)
       </td>
-      <td>BINARY(⌈n/8⌉)</td>
+      <td>BINARY(⌈(n + 7) / 8⌉)</td>
       <td></td>
     </tr>
     <tr>

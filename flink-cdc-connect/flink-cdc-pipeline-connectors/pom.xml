@@ -27,20 +27,23 @@ under the License.
     <packaging>pom</packaging>
     <modules>
         <module>flink-cdc-pipeline-connector-values</module>
+        <module>flink-cdc-pipeline-connector-mysql</module>
+        <module>flink-cdc-pipeline-connector-doris</module>
+        <module>flink-cdc-pipeline-connector-starrocks</module>
     </modules>
 
     <dependencies>
         <dependency>
             <groupId>com.ververica</groupId>
             <artifactId>flink-cdc-common</artifactId>
-            <version>${revision}</version>
+            <version>${project.version}</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>com.ververica</groupId>
             <artifactId>flink-cdc-runtime</artifactId>
-            <version>${revision}</version>
+            <version>${project.version}</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

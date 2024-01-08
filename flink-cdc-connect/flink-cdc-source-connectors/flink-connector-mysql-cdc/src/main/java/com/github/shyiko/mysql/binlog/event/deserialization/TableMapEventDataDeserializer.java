@@ -77,6 +77,7 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
                 case NEWDECIMAL:
                 case FLOAT:
                 case DOUBLE:
+                case YEAR:
                     count++;
                     break;
                 default:

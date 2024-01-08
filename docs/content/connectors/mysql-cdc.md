@@ -327,7 +327,11 @@ During a snapshot operation, the connector will query each included table to pro
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
-      <td>Whether to close idle readers at the end of the snapshot phase. The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.</td>
+      <td>Whether to close idle readers at the end of the snapshot phase. <br>
+          The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.<br>
+          If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
+          so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
+      </td>
     </tr>
     <tr>
       <td>debezium.binary.handling.mode</td>
@@ -373,55 +377,68 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the binlog, the value is always 0.</td>
     </tr>
+    <tr>
+      <td>row_kind</td>
+      <td>STRING NOT NULL</td>
+      <td>It indicates the row kind of the changelog,Note: The downstream SQL operator may fail to compare due to this new added column when processing the row retraction if 
+the source operator chooses to output the 'row_kind' column for each record. It is recommended to use this metadata column only in simple synchronization jobs.
+<br>'+I' means INSERT message, '-D' means DELETE message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message.</td>
+    </tr>
   </tbody>
 </table>
 
 The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    order_id INT,
-    order_date TIMESTAMP(0),
+CREATE TABLE products
+(
+    db_name       STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name    STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts  TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
+    order_id      INT,
+    order_date    TIMESTAMP(0),
     customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    price         DECIMAL(10, 5),
+    product_id    INT,
+    order_status  BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'mysql-cdc',
-    'hostname' = 'localhost',
-    'port' = '3306',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = 'mydb',
-    'table-name' = 'orders'
-);
+      'connector' = 'mysql-cdc',
+      'hostname' = 'localhost',
+      'port' = '3306',
+      'username' = 'root',
+      'password' = '123456',
+      'database-name' = 'mydb',
+      'table-name' = 'orders'
+      );
 ```
 
 The extended CREATE TABLE example demonstrates the usage of regex to match multi-tables:
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    order_id INT,
-    order_date TIMESTAMP(0),
+CREATE TABLE products
+(
+    db_name       STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name    STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts  TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
+    order_id      INT,
+    order_date    TIMESTAMP(0),
     customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    price         DECIMAL(10, 5),
+    product_id    INT,
+    order_status  BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'mysql-cdc',
-    'hostname' = 'localhost',
-    'port' = '3306',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
-    'table-name' = '(t[5-8]|tt)'
-);
+      'connector' = 'mysql-cdc',
+      'hostname' = 'localhost',
+      'port' = '3306',
+      'username' = 'root',
+      'password' = '123456',
+      'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
+      'table-name' = '(t[5-8]|tt)'
+      );
 ```
 <table class="colwidths-auto docutils">
   <thead>
@@ -920,7 +937,7 @@ Data Type Mapping
       <td>
         BIT(n)
       </td>
-      <td>BINARY(⌈n/8⌉)</td>
+      <td>BINARY(⌈(n + 7) / 8⌉)</td>
       <td></td>
     </tr>
     <tr>

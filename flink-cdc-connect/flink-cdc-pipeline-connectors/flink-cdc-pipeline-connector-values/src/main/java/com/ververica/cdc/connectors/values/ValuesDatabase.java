@@ -332,13 +332,13 @@ public class ValuesDatabase {
                     case BEFORE:
                         {
                             int index = columns.indexOf(columnWithPosition.getExistingColumn());
-                            columns.add(index, columnWithPosition.getExistingColumn());
+                            columns.add(index, columnWithPosition.getAddColumn());
                             break;
                         }
                     case AFTER:
                         {
                             int index = columns.indexOf(columnWithPosition.getExistingColumn());
-                            columns.add(index + 1, columnWithPosition.getExistingColumn());
+                            columns.add(index + 1, columnWithPosition.getAddColumn());
                             break;
                         }
                 }

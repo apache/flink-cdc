@@ -29,19 +29,19 @@ import static com.ververica.cdc.common.configuration.description.TextElement.tex
 public class PipelineOptions {
 
     public static final ConfigOption<String> PIPELINE_NAME =
-            ConfigOptions.key("pipeline.name")
+            ConfigOptions.key("name")
                     .stringType()
                     .defaultValue("Flink CDC Pipeline Job")
                     .withDescription("The name of the pipeline");
 
-    public static final ConfigOption<Integer> GLOBAL_PARALLELISM =
-            ConfigOptions.key("pipeline.global.parallelism")
+    public static final ConfigOption<Integer> PIPELINE_PARALLELISM =
+            ConfigOptions.key("parallelism")
                     .intType()
                     .noDefaultValue()
-                    .withDescription("The global parallelism of the pipeline");
+                    .withDescription("Parallelism of the pipeline");
 
-    public static final ConfigOption<SchemaChangeBehavior> SCHEMA_CHANGE_BEHAVIOR =
-            ConfigOptions.key("pipeline.schema.change.behavior")
+    public static final ConfigOption<SchemaChangeBehavior> PIPELINE_SCHEMA_CHANGE_BEHAVIOR =
+            ConfigOptions.key("schema.change.behavior")
                     .enumType(SchemaChangeBehavior.class)
                     .defaultValue(SchemaChangeBehavior.EVOLVE)
                     .withDescription(
@@ -57,8 +57,28 @@ public class PipelineOptions {
                                                             "EXCEPTION: Throw an exception to terminate the sync pipeline.")))
                                     .build());
 
-    public static final ConfigOption<String> SCHEMA_OPERATOR_UID =
-            ConfigOptions.key("pipeline.schema.operator.uid")
+    public static final ConfigOption<String> PIPELINE_LOCAL_TIME_ZONE =
+            ConfigOptions.key("local-time-zone")
+                    .stringType()
+                    // "systemDefault" is a special value to decide whether to use
+                    // ZoneId.systemDefault() in
+                    // PipelineOptions.getLocalTimeZone()
+                    .defaultValue("systemDefault")
+                    .withDescription(
+                            Description.builder()
+                                    .text(
+                                            "The local time zone defines current session time zone id. ")
+                                    .linebreak()
+                                    .text(
+                                            "It is used when converting to/from <code>TIMESTAMP WITH LOCAL TIME ZONE</code>. "
+                                                    + "Internally, timestamps with local time zone are always represented in the UTC time zone. "
+                                                    + "However, when converting to data types that don't include a time zone (e.g. TIMESTAMP, STRING), "
+                                                    + "the session time zone is used during conversion. The input of option is either a full name "
+                                                    + "such as \"America/Los_Angeles\", or a custom timezone id such as \"GMT-08:00\".")
+                                    .build());
+
+    public static final ConfigOption<String> PIPELINE_SCHEMA_OPERATOR_UID =
+            ConfigOptions.key("schema.operator.uid")
                     .stringType()
                     .defaultValue("$$_schema_operator_$$")
                     .withDescription(

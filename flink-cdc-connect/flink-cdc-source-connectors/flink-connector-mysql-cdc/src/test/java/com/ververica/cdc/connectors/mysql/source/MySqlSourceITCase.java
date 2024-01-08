@@ -528,11 +528,6 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                     connection.setAutoCommit(false);
                     connection.execute(statements);
                     connection.commit();
-                    try {
-                        Thread.sleep(500L);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
                 };
         if (hookType == USE_PRE_HIGHWATERMARK_HOOK) {
             hooks.setPreHighWatermarkAction(snapshotPhaseHook);

@@ -25,7 +25,50 @@ This README is meant as a brief walkthrough on the core features of CDC Connecto
 2. CDC connectors for DataStream API, users can consume changes on multiple databases and tables in a single job without Debezium and Kafka deployed.
 3. CDC connectors for Table/SQL API, users can use SQL DDL to create a CDC source to monitor changes on a single table.
 
-## Usage for Table/SQL API
+## Quick Start
+
+### Usage for CDC Streaming ELT Framework
+
+The example shows how to continuously synchronize data, including snapshot data and incremental data, from multiple business tables in MySQL database to Doris for creating the ODS layer.
+
+1. Download and extract the flink-cdc-3.0.tar file to a local directory.
+2. Download the required CDC Pipeline Connector JAR from Maven and place it in the lib directory.
+3. Configure the FLINK_HOME environment variable to load the Flink cluster configuration from the flink-conf.yaml file located in the $FLINK_HOME/conf directory.
+```bash
+export FLINK_HOME=/path/to/your/flink/home
+```
+4. Write Flink CDC task YAML.
+```yaml
+source:
+  type: mysql
+  host: localhost
+  port: 3306
+  username: admin
+  password: pass
+  tables: db0.commodity, db1.user_table_[0-9]+, [app|web]_order_\.*
+
+sink:
+  type: doris
+  fenodes: FE_IP:HTTP_PORT
+  username: admin
+  password: pass
+
+pipeline:
+  name: mysql-sync-doris
+  parallelism: 4
+```
+5. Submit the job to Flink cluster.
+```bash
+# Submit Pipeline
+$ ./bin/flink-cdc.sh mysql-to-doris.yaml
+Pipeline "mysql-sync-doris" is submitted with Job ID "DEADBEEF".
+```
+
+During the execution of the flink-cdc.sh script, the CDC task configuration is parsed and translated into a DataStream job, which is then submitted to the specified Flink cluster.
+
+### Usage for Source Connectors
+
+#### Usage for Table/SQL API
 
 We need several steps to setup a Flink cluster with the provided connector.
 
@@ -57,7 +100,7 @@ CREATE TABLE mysql_binlog (
 SELECT id, UPPER(name), description, weight FROM mysql_binlog;
 ```
 
-## Usage for DataStream API
+#### Usage for DataStream API
 
 Include following Maven dependency (available through Maven Central):
 

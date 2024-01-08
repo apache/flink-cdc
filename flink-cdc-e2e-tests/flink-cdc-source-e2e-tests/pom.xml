@@ -164,14 +164,6 @@ under the License.
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-deploy-plugin</artifactId>
-                <configuration>
-                    <skip>true</skip>
-                </configuration>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <executions>
                     <execution>
@@ -360,6 +352,16 @@ under the License.
                             <artifactId>flink-sql-connector-vitess-cdc</artifactId>
                             <version>${project.version}</version>
                             <destFileName>vitess-cdc-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.ververica</groupId>
+                            <artifactId>flink-sql-connector-oceanbase-cdc</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>oceanbase-cdc-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

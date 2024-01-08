@@ -72,3 +72,9 @@ vitess-cdc-connector:
   - flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-vitess-cdc/**/*
 values-pipeline-connector:
   - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values/**/*
+mysql-pipeline-connector:
+  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql/**/*
+doris-pipeline-connector:
+  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris/**/*
+starrocks-pipeline-connector:
+  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks/**/*

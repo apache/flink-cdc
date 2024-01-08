@@ -30,6 +30,7 @@ import io.debezium.document.DocumentWriter;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -161,7 +162,12 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             if (version >= 3) {
                 totalFinishedSplitSize = in.readInt();
                 if (version > 3) {
-                    isSuspended = in.readBoolean();
+                    try {
+                        isSuspended = in.readBoolean();
+                    } catch (EOFException e) {
+                        // cdc version <= v2.2.0 does not serialize isSuspended value, skip reading
+                        // it
+                    }
                 }
             }
             in.releaseArrays();

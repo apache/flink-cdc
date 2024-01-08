@@ -49,8 +49,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String NAME_KEY = "name";
 
     // Route keys
-    private static final String ROUTE_SOURCE_TABLE_KEY = "sourceTable";
-    private static final String ROUTE_SINK_TABLE_KEY = "sinkTable";
+    private static final String ROUTE_SOURCE_TABLE_KEY = "source-table";
+    private static final String ROUTE_SINK_TABLE_KEY = "sink-table";
     private static final String ROUTE_DESCRIPTION_KEY = "description";
 
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
@@ -148,7 +148,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     }
 
     private Configuration toPipelineConfig(JsonNode pipelineConfigNode) {
-        if (pipelineConfigNode == null) {
+        if (pipelineConfigNode == null || pipelineConfigNode.isNull()) {
             return new Configuration();
         }
         Map<String, String> pipelineConfigMap =

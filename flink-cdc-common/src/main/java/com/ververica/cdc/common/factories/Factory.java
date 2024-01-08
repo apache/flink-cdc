@@ -20,8 +20,6 @@ import com.ververica.cdc.common.annotation.PublicEvolving;
 import com.ververica.cdc.common.configuration.ConfigOption;
 import com.ververica.cdc.common.configuration.Configuration;
 
-import java.util.Collections;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -63,8 +61,15 @@ public interface Factory {
     @PublicEvolving
     interface Context {
 
-        /** Gives the configuration of the current session. */
-        Configuration getConfiguration();
+        /**
+         * Returns the factory options used to create the object instances.
+         *
+         * @return options of the current session.
+         */
+        Configuration getFactoryConfiguration();
+
+        /** Returns the configuration of current pipeline. */
+        Configuration getPipelineConfiguration();
 
         /**
          * Returns the class loader of the current session.
@@ -72,14 +77,5 @@ public interface Factory {
          * <p>The class loader is in particular useful for discovering factories.
          */
         ClassLoader getClassLoader();
-
-        /**
-         * Returns the options of the current session.
-         *
-         * @return options of the current session.
-         */
-        default Map<String, String> getEnrichmentOptions() {
-            return Collections.emptyMap();
-        }
     }
 }

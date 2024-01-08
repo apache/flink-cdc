@@ -16,10 +16,12 @@
 
 package com.ververica.cdc.composer.flink;
 
+import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import com.ververica.cdc.common.annotation.Internal;
+import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.common.event.Event;
 import com.ververica.cdc.common.factories.DataSinkFactory;
 import com.ververica.cdc.common.factories.FactoryHelper;
@@ -56,10 +58,26 @@ public class FlinkPipelineComposer implements PipelineComposer {
     private final boolean isBlocking;
 
     public static FlinkPipelineComposer ofRemoteCluster(
-            String host, int port, List<Path> additionalJars) {
-        String[] jarPaths = additionalJars.stream().map(Path::toString).toArray(String[]::new);
-        return new FlinkPipelineComposer(
-                StreamExecutionEnvironment.createRemoteEnvironment(host, port, jarPaths), false);
+            org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
+        org.apache.flink.configuration.Configuration effectiveConfiguration =
+                new org.apache.flink.configuration.Configuration();
+        // Use "remote" as the default target
+        effectiveConfiguration.set(DeploymentOptions.TARGET, "remote");
+        effectiveConfiguration.addAll(flinkConfig);
+        StreamExecutionEnvironment env = new StreamExecutionEnvironment(effectiveConfiguration);
+        additionalJars.forEach(
+                jarPath -> {
+                    try {
+                        FlinkEnvironmentUtils.addJar(env, jarPath.toUri().toURL());
+                    } catch (Exception e) {
+                        throw new RuntimeException(
+                                String.format(
+                                        "Unable to convert JAR path \"%s\" to URL when adding JAR to Flink environment",
+                                        jarPath),
+                                e);
+                    }
+                });
+        return new FlinkPipelineComposer(env, false);
     }
 
     public static FlinkPipelineComposer ofMiniCluster() {
@@ -74,26 +92,28 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
     @Override
     public PipelineExecution compose(PipelineDef pipelineDef) {
-        int parallelism = pipelineDef.getConfig().get(PipelineOptions.GLOBAL_PARALLELISM);
+        int parallelism = pipelineDef.getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
 
         // Source
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
         DataStream<Event> stream =
-                sourceTranslator.translate(pipelineDef.getSource(), env, parallelism);
+                sourceTranslator.translate(pipelineDef.getSource(), env, pipelineDef.getConfig());
 
         // Route
         RouteTranslator routeTranslator = new RouteTranslator();
         stream = routeTranslator.translate(stream, pipelineDef.getRoute());
 
         // Create sink in advance as schema operator requires MetadataApplier
-        DataSink dataSink = createDataSink(pipelineDef.getSink());
+        DataSink dataSink = createDataSink(pipelineDef.getSink(), pipelineDef.getConfig());
 
         // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
-                        pipelineDef.getConfig().get(PipelineOptions.SCHEMA_CHANGE_BEHAVIOR),
-                        pipelineDef.getConfig().get(PipelineOptions.SCHEMA_OPERATOR_UID));
+                        pipelineDef
+                                .getConfig()
+                                .get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR),
+                        pipelineDef.getConfig().get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID));
         stream =
                 schemaOperatorTranslator.translate(
                         stream, parallelism, dataSink.getMetadataApplier());
@@ -118,7 +138,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 env, pipelineDef.getConfig().get(PipelineOptions.PIPELINE_NAME), isBlocking);
     }
 
-    private DataSink createDataSink(SinkDef sinkDef) {
+    private DataSink createDataSink(SinkDef sinkDef, Configuration pipelineConfig) {
         // Search the data sink factory
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier(
@@ -131,8 +151,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
         // Create data sink
         return sinkFactory.createDataSink(
                 new FactoryHelper.DefaultContext(
-                        sinkDef.getConfig().toMap(),
                         sinkDef.getConfig(),
+                        pipelineConfig,
                         Thread.currentThread().getContextClassLoader()));
     }
 
