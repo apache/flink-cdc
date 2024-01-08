@@ -141,7 +141,7 @@ public class Db2SourceITCase extends Db2TestBase {
             boolean skipSnapshotBackfill)
             throws Exception {
 
-        initializeDb2Table("customers");
+        initializeDb2Table("customers", "CUSTOMERS");
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);

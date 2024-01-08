@@ -66,7 +66,6 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
     @Override
     protected void executeDataSnapshot(Context context) throws Exception {
         Db2SourceFetchTaskContext sourceFetchContext = (Db2SourceFetchTaskContext) context;
-        taskRunning = true;
         Db2SnapshotSplitReadTask snapshotSplitReadTask =
                 new Db2SnapshotSplitReadTask(
                         sourceFetchContext.getDbzConnectorConfig(),
@@ -212,7 +211,6 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
             final Db2SnapshotContext ctx = (Db2SnapshotContext) snapshotContext;
             ctx.offset = offsetContext;
 
-            LOG.info("Snapshot step 2 - Snapshotting data");
             createDataEvents(ctx, snapshotSplit.getTableId());
 
             return SnapshotResult.completed(ctx.offset);

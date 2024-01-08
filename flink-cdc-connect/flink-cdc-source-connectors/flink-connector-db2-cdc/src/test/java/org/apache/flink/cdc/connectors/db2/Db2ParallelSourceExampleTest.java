@@ -35,7 +35,7 @@ public class Db2ParallelSourceExampleTest extends Db2TestBase {
     @Test
     @Ignore("Test ignored because it won't stop and is used for manual test")
     public void testDb2ExampleSource() throws Exception {
-
+        initializeDb2Table("customers", "CUSTOMERS");
         Db2IncrementalSource<String> sqlServerSource =
                 new Db2SourceBuilder()
                         .hostname(DB2_CONTAINER.getHost())

@@ -17,11 +17,16 @@
 
 package org.apache.flink.cdc.connectors.db2;
 
+import org.apache.flink.runtime.minicluster.RpcServiceSharing;
+import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
+import org.apache.flink.test.util.MiniClusterWithClientResource;
+
 import org.apache.commons.lang3.StringUtils;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Db2Container;
@@ -37,6 +42,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
@@ -59,6 +65,17 @@ import static org.junit.Assert.assertTrue;
 public class Db2TestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(Db2TestBase.class);
+    protected static final int DEFAULT_PARALLELISM = 4;
+
+    @Rule
+    public final MiniClusterWithClientResource miniClusterResource =
+            new MiniClusterWithClientResource(
+                    new MiniClusterResourceConfiguration.Builder()
+                            .setNumberTaskManagers(1)
+                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                            .withHaLeadershipControl()
+                            .build());
 
     private static final DockerImageName DEBEZIUM_DOCKER_IMAGE_NAME =
             DockerImageName.parse(
@@ -187,13 +204,26 @@ public class Db2TestBase {
      * Executes a JDBC statement using the default jdbc config without autocommitting the
      * connection.
      */
-    protected void initializeDb2Table(String sqlFile) {
+    protected void initializeDb2Table(String sqlFile, String tableName) {
         final String ddlFile = String.format("db2_server/%s.sql", sqlFile);
         final URL ddlTestFile = Db2TestBase.class.getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-            dropTestTable(connection, sqlFile.toUpperCase(Locale.ROOT));
+            String tableExistSql =
+                    String.format(
+                            "SELECT COUNT(*) FROM SYSCAT.TABLES WHERE TABNAME = '%s' AND "
+                                    + "TABSCHEMA = 'DB2INST1';",
+                            tableName);
+            ResultSet resultSet = statement.executeQuery(tableExistSql);
+            int count = 0;
+            if (resultSet.next()) {
+                count = resultSet.getInt(1);
+            }
+            if (count == 1) {
+                LOG.info("{} table exist", tableName);
+                dropTestTable(connection, tableName.toUpperCase(Locale.ROOT));
+            }
             final List<String> statements =
                     Arrays.stream(
                                     Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
