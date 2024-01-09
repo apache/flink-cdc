@@ -300,6 +300,13 @@ Connector Options
       <td>JdbcUrl of the oracle database server . If the hostname and port parameter is configured, the URL is concatenated by hostname port database-name in SID format by default. Otherwise, you need to configure the URL parameter</td>
     </tr>
     <tr>
+      <td>server-time-zone</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">UTC</td>
+      <td>String</td>
+      <td>The session time zone in database server. Default value is UTC.</td>
+    </tr>
+    <tr>
       <td>scan.startup.mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>

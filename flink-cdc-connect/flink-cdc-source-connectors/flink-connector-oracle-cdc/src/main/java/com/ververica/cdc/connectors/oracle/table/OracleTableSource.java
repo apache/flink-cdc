@@ -40,6 +40,7 @@ import com.ververica.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import javax.annotation.Nullable;
 
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +80,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final String chunkKeyColumn;
     private final boolean closeIdleReaders;
     private final boolean skipSnapshotBackfill;
+    private final String serverTimeZone;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -113,7 +115,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             double distributionFactorLower,
             @Nullable String chunkKeyColumn,
             boolean closeIdleReaders,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            String serverTimeZone) {
         this.physicalSchema = physicalSchema;
         this.url = url;
         this.port = port;
@@ -139,6 +142,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.chunkKeyColumn = chunkKeyColumn;
         this.closeIdleReaders = closeIdleReaders;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
+        this.serverTimeZone = serverTimeZone;
     }
 
     @Override
@@ -160,6 +164,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         .setResultTypeInfo(typeInfo)
                         .setUserDefinedConverterFactory(
                                 OracleDeserializationConverterFactory.instance())
+                        .setServerTimeZone(ZoneId.of(serverTimeZone))
                         .build();
 
         if (enableParallelRead) {
@@ -186,6 +191,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .distributionFactorLower(distributionFactorLower)
                             .closeIdleReaders(closeIdleReaders)
                             .skipSnapshotBackfill(skipSnapshotBackfill)
+                            .serverTimeZone(serverTimeZone)
                             .build();
 
             return SourceProvider.of(oracleChangeEventSource);
@@ -251,7 +257,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         distributionFactorLower,
                         chunkKeyColumn,
                         closeIdleReaders,
-                        skipSnapshotBackfill);
+                        skipSnapshotBackfill,
+                        serverTimeZone);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
