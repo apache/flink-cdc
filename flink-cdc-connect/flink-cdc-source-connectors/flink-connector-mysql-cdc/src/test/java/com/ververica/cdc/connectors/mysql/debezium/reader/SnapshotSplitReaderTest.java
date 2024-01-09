@@ -31,6 +31,8 @@ import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory
 import com.ververica.cdc.connectors.mysql.source.split.MySqlSplit;
 import com.ververica.cdc.connectors.mysql.source.split.SourceRecords;
 import com.ververica.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlContainer;
+import com.ververica.cdc.connectors.mysql.testutils.MySqlVersion;
 import com.ververica.cdc.connectors.mysql.testutils.RecordsFormatter;
 import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
@@ -40,6 +42,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.testcontainers.lifecycle.Startables;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -48,6 +51,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -64,6 +68,9 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     private static BinaryLogClient binaryLogClient;
     private static MySqlConnection mySqlConnection;
+
+    private static final MySqlContainer MYSQL_WITHOUT_GTID_CONTAINER =
+            createMySqlContainer(MySqlVersion.V5_7, false);
 
     @BeforeClass
     public static void init() {
@@ -458,7 +465,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     public void testSnapshotScanSkipBackfillWithPostLowWatermark() throws Exception {
         String tableName = "customers";
         MySqlSourceConfig sourceConfig =
-                getConfig(customerDatabase, new String[] {tableName}, 10, true);
+                getConfig(MYSQL_CONTAINER, customerDatabase, new String[] {tableName}, 10, true);
 
         String tableId = customerDatabase.getDatabaseName() + "." + tableName;
         String[] changingDataSql =
@@ -513,7 +520,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     public void testSnapshotScanSkipBackfillWithPreHighWatermark() throws Exception {
         String tableName = "customers";
         MySqlSourceConfig sourceConfig =
-                getConfig(customerDatabase, new String[] {tableName}, 10, true);
+                getConfig(MYSQL_CONTAINER, customerDatabase, new String[] {tableName}, 10, true);
 
         String tableId = customerDatabase.getDatabaseName() + "." + tableName;
         String[] changingDataSql =
@@ -562,6 +569,92 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 readTableSnapshotSplits(
                         mySqlSplits, statefulTaskContext, 1, dataType, snapshotHooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+    }
+
+    @Test
+    public void testSnapshotScanBackfillWithoutGtidWithPreHighWatermark() throws Exception {
+        LOG.info("Starting without gtid containers...");
+        Startables.deepStart(Stream.of(MYSQL_WITHOUT_GTID_CONTAINER)).join();
+        LOG.info("Without gtid Containers are started.");
+
+        UniqueDatabase customerDatabaseWithoutGtid =
+                new UniqueDatabase(
+                        MYSQL_WITHOUT_GTID_CONTAINER,
+                        "customer_without_gtid",
+                        "mysqluser",
+                        "mysqlpw");
+        customerDatabaseWithoutGtid.createAndInitialize();
+
+        String tableName = "customers_without_gtid";
+        MySqlSourceConfig sourceConfig =
+                getConfig(
+                        MYSQL_WITHOUT_GTID_CONTAINER,
+                        customerDatabaseWithoutGtid,
+                        new String[] {tableName},
+                        10,
+                        false);
+
+        BinaryLogClient binaryLogClientWithoutGtid =
+                DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        MySqlConnection mySqlConnectionWithoutGtid =
+                DebeziumUtils.createMySqlConnection(sourceConfig);
+
+        String tableId = customerDatabaseWithoutGtid.getDatabaseName() + "." + tableName;
+        String[] changingDataSql =
+                new String[] {
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
+                    "DELETE FROM " + tableId + " where id = 102",
+                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','hangzhou','123567891234')",
+                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
+                };
+
+        StatefulTaskContext statefulTaskContext =
+                new StatefulTaskContext(
+                        sourceConfig, binaryLogClientWithoutGtid, mySqlConnectionWithoutGtid);
+
+        SnapshotPhaseHooks snapshotHooks = new SnapshotPhaseHooks();
+        snapshotHooks.setPreHighWatermarkAction(
+                (mySqlConnection, split) -> {
+                    mySqlConnection.execute(changingDataSql);
+                    mySqlConnection.commit();
+                });
+
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        List<MySqlSplit> mySqlSplits = getMySqlSplits(sourceConfig);
+
+        // Change data during [snapshot, high_watermark) will not be captured by snapshotting
+        String[] expected =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, hangzhou, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Hangzhou, 123567891234]",
+                    "+I[111, user_6, Hangzhou, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                };
+
+        List<String> actual =
+                readTableSnapshotSplits(
+                        mySqlSplits, statefulTaskContext, 1, dataType, snapshotHooks);
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+
+        LOG.info("Stopping without gtid containers...");
+        MYSQL_WITHOUT_GTID_CONTAINER.stop();
+        LOG.info("Without gtid Containers are stopped.");
+
+        mySqlConnectionWithoutGtid.close();
+
+        binaryLogClientWithoutGtid.disconnect();
     }
 
     private List<String> readTableSnapshotSplits(
@@ -645,10 +738,11 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     public static MySqlSourceConfig getConfig(
             UniqueDatabase database, String[] captureTables, int splitSize) {
-        return getConfig(database, captureTables, splitSize, false);
+        return getConfig(MYSQL_CONTAINER, database, captureTables, splitSize, false);
     }
 
     public static MySqlSourceConfig getConfig(
+            MySqlContainer mySqlContainer,
             UniqueDatabase database,
             String[] captureTables,
             int splitSize,
@@ -662,8 +756,8 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
                 .databaseList(database.getDatabaseName())
                 .tableList(captureTableIds)
                 .serverId("1001-1002")
-                .hostname(MYSQL_CONTAINER.getHost())
-                .port(MYSQL_CONTAINER.getDatabasePort())
+                .hostname(mySqlContainer.getHost())
+                .port(mySqlContainer.getDatabasePort())
                 .username(database.getUsername())
                 .splitSize(splitSize)
                 .fetchSize(2)
