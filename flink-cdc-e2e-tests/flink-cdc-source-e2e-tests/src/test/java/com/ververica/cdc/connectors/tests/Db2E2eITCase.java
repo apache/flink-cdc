@@ -20,7 +20,6 @@ import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -112,23 +111,6 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
         }
         db2AsnAgentRunning = false;
         super.after();
-    }
-
-    @AfterClass
-    public static void afterClass() {
-        // Cleanup the db2 image, because it's too large and will cause the next test to fail.
-        db2Container.getDockerClient().removeImageCmd(DB2_CUSTOM_IMAGE).exec();
-        db2Container
-                .getDockerClient()
-                .listImagesCmd()
-                .withImageNameFilter(DB2_IMAGE)
-                .exec()
-                .forEach(
-                        image ->
-                                db2Container
-                                        .getDockerClient()
-                                        .removeImageCmd(image.getId())
-                                        .exec());
     }
 
     @Test

@@ -20,7 +20,6 @@ import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -82,16 +81,6 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
             oracle.stop();
         }
         super.after();
-    }
-
-    @AfterClass
-    public static void afterClass() {
-        // Cleanup the oracle image, because it's too large and will cause the next test to fail.
-        oracle.getDockerClient()
-                .listImagesCmd()
-                .withImageNameFilter(ORACLE_IMAGE)
-                .exec()
-                .forEach(image -> oracle.getDockerClient().removeImageCmd(image.getId()).exec());
     }
 
     @Test
