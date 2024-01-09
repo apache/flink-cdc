@@ -29,9 +29,12 @@ import com.ververica.cdc.common.schema.Schema;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
-/** Utils for {@link Schema} to perform the ability of evolution. */
+/**
+ * Utils for {@link Schema} to perform the ability of evolution.
+ */
 @PublicEvolving
 public class SchemaUtils {
 
@@ -47,7 +50,9 @@ public class SchemaUtils {
         return fieldGetters;
     }
 
-    /** apply SchemaChangeEvent to the old schema and return the schema after changing. */
+    /**
+     * apply SchemaChangeEvent to the old schema and return the schema after changing.
+     */
     public static Schema applySchemaChangeEvent(Schema schema, SchemaChangeEvent event) {
         if (event instanceof AddColumnEvent) {
             return applyAddColumnEvent((AddColumnEvent) event, schema);
@@ -68,58 +73,58 @@ public class SchemaUtils {
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
         LinkedList<Column> columns = new LinkedList<>(oldSchema.getColumns());
         for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
-            if (columns.contains(columnWithPosition.getAddColumn())) {
-                throw new IllegalArgumentException(
-                        columnWithPosition.getAddColumn().getName()
-                                + " of AddColumnEvent is already existed");
-            }
+            columns.forEach(data -> {
+                if (Objects.equals(data.getName(), columnWithPosition.getAddColumn().getName())) {
+                    throw new IllegalArgumentException(
+                            columnWithPosition.getAddColumn().getName()
+                                    + " of AddColumnEvent is already existed");
+                }
+            });
+
+
             switch (columnWithPosition.getPosition()) {
-                case FIRST:
-                    {
-                        columns.addFirst(columnWithPosition.getAddColumn());
-                        break;
+                case FIRST: {
+                    columns.addFirst(columnWithPosition.getAddColumn());
+                    break;
+                }
+                case LAST: {
+                    columns.addLast(columnWithPosition.getAddColumn());
+                    break;
+                }
+                case BEFORE: {
+                    Preconditions.checkNotNull(
+                            columnWithPosition.getExistingColumn(),
+                            "existingColumn could not be null in BEFORE type AddColumnEvent");
+                    List<String> columnNames =
+                            columns.stream().map(Column::getName).collect(Collectors.toList());
+                    int index =
+                            columnNames.indexOf(
+                                    columnWithPosition.getExistingColumn().getName());
+                    if (index < 0) {
+                        throw new IllegalArgumentException(
+                                columnWithPosition.getExistingColumn().getName()
+                                        + " of AddColumnEvent is not existed");
                     }
-                case LAST:
-                    {
-                        columns.addLast(columnWithPosition.getAddColumn());
-                        break;
+                    columns.add(index, columnWithPosition.getAddColumn());
+                    break;
+                }
+                case AFTER: {
+                    Preconditions.checkNotNull(
+                            columnWithPosition.getExistingColumn(),
+                            "existingColumn could not be null in AFTER type AddColumnEvent");
+                    List<String> columnNames =
+                            columns.stream().map(Column::getName).collect(Collectors.toList());
+                    int index =
+                            columnNames.indexOf(
+                                    columnWithPosition.getExistingColumn().getName());
+                    if (index < 0) {
+                        throw new IllegalArgumentException(
+                                columnWithPosition.getExistingColumn().getName()
+                                        + " of AddColumnEvent is not existed");
                     }
-                case BEFORE:
-                    {
-                        Preconditions.checkNotNull(
-                                columnWithPosition.getExistingColumn(),
-                                "existingColumn could not be null in BEFORE type AddColumnEvent");
-                        List<String> columnNames =
-                                columns.stream().map(Column::getName).collect(Collectors.toList());
-                        int index =
-                                columnNames.indexOf(
-                                        columnWithPosition.getExistingColumn().getName());
-                        if (index < 0) {
-                            throw new IllegalArgumentException(
-                                    columnWithPosition.getExistingColumn().getName()
-                                            + " of AddColumnEvent is not existed");
-                        }
-                        columns.add(index, columnWithPosition.getAddColumn());
-                        break;
-                    }
-                case AFTER:
-                    {
-                        Preconditions.checkNotNull(
-                                columnWithPosition.getExistingColumn(),
-                                "existingColumn could not be null in AFTER type AddColumnEvent");
-                        List<String> columnNames =
-                                columns.stream().map(Column::getName).collect(Collectors.toList());
-                        int index =
-                                columnNames.indexOf(
-                                        columnWithPosition.getExistingColumn().getName());
-                        if (index < 0) {
-                            throw new IllegalArgumentException(
-                                    columnWithPosition.getExistingColumn().getName()
-                                            + " of AddColumnEvent is not existed");
-                        }
-                        columns.add(index + 1, columnWithPosition.getAddColumn());
-                        break;
-                    }
+                    columns.add(index + 1, columnWithPosition.getAddColumn());
+                    break;
+                }
             }
         }
         return oldSchema.copy(columns);
