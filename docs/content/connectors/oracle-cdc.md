@@ -300,6 +300,13 @@ Connector Options
       <td>JdbcUrl of the oracle database server . If the hostname and port parameter is configured, the URL is concatenated by hostname port database-name in SID format by default. Otherwise, you need to configure the URL parameter</td>
     </tr>
     <tr>
+      <td>server-time-zone</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">UTC</td>
+      <td>String</td>
+      <td>The session time zone in database server. Default value is UTC.</td>
+    </tr>
+    <tr>
       <td>scan.startup.mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
@@ -411,7 +418,7 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
     </tr>
     <tr>
       <td>database_name</td>
-      <td>STRING NOT NULL</td>
+      <td>STRING NOT NULL</td>OracleSource
       <td>Name of the database that contain the row.</td>
     </tr>
     <tr>
