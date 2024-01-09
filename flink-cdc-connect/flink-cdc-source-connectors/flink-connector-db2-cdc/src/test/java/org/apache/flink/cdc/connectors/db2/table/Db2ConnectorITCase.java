@@ -70,7 +70,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
 
     @Parameterized.Parameters(name = "incrementalSnapshot: {0}")
     public static Object[] parameters() {
-        return new Object[][] {new Object[] {false}, new Object[] {true}};
+        return new Object[][] {new Object[] {true}, new Object[] {false}};
     }
 
     @Before

@@ -65,7 +65,7 @@ import static org.junit.Assert.assertTrue;
 public class Db2TestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(Db2TestBase.class);
-    protected static final int DEFAULT_PARALLELISM = 4;
+    protected static final int DEFAULT_PARALLELISM = 2;
 
     @Rule
     public final MiniClusterWithClientResource miniClusterResource =
