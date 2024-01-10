@@ -522,6 +522,12 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         tableId,
                         Collections.singletonList(
                                 Column.physicalColumn("DESC3", DataTypes.BIGINT()))));
+
+        // Should not catch SchemaChangeEvent of tables other than `products`
+        statement.execute(
+                String.format(
+                        "ALTER TABLE `%s`.`orders` ADD COLUMN `desc1` VARCHAR(45) NULL;",
+                        inventoryDatabase.getDatabaseName()));
         return expected;
     }
 }
