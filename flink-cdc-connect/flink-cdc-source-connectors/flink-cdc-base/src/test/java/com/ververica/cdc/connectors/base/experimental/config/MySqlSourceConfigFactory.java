@@ -127,6 +127,7 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
                 serverTimeZone,
                 connectTimeout,
                 connectMaxRetries,
-                connectionPoolSize);
+                connectionPoolSize,
+                scanNewlyAddedTableEnabled);
     }
 }

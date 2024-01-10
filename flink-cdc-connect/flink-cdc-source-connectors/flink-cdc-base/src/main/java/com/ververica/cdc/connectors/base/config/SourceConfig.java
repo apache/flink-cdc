@@ -37,6 +37,8 @@ public interface SourceConfig extends Serializable {
 
     boolean isSkipSnapshotBackfill();
 
+    boolean isScanNewlyAddedTableEnabled();
+
     /** Factory for the {@code SourceConfig}. */
     @FunctionalInterface
     interface Factory<C extends SourceConfig> extends Serializable {
