@@ -418,7 +418,7 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
     </tr>
     <tr>
       <td>database_name</td>
-      <td>STRING NOT NULL</td>OracleSource
+      <td>STRING NOT NULL</td>
       <td>Name of the database that contain the row.</td>
     </tr>
     <tr>
