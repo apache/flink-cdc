@@ -16,17 +16,14 @@
 
 package com.ververica.cdc.connectors.tests;
 
-import com.github.dockerjava.api.DockerClient;
 import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -46,7 +43,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.junit.Assert.assertNotNull;
 
@@ -114,21 +110,6 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
         } catch (Exception e) {
             throw new RuntimeException("Failed to get test jdbc connection", e);
         }
-    }
-
-    @AfterClass
-    public static void afterClass() {
-        Stream.of(OB_SERVER, LOG_PROXY).forEach(GenericContainer::stop);
-
-        DockerClient client = DockerClientFactory.instance().client();
-        client.listImagesCmd()
-                .withImageNameFilter(OB_SERVER_IMAGE)
-                .exec()
-                .forEach(image -> client.removeImageCmd(image.getId()).exec());
-        client.listImagesCmd()
-                .withImageNameFilter(OB_LOG_PROXY_IMAGE)
-                .exec()
-                .forEach(image -> client.removeImageCmd(image.getId()).exec());
     }
 
     @Test
