@@ -247,7 +247,7 @@ public class Db2SourceTest extends Db2TestBase {
                 String lsn = JsonPath.read(state, "$.sourceOffset.commit_lsn");
                 assertTrue(lsn.compareTo(prevLsn) > 0);
 
-                // execute 2 more DMLs to have more binlog
+                // execute 2 more DMLs to have more redo logs
                 statement.execute(
                         "INSERT INTO DB2INST1.PRODUCTS VALUES (1001,'roy','old robot',1234.56)"); // 1001
                 statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT=1345.67 WHERE ID=1001");
@@ -277,7 +277,7 @@ public class Db2SourceTest extends Db2TestBase {
                     };
             runThread3.start();
 
-            // consume the unconsumed binlog
+            // consume the unconsumed redo logs
             List<SourceRecord> records = drain(sourceContext3, 2);
             assertInsert(records.get(0), "ID", 1001);
             assertUpdate(records.get(1), "ID", 1001);

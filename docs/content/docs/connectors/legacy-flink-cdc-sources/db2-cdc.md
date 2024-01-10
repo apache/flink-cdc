@@ -94,7 +94,7 @@ Flink SQL> CREATE TABLE products (
      'database-name' = 'mydb',
      'table-name' = 'myschema.products');
   
--- read snapshot and binlogs from products table
+-- read snapshot and redo logs from products table
 Flink SQL> SELECT * FROM products;
 ```
 
@@ -290,9 +290,9 @@ Features
 
 The config option `scan.startup.mode` specifies the startup mode for DB2 CDC consumer. The valid enumerations are:
 
-- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest binlog.
+- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest redo logs.
 - `latest-offset`: Never to perform snapshot on the monitored database tables upon first startup, just read from
-  the end of the binlog which means only have the changes since the connector was started.
+  the end of the redo logs which means only have the changes since the connector was started.
 
 _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not using them together. If you speicifying both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
 

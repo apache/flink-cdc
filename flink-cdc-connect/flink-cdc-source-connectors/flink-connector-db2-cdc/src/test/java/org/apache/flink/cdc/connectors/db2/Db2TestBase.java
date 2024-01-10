@@ -61,7 +61,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-/** Basic class for testing DB2 source, this contains a DB2 container which enables binlog. */
+/** Basic class for testing DB2 source, this contains a DB2 container which enables redo logs. */
 public class Db2TestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(Db2TestBase.class);

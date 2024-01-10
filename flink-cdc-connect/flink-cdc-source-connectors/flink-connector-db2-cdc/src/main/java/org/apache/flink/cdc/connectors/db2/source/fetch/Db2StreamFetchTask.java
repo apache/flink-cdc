@@ -55,7 +55,7 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
         Db2SourceFetchTaskContext sourceFetchContext = (Db2SourceFetchTaskContext) context;
         sourceFetchContext.getOffsetContext().preSnapshotCompletion();
         taskRunning = true;
-        StreamSplitReadTask walSplitReadTask =
+        StreamSplitReadTask streamSplitReadTask =
                 new StreamSplitReadTask(
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getConnection(),
@@ -66,7 +66,7 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
                         split);
         RedoLogSplitChangeEventSourceContext changeEventSourceContext =
                 new RedoLogSplitChangeEventSourceContext();
-        walSplitReadTask.execute(
+        streamSplitReadTask.execute(
                 changeEventSourceContext,
                 sourceFetchContext.getPartition(),
                 sourceFetchContext.getOffsetContext());
@@ -88,8 +88,8 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     /**
-     * A wrapped task to read all binlog for table and also supports read bounded (from lowWatermark
-     * to highWatermark) binlog.
+     * A wrapped task to read all redo logs for table and also supports read bounded (from
+     * lowWatermark to highWatermark) redo logs.
      */
     public static class StreamSplitReadTask extends Db2StreamingChangeEventSource {
 
@@ -122,7 +122,7 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
 
         @Override
         public void afterHandleLsn(Db2Partition partition, Lsn toLsn) {
-            // check do we need to stop for fetch wal for snapshot split.
+            // check do we need to stop for fetch redo logs for snapshot split.
             if (isBoundedRead()) {
                 LsnOffset currentLsnOffset = new LsnOffset(null, toLsn);
                 Offset endingOffset = lsnSplit.getEndingOffset();
@@ -137,7 +137,8 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
                     } catch (InterruptedException e) {
                         LOG.error("Send signal event error.", e);
                         errorHandler.setProducerThrowable(
-                                new DebeziumException("Error processing binlog signal event", e));
+                                new DebeziumException(
+                                        "Error processing redo logs signal event", e));
                     }
                     // tell fetcher the streaming task finished
                     ((Db2ScanFetchTask.Db2SnapshotSplitChangeEventSourceContext) context)
@@ -161,7 +162,7 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
         }
     }
 
-    /** The {@link ChangeEventSourceContext} implementation for binlog split task. */
+    /** The {@link ChangeEventSourceContext} implementation for redo logs split task. */
     private class RedoLogSplitChangeEventSourceContext implements ChangeEventSourceContext {
         @Override
         public boolean isRunning() {

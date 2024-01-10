@@ -83,7 +83,7 @@ public class Db2SourceITCase extends Db2TestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverInBinlogPhase() throws Exception {
+    public void testTaskManagerFailoverInRedoLogsPhase() throws Exception {
         testDb2ParallelSource(
                 FailoverType.TM, FailoverPhase.STREAM, new String[] {"DB2INST1.CUSTOMERS"});
     }
@@ -95,7 +95,7 @@ public class Db2SourceITCase extends Db2TestBase {
     }
 
     @Test
-    public void testJobManagerFailoverInBinlogPhase() throws Exception {
+    public void testJobManagerFailoverInRedoLogsPhase() throws Exception {
         testDb2ParallelSource(
                 FailoverType.JM, FailoverPhase.STREAM, new String[] {"DB2INST1.CUSTOMERS"});
     }
@@ -230,10 +230,10 @@ public class Db2SourceITCase extends Db2TestBase {
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
         }
         for (String tableId : captureCustomerTables) {
-            makeSecondPartBinlogEvents(tableId);
+            makeSecondPartRedoLogsEvents(tableId);
         }
 
-        String[] binlogForSingleTable =
+        String[] redoLogsForSingleTable =
                 new String[] {
                     "-U[103, user_3, Shanghai, 123567891234]",
                     "+U[103, user_3, Hangzhou, 123567891234]",
@@ -247,11 +247,12 @@ public class Db2SourceITCase extends Db2TestBase {
                     "+I[2002, user_23, Shanghai, 123567891234]",
                     "+I[2003, user_24, Shanghai, 123567891234]"
                 };
-        List<String> expectedBinlogData = new ArrayList<>();
+        List<String> expectedRedoLogsData = new ArrayList<>();
         for (int i = 0; i < captureCustomerTables.length; i++) {
-            expectedBinlogData.addAll(Arrays.asList(binlogForSingleTable));
+            expectedRedoLogsData.addAll(Arrays.asList(redoLogsForSingleTable));
         }
-        assertEqualsInAnyOrder(expectedBinlogData, fetchRows(iterator, expectedBinlogData.size()));
+        assertEqualsInAnyOrder(
+                expectedRedoLogsData, fetchRows(iterator, expectedRedoLogsData.size()));
         tableResult.getJobClient().get().cancel().get();
     }
 
@@ -262,7 +263,7 @@ public class Db2SourceITCase extends Db2TestBase {
         executeSql("UPDATE " + tableId + " SET ADDRESS = 'Shanghai' where ID = 103");
     }
 
-    private void makeSecondPartBinlogEvents(String tableId) {
+    private void makeSecondPartRedoLogsEvents(String tableId) {
         executeSql("UPDATE " + tableId + " SET ADDRESS = 'Hangzhou' where ID = 1010");
         executeSql("INSERT INTO " + tableId + " VALUES(2001, 'user_22','Shanghai','123567891234')");
         executeSql("INSERT INTO " + tableId + " VALUES(2002, 'user_23','Shanghai','123567891234')");
