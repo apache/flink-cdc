@@ -97,7 +97,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
 
         boolean closeIdlerReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
-        String serverTimeZone = config.getOptional(SERVER_TIME_ZONE).orElse("UTC");
+        String serverTimeZone = config.get(SERVER_TIME_ZONE);
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
