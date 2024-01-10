@@ -130,6 +130,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                                             DataTypes.TIMESTAMP(0),
                                             DataTypes.TIMESTAMP(3),
                                             DataTypes.TIMESTAMP(6),
+                                            DataTypes.TIMESTAMP_LTZ(0),
                                             DataTypes.TIMESTAMP_LTZ(0)
                                         },
                                         new String[] {
@@ -142,7 +143,8 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                                             "datetime_c",
                                             "datetime3_c",
                                             "datetime6_c",
-                                            "timestamp_c"
+                                            "timestamp_c",
+                                            "timestamp_def_c"
                                         }))
                         .build();
         assertThat(actualSchema).isEqualTo(expectedSchema);
@@ -176,7 +178,8 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                                             DataTypes.TIMESTAMP(6),
                                             DataTypes.TIMESTAMP_LTZ(0),
                                             DataTypes.TIMESTAMP_LTZ(3),
-                                            DataTypes.TIMESTAMP_LTZ(6)
+                                            DataTypes.TIMESTAMP_LTZ(6),
+                                            DataTypes.TIMESTAMP_LTZ(0)
                                         },
                                         new String[] {
                                             "id",
@@ -190,7 +193,8 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                                             "datetime6_c",
                                             "timestamp_c",
                                             "timestamp3_c",
-                                            "timestamp6_c"
+                                            "timestamp6_c",
+                                            "timestamp_def_c"
                                         }))
                         .build();
         assertThat(actualSchema).isEqualTo(expectedSchema);
