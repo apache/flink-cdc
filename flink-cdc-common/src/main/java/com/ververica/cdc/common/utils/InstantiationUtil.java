@@ -19,7 +19,6 @@ package com.ververica.cdc.common.utils;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
-import org.apache.flink.util.CollectionUtil;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -112,8 +111,7 @@ public class InstantiationUtil {
 
         // ------------------------------------------------
 
-        private static final HashMap<String, Class<?>> primitiveClasses =
-                CollectionUtil.newHashMapWithExpectedSize(9);
+        private static final HashMap<String, Class<?>> primitiveClasses = new HashMap<>(9);
 
         static {
             primitiveClasses.put("boolean", boolean.class);
