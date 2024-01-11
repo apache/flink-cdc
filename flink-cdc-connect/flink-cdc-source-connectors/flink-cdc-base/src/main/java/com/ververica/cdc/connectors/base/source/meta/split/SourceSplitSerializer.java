@@ -159,7 +159,7 @@ public abstract class SourceSplitSerializer
                     readFinishedSplitsInfo(version, in);
             Map<TableId, TableChange> tableChangeMap = readTableSchemas(version, in);
             int totalFinishedSplitSize = finishedSplitsInfo.size();
-            if (version == 3) {
+            if (version >= 3) {
                 totalFinishedSplitSize = in.readInt();
             }
             in.releaseArrays();
