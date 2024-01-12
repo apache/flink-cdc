@@ -78,8 +78,8 @@ We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kib
 
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself.**
     - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-    - flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar
-    - flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar
+    - flink-sql-connector-mysql-cdc-3.0-SNAPSHOT.jar
+    - flink-sql-connector-postgres-cdc-3.0-SNAPSHOT.jar
 
 ### Preparing data in databases
 #### Preparing data in MySQL
