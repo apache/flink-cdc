@@ -74,8 +74,8 @@ docker-compose up -d
 
    **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译**
     - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-    - flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar
-    - flink-sql-connector-postgres-cdc-2.5-SNAPSHOT.jar
+    - flink-sql-connector-mysql-cdc-3.0-SNAPSHOT.jar
+    - flink-sql-connector-postgres-cdc-3.0-SNAPSHOT.jar
 
 ### 准备数据
 #### 在 MySQL 数据库中准备数据
