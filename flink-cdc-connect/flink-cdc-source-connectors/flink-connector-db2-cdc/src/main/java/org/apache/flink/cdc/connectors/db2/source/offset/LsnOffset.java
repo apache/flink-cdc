@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.db2.source.offset;
 
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
+
 import io.debezium.connector.db2.Lsn;
 import io.debezium.connector.db2.SourceInfo;
 

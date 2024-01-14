@@ -17,12 +17,14 @@
 
 package org.apache.flink.cdc.connectors.tests;
 
+import org.apache.flink.cdc.connectors.db2.Db2TestBase;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import org.apache.flink.cdc.connectors.tests.utils.JdbcProxy;
 import org.apache.flink.cdc.connectors.tests.utils.TestUtils;
 
-import org.junit.After;
-import org.junit.Before;
+import org.awaitility.Awaitility;
+import org.awaitility.core.ConditionTimeoutException;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -35,16 +37,23 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.Assert.assertNotNull;
@@ -68,8 +77,25 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
                                     .get())
                     .asCompatibleSubstituteFor(DB2_IMAGE);
     private static boolean db2AsnAgentRunning = false;
+    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
-    private static Db2Container db2Container;
+    protected static final Db2Container DB2_CONTAINER =
+            new Db2Container(DEBEZIUM_DOCKER_IMAGE_NAME)
+                    .withDatabaseName("testdb")
+                    .withUsername("db2inst1")
+                    .withPassword("flinkpw")
+                    .withEnv("AUTOCONFIG", "false")
+                    .withEnv("ARCHIVE_LOGS", "true")
+                    .acceptLicense()
+                    .withLogConsumer(new Slf4jLogConsumer(LOG))
+                    .withLogConsumer(
+                            outputFrame -> {
+                                if (outputFrame
+                                        .getUtf8String()
+                                        .contains("The asncdc program enable finished")) {
+                                    db2AsnAgentRunning = true;
+                                }
+                            });
 
     @Parameterized.Parameter(1)
     public boolean parallelismSnapshot;
@@ -85,30 +111,10 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
         return params;
     }
 
-    @Before
-    public void before() {
-        super.before();
+    @BeforeClass
+    public static void startContainers() {
         LOG.info("Starting db2 containers...");
-        db2Container =
-                new Db2Container(DEBEZIUM_DOCKER_IMAGE_NAME)
-                        .withDatabaseName("testdb")
-                        .withUsername("db2inst1")
-                        .withPassword("flinkpw")
-                        .withEnv("AUTOCONFIG", "false")
-                        .withEnv("ARCHIVE_LOGS", "true")
-                        .acceptLicense()
-                        .withNetwork(NETWORK)
-                        .withNetworkAliases(INTER_CONTAINER_DB2_ALIAS)
-                        .withLogConsumer(new Slf4jLogConsumer(LOG))
-                        .withLogConsumer(
-                                outputFrame -> {
-                                    if (outputFrame
-                                            .getUtf8String()
-                                            .contains("The asncdc program enable finished")) {
-                                        db2AsnAgentRunning = true;
-                                    }
-                                });
-        Startables.deepStart(Stream.of(db2Container)).join();
+        Startables.deepStart(Stream.of(DB2_CONTAINER)).join();
         LOG.info("Db2 containers are started.");
 
         LOG.info("Waiting db2 asn agent start...");
@@ -122,17 +128,9 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
         LOG.info("Db2 asn agent are started.");
     }
 
-    @After
-    public void after() {
-        if (db2Container != null) {
-            db2Container.close();
-        }
-        db2AsnAgentRunning = false;
-        super.after();
-    }
-
     @Test
     public void testDb2CDC() throws Exception {
+        initializeDb2Table("inventory", "PRODUCTS");
         List<String> sqlLines =
                 Arrays.asList(
                         String.format(
@@ -156,9 +154,9 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
                                         + ");",
                                 INTER_CONTAINER_DB2_ALIAS,
                                 DB2_PORT,
-                                db2Container.getUsername(),
-                                db2Container.getPassword(),
-                                db2Container.getDatabaseName(),
+                                DB2_CONTAINER.getUsername(),
+                                DB2_CONTAINER.getPassword(),
+                                DB2_CONTAINER.getDatabaseName(),
                                 "DB2INST1.PRODUCTS"),
                         "CREATE TABLE products_sink (",
                         " `id` INT NOT NULL,",
@@ -230,7 +228,9 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
 
     private Connection getDb2Connection() throws SQLException {
         return DriverManager.getConnection(
-                db2Container.getJdbcUrl(), db2Container.getUsername(), db2Container.getPassword());
+                DB2_CONTAINER.getJdbcUrl(),
+                DB2_CONTAINER.getUsername(),
+                DB2_CONTAINER.getPassword());
     }
 
     private static Path getFilePath(String resourceFilePath) {
@@ -243,5 +243,110 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
             LOG.error("Cannot get path from URI.", e);
         }
         return path;
+    }
+
+    private static void dropTestTable(Connection connection, String tableName) {
+
+        try {
+            Awaitility.await(String.format("cdc remove table %s", tableName))
+                    .atMost(60, TimeUnit.SECONDS)
+                    .until(
+                            () -> {
+                                try {
+                                    String sql =
+                                            String.format(
+                                                    "CALL ASNCDC.REMOVETABLE('DB2INST1', '%s')",
+                                                    tableName);
+                                    connection.createStatement().execute(sql);
+                                    return true;
+                                } catch (SQLException e) {
+                                    LOG.warn(
+                                            String.format(
+                                                    "cdc remove TABLE %s failed (will be retried): {}",
+                                                    tableName),
+                                            e.getMessage());
+                                    return false;
+                                }
+                            });
+        } catch (ConditionTimeoutException e) {
+            throw new IllegalStateException("Failed to cdc remove test table", e);
+        }
+
+        try {
+            Awaitility.await(String.format("Dropping table %s", tableName))
+                    .atMost(60, TimeUnit.SECONDS)
+                    .until(
+                            () -> {
+                                try {
+                                    String sql = String.format("DROP TABLE DB2INST1.%s", tableName);
+                                    connection.createStatement().execute(sql);
+                                    connection.commit();
+                                    return true;
+                                } catch (SQLException e) {
+                                    LOG.warn(
+                                            String.format(
+                                                    "DROP TABLE %s failed (will be retried): {}",
+                                                    tableName),
+                                            e.getMessage());
+                                    return false;
+                                }
+                            });
+        } catch (ConditionTimeoutException e) {
+            throw new IllegalStateException("Failed to drop test database", e);
+        }
+    }
+
+    protected Connection getJdbcConnection() throws SQLException {
+        return DriverManager.getConnection(
+                DB2_CONTAINER.getJdbcUrl(),
+                DB2_CONTAINER.getUsername(),
+                DB2_CONTAINER.getPassword());
+    }
+
+    /**
+     * Executes a JDBC statement using the default jdbc config without autocommitting the
+     * connection.
+     */
+    protected void initializeDb2Table(String sqlFile, String tableName) {
+        final String ddlFile = String.format("docker/db2/%s.sql", sqlFile);
+        final URL ddlTestFile = Db2TestBase.class.getClassLoader().getResource(ddlFile);
+        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            String tableExistSql =
+                    String.format(
+                            "SELECT COUNT(*) FROM SYSCAT.TABLES WHERE TABNAME = '%s' AND "
+                                    + "TABSCHEMA = 'DB2INST1';",
+                            tableName);
+            ResultSet resultSet = statement.executeQuery(tableExistSql);
+            int count = 0;
+            if (resultSet.next()) {
+                count = resultSet.getInt(1);
+            }
+            if (count == 1) {
+                LOG.info("{} table exist", tableName);
+                dropTestTable(connection, tableName.toUpperCase(Locale.ROOT));
+            }
+            final List<String> statements =
+                    Arrays.stream(
+                                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
+                                            .map(String::trim)
+                                            .filter(x -> !x.startsWith("--") && !x.isEmpty())
+                                            .map(
+                                                    x -> {
+                                                        final Matcher m =
+                                                                COMMENT_PATTERN.matcher(x);
+                                                        return m.matches() ? m.group(1) : x;
+                                                    })
+                                            .collect(Collectors.joining("\n"))
+                                            .split(";"))
+                            .collect(Collectors.toList());
+            for (String stmt : statements) {
+                statement.execute(stmt);
+                Thread.sleep(500);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

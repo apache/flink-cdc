@@ -17,10 +17,6 @@
 
 package org.apache.flink.cdc.connectors.db2.source.dialect;
 
-import io.debezium.relational.Tables;
-import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask.Context;
-import org.apache.flink.util.FlinkRuntimeException;
-
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
@@ -29,14 +25,18 @@ import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitt
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
+import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask.Context;
 import org.apache.flink.cdc.connectors.db2.source.config.Db2SourceConfig;
 import org.apache.flink.cdc.connectors.db2.source.fetch.Db2ScanFetchTask;
 import org.apache.flink.cdc.connectors.db2.source.fetch.Db2SourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.db2.source.fetch.Db2StreamFetchTask;
 import org.apache.flink.cdc.connectors.db2.source.utils.Db2ConnectionUtils;
+import org.apache.flink.util.FlinkRuntimeException;
+
 import io.debezium.connector.db2.Db2Connection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.sql.SQLException;

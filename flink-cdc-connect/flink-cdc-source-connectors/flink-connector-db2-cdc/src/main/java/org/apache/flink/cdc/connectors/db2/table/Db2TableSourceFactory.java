@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.db2.table;
 
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.db2.utils.OptionUtils;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
@@ -27,8 +28,6 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
-
-import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 
 import java.time.Duration;
 import java.time.ZoneId;

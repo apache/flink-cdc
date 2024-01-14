@@ -17,10 +17,6 @@
 
 package org.apache.flink.cdc.connectors.db2.source.dialect;
 
-import org.apache.flink.table.types.DataType;
-import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.util.FlinkRuntimeException;
-
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkRange;
@@ -29,6 +25,10 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.utils.ObjectUtils;
 import org.apache.flink.cdc.connectors.db2.source.utils.Db2TypeUtils;
 import org.apache.flink.cdc.connectors.db2.source.utils.Db2Utils;
+import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.util.FlinkRuntimeException;
+
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;

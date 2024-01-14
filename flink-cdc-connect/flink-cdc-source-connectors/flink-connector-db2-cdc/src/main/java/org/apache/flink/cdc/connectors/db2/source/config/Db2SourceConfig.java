@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.db2.source.config;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
+
 import io.debezium.config.Configuration;
 import io.debezium.connector.db2.Db2ConnectorConfig;
 
@@ -80,7 +81,8 @@ public class Db2SourceConfig extends JdbcSourceConfig {
                 connectMaxRetries,
                 connectionPoolSize,
                 chunkKeyColumn,
-                skipSnapshotBackfill);
+                skipSnapshotBackfill,
+                false);
     }
 
     @Override

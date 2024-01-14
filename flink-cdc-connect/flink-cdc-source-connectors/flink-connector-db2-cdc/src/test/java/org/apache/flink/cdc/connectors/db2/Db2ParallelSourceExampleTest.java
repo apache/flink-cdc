@@ -18,12 +18,12 @@
 package org.apache.flink.cdc.connectors.db2;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.db2.source.Db2SourceBuilder;
 import org.apache.flink.cdc.connectors.db2.source.Db2SourceBuilder.Db2IncrementalSource;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+
 import org.junit.Ignore;
 import org.junit.Test;
 

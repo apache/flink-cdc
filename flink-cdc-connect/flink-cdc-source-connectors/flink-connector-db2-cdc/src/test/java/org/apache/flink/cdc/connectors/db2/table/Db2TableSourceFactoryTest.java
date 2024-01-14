@@ -17,7 +17,9 @@
 
 package org.apache.flink.cdc.connectors.db2.table;
 
-import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
+import org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions;
+import org.apache.flink.cdc.connectors.base.options.SourceOptions;
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
@@ -32,9 +34,6 @@ import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.ExceptionUtils;
 
-import org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions;
-import org.apache.flink.cdc.connectors.base.options.SourceOptions;
-import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.junit.Test;
 
 import java.time.ZoneId;

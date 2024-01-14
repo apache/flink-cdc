@@ -17,12 +17,12 @@
 
 package org.apache.flink.cdc.connectors.db2.source.utils;
 
+import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
+import org.apache.flink.cdc.connectors.db2.source.offset.LsnOffset;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
-import org.apache.flink.cdc.connectors.db2.source.offset.LsnOffset;
 import io.debezium.connector.db2.Db2Connection;
 import io.debezium.connector.db2.Db2ConnectorConfig;
 import io.debezium.connector.db2.Db2DatabaseSchema;

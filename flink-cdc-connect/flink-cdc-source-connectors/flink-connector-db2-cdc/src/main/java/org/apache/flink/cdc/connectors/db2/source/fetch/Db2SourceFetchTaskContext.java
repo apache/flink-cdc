@@ -1,11 +1,12 @@
 /*
- * Copyright 2023 Ververica Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,8 +17,6 @@
 
 package org.apache.flink.cdc.connectors.db2.source.fetch;
 
-import org.apache.flink.table.types.logical.RowType;
-
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
@@ -26,8 +25,11 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.db2.source.config.Db2SourceConfig;
 import org.apache.flink.cdc.connectors.db2.source.dialect.Db2Dialect;
+import org.apache.flink.cdc.connectors.db2.source.handler.Db2SchemaChangeEventHandler;
 import org.apache.flink.cdc.connectors.db2.source.offset.LsnOffset;
 import org.apache.flink.cdc.connectors.db2.source.utils.Db2Utils;
+import org.apache.flink.table.types.logical.RowType;
+
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.base.ChangeEventQueue.Builder;
 import io.debezium.connector.db2.Db2Connection;
@@ -59,15 +61,12 @@ import io.debezium.util.Collect;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.Map;
 
 /** The context for fetch task that fetching data of snapshot split from Db2 data source. */
 public class Db2SourceFetchTaskContext extends JdbcSourceFetchTaskContext {
-    private static final Logger LOG = LoggerFactory.getLogger(Db2SourceFetchTaskContext.class);
 
     /** Connection used for reading CDC tables. */
     private final Db2Connection connection;
@@ -140,7 +139,8 @@ public class Db2SourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         connectorConfig.getTableFilters().dataCollectionFilter(),
                         DataChangeEvent::new,
                         metadataProvider,
-                        schemaNameAdjuster);
+                        schemaNameAdjuster,
+                        new Db2SchemaChangeEventHandler());
 
         this.snapshotReceiver = dispatcher.getSnapshotChangeEventReceiver();
 

@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.db2.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.cdc.connectors.db2.Db2TestBase;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
@@ -30,7 +31,6 @@ import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import org.apache.flink.cdc.connectors.db2.Db2TestBase;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;

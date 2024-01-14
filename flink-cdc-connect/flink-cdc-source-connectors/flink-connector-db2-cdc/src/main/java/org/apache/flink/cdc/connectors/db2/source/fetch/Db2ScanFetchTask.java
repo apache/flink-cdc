@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import org.apache.flink.cdc.connectors.db2.source.fetch.Db2StreamFetchTask.StreamSplitReadTask;
+
 import io.debezium.DebeziumException;
 import io.debezium.config.Configuration;
 import io.debezium.connector.db2.Db2Connection;
