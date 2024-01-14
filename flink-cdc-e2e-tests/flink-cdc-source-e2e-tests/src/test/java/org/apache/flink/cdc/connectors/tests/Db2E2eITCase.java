@@ -63,7 +63,6 @@ import static org.testcontainers.containers.Db2Container.DB2_PORT;
 public class Db2E2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(Db2E2eITCase.class);
-    private static final String INTER_CONTAINER_DB2_ALIAS = "db2";
 
     private static final Path db2CdcJar = TestUtils.getResource("db2-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -152,8 +151,8 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
                                         + "',"
                                         + " 'scan.incremental.snapshot.chunk.size' = '4'"
                                         + ");",
-                                INTER_CONTAINER_DB2_ALIAS,
-                                DB2_PORT,
+                                DB2_CONTAINER,
+                                DB2_CONTAINER.getMappedPort(DB2_PORT),
                                 DB2_CONTAINER.getUsername(),
                                 DB2_CONTAINER.getPassword(),
                                 DB2_CONTAINER.getDatabaseName(),
