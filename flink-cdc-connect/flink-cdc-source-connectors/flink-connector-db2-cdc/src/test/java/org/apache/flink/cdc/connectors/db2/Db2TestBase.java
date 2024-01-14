@@ -17,16 +17,11 @@
 
 package org.apache.flink.cdc.connectors.db2;
 
-import org.apache.flink.runtime.minicluster.RpcServiceSharing;
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
-import org.apache.flink.test.util.MiniClusterWithClientResource;
-
 import org.apache.commons.lang3.StringUtils;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Rule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Db2Container;
@@ -65,17 +60,6 @@ import static org.junit.Assert.assertTrue;
 public class Db2TestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(Db2TestBase.class);
-    protected static final int DEFAULT_PARALLELISM = 2;
-
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .build());
 
     private static final DockerImageName DEBEZIUM_DOCKER_IMAGE_NAME =
             DockerImageName.parse(

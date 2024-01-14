@@ -19,15 +19,19 @@ package org.apache.flink.cdc.connectors.db2.table;
 
 import org.apache.flink.cdc.connectors.db2.Db2TestBase;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.runtime.minicluster.RpcServiceSharing;
+import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
+import org.apache.flink.test.util.MiniClusterWithClientResource;
 
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -51,8 +55,19 @@ import static org.testcontainers.containers.Db2Container.DB2_PORT;
 /** Integration tests for DB2 CDC source. */
 @RunWith(Parameterized.class)
 public class Db2ConnectorITCase extends Db2TestBase {
-
     private static final Logger LOG = LoggerFactory.getLogger(Db2ConnectorITCase.class);
+
+    protected static final int DEFAULT_PARALLELISM = 2;
+
+    @Rule
+    public final MiniClusterWithClientResource miniClusterResource =
+            new MiniClusterWithClientResource(
+                    new MiniClusterResourceConfiguration.Builder()
+                            .setNumberTaskManagers(1)
+                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                            .withHaLeadershipControl()
+                            .build());
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -79,7 +94,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
         env.setRestartStrategy(RestartStrategies.noRestart());
         if (incrementalSnapshot) {
             env.setParallelism(DEFAULT_PARALLELISM);
-            env.enableCheckpointing(200);
+            env.enableCheckpointing(1000);
         } else {
             env.setParallelism(1);
         }
