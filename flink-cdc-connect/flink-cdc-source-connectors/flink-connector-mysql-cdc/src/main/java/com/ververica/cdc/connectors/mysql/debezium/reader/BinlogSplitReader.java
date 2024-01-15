@@ -64,6 +64,8 @@ import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getSpl
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getStructContainsChunkKey;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.getTableId;
 import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isSchemaChangeEvent;
+import static com.ververica.cdc.connectors.mysql.source.utils.RecordUtils.isTableChangeRecord;
 
 /**
  * A Debezium binlog reader implementation that also support reads binlog and filter overlapping
@@ -245,9 +247,15 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             }
             // not in the monitored splits scope, do not emit
             return false;
+        } else if (isSchemaChangeEvent(sourceRecord)) {
+            if (isTableChangeRecord(sourceRecord)) {
+                TableId tableId = getTableId(sourceRecord);
+                return capturedTableFilter.isIncluded(tableId);
+            } else {
+                // Not related to changes in table structure, like `CREATE/DROP DATABASE`, skip it
+                return false;
+            }
         }
-        // always send the schema change event and signal event
-        // we need record them to state of Flink
         return true;
     }
 
