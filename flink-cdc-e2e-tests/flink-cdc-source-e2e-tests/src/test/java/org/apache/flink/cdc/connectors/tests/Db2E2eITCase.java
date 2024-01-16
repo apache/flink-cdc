@@ -24,7 +24,8 @@ import org.apache.flink.cdc.connectors.tests.utils.TestUtils;
 
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -77,27 +78,8 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
                                     .get())
                     .asCompatibleSubstituteFor(DB2_IMAGE);
     private static boolean db2AsnAgentRunning = false;
+    private static Db2Container db2Container;
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
-
-    protected static final Db2Container DB2_CONTAINER =
-            new Db2Container(DEBEZIUM_DOCKER_IMAGE_NAME)
-                    .withDatabaseName("testdb")
-                    .withUsername("db2inst1")
-                    .withPassword("flinkpw")
-                    .withEnv("AUTOCONFIG", "false")
-                    .withEnv("ARCHIVE_LOGS", "true")
-                    .acceptLicense()
-                    .withNetwork(NETWORK)
-                    .withNetworkAliases(INTER_CONTAINER_DB2_ALIAS)
-                    .withLogConsumer(new Slf4jLogConsumer(LOG))
-                    .withLogConsumer(
-                            outputFrame -> {
-                                if (outputFrame
-                                        .getUtf8String()
-                                        .contains("The asncdc program enable finished")) {
-                                    db2AsnAgentRunning = true;
-                                }
-                            });
 
     @Parameterized.Parameter(1)
     public boolean parallelismSnapshot;
@@ -113,10 +95,30 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
         return params;
     }
 
-    @BeforeClass
-    public static void startContainers() {
+    @Before
+    public void before() {
+        super.before();
         LOG.info("Starting db2 containers...");
-        Startables.deepStart(Stream.of(DB2_CONTAINER)).join();
+        db2Container =
+                new Db2Container(DEBEZIUM_DOCKER_IMAGE_NAME)
+                        .withDatabaseName("testdb")
+                        .withUsername("db2inst1")
+                        .withPassword("flinkpw")
+                        .withEnv("AUTOCONFIG", "false")
+                        .withEnv("ARCHIVE_LOGS", "true")
+                        .acceptLicense()
+                        .withNetwork(NETWORK)
+                        .withNetworkAliases(INTER_CONTAINER_DB2_ALIAS)
+                        .withLogConsumer(new Slf4jLogConsumer(LOG))
+                        .withLogConsumer(
+                                outputFrame -> {
+                                    if (outputFrame
+                                            .getUtf8String()
+                                            .contains("The asncdc program enable finished")) {
+                                        db2AsnAgentRunning = true;
+                                    }
+                                });
+        Startables.deepStart(Stream.of(db2Container)).join();
         LOG.info("Db2 containers are started.");
 
         LOG.info("Waiting db2 asn agent start...");
@@ -128,6 +130,15 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
             }
         }
         LOG.info("Db2 asn agent are started.");
+    }
+
+    @After
+    public void after() {
+        if (db2Container != null) {
+            db2Container.close();
+        }
+        db2AsnAgentRunning = false;
+        super.after();
     }
 
     @Test
@@ -156,9 +167,9 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
                                         + ");",
                                 INTER_CONTAINER_DB2_ALIAS,
                                 DB2_PORT,
-                                DB2_CONTAINER.getUsername(),
-                                DB2_CONTAINER.getPassword(),
-                                DB2_CONTAINER.getDatabaseName(),
+                                db2Container.getUsername(),
+                                db2Container.getPassword(),
+                                db2Container.getDatabaseName(),
                                 "DB2INST1.PRODUCTS"),
                         "CREATE TABLE products_sink (",
                         " `id` INT NOT NULL,",
@@ -230,9 +241,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
 
     private Connection getDb2Connection() throws SQLException {
         return DriverManager.getConnection(
-                DB2_CONTAINER.getJdbcUrl(),
-                DB2_CONTAINER.getUsername(),
-                DB2_CONTAINER.getPassword());
+                db2Container.getJdbcUrl(), db2Container.getUsername(), db2Container.getPassword());
     }
 
     private static Path getFilePath(String resourceFilePath) {
@@ -298,13 +307,6 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
         }
     }
 
-    protected Connection getJdbcConnection() throws SQLException {
-        return DriverManager.getConnection(
-                DB2_CONTAINER.getJdbcUrl(),
-                DB2_CONTAINER.getUsername(),
-                DB2_CONTAINER.getPassword());
-    }
-
     /**
      * Executes a JDBC statement using the default jdbc config without autocommitting the
      * connection.
@@ -313,7 +315,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
         final String ddlFile = String.format("docker/db2/%s.sql", sqlFile);
         final URL ddlTestFile = Db2TestBase.class.getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
-        try (Connection connection = getJdbcConnection();
+        try (Connection connection = getDb2Connection();
                 Statement statement = connection.createStatement()) {
             String tableExistSql =
                     String.format(
