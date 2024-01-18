@@ -90,7 +90,7 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
         if (!eventFilter.test(event)) {
             return;
         }
-        super.handleEvent(partition, offsetContext, event);
+
         // check do we need to stop for read binlog for snapshot split.
         if (isBoundedRead()) {
             final BinlogOffset currentBinlogOffset = getBinlogPosition(offsetContext.getOffset());
@@ -109,8 +109,10 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
                 }
                 // tell reader the binlog task finished
                 ((StoppableChangeEventSourceContext) context).stopChangeEventSource();
+                return;
             }
         }
+        super.handleEvent(partition, offsetContext, event);
     }
 
     private boolean isBoundedRead() {
