@@ -895,16 +895,6 @@ public class PostgresSourceITCase extends PostgresTestBase {
         return rows.stream().map(stringifier).collect(Collectors.toList());
     }
 
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
-    }
-
     /**
      * Make some changes on the specified customer table. Changelog in string could be accessed by
      * {@link #firstPartStreamEvents}.
