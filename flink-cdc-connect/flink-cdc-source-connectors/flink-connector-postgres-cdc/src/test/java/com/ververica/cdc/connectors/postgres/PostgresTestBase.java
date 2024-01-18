@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.postgres;
 
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.types.Row;
 
 import com.ververica.cdc.connectors.postgres.source.PostgresConnectionPoolFactory;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
@@ -41,7 +42,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -217,6 +220,16 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         postgresSourceConfigFactory.splitSize(splitSize);
         postgresSourceConfigFactory.skipSnapshotBackfill(skipSnapshotBackfill);
         return postgresSourceConfigFactory;
+    }
+
+    public static List<String> fetchRows(Iterator<Row> iter, int size) {
+        List<String> rows = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            Row row = iter.next();
+            rows.add(row.toString());
+            size--;
+        }
+        return rows;
     }
 
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {

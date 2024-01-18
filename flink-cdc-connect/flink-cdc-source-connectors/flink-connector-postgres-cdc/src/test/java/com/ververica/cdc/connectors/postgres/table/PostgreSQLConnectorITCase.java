@@ -23,6 +23,9 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
+import org.apache.flink.types.Row;
+import org.apache.flink.types.RowUtils;
+import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.connectors.postgres.PostgresTestBase;
@@ -35,6 +38,7 @@ import org.junit.runners.Parameterized;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -706,5 +710,70 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testUniqueIndexIncludingFunction() throws Exception {
+        // Clear the influence of usesLegacyRows which set USE_LEGACY_TO_STRING = true.
+        // In this test, print +I,-U, +U to see more clearly.
+        RowUtils.USE_LEGACY_TO_STRING = false;
+        initializePostgresTable(POSTGRES_CONTAINER, "index_type_test");
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE functional_unique_index ("
+                                + "    id INTEGER NOT NULL,"
+                                + "    char_c STRING"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                // In the snapshot phase of increment snapshot mode, table without
+                                // primary key is not allowed now.Thus, when
+                                // scan.incremental.snapshot.enabled = true, use 'latest-offset'
+                                // startup mode.
+                                + (parallelismSnapshot
+                                        ? " 'scan.startup.mode' = 'latest-offset',"
+                                        : "")
+                                + " 'slot.name' = '%s'"
+                                + ")",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
+                        "indexes",
+                        "functional_unique_index",
+                        parallelismSnapshot,
+                        getSlotName());
+        tEnv.executeSql(sourceDDL);
+
+        // async submit job
+        TableResult tableResult = tEnv.executeSql("SELECT * FROM functional_unique_index");
+        List<String> expected = new ArrayList<>();
+        if (!parallelismSnapshot) {
+            expected.add("+I[1, a]");
+        }
+
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000L);
+
+        // generate WAL
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE indexes.functional_unique_index SET char_c=NULL WHERE id=1;");
+        }
+
+        expected.addAll(Arrays.asList("-U[1, a]", "+U[1, null]"));
+        CloseableIterator<Row> iterator = tableResult.collect();
+        assertEqualsInAnyOrder(expected, fetchRows(iterator, expected.size()));
+        tableResult.getJobClient().get().cancel().get();
+        RowUtils.USE_LEGACY_TO_STRING = true;
     }
 }
