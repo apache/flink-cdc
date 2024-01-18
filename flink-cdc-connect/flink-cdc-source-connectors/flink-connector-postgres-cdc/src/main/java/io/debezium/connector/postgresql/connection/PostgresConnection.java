@@ -49,6 +49,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 
 /**
  * {@link JdbcConnection} connection extension used for connecting to Postgres instances.
@@ -61,6 +62,9 @@ import java.util.concurrent.atomic.AtomicLong;
  *           ConnectionFactory
  *       <li>override connection() to return a unwrapped PgConnection (otherwise, it will complain
  *           about HikariProxyConnection cannot be cast to class org.postgresql.core.BaseConnection)
+ *       <li>override isTableUniqueIndexIncluded: Copied DBZ-5398 from Debezium 2.0.0.Final to fix
+ *           https://github.com/ververica/flink-cdc-connectors/issues/2710. Remove this comment
+ *           after bumping debezium version to 2.0.0.Final.
  *     </ul>
  */
 public class PostgresConnection extends JdbcConnection {
@@ -72,6 +76,10 @@ public class PostgresConnection extends JdbcConnection {
     public static final String CONNECTION_HEARTBEAT = "Debezium Heartbeat";
     public static final String CONNECTION_GENERAL = "Debezium General";
 
+    private static final Pattern FUNCTION_DEFAULT_PATTERN =
+            Pattern.compile("^[(]?[A-Za-z0-9_.]+\\((?:.+(?:, ?.+)*)?\\)");
+    private static final Pattern EXPRESSION_DEFAULT_PATTERN =
+            Pattern.compile("\\(+(?:.+(?:[+ - * / < > = ~ ! @ # % ^ & | ` ?] ?.+)+)+\\)");
     private static Logger LOGGER = LoggerFactory.getLogger(PostgresConnection.class);
 
     private static final String URL_PATTERN =
@@ -828,6 +836,15 @@ public class PostgresConnection extends JdbcConnection {
     @Override
     protected boolean isTableType(String tableType) {
         return "TABLE".equals(tableType) || "PARTITIONED TABLE".equals(tableType);
+    }
+
+    @Override
+    protected boolean isTableUniqueIndexIncluded(String indexName, String columnName) {
+        if (columnName != null) {
+            return !FUNCTION_DEFAULT_PATTERN.matcher(columnName).matches()
+                    && !EXPRESSION_DEFAULT_PATTERN.matcher(columnName).matches();
+        }
+        return false;
     }
 
     @FunctionalInterface
