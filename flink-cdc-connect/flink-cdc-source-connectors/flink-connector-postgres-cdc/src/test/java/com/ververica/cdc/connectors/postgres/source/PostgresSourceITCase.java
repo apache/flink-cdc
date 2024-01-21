@@ -33,6 +33,7 @@ import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
@@ -60,12 +61,14 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -552,6 +555,72 @@ public class PostgresSourceITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
+    @Test
+    public void testNewLsnCommittedWhenCheckpoint() throws Exception {
+        int parallelism = 1;
+        FailoverType failoverType = FailoverType.JM;
+        FailoverPhase failoverPhase = FailoverPhase.STREAM;
+        String[] captureCustomerTables = new String[] {"customers"};
+        RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration =
+                RestartStrategies.fixedDelayRestart(1, 0);
+        boolean skipSnapshotBackfill = false;
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+        env.setParallelism(parallelism);
+        env.enableCheckpointing(200L);
+        env.setRestartStrategy(restartStrategyConfiguration);
+        String sourceDDL =
+                format(
+                        "CREATE TABLE customers ("
+                                + " id BIGINT NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " primary key (id) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc-mock',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.startup.mode' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'slot.name' = '%s',"
+                                + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
+                                + ")",
+                        customDatabase.getHost(),
+                        customDatabase.getDatabasePort(),
+                        customDatabase.getUsername(),
+                        customDatabase.getPassword(),
+                        customDatabase.getDatabaseName(),
+                        SCHEMA_NAME,
+                        getTableNameRegex(captureCustomerTables),
+                        scanStartupMode,
+                        slotName,
+                        skipSnapshotBackfill);
+        tEnv.executeSql(sourceDDL);
+        TableResult tableResult = tEnv.executeSql("select * from customers");
+
+        // first step: check the snapshot data
+        if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            checkSnapshotData(tableResult, failoverType, failoverPhase, captureCustomerTables);
+        }
+
+        // second step: check the stream data
+        checkStreamDataWithHook(tableResult, failoverType, failoverPhase, captureCustomerTables);
+
+        tableResult.getJobClient().get().cancel().get();
+
+        // sleep 1000ms to wait until connections are closed.
+        Thread.sleep(1000L);
+    }
+
     private List<String> testBackfillWhenWritingEvents(
             boolean skipSnapshotBackfill,
             int fetchSize,
@@ -787,6 +856,75 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
         // wait for the stream reading
         Thread.sleep(2000L);
+
+        if (failoverPhase == FailoverPhase.STREAM) {
+            triggerFailover(
+                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
+            waitUntilJobRunning(tableResult);
+        }
+        for (String tableId : captureCustomerTables) {
+            makeSecondPartStreamEvents(
+                    getConnection(),
+                    customDatabase.getDatabaseName() + '.' + SCHEMA_NAME + '.' + tableId);
+        }
+
+        List<String> expectedStreamData = new ArrayList<>();
+        for (int i = 0; i < captureCustomerTables.length; i++) {
+            expectedStreamData.addAll(firstPartStreamEvents);
+            expectedStreamData.addAll(secondPartStreamEvents);
+        }
+        // wait for the stream reading
+        Thread.sleep(2000L);
+
+        assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
+        assertTrue(!hasNextData(iterator));
+    }
+
+    private void checkStreamDataWithHook(
+            TableResult tableResult,
+            FailoverType failoverType,
+            FailoverPhase failoverPhase,
+            String[] captureCustomerTables)
+            throws Exception {
+        waitUntilJobRunning(tableResult);
+        CloseableIterator<Row> iterator = tableResult.collect();
+        JobID jobId = tableResult.getJobClient().get().getJobID();
+
+        final AtomicLong savedCheckpointId = new AtomicLong(0);
+        final CountDownLatch countDownLatch = new CountDownLatch(1);
+
+        MockPostgresDialect.setNotifyCheckpointCompleteCallback(
+                checkpointId -> {
+                    try {
+                        if (savedCheckpointId.get() == 0) {
+                            savedCheckpointId.set(checkpointId);
+
+                            for (String tableId : captureCustomerTables) {
+                                makeFirstPartStreamEvents(
+                                        getConnection(),
+                                        customDatabase.getDatabaseName()
+                                                + '.'
+                                                + SCHEMA_NAME
+                                                + '.'
+                                                + tableId);
+                            }
+                            // wait for the stream reading
+                            Thread.sleep(2000L);
+
+                            triggerFailover(
+                                    failoverType,
+                                    jobId,
+                                    miniClusterResource.getMiniCluster(),
+                                    () -> sleepMs(200));
+                            countDownLatch.countDown();
+                        }
+                    } catch (Exception e) {
+                        throw new FlinkRuntimeException(e);
+                    }
+                });
+
+        countDownLatch.await();
+        waitUntilJobRunning(tableResult);
 
         if (failoverPhase == FailoverPhase.STREAM) {
             triggerFailover(

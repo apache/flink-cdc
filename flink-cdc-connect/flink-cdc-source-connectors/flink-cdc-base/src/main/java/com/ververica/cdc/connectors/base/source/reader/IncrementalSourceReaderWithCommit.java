@@ -1,0 +1,100 @@
+/*
+ * Copyright 2023 Ververica Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.ververica.cdc.connectors.base.source.reader;
+
+import org.apache.flink.api.connector.source.SourceReaderContext;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.connector.base.source.reader.RecordEmitter;
+import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
+
+import com.ververica.cdc.connectors.base.config.SourceConfig;
+import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
+import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
+import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
+import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.TreeMap;
+import java.util.function.Supplier;
+
+/**
+ * Record the LSN of checkpoint {@link StreamSplit}, which can be used to submit to the CDC source.
+ */
+public class IncrementalSourceReaderWithCommit extends IncrementalSourceReader {
+    private static final Logger LOG =
+            LoggerFactory.getLogger(IncrementalSourceReaderWithCommit.class);
+
+    private final TreeMap<Long, Offset> lastCheckPointOffset;
+    private long maxCompletedCheckpointId;
+
+    public IncrementalSourceReaderWithCommit(
+            FutureCompletingBlockingQueue elementQueue,
+            Supplier supplier,
+            RecordEmitter recordEmitter,
+            Configuration config,
+            SourceReaderContext context,
+            SourceConfig sourceConfig,
+            SourceSplitSerializer sourceSplitSerializer,
+            DataSourceDialect dialect) {
+        super(
+                elementQueue,
+                supplier,
+                recordEmitter,
+                config,
+                context,
+                sourceConfig,
+                sourceSplitSerializer,
+                dialect);
+        this.lastCheckPointOffset = new TreeMap<>();
+        this.maxCompletedCheckpointId = 0;
+    }
+
+    @Override
+    public List<SourceSplitBase> snapshotState(long checkpointId) {
+        final List<SourceSplitBase> stateSplits = super.snapshotState(checkpointId);
+
+        stateSplits.stream()
+                .filter(SourceSplitBase::isStreamSplit)
+                .findAny()
+                .map(SourceSplitBase::asStreamSplit)
+                .ifPresent(
+                        streamSplit -> {
+                            lastCheckPointOffset.put(checkpointId, streamSplit.getStartingOffset());
+                            LOG.debug(
+                                    "Starting offset of stream split is: {}, and checkpoint id is {}.",
+                                    streamSplit.getStartingOffset(),
+                                    checkpointId);
+                        });
+
+        return stateSplits;
+    }
+
+    @Override
+    public void notifyCheckpointComplete(long checkpointId) throws Exception {
+        // checkpointId might be for a checkpoint that was triggered earlier. see
+        // CheckpointListener#notifyCheckpointComplete(long).
+        if (checkpointId > maxCompletedCheckpointId) {
+            Offset offset = lastCheckPointOffset.get(checkpointId);
+            dialect.notifyCheckpointComplete(checkpointId, offset);
+            lastCheckPointOffset.headMap(checkpointId, true).clear();
+            maxCompletedCheckpointId = checkpointId;
+        }
+    }
+}
