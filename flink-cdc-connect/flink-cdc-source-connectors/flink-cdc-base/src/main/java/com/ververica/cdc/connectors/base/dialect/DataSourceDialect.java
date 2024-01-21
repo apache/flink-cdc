@@ -79,4 +79,12 @@ public interface DataSourceDialect<C extends SourceConfig>
      */
     @Override
     default void notifyCheckpointComplete(long checkpointId) throws Exception {}
+
+    /**
+     * We may need the offset corresponding to the checkpointId. For example, we should commit LSN
+     * of checkpoint to postgres's slot.
+     */
+    default void notifyCheckpointComplete(long checkpointId, Offset offset) throws Exception {
+        notifyCheckpointComplete(checkpointId);
+    }
 }

@@ -78,7 +78,7 @@ public class IncrementalSource<T, C extends SourceConfig>
     // This field is introduced for testing purpose, for example testing if changes made in the
     // snapshot phase are correctly backfilled into the snapshot by registering a pre high watermark
     // hook for generating changes.
-    private SnapshotPhaseHooks snapshotHooks = SnapshotPhaseHooks.empty();
+    protected SnapshotPhaseHooks snapshotHooks = SnapshotPhaseHooks.empty();
 
     public IncrementalSource(
             SourceConfig.Factory<C> configFactory,

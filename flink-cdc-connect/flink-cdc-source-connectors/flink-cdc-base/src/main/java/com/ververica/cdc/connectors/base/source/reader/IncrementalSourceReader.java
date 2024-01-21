@@ -77,7 +77,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     private final int subtaskId;
     private final SourceSplitSerializer sourceSplitSerializer;
     private final C sourceConfig;
-    private final DataSourceDialect<C> dialect;
+    protected final DataSourceDialect<C> dialect;
 
     public IncrementalSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
