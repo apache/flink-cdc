@@ -91,7 +91,6 @@ jobs:
   compile_and_test:
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
         jdk: [ 8 ]
         module: [ "core",
