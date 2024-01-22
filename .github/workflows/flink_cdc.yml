@@ -1,0 +1,241 @@
+#
+# Copyright 2023 Ververica Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This workflow will triage pull requests and apply a label based on the
+# paths that are modified in the pull request.
+#
+# To use this workflow, you will need to set up a .github/label.yml
+# file with configuration.  For more information, see:
+
+name: Flink CDC CI
+on:
+  push:
+    branches:
+      - master
+      - release-*
+  pull_request:
+    branches:
+      - master
+      - release-*
+#  schedule:
+#    - cron: "0 18 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MODULES_CORE: "\
+  flink-cdc-cli,\
+  flink-cdc-common,\
+  flink-cdc-composer,\
+  flink-cdc-runtime"
+  
+  MODULES_PIPELINE_CONNECTORS: "\
+  flink-cdc-connect/flink-cdc-pipeline-connectors"
+  
+  MODULES_MYSQL: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc"
+  
+  MODULES_POSTGRES: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-postgres-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-postgres-cdc"
+  
+  MODULES_ORACLE: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oracle-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oracle-cdc"
+  
+  MODULES_MONGODB: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mongodb-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mongodb-cdc"
+  
+  MODULES_SQLSERVER: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-sqlserver-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-sqlserver-cdc"
+  
+  MODULES_TIDB: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-tidb-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-tidb-cdc"
+  
+  MODULES_OCEANBASE: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oceanbase-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oceanbase-cdc"
+  
+  MODULES_DB2: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-db2-cdc"
+  
+  MODULES_VITESS: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-vitess-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-vitess-cdc"
+  
+  MODULES_E2E: "\
+  flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests,\
+  flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
+
+jobs:
+#  if: github.repository == 'ververica/flink-cdc-connectors'
+  compile_and_test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        jdk: [ 8 ]
+        module: [ "core",
+                  "pipeline_connectors",
+                  "mysql",
+                  "postgres",
+                  "oracle",
+                  "mongodb",
+                  "sqlserver",
+                  "tidb",
+                  "oceanbase",
+                  "db2",
+                  "vitess",
+                  "e2e"
+        ]
+    timeout-minutes: 120
+    env:
+      MVN_COMMON_OPTIONS: -Dmaven.wagon.http.pool=false \
+        -Dorg.slf4j.simpleLogger.showDateTime=true \
+        -Dorg.slf4j.simpleLogger.dateTimeFormat=HH:mm:ss.SSS \
+        -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn \
+        --no-snapshot-updates -B \
+        --settings /home/vsts/work/1/s/tools/ci/google-mirror-settings.xml \
+        -Dfast -Dlog.dir=/home/vsts/work/_temp/debug_files \
+        -Dlog4j.configurationFile=file:///home/vsts/work/1/s/tools/ci/log4j.properties
+    steps:
+      - run: echo "Running CI pipeline for JDK version ${{ matrix.jdk }}"
+
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ matrix.jdk }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Set Maven 3.8.6
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: 3.8.6
+
+      - name: Compile and test ${{ matrix.module }}
+        timeout-minutes: 90
+        run: |
+          set -o pipefail
+          
+          case ${{ matrix.module }} in
+              ("core")
+               modules=${{ env.MODULES_CORE }}
+              ;;
+              ("pipeline_connectors")
+               modules=${{ env.MODULES_PIPELINE_CONNECTORS }}
+              ;;
+              ("mysql")
+               modules=${{ env.MODULES_MYSQL }}
+              ;;
+              ("postgres")
+               modules=${{ env.MODULES_POSTGRES }}
+              ;;
+              ("oracle")
+               modules=${{ env.MODULES_ORACLE }}
+              ;;
+              ("mongodb")
+               modules=${{ env.MODULES_MONGODB }}
+              ;;
+              ("sqlserver")
+               modules=${{ env.MODULES_SQLSERVER }}
+              ;;
+              ("tidb")
+               modules=${{ env.MODULES_TIDB }}
+              ;;
+              ("oceanbase")
+               modules=${{ env.MODULES_OCEANBASE }}
+              ;;
+              ("db2")
+               modules=${{ env.MODULES_DB2 }}
+              ;;
+              ("vitess")
+               modules=${{ env.MODULES_VITESS }}
+              ;;
+              ("e2e")
+               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_E2E }}"
+               modules=${{ env.MODULES_E2E }}
+              ;;
+          esac
+
+          if [ ${{ matrix.module }} != "e2e" ]; then
+            compile_modules=$modules
+          fi
+
+          mvn --no-snapshot-updates -B -DskipTests -pl $compile_modules -am install && mvn --no-snapshot-updates -B -pl $modules verify
+
+#      - name: Check licensing
+#        run: |
+#          mvn ${MVN_COMMON_OPTIONS} exec:java@check-license -N \
+#            -Dexec.args="${{ env.MVN_BUILD_OUTPUT_FILE }} $(pwd) ${{ env.MVN_VALIDATION_DIR }}" \
+#            ${{ env.MVN_CONNECTION_OPTIONS }} \
+#            -Dlog4j.configurationFile=file://$(pwd)/tools/ci/log4j.properties
+
+#      - name: Checkout flink docs
+#        uses: actions/checkout@v4
+#        with:
+#          repository: apache/flink
+#          ref: master
+#          sparse-checkout: |
+#            docs
+#          path: flink-docs
+
+      - name: Print JVM thread dumps when cancelled
+        if: ${{ failure() }}
+        run: |
+          # ----------------------------------------------------------------------------
+          # Copyright 2023 The Netty Project
+          #
+          # ----------------------------------------------------------------------------
+          # Source: https://github.com/netty/netty/blob/main/.github/actions/thread-dump-jvms/action.yml
+          echo "$OSTYPE"
+          if [[ "$OSTYPE" == "linux-gnu"* ]] && command -v sudo &> /dev/null; then
+            echo "Setting up JVM thread dumps"
+            # use jattach so that Java processes in docker containers are also covered
+            # download jattach
+            curl -s -L -o /tmp/jattach https://github.com/apangin/jattach/releases/download/v2.1/jattach
+            if command -v sha256sum &> /dev/null; then
+              # verify hash of jattach binary
+              sha256sum -c <(echo "07885fdc782e02e7302c6d190f54c3930afa10a38140365adf54076ec1086a8e  /tmp/jattach") || exit 1
+            fi
+            chmod +x /tmp/jattach
+            for java_pid in $(sudo pgrep java); do
+              echo "----------------------- pid $java_pid -----------------------"
+              echo "command line: $(sudo cat /proc/$java_pid/cmdline | xargs -0 echo)"
+              sudo /tmp/jattach $java_pid jcmd VM.command_line || true
+              sudo /tmp/jattach $java_pid jcmd "Thread.print -l"
+              sudo /tmp/jattach $java_pid jcmd GC.heap_info || true
+            done
+          else
+            for java_pid in $(jps -q -J-XX:+PerfDisableSharedMem); do
+              echo "----------------------- pid $java_pid -----------------------"
+              jcmd $java_pid VM.command_line || true
+              jcmd $java_pid Thread.print -l
+              jcmd $java_pid GC.heap_info || true
+            done
+          fi
+          exit 0
