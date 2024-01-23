@@ -80,7 +80,7 @@ env:
 
 jobs:
   compile_and_test:
-    if: github.repository == 'apache/flink-cdc-connectors'
+#    if: github.repository == 'apache/flink-cdc-connectors'
     runs-on: ubuntu-latest
     strategy:
       matrix:
