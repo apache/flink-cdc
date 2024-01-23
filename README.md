@@ -59,7 +59,7 @@ pipeline:
 
 flink-config:
   execution.checkpointing.interval: 30000
-  execution.checkpointing.mode: EXACTLY_ONC
+  execution.checkpointing.mode: EXACTLY_ONCE
 ```
 5. Submit the job to Flink cluster.
 ```bash
