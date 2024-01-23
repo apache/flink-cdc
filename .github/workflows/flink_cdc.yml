@@ -13,12 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This workflow will triage pull requests and apply a label based on the
-# paths that are modified in the pull request.
-#
-# To use this workflow, you will need to set up a .github/label.yml
-# file with configuration.  For more information, see:
-
 name: Flink CDC CI
 on:
   push:
@@ -29,8 +23,6 @@ on:
     branches:
       - master
       - release-*
-#  schedule:
-#    - cron: "0 18 * * *"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -87,8 +79,8 @@ env:
   flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 
 jobs:
-#  if: github.repository == 'ververica/flink-cdc-connectors'
   compile_and_test:
+    if: github.repository == 'apache/flink-cdc-connectors'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -135,6 +127,11 @@ jobs:
         uses: stCarolas/setup-maven@v4.5
         with:
           maven-version: 3.8.6
+
+      - name: Cache Docker images
+        uses: ScribeMD/docker-cache@0.3.7
+        with:
+          key: docker-${{ runner.os }}
 
       - name: Compile and test ${{ matrix.module }}
         timeout-minutes: 90
@@ -186,22 +183,6 @@ jobs:
           fi
 
           mvn --no-snapshot-updates -B -DskipTests -pl $compile_modules -am install && mvn --no-snapshot-updates -B -pl $modules verify
-
-#      - name: Check licensing
-#        run: |
-#          mvn ${MVN_COMMON_OPTIONS} exec:java@check-license -N \
-#            -Dexec.args="${{ env.MVN_BUILD_OUTPUT_FILE }} $(pwd) ${{ env.MVN_VALIDATION_DIR }}" \
-#            ${{ env.MVN_CONNECTION_OPTIONS }} \
-#            -Dlog4j.configurationFile=file://$(pwd)/tools/ci/log4j.properties
-
-#      - name: Checkout flink docs
-#        uses: actions/checkout@v4
-#        with:
-#          repository: apache/flink
-#          ref: master
-#          sparse-checkout: |
-#            docs
-#          path: flink-docs
 
       - name: Print JVM thread dumps when cancelled
         if: ${{ failure() }}
