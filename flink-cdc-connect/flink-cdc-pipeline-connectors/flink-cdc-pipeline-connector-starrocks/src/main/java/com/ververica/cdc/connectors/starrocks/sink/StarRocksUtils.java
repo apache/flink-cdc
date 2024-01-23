@@ -23,6 +23,7 @@ import com.ververica.cdc.common.event.TableId;
 import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.schema.Schema;
 import com.ververica.cdc.common.types.BigIntType;
+import com.ververica.cdc.common.types.BinaryType;
 import com.ververica.cdc.common.types.BooleanType;
 import com.ververica.cdc.common.types.CharType;
 import com.ververica.cdc.common.types.DataType;
@@ -36,6 +37,7 @@ import com.ververica.cdc.common.types.LocalZonedTimestampType;
 import com.ververica.cdc.common.types.SmallIntType;
 import com.ververica.cdc.common.types.TimestampType;
 import com.ververica.cdc.common.types.TinyIntType;
+import com.ververica.cdc.common.types.VarBinaryType;
 import com.ververica.cdc.common.types.VarCharType;
 
 import java.time.LocalDate;
@@ -191,6 +193,10 @@ public class StarRocksUtils {
                                         .toLocalDateTime()
                                         .format(DATETIME_FORMATTER);
                 break;
+            case BINARY:
+            case VARBINARY:
+                fieldGetter = record -> record.getBinary(fieldPos);
+                break;
             default:
                 throw new UnsupportedOperationException(
                         "Don't support data type " + fieldType.getTypeRoot());
@@ -225,6 +231,8 @@ public class StarRocksUtils {
     public static final String DATE = "DATE";
     public static final String DATETIME = "DATETIME";
     public static final String JSON = "JSON";
+    public static final String BINARY = "BINARY";
+    public static final String VARBINARY = "VARBINARY";
 
     /** Max size of char type of StarRocks. */
     public static final int MAX_CHAR_SIZE = 255;
@@ -360,6 +368,20 @@ public class StarRocksUtils {
         public StarRocksColumn.Builder visit(LocalZonedTimestampType localZonedTimestampType) {
             builder.setDataType(DATETIME);
             builder.setNullable(localZonedTimestampType.isNullable());
+            return builder;
+        }
+
+        @Override
+        public StarRocksColumn.Builder visit(BinaryType binaryType) {
+            builder.setDataType(BINARY);
+            builder.setNullable(binaryType.isNullable());
+            return builder;
+        }
+
+        @Override
+        public StarRocksColumn.Builder visit(VarBinaryType varBinaryType) {
+            builder.setDataType(VARBINARY);
+            builder.setNullable(varBinaryType.isNullable());
             return builder;
         }
 
