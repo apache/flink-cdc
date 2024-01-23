@@ -225,7 +225,9 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     @Override
-    public void close() {}
+    public void close() {
+        taskRunning = false;
+    }
 
     private MongoChangeStreamCursor<BsonDocument> openChangeStreamCursor(
             ChangeStreamDescriptor changeStreamDescriptor) {
