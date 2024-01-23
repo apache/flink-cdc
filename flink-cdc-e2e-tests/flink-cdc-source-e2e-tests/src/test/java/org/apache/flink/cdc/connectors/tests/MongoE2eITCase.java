@@ -17,10 +17,10 @@
 
 package org.apache.flink.cdc.connectors.tests;
 
+import org.apache.flink.cdc.common.test.utils.JdbcProxy;
+import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
-import org.apache.flink.cdc.connectors.tests.utils.JdbcProxy;
-import org.apache.flink.cdc.connectors.tests.utils.TestUtils;
 
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;

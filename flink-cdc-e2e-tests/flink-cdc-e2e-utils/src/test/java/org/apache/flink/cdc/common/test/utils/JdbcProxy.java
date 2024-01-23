@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.tests.utils;
+package org.apache.flink.cdc.common.test.utils;
 
 import org.apache.commons.lang3.StringUtils;
+import org.junit.Assert;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -27,8 +28,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import static org.junit.Assert.assertArrayEquals;
 
 /** Proxy to communicate with database using JDBC protocol. */
 public class JdbcProxy {
@@ -45,11 +44,11 @@ public class JdbcProxy {
         this.driverClass = driverClass;
     }
 
-    public void checkResult(List<String> expectedResult, String table, String[] fields)
+    private void checkResult(List<String> expectedResult, String table, String[] fields)
             throws SQLException, ClassNotFoundException {
         Class.forName(driverClass);
         try (Connection dbConn = DriverManager.getConnection(url, userName, password);
-                PreparedStatement statement = dbConn.prepareStatement("select * from " + table);
+                PreparedStatement statement = dbConn.prepareStatement("SELECT * FROM " + table);
                 ResultSet resultSet = statement.executeQuery()) {
             List<String> results = new ArrayList<>();
             while (resultSet.next()) {
@@ -68,10 +67,14 @@ public class JdbcProxy {
             Collections.sort(results);
             Collections.sort(expectedResult);
             // make it easier to check the result
-            assertArrayEquals(expectedResult.toArray(), results.toArray());
+            Assert.assertArrayEquals(expectedResult.toArray(), results.toArray());
         }
     }
 
+    /**
+     * Check the result of a table with specified fields. If the result is not as expected, it will
+     * retry until timeout.
+     */
     public void checkResultWithTimeout(
             List<String> expectedResult, String table, String[] fields, long timeout)
             throws Exception {

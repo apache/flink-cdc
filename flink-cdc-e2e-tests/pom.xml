@@ -30,6 +30,7 @@ limitations under the License.
     <packaging>pom</packaging>
 
     <modules>
+        <module>flink-cdc-e2e-utils</module>
         <module>flink-cdc-source-e2e-tests</module>
         <module>flink-cdc-pipeline-e2e-tests</module>
     </modules>
