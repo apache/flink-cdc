@@ -96,6 +96,7 @@ You have to enable log archiving for Oracle database and define an Oracle user w
      GRANT EXECUTE_CATALOG_ROLE TO flinkuser;
      GRANT SELECT ANY TRANSACTION TO flinkuser;
      GRANT LOGMINING TO flinkuser;
+     GRANT ANALYZE ANY TO flinkuser;
 
      GRANT CREATE TABLE TO flinkuser;
      -- need not to execute if set scan.incremental.snapshot.enabled=true(default)
@@ -367,6 +368,14 @@ Connector Options
           If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
+    </tr>
+    <tr>
+          <td>scan.incremental.snapshot.chunk.key-column</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">(none)</td>
+          <td>String</td>
+          <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
+            By default, the chunk key is 'ROWID'. This column must be a column of the primary key.</td>
     </tr>
     </tbody>
 </table>    
