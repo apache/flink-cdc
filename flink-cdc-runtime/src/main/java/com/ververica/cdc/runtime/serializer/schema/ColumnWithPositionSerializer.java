@@ -27,6 +27,7 @@ import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.runtime.serializer.EnumSerializer;
 import com.ververica.cdc.runtime.serializer.NullableSerializerWrapper;
+import com.ververica.cdc.runtime.serializer.StringSerializer;
 import com.ververica.cdc.runtime.serializer.TypeSerializerSingleton;
 
 import java.io.IOException;
@@ -40,8 +41,11 @@ public class ColumnWithPositionSerializer
     /** Sharable instance of the TableIdSerializer. */
     public static final ColumnWithPositionSerializer INSTANCE = new ColumnWithPositionSerializer();
 
-    private final TypeSerializer<Column> columnSerializer =
+    private final TypeSerializer<Column> addColumnSerializer =
             new NullableSerializerWrapper<>(ColumnSerializer.INSTANCE);
+
+    private final TypeSerializer<String> existedColumnNameSerializer = StringSerializer.INSTANCE;
+
     private final EnumSerializer<AddColumnEvent.ColumnPosition> positionEnumSerializer =
             new EnumSerializer<>(AddColumnEvent.ColumnPosition.class);
 
@@ -59,9 +63,9 @@ public class ColumnWithPositionSerializer
     @Override
     public AddColumnEvent.ColumnWithPosition copy(AddColumnEvent.ColumnWithPosition from) {
         return new AddColumnEvent.ColumnWithPosition(
-                columnSerializer.copy(from.getAddColumn()),
+                addColumnSerializer.copy(from.getAddColumn()),
                 from.getPosition(),
-                columnSerializer.copy(from.getExistingColumn()));
+                existedColumnNameSerializer.copy(from.getExistedColumnName()));
     }
 
     @Override
@@ -78,25 +82,17 @@ public class ColumnWithPositionSerializer
     @Override
     public void serialize(AddColumnEvent.ColumnWithPosition record, DataOutputView target)
             throws IOException {
-        columnSerializer.serialize(record.getAddColumn(), target);
+        addColumnSerializer.serialize(record.getAddColumn(), target);
         positionEnumSerializer.serialize(record.getPosition(), target);
-        if (record.getExistingColumn() == null) {
-            target.writeInt(0);
-        } else {
-            target.writeInt(1);
-            columnSerializer.serialize(record.getExistingColumn(), target);
-        }
+        existedColumnNameSerializer.serialize(record.getExistedColumnName(), target);
     }
 
     @Override
     public AddColumnEvent.ColumnWithPosition deserialize(DataInputView source) throws IOException {
-        Column addColumn = columnSerializer.deserialize(source);
+        Column addColumn = addColumnSerializer.deserialize(source);
         AddColumnEvent.ColumnPosition position = positionEnumSerializer.deserialize(source);
-        if (source.readInt() == 1) {
-            return new AddColumnEvent.ColumnWithPosition(
-                    addColumn, position, columnSerializer.deserialize(source));
-        }
-        return new AddColumnEvent.ColumnWithPosition(addColumn, position, null);
+        return new AddColumnEvent.ColumnWithPosition(
+                addColumn, position, existedColumnNameSerializer.deserialize(source));
     }
 
     @Override

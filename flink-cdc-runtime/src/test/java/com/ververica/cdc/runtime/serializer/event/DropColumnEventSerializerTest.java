@@ -20,8 +20,6 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 
 import com.ververica.cdc.common.event.DropColumnEvent;
 import com.ververica.cdc.common.event.TableId;
-import com.ververica.cdc.common.schema.Column;
-import com.ververica.cdc.common.types.DataTypes;
 import com.ververica.cdc.runtime.serializer.SerializerTestBase;
 
 import java.util.Arrays;
@@ -46,22 +44,11 @@ public class DropColumnEventSerializerTest extends SerializerTestBase<DropColumn
     @Override
     protected DropColumnEvent[] getTestData() {
         return new DropColumnEvent[] {
+            new DropColumnEvent(TableId.tableId("table"), Arrays.asList("c1", "c2")),
             new DropColumnEvent(
-                    TableId.tableId("table"),
-                    Arrays.asList(
-                            Column.physicalColumn("c1", DataTypes.TIMESTAMP()),
-                            Column.physicalColumn("c2", DataTypes.DOUBLE(), "desc"))),
+                    TableId.tableId("schema", "table"), Arrays.asList("m1", "m2", "m3")),
             new DropColumnEvent(
-                    TableId.tableId("schema", "table"),
-                    Arrays.asList(
-                            Column.metadataColumn("m1", DataTypes.TIMESTAMP()),
-                            Column.metadataColumn("m2", DataTypes.DOUBLE(), "mKey"),
-                            Column.metadataColumn("m3", DataTypes.DOUBLE(), "mKey", "desc"))),
-            new DropColumnEvent(
-                    TableId.tableId("namespace", "schema", "table"),
-                    Arrays.asList(
-                            Column.physicalColumn("c1", DataTypes.TIMESTAMP()),
-                            Column.physicalColumn("c2", DataTypes.DOUBLE(), "desc")))
+                    TableId.tableId("namespace", "schema", "table"), Arrays.asList("c1", "c2"))
         };
     }
 }

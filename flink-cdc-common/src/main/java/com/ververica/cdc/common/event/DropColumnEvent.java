@@ -17,7 +17,6 @@
 package com.ververica.cdc.common.event;
 
 import com.ververica.cdc.common.annotation.PublicEvolving;
-import com.ververica.cdc.common.schema.Column;
 
 import java.util.List;
 import java.util.Objects;
@@ -33,16 +32,15 @@ public class DropColumnEvent implements SchemaChangeEvent {
 
     private final TableId tableId;
 
-    private final List<Column> droppedColumns;
+    private final List<String> droppedColumnNames;
 
-    public DropColumnEvent(TableId tableId, List<Column> droppedColumns) {
+    public DropColumnEvent(TableId tableId, List<String> droppedColumnNames) {
         this.tableId = tableId;
-        this.droppedColumns = droppedColumns;
+        this.droppedColumnNames = droppedColumnNames;
     }
 
-    /** Returns the dropped columns. */
-    public List<Column> getDroppedColumns() {
-        return droppedColumns;
+    public List<String> getDroppedColumnNames() {
+        return droppedColumnNames;
     }
 
     @Override
@@ -55,12 +53,12 @@ public class DropColumnEvent implements SchemaChangeEvent {
         }
         DropColumnEvent that = (DropColumnEvent) o;
         return Objects.equals(tableId, that.tableId)
-                && Objects.equals(droppedColumns, that.droppedColumns);
+                && Objects.equals(droppedColumnNames, that.droppedColumnNames);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId, droppedColumns);
+        return Objects.hash(tableId, droppedColumnNames);
     }
 
     @Override
@@ -68,8 +66,8 @@ public class DropColumnEvent implements SchemaChangeEvent {
         return "DropColumnEvent{"
                 + "tableId="
                 + tableId
-                + ", droppedColumns="
-                + droppedColumns
+                + ", droppedColumnNames="
+                + droppedColumnNames
                 + '}';
     }
 

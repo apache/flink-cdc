@@ -51,13 +51,13 @@ public class ColumnWithPositionSerializerTest
             new AddColumnEvent.ColumnWithPosition(
                     Column.metadataColumn("testCol2", DataTypes.DOUBLE(), "mKey"),
                     AddColumnEvent.ColumnPosition.BEFORE,
-                    Column.metadataColumn("testCol1", DataTypes.TIMESTAMP())),
+                    "testCol1"),
             new AddColumnEvent.ColumnWithPosition(
                     Column.physicalColumn("testCol1", DataTypes.TIMESTAMP())),
             new AddColumnEvent.ColumnWithPosition(
                     Column.physicalColumn("testCol2", DataTypes.DOUBLE(), "desc"),
                     AddColumnEvent.ColumnPosition.AFTER,
-                    Column.physicalColumn("testCol1", DataTypes.TIMESTAMP()))
+                    "testCol1")
         };
     }
 }
