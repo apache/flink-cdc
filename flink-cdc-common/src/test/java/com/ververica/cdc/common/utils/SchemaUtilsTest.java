@@ -67,7 +67,7 @@ public class SchemaUtilsTest {
                 new AddColumnEvent.ColumnWithPosition(
                         Column.physicalColumn("col4", DataTypes.STRING()),
                         AddColumnEvent.ColumnPosition.BEFORE,
-                        Column.physicalColumn("col3", DataTypes.STRING())));
+                        "col3"));
         addColumnEvent = new AddColumnEvent(tableId, addedColumns);
         schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
         Assert.assertEquals(
@@ -85,7 +85,7 @@ public class SchemaUtilsTest {
                 new AddColumnEvent.ColumnWithPosition(
                         Column.physicalColumn("col5", DataTypes.STRING()),
                         AddColumnEvent.ColumnPosition.AFTER,
-                        Column.physicalColumn("col4", DataTypes.STRING())));
+                        "col4"));
         addColumnEvent = new AddColumnEvent(tableId, addedColumns);
         schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
         Assert.assertEquals(
@@ -120,11 +120,7 @@ public class SchemaUtilsTest {
 
         // drop columns
         DropColumnEvent dropColumnEvent =
-                new DropColumnEvent(
-                        tableId,
-                        Arrays.asList(
-                                Column.physicalColumn("col3", DataTypes.STRING()),
-                                Column.physicalColumn("col5", DataTypes.STRING())));
+                new DropColumnEvent(tableId, Arrays.asList("col3", "col5"));
         schema = SchemaUtils.applySchemaChangeEvent(schema, dropColumnEvent);
         Assert.assertEquals(
                 schema,

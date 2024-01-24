@@ -173,10 +173,9 @@ public class DorisMetadataApplier implements MetadataApplier {
     private void applyDropColumnEvent(DropColumnEvent event)
             throws IOException, IllegalArgumentException {
         TableId tableId = event.tableId();
-        List<Column> droppedColumns = event.getDroppedColumns();
-        for (Column col : droppedColumns) {
-            schemaChangeManager.dropColumn(
-                    tableId.getSchemaName(), tableId.getTableName(), col.getName());
+        List<String> droppedColumns = event.getDroppedColumnNames();
+        for (String col : droppedColumns) {
+            schemaChangeManager.dropColumn(tableId.getSchemaName(), tableId.getTableName(), col);
         }
     }
 

@@ -24,11 +24,10 @@ import org.apache.flink.core.memory.DataOutputView;
 
 import com.ververica.cdc.common.event.DropColumnEvent;
 import com.ververica.cdc.common.event.TableId;
-import com.ververica.cdc.common.schema.Column;
 import com.ververica.cdc.runtime.serializer.ListSerializer;
+import com.ververica.cdc.runtime.serializer.StringSerializer;
 import com.ververica.cdc.runtime.serializer.TableIdSerializer;
 import com.ververica.cdc.runtime.serializer.TypeSerializerSingleton;
-import com.ververica.cdc.runtime.serializer.schema.ColumnSerializer;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -42,8 +41,8 @@ public class DropColumnEventSerializer extends TypeSerializerSingleton<DropColum
     public static final DropColumnEventSerializer INSTANCE = new DropColumnEventSerializer();
 
     private final TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
-    private final ListSerializer<Column> columnsSerializer =
-            new ListSerializer<>(ColumnSerializer.INSTANCE);
+    private final ListSerializer<String> columnNamesSerializer =
+            new ListSerializer<>(StringSerializer.INSTANCE);
 
     @Override
     public boolean isImmutableType() {
@@ -58,7 +57,7 @@ public class DropColumnEventSerializer extends TypeSerializerSingleton<DropColum
     @Override
     public DropColumnEvent copy(DropColumnEvent from) {
         return new DropColumnEvent(
-                from.tableId(), columnsSerializer.copy(from.getDroppedColumns()));
+                from.tableId(), columnNamesSerializer.copy(from.getDroppedColumnNames()));
     }
 
     @Override
@@ -74,13 +73,13 @@ public class DropColumnEventSerializer extends TypeSerializerSingleton<DropColum
     @Override
     public void serialize(DropColumnEvent record, DataOutputView target) throws IOException {
         tableIdSerializer.serialize(record.tableId(), target);
-        columnsSerializer.serialize(record.getDroppedColumns(), target);
+        columnNamesSerializer.serialize(record.getDroppedColumnNames(), target);
     }
 
     @Override
     public DropColumnEvent deserialize(DataInputView source) throws IOException {
         return new DropColumnEvent(
-                tableIdSerializer.deserialize(source), columnsSerializer.deserialize(source));
+                tableIdSerializer.deserialize(source), columnNamesSerializer.deserialize(source));
     }
 
     @Override

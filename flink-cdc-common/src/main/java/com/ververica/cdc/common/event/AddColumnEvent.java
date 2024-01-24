@@ -66,20 +66,20 @@ public final class AddColumnEvent implements SchemaChangeEvent {
         private final ColumnPosition position;
 
         /** The added column lies in the position relative to this column. */
-        private final @Nullable Column existingColumn;
+        private final @Nullable String existedColumnName;
 
         /** In the default scenario, we add fields at the end of the column. */
         public ColumnWithPosition(Column addColumn) {
             this.addColumn = addColumn;
             position = ColumnPosition.LAST;
-            existingColumn = null;
+            existedColumnName = null;
         }
 
         public ColumnWithPosition(
-                Column addColumn, ColumnPosition position, Column existingColumn) {
+                Column addColumn, ColumnPosition position, @Nullable String existedColumnName) {
             this.addColumn = addColumn;
             this.position = position;
-            this.existingColumn = existingColumn;
+            this.existedColumnName = existedColumnName;
         }
 
         public Column getAddColumn() {
@@ -90,8 +90,9 @@ public final class AddColumnEvent implements SchemaChangeEvent {
             return position;
         }
 
-        public Column getExistingColumn() {
-            return existingColumn;
+        @Nullable
+        public String getExistedColumnName() {
+            return existedColumnName;
         }
 
         @Override
@@ -105,12 +106,12 @@ public final class AddColumnEvent implements SchemaChangeEvent {
             ColumnWithPosition position1 = (ColumnWithPosition) o;
             return Objects.equals(addColumn, position1.addColumn)
                     && position == position1.position
-                    && Objects.equals(existingColumn, position1.existingColumn);
+                    && Objects.equals(existedColumnName, position1.existedColumnName);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(addColumn, position, existingColumn);
+            return Objects.hash(addColumn, position, existedColumnName);
         }
 
         @Override
@@ -120,8 +121,8 @@ public final class AddColumnEvent implements SchemaChangeEvent {
                     + addColumn
                     + ", position="
                     + position
-                    + ", existingColumn="
-                    + existingColumn
+                    + ", existedColumnName="
+                    + existedColumnName
                     + '}';
         }
     }

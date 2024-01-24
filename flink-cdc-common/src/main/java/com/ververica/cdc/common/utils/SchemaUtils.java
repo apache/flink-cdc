@@ -87,16 +87,14 @@ public class SchemaUtils {
                 case BEFORE:
                     {
                         Preconditions.checkNotNull(
-                                columnWithPosition.getExistingColumn(),
-                                "existingColumn could not be null in BEFORE type AddColumnEvent");
+                                columnWithPosition.getExistedColumnName(),
+                                "existedColumnName could not be null in BEFORE type AddColumnEvent");
                         List<String> columnNames =
                                 columns.stream().map(Column::getName).collect(Collectors.toList());
-                        int index =
-                                columnNames.indexOf(
-                                        columnWithPosition.getExistingColumn().getName());
+                        int index = columnNames.indexOf(columnWithPosition.getExistedColumnName());
                         if (index < 0) {
                             throw new IllegalArgumentException(
-                                    columnWithPosition.getExistingColumn().getName()
+                                    columnWithPosition.getExistedColumnName()
                                             + " of AddColumnEvent is not existed");
                         }
                         columns.add(index, columnWithPosition.getAddColumn());
@@ -105,16 +103,14 @@ public class SchemaUtils {
                 case AFTER:
                     {
                         Preconditions.checkNotNull(
-                                columnWithPosition.getExistingColumn(),
-                                "existingColumn could not be null in AFTER type AddColumnEvent");
+                                columnWithPosition.getExistedColumnName(),
+                                "existedColumnName could not be null in AFTER type AddColumnEvent");
                         List<String> columnNames =
                                 columns.stream().map(Column::getName).collect(Collectors.toList());
-                        int index =
-                                columnNames.indexOf(
-                                        columnWithPosition.getExistingColumn().getName());
+                        int index = columnNames.indexOf(columnWithPosition.getExistedColumnName());
                         if (index < 0) {
                             throw new IllegalArgumentException(
-                                    columnWithPosition.getExistingColumn().getName()
+                                    columnWithPosition.getExistedColumnName()
                                             + " of AddColumnEvent is not existed");
                         }
                         columns.add(index + 1, columnWithPosition.getAddColumn());
@@ -126,17 +122,19 @@ public class SchemaUtils {
     }
 
     private static Schema applyDropColumnEvent(DropColumnEvent event, Schema oldSchema) {
-        event.getDroppedColumns()
+        event.getDroppedColumnNames()
                 .forEach(
                         column -> {
-                            if (!oldSchema.getColumn(column.getName()).isPresent()) {
+                            if (!oldSchema.getColumn(column).isPresent()) {
                                 throw new IllegalArgumentException(
-                                        column.getName() + " of DropColumnEvent is not existed");
+                                        column + " of DropColumnEvent is not existed");
                             }
                         });
         List<Column> columns =
                 oldSchema.getColumns().stream()
-                        .filter((column -> !event.getDroppedColumns().contains(column)))
+                        .filter(
+                                (column ->
+                                        !event.getDroppedColumnNames().contains(column.getName())))
                         .collect(Collectors.toList());
         return oldSchema.copy(columns);
     }

@@ -86,11 +86,11 @@ class SchemaManagerTest {
                         new AddColumnEvent.ColumnWithPosition(
                                 Column.physicalColumn("append_after_id", DataTypes.BIGINT()),
                                 AddColumnEvent.ColumnPosition.AFTER,
-                                Column.physicalColumn("id", DataTypes.INT())),
+                                "id"),
                         new AddColumnEvent.ColumnWithPosition(
                                 Column.physicalColumn("append_before_phone", DataTypes.BIGINT()),
                                 AddColumnEvent.ColumnPosition.BEFORE,
-                                Column.physicalColumn("phone", DataTypes.BIGINT())));
+                                "phone"));
 
         schemaManager.applySchemaChange(new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
         schemaManager.applySchemaChange(new AddColumnEvent(CUSTOMERS, newColumns));
@@ -129,11 +129,7 @@ class SchemaManagerTest {
         SchemaManager schemaManager = new SchemaManager();
         schemaManager.applySchemaChange(new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
         schemaManager.applySchemaChange(
-                new DropColumnEvent(
-                        CUSTOMERS,
-                        Arrays.asList(
-                                Column.physicalColumn("name", DataTypes.STRING()),
-                                Column.physicalColumn("phone", DataTypes.BIGINT()))));
+                new DropColumnEvent(CUSTOMERS, Arrays.asList("name", "phone")));
         assertThat(schemaManager.getLatestSchema(CUSTOMERS))
                 .contains(
                         Schema.newBuilder()

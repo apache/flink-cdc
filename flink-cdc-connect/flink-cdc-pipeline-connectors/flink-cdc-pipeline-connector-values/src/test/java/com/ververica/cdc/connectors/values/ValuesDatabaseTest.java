@@ -188,10 +188,7 @@ public class ValuesDatabaseTest {
         Assert.assertEquals(schema, metadataAccessor.getTableSchema(table1));
 
         DropColumnEvent dropColumnEvent =
-                new DropColumnEvent(
-                        table1,
-                        Collections.singletonList(
-                                Column.physicalColumn("newCol2", new CharType())));
+                new DropColumnEvent(table1, Collections.singletonList("newCol2"));
         metadataApplier.applySchemaChange(dropColumnEvent);
         schema =
                 Schema.newBuilder()
@@ -284,10 +281,7 @@ public class ValuesDatabaseTest {
         Assert.assertEquals(results, ValuesDatabase.getResults(table1));
 
         DropColumnEvent dropColumnEvent =
-                new DropColumnEvent(
-                        table1,
-                        Collections.singletonList(
-                                Column.physicalColumn("newCol2", new CharType())));
+                new DropColumnEvent(table1, Collections.singletonList("newCol2"));
         metadataApplier.applySchemaChange(dropColumnEvent);
         results.clear();
         results.add("default.default.table1:col1=1;newCol3=");

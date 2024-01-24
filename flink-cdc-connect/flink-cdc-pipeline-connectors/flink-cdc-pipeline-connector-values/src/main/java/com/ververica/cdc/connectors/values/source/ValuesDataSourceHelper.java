@@ -168,10 +168,7 @@ public class ValuesDataSourceHelper {
 
         // drop column
         DropColumnEvent dropColumnEvent =
-                new DropColumnEvent(
-                        TABLE_1,
-                        Collections.singletonList(
-                                Column.physicalColumn("newCol2", DataTypes.STRING())));
+                new DropColumnEvent(TABLE_1, Collections.singletonList("newCol2"));
         split1.add(dropColumnEvent);
 
         // delete
@@ -296,10 +293,7 @@ public class ValuesDataSourceHelper {
 
         // drop column
         DropColumnEvent dropColumnEvent =
-                new DropColumnEvent(
-                        TABLE_1,
-                        Collections.singletonList(
-                                Column.physicalColumn("newCol2", DataTypes.STRING())));
+                new DropColumnEvent(TABLE_1, Collections.singletonList("newCol2"));
         split1.add(dropColumnEvent);
 
         // delete

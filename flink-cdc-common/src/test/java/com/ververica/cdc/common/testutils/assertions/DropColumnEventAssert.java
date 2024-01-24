@@ -17,7 +17,6 @@
 package com.ververica.cdc.common.testutils.assertions;
 
 import com.ververica.cdc.common.event.DropColumnEvent;
-import com.ververica.cdc.common.schema.Column;
 import org.assertj.core.internal.Iterables;
 
 import java.util.List;
@@ -35,8 +34,8 @@ public class DropColumnEventAssert
         super(event, DropColumnEventAssert.class);
     }
 
-    public DropColumnEventAssert containsDroppedColumns(Column... droppedColumns) {
-        List<Column> actualDroppedColumns = actual.getDroppedColumns();
+    public DropColumnEventAssert containsDroppedColumns(String... droppedColumns) {
+        List<String> actualDroppedColumns = actual.getDroppedColumnNames();
         iterables.assertContainsExactlyInAnyOrder(info, actualDroppedColumns, droppedColumns);
         return myself;
     }

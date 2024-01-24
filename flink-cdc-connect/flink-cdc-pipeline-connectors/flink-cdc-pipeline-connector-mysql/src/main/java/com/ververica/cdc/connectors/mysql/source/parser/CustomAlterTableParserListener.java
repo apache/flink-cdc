@@ -22,7 +22,6 @@ import com.ververica.cdc.common.event.DropColumnEvent;
 import com.ververica.cdc.common.event.RenameColumnEvent;
 import com.ververica.cdc.common.event.SchemaChangeEvent;
 import com.ververica.cdc.common.types.DataType;
-import com.ververica.cdc.common.types.DataTypes;
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.connector.mysql.antlr.listener.AlterTableParserListener;
 import io.debezium.ddl.parser.mysql.generated.MySqlParser;
@@ -35,7 +34,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -116,10 +114,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                                                 new AddColumnEvent.ColumnWithPosition(
                                                         toCdcColumn(column),
                                                         AddColumnEvent.ColumnPosition.AFTER,
-                                                        com.ververica.cdc.common.schema.Column
-                                                                .physicalColumn(
-                                                                        afterColumn,
-                                                                        DataTypes.BIGINT())))));
+                                                        afterColumn))));
                     } else {
                         changes.add(
                                 new AddColumnEvent(
@@ -223,12 +218,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     @Override
     public void enterAlterByDropColumn(MySqlParser.AlterByDropColumnContext ctx) {
         String removedColName = parser.parseName(ctx.uid());
-        changes.add(
-                new DropColumnEvent(
-                        currentTable,
-                        Arrays.asList(
-                                com.ververica.cdc.common.schema.Column.physicalColumn(
-                                        removedColName, DataTypes.BIGINT()))));
+        changes.add(new DropColumnEvent(currentTable, Collections.singletonList(removedColName)));
         super.enterAlterByDropColumn(ctx);
     }
 

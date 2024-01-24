@@ -200,11 +200,7 @@ public class StarRocksMetadataApplierTest {
         metadataApplier.applySchemaChange(createTableEvent);
 
         DropColumnEvent dropColumnEvent =
-                new DropColumnEvent(
-                        tableId,
-                        Arrays.asList(
-                                Column.physicalColumn("col2", new BooleanType()),
-                                Column.physicalColumn("col3", new TimestampType())));
+                new DropColumnEvent(tableId, Arrays.asList("col2", "col3"));
         metadataApplier.applySchemaChange(dropColumnEvent);
 
         StarRocksTable actualTable =
