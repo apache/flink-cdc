@@ -176,15 +176,26 @@ public class MySqlSourceReader<T>
             for (MySqlSplitState mySqlSplitState : finishedSplitIds.values()) {
                 MySqlSplit mySqlSplit = mySqlSplitState.toMySqlSplit();
                 if (mySqlSplit.isBinlogSplit()) {
-                    suspendedBinlogSplit = toSuspendedBinlogSplit(mySqlSplit.asBinlogSplit());
-                    LOG.info(
-                            "Source reader {} suspended binlog split reader success after the newly added table process, current offset {}",
-                            subtaskId,
-                            suspendedBinlogSplit.getStartingOffset());
-                    context.sendSourceEventToCoordinator(
-                            new LatestFinishedSplitsNumberRequestEvent());
-                    // do not request next split when the reader is suspended
-                    requestNextSplit = false;
+                    // Two possibilities that finish a binlog split:
+                    //
+                    // 1. Binlog reader is suspended by enumerator because new tables have been
+                    // finished its snapshot reading.
+                    // Under this case mySqlSourceReaderContext.isBinlogSplitReaderSuspended() is
+                    // true and need to request the latest finished splits number.
+                    //
+                    // 2. Binlog reader reaches the ending offset of the split. We need to do
+                    // nothing under this case.
+                    if (mySqlSourceReaderContext.isBinlogSplitReaderSuspended()) {
+                        suspendedBinlogSplit = toSuspendedBinlogSplit(mySqlSplit.asBinlogSplit());
+                        LOG.info(
+                                "Source reader {} suspended binlog split reader success after the newly added table process, current offset {}",
+                                subtaskId,
+                                suspendedBinlogSplit.getStartingOffset());
+                        context.sendSourceEventToCoordinator(
+                                new LatestFinishedSplitsNumberRequestEvent());
+                        // do not request next split when the reader is suspended
+                        requestNextSplit = false;
+                    }
                 } else {
                     finishedUnackedSplits.put(mySqlSplit.splitId(), mySqlSplit.asSnapshotSplit());
                 }

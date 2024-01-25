@@ -720,7 +720,7 @@ public class MySqlTableSourceFactoryTest {
         } catch (Throwable t) {
             String msg =
                     "Invalid value for option 'scan.startup.mode'. Supported values are "
-                            + "[initial, latest-offset, earliest-offset, specific-offset, timestamp], "
+                            + "[initial, snapshot, latest-offset, earliest-offset, specific-offset, timestamp], "
                             + "but was: abc";
             assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
         }

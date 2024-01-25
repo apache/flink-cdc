@@ -20,7 +20,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mysql-cdc</artifactId>
   <!-- 请使用已发布的版本依赖，snapshot版本的依赖需要本地自行编译。 -->
-  <version>2.5-SNAPSHOT</version>
+  <version>3.0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -28,7 +28,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
-下载 flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar 到 `<FLINK_HOME>/lib/` 目录下。
+下载 flink-sql-connector-mysql-cdc-3.0-SNAPSHOT.jar 到 `<FLINK_HOME>/lib/` 目录下。
 
 **注意:** flink-sql-connector-mysql-cdc-XXX-SNAPSHOT 版本是开发分支`release-XXX`对应的快照版本，快照版本用户需要下载源代码并编译相应的 jar。用户应使用已经发布的版本，例如 [flink-sql-connector-mysql-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
@@ -369,55 +369,68 @@ Flink SQL> SELECT * FROM orders;
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是 binlog 读取记录，该值将始终为0。</td>
     </tr>
+    <tr>
+      <td>row_kind</td>
+      <td>STRING NOT NULL</td>
+      <td>当前记录对应的 changelog 类型。注意：当 Source 算子选择为每条记录输出 row_kind 字段后，下游 SQL 算子在处理消息撤回时会因为这个字段不同而比对失败，
+建议只在简单的同步作业中引用该元数据列。<br>'+I' 表示 INSERT 数据，'-D' 表示 DELETE 数据，'-U' 表示 UPDATE_BEFORE 数据，'+U' 表示 UPDATE_AFTER 数据。
+</td>
+    </tr>
   </tbody>
 </table>
 
 下述创建表示例展示元数据列的用法：
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    order_id INT,
-    order_date TIMESTAMP(0),
+CREATE TABLE products
+(
+    db_name       STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name    STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts  TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
+    order_id      INT,
+    order_date    TIMESTAMP(0),
     customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    price         DECIMAL(10, 5),
+    product_id    INT,
+    order_status  BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'mysql-cdc',
-    'hostname' = 'localhost',
-    'port' = '3306',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = 'mydb',
-    'table-name' = 'orders'
-);
+      'connector' = 'mysql-cdc',
+      'hostname' = 'localhost',
+      'port' = '3306',
+      'username' = 'root',
+      'password' = '123456',
+      'database-name' = 'mydb',
+      'table-name' = 'orders'
+      );
 ```
 
 下述创建表示例展示使用正则表达式匹配多张库表的用法：
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    order_id INT,
-    order_date TIMESTAMP(0),
+CREATE TABLE products
+(
+    db_name       STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name    STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts  TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
+    order_id      INT,
+    order_date    TIMESTAMP(0),
     customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    price         DECIMAL(10, 5),
+    product_id    INT,
+    order_status  BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'mysql-cdc',
-    'hostname' = 'localhost',
-    'port' = '3306',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
-    'table-name' = '(t[5-8]|tt)'
-);
+      'connector' = 'mysql-cdc',
+      'hostname' = 'localhost',
+      'port' = '3306',
+      'username' = 'root',
+      'password' = '123456',
+      'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
+      'table-name' = '(t[5-8]|tt)'
+      );
 ```
 <table class="colwidths-auto docutils">
   <thead>

@@ -84,7 +84,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
             throw new IOException(e);
         }
         return dataIt == null
-                ? finishedSnapshotSplit()
+                ? finishedSplit()
                 : ChangeEventRecords.forRecords(currentSplitId, dataIt);
     }
 
@@ -154,7 +154,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
         return currentFetcher == null || currentFetcher.isFinished();
     }
 
-    private ChangeEventRecords finishedSnapshotSplit() {
+    private ChangeEventRecords finishedSplit() {
         final ChangeEventRecords finishedRecords =
                 ChangeEventRecords.forFinishedSplit(currentSplitId);
         currentSplitId = null;

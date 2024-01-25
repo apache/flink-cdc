@@ -29,6 +29,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * A builder to build a SourceFunction which can read snapshot and continue to consume transaction
  * log for SqlServer.
  */
+@Deprecated
 public class SqlServerSource {
 
     private static final String DATABASE_SERVER_NAME = "sqlserver_transaction_log_source";

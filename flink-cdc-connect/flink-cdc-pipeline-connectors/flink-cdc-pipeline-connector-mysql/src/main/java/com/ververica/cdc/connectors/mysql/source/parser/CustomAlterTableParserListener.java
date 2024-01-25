@@ -44,7 +44,7 @@ import java.util.Map;
 
 import static com.ververica.cdc.connectors.mysql.utils.MySqlTypeUtils.fromDbzColumn;
 
-/** Copied from {@link AlterTableParserListener} in Debezium 1.9.7.Final. */
+/** Copied from {@link AlterTableParserListener} in Debezium 1.9.8.Final. */
 public class CustomAlterTableParserListener extends MySqlParserBaseListener {
 
     private static final int STARTING_INDEX = 1;

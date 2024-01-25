@@ -20,14 +20,12 @@ import com.ververica.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 import com.ververica.cdc.connectors.tests.utils.JdbcProxy;
 import com.ververica.cdc.connectors.tests.utils.TestUtils;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
@@ -101,12 +99,6 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
             sqlServer.stop();
         }
         super.after();
-    }
-
-    @AfterClass
-    public static void afterClass() {
-        // Cleanup the sqlserver image, because it's too large and will cause the next test to fail.
-        DockerClientFactory.instance().client().removeImageCmd(MSSQL_SERVER_IMAGE).exec();
     }
 
     @Test

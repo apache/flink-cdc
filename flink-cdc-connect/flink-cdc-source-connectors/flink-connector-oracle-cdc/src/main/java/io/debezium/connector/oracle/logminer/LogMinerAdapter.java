@@ -58,7 +58,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Copied from Debezium 1.9.7.
+ * Copied from Debezium 1.9.8.Final.
  *
  * <p>Line 356: Replace < condition with <= to be able to catch ongoing transactions during snapshot
  * if current SCN points to START/INSERT/DELETE/UPDATE event.

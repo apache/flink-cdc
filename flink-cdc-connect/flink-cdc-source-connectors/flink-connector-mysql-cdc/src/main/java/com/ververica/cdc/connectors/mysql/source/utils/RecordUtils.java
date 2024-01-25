@@ -18,6 +18,7 @@ package com.ververica.cdc.connectors.mysql.source.utils;
 
 import org.apache.flink.table.types.logical.RowType;
 
+import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WatermarkKind;
 import com.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -385,6 +386,13 @@ public class RecordUtils {
         String dbName = source.getString(DATABASE_NAME_KEY);
         String tableName = source.getString(TABLE_NAME_KEY);
         return new TableId(dbName, null, tableName);
+    }
+
+    public static boolean isTableChangeRecord(SourceRecord dataRecord) {
+        Struct value = (Struct) dataRecord.value();
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+        String tableName = source.getString(TABLE_NAME_KEY);
+        return !StringUtils.isNullOrWhitespaceOnly(tableName);
     }
 
     public static Object[] getSplitKey(

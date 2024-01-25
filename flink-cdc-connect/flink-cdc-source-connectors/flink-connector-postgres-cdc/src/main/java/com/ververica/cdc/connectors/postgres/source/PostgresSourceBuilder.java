@@ -16,19 +16,27 @@
 
 package com.ververica.cdc.connectors.postgres.source;
 
+import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
+import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.ververica.cdc.common.annotation.Experimental;
-import com.ververica.cdc.connectors.base.options.StartupMode;
+import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.assigner.HybridSplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.StreamSplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsState;
 import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReaderWithCommit;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceSplitReader;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import com.ververica.cdc.connectors.postgres.source.enumerator.PostgresSourceEnumerator;
@@ -39,6 +47,7 @@ import io.debezium.relational.TableId;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.Supplier;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -287,11 +296,41 @@ public class PostgresSourceBuilder<T> {
         }
 
         @Override
+        public IncrementalSourceReader<T, JdbcSourceConfig> createReader(
+                SourceReaderContext readerContext) throws Exception {
+            // create source config for the given subtask (e.g. unique server id)
+            JdbcSourceConfig sourceConfig = configFactory.create(readerContext.getIndexOfSubtask());
+            FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
+                    new FutureCompletingBlockingQueue<>();
+
+            final SourceReaderMetrics sourceReaderMetrics =
+                    new SourceReaderMetrics(readerContext.metricGroup());
+
+            sourceReaderMetrics.registerMetrics();
+            Supplier<IncrementalSourceSplitReader<JdbcSourceConfig>> splitReaderSupplier =
+                    () ->
+                            new IncrementalSourceSplitReader<>(
+                                    readerContext.getIndexOfSubtask(),
+                                    dataSourceDialect,
+                                    sourceConfig,
+                                    snapshotHooks);
+            return new IncrementalSourceReaderWithCommit(
+                    elementsQueue,
+                    splitReaderSupplier,
+                    createRecordEmitter(sourceConfig, sourceReaderMetrics),
+                    readerContext.getConfiguration(),
+                    readerContext,
+                    sourceConfig,
+                    sourceSplitSerializer,
+                    dataSourceDialect);
+        }
+
+        @Override
         public SplitEnumerator<SourceSplitBase, PendingSplitsState> createEnumerator(
                 SplitEnumeratorContext<SourceSplitBase> enumContext) {
             final SplitAssigner splitAssigner;
             PostgresSourceConfig sourceConfig = (PostgresSourceConfig) configFactory.create(0);
-            if (sourceConfig.getStartupOptions().startupMode == StartupMode.INITIAL) {
+            if (!sourceConfig.getStartupOptions().isStreamOnly()) {
                 try {
                     final List<TableId> remainingTables =
                             dataSourceDialect.discoverDataCollections(sourceConfig);
@@ -315,7 +354,11 @@ public class PostgresSourceBuilder<T> {
             }
 
             return new PostgresSourceEnumerator(
-                    enumContext, sourceConfig, splitAssigner, (PostgresDialect) dataSourceDialect);
+                    enumContext,
+                    sourceConfig,
+                    splitAssigner,
+                    (PostgresDialect) dataSourceDialect,
+                    this.getBoundedness());
         }
 
         public static <T> PostgresSourceBuilder<T> builder() {

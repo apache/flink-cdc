@@ -11,15 +11,20 @@
 
 Create `docker-compose.yml`.
 
+*Note*: `host` network mode is required in this demo, so it can only work on Linux, see [network-tutorial-host](https://docs.docker.com/network/network-tutorial-host/).
+
 ```yaml
 version: '2.1'
 services:
   observer:
-    image: oceanbase/oceanbase-ce:4.0.0.0
+    image: oceanbase/oceanbase-ce:4.2.0.0
     container_name: observer
+    environment:
+      - 'MODE=slim'
+      - 'OB_ROOT_PASSWORD=pswd'
     network_mode: "host"
   oblogproxy:
-    image: whhe/oblogproxy:1.1.0_4x
+    image: whhe/oblogproxy:1.1.3_4x
     container_name: oblogproxy
     environment:
       - 'OB_SYS_USERNAME=root'
@@ -59,20 +64,6 @@ docker-compose up -d
 ```
 
 ### Set password
-
-There is no password for 'root' user by default, but we need a user of 'sys' tenant with non-empty password in oblogproxy. So here we should set a password for 'root@sys' firstly.
-
-Login 'root' user of 'sys' tenant.
-
-```shell
-docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@sys
-```
-
-Set a password, note that the password needs to be consistent with the environment variable 'OB_SYS_PASSWORD' of oblogproxy service.
-
-```mysql
-ALTER USER root IDENTIFIED BY 'pswd';
-```
 
 From OceanBase 4.0.0.0 CE, we can only fetch the commit log of non-sys tenant.
 

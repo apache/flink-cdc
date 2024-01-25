@@ -142,7 +142,7 @@ public class UniqueDatabase {
         }
     }
 
-    /** Drop the database if is exists. */
+    /** Drop the database if it is existing. */
     public void dropDatabase() {
         try {
             try (Connection connection =

@@ -47,6 +47,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.rules.TemporaryFolder;
+import org.locationtech.jts.util.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -257,6 +258,77 @@ public class SpecificStartingOffsetITCase {
     }
 
     @Test
+    void testBinlogSplitFromTimestampOffset() throws Exception {
+        // Purge binary log at first
+        purgeBinaryLogs();
+
+        Assert.equals(
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000004", 0),
+                DebeziumUtils.findBinlogOffset(System.currentTimeMillis(), connection));
+
+        executeStatements(
+                String.format(
+                        "INSERT INTO %s VALUES (15213, 'Alice', 'Rome', '123456987');",
+                        customers.getTableId()));
+        Thread.sleep(1000);
+        long t1 = System.currentTimeMillis();
+        flushLogs();
+
+        executeStatements(
+                String.format(
+                        "INSERT INTO %s VALUES (15513, 'Bob', 'Milan', '123456987');",
+                        customers.getTableId()));
+        Thread.sleep(1000);
+        long t2 = System.currentTimeMillis();
+        flushLogs();
+
+        executeStatements(
+                String.format(
+                        "INSERT INTO %s VALUES (18213, 'Charlie', 'Paris', '123456987');",
+                        customers.getTableId()));
+        Thread.sleep(1000);
+        long t3 = System.currentTimeMillis();
+        flushLogs();
+
+        executeStatements(
+                String.format(
+                        "INSERT INTO %s VALUES (19613, 'Tom', 'NewYork', '123456987');",
+                        customers.getTableId()));
+        Thread.sleep(1000);
+        long t4 = System.currentTimeMillis();
+        flushLogs();
+
+        executeStatements(
+                String.format(
+                        "INSERT INTO %s VALUES (20913, 'Cat', 'Washington', '123456987');",
+                        customers.getTableId()));
+        Thread.sleep(1000);
+        long t5 = System.currentTimeMillis();
+        flushLogs();
+
+        Assert.equals(
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000005", 0),
+                DebeziumUtils.findBinlogOffset(t1, connection));
+        Assert.equals(
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000006", 0),
+                DebeziumUtils.findBinlogOffset(t2, connection));
+        Assert.equals(
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000007", 0),
+                DebeziumUtils.findBinlogOffset(t3, connection));
+        Assert.equals(
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000008", 0),
+                DebeziumUtils.findBinlogOffset(t4, connection));
+        Assert.equals(
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000009", 0),
+                DebeziumUtils.findBinlogOffset(t5, connection));
+
+        purgeBinaryLogs();
+        Assert.equals(
+                BinlogOffset.ofBinlogFilePosition("mysql-bin.000009", 0),
+                DebeziumUtils.findBinlogOffset(t3, connection));
+    }
+
+    @Test
     void testStartingFromTimestampOffset() throws Exception {
         // Purge binary log at first
         purgeBinaryLogs();
@@ -274,6 +346,9 @@ public class SpecificStartingOffsetITCase {
                 String.format(
                         "INSERT INTO %s VALUES (18213, 'Charlie', 'Paris', '123456987');",
                         customers.getTableId()));
+
+        // switch new log
+        flushLogs();
 
         // Record current timestamp
         Thread.sleep(1000);

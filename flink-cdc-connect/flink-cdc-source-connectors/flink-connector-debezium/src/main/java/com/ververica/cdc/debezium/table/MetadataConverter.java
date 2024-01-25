@@ -25,5 +25,6 @@ import java.io.Serializable;
 @FunctionalInterface
 @Internal
 public interface MetadataConverter extends Serializable {
+
     Object read(SourceRecord record);
 }

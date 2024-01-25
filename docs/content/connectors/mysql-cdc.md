@@ -21,7 +21,7 @@ In order to setup the MySQL CDC connector, the following table provides dependen
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-mysql-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself. -->
-  <version>2.5-SNAPSHOT</version>
+  <version>3.0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -29,7 +29,7 @@ In order to setup the MySQL CDC connector, the following table provides dependen
 
 ```Download link is available only for stable releases.```
 
-Download flink-sql-connector-mysql-cdc-2.5-SNAPSHOT.jar and put it under `<FLINK_HOME>/lib/`.
+Download flink-sql-connector-mysql-cdc-3.0-SNAPSHOT.jar and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** flink-sql-connector-mysql-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-mysql-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-mysql-cdc), the released version will be available in the Maven central warehouse. 
 
@@ -377,55 +377,68 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the binlog, the value is always 0.</td>
     </tr>
+    <tr>
+      <td>row_kind</td>
+      <td>STRING NOT NULL</td>
+      <td>It indicates the row kind of the changelog,Note: The downstream SQL operator may fail to compare due to this new added column when processing the row retraction if 
+the source operator chooses to output the 'row_kind' column for each record. It is recommended to use this metadata column only in simple synchronization jobs.
+<br>'+I' means INSERT message, '-D' means DELETE message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message.</td>
+    </tr>
   </tbody>
 </table>
 
 The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    order_id INT,
-    order_date TIMESTAMP(0),
+CREATE TABLE products
+(
+    db_name       STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name    STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts  TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
+    order_id      INT,
+    order_date    TIMESTAMP(0),
     customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    price         DECIMAL(10, 5),
+    product_id    INT,
+    order_status  BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'mysql-cdc',
-    'hostname' = 'localhost',
-    'port' = '3306',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = 'mydb',
-    'table-name' = 'orders'
-);
+      'connector' = 'mysql-cdc',
+      'hostname' = 'localhost',
+      'port' = '3306',
+      'username' = 'root',
+      'password' = '123456',
+      'database-name' = 'mydb',
+      'table-name' = 'orders'
+      );
 ```
 
 The extended CREATE TABLE example demonstrates the usage of regex to match multi-tables:
+
 ```sql
-CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
-    table_name STRING METADATA  FROM 'table_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    order_id INT,
-    order_date TIMESTAMP(0),
+CREATE TABLE products
+(
+    db_name       STRING METADATA FROM 'database_name' VIRTUAL,
+    table_name    STRING METADATA FROM 'table_name' VIRTUAL,
+    operation_ts  TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
+    order_id      INT,
+    order_date    TIMESTAMP(0),
     customer_name STRING,
-    price DECIMAL(10, 5),
-    product_id INT,
-    order_status BOOLEAN,
-    PRIMARY KEY(order_id) NOT ENFORCED
+    price         DECIMAL(10, 5),
+    product_id    INT,
+    order_status  BOOLEAN,
+    PRIMARY KEY (order_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'mysql-cdc',
-    'hostname' = 'localhost',
-    'port' = '3306',
-    'username' = 'root',
-    'password' = '123456',
-    'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
-    'table-name' = '(t[5-8]|tt)'
-);
+      'connector' = 'mysql-cdc',
+      'hostname' = 'localhost',
+      'port' = '3306',
+      'username' = 'root',
+      'password' = '123456',
+      'database-name' = '(^(test).*|^(tpc).*|txc|.*[p$]|t{2})',
+      'table-name' = '(t[5-8]|tt)'
+      );
 ```
 <table class="colwidths-auto docutils">
   <thead>
