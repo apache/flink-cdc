@@ -27,6 +27,7 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
+import org.apache.flink.util.ExceptionUtils;
 
 import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
@@ -55,6 +56,7 @@ import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
 import static org.apache.flink.util.Preconditions.checkState;
+import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** IT tests for {@link SqlServerSourceBuilder.SqlServerIncrementalSource}. */
@@ -117,7 +119,9 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
                 FailoverType.TM,
                 FailoverPhase.SNAPSHOT,
                 new String[] {"dbo.customers"},
-                true);
+                true,
+                RestartStrategies.fixedDelayRestart(1, 0),
+                null);
     }
 
     @Test
@@ -273,6 +277,29 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
+    @Test
+    public void testTableWithChunkColumnOfNoPrimaryKey() {
+        String chunkColumn = "name";
+        try {
+            testSqlServerParallelSource(
+                    1,
+                    FailoverType.NONE,
+                    FailoverPhase.NEVER,
+                    new String[] {"dbo.customers"},
+                    false,
+                    RestartStrategies.noRestart(),
+                    chunkColumn);
+        } catch (Exception e) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    e,
+                                    String.format(
+                                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
+                                            chunkColumn, "id", "customer.dbo.customers"))
+                            .isPresent());
+        }
+    }
+
     private List<String> testBackfillWhenWritingEvents(
             boolean skipSnapshotBackfill, int fetchSize, int hookType) throws Exception {
 
@@ -360,7 +387,13 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
             String[] captureCustomerTables)
             throws Exception {
         testSqlServerParallelSource(
-                parallelism, failoverType, failoverPhase, captureCustomerTables, false);
+                parallelism,
+                failoverType,
+                failoverPhase,
+                captureCustomerTables,
+                false,
+                RestartStrategies.fixedDelayRestart(1, 0),
+                null);
     }
 
     private void testSqlServerParallelSource(
@@ -368,7 +401,9 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
             FailoverType failoverType,
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            boolean skipSnapshotBackfill)
+            boolean skipSnapshotBackfill,
+            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            String chunkColumn)
             throws Exception {
 
         String databaseName = "customer";
@@ -379,7 +414,7 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+        env.setRestartStrategy(restartStrategyConfiguration);
 
         String sourceDDL =
                 format(
@@ -400,6 +435,7 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '4',"
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
+                                + "%s"
                                 + ")",
                         MSSQL_SERVER_CONTAINER.getHost(),
                         MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT),
@@ -407,7 +443,12 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
                         MSSQL_SERVER_CONTAINER.getPassword(),
                         databaseName,
                         getTableNameRegex(captureCustomerTables),
-                        skipSnapshotBackfill);
+                        skipSnapshotBackfill,
+                        chunkColumn == null
+                                ? ""
+                                : ",'scan.incremental.snapshot.chunk.key-column'='"
+                                        + chunkColumn
+                                        + "'");
 
         // first step: check the snapshot data
         String[] snapshotForSingleTable =

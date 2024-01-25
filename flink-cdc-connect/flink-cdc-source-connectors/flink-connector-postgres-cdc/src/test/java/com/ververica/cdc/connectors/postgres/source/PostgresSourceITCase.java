@@ -238,7 +238,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         FailoverPhase.NEVER,
                         new String[] {"customers_no_pk"},
                         RestartStrategies.noRestart(),
-                        false);
+                        false,
+                        null);
             } catch (Exception e) {
                 assertTrue(
                         ExceptionUtils.findThrowableWithMessage(
@@ -256,7 +257,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     FailoverPhase.NEVER,
                     new String[] {"customers_no_pk"},
                     RestartStrategies.noRestart(),
-                    false);
+                    false,
+                    null);
         }
     }
 
@@ -269,7 +271,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 FailoverPhase.SNAPSHOT,
                 new String[] {"customers"},
                 RestartStrategies.fixedDelayRestart(1, 0),
-                true);
+                true,
+                null);
     }
 
     @Test
@@ -621,6 +624,33 @@ public class PostgresSourceITCase extends PostgresTestBase {
         Thread.sleep(1000L);
     }
 
+    @Test
+    public void testTableWithChunkColumnOfNoPrimaryKey() {
+        if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            return;
+        }
+        String chunkColumn = "name";
+        try {
+            testPostgresParallelSource(
+                    1,
+                    scanStartupMode,
+                    FailoverType.NONE,
+                    FailoverPhase.NEVER,
+                    new String[] {"customers"},
+                    RestartStrategies.noRestart(),
+                    false,
+                    chunkColumn);
+        } catch (Exception e) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    e,
+                                    String.format(
+                                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
+                                            chunkColumn, "id", "customer.customers"))
+                            .isPresent());
+        }
+    }
+
     private List<String> testBackfillWhenWritingEvents(
             boolean skipSnapshotBackfill,
             int fetchSize,
@@ -721,7 +751,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 failoverPhase,
                 captureCustomerTables,
                 RestartStrategies.fixedDelayRestart(1, 0),
-                false);
+                false,
+                null);
     }
 
     private void testPostgresParallelSource(
@@ -731,7 +762,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
-            boolean skipSnapshotBackfill)
+            boolean skipSnapshotBackfill,
+            String chunkColumn)
             throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
@@ -761,6 +793,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
+                                + ""
                                 + ")",
                         customDatabase.getHost(),
                         customDatabase.getDatabasePort(),
@@ -771,7 +804,12 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         getTableNameRegex(captureCustomerTables),
                         scanStartupMode,
                         slotName,
-                        skipSnapshotBackfill);
+                        skipSnapshotBackfill,
+                        chunkColumn == null
+                                ? ""
+                                : ",'scan.incremental.snapshot.chunk.key-column'='"
+                                        + chunkColumn
+                                        + "'");
         tEnv.executeSql(sourceDDL);
         TableResult tableResult = tEnv.executeSql("select * from customers");
 
