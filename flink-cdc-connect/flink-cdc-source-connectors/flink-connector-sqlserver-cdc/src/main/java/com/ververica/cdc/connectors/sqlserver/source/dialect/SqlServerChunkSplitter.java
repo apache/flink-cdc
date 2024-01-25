@@ -89,7 +89,8 @@ public class SqlServerChunkSplitter implements JdbcSourceChunkSplitter {
             long start = System.currentTimeMillis();
 
             Table table = dialect.queryTableSchema(jdbc, tableId).getTable();
-            Column splitColumn = SqlServerUtils.getSplitColumn(table);
+            Column splitColumn =
+                    SqlServerUtils.getSplitColumn(table, sourceConfig.getChunkKeyColumn());
             final List<ChunkRange> chunks;
             try {
                 chunks = splitTableIntoChunks(jdbc, tableId, splitColumn);
