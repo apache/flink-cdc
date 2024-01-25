@@ -13,11 +13,11 @@ import io.debezium.relational.ColumnEditor;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Copied from Debezium project(v1.9.7.Final) to fix
+ * Copied from Debezium project(v1.9.8.Final) to fix
  * https://github.com/ververica/flink-cdc-connectors/issues/1506.
  *
  * <p>Line 48~59: use the actual default string value when the sql contains COLLATE. We should
- * remove this class after we bumped a higher debezium version where the
+ * remove this class after we bumped debezium 2.0 where the
  * https://issues.redhat.com/browse/DBZ-5587 has been fixed.
  */
 public class DefaultValueParserListener extends MySqlParserBaseListener {
@@ -95,7 +95,10 @@ public class DefaultValueParserListener extends MySqlParserBaseListener {
     }
 
     private String unquote(String stringLiteral) {
-        return stringLiteral.substring(1, stringLiteral.length() - 1);
+        if (stringLiteral != null && stringLiteral.startsWith("'") && stringLiteral.endsWith("'")) {
+            return stringLiteral.substring(1, stringLiteral.length() - 1);
+        }
+        return stringLiteral;
     }
 
     private String unquoteBinary(String stringLiteral) {

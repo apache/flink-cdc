@@ -37,9 +37,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Copied from Debezium project(1.9.7.final) to add method {@link
+ * Copied from Debezium project(1.9.8.final) to add method {@link
  * SqlServerStreamingChangeEventSource#afterHandleLsn(SqlServerPartition, Lsn)}. Also implemented
- * {@link SqlServerStreamingChangeEventSource#execute( ChangeEventSourceContext, SqlServerPartition,
+ * {@link SqlServerStreamingChangeEventSource#execute(ChangeEventSourceContext, SqlServerPartition,
  * SqlServerOffsetContext)}. A {@link StreamingChangeEventSource} based on SQL Server change data
  * capture functionality. A main loop polls database DDL change and change data tables and turns
  * them into change events.

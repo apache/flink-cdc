@@ -48,7 +48,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Copied from {@link MySqlAntlrDdlParserListener} in Debezium 1.9.7.final.
+ * Copied from {@link MySqlAntlrDdlParserListener} in Debezium 1.9.8.final.
  *
  * <p>This listener's constructor will use some modified listener.
  */

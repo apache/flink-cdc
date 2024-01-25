@@ -48,8 +48,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Copied from Debezium project to fix FLOAT converted to FLOAT64 type issue. See DBZ-3865,
- * DBZ-5843. Remove it when debezium version is upgraded above 2.0.0.Final.
+ * Copied from Debezium project(1.9.8.Final) to fix FLOAT converted to FLOAT64 type issue. See
+ * DBZ-3865, DBZ-5843. Remove it when debezium version is upgraded above 2.0.0.Final.
  *
  * <p>Line 240 & 246: add FLOAT type adjustment.
  *
