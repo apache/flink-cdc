@@ -54,7 +54,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Copied from Debezium 1.9.7.Final.
+ * Copied from Debezium 1.9.8.Final.
  *
  * <p>An abstract implementation of {@link LogMinerEventProcessor} that all processors should
  * extend.

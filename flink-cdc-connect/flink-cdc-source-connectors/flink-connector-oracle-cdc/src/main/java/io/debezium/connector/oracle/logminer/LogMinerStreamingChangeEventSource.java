@@ -63,7 +63,7 @@ import static io.debezium.connector.oracle.logminer.LogMinerHelper.logError;
 import static io.debezium.connector.oracle.logminer.LogMinerHelper.setLogFilesForMining;
 
 /**
- * Copied from Debezium 1.9.7. A {@link StreamingChangeEventSource} based on Oracle's LogMiner
+ * Copied from Debezium 1.9.8.Final. A {@link StreamingChangeEventSource} based on Oracle's LogMiner
  * utility. The event handler loop is executed in a separate executor.
  *
  * <p>Diff: Make createProcessor method as protected to produce a LogMinerEventProcessor with
