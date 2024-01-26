@@ -26,11 +26,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
-import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
-import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
-import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
-import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
+import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.*;
 import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,6 +47,55 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
         options.put(USERNAME.key(), TEST_USER);
         options.put(PASSWORD.key(), TEST_PASSWORD);
         options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+        assertThat(dataSource.getSourceConfig().getTableList())
+                .isEqualTo(Arrays.asList(inventoryDatabase.getDatabaseName() + ".products"));
+    }
+
+    @Test
+    public void testNoIgnoreNoPrimaryKeyTables() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(IGNORE_NOPRIMARYKEY_TABLE.key(), "FALSE");
+        options.put(
+                TABLES.key(),
+                inventoryDatabase.getDatabaseName()
+                        + ".products,"
+                        + inventoryDatabase.getDatabaseName()
+                        + ".users");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+        assertThat(dataSource.getSourceConfig().getTableList())
+                .isEqualTo(
+                        Arrays.asList(
+                                inventoryDatabase.getDatabaseName() + ".products",
+                                inventoryDatabase.getDatabaseName() + ".users"));
+    }
+
+    @Test
+    public void testIgnoreNoPrimaryKeyTables() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(IGNORE_NOPRIMARYKEY_TABLE.key(), "TRUE");
+        options.put(
+                TABLES.key(),
+                inventoryDatabase.getDatabaseName()
+                        + ".products,"
+                        + inventoryDatabase.getDatabaseName()
+                        + ".users");
         Factory.Context context = new MockContext(Configuration.fromMap(options));
 
         MySqlDataSourceFactory factory = new MySqlDataSourceFactory();

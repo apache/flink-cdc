@@ -154,9 +154,10 @@ public class MySqlSchemaUtils {
         final List<TableId> tableIds = new ArrayList<>();
 
         jdbc.query(
-                "select distinct TABLE_NAME from INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA = '"
+                "SELECT DISTINCT TABLE_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS "
+                        + "WHERE CONSTRAINT_TYPE = 'PRIMARY KEY' AND TABLE_SCHEMA = '"
                         + dbName
-                        + "' and COLUMN_KEY = 'PRI'",
+                        + "'",
                 rs -> {
                     while (rs.next()) {
                         tableIds.add(TableId.tableId(dbName, rs.getString(1)));
