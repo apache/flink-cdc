@@ -27,11 +27,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
+import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.IGNORE_NOPRIMARYKEY_TABLE;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
-import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.IGNORE_NOPRIMARYKEY_TABLE;
 import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static com.ververica.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.assertj.core.api.Assertions.assertThat;
