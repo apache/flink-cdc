@@ -106,6 +106,7 @@ public class MySqlSchemaUtils {
         // database and not taking them from the user ...
         LOG.info("Read list of available tables in {}", dbName);
         final List<TableId> tableIds = new ArrayList<>();
+
         jdbc.query(
                 "SHOW FULL TABLES IN " + quote(dbName) + " where Table_Type = 'BASE TABLE'",
                 rs -> {
@@ -114,6 +115,56 @@ public class MySqlSchemaUtils {
                     }
                 });
         LOG.info("\t list of available tables are: {}", tableIds);
+        return tableIds;
+    }
+
+    /**
+     * list all tables which contain primary key in a database.
+     *
+     * @param sourceConfig
+     * @param dbName
+     * @return
+     */
+    public static List<TableId> listPrimaryKeyTables(
+            MySqlSourceConfig sourceConfig, String dbName) {
+        try (MySqlConnection jdbc = createMySqlConnection(sourceConfig)) {
+            List<String> databases =
+                    dbName != null ? Collections.singletonList(dbName) : listDatabases(jdbc);
+
+            List<TableId> tableIds = new ArrayList<>();
+            for (String database : databases) {
+                tableIds.addAll(listPrimaryKeyTables(jdbc, database));
+            }
+            return tableIds;
+        } catch (SQLException e) {
+            throw new RuntimeException("Error to list databases: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * list all tables which contain primary key in a database.
+     *
+     * @param jdbc
+     * @param dbName
+     * @return
+     */
+    public static List<TableId> listPrimaryKeyTables(JdbcConnection jdbc, String dbName)
+            throws SQLException {
+
+        final List<TableId> tableIds = new ArrayList<>();
+
+        jdbc.query(
+                "select distinct TABLE_NAME from INFORMATION_SCHEMA.COLUMNS where TABLE_SCHEMA = '"
+                        + dbName
+                        + "' and COLUMN_KEY = 'PRI'",
+                rs -> {
+                    while (rs.next()) {
+                        tableIds.add(TableId.tableId(dbName, rs.getString(1)));
+                    }
+                });
+
+        LOG.info("\t list of available tables are: {}", tableIds);
+
         return tableIds;
     }
 

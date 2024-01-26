@@ -230,4 +230,11 @@ public class MySqlDataSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "Whether send schema change events, by default is true. If set to false, the schema changes will not be sent.");
+
+    public static final ConfigOption<Boolean> IGNORE_NOPRIMARYKEY_TABLE =
+            ConfigOptions.key("ignore.noprimarykey.table")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether ignore no primary key table, by default is false. If set to true, will ignore no primary key tables.");
 }
