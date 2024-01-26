@@ -22,7 +22,12 @@ import org.apache.kafka.connect.header.ConnectHeaders;
 
 import java.util.Optional;
 
-/** Emits change records based on an event read from Oracle LogMiner. */
+/**
+ * Copied from Debezium 1.9.8.Final. Emits change records based on an event read from Oracle
+ * LogMiner.
+ *
+ * <p>This class add RowId and overrides the emit methods to put rowId in the header.
+ */
 public class LogMinerChangeRecordEmitter extends BaseChangeRecordEmitter<Object> {
 
     private final Operation operation;
