@@ -34,17 +34,21 @@ public class MySqlDataSource implements DataSource {
 
     private final MySqlSourceConfigFactory configFactory;
     private final MySqlSourceConfig sourceConfig;
+    private final boolean enableColumnComments;
 
-    public MySqlDataSource(MySqlSourceConfigFactory configFactory) {
+    public MySqlDataSource(MySqlSourceConfigFactory configFactory, Boolean enableColumnComments) {
         this.configFactory = configFactory;
         this.sourceConfig = configFactory.createConfig(0);
+        this.enableColumnComments = enableColumnComments;
     }
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
-                        DebeziumChangelogMode.ALL, sourceConfig.isIncludeSchemaChanges());
+                        DebeziumChangelogMode.ALL,
+                        sourceConfig.isIncludeSchemaChanges(),
+                        enableColumnComments);
 
         MySqlSource<Event> source =
                 new MySqlSource<>(
@@ -52,7 +56,11 @@ public class MySqlDataSource implements DataSource {
                         deserializer,
                         (sourceReaderMetrics, sourceConfig) ->
                                 new MySqlPipelineRecordEmitter(
-                                        deserializer, sourceReaderMetrics, sourceConfig));
+                                        deserializer,
+                                        sourceReaderMetrics,
+                                        sourceConfig,
+                                        ((MySqlEventDeserializer) deserializer)
+                                                .getEnableColumnComments()));
 
         return FlinkSourceProvider.of(source);
     }

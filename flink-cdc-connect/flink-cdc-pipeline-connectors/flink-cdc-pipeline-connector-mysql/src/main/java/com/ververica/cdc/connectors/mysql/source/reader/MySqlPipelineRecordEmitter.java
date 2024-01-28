@@ -61,6 +61,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
     private final MySqlSourceConfig sourceConfig;
     private MySqlAntlrDdlParser mySqlAntlrDdlParser;
+    private final Boolean enableColumnComments;
 
     // Used when startup mode is initial
     private Set<TableId> alreadySendCreateTableTables;
@@ -72,7 +73,8 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     public MySqlPipelineRecordEmitter(
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
-            MySqlSourceConfig sourceConfig) {
+            MySqlSourceConfig sourceConfig,
+            Boolean enableColumnComments) {
         super(
                 debeziumDeserializationSchema,
                 sourceReaderMetrics,
@@ -80,6 +82,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
         this.sourceConfig = sourceConfig;
         this.alreadySendCreateTableTables = new HashSet<>();
         this.createTableEventCache = new ArrayList<>();
+        this.enableColumnComments = enableColumnComments;
 
         if (!sourceConfig.getStartupOptions().startupMode.equals(StartupMode.INITIAL)) {
             try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
@@ -224,7 +227,13 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
     private synchronized MySqlAntlrDdlParser getParser() {
         if (mySqlAntlrDdlParser == null) {
-            mySqlAntlrDdlParser = new MySqlAntlrDdlParser();
+            mySqlAntlrDdlParser =
+                    new MySqlAntlrDdlParser(
+                            true,
+                            false,
+                            enableColumnComments,
+                            null,
+                            Tables.TableFilter.includeAll());
         }
         return mySqlAntlrDdlParser;
     }

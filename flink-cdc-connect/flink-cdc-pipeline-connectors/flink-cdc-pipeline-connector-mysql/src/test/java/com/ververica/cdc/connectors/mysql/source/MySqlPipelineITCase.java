@@ -58,6 +58,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.stream.Stream;
 
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCHEMA_CHANGE_ENABLED;
@@ -118,7 +119,8 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
 
         FlinkSourceProvider sourceProvider =
-                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+                (FlinkSourceProvider)
+                        new MySqlDataSource(configFactory, false).getEventSourceProvider();
         CloseableIterator<Event> events =
                 env.fromSource(
                                 sourceProvider.getSource(),
@@ -246,7 +248,8 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
 
         FlinkSourceProvider sourceProvider =
-                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+                (FlinkSourceProvider)
+                        new MySqlDataSource(configFactory, false).getEventSourceProvider();
         CloseableIterator<Event> events =
                 env.fromSource(
                                 sourceProvider.getSource(),
@@ -313,6 +316,16 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .physicalColumn("name", DataTypes.VARCHAR(255).notNull())
                         .physicalColumn("description", DataTypes.VARCHAR(512))
                         .physicalColumn("weight", DataTypes.FLOAT())
+                        .primaryKey(Collections.singletonList("id"))
+                        .build());
+    }
+
+    private CreateTableEvent getColumnCommentsTable(TableId tableId) {
+        return new CreateTableEvent(
+                tableId,
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull(), "自增主键")
+                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), "名称")
                         .primaryKey(Collections.singletonList("id"))
                         .build());
     }
@@ -521,5 +534,64 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         "ALTER TABLE `%s`.`orders` ADD COLUMN `desc1` VARCHAR(45) NULL;",
                         inventoryDatabase.getDatabaseName()));
         return expected;
+    }
+
+    @Test
+    public void testColumnCommentsTable() throws Exception {
+        Properties debeziumProperties = new Properties();
+        debeziumProperties.put("include.schema.comments", "true");
+        env.setParallelism(1);
+        inventoryDatabase.createAndInitialize();
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(MYSQL8_CONTAINER.getHost())
+                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(inventoryDatabase.getDatabaseName() + "\\.columnCommentsTable")
+                        .startupOptions(StartupOptions.latest())
+                        .serverId(getServerId(env.getParallelism()))
+                        .debeziumProperties(debeziumProperties)
+                        .serverTimeZone("UTC")
+                        .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new MySqlDataSource(configFactory, true).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(5_000);
+
+        TableId tableId =
+                TableId.tableId(inventoryDatabase.getDatabaseName(), "columnCommentsTable");
+        List<Event> expected = new ArrayList<>();
+        expected.add(getColumnCommentsTable(tableId));
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`columnCommentsTable` ADD COLUMN (`desc` VARCHAR(45) comment '描述', `cols2` VARCHAR(55));",
+                            inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new AddColumnEvent(
+                            tableId,
+                            Arrays.asList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "desc", DataTypes.VARCHAR(45), "描述")),
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "cols2", DataTypes.VARCHAR(55))))));
+        }
+        List<Event> actual = fetchResults(events, expected.size());
+        assertThat(actual).isEqualTo(expected);
     }
 }

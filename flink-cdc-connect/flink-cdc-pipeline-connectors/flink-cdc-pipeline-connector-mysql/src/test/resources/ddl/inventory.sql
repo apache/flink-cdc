@@ -68,3 +68,12 @@ VALUES (default, '2016-01-16', 1001, 1, 102),
        (default, '16-02-21', 1003, 1, 107);
 
 
+-- create a table which contain column comments
+CREATE TABLE columnCommentsTable(
+    id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
+    name varchar(255) NOT NULL COMMENT '名称'
+);
+
+INSERT INTO columnCommentsTable
+VALUES (DEFAULT, 'Sally'),
+       (DEFAULT, 'George');

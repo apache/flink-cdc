@@ -230,4 +230,12 @@ public class MySqlDataSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "Whether send schema change events, by default is true. If set to false, the schema changes will not be sent.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> ENABLE_COLUMN_COMMENTS =
+            ConfigOptions.key("enable.column.comments")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether enable column comments, by default is false, if set to true, the column comment will be sent.");
 }

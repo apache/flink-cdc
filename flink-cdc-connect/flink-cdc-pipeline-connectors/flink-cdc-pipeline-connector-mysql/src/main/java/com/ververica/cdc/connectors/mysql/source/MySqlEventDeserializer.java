@@ -57,21 +57,25 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final boolean includeSchemaChanges;
+    private final Boolean enableColumnComments;
 
     private transient Tables tables;
     private transient CustomMySqlAntlrDdlParser customParser;
 
     public MySqlEventDeserializer(
-            DebeziumChangelogMode changelogMode, boolean includeSchemaChanges) {
+            DebeziumChangelogMode changelogMode,
+            boolean includeSchemaChanges,
+            Boolean enableColumnComments) {
         super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
+        this.enableColumnComments = enableColumnComments;
     }
 
     @Override
     protected List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record) {
         if (includeSchemaChanges) {
             if (customParser == null) {
-                customParser = new CustomMySqlAntlrDdlParser();
+                customParser = new CustomMySqlAntlrDdlParser(enableColumnComments);
                 tables = new Tables();
             }
 
@@ -117,6 +121,10 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     @Override
     protected Map<String, String> getMetadata(SourceRecord record) {
         return Collections.emptyMap();
+    }
+
+    protected boolean getEnableColumnComments() {
+        return this.enableColumnComments;
     }
 
     @Override

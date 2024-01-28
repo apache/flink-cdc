@@ -51,6 +51,7 @@ import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.C
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.CONNECT_MAX_RETRIES;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.CONNECT_TIMEOUT;
+import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.ENABLE_COLUMN_COMMENTS;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.HEARTBEAT_INTERVAL;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
@@ -98,6 +99,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         StartupOptions startupOptions = getStartupOptions(config);
 
         boolean includeSchemaChanges = config.get(SCHEMA_CHANGE_ENABLED);
+        Boolean enableColumnComments = config.get(ENABLE_COLUMN_COMMENTS);
 
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
@@ -157,7 +159,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         }
         configFactory.tableList(capturedTables);
 
-        return new MySqlDataSource(configFactory);
+        return new MySqlDataSource(configFactory, enableColumnComments);
     }
 
     @Override
@@ -194,6 +196,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(HEARTBEAT_INTERVAL);
         options.add(SCHEMA_CHANGE_ENABLED);
+        options.add(ENABLE_COLUMN_COMMENTS);
         return options;
     }
 

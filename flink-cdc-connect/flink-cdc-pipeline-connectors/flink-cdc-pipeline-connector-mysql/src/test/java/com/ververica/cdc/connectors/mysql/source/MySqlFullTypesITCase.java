@@ -379,7 +379,8 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                         .password(database.getPassword())
                         .serverTimeZone(ZoneId.of("UTC").toString())
                         .serverId(getServerId(env.getParallelism()));
-        return (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        return (FlinkSourceProvider)
+                new MySqlDataSource(configFactory, false).getEventSourceProvider();
     }
 
     private static final RowType COMMON_TYPES =

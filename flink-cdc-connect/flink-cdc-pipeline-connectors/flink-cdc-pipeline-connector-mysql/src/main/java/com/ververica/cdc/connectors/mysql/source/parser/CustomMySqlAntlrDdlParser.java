@@ -21,6 +21,7 @@ import io.debezium.antlr.AntlrDdlParserListener;
 import io.debezium.antlr.DataTypeResolver;
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.ddl.parser.mysql.generated.MySqlParser;
+import io.debezium.relational.Tables;
 
 import java.sql.Types;
 import java.util.ArrayList;
@@ -33,8 +34,9 @@ public class CustomMySqlAntlrDdlParser extends MySqlAntlrDdlParser {
 
     private final LinkedList<SchemaChangeEvent> parsedEvents;
 
-    public CustomMySqlAntlrDdlParser() {
-        super();
+    public CustomMySqlAntlrDdlParser(boolean enableColumnComments) {
+        super(true, false, enableColumnComments, null, Tables.TableFilter.includeAll());
+
         this.parsedEvents = new LinkedList<>();
     }
 
