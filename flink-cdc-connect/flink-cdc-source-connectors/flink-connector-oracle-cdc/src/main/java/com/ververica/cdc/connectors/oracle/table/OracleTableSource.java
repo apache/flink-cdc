@@ -298,7 +298,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(distributionFactorLower, that.distributionFactorLower)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
                 && Objects.equals(closeIdleReaders, that.closeIdleReaders)
-                && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill);
+                && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
+                && Objects.equals(serverTimeZone, that.serverTimeZone);
     }
 
     @Override
@@ -328,7 +329,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 distributionFactorLower,
                 chunkKeyColumn,
                 closeIdleReaders,
-                skipSnapshotBackfill);
+                skipSnapshotBackfill,
+                serverTimeZone);
     }
 
     @Override
