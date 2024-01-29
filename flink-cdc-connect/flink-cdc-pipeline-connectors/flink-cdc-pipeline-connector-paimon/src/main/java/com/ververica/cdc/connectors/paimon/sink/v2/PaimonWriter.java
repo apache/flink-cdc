@@ -130,19 +130,10 @@ public class PaimonWriter
                         Identifier.create(
                                 schemaChangeEvent.tableId().getSchemaName(),
                                 schemaChangeEvent.tableId().getTableName());
-                // fresh table in cache to get the latest schema.
-                FileStoreTable table = getTable(tableId, true);
-                writes.put(
-                        tableId,
-                        new StoreSinkWriteImpl(
-                                table,
-                                commitUser,
-                                ioManager,
-                                false,
-                                false,
-                                true,
-                                memoryPoolFactory,
-                                metricGroup));
+                // remove the table temporarily, then add the table with latest schema when received
+                // DataChangeEvent.
+                writes.remove(tableId);
+                tables.remove(tableId);
             }
         } else if (event instanceof DataChangeEvent) {
             DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
@@ -152,7 +143,7 @@ public class PaimonWriter
                             dataChangeEvent.tableId().getTableName());
 
             FileStoreTable table;
-            table = getTable(tableId, false);
+            table = getTable(tableId);
 
             if (memoryPoolFactory == null) {
                 memoryPoolFactory =
@@ -193,9 +184,9 @@ public class PaimonWriter
         }
     }
 
-    private FileStoreTable getTable(Identifier tableId, boolean refresh) {
+    private FileStoreTable getTable(Identifier tableId) {
         FileStoreTable table = tables.get(tableId);
-        if (table == null || refresh) {
+        if (table == null) {
             try {
                 table = (FileStoreTable) catalog.getTable(tableId);
             } catch (Exception e) {

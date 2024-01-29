@@ -283,8 +283,8 @@ public class PaimonSinkITCase {
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(table1, Collections.singletonList(columnWithPosition));
         PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
-        metadataApplier.applySchemaChange(addColumnEvent);
         writer.write(addColumnEvent, null);
+        metadataApplier.applySchemaChange(addColumnEvent);
         generator =
                 new BinaryRecordDataGenerator(
                         RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
