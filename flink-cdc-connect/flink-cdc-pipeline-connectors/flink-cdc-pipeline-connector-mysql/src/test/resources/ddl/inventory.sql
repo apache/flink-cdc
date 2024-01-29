@@ -72,7 +72,8 @@ VALUES (default, '2016-01-16', 1001, 1, 102),
 CREATE TABLE columnCommentsTable(
     id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'id',
     name varchar(255) NOT NULL COMMENT 'name'
-);
+) comment='table which contain column comments'
+;
 
 INSERT INTO columnCommentsTable
 VALUES (DEFAULT, 'Sally'),

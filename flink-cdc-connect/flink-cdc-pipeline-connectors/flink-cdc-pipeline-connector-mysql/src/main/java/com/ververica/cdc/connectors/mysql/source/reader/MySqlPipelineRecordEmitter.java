@@ -209,6 +209,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
             }
             tableBuilder.physicalColumn(colName, dataType, column.comment());
         }
+        tableBuilder.comment(table.comment());
 
         List<String> primaryKey = table.primaryKeyColumnNames();
         if (Objects.nonNull(primaryKey) && !primaryKey.isEmpty()) {

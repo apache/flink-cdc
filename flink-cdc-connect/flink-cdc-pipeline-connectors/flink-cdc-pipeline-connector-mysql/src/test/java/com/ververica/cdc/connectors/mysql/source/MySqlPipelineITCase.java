@@ -327,6 +327,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .physicalColumn("id", DataTypes.INT().notNull(), "id")
                         .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), "name")
                         .primaryKey(Collections.singletonList("id"))
+                        .comment("table which contain column comments")
                         .build());
     }
 

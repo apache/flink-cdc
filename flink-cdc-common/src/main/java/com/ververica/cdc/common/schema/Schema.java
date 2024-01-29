@@ -199,6 +199,7 @@ public class Schema implements Serializable {
         }
         sb.append("}");
         sb.append(", primaryKeys=").append(String.join(";", primaryKeys));
+        sb.append(", comment=").append(comment);
         sb.append(", options=").append(describeOptions());
 
         return sb.toString();
