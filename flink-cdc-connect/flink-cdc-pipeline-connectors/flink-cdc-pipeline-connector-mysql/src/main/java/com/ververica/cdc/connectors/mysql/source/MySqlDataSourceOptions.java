@@ -233,7 +233,7 @@ public class MySqlDataSourceOptions {
 
     @Experimental
     public static final ConfigOption<Boolean> ENABLE_COLUMN_COMMENTS =
-            ConfigOptions.key("enable.column.comments")
+            ConfigOptions.key("column-comments.enabled")
                     .booleanType()
                     .defaultValue(false)
                     .withDescription(

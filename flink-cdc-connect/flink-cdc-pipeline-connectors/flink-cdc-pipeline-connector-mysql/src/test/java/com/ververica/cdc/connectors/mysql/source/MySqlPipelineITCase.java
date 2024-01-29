@@ -324,8 +324,8 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         return new CreateTableEvent(
                 tableId,
                 Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.INT().notNull(), "自增主键")
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), "名称")
+                        .physicalColumn("id", DataTypes.INT().notNull(), "id")
+                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), "name")
                         .primaryKey(Collections.singletonList("id"))
                         .build());
     }
@@ -577,7 +577,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
 
             statement.execute(
                     String.format(
-                            "ALTER TABLE `%s`.`columnCommentsTable` ADD COLUMN (`desc` VARCHAR(45) comment '描述', `cols2` VARCHAR(55));",
+                            "ALTER TABLE `%s`.`columnCommentsTable` ADD COLUMN (`desc` VARCHAR(45) comment 'desc', `cols2` VARCHAR(55));",
                             inventoryDatabase.getDatabaseName()));
 
             expected.add(
@@ -586,7 +586,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             Arrays.asList(
                                     new AddColumnEvent.ColumnWithPosition(
                                             Column.physicalColumn(
-                                                    "desc", DataTypes.VARCHAR(45), "描述")),
+                                                    "desc", DataTypes.VARCHAR(45), "desc")),
                                     new AddColumnEvent.ColumnWithPosition(
                                             Column.physicalColumn(
                                                     "cols2", DataTypes.VARCHAR(55))))));

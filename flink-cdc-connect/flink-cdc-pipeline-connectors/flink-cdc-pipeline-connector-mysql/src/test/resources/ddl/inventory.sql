@@ -70,8 +70,8 @@ VALUES (default, '2016-01-16', 1001, 1, 102),
 
 -- create a table which contain column comments
 CREATE TABLE columnCommentsTable(
-    id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '自增主键',
-    name varchar(255) NOT NULL COMMENT '名称'
+    id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'id',
+    name varchar(255) NOT NULL COMMENT 'name'
 );
 
 INSERT INTO columnCommentsTable
