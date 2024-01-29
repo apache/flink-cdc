@@ -183,6 +183,7 @@ This command automatically starts all the containers defined in the Docker Compo
    sink:
      type: doris
      fenodes: 127.0.0.1:8030
+     benodes: 127.0.0.1:8040
      username: root
      password: ""
      table.create.properties.light_schema_change: true

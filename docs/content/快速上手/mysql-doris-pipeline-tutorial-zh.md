@@ -185,6 +185,7 @@ flink-cdc-3.0.0 下会包含 bin、lib、log、conf 四个目录。
    sink:
      type: doris
      fenodes: 127.0.0.1:8030
+     benodes: 127.0.0.1:8040
      username: root
      password: ""
      table.create.properties.light_schema_change: true
