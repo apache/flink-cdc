@@ -80,15 +80,11 @@ public class SchemaChangeEventSerializerTest extends SerializerTestBase<SchemaCh
                             new AddColumnEvent.ColumnWithPosition(
                                     Column.physicalColumn("testCol2", DataTypes.DOUBLE(), "desc"),
                                     AddColumnEvent.ColumnPosition.AFTER,
-                                    Column.physicalColumn("testCol1", DataTypes.TIMESTAMP())))),
+                                    "testCol1"))),
             new AlterColumnTypeEvent(TableId.tableId("namespace", "schema", "table"), alterTypeMap),
             new CreateTableEvent(TableId.tableId("schema", "table"), schema),
             new DropColumnEvent(
-                    TableId.tableId("schema", "table"),
-                    Arrays.asList(
-                            Column.metadataColumn("m1", DataTypes.TIMESTAMP()),
-                            Column.metadataColumn("m2", DataTypes.DOUBLE(), "mKey"),
-                            Column.metadataColumn("m3", DataTypes.DOUBLE(), "mKey", "desc"))),
+                    TableId.tableId("schema", "table"), Arrays.asList("m1", "m2", "m3")),
             new RenameColumnEvent(TableId.tableId("table"), renameMap)
         };
     }

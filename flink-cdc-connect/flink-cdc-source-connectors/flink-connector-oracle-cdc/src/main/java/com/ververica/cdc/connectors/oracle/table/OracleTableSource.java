@@ -191,6 +191,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .distributionFactorLower(distributionFactorLower)
                             .closeIdleReaders(closeIdleReaders)
                             .skipSnapshotBackfill(skipSnapshotBackfill)
+                            .chunkKeyColumn(chunkKeyColumn)
                             .serverTimeZone(serverTimeZone)
                             .build();
 

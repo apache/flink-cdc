@@ -214,9 +214,9 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     }
 
     @Override
-    public void notifyCheckpointComplete(long checkpointId) throws Exception {
+    public void notifyCheckpointComplete(long checkpointId, Offset offset) throws Exception {
         if (streamFetchTask != null) {
-            streamFetchTask.commitCurrentOffset();
+            streamFetchTask.commitCurrentOffset(offset);
         }
     }
 

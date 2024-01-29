@@ -153,6 +153,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
     }
 
     private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
+
+    private static final String SCAN_STARTUP_MODE_VALUE_SNAPSHOT = "snapshot";
     private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
     private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMP = "timestamp";
 
@@ -162,6 +164,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         switch (modeString.toLowerCase()) {
             case SCAN_STARTUP_MODE_VALUE_INITIAL:
                 return StartupOptions.initial();
+            case SCAN_STARTUP_MODE_VALUE_SNAPSHOT:
+                return StartupOptions.snapshot();
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
             case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
@@ -174,9 +178,10 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
             default:
                 throw new ValidationException(
                         String.format(
-                                "Invalid value for option '%s'. Supported values are [%s, %s, %s], but was: %s",
+                                "Invalid value for option '%s'. Supported values are [%s, %s, %s, %s], but was: %s",
                                 SCAN_STARTUP_MODE.key(),
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
+                                SCAN_STARTUP_MODE_VALUE_SNAPSHOT,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
                                 SCAN_STARTUP_MODE_VALUE_TIMESTAMP,
                                 modeString));

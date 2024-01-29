@@ -11,10 +11,11 @@ import org.postgresql.replication.LogSequenceNumber;
 import java.nio.ByteBuffer;
 
 /**
- * Copied from Debezium 1.9.7 without changes due to the NoSuchMethodError, caused by the fact that
- * current Debezium release java version is 11, so we need to compile this file by java 8 compiler.
- * <a href="https://www.morling.dev/blog/bytebuffer-and-the-dreaded-nosuchmethoderror/">More
- * info</a>. Abstraction of PostgreSQL log sequence number, adapted from {@link LogSequenceNumber}.
+ * Copied from Debezium 1.9.8.final without changes due to the NoSuchMethodError, caused by the fact
+ * that current Debezium release java version is 11, so we need to compile this file by java 8
+ * compiler. <a
+ * href="https://www.morling.dev/blog/bytebuffer-and-the-dreaded-nosuchmethoderror/">More info</a>.
+ * Abstraction of PostgreSQL log sequence number, adapted from {@link LogSequenceNumber}.
  *
  * <p>Line 32: add NO_STOPPING_LSN
  */

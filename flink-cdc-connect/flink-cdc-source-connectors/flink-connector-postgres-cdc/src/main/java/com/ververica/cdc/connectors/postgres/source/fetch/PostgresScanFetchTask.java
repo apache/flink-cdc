@@ -36,7 +36,6 @@ import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
-import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.pipeline.source.spi.SnapshotProgressListener;
 import io.debezium.pipeline.spi.SnapshotResult;
 import io.debezium.relational.RelationalSnapshotChangeEventSource;
@@ -104,8 +103,8 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                         ctx.getSnapshotChangeEventSourceMetrics(),
                         snapshotSplit);
 
-        PostgresChangeEventSourceContext changeEventSourceContext =
-                new PostgresChangeEventSourceContext();
+        StoppableChangeEventSourceContext changeEventSourceContext =
+                new StoppableChangeEventSourceContext();
         SnapshotResult<PostgresOffsetContext> snapshotResult =
                 snapshotSplitReadTask.execute(
                         changeEventSourceContext, ctx.getPartition(), ctx.getOffsetContext());
@@ -146,7 +145,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                 snapshotSplit,
                 ((PostgresSourceConfig) ctx.getSourceConfig()).getSlotNameForBackfillTask());
         backfillReadTask.execute(
-                new PostgresChangeEventSourceContext(), ctx.getPartition(), postgresOffsetContext);
+                new StoppableChangeEventSourceContext(), ctx.getPartition(), postgresOffsetContext);
     }
 
     /**
@@ -202,18 +201,6 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
         } catch (Throwable t) {
             LOG.info("here exception occurs");
             throw new FlinkRuntimeException(t);
-        }
-    }
-
-    class PostgresChangeEventSourceContext implements ChangeEventSource.ChangeEventSourceContext {
-
-        public void finished() {
-            taskRunning = false;
-        }
-
-        @Override
-        public boolean isRunning() {
-            return taskRunning;
         }
     }
 

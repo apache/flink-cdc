@@ -16,6 +16,7 @@
 
 package com.ververica.cdc.connectors.mysql.source.enumerator;
 
+import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
@@ -24,7 +25,6 @@ import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import com.ververica.cdc.common.annotation.Internal;
-import com.ververica.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlHybridSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
 import com.ververica.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
@@ -71,6 +71,8 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     private final MySqlSourceConfig sourceConfig;
     private final MySqlSplitAssigner splitAssigner;
 
+    private final Boundedness boundedness;
+
     // using TreeSet to prefer assigning binlog split to task-0 for easier debug
     private final TreeSet<Integer> readersAwaitingSplit;
     private List<List<FinishedSnapshotSplitInfo>> binlogSplitMeta;
@@ -80,10 +82,12 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     public MySqlSourceEnumerator(
             SplitEnumeratorContext<MySqlSplit> context,
             MySqlSourceConfig sourceConfig,
-            MySqlSplitAssigner splitAssigner) {
+            MySqlSplitAssigner splitAssigner,
+            Boundedness boundedness) {
         this.context = context;
         this.sourceConfig = sourceConfig;
         this.splitAssigner = splitAssigner;
+        this.boundedness = boundedness;
         this.readersAwaitingSplit = new TreeSet<>();
     }
 
@@ -204,10 +208,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 continue;
             }
 
-            if (splitAssigner.isStreamSplitAssigned()
-                    && sourceConfig.isCloseIdleReaders()
-                    && noMoreSnapshotSplits()
-                    && (binlogSplitTaskId != null && !binlogSplitTaskId.equals(nextAwaiting))) {
+            if (shouldCloseIdleReader(nextAwaiting)) {
                 // close idle readers when snapshot phase finished.
                 context.signalNoMoreSplits(nextAwaiting);
                 awaitingReader.remove();
@@ -232,14 +233,18 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         }
     }
 
-    private boolean noMoreSnapshotSplits() {
-        if (splitAssigner instanceof MySqlHybridSplitAssigner) {
-            return ((MySqlHybridSplitAssigner) splitAssigner).noMoreSnapshotSplits();
-        } else if (splitAssigner instanceof MySqlBinlogSplitAssigner) {
-            return true;
-        }
-        throw new IllegalStateException(
-                "Unexpected subtype of MySqlSplitAssigner class when invoking noMoreSnapshotSplits.");
+    private boolean shouldCloseIdleReader(int nextAwaiting) {
+        // When no unassigned split anymore, Signal NoMoreSplitsEvent to awaiting reader in two
+        // situations:
+        // 1. When Set StartupMode = snapshot mode(also bounded), there's no more splits in the
+        // assigner.
+        // 2. When set scan.incremental.close-idle-reader.enabled = true, there's no more splits in
+        // the assigner.
+        return splitAssigner.noMoreSplits()
+                && (boundedness == Boundedness.BOUNDED
+                        || (sourceConfig.isCloseIdleReaders()
+                                && (binlogSplitTaskId != null
+                                        && !binlogSplitTaskId.equals(nextAwaiting))));
     }
 
     private int[] getRegisteredReader() {

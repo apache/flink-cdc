@@ -48,19 +48,24 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 
 /**
  * {@link JdbcConnection} connection extension used for connecting to Postgres instances.
  *
  * @author Horia Chiorean
- *     <p>Copied from Debezium 1.9.2-Final with two additional methods:
+ *     <p>Copied from Debezium 1.9.8-Final with three additional methods:
  *     <ul>
  *       <li>Constructor PostgresConnection( Configuration config, PostgresValueConverterBuilder
  *           valueConverterBuilder, ConnectionFactory factory) to allow passing a custom
  *           ConnectionFactory
  *       <li>override connection() to return a unwrapped PgConnection (otherwise, it will complain
  *           about HikariProxyConnection cannot be cast to class org.postgresql.core.BaseConnection)
+ *       <li>override isTableUniqueIndexIncluded: Copied DBZ-5398 from Debezium 2.0.0.Final to fix
+ *           https://github.com/ververica/flink-cdc-connectors/issues/2710. Remove this comment
+ *           after bumping debezium version to 2.0.0.Final.
  *     </ul>
  */
 public class PostgresConnection extends JdbcConnection {
@@ -72,6 +77,10 @@ public class PostgresConnection extends JdbcConnection {
     public static final String CONNECTION_HEARTBEAT = "Debezium Heartbeat";
     public static final String CONNECTION_GENERAL = "Debezium General";
 
+    private static final Pattern FUNCTION_DEFAULT_PATTERN =
+            Pattern.compile("^[(]?[A-Za-z0-9_.]+\\((?:.+(?:, ?.+)*)?\\)");
+    private static final Pattern EXPRESSION_DEFAULT_PATTERN =
+            Pattern.compile("\\(+(?:.+(?:[+ - * / < > = ~ ! @ # % ^ & | ` ?] ?.+)+)+\\)");
     private static Logger LOGGER = LoggerFactory.getLogger(PostgresConnection.class);
 
     private static final String URL_PATTERN =
@@ -541,7 +550,7 @@ public class PostgresConnection extends JdbcConnection {
     public Long currentTransactionId() throws SQLException {
         AtomicLong txId = new AtomicLong(0);
         query(
-                "select * from txid_current()",
+                "select (case pg_is_in_recovery() when 't' then 0 else txid_current() end) AS pg_current_txid",
                 rs -> {
                     if (rs.next()) {
                         txId.compareAndSet(0, rs.getLong(1));
@@ -562,7 +571,7 @@ public class PostgresConnection extends JdbcConnection {
         int majorVersion = connection().getMetaData().getDatabaseMajorVersion();
         query(
                 majorVersion >= 10
-                        ? "select * from pg_current_wal_lsn()"
+                        ? "select (case pg_is_in_recovery() when 't' then pg_last_wal_receive_lsn() else pg_current_wal_lsn() end) AS pg_current_wal_lsn"
                         : "select * from pg_current_xlog_location()",
                 rs -> {
                     if (!rs.next()) {
@@ -828,6 +837,26 @@ public class PostgresConnection extends JdbcConnection {
     @Override
     protected boolean isTableType(String tableType) {
         return "TABLE".equals(tableType) || "PARTITIONED TABLE".equals(tableType);
+    }
+
+    @Override
+    protected boolean isTableUniqueIndexIncluded(String indexName, String columnName) {
+        if (columnName != null) {
+            return !FUNCTION_DEFAULT_PATTERN.matcher(columnName).matches()
+                    && !EXPRESSION_DEFAULT_PATTERN.matcher(columnName).matches();
+        }
+        return false;
+    }
+
+    /**
+     * Retrieves all {@code TableId}s in a given database catalog, including partitioned tables.
+     *
+     * @param catalogName the catalog/database name
+     * @return set of all table ids for existing table objects
+     * @throws SQLException if a database exception occurred
+     */
+    public Set<TableId> getAllTableIds(String catalogName) throws SQLException {
+        return readTableNames(catalogName, null, null, new String[] {"TABLE", "PARTITIONED TABLE"});
     }
 
     @FunctionalInterface

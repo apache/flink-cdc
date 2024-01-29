@@ -19,7 +19,7 @@ package com.ververica.cdc.connectors.mysql.debezium.task;
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
-import com.ververica.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader.SnapshotBinlogSplitChangeEventSourceContextImpl;
+import com.ververica.cdc.connectors.mysql.debezium.reader.StoppableChangeEventSourceContext;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
 import com.ververica.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import io.debezium.DebeziumException;
@@ -108,7 +108,7 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
                             new DebeziumException("Error processing binlog signal event", e));
                 }
                 // tell reader the binlog task finished
-                ((SnapshotBinlogSplitChangeEventSourceContextImpl) context).finished();
+                ((StoppableChangeEventSourceContext) context).stopChangeEventSource();
             }
         }
     }

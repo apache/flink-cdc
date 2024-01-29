@@ -110,7 +110,7 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
-    public boolean isStreamSplitAssigned() {
+    public boolean noMoreSplits() {
         return isBinlogSplitAssigned;
     }
 

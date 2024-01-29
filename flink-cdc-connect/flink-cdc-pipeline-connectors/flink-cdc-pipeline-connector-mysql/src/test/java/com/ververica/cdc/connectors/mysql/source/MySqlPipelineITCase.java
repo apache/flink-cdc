@@ -313,7 +313,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .physicalColumn("name", DataTypes.VARCHAR(255).notNull())
                         .physicalColumn("description", DataTypes.VARCHAR(512))
                         .physicalColumn("weight", DataTypes.FLOAT())
-                        .primaryKey(Arrays.asList("id"))
+                        .primaryKey(Collections.singletonList("id"))
                         .build());
     }
 
@@ -466,11 +466,11 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         expected.add(
                 new AddColumnEvent(
                         tableId,
-                        Arrays.asList(
+                        Collections.singletonList(
                                 new AddColumnEvent.ColumnWithPosition(
                                         Column.physicalColumn("desc1", DataTypes.VARCHAR(45)),
                                         AddColumnEvent.ColumnPosition.AFTER,
-                                        Column.physicalColumn("weight", DataTypes.BIGINT())))));
+                                        "weight"))));
 
         statement.execute(
                 String.format(
@@ -479,29 +479,25 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         expected.add(
                 new AddColumnEvent(
                         tableId,
-                        Arrays.asList(
+                        Collections.singletonList(
                                 new AddColumnEvent.ColumnWithPosition(
                                         Column.physicalColumn("col1", DataTypes.VARCHAR(45)),
                                         AddColumnEvent.ColumnPosition.AFTER,
-                                        Column.physicalColumn("weight", DataTypes.BIGINT())))));
+                                        "weight"))));
         expected.add(
                 new AddColumnEvent(
                         tableId,
-                        Arrays.asList(
+                        Collections.singletonList(
                                 new AddColumnEvent.ColumnWithPosition(
                                         Column.physicalColumn("col2", DataTypes.VARCHAR(55)),
                                         AddColumnEvent.ColumnPosition.AFTER,
-                                        Column.physicalColumn("desc1", DataTypes.BIGINT())))));
+                                        "desc1"))));
 
         statement.execute(
                 String.format(
                         "ALTER TABLE `%s`.`products` DROP COLUMN `desc2`, CHANGE COLUMN `desc1` `desc1` VARCHAR(65) NULL DEFAULT NULL;",
                         inventoryDatabase.getDatabaseName()));
-        expected.add(
-                new DropColumnEvent(
-                        tableId,
-                        Collections.singletonList(
-                                Column.physicalColumn("desc2", DataTypes.BIGINT()))));
+        expected.add(new DropColumnEvent(tableId, Collections.singletonList("desc2")));
         expected.add(
                 new AlterColumnTypeEvent(
                         tableId, Collections.singletonMap("desc1", DataTypes.VARCHAR(65))));
@@ -517,11 +513,13 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                 String.format(
                         "ALTER TABLE `%s`.`products` DROP COLUMN `DESC3`;",
                         inventoryDatabase.getDatabaseName()));
-        expected.add(
-                new DropColumnEvent(
-                        tableId,
-                        Collections.singletonList(
-                                Column.physicalColumn("DESC3", DataTypes.BIGINT()))));
+        expected.add(new DropColumnEvent(tableId, Collections.singletonList("DESC3")));
+
+        // Should not catch SchemaChangeEvent of tables other than `products`
+        statement.execute(
+                String.format(
+                        "ALTER TABLE `%s`.`orders` ADD COLUMN `desc1` VARCHAR(45) NULL;",
+                        inventoryDatabase.getDatabaseName()));
         return expected;
     }
 }

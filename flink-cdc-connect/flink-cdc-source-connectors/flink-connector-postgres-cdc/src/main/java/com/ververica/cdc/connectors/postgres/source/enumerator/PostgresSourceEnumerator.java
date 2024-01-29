@@ -16,9 +16,11 @@
 
 package com.ververica.cdc.connectors.postgres.source.enumerator;
 
+import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.util.FlinkRuntimeException;
 
+import com.ververica.cdc.common.annotation.Internal;
 import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
 import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
@@ -32,6 +34,7 @@ import io.debezium.connector.postgresql.spi.SlotState;
  * The Postgres source enumerator that enumerates receive the split request and assign the split to
  * source readers.
  */
+@Internal
 public class PostgresSourceEnumerator extends IncrementalSourceEnumerator {
 
     private final PostgresDialect postgresDialect;
@@ -40,8 +43,9 @@ public class PostgresSourceEnumerator extends IncrementalSourceEnumerator {
             SplitEnumeratorContext<SourceSplitBase> context,
             PostgresSourceConfig sourceConfig,
             SplitAssigner splitAssigner,
-            PostgresDialect postgresDialect) {
-        super(context, sourceConfig, splitAssigner);
+            PostgresDialect postgresDialect,
+            Boundedness boundedness) {
+        super(context, sourceConfig, splitAssigner, boundedness);
         this.postgresDialect = postgresDialect;
     }
 

@@ -119,7 +119,7 @@ public class StreamSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public boolean isStreamSplitAssigned() {
+    public boolean noMoreSplits() {
         return isStreamSplitAssigned;
     }
 

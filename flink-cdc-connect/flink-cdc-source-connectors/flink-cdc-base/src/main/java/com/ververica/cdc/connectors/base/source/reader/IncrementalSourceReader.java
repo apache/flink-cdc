@@ -77,7 +77,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     private final int subtaskId;
     private final SourceSplitSerializer sourceSplitSerializer;
     private final C sourceConfig;
-    private final DataSourceDialect<C> dialect;
+    protected final DataSourceDialect<C> dialect;
 
     public IncrementalSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
@@ -141,6 +141,10 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     protected void onSplitFinished(Map<String, SourceSplitState> finishedSplitIds) {
         for (SourceSplitState splitState : finishedSplitIds.values()) {
             SourceSplitBase sourceSplit = splitState.toSourceSplit();
+            if (sourceConfig.getStartupOptions().isSnapshotOnly() && sourceSplit.isStreamSplit()) {
+                // when startupMode = SNAPSHOT. the stream split could finish.
+                continue;
+            }
             checkState(
                     sourceSplit.isSnapshotSplit(),
                     String.format(

@@ -14,7 +14,7 @@ In order to setup the SQLServer CDC connector, the following table provides depe
   <groupId>com.ververica</groupId>
   <artifactId>flink-connector-sqlserver-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependencies need to be built based on master or release- branches by yourself. -->
-  <version>2.5-SNAPSHOT</version>
+  <version>3.0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -22,7 +22,7 @@ In order to setup the SQLServer CDC connector, the following table provides depe
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-sqlserver-cdc-2.5-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-sqlserver-cdc/2.5-SNAPSHOT/flink-sql-connector-sqlserver-cdc-2.5-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-sqlserver-cdc-3.0-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-sqlserver-cdc/3.0-SNAPSHOT/flink-sql-connector-sqlserver-cdc-3.0-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** flink-sql-connector-sqlserver-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-sqlserver-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-sqlserver-cdc), the released version will be available in the Maven central warehouse.
 
@@ -210,6 +210,14 @@ Connector Options
           If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
+    </tr>
+      <tr>
+          <td>scan.incremental.snapshot.chunk.key-column</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">(none)</td>
+          <td>String</td>
+          <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
+            By default, the chunk key is the first column of the primary key. This column must be a column of the primary key.</td>
     </tr>
     </tbody>
 </table>    

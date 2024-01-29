@@ -39,6 +39,14 @@ public final class StartupOptions implements Serializable {
     }
 
     /**
+     * Performs an initial snapshot on the monitored database tables upon first startup, and not
+     * read the binlog anymore .
+     */
+    public static StartupOptions snapshot() {
+        return new StartupOptions(StartupMode.SNAPSHOT, null, null, null);
+    }
+
+    /**
      * Never to perform snapshot on the monitored database tables upon first startup, just read from
      * the beginning of the change log. This should be used with care, as it is only valid when the
      * change log is guaranteed to contain the entire history of the database.
@@ -89,6 +97,7 @@ public final class StartupOptions implements Serializable {
 
         switch (startupMode) {
             case INITIAL:
+            case SNAPSHOT:
             case EARLIEST_OFFSET:
             case LATEST_OFFSET:
                 break;
@@ -102,6 +111,17 @@ public final class StartupOptions implements Serializable {
             default:
                 throw new UnsupportedOperationException(startupMode + " mode is not supported.");
         }
+    }
+
+    public boolean isStreamOnly() {
+        return startupMode == StartupMode.EARLIEST_OFFSET
+                || startupMode == StartupMode.LATEST_OFFSET
+                || startupMode == StartupMode.SPECIFIC_OFFSETS
+                || startupMode == StartupMode.TIMESTAMP;
+    }
+
+    public boolean isSnapshotOnly() {
+        return startupMode == StartupMode.SNAPSHOT;
     }
 
     @Override

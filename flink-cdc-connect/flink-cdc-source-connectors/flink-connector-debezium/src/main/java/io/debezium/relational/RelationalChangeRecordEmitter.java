@@ -22,7 +22,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Copied from Debezium 1.9.7.Final.
+ * Copied from Debezium 1.9.8.Final.
  *
  * <p>Base class for {@link ChangeRecordEmitter} implementations based on a relational database.
  *

@@ -63,7 +63,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
@@ -84,8 +83,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private PostgresTaskContext taskContext;
     private ChangeEventQueue<DataChangeEvent> queue;
     private PostgresConnection jdbcConnection;
-    private final AtomicReference<ReplicationConnection> replicationConnection =
-            new AtomicReference<>();
+    private ReplicationConnection replicationConnection;
     private PostgresOffsetContext offsetContext;
     private PostgresPartition partition;
     private PostgresSchema schema;
@@ -190,13 +188,14 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         this.partition = new PostgresPartition(dbzConfig.getLogicalName());
         this.taskContext = PostgresObjectUtils.newTaskContext(dbzConfig, schema, topicSelector);
 
-        this.replicationConnection.compareAndSet(
-                null,
-                createReplicationConnection(
-                        this.taskContext,
-                        jdbcConnection,
-                        this.snapShotter.shouldSnapshot(),
-                        dbzConfig));
+        if (replicationConnection == null) {
+            replicationConnection =
+                    createReplicationConnection(
+                            this.taskContext,
+                            jdbcConnection,
+                            this.snapShotter.shouldSnapshot(),
+                            dbzConfig);
+        }
 
         this.queue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()
@@ -302,8 +301,13 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     @Override
-    public void close() {
-        jdbcConnection.close();
+    public void close() throws Exception {
+        if (jdbcConnection != null) {
+            jdbcConnection.close();
+        }
+        if (replicationConnection != null) {
+            replicationConnection.close();
+        }
     }
 
     public PostgresConnection getConnection() {
@@ -315,7 +319,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     public ReplicationConnection getReplicationConnection() {
-        return replicationConnection.get();
+        return replicationConnection;
     }
 
     public SnapshotChangeEventSourceMetrics<PostgresPartition>

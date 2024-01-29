@@ -33,7 +33,9 @@ import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.ExceptionUtils;
+import org.apache.flink.util.FlinkRuntimeException;
 
+import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import com.ververica.cdc.connectors.postgres.PostgresTestBase;
@@ -59,12 +61,14 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -89,6 +93,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
     private static final int USE_POST_LOWWATERMARK_HOOK = 1;
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
+    private static final int USE_POST_HIGHWATERMARK_HOOK = 3;
 
     private final String scanStartupMode;
 
@@ -233,7 +238,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         FailoverPhase.NEVER,
                         new String[] {"customers_no_pk"},
                         RestartStrategies.noRestart(),
-                        false);
+                        false,
+                        null);
             } catch (Exception e) {
                 assertTrue(
                         ExceptionUtils.findThrowableWithMessage(
@@ -251,7 +257,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     FailoverPhase.NEVER,
                     new String[] {"customers_no_pk"},
                     RestartStrategies.noRestart(),
-                    false);
+                    false,
+                    null);
         }
     }
 
@@ -264,7 +271,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 FailoverPhase.SNAPSHOT,
                 new String[] {"customers"},
                 RestartStrategies.fixedDelayRestart(1, 0),
-                true);
+                true,
+                null);
     }
 
     @Test
@@ -324,12 +332,80 @@ public class PostgresSourceITCase extends PostgresTestBase {
     }
 
     @Test
+    public void testSnapshotOnlyModeWithDMLPostHighWaterMark() throws Exception {
+        // The data num is 21, set fetchSize = 22 to test the job is bounded.
+        List<String> records =
+                testBackfillWhenWritingEvents(
+                        false, 22, USE_POST_HIGHWATERMARK_HOOK, StartupOptions.snapshot());
+        List<String> expectedRecords =
+                Arrays.asList(
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[109, user_4, Shanghai, 123567891234]",
+                        "+I[110, user_5, Shanghai, 123567891234]",
+                        "+I[111, user_6, Shanghai, 123567891234]",
+                        "+I[118, user_7, Shanghai, 123567891234]",
+                        "+I[121, user_8, Shanghai, 123567891234]",
+                        "+I[123, user_9, Shanghai, 123567891234]",
+                        "+I[1009, user_10, Shanghai, 123567891234]",
+                        "+I[1010, user_11, Shanghai, 123567891234]",
+                        "+I[1011, user_12, Shanghai, 123567891234]",
+                        "+I[1012, user_13, Shanghai, 123567891234]",
+                        "+I[1013, user_14, Shanghai, 123567891234]",
+                        "+I[1014, user_15, Shanghai, 123567891234]",
+                        "+I[1015, user_16, Shanghai, 123567891234]",
+                        "+I[1016, user_17, Shanghai, 123567891234]",
+                        "+I[1017, user_18, Shanghai, 123567891234]",
+                        "+I[1018, user_19, Shanghai, 123567891234]",
+                        "+I[1019, user_20, Shanghai, 123567891234]",
+                        "+I[2000, user_21, Shanghai, 123567891234]");
+        assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    @Test
+    public void testSnapshotOnlyModeWithDMLPreHighWaterMark() throws Exception {
+        // The data num is 21, set fetchSize = 22 to test the job is bounded
+        List<String> records =
+                testBackfillWhenWritingEvents(
+                        false, 22, USE_PRE_HIGHWATERMARK_HOOK, StartupOptions.snapshot());
+        List<String> expectedRecords =
+                Arrays.asList(
+                        "+I[101, user_1, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "+I[103, user_3, Shanghai, 123567891234]",
+                        "+I[109, user_4, Shanghai, 123567891234]",
+                        "+I[110, user_5, Shanghai, 123567891234]",
+                        "+I[111, user_6, Shanghai, 123567891234]",
+                        "+I[118, user_7, Shanghai, 123567891234]",
+                        "+I[121, user_8, Shanghai, 123567891234]",
+                        "+I[123, user_9, Shanghai, 123567891234]",
+                        "+I[1009, user_10, Shanghai, 123567891234]",
+                        "+I[1010, user_11, Shanghai, 123567891234]",
+                        "+I[1011, user_12, Shanghai, 123567891234]",
+                        "+I[1012, user_13, Shanghai, 123567891234]",
+                        "+I[1013, user_14, Shanghai, 123567891234]",
+                        "+I[1014, user_15, Shanghai, 123567891234]",
+                        "+I[1015, user_16, Shanghai, 123567891234]",
+                        "+I[1016, user_17, Shanghai, 123567891234]",
+                        "+I[1017, user_18, Shanghai, 123567891234]",
+                        "+I[1018, user_19, Shanghai, 123567891234]",
+                        "+I[2000, user_21, Pittsburgh, 123567891234]",
+                        "+I[15213, user_15213, Shanghai, 123567891234]");
+        // when enable backfill, the wal log between (snapshot, high_watermark) will be
+        // applied as snapshot image
+        assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    @Test
     public void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
         if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             return;
         }
 
-        List<String> records = testBackfillWhenWritingEvents(false, 21, USE_PRE_HIGHWATERMARK_HOOK);
+        List<String> records =
+                testBackfillWhenWritingEvents(
+                        false, 21, USE_PRE_HIGHWATERMARK_HOOK, StartupOptions.initial());
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -365,7 +441,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
             return;
         }
 
-        List<String> records = testBackfillWhenWritingEvents(false, 21, USE_POST_LOWWATERMARK_HOOK);
+        List<String> records =
+                testBackfillWhenWritingEvents(
+                        false, 21, USE_POST_LOWWATERMARK_HOOK, StartupOptions.initial());
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -401,7 +479,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
             return;
         }
 
-        List<String> records = testBackfillWhenWritingEvents(true, 25, USE_PRE_HIGHWATERMARK_HOOK);
+        List<String> records =
+                testBackfillWhenWritingEvents(
+                        true, 25, USE_PRE_HIGHWATERMARK_HOOK, StartupOptions.initial());
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -441,7 +521,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
             return;
         }
 
-        List<String> records = testBackfillWhenWritingEvents(true, 25, USE_POST_LOWWATERMARK_HOOK);
+        List<String> records =
+                testBackfillWhenWritingEvents(
+                        true, 25, USE_POST_LOWWATERMARK_HOOK, StartupOptions.initial());
 
         List<String> expectedRecords =
                 Arrays.asList(
@@ -476,8 +558,105 @@ public class PostgresSourceITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
+    @Test
+    public void testNewLsnCommittedWhenCheckpoint() throws Exception {
+        int parallelism = 1;
+        FailoverType failoverType = FailoverType.JM;
+        FailoverPhase failoverPhase = FailoverPhase.STREAM;
+        String[] captureCustomerTables = new String[] {"customers"};
+        RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration =
+                RestartStrategies.fixedDelayRestart(1, 0);
+        boolean skipSnapshotBackfill = false;
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+        env.setParallelism(parallelism);
+        env.enableCheckpointing(200L);
+        env.setRestartStrategy(restartStrategyConfiguration);
+        String sourceDDL =
+                format(
+                        "CREATE TABLE customers ("
+                                + " id BIGINT NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " primary key (id) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc-mock',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.startup.mode' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'slot.name' = '%s',"
+                                + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
+                                + ")",
+                        customDatabase.getHost(),
+                        customDatabase.getDatabasePort(),
+                        customDatabase.getUsername(),
+                        customDatabase.getPassword(),
+                        customDatabase.getDatabaseName(),
+                        SCHEMA_NAME,
+                        getTableNameRegex(captureCustomerTables),
+                        scanStartupMode,
+                        slotName,
+                        skipSnapshotBackfill);
+        tEnv.executeSql(sourceDDL);
+        TableResult tableResult = tEnv.executeSql("select * from customers");
+
+        // first step: check the snapshot data
+        if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            checkSnapshotData(tableResult, failoverType, failoverPhase, captureCustomerTables);
+        }
+
+        // second step: check the stream data
+        checkStreamDataWithHook(tableResult, failoverType, failoverPhase, captureCustomerTables);
+
+        tableResult.getJobClient().get().cancel().get();
+
+        // sleep 1000ms to wait until connections are closed.
+        Thread.sleep(1000L);
+    }
+
+    @Test
+    public void testTableWithChunkColumnOfNoPrimaryKey() {
+        if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            return;
+        }
+        String chunkColumn = "name";
+        try {
+            testPostgresParallelSource(
+                    1,
+                    scanStartupMode,
+                    FailoverType.NONE,
+                    FailoverPhase.NEVER,
+                    new String[] {"customers"},
+                    RestartStrategies.noRestart(),
+                    false,
+                    chunkColumn);
+        } catch (Exception e) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    e,
+                                    String.format(
+                                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
+                                            chunkColumn, "id", "customer.customers"))
+                            .isPresent());
+        }
+    }
+
     private List<String> testBackfillWhenWritingEvents(
-            boolean skipSnapshotBackfill, int fetchSize, int hookType) throws Exception {
+            boolean skipSnapshotBackfill,
+            int fetchSize,
+            int hookType,
+            StartupOptions startupOptions)
+            throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(1000);
         env.setParallelism(1);
@@ -504,6 +683,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         .database(customDatabase.getDatabaseName())
                         .slotName(slotName)
                         .tableList(tableId)
+                        .startupOptions(startupOptions)
                         .skipSnapshotBackfill(skipSnapshotBackfill)
                         .deserializer(customerTable.getDeserializer())
                         .build();
@@ -528,10 +708,16 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     }
                 };
 
-        if (hookType == USE_POST_LOWWATERMARK_HOOK) {
-            hooks.setPostLowWatermarkAction(snapshotPhaseHook);
-        } else if (hookType == USE_PRE_HIGHWATERMARK_HOOK) {
-            hooks.setPreHighWatermarkAction(snapshotPhaseHook);
+        switch (hookType) {
+            case USE_POST_LOWWATERMARK_HOOK:
+                hooks.setPostLowWatermarkAction(snapshotPhaseHook);
+                break;
+            case USE_PRE_HIGHWATERMARK_HOOK:
+                hooks.setPreHighWatermarkAction(snapshotPhaseHook);
+                break;
+            case USE_POST_HIGHWATERMARK_HOOK:
+                hooks.setPostHighWatermarkAction(snapshotPhaseHook);
+                break;
         }
         source.setSnapshotHooks(hooks);
 
@@ -565,7 +751,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 failoverPhase,
                 captureCustomerTables,
                 RestartStrategies.fixedDelayRestart(1, 0),
-                false);
+                false,
+                null);
     }
 
     private void testPostgresParallelSource(
@@ -575,7 +762,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
-            boolean skipSnapshotBackfill)
+            boolean skipSnapshotBackfill,
+            String chunkColumn)
             throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
@@ -605,6 +793,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
+                                + ""
                                 + ")",
                         customDatabase.getHost(),
                         customDatabase.getDatabasePort(),
@@ -615,7 +804,12 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         getTableNameRegex(captureCustomerTables),
                         scanStartupMode,
                         slotName,
-                        skipSnapshotBackfill);
+                        skipSnapshotBackfill,
+                        chunkColumn == null
+                                ? ""
+                                : ",'scan.incremental.snapshot.chunk.key-column'='"
+                                        + chunkColumn
+                                        + "'");
         tEnv.executeSql(sourceDDL);
         TableResult tableResult = tEnv.executeSql("select * from customers");
 
@@ -724,6 +918,75 @@ public class PostgresSourceITCase extends PostgresTestBase {
         assertTrue(!hasNextData(iterator));
     }
 
+    private void checkStreamDataWithHook(
+            TableResult tableResult,
+            FailoverType failoverType,
+            FailoverPhase failoverPhase,
+            String[] captureCustomerTables)
+            throws Exception {
+        waitUntilJobRunning(tableResult);
+        CloseableIterator<Row> iterator = tableResult.collect();
+        JobID jobId = tableResult.getJobClient().get().getJobID();
+
+        final AtomicLong savedCheckpointId = new AtomicLong(0);
+        final CountDownLatch countDownLatch = new CountDownLatch(1);
+
+        MockPostgresDialect.setNotifyCheckpointCompleteCallback(
+                checkpointId -> {
+                    try {
+                        if (savedCheckpointId.get() == 0) {
+                            savedCheckpointId.set(checkpointId);
+
+                            for (String tableId : captureCustomerTables) {
+                                makeFirstPartStreamEvents(
+                                        getConnection(),
+                                        customDatabase.getDatabaseName()
+                                                + '.'
+                                                + SCHEMA_NAME
+                                                + '.'
+                                                + tableId);
+                            }
+                            // wait for the stream reading
+                            Thread.sleep(2000L);
+
+                            triggerFailover(
+                                    failoverType,
+                                    jobId,
+                                    miniClusterResource.getMiniCluster(),
+                                    () -> sleepMs(200));
+                            countDownLatch.countDown();
+                        }
+                    } catch (Exception e) {
+                        throw new FlinkRuntimeException(e);
+                    }
+                });
+
+        countDownLatch.await();
+        waitUntilJobRunning(tableResult);
+
+        if (failoverPhase == FailoverPhase.STREAM) {
+            triggerFailover(
+                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
+            waitUntilJobRunning(tableResult);
+        }
+        for (String tableId : captureCustomerTables) {
+            makeSecondPartStreamEvents(
+                    getConnection(),
+                    customDatabase.getDatabaseName() + '.' + SCHEMA_NAME + '.' + tableId);
+        }
+
+        List<String> expectedStreamData = new ArrayList<>();
+        for (int i = 0; i < captureCustomerTables.length; i++) {
+            expectedStreamData.addAll(firstPartStreamEvents);
+            expectedStreamData.addAll(secondPartStreamEvents);
+        }
+        // wait for the stream reading
+        Thread.sleep(2000L);
+
+        assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
+        assertTrue(!hasNextData(iterator));
+    }
+
     private void checkStreamDataWithDDLDuringFailover(
             TableResult tableResult,
             FailoverType failoverType,
@@ -806,16 +1069,6 @@ public class PostgresSourceITCase extends PostgresTestBase {
             size--;
         }
         return rows.stream().map(stringifier).collect(Collectors.toList());
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 
     /**

@@ -201,6 +201,7 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     public JdbcSourceConfigFactory startupOptions(StartupOptions startupOptions) {
         switch (startupOptions.startupMode) {
             case INITIAL:
+            case SNAPSHOT:
             case LATEST_OFFSET:
                 break;
             default:

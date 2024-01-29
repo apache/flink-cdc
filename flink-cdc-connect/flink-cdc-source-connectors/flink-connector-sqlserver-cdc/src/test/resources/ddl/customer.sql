@@ -83,3 +83,28 @@ VALUES (101,'user_1','Shanghai','123567891234'),
        (1019,'user_20','Shanghai','123567891234'),
        (2000,'user_21','Shanghai','123567891234');
 EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'customers_1', @role_name = NULL, @supports_net_changes = 0;
+
+-- table has combined primary key and one of the primary key is evenly
+CREATE TABLE evenly_shopping_cart (
+  product_no INT NOT NULL,
+  product_kind VARCHAR(255),
+  user_id VARCHAR(255) NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  PRIMARY KEY(product_kind, product_no, user_id)
+);
+
+insert into evenly_shopping_cart
+VALUES (101, 'KIND_001', 'user_1', 'my shopping cart'),
+       (102, 'KIND_002', 'user_1', 'my shopping cart'),
+       (103, 'KIND_007', 'user_1', 'my shopping cart'),
+       (104, 'KIND_008', 'user_1', 'my shopping cart'),
+       (105, 'KIND_100', 'user_2', 'my shopping list'),
+       (105, 'KIND_999', 'user_3', 'my shopping list'),
+       (107, 'KIND_010', 'user_4', 'my shopping list'),
+       (108, 'KIND_009', 'user_4', 'my shopping list'),
+       (109, 'KIND_002', 'user_5', 'leo list'),
+       (111, 'KIND_007', 'user_5', 'leo list'),
+       (111, 'KIND_008', 'user_5', 'leo list'),
+       (112, 'KIND_009', 'user_6', 'my shopping cart');
+EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'evenly_shopping_cart', @role_name = NULL, @supports_net_changes = 0;
+
