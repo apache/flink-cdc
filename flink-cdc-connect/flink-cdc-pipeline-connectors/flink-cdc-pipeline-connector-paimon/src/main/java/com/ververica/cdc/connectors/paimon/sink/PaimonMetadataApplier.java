@@ -44,16 +44,18 @@ import java.util.Map;
  */
 public class PaimonMetadataApplier implements MetadataApplier {
 
-    // use `static` because Catalog is unSerializable.
-    private static Catalog catalog;
+    // Catalog is unSerializable.
+    private transient Catalog catalog;
 
     // currently, we set table options for all tables using the same options.
     private final Map<String, String> tableOptions;
 
+    private final Options catalogOptions;
+
     private final Map<TableId, List<String>> partitionMaps;
 
     public PaimonMetadataApplier(Options catalogOptions) {
-        catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        this.catalogOptions = catalogOptions;
         this.tableOptions = new HashMap<>();
         this.partitionMaps = new HashMap<>();
     }
@@ -62,13 +64,16 @@ public class PaimonMetadataApplier implements MetadataApplier {
             Options catalogOptions,
             Map<String, String> tableOptions,
             Map<TableId, List<String>> partitionMaps) {
-        catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.partitionMaps = partitionMaps;
     }
 
     @Override
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+        if (catalog == null) {
+            catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        }
         try {
             if (schemaChangeEvent instanceof CreateTableEvent) {
                 applyCreateTable((CreateTableEvent) schemaChangeEvent);
