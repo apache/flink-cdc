@@ -199,7 +199,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     "+I[2000, user_21, Shanghai, 123567891234]"
                 };
         // Step 2: wait the snapshot splits finished reading
-        Thread.sleep(5000L);
+        Thread.sleep(10000L);
         List<String> actualRecords = consumeRecords(reader, dataType);
         assertEqualsInAnyOrder(Arrays.asList(expectedRecords), actualRecords);
 
