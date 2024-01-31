@@ -92,7 +92,7 @@ The most typical scenario is the merge of sub-databases and sub-tables, routing 
 To describe a route, the follows are required:
 * source-table: Source table id, supports regular expressions
 * sink-table: Sink table id, supports regular expressions
-* escription: Routing rule description(optional, default value provided)
+* description: Routing rule description(optional, default value provided)
 
 For example, if synchronize the table 'web_order' in the database 'mydb' to a Kafka topic 'ods_web_order', we can use this yaml file to define this route：
 ```yaml
