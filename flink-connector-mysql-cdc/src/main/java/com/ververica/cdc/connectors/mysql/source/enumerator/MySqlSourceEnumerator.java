@@ -239,11 +239,11 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                         } else {
                             position = startupMode.toString();
                         }
-                        SlackWebhookUtils.notify(
-                                this.sourceConfig.getHookUrl(),
-                                "BINLOG STREAM START",
-                                this.sourceConfig.getTableList().get(0),
-                                position);
+//                        SlackWebhookUtils.notify(
+//                                this.sourceConfig.getHookUrl(),
+//                                "BINLOG STREAM START",
+//                                this.sourceConfig.getTableList().get(0),
+//                                position);
                     }
                 }
                 awaitingReader.remove();
