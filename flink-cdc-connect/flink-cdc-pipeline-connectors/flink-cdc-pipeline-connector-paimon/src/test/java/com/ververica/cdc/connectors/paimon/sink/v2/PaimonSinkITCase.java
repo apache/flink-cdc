@@ -180,6 +180,7 @@ public class PaimonSinkITCase {
         for (Event event : createTestEvents()) {
             writer.write(event, null);
         }
+        writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
                         .map(MockCommitRequestImpl::new)
@@ -205,6 +206,7 @@ public class PaimonSinkITCase {
                                     BinaryStringData.fromString("1")
                                 }));
         writer.write(event, null);
+        writer.flush(false);
         commitRequests =
                 writer.prepareCommit().stream()
                         .map(MockCommitRequestImpl::new)
@@ -233,6 +235,7 @@ public class PaimonSinkITCase {
                                     BinaryStringData.fromString("x")
                                 }));
         writer.write(event, null);
+        writer.flush(false);
         commitRequests =
                 writer.prepareCommit().stream()
                         .map(MockCommitRequestImpl::new)
@@ -257,10 +260,11 @@ public class PaimonSinkITCase {
         PaimonWriter writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
 
-        // insert
+        // 1. receive only DataChangeEvents during one checkpoint
         for (Event event : createTestEvents()) {
             writer.write(event, null);
         }
+        writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
                         .map(MockCommitRequestImpl::new)
@@ -276,6 +280,18 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "1", "1"), Row.ofKind(RowKind.INSERT, "2", "2")),
                 result);
 
+        // 2. receive DataChangeEvents and SchemaChangeEvents during one checkpoint
+        DataChangeEvent insertEvent3 =
+                DataChangeEvent.insertEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3")
+                                }));
+        writer.write(insertEvent3, null);
+        writer.flush(false);
+
         // add column
         AddColumnEvent.ColumnWithPosition columnWithPosition =
                 new AddColumnEvent.ColumnWithPosition(
@@ -288,16 +304,17 @@ public class PaimonSinkITCase {
         generator =
                 new BinaryRecordDataGenerator(
                         RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
-        DataChangeEvent insertEvent =
+        DataChangeEvent insertEvent4 =
                 DataChangeEvent.insertEvent(
                         table1,
                         generator.generate(
                                 new Object[] {
-                                    BinaryStringData.fromString("3"),
-                                    BinaryStringData.fromString("3"),
-                                    BinaryStringData.fromString("3")
+                                    BinaryStringData.fromString("4"),
+                                    BinaryStringData.fromString("4"),
+                                    BinaryStringData.fromString("4")
                                 }));
-        writer.write(insertEvent, null);
+        writer.write(insertEvent4, null);
+        writer.flush(false);
         commitRequests =
                 writer.prepareCommit().stream()
                         .map(MockCommitRequestImpl::new)
@@ -312,9 +329,22 @@ public class PaimonSinkITCase {
                 Arrays.asList(
                         Row.ofKind(RowKind.INSERT, "1", "1", null),
                         Row.ofKind(RowKind.INSERT, "2", "2", null),
-                        Row.ofKind(RowKind.INSERT, "3", "3", "3")),
+                        Row.ofKind(RowKind.INSERT, "3", "3", null),
+                        Row.ofKind(RowKind.INSERT, "4", "4", "4")),
                 result);
 
+        // 2. receive DataChangeEvents and SchemaChangeEvents during one checkpoint
+        DataChangeEvent insertEvent5 =
+                DataChangeEvent.insertEvent(
+                        table1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("5"),
+                                    BinaryStringData.fromString("5"),
+                                    BinaryStringData.fromString("5")
+                                }));
+        writer.write(insertEvent5, null);
+        writer.flush(false);
         // drop column
         DropColumnEvent dropColumnEvent =
                 new DropColumnEvent(table1, Collections.singletonList("col2"));
@@ -322,15 +352,16 @@ public class PaimonSinkITCase {
         writer.write(dropColumnEvent, null);
         generator =
                 new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
-        insertEvent =
+        DataChangeEvent insertEvent6 =
                 DataChangeEvent.insertEvent(
                         table1,
                         generator.generate(
                                 new Object[] {
-                                    BinaryStringData.fromString("4"),
-                                    BinaryStringData.fromString("4")
+                                    BinaryStringData.fromString("6"),
+                                    BinaryStringData.fromString("6")
                                 }));
-        writer.write(insertEvent, null);
+        writer.write(insertEvent6, null);
+        writer.flush(false);
         commitRequests =
                 writer.prepareCommit().stream()
                         .map(MockCommitRequestImpl::new)
@@ -345,8 +376,10 @@ public class PaimonSinkITCase {
                 Arrays.asList(
                         Row.ofKind(RowKind.INSERT, "1", null),
                         Row.ofKind(RowKind.INSERT, "2", null),
-                        Row.ofKind(RowKind.INSERT, "3", "3"),
-                        Row.ofKind(RowKind.INSERT, "4", "4")),
+                        Row.ofKind(RowKind.INSERT, "3", null),
+                        Row.ofKind(RowKind.INSERT, "4", "4"),
+                        Row.ofKind(RowKind.INSERT, "5", "5"),
+                        Row.ofKind(RowKind.INSERT, "6", "6")),
                 result);
     }
 
@@ -387,6 +420,7 @@ public class PaimonSinkITCase {
         for (Event event : testEvents) {
             writer.write(event, null);
         }
+        writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
                         .map(MockCommitRequestImpl::new)
