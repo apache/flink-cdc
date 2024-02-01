@@ -30,6 +30,7 @@ import com.github.shyiko.mysql.binlog.network.DefaultSSLSocketFactory;
 import com.github.shyiko.mysql.binlog.network.SSLMode;
 import com.github.shyiko.mysql.binlog.network.SSLSocketFactory;
 import com.github.shyiko.mysql.binlog.network.ServerException;
+import com.ververica.cdc.connectors.mysql.source.utils.SlackWebhookUtils;
 import io.debezium.DebeziumException;
 import io.debezium.annotation.SingleThreadAccess;
 import io.debezium.config.CommonConnectorConfig.EventProcessingFailureHandlingMode;
@@ -123,6 +124,9 @@ public class MySqlStreamingChangeEventSource
     private final MySqlConnection connection;
     private final EventDispatcher<MySqlPartition, TableId> eventDispatcher;
     private final ErrorHandler errorHandler;
+    private boolean doesDdlPassed = false; // louis
+    private boolean isFirstDmlAfterDdl = true; // louis
+    private boolean isFirstDdlAfterDdl = true; // louis
 
     @SingleThreadAccess("binlog client thread")
     private Instant eventTimestamp;
@@ -598,6 +602,9 @@ public class MySqlStreamingChangeEventSource
         LOGGER.debug("Received query command: {}", event);
         String sql = command.getSql().trim();
         if (sql.equalsIgnoreCase("BEGIN")) {
+            if (doesDdlPassed) {
+                return;
+            }
             // We are starting a new transaction ...
             offsetContext.startNextTransaction();
             eventDispatcher.dispatchTransactionStartedEvent(
@@ -639,6 +646,9 @@ public class MySqlStreamingChangeEventSource
             return;
         }
         if (sql.equalsIgnoreCase("ROLLBACK")) {
+            if (doesDdlPassed) {
+                return;
+            }
             // We have hit a ROLLBACK which is not supported
             LOGGER.warn(
                     "Rollback statements cannot be handled without binlog buffering, the connector will fail. Please check '{}' to see how to enable buffering",
@@ -664,6 +674,55 @@ public class MySqlStreamingChangeEventSource
                         schemaChangeEvent.getTables().isEmpty()
                                 ? null
                                 : schemaChangeEvent.getTables().iterator().next().id();
+
+                // Filter table id in DDL is not in tableIncludeList
+                if (tableId != null) { // filter table id == null
+                    LOGGER.info("table include list: {}", connectorConfig.tableIncludeList());
+                    LOGGER.info("table id in event: {}", tableId);
+                    if (connectorConfig.tableIncludeList().trim().equals(tableId.toString())) {
+                        if (doesDdlPassed) {
+                            if (isFirstDdlAfterDdl) {
+                                LOGGER.info(
+                                        "Second Skipped DDL (after first DDL) "
+                                                + "\n Host: {}"
+                                                + "\n DB & Table: {}"
+                                                + "\n GTIDs: {}"
+                                                + "\n Query: {}",
+                                        connectorConfig.getJdbcConfig().getHostname(),
+                                        connectorConfig.tableIncludeList(),
+                                        offsetContext.gtidSet(),
+                                        sql);
+                                SlackWebhookUtils.notifyDDL(
+                                        "SECOND SKIPPED DDL",
+                                        connectorConfig.getJdbcConfig().getHostname(),
+                                        connectorConfig.tableIncludeList(),
+                                        offsetContext.gtidSet(),
+                                        sql);
+                                isFirstDdlAfterDdl = false;
+                            }
+                            return;
+                        } else {
+                            doesDdlPassed = true;
+                            LOGGER.info(
+                                    "DDL Executed."
+                                            + "\n Host: {}"
+                                            + "\n DB & Table: {}"
+                                            + "\n GTIDs: {}"
+                                            + "\n Query: {}",
+                                    connectorConfig.getJdbcConfig().getHostname(),
+                                    connectorConfig.tableIncludeList(),
+                                    offsetContext.gtidSet(),
+                                    sql);
+                            SlackWebhookUtils.notifyDDL(
+                                    "SKIPPED DDL",
+                                    connectorConfig.getJdbcConfig().getHostname(),
+                                    connectorConfig.tableIncludeList(),
+                                    offsetContext.gtidSet(),
+                                    sql);
+                        }
+                    }
+                }
+
                 eventDispatcher.dispatchSchemaChangeEvent(
                         partition,
                         tableId,
@@ -935,6 +994,47 @@ public class MySqlStreamingChangeEventSource
         final TableId tableId = tableIdProvider.getTableId(data);
         final List<U> rows = rowsProvider.getRows(data);
         String changeType = operation.name();
+
+        // louis. Check whether tableId of event is in tableIncludeList.
+        if (tableId != null) {
+            if (connectorConfig.tableIncludeList().trim().equals(tableId.toString())) {
+                if (doesDdlPassed) {
+                    if (isFirstDmlAfterDdl) {
+                        LOGGER.info(
+                                "First Skipped DML After DDL"
+                                        + "\n DML metadata "
+                                        + "\n Host: {}"
+                                        + "\n DB & Table: {}"
+                                        + "\n GTIDs: {}"
+                                        + "\n Event: {}",
+                                connectorConfig.getJdbcConfig().getHostname(),
+                                connectorConfig.tableIncludeList(),
+                                offsetContext.gtidSet(),
+                                event);
+                        SlackWebhookUtils.notifyFirstDMLAfterDDL(
+                                "FIRST SKIPPED DML",
+                                connectorConfig.getJdbcConfig().getHostname(),
+                                connectorConfig.tableIncludeList(),
+                                offsetContext.gtidSet(),
+                                event.toString());
+
+                        isFirstDmlAfterDdl = false;
+                    } else {
+                        LOGGER.debug(
+                                "DML metadata "
+                                        + "\n Host: {}"
+                                        + "\n DB & Table: {}"
+                                        + "\n GTIDs: {}"
+                                        + "\n Event: {}",
+                                connectorConfig.getJdbcConfig().getHostname(),
+                                connectorConfig.tableIncludeList(),
+                                offsetContext.gtidSet(),
+                                event);
+                    }
+                    return;
+                }
+            }
+        }
 
         if (tableId != null && taskContext.getSchema().schemaFor(tableId) != null) {
             int count = 0;
