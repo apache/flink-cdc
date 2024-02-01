@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 /** Send notification to slack. */
 public class SlackWebhookUtils {
@@ -67,6 +68,56 @@ public class SlackWebhookUtils {
                     String.format(
                             "{\"text\":\"[%s]\\nDatabase: %s\\nTable: %s%s\"}",
                             header, database, table, gtidsInfo);
+            sendPayload(conn, payload);
+        } catch (Exception e) {
+            LOG.info("Fail to Send Notification to Slack");
+            LOG.info(e.getMessage());
+        }
+    }
+
+    public static void notifyDDL(String header, String host, String dbTable, String gtid, String sql) {
+
+        try {
+            HttpURLConnection conn = createConnection("slack-hook-url");
+
+            String hostWithoutNewlines = removeNewlines(host);
+            String dbTableWithoutNewlines = removeNewlines(dbTable);
+            String gtidWithoutNewlines = removeNewlines(gtid);
+            String sqlWithoutNewlines = removeNewlines(sql);
+
+            String payload =
+                    String.format(
+                            "{\"text\":\"[%s]\\nHost: %s\\nDB & Table: %s\\nGTIDs: %s\\nQuery: %s\"}",
+                            header,
+                            hostWithoutNewlines,
+                            dbTableWithoutNewlines,
+                            gtidWithoutNewlines,
+                            sqlWithoutNewlines);
+            sendPayload(conn, payload);
+        } catch (Exception e) {
+            LOG.info("Fail to Send Notification to Slack");
+            LOG.info(e.getMessage());
+        }
+    }
+
+    public static void notifyFirstDMLAfterDDL(String header, String host, String dbTable, String gtid, String event) {
+
+        try {
+            HttpURLConnection conn = createConnection("slack-hook-url");
+
+            String hostWithoutNewlines = removeNewlines(host);
+            String dbTableWithoutNewlines = removeNewlines(dbTable);
+            String gtidWithoutNewlines = removeNewlines(gtid);
+            String eventWithoutNewlines = removeNewlines(event);
+
+            String payload =
+                    String.format(
+                            "{\"text\":\"[%s]\\nHost: %s\\nDB & Table: %s\\nGTIDs: %s\\nEvent: %s\"}",
+                            header,
+                            hostWithoutNewlines,
+                            dbTableWithoutNewlines,
+                            gtidWithoutNewlines,
+                            eventWithoutNewlines);
             sendPayload(conn, payload);
         } catch (Exception e) {
             LOG.info("Fail to Send Notification to Slack");
