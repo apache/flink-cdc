@@ -21,22 +21,23 @@ import org.apache.flink.table.api.ValidationException;
 
 import com.ververica.cdc.connectors.oracle.util.OracleJdbcUrlUtils;
 import com.ververica.cdc.debezium.Validator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 /** Validates the version of the database connecting to. */
 public class OracleValidator implements Validator {
 
-    private static final Logger LOG = LoggerFactory.getLogger(OracleValidator.class);
     private static final long serialVersionUID = 1L;
 
     private final Properties properties;
+
+    private static final List<Integer> SUPPORT_VERSIONS = Arrays.asList(11, 12, 19, 21);
 
     public OracleValidator(Properties properties) {
         this.properties = properties;
@@ -46,13 +47,12 @@ public class OracleValidator implements Validator {
     public void validate() {
         try (Connection connection = openConnection(properties)) {
             DatabaseMetaData metaData = connection.getMetaData();
-            if (metaData.getDatabaseMajorVersion() != 19
-                    && metaData.getDatabaseMajorVersion() != 12
-                    && metaData.getDatabaseMajorVersion() != 11) {
+            if (!SUPPORT_VERSIONS.contains(metaData.getDatabaseMajorVersion())) {
                 throw new ValidationException(
                         String.format(
                                 "Currently Flink Oracle CDC connector only supports Oracle "
-                                        + "whose version is either 11, 12 or 19, but actual is %d.%d.",
+                                        + "whose version is either %s but actual is %d.%d.",
+                                SUPPORT_VERSIONS,
                                 metaData.getDatabaseMajorVersion(),
                                 metaData.getDatabaseMinorVersion()));
             }
