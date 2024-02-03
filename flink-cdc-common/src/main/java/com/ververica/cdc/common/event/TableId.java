@@ -84,6 +84,17 @@ public class TableId implements Serializable {
         throw new IllegalArgumentException("Invalid tableId: " + tableId);
     }
 
+    public static TableId parse(String namespace, String schemaName, String tableName) {
+        if (namespace != null) {
+            return tableId(namespace, schemaName, tableName);
+        } else if (schemaName != null) {
+            return tableId(schemaName, tableName);
+        } else if (tableName != null) {
+            return tableId(tableName);
+        }
+        throw new IllegalArgumentException("Invalid tableName: " + tableName);
+    }
+
     public String identifier() {
         if (namespace == null || namespace.isEmpty()) {
             if (schemaName == null || schemaName.isEmpty()) {

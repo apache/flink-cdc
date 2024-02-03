@@ -35,7 +35,9 @@ public class RouteTranslator {
         RouteFunction.Builder routeFunctionBuilder = RouteFunction.newBuilder();
         for (RouteDef route : routes) {
             routeFunctionBuilder.addRoute(
-                    route.getSourceTable(), TableId.parse(route.getSinkTable()));
+                    route.getSourceTable(),
+                    route.getReplaceSymbol(),
+                    TableId.parse(route.getSinkTable()));
         }
         return input.map(routeFunctionBuilder.build(), new EventTypeInfo()).name("Route");
     }

@@ -51,6 +51,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     // Route keys
     private static final String ROUTE_SOURCE_TABLE_KEY = "source-table";
     private static final String ROUTE_SINK_TABLE_KEY = "sink-table";
+    private static final String ROUTE_REPLACE_SYMBOL = "replace-symbol";
     private static final String ROUTE_DESCRIPTION_KEY = "description";
 
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
@@ -140,11 +141,15 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 "Missing required field \"%s\" in route configuration",
                                 ROUTE_SINK_TABLE_KEY)
                         .asText();
+        String replaceSymbol =
+                Optional.ofNullable(routeNode.get(ROUTE_REPLACE_SYMBOL))
+                        .map(JsonNode::asText)
+                        .orElse(null);
         String description =
                 Optional.ofNullable(routeNode.get(ROUTE_DESCRIPTION_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
-        return new RouteDef(sourceTable, sinkTable, description);
+        return new RouteDef(sourceTable, sinkTable, replaceSymbol, description);
     }
 
     private Configuration toPipelineConfig(JsonNode pipelineConfigNode) {

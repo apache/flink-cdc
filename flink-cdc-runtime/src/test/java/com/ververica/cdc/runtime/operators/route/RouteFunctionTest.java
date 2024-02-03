@@ -191,4 +191,49 @@ class RouteFunctionTest {
                 .containsTypeMapping(typeMapping)
                 .hasTableId(NEW_CUSTOMERS);
     }
+
+    @Test
+    void testSchemaChangeRouting() throws Exception {
+        String DEFAULT_TABLE_NAME_REPLACE_SYMBOL = "<>";
+        // The test only modified schema and the table name remains unchanged
+        TableId route =
+                TableId.tableId(
+                        "my_new_company", "my_new_branch", DEFAULT_TABLE_NAME_REPLACE_SYMBOL);
+        TableId target = TableId.tableId("my_new_company", "my_new_branch", "customers");
+        RouteFunction router =
+                RouteFunction.newBuilder()
+                        .addRoute(
+                                "my_company.my_branch.\\.*",
+                                DEFAULT_TABLE_NAME_REPLACE_SYMBOL,
+                                route)
+                        .build();
+        router.open(new Configuration());
+        // CreateTableEvent
+        CreateTableEvent createTableEvent = new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA);
+        assertThat(router.map(createTableEvent)).asSchemaChangeEvent().hasTableId(target);
+    }
+
+    @Test
+    void testTableNameChangeRouting() throws Exception {
+        String DEFAULT_TABLE_NAME_REPLACE_SYMBOL = "<>";
+        // The test only modified schema and the table name remains unchanged
+        TableId route =
+                TableId.tableId(
+                        "my_new_company",
+                        "my_new_branch",
+                        "db_target_" + DEFAULT_TABLE_NAME_REPLACE_SYMBOL + "_1");
+        TableId target =
+                TableId.tableId("my_new_company", "my_new_branch", "db_target_customers_1");
+        RouteFunction router =
+                RouteFunction.newBuilder()
+                        .addRoute(
+                                "my_company.my_branch.\\.*",
+                                DEFAULT_TABLE_NAME_REPLACE_SYMBOL,
+                                route)
+                        .build();
+        router.open(new Configuration());
+        // CreateTableEvent
+        CreateTableEvent createTableEvent = new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA);
+        assertThat(router.map(createTableEvent)).asSchemaChangeEvent().hasTableId(target);
+    }
 }

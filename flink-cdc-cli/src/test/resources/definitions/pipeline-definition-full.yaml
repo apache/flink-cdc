@@ -36,6 +36,13 @@ route:
   - source-table: mydb.default.web_order
     sink-table: odsdb.default.ods_web_order
     description: sync table to with given prefix ods_
+  - source-table: mydb.sharding.sharding_order
+    sink-table: odsdb.default.<>
+    description: sync table to different schema with original table name
+  - source-table: mydb.sharding.busi_cust_info
+    sink-table: odsdb.default.dim_c<>
+    replace-symbol: c<>
+    description: sync table to different schema with customized replace symbol
 
 transform:
   - source-table: mydb.app_order_.*
