@@ -31,7 +31,6 @@ import io.debezium.connector.oracle.OracleStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.logminer.LogMinerStreamingChangeEventSource;
 import io.debezium.connector.oracle.logminer.processor.LogMinerEventProcessor;
 import io.debezium.pipeline.ErrorHandler;
-import io.debezium.pipeline.source.spi.ChangeEventSource;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,8 +60,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getSourceConfig().getOriginDbzConnectorConfig(),
                         sourceFetchContext.getStreamingChangeEventSourceMetrics(),
                         split);
-        RedoLogSplitChangeEventSourceContext changeEventSourceContext =
-                new RedoLogSplitChangeEventSourceContext();
+        StoppableChangeEventSourceContext changeEventSourceContext =
+                new StoppableChangeEventSourceContext();
         redoLogSplitReadTask.execute(
                 changeEventSourceContext,
                 sourceFetchContext.getPartition(),
@@ -158,18 +157,6 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                     metrics,
                     errorHandler,
                     redoLogSplit);
-        }
-    }
-
-    /**
-     * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for redo log split
-     * task.
-     */
-    private class RedoLogSplitChangeEventSourceContext
-            implements ChangeEventSource.ChangeEventSourceContext {
-        @Override
-        public boolean isRunning() {
-            return taskRunning;
         }
     }
 }
