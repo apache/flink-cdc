@@ -148,8 +148,11 @@ public class EventProcessorFactory {
         @Override
         protected void processRow(OraclePartition partition, LogMinerEventRow row)
                 throws SQLException, InterruptedException {
+            if (reachEndingOffset(
+                    partition, row, redoLogSplit, errorHandler, dispatcher, context)) {
+                return;
+            }
             super.processRow(partition, row);
-            afterRowProcess(partition, row, redoLogSplit, errorHandler, dispatcher, context);
         }
     }
 
@@ -194,8 +197,11 @@ public class EventProcessorFactory {
         @Override
         protected void processRow(OraclePartition partition, LogMinerEventRow row)
                 throws SQLException, InterruptedException {
+            if (reachEndingOffset(
+                    partition, row, redoLogSplit, errorHandler, dispatcher, context)) {
+                return;
+            }
             super.processRow(partition, row);
-            afterRowProcess(partition, row, redoLogSplit, errorHandler, dispatcher, context);
         }
     }
 
@@ -240,12 +246,15 @@ public class EventProcessorFactory {
         @Override
         protected void processRow(OraclePartition partition, LogMinerEventRow row)
                 throws SQLException, InterruptedException {
+            if (reachEndingOffset(
+                    partition, row, redoLogSplit, errorHandler, dispatcher, context)) {
+                return;
+            }
             super.processRow(partition, row);
-            afterRowProcess(partition, row, redoLogSplit, errorHandler, dispatcher, context);
         }
     }
 
-    public static void afterRowProcess(
+    public static boolean reachEndingOffset(
             OraclePartition partition,
             LogMinerEventRow row,
             StreamSplit redoLogSplit,
@@ -270,10 +279,11 @@ public class EventProcessorFactory {
                             new DebeziumException("Error processing redo log signal event", e));
                 }
                 // tell fetcher the redo log task finished
-                ((OracleScanFetchTask.OracleSnapshotRedoLogSplitChangeEventSourceContext) context)
-                        .finished();
+                ((StoppableChangeEventSourceContext) context).stopChangeEventSource();
+                return true;
             }
         }
+        return false;
     }
 
     private static boolean isBoundedRead(StreamSplit redoLogSplit) {
