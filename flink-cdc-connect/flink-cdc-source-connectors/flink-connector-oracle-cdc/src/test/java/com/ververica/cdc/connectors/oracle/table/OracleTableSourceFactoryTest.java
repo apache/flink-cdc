@@ -442,7 +442,7 @@ public class OracleTableSourceFactoryTest {
         } catch (Throwable t) {
             String msg =
                     "Invalid value for option 'scan.startup.mode'. Supported values are "
-                            + "[initial, latest-offset], "
+                            + "[initial, snapshot, latest-offset], "
                             + "but was: abc";
 
             assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());

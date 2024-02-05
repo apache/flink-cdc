@@ -222,9 +222,17 @@ public class MongoUtils {
         }
 
         if (fullDocPrePostImage) {
-            // require both pre-image and post-image
-            changeStream.fullDocument(FullDocument.REQUIRED);
-            changeStream.fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED);
+            if (StringUtils.isNotEmpty(database) && StringUtils.isNotEmpty(collection)) {
+                // require both pre-image and post-image records
+                changeStream.fullDocument(FullDocument.REQUIRED);
+                changeStream.fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED);
+            } else {
+                // for RegEx limited namespaces, use WHEN_AVAILABLE option
+                // to avoid MongoDB complaining about missing pre- and post-image
+                // coming from irrelevant collections
+                changeStream.fullDocument(FullDocument.WHEN_AVAILABLE);
+                changeStream.fullDocumentBeforeChange(FullDocumentBeforeChange.WHEN_AVAILABLE);
+            }
         } else if (updateLookup) {
             changeStream.fullDocument(FullDocument.UPDATE_LOOKUP);
         }
