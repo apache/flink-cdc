@@ -166,13 +166,14 @@ public class OracleConnectorITCase {
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
+            statement.execute("ALTER TABLE debezium.products ADD volume FLOAT");
             statement.execute(
                     "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
             statement.execute(
-                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)"); // 110
+                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2, 1.2)"); // 110
             statement.execute(
-                    "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
+                    "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18, 2.2)");
             statement.execute(
                     "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
