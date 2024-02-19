@@ -46,6 +46,16 @@ public class CliFrontendOptions {
                     .desc("JARs to be submitted together with the pipeline")
                     .build();
 
+    public static final Option TARGET =
+            Option.builder("t")
+                    .longOpt("target")
+                    .hasArg()
+                    .desc(
+                            "The deployment target for the execution. This can take one of the following values "
+                                    + "local/remote/yarn-session/yarn-application/kubernetes-session/kubernetes"
+                                    + "-application")
+                    .build();
+
     public static final Option USE_MINI_CLUSTER =
             Option.builder()
                     .longOpt("use-mini-cluster")
@@ -90,6 +100,8 @@ public class CliFrontendOptions {
                 .addOption(JAR)
                 .addOption(FLINK_HOME)
                 .addOption(GLOBAL_CONFIG)
+                .addOption(USE_MINI_CLUSTER)
+                .addOption(TARGET)
                 .addOption(USE_MINI_CLUSTER)
                 .addOption(SAVEPOINT_PATH_OPTION)
                 .addOption(SAVEPOINT_CLAIM_MODE)

@@ -54,7 +54,6 @@ import java.util.Set;
 @Internal
 public class FlinkPipelineComposer implements PipelineComposer {
 
-    private final StreamExecutionEnvironment env;
     private final boolean isBlocking;
 
     public static FlinkPipelineComposer ofRemoteCluster(
@@ -77,21 +76,20 @@ public class FlinkPipelineComposer implements PipelineComposer {
                                 e);
                     }
                 });
-        return new FlinkPipelineComposer(env, false);
+        return new FlinkPipelineComposer(false);
     }
 
     public static FlinkPipelineComposer ofMiniCluster() {
-        return new FlinkPipelineComposer(
-                StreamExecutionEnvironment.getExecutionEnvironment(), true);
+        return new FlinkPipelineComposer(true);
     }
 
-    private FlinkPipelineComposer(StreamExecutionEnvironment env, boolean isBlocking) {
-        this.env = env;
+    public FlinkPipelineComposer(boolean isBlocking) {
         this.isBlocking = isBlocking;
     }
 
     @Override
     public PipelineExecution compose(PipelineDef pipelineDef) {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         int parallelism = pipelineDef.getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
 
@@ -126,7 +124,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
 
         // Build DataSink in advance as schema operator requires MetadataApplier
-        DataSink dataSink = createDataSink(pipelineDef.getSink(), pipelineDef.getConfig());
+        DataSink dataSink = createDataSink(env, pipelineDef.getSink(), pipelineDef.getConfig());
 
         stream =
                 schemaOperatorTranslator.translate(
@@ -148,13 +146,14 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 pipelineDef.getSink(), stream, dataSink, schemaOperatorIDGenerator.generate());
 
         // Add framework JARs
-        addFrameworkJars();
+        addFrameworkJars(env);
 
         return new FlinkPipelineExecution(
                 env, pipelineDef.getConfig().get(PipelineOptions.PIPELINE_NAME), isBlocking);
     }
 
-    private DataSink createDataSink(SinkDef sinkDef, Configuration pipelineConfig) {
+    private DataSink createDataSink(
+            StreamExecutionEnvironment env, SinkDef sinkDef, Configuration pipelineConfig) {
         // Search the data sink factory
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier(
@@ -172,7 +171,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         Thread.currentThread().getContextClassLoader()));
     }
 
-    private void addFrameworkJars() {
+    private void addFrameworkJars(StreamExecutionEnvironment env) {
         try {
             Set<URI> frameworkJars = new HashSet<>();
             // Common JAR
