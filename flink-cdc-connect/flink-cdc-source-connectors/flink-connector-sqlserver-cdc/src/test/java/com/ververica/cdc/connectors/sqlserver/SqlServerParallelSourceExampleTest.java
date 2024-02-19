@@ -45,6 +45,7 @@ public class SqlServerParallelSourceExampleTest extends SqlServerSourceTestBase 
                         .password(MSSQL_SERVER_CONTAINER.getPassword())
                         .deserializer(new JsonDebeziumDeserializationSchema())
                         .startupOptions(StartupOptions.initial())
+                        .includeSchemaChanges(true) // output the schema changes as well
                         .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();

@@ -39,7 +39,7 @@ public class SqlServerSchemaChangeEventHandler implements SchemaChangeEventHandl
         Struct sourceInfo = event.getSource();
         String changeLsn = sourceInfo.getString(CHANGE_LSN_KEY);
         String commitLsn = sourceInfo.getString(COMMIT_LSN_KEY);
-        String eventSerialNo = sourceInfo.getString(EVENT_SERIAL_NO_KEY);
+        Long eventSerialNo = sourceInfo.getInt64(EVENT_SERIAL_NO_KEY);
         source.put(CHANGE_LSN_KEY, changeLsn);
         source.put(COMMIT_LSN_KEY, commitLsn);
         source.put(EVENT_SERIAL_NO_KEY, eventSerialNo);
