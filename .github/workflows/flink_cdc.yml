@@ -80,6 +80,7 @@ env:
 
 jobs:
   compile_and_test:
+    # Only run the CI pipeline for the flink-cdc-connectors repository
 #    if: github.repository == 'apache/flink-cdc-connectors'
     runs-on: ubuntu-latest
     strategy:
@@ -117,7 +118,7 @@ jobs:
           submodules: true
 
       - name: Set JDK
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.jdk }}
           distribution: 'temurin'
