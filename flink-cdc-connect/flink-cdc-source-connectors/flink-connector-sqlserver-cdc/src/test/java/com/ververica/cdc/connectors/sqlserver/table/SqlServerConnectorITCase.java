@@ -98,6 +98,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
@@ -146,6 +147,23 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
 
             statement.execute(
                     "INSERT INTO product.dbo.products (name,description,weight) VALUES ('scooter','Big 2-wheel scooter ',5.18);");
+        }
+
+        // test schema change
+        // sqlserver online schema update refer:
+        // https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#online-schema-updates
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("USE inventory;");
+            // modify the schema
+            statement.execute("ALTER TABLE inventory.dbo.products ADD volume FLOAT;");
+            // create the new capture instance
+            statement.execute(
+                    "EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'products', @role_name = NULL, @supports_net_changes = 0, @capture_instance = 'dbo_products_v2';");
+
+            statement.execute(
+                    "INSERT INTO inventory.dbo.products (name,description,weight,volume) VALUES ('bicycle','short distance travel tools',0.5,1.1);");
+            statement.execute("DELETE FROM inventory.dbo.products WHERE id=112;");
         }
 
         waitForSinkSize("sink", 20);
