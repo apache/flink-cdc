@@ -154,6 +154,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
         // https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#online-schema-updates
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
+
             statement.execute("USE inventory;");
             // modify the schema
             statement.execute("ALTER TABLE inventory.dbo.products ADD volume FLOAT;");
