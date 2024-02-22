@@ -198,7 +198,6 @@ public class MySqlSchemaUtils {
      * @param jdbc
      * @param dbName
      * @return
-     * @throws SQLException
      */
     public static List<TableId> listNoPrimaryKeyTables(JdbcConnection jdbc, String dbName)
             throws SQLException {
