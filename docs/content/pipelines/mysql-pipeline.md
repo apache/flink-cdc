@@ -215,6 +215,13 @@ Pipeline Connector Options
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
     </tr>
+    <tr>
+      <td>ignore.noprimarykey.table</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Whether ignore no primary key table, by default is false. If set to true, will ignore no primary key tables.</td>
+    </tr>
     </tbody>
 </table>
 </div>

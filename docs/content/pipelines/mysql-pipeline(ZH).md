@@ -210,6 +210,13 @@ Pipeline 连接器选项
       <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。<br>
           若 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 默认值变更为 true，可以不用显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = true。</td>
     </tr>
+    <tr>
+      <td>ignore.noprimarykey.table</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>是否忽略没有主键的表，默认是false，如果设置为true，那么就忽略没有主键的表。</td>
+    </tr>
     </tbody>
 </table>
 </div>

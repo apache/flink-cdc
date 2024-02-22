@@ -169,6 +169,64 @@ public class MySqlSchemaUtils {
         return tableIds;
     }
 
+    /**
+     * list all tables without primary key in a database.
+     *
+     * @param sourceConfig
+     * @param dbName
+     * @return
+     */
+    public static List<TableId> listNoPrimaryKeyTables(
+            MySqlSourceConfig sourceConfig, String dbName) {
+        try (MySqlConnection jdbc = createMySqlConnection(sourceConfig)) {
+            List<String> databases =
+                    dbName != null ? Collections.singletonList(dbName) : listDatabases(jdbc);
+
+            List<TableId> tableIds = new ArrayList<>();
+            for (String database : databases) {
+                tableIds.addAll(listNoPrimaryKeyTables(jdbc, database));
+            }
+            return tableIds;
+        } catch (SQLException e) {
+            throw new RuntimeException("Error to list databases: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * list all tables without primary key in a database.
+     *
+     * @param jdbc
+     * @param dbName
+     * @return
+     * @throws SQLException
+     */
+    public static List<TableId> listNoPrimaryKeyTables(JdbcConnection jdbc, String dbName)
+            throws SQLException {
+        final List<TableId> tableIds = new ArrayList<>();
+
+        jdbc.query(
+                "select tab.table_name\n"
+                        + " from information_schema.tables tab\n"
+                        + " left join information_schema.table_constraints tco\n"
+                        + "          on tab.table_schema = tco.table_schema\n"
+                        + "          and tab.table_name = tco.table_name\n"
+                        + "          and tco.constraint_type = 'PRIMARY KEY'\n"
+                        + " where tco.constraint_type is null\n"
+                        + "      and tab.table_type = 'BASE TABLE'\n"
+                        + "      and tab.table_schema = '"
+                        + dbName
+                        + "'",
+                rs -> {
+                    while (rs.next()) {
+                        tableIds.add(TableId.tableId(dbName, rs.getString(1)));
+                    }
+                });
+
+        LOG.info("\t list of tables without primary key are: {}", tableIds);
+
+        return tableIds;
+    }
+
     public static Schema getTableSchema(
             MySqlPartition partition,
             TableId tableId,

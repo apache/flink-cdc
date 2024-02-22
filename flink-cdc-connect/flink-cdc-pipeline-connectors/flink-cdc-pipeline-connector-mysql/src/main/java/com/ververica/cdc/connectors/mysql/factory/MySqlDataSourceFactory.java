@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -216,6 +217,10 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     private static String[] getTableList(
             MySqlSourceConfig sourceConfig, Selectors selectors, boolean ignorePrimaryKeyTable) {
         if (ignorePrimaryKeyTable) {
+            List<TableId> noPrimaryKeyTables =
+                    MySqlSchemaUtils.listNoPrimaryKeyTables(sourceConfig, null);
+            LOG.info("\t List of tables ignored without primary keys are: {}", noPrimaryKeyTables);
+
             return MySqlSchemaUtils.listPrimaryKeyTables(sourceConfig, null).stream()
                     .filter(selectors::isMatch)
                     .map(TableId::toString)
