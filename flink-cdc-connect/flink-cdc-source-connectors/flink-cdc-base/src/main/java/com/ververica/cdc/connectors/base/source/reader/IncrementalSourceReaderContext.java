@@ -23,28 +23,38 @@ import org.apache.flink.api.connector.source.SourceReaderContext;
  * IncrementalSourceReader} and {@link IncrementalSourceSplitReader}.
  */
 public class IncrementalSourceReaderContext {
-
     private final SourceReaderContext sourceReaderContext;
-    private volatile boolean stopStreamSplitReader;
+    private volatile boolean isStreamSplitReaderSuspended;
 
-    public IncrementalSourceReaderContext(final SourceReaderContext sourceReaderContext) {
+    private volatile boolean hasAssignedStreamSplit;
+
+    public IncrementalSourceReaderContext(SourceReaderContext sourceReaderContext) {
         this.sourceReaderContext = sourceReaderContext;
-        this.stopStreamSplitReader = false;
+        this.isStreamSplitReaderSuspended = false;
+        this.hasAssignedStreamSplit = false;
     }
 
     public SourceReaderContext getSourceReaderContext() {
         return sourceReaderContext;
     }
 
-    public boolean needStopStreamSplitReader() {
-        return stopStreamSplitReader;
+    public boolean isStreamSplitReaderSuspended() {
+        return isStreamSplitReaderSuspended;
     }
 
-    public void setStopStreamSplitReader() {
-        this.stopStreamSplitReader = true;
+    public void suspendStreamSplitReader() {
+        this.isStreamSplitReaderSuspended = true;
     }
 
-    public void resetStopStreamSplitReader() {
-        this.stopStreamSplitReader = false;
+    public void wakeupSuspendedStreamSplitReader() {
+        this.isStreamSplitReaderSuspended = false;
+    }
+
+    public boolean isHasAssignedStreamSplit() {
+        return hasAssignedStreamSplit;
+    }
+
+    public void setHasAssignedStreamSplit(boolean hasAssignedStreamSplit) {
+        this.hasAssignedStreamSplit = hasAssignedStreamSplit;
     }
 }

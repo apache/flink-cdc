@@ -34,6 +34,7 @@ import com.ververica.cdc.connectors.sqlserver.source.utils.SqlServerConnectionUt
 import io.debezium.connector.sqlserver.SqlServerConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.sql.SQLException;
@@ -50,6 +51,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
 
     private static final long serialVersionUID = 1L;
     private final SqlServerSourceConfig sourceConfig;
+    private transient Tables.TableFilter filters;
     private transient SqlServerSchema sqlserverSchema;
 
     public SqlServerDialect(SqlServerSourceConfig sourceConfig) {
@@ -96,7 +98,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
         try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
             return SqlServerConnectionUtils.listTables(
                     jdbcConnection,
-                    sqlserverSourceConfig.getDbzConnectorConfig().getTableFilters(),
+                    sqlserverSourceConfig.getTableFilters(),
                     sqlserverSourceConfig.getDatabaseList());
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Error to discover tables: " + e.getMessage(), e);
@@ -135,7 +137,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
 
     @Override
     public SqlServerSourceFetchTaskContext createFetchTaskContext(
-            SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
+            JdbcSourceConfig taskSourceConfig) {
         final SqlServerConnection jdbcConnection =
                 createSqlServerConnection(sourceConfig.getDbzConnectorConfig());
         final SqlServerConnection metaDataConnection =
@@ -151,5 +153,14 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
         } else {
             return new SqlServerStreamFetchTask(sourceSplitBase.asStreamSplit());
         }
+    }
+
+    @Override
+    public boolean isIncludeDataCollection(JdbcSourceConfig sourceConfig, TableId tableId) {
+        if (filters == null) {
+            this.filters = sourceConfig.getTableFilters().dataCollectionFilter();
+        }
+
+        return filters.isIncluded(tableId);
     }
 }

@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.mongodb.internal.MongoDBEnvelope.ID_FIELD;
@@ -63,6 +64,7 @@ public class MongoDBDialect implements DataSourceDialect<MongoDBSourceConfig> {
 
     private final Map<MongoDBSourceConfig, CollectionDiscoveryInfo> cache =
             new ConcurrentHashMap<>();
+    private transient Predicate<String> collectionsFilter;
 
     @Override
     public String getName() {
@@ -180,8 +182,7 @@ public class MongoDBDialect implements DataSourceDialect<MongoDBSourceConfig> {
     }
 
     @Override
-    public MongoDBFetchTaskContext createFetchTaskContext(
-            SourceSplitBase sourceSplitBase, MongoDBSourceConfig sourceConfig) {
+    public MongoDBFetchTaskContext createFetchTaskContext(MongoDBSourceConfig sourceConfig) {
         CollectionDiscoveryInfo discoveryInfo = discoverAndCacheDataCollections(sourceConfig);
         ChangeStreamDescriptor changeStreamDescriptor =
                 getChangeStreamDescriptor(
@@ -189,5 +190,13 @@ public class MongoDBDialect implements DataSourceDialect<MongoDBSourceConfig> {
                         discoveryInfo.getDiscoveredDatabases(),
                         discoveryInfo.getDiscoveredCollections());
         return new MongoDBFetchTaskContext(this, sourceConfig, changeStreamDescriptor);
+    }
+
+    @Override
+    public boolean isIncludeDataCollection(MongoDBSourceConfig sourceConfig, TableId tableId) {
+        if (collectionsFilter == null) {
+            collectionsFilter = collectionsFilter(sourceConfig.getCollectionList());
+        }
+        return collectionsFilter.test(tableId.catalog() + "." + tableId.table());
     }
 }

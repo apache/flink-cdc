@@ -27,17 +27,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /** The split to describe the change log of database table(s). */
 public class StreamSplit extends SourceSplitBase {
+    public static final String STREAM_SPLIT_ID = "stream-split";
 
     private final Offset startingOffset;
     private final Offset endingOffset;
     private final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos;
     private final Map<TableId, TableChange> tableSchemas;
     private final int totalFinishedSplitSize;
-    @Nullable transient byte[] serializedFormCache;
+
     private final boolean isSuspended;
+    @Nullable transient byte[] serializedFormCache;
 
     public StreamSplit(
             String splitId,
@@ -93,12 +97,12 @@ public class StreamSplit extends SourceSplitBase {
         return totalFinishedSplitSize;
     }
 
-    public boolean isSuspended() {
-        return isSuspended;
-    }
-
     public boolean isCompletedSplit() {
         return totalFinishedSplitSize == finishedSnapshotSplitInfos.size();
+    }
+
+    public boolean isSuspended() {
+        return isSuspended;
     }
 
     @Override
@@ -113,8 +117,8 @@ public class StreamSplit extends SourceSplitBase {
             return false;
         }
         StreamSplit that = (StreamSplit) o;
-        return totalFinishedSplitSize == that.totalFinishedSplitSize
-                && Objects.equals(isSuspended, that.isSuspended)
+        return isSuspended == that.isSuspended
+                && totalFinishedSplitSize == that.totalFinishedSplitSize
                 && Objects.equals(startingOffset, that.startingOffset)
                 && Objects.equals(endingOffset, that.endingOffset)
                 && Objects.equals(finishedSnapshotSplitInfos, that.finishedSnapshotSplitInfos)
@@ -161,6 +165,41 @@ public class StreamSplit extends SourceSplitBase {
                 splitInfos,
                 streamSplit.getTableSchemas(),
                 streamSplit.getTotalFinishedSplitSize(),
+                streamSplit.isSuspended);
+    }
+
+    /**
+     * Filter out the outdated finished splits in {@link StreamSplit}.
+     *
+     * <p>When restore from a checkpoint, the finished split infos may contain some splits from the
+     * deleted tables. We need to remove these splits from the total finished split infos and update
+     * the size.
+     */
+    public static StreamSplit filterOutdatedSplitInfos(
+            StreamSplit streamSplit, Predicate<TableId> currentTableFilter) {
+        List<FinishedSnapshotSplitInfo> allFinishedSnapshotSplitInfos =
+                streamSplit.getFinishedSnapshotSplitInfos().stream()
+                        .filter(i -> currentTableFilter.test(i.getTableId()))
+                        .collect(Collectors.toList());
+        Map<TableId, TableChange> previousTableSchemas = streamSplit.getTableSchemas();
+        Map<TableId, TableChange> newTableSchemas = new HashMap<>();
+        previousTableSchemas.keySet().stream()
+                .forEach(
+                        (tableId -> {
+                            if (currentTableFilter.test(tableId)) {
+                                newTableSchemas.put(tableId, previousTableSchemas.get(tableId));
+                            }
+                        }));
+
+        return new StreamSplit(
+                streamSplit.splitId,
+                streamSplit.getStartingOffset(),
+                streamSplit.getEndingOffset(),
+                allFinishedSnapshotSplitInfos,
+                newTableSchemas,
+                streamSplit.getTotalFinishedSplitSize()
+                        - (streamSplit.getFinishedSnapshotSplitInfos().size()
+                                - allFinishedSnapshotSplitInfos.size()),
                 streamSplit.isSuspended());
     }
 
@@ -174,7 +213,7 @@ public class StreamSplit extends SourceSplitBase {
                 streamSplit.getFinishedSnapshotSplitInfos(),
                 tableSchemas,
                 streamSplit.getTotalFinishedSplitSize(),
-                streamSplit.isSuspended());
+                streamSplit.isSuspended);
     }
 
     public static StreamSplit toNormalStreamSplit(
@@ -194,9 +233,43 @@ public class StreamSplit extends SourceSplitBase {
                 normalStreamSplit.splitId,
                 normalStreamSplit.getStartingOffset(),
                 normalStreamSplit.getEndingOffset(),
-                new ArrayList<>(),
-                new HashMap<>(),
+                forwardHighWatermarkToStartingOffset(
+                        normalStreamSplit.getFinishedSnapshotSplitInfos(),
+                        normalStreamSplit.getStartingOffset()),
+                normalStreamSplit.getTableSchemas(),
                 normalStreamSplit.getTotalFinishedSplitSize(),
                 true);
+    }
+
+    /**
+     * Forwards {@link FinishedSnapshotSplitInfo#getHighWatermark()} to current change log reading
+     * offset for these snapshot-splits have started the change log reading, this is pretty useful
+     * for newly added table process that we can continue to consume change log for these splits
+     * from the updated high watermark.
+     *
+     * @param existedSplitInfos
+     * @param currentReadingOffset
+     */
+    private static List<FinishedSnapshotSplitInfo> forwardHighWatermarkToStartingOffset(
+            List<FinishedSnapshotSplitInfo> existedSplitInfos, Offset currentReadingOffset) {
+        List<FinishedSnapshotSplitInfo> updatedSnapshotSplitInfos = new ArrayList<>();
+        for (FinishedSnapshotSplitInfo existedSplitInfo : existedSplitInfos) {
+            // for split has started read stream, forward its high watermark to current stream
+            // reading offset
+            if (existedSplitInfo.getHighWatermark().isBefore(currentReadingOffset)) {
+                FinishedSnapshotSplitInfo forwardHighWatermarkSnapshotSplitInfo =
+                        new FinishedSnapshotSplitInfo(
+                                existedSplitInfo.getTableId(),
+                                existedSplitInfo.getSplitId(),
+                                existedSplitInfo.getSplitStart(),
+                                existedSplitInfo.getSplitEnd(),
+                                currentReadingOffset,
+                                existedSplitInfo.getOffsetFactory());
+                updatedSnapshotSplitInfos.add(forwardHighWatermarkSnapshotSplitInfo);
+            } else {
+                updatedSnapshotSplitInfos.add(existedSplitInfo);
+            }
+        }
+        return updatedSnapshotSplitInfos;
     }
 }

@@ -18,16 +18,15 @@ package com.ververica.cdc.connectors.base.source.meta.events;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 
-import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
-import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
-
 /**
- * The {@link SourceEvent} that {@link IncrementalSourceReader} sends to {@link
- * IncrementalSourceEnumerator} to notify the binlog split reader has been suspended.
+ * The {@link SourceEvent} that {@link
+ * com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader} sends to {@link
+ * com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator} to notify the
+ * {@link com.ververica.cdc.connectors.base.source.meta.split.StreamSplit} assigned to itself.
  */
-public class SuspendStreamReaderAckEvent implements SourceEvent {
+public class StreamSplitAssignedEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
-    public SuspendStreamReaderAckEvent() {}
+    public StreamSplitAssignedEvent() {}
 }
