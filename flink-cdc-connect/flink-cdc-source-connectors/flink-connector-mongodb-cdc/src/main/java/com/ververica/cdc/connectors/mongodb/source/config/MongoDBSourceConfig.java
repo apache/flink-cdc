@@ -54,6 +54,8 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final boolean disableCursorTimeout;
     private final boolean skipSnapshotBackfill;
 
+    private final boolean isScanNewlyAddedTableEnabled;
+
     MongoDBSourceConfig(
             String scheme,
             String hosts,
@@ -74,7 +76,8 @@ public class MongoDBSourceConfig implements SourceConfig {
             boolean closeIdleReaders,
             boolean enableFullDocPrePostImage,
             boolean disableCursorTimeout,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            boolean isScanNewlyAddedTableEnabled) {
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
         this.username = username;
@@ -96,6 +99,7 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.enableFullDocPrePostImage = enableFullDocPrePostImage;
         this.disableCursorTimeout = disableCursorTimeout;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
+        this.isScanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
     }
 
     public String getScheme() {
@@ -192,9 +196,8 @@ public class MongoDBSourceConfig implements SourceConfig {
         return skipSnapshotBackfill;
     }
 
-    @Override
     public boolean isScanNewlyAddedTableEnabled() {
-        return false;
+        return isScanNewlyAddedTableEnabled;
     }
 
     @Override
@@ -222,7 +225,9 @@ public class MongoDBSourceConfig implements SourceConfig {
                 && Objects.equals(password, that.password)
                 && Objects.equals(databaseList, that.databaseList)
                 && Objects.equals(collectionList, that.collectionList)
-                && Objects.equals(connectionString, that.connectionString);
+                && Objects.equals(connectionString, that.connectionString)
+                && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
+                && Objects.equals(isScanNewlyAddedTableEnabled, that.isScanNewlyAddedTableEnabled);
     }
 
     @Override
@@ -244,6 +249,8 @@ public class MongoDBSourceConfig implements SourceConfig {
                 splitMetaGroupSize,
                 splitSizeMB,
                 samplesPerChunk,
-                closeIdleReaders);
+                closeIdleReaders,
+                skipSnapshotBackfill,
+                isScanNewlyAddedTableEnabled);
     }
 }

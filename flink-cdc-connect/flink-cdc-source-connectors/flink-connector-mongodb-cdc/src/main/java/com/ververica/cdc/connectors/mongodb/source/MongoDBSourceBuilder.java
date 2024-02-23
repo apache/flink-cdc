@@ -259,6 +259,16 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
+     * Whether the {@link
+     * com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator} should scan
+     * the newly added tables or not.
+     */
+    public MongoDBSourceBuilder<T> scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
+        this.configFactory.scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
+        return this;
+    }
+
+    /**
      * Build the {@link MongoDBSource}.
      *
      * @return a MongoDBParallelSource with the settings made for this builder.
