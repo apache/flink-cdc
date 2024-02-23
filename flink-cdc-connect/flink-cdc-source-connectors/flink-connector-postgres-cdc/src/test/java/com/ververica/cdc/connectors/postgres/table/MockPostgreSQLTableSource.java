@@ -63,7 +63,8 @@ public class MockPostgreSQLTableSource extends PostgreSQLTableSource {
                 (StartupOptions) get(postgreSQLTableSource, "startupOptions"),
                 (String) get(postgreSQLTableSource, "chunkKeyColumn"),
                 (boolean) get(postgreSQLTableSource, "closeIdleReaders"),
-                (boolean) get(postgreSQLTableSource, "skipSnapshotBackfill"));
+                (boolean) get(postgreSQLTableSource, "skipSnapshotBackfill"),
+                (boolean) get(postgreSQLTableSource, "scanNewlyAddedTableEnabled"));
     }
 
     @Override

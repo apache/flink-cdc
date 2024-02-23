@@ -11,7 +11,7 @@
 -- specific language governing permissions and limitations
 -- under the License.
 
--- Create the schema that we'll use to populate data and watch the effect in the binlog
+-- Create the schema that we'll use to populate data and watch the effect in the wal log
 DROP SCHEMA IF EXISTS inventory CASCADE;
 CREATE SCHEMA inventory;
 SET search_path TO inventory;
