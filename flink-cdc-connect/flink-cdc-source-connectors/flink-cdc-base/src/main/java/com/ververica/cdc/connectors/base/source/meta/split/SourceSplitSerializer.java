@@ -40,11 +40,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** A serializer for the {@link SourceSplitBase}. */
+/**
+ * A serializer for the {@link SourceSplitBase}.
+ *
+ * <p>The modification of 5th version: add isSuspended(boolean) to StreamSplit, which means whether
+ * stream split read is suspended.
+ */
 public abstract class SourceSplitSerializer
         implements SimpleVersionedSerializer<SourceSplitBase>, OffsetDeserializerSerializer {
 
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -102,6 +107,7 @@ public abstract class SourceSplitSerializer
             writeFinishedSplitsInfo(streamSplit.getFinishedSnapshotSplitInfos(), out);
             writeTableSchemas(streamSplit.getTableSchemas(), out);
             out.writeInt(streamSplit.getTotalFinishedSplitSize());
+            out.writeBoolean(streamSplit.isSuspended());
             final byte[] result = out.getCopyOfBuffer();
             out.clear();
             // optimization: cache the serialized from, so we avoid the byte work during repeated
@@ -118,6 +124,7 @@ public abstract class SourceSplitSerializer
             case 2:
             case 3:
             case 4:
+            case 5:
                 return deserializeSplit(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -162,6 +169,11 @@ public abstract class SourceSplitSerializer
             if (version >= 3) {
                 totalFinishedSplitSize = in.readInt();
             }
+
+            boolean isSuspended = false;
+            if (version == 5) {
+                isSuspended = in.readBoolean();
+            }
             in.releaseArrays();
             return new StreamSplit(
                     splitId,
@@ -169,7 +181,8 @@ public abstract class SourceSplitSerializer
                     endingOffset,
                     finishedSplitsInfo,
                     tableChangeMap,
-                    totalFinishedSplitSize);
+                    totalFinishedSplitSize,
+                    isSuspended);
         } else {
             throw new IOException("Unknown split kind: " + splitKind);
         }
@@ -210,6 +223,7 @@ public abstract class SourceSplitSerializer
                 case 2:
                 case 3:
                 case 4:
+                case 5:
                     final int len = in.readInt();
                     final byte[] bytes = new byte[len];
                     in.read(bytes);

@@ -40,7 +40,7 @@ public final class StartupOptions implements Serializable {
 
     /**
      * Performs an initial snapshot on the monitored database tables upon first startup, and not
-     * read the binlog anymore .
+     * read the change log anymore .
      */
     public static StartupOptions snapshot() {
         return new StartupOptions(StartupMode.SNAPSHOT, null, null, null);

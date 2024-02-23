@@ -38,6 +38,7 @@ import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 
@@ -59,10 +60,12 @@ public class MySqlDialect implements JdbcDataSourceDialect {
 
     private static final long serialVersionUID = 1L;
     private final MySqlSourceConfig sourceConfig;
+    private transient Tables.TableFilter filters;
     private transient MySqlSchema mySqlSchema;
 
     public MySqlDialect(MySqlSourceConfig sourceConfig) {
         this.sourceConfig = sourceConfig;
+        this.filters = sourceConfig.getTableFilters().dataCollectionFilter();
     }
 
     @Override
@@ -152,8 +155,7 @@ public class MySqlDialect implements JdbcDataSourceDialect {
     }
 
     @Override
-    public MySqlSourceFetchTaskContext createFetchTaskContext(
-            SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
+    public MySqlSourceFetchTaskContext createFetchTaskContext(JdbcSourceConfig taskSourceConfig) {
         final MySqlConnection jdbcConnection =
                 createMySqlConnection(taskSourceConfig.getDbzConfiguration());
         final BinaryLogClient binaryLogClient =
@@ -169,5 +171,14 @@ public class MySqlDialect implements JdbcDataSourceDialect {
         } else {
             return new MySqlStreamFetchTask(sourceSplitBase.asStreamSplit());
         }
+    }
+
+    @Override
+    public boolean isIncludeDataCollection(JdbcSourceConfig sourceConfig, TableId tableId) {
+        if (filters == null) {
+            this.filters = sourceConfig.getTableFilters().dataCollectionFilter();
+        }
+
+        return filters.isIncluded(tableId);
     }
 }

@@ -42,6 +42,7 @@ import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.schema.TopicSelector;
 
@@ -64,6 +65,7 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
     private static final String CONNECTION_NAME = "postgres-cdc-connector";
     private final PostgresSourceConfig sourceConfig;
+    private transient Tables.TableFilter filters;
 
     private transient CustomPostgresSchema schema;
 
@@ -208,8 +210,7 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     }
 
     @Override
-    public JdbcSourceFetchTaskContext createFetchTaskContext(
-            SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
+    public JdbcSourceFetchTaskContext createFetchTaskContext(JdbcSourceConfig taskSourceConfig) {
         return new PostgresSourceFetchTaskContext(taskSourceConfig, this);
     }
 
@@ -218,6 +219,15 @@ public class PostgresDialect implements JdbcDataSourceDialect {
         if (streamFetchTask != null) {
             streamFetchTask.commitCurrentOffset(offset);
         }
+    }
+
+    @Override
+    public boolean isIncludeDataCollection(JdbcSourceConfig sourceConfig, TableId tableId) {
+        if (filters == null) {
+            this.filters = sourceConfig.getTableFilters().dataCollectionFilter();
+        }
+
+        return filters.isIncluded(tableId);
     }
 
     public String getSlotName() {

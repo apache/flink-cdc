@@ -20,7 +20,6 @@ import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
-import io.debezium.relational.RelationalTableFilters;
 
 import java.time.Duration;
 import java.util.List;
@@ -58,7 +57,7 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
-            boolean scanNewlyAddedTableEnabled) {
+            boolean isScanNewlyAddedTableEnabled) {
         super(
                 startupOptions,
                 databaseList,
@@ -84,15 +83,11 @@ public class MySqlSourceConfig extends JdbcSourceConfig {
                 connectionPoolSize,
                 null,
                 true,
-                scanNewlyAddedTableEnabled);
+                isScanNewlyAddedTableEnabled);
     }
 
     @Override
     public MySqlConnectorConfig getDbzConnectorConfig() {
         return new MySqlConnectorConfig(getDbzConfiguration());
-    }
-
-    public RelationalTableFilters getTableFilters() {
-        return getDbzConnectorConfig().getTableFilters();
     }
 }

@@ -296,7 +296,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                 assertTrue(lsn > prevLsn);
                 prevLsn = lsn;
 
-                // execute 2 more DMLs to have more binlog
+                // execute 2 more DMLs to have more wal log
                 statement.execute(
                         "INSERT INTO inventory.products VALUES (1001,'roy','old robot',1234.56)"); // 1001
                 statement.execute("UPDATE inventory.products SET weight=1345.67 WHERE id=1001");
@@ -326,7 +326,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                     };
             runThread3.start();
 
-            // consume the unconsumed binlog
+            // consume the unconsumed wal log
             List<SourceRecord> records = drain(sourceContext3, 2);
             assertInsert(records.get(0), "id", 1001);
             assertUpdate(records.get(1), "id", 1001);

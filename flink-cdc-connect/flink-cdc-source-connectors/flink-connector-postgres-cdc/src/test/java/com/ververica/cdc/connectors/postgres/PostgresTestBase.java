@@ -59,8 +59,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Basic class for testing PostgreSQL source, this contains a PostgreSQL container which enables
- * binlog.
+ * Basic class for testing PostgreSQL source, this contains a PostgreSQL container which enables wal
+ * log.
  */
 public abstract class PostgresTestBase extends AbstractTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(PostgresTestBase.class);

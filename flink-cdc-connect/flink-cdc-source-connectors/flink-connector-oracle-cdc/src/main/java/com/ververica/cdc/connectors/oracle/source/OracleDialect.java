@@ -36,6 +36,7 @@ import com.ververica.cdc.connectors.oracle.source.utils.OracleSchema;
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.sql.SQLException;
@@ -52,6 +53,8 @@ public class OracleDialect implements JdbcDataSourceDialect {
 
     private static final long serialVersionUID = 1L;
     private transient OracleSchema oracleSchema;
+
+    private transient Tables.TableFilter filters;
 
     @Override
     public String getName() {
@@ -131,8 +134,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
     }
 
     @Override
-    public OracleSourceFetchTaskContext createFetchTaskContext(
-            SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig) {
+    public OracleSourceFetchTaskContext createFetchTaskContext(JdbcSourceConfig taskSourceConfig) {
         return new OracleSourceFetchTaskContext(taskSourceConfig, this);
     }
 
@@ -143,5 +145,14 @@ public class OracleDialect implements JdbcDataSourceDialect {
         } else {
             return new OracleStreamFetchTask(sourceSplitBase.asStreamSplit());
         }
+    }
+
+    @Override
+    public boolean isIncludeDataCollection(JdbcSourceConfig sourceConfig, TableId tableId) {
+        if (filters == null) {
+            this.filters = sourceConfig.getTableFilters().dataCollectionFilter();
+        }
+
+        return filters.isIncluded(tableId);
     }
 }

@@ -16,8 +16,6 @@
 
 package com.ververica.cdc.connectors.base.dialect;
 
-import org.apache.flink.api.common.state.CheckpointListener;
-
 import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
@@ -37,8 +35,7 @@ import java.util.Map;
  * @param <C> The source config of data source.
  */
 @Experimental
-public interface DataSourceDialect<C extends SourceConfig>
-        extends Serializable, CheckpointListener {
+public interface DataSourceDialect<C extends SourceConfig> extends Serializable {
 
     /** Get the name of dialect. */
     String getName();
@@ -69,22 +66,14 @@ public interface DataSourceDialect<C extends SourceConfig>
     FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase);
 
     /** The task context used for fetch task to fetch data from external systems. */
-    FetchTask.Context createFetchTaskContext(SourceSplitBase sourceSplitBase, C sourceConfig);
-
-    /**
-     * We have an empty default implementation here because most dialects do not have to implement
-     * the method.
-     *
-     * @see CheckpointListener#notifyCheckpointComplete(long)
-     */
-    @Override
-    default void notifyCheckpointComplete(long checkpointId) throws Exception {}
+    FetchTask.Context createFetchTaskContext(C sourceConfig);
 
     /**
      * We may need the offset corresponding to the checkpointId. For example, we should commit LSN
      * of checkpoint to postgres's slot.
      */
-    default void notifyCheckpointComplete(long checkpointId, Offset offset) throws Exception {
-        notifyCheckpointComplete(checkpointId);
-    }
+    default void notifyCheckpointComplete(long checkpointId, Offset offset) throws Exception {}
+
+    /** Check if the tableId is included in SourceConfig. */
+    boolean isIncludeDataCollection(C sourceConfig, TableId tableId);
 }

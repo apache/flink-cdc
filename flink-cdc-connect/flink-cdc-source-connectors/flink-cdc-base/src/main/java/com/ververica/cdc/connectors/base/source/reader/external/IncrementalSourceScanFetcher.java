@@ -136,7 +136,7 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
 
                     if (highWatermark == null && isHighWatermarkEvent(record)) {
                         highWatermark = record;
-                        // snapshot events capture end and begin to capture binlog events
+                        // snapshot events capture end and begin to capture stream events
                         reachChangeLogStart = true;
                         continue;
                     }

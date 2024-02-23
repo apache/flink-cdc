@@ -80,6 +80,11 @@ public final class ChangeEventRecords implements RecordsWithSplitIds<SourceRecor
         return new ChangeEventRecords(splitId, recordsForSplit, Collections.emptySet());
     }
 
+    public static ChangeEventRecords forSnapshotRecords(
+            final String splitId, final Iterator<SourceRecords> recordsForSplit) {
+        return new ChangeEventRecords(splitId, recordsForSplit, Collections.singleton(splitId));
+    }
+
     public static ChangeEventRecords forFinishedSplit(final String splitId) {
         return new ChangeEventRecords(null, null, Collections.singleton(splitId));
     }

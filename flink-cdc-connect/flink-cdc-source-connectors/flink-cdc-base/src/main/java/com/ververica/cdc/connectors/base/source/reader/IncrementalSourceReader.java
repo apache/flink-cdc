@@ -17,7 +17,6 @@
 package com.ververica.cdc.connectors.base.source.reader;
 
 import org.apache.flink.api.connector.source.SourceEvent;
-import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
@@ -33,8 +32,13 @@ import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsAckEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsReportEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsRequestEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.LatestFinishedSplitsNumberEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.LatestFinishedSplitsNumberRequestEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitAssignedEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitMetaEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitMetaRequestEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitUpdateAckEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitUpdateRequestEvent;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
@@ -53,13 +57,18 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.base.source.meta.split.StreamSplit.STREAM_SPLIT_ID;
+import static com.ververica.cdc.connectors.base.source.meta.split.StreamSplit.filterOutdatedSplitInfos;
+import static com.ververica.cdc.connectors.base.source.meta.split.StreamSplit.toNormalStreamSplit;
+import static com.ververica.cdc.connectors.base.source.meta.split.StreamSplit.toSuspendedStreamSplit;
 import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.Preconditions.checkState;
 
 /**
  * The multi-parallel source reader for table snapshot phase from {@link SnapshotSplit} and then
@@ -72,19 +81,38 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
 
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceReader.class);
 
+    /**
+     * Snapshot spit which is read finished, but not notify and receive ack event from enumerator to
+     * update snapshot splits information (such as high_watermark).
+     */
     private final Map<String, SnapshotSplit> finishedUnackedSplits;
-    private final Map<String, StreamSplit> uncompletedStreamSplits;
+
+    /**
+     * Stream split which lack and wait for snapshot splits information from enumerator, will
+     * addSplit and add back to split reader if snapshot split information is enough.
+     */
+    protected final Map<String, StreamSplit> uncompletedStreamSplits;
+
+    /**
+     * Steam split which is suspended reading in split reader and wait for
+     * LatestFinishedSplitsNumberEvent from enumerator, will addSpilt and become
+     * uncompletedStreamSplits later.
+     */
+    protected volatile StreamSplit suspendedStreamSplit;
+
     private final int subtaskId;
     private final SourceSplitSerializer sourceSplitSerializer;
-    private final C sourceConfig;
+    protected final C sourceConfig;
     protected final DataSourceDialect<C> dialect;
+
+    private final IncrementalSourceReaderContext incrementalSourceReaderContext;
 
     public IncrementalSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
             Supplier<IncrementalSourceSplitReader<C>> splitReaderSupplier,
             RecordEmitter<SourceRecords, T, SourceSplitState> recordEmitter,
             Configuration config,
-            SourceReaderContext context,
+            IncrementalSourceReaderContext incrementalSourceReaderContext,
             C sourceConfig,
             SourceSplitSerializer sourceSplitSerializer,
             DataSourceDialect<C> dialect) {
@@ -93,18 +121,20 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                 new SingleThreadFetcherManager<>(elementQueue, splitReaderSupplier::get),
                 recordEmitter,
                 config,
-                context);
+                incrementalSourceReaderContext.getSourceReaderContext());
         this.sourceConfig = sourceConfig;
         this.finishedUnackedSplits = new HashMap<>();
         this.uncompletedStreamSplits = new HashMap<>();
         this.subtaskId = context.getIndexOfSubtask();
         this.sourceSplitSerializer = checkNotNull(sourceSplitSerializer);
         this.dialect = dialect;
+        this.incrementalSourceReaderContext = incrementalSourceReaderContext;
+        this.suspendedStreamSplit = null;
     }
 
     @Override
     public void start() {
-        if (getNumberOfCurrentlyAssignedSplits() == 0) {
+        if (getNumberOfCurrentlyAssignedSplits() <= 1) {
             context.sendSplitRequest();
         }
     }
@@ -123,41 +153,108 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
         // unfinished splits
         List<SourceSplitBase> stateSplits = super.snapshotState(checkpointId);
 
-        // add finished snapshot splits that didn't receive ack yet
-        stateSplits.addAll(finishedUnackedSplits.values());
+        // unfinished splits
+        List<SourceSplitBase> unfinishedSplits =
+                stateSplits.stream()
+                        .filter(split -> !finishedUnackedSplits.containsKey(split.splitId()))
+                        .collect(Collectors.toList());
+
+        // add finished snapshot splits that did not receive ack yet
+        unfinishedSplits.addAll(finishedUnackedSplits.values());
 
         // add stream splits who are uncompleted
-        stateSplits.addAll(uncompletedStreamSplits.values());
+        unfinishedSplits.addAll(uncompletedStreamSplits.values());
 
-        return stateSplits;
-    }
+        // add suspended StreamSplit
+        if (suspendedStreamSplit != null) {
+            unfinishedSplits.add(suspendedStreamSplit);
+        }
 
-    @Override
-    public void notifyCheckpointComplete(long checkpointId) throws Exception {
-        dialect.notifyCheckpointComplete(checkpointId);
+        logCurrentStreamOffsets(unfinishedSplits, checkpointId);
+
+        return unfinishedSplits;
     }
 
     @Override
     protected void onSplitFinished(Map<String, SourceSplitState> finishedSplitIds) {
-        for (SourceSplitState splitState : finishedSplitIds.values()) {
-            SourceSplitBase sourceSplit = splitState.toSourceSplit();
-            if (sourceConfig.getStartupOptions().isSnapshotOnly() && sourceSplit.isStreamSplit()) {
-                // when startupMode = SNAPSHOT. the stream split could finish.
-                continue;
+        boolean requestNextSplit = true;
+        if (isNewlyAddedTableSplitAndStreamSplit(finishedSplitIds)) {
+            SourceSplitState streamSplitState = finishedSplitIds.remove(STREAM_SPLIT_ID);
+            finishedSplitIds
+                    .values()
+                    .forEach(
+                            newAddedSplitState ->
+                                    finishedUnackedSplits.put(
+                                            newAddedSplitState.toSourceSplit().splitId(),
+                                            newAddedSplitState
+                                                    .asSnapshotSplitState()
+                                                    .toSourceSplit()));
+            Preconditions.checkState(finishedSplitIds.values().size() == 1);
+            LOG.info(
+                    "Source reader {} finished stream split and snapshot split {}",
+                    subtaskId,
+                    finishedSplitIds.values().iterator().next().toSourceSplit().splitId());
+            this.addSplits(Collections.singletonList(streamSplitState.toSourceSplit()));
+        } else {
+            Preconditions.checkState(finishedSplitIds.size() == 1);
+
+            for (SourceSplitState splitState : finishedSplitIds.values()) {
+                SourceSplitBase sourceSplit = splitState.toSourceSplit();
+                if (sourceSplit.isStreamSplit()) {
+                    // Two possibilities that finish a stream split:
+                    //
+                    // 1. Stream reader is suspended by enumerator because new tables have been
+                    // finished its snapshot reading.
+                    // Under this case incrementalSourceReaderContext.isStreamSplitReaderSuspended()
+                    // is true and need to request the latest finished splits number.
+                    //
+                    // 2. Stream reader reaches the ending offset of the split. We need to do
+                    // nothing under this case.
+                    if (incrementalSourceReaderContext.isStreamSplitReaderSuspended()) {
+                        suspendedStreamSplit = toSuspendedStreamSplit(sourceSplit.asStreamSplit());
+                        LOG.info(
+                                "Source reader {} suspended stream split reader success after the newly added table process, current offset {}",
+                                subtaskId,
+                                suspendedStreamSplit.getStartingOffset());
+                        context.sendSourceEventToCoordinator(
+                                new LatestFinishedSplitsNumberRequestEvent());
+                        // do not request next split when the reader is suspended
+                        requestNextSplit = false;
+                    }
+                } else {
+                    finishedUnackedSplits.put(sourceSplit.splitId(), sourceSplit.asSnapshotSplit());
+                }
             }
-            checkState(
-                    sourceSplit.isSnapshotSplit(),
-                    String.format(
-                            "Only snapshot split could finish, but the actual split is stream split %s",
-                            sourceSplit));
-            finishedUnackedSplits.put(sourceSplit.splitId(), sourceSplit.asSnapshotSplit());
+            reportFinishedSnapshotSplitsIfNeed();
         }
-        reportFinishedSnapshotSplitsIfNeed();
-        context.sendSplitRequest();
+        if (requestNextSplit) {
+            context.sendSplitRequest();
+        }
+    }
+
+    /**
+     * During the newly added table process, for the source reader who holds the stream split, we
+     * return the latest finished snapshot split and stream split as well, this design let us have
+     * opportunity to exchange stream reading and snapshot reading, we put the stream split back.
+     */
+    private boolean isNewlyAddedTableSplitAndStreamSplit(
+            Map<String, SourceSplitState> finishedSplitIds) {
+        return finishedSplitIds.containsKey(STREAM_SPLIT_ID) && finishedSplitIds.size() == 2;
     }
 
     @Override
     public void addSplits(List<SourceSplitBase> splits) {
+        addSplits(splits, true);
+    }
+
+    /**
+     * Adds a list of splits for this reader to read.
+     *
+     * @param splits the splits to add.
+     * @param checkTableChangeForStreamSplit to check the captured table list change or not, it
+     *     should be true for reader which is during restoration from a checkpoint or savepoint.
+     */
+    private void addSplits(List<SourceSplitBase> splits, boolean checkTableChangeForStreamSplit) {
         // restore for finishedUnackedSplits
         List<SourceSplitBase> unfinishedSplits = new ArrayList<>();
         for (SourceSplitBase split : splits) {
@@ -165,46 +262,119 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                 SnapshotSplit snapshotSplit = split.asSnapshotSplit();
                 if (snapshotSplit.isSnapshotReadFinished()) {
                     finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
-                } else {
+                } else if (dialect.isIncludeDataCollection(
+                        sourceConfig, snapshotSplit.getTableId())) {
                     unfinishedSplits.add(split);
+                } else {
+                    LOG.debug(
+                            "The subtask {} is skipping split {} because it does not match new table filter.",
+                            subtaskId,
+                            split.splitId());
                 }
             } else {
-                // the stream split is uncompleted
-                if (!split.asStreamSplit().isCompletedSplit()) {
+                StreamSplit streamSplit = split.asStreamSplit();
+                // When restore from a checkpoint, the finished split infos may contain some splits
+                // for the deleted tables.
+                // We need to remove these splits for the deleted tables at the finished split
+                // infos.
+                if (checkTableChangeForStreamSplit) {
+                    LOG.info("before checkTableChangeForStreamSplit: " + streamSplit);
+                    streamSplit =
+                            filterOutdatedSplitInfos(
+                                    streamSplit,
+                                    (tableId) ->
+                                            dialect.isIncludeDataCollection(sourceConfig, tableId));
+                    LOG.info("after checkTableChangeForStreamSplit: " + streamSplit);
+                }
+
+                // Try to discovery table schema once for newly added tables when source reader
+                // start or restore
+                boolean checkNewlyAddedTableSchema =
+                        !incrementalSourceReaderContext.isHasAssignedStreamSplit()
+                                && sourceConfig.isScanNewlyAddedTableEnabled();
+                incrementalSourceReaderContext.setHasAssignedStreamSplit(true);
+
+                // the stream split is suspended
+                if (streamSplit.isSuspended()) {
+                    suspendedStreamSplit = streamSplit;
+                } else if (!streamSplit.isCompletedSplit()) {
+                    // the stream split is uncompleted
                     uncompletedStreamSplits.put(split.splitId(), split.asStreamSplit());
                     requestStreamSplitMetaIfNeeded(split.asStreamSplit());
                 } else {
                     uncompletedStreamSplits.remove(split.splitId());
-                    StreamSplit streamSplit =
-                            discoverTableSchemasForStreamSplit(split.asStreamSplit());
+                    streamSplit =
+                            discoverTableSchemasForStreamSplit(
+                                    streamSplit, checkNewlyAddedTableSchema);
                     unfinishedSplits.add(streamSplit);
                 }
+
+                LOG.info(
+                        "Source reader {} received the stream split : {}.", subtaskId, streamSplit);
+                context.sendSourceEventToCoordinator(new StreamSplitAssignedEvent());
             }
         }
         // notify split enumerator again about the finished unacked snapshot splits
         reportFinishedSnapshotSplitsIfNeed();
-        // add all un-finished splits (including stream split) to SourceReaderBase
-        super.addSplits(unfinishedSplits);
+        // add all un-finished splits (including binlog split) to SourceReaderBase
+        if (!unfinishedSplits.isEmpty()) {
+            super.addSplits(unfinishedSplits);
+        } else if (suspendedStreamSplit
+                != null) { // only request new snapshot split if the stream split is suspended
+            context.sendSplitRequest();
+        }
     }
 
-    private StreamSplit discoverTableSchemasForStreamSplit(StreamSplit split) {
+    private StreamSplit discoverTableSchemasForStreamSplit(
+            StreamSplit split, boolean checkNewlyAddedTableSchema) {
         final String splitId = split.splitId();
-        if (split.getTableSchemas().isEmpty()) {
+        if (split.getTableSchemas().isEmpty() || checkNewlyAddedTableSchema) {
+            Map<TableId, TableChanges.TableChange> tableSchemas;
             try {
-                Map<TableId, TableChanges.TableChange> tableSchemas =
-                        dialect.discoverDataCollectionSchemas(sourceConfig);
-                LOG.info("The table schema discovery for stream split {} success", splitId);
+                Map<TableId, TableChanges.TableChange> existTableSchemas = split.getTableSchemas();
+                tableSchemas = dialect.discoverDataCollectionSchemas(sourceConfig);
+                tableSchemas.putAll(existTableSchemas);
+                LOG.info(
+                        "Source reader {} discovers table schema for stream split {} success",
+                        subtaskId,
+                        splitId);
                 return StreamSplit.fillTableSchemas(split, tableSchemas);
             } catch (Exception e) {
-                LOG.error("Failed to obtains table schemas due to {}", e.getMessage());
+                LOG.error(
+                        "Source reader {} failed to obtains table schemas due to {}",
+                        subtaskId,
+                        e.getMessage());
                 throw new FlinkRuntimeException(e);
             }
         } else {
             LOG.warn(
-                    "The stream split {} has table schemas yet, skip the table schema discovery",
+                    "Source reader {} skip the table schema discovery, the stream split {} has table schemas yet.",
+                    subtaskId,
                     split);
             return split;
         }
+    }
+
+    private Set<String> getExistedSplitsOfLastGroup(
+            List<FinishedSnapshotSplitInfo> finishedSnapshotSplits, int metaGroupSize) {
+        int splitsNumOfLastGroup =
+                finishedSnapshotSplits.size() % sourceConfig.getSplitMetaGroupSize();
+        if (splitsNumOfLastGroup != 0) {
+            int lastGroupStart =
+                    ((int) (finishedSnapshotSplits.size() / sourceConfig.getSplitMetaGroupSize()))
+                            * metaGroupSize;
+            // Keep same order with HybridSplitAssigner.createStreamSplit() to avoid
+            // 'invalid request meta group id' error
+            List<String> sortedFinishedSnapshotSplits =
+                    finishedSnapshotSplits.stream()
+                            .map(FinishedSnapshotSplitInfo::getSplitId)
+                            .sorted()
+                            .collect(Collectors.toList());
+            return new HashSet<>(
+                    sortedFinishedSnapshotSplits.subList(
+                            lastGroupStart, lastGroupStart + splitsNumOfLastGroup));
+        }
+        return new HashSet<>();
     }
 
     @Override
@@ -230,9 +400,17 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                     subtaskId,
                     ((StreamSplitMetaEvent) sourceEvent).getMetaGroupId());
             fillMetaDataForStreamSplit((StreamSplitMetaEvent) sourceEvent);
+        } else if (sourceEvent instanceof StreamSplitUpdateRequestEvent) {
+            suspendStreamSplitReader();
+        } else if (sourceEvent instanceof LatestFinishedSplitsNumberEvent) {
+            updateStreamSplitFinishedSplitsSize((LatestFinishedSplitsNumberEvent) sourceEvent);
         } else {
             super.handleSourceEvents(sourceEvent);
         }
+    }
+
+    private void suspendStreamSplitReader() {
+        incrementalSourceReaderContext.suspendStreamSplitReader();
     }
 
     private void fillMetaDataForStreamSplit(StreamSplitMetaEvent metadataEvent) {
@@ -244,15 +422,21 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                             streamSplit.getFinishedSnapshotSplitInfos().size(),
                             sourceConfig.getSplitMetaGroupSize());
             if (receivedMetaGroupId == expectedMetaGroupId) {
-                List<FinishedSnapshotSplitInfo> metaDataGroup =
+                Set<String> existedSplitsOfLastGroup =
+                        getExistedSplitsOfLastGroup(
+                                streamSplit.getFinishedSnapshotSplitInfos(),
+                                sourceConfig.getSplitMetaGroupSize());
+
+                List<FinishedSnapshotSplitInfo> newAddedMetadataGroup =
                         metadataEvent.getMetaGroup().stream()
                                 .map(sourceSplitSerializer::deserialize)
+                                .filter(r -> !existedSplitsOfLastGroup.contains(r.getSplitId()))
                                 .collect(Collectors.toList());
                 uncompletedStreamSplits.put(
                         streamSplit.splitId(),
-                        StreamSplit.appendFinishedSplitInfos(streamSplit, metaDataGroup));
+                        StreamSplit.appendFinishedSplitInfos(streamSplit, newAddedMetadataGroup));
 
-                LOG.info("Fill metadata of group {} to stream split", metaDataGroup.size());
+                LOG.info("Fill metadata of group {} to stream split", newAddedMetadataGroup.size());
             } else {
                 LOG.warn(
                         "Received out of oder metadata event for split {}, the received meta group id is {}, but expected is {}, ignore it",
@@ -260,7 +444,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                         receivedMetaGroupId,
                         expectedMetaGroupId);
             }
-            requestStreamSplitMetaIfNeeded(streamSplit);
+            requestStreamSplitMetaIfNeeded(uncompletedStreamSplits.get(streamSplit.splitId()));
         } else {
             LOG.warn(
                     "Received metadata event for split {}, but the uncompleted split map does not contain it",
@@ -284,6 +468,29 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
         }
     }
 
+    protected void updateStreamSplitFinishedSplitsSize(
+            LatestFinishedSplitsNumberEvent sourceEvent) {
+        if (suspendedStreamSplit != null) {
+            final int finishedSplitsSize = sourceEvent.getLatestFinishedSplitsNumber();
+            final StreamSplit streamSplit =
+                    toNormalStreamSplit(suspendedStreamSplit, finishedSplitsSize);
+            suspendedStreamSplit = null;
+            this.addSplits(Collections.singletonList(streamSplit), false);
+
+            context.sendSourceEventToCoordinator(new StreamSplitUpdateAckEvent());
+            LOG.info(
+                    "Source reader {} notifies enumerator that stream split has been updated.",
+                    subtaskId);
+
+            incrementalSourceReaderContext.wakeupSuspendedStreamSplitReader();
+            LOG.info(
+                    "Source reader {} wakes up suspended stream reader as stream split has been updated.",
+                    subtaskId);
+        } else {
+            LOG.warn("Unexpected event {}, this should not happen.", sourceEvent);
+        }
+    }
+
     private void reportFinishedSnapshotSplitsIfNeed() {
         if (!finishedUnackedSplits.isEmpty()) {
             final Map<String, Offset> finishedOffsets = new HashMap<>();
@@ -303,13 +510,24 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     /** Returns next meta group id according to received meta number and meta group size. */
     public static int getNextMetaGroupId(int receivedMetaNum, int metaGroupSize) {
         Preconditions.checkState(metaGroupSize > 0);
-        return receivedMetaNum % metaGroupSize == 0
-                ? (receivedMetaNum / metaGroupSize)
-                : (receivedMetaNum / metaGroupSize) + 1;
+        return receivedMetaNum / metaGroupSize;
     }
 
     @Override
     protected SourceSplitBase toSplitType(String splitId, SourceSplitState splitState) {
         return splitState.toSourceSplit();
+    }
+
+    private void logCurrentStreamOffsets(List<SourceSplitBase> splits, long checkpointId) {
+        if (!LOG.isInfoEnabled()) {
+            return;
+        }
+        for (SourceSplitBase split : splits) {
+            if (!split.isStreamSplit()) {
+                return;
+            }
+            Offset offset = split.asStreamSplit().getStartingOffset();
+            LOG.info("Stream split offset on checkpoint {}: {}", checkpointId, offset);
+        }
     }
 }

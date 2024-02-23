@@ -25,9 +25,9 @@ import java.io.Serializable;
  *
  * <ul>
  *   <li>{@link #preHighWatermarkAction}: Hook to run before emitting high watermark, which is for
- *       testing whether binlog events created within snapshot phase are backfilled correctly.
+ *       testing whether stream events created within snapshot phase are backfilled correctly.
  *   <li>{@link #postHighWatermarkAction}: Hook to run after emitting high watermark, which is for
- *       testing actions handling binlog events between snapshot splits.
+ *       testing actions handling stream events between snapshot splits.
  * </ul>
  */
 public class SnapshotPhaseHooks implements Serializable {

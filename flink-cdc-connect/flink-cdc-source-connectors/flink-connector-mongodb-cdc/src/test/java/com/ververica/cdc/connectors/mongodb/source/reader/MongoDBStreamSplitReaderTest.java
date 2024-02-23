@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mongodb.source.reader;
 
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsAddition;
+import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
 
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.changestream.OperationType;
@@ -119,11 +120,15 @@ public class MongoDBStreamSplitReaderTest extends MongoDBSourceTestBase {
 
     @Test
     public void testStreamSplitReader() throws Exception {
-        IncrementalSourceReaderContext sourceReaderContext =
-                new IncrementalSourceReaderContext(null);
+        IncrementalSourceReaderContext incrementalSourceReaderContext =
+                new IncrementalSourceReaderContext(new TestingReaderContext());
         IncrementalSourceSplitReader<MongoDBSourceConfig> streamSplitReader =
                 new IncrementalSourceSplitReader<>(
-                        0, dialect, sourceConfig, SnapshotPhaseHooks.empty(), sourceReaderContext);
+                        0,
+                        dialect,
+                        sourceConfig,
+                        incrementalSourceReaderContext,
+                        SnapshotPhaseHooks.empty());
 
         try {
             ChangeStreamOffset startOffset = new ChangeStreamOffset(startupResumeToken);

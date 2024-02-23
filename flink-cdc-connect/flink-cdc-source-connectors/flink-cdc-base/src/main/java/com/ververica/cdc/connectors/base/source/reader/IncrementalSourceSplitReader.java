@@ -26,8 +26,10 @@ import com.ververica.cdc.common.annotation.VisibleForTesting;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.source.meta.split.ChangeEventRecords;
+import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import com.ververica.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
 import com.ververica.cdc.connectors.base.source.reader.external.Fetcher;
@@ -42,8 +44,12 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Queue;
+import java.util.Set;
+
+import static com.ververica.cdc.common.utils.Preconditions.checkState;
+import static com.ververica.cdc.connectors.base.source.meta.split.StreamSplit.STREAM_SPLIT_ID;
 
 /** Basic class read {@link SourceSplitBase} and return {@link SourceRecord}. */
 @Experimental
@@ -51,56 +57,58 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
         implements SplitReader<SourceRecords, SourceSplitBase> {
 
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceSplitReader.class);
-    private final Queue<SourceSplitBase> splits;
+
+    private final ArrayDeque<SnapshotSplit> snapshotSplits;
+    private final ArrayDeque<StreamSplit> streamSplits;
     private final int subtaskId;
-    private final IncrementalSourceReaderContext context;
+
     @Nullable private Fetcher<SourceRecords, SourceSplitBase> currentFetcher;
+
+    @Nullable private IncrementalSourceScanFetcher reusedScanFetcher;
+    @Nullable private IncrementalSourceStreamFetcher reusedStreamFetcher;
+
     @Nullable private String currentSplitId;
     private final DataSourceDialect<C> dataSourceDialect;
     private final C sourceConfig;
 
+    private final IncrementalSourceReaderContext context;
     private final SnapshotPhaseHooks snapshotHooks;
 
     public IncrementalSourceSplitReader(
             int subtaskId,
             DataSourceDialect<C> dataSourceDialect,
             C sourceConfig,
-            SnapshotPhaseHooks snapshotHooks,
-            IncrementalSourceReaderContext context) {
+            IncrementalSourceReaderContext context,
+            SnapshotPhaseHooks snapshotHooks) {
         this.subtaskId = subtaskId;
-        this.splits = new ArrayDeque<>();
+        this.snapshotSplits = new ArrayDeque<>();
+        this.streamSplits = new ArrayDeque<>(1);
         this.dataSourceDialect = dataSourceDialect;
         this.sourceConfig = sourceConfig;
-        this.snapshotHooks = snapshotHooks;
         this.context = context;
+        this.snapshotHooks = snapshotHooks;
     }
 
     @Override
     public RecordsWithSplitIds<SourceRecords> fetch() throws IOException {
-        checkSplitOrStartNext();
-        checkNeedStopSplitReader();
 
-        Iterator<SourceRecords> dataIt;
         try {
-            dataIt = currentFetcher.pollSplitRecords();
-        } catch (InterruptedException e) {
+            suspendStreamReaderIfNeed();
+            return pollSplitRecords();
+        } catch (Exception e) {
             LOG.warn("fetch data failed.", e);
             throw new IOException(e);
         }
-        return dataIt == null
-                ? finishedSplit()
-                : ChangeEventRecords.forRecords(currentSplitId, dataIt);
     }
 
-    private void checkNeedStopSplitReader() {
-        if (currentFetcher instanceof IncrementalSourceStreamFetcher
-                && context.needStopStreamSplitReader()
+    /** Suspends stream reader until updated stream split join again. */
+    private void suspendStreamReaderIfNeed() throws Exception {
+        if (currentFetcher != null
+                && currentFetcher instanceof IncrementalSourceStreamFetcher
+                && context.isStreamSplitReaderSuspended()
                 && !currentFetcher.isFinished()) {
-            try {
-                ((IncrementalSourceStreamFetcher) currentFetcher).stopReadTask();
-            } catch (Exception e) {
-                LOG.error("Couldn't stop fetcher: ", e);
-            }
+            ((IncrementalSourceStreamFetcher) currentFetcher).stopReadTask();
+            LOG.info("Suspend stream reader to wait the stream split update.");
         }
     }
 
@@ -114,7 +122,13 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
         }
 
         LOG.debug("Handling split change {}", splitsChanges);
-        splits.addAll(splitsChanges.splits());
+        for (SourceSplitBase split : splitsChanges.splits()) {
+            if (split.isSnapshotSplit()) {
+                snapshotSplits.add(split.asSnapshotSplit());
+            } else {
+                streamSplits.add(split.asStreamSplit());
+            }
+        }
     }
 
     @Override
@@ -122,47 +136,76 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
 
     @Override
     public void close() throws Exception {
-        if (currentFetcher != null) {
-            LOG.info("Close current fetcher {}", currentFetcher.getClass().getCanonicalName());
-            currentFetcher.close();
-            currentSplitId = null;
-        }
+        closeScanFetcher();
+        closeStreamFetcher();
     }
 
-    protected void checkSplitOrStartNext() throws IOException {
-        if (canAssignNextSplit()) {
-            final SourceSplitBase nextSplit = splits.poll();
-
-            if (nextSplit == null) {
-                return;
-            }
-            currentSplitId = nextSplit.splitId();
-            FetchTask fetchTask = dataSourceDialect.createFetchTask(nextSplit);
-            if (nextSplit.isSnapshotSplit()) {
-                if (currentFetcher instanceof IncrementalSourceStreamFetcher) {
-                    LOG.info(
-                            "This is the point from stream split reading change to snapshot split reading");
-                    currentFetcher.close();
-                    currentFetcher = null;
-                }
-                if (currentFetcher == null) {
-                    final FetchTask.Context taskContext =
-                            dataSourceDialect.createFetchTaskContext(nextSplit, sourceConfig);
-                    currentFetcher = new IncrementalSourceScanFetcher(taskContext, subtaskId);
-                    ((AbstractScanFetchTask) fetchTask).setSnapshotPhaseHooks(snapshotHooks);
-                }
+    private ChangeEventRecords pollSplitRecords() throws InterruptedException {
+        Iterator<SourceRecords> dataIt = null;
+        if (currentFetcher == null) {
+            // (1) Reads stream split firstly and then read snapshot split
+            if (streamSplits.size() > 0) {
+                // the stream split may come from:
+                // (a) the initial stream split
+                // (b) added back stream-split in newly added table process
+                StreamSplit nextSplit = streamSplits.poll();
+                submitStreamSplit(nextSplit);
+            } else if (snapshotSplits.size() > 0) {
+                submitSnapshotSplit(snapshotSplits.poll());
             } else {
-                // point from snapshot split to stream split
-                if (currentFetcher != null) {
-                    LOG.info("It's turn to read stream split, close current snapshot fetcher.");
-                    currentFetcher.close();
-                }
-                final FetchTask.Context taskContext =
-                        dataSourceDialect.createFetchTaskContext(nextSplit, sourceConfig);
-                currentFetcher = new IncrementalSourceStreamFetcher(taskContext, subtaskId);
-                LOG.info("Stream fetcher is created.");
+                LOG.info("No available split to read.");
             }
-            currentFetcher.submitTask(fetchTask);
+
+            if (currentFetcher != null) {
+                dataIt = currentFetcher.pollSplitRecords();
+            } else {
+                currentSplitId = null;
+            }
+            return dataIt == null ? finishedSplit() : forRecords(dataIt);
+        } else if (currentFetcher instanceof IncrementalSourceScanFetcher) {
+            // (2) try to switch to stream split reading util current snapshot split finished
+            dataIt = currentFetcher.pollSplitRecords();
+            if (dataIt != null) {
+                // first fetch data of snapshot split, return and emit the records of snapshot split
+                ChangeEventRecords records;
+                if (context.isHasAssignedStreamSplit()) {
+                    records = forNewAddedTableFinishedSplit(currentSplitId, dataIt);
+                    closeScanFetcher();
+                    closeStreamFetcher();
+                } else {
+                    records = forRecords(dataIt);
+                    SnapshotSplit nextSplit = snapshotSplits.poll();
+                    if (nextSplit != null) {
+                        checkState(reusedScanFetcher != null);
+                        submitSnapshotSplit(nextSplit);
+                    } else {
+                        closeScanFetcher();
+                    }
+                }
+                return records;
+            } else {
+                return finishedSplit();
+            }
+        } else if (currentFetcher instanceof IncrementalSourceStreamFetcher) {
+            // (3) switch to snapshot split reading if there are newly added snapshot splits
+            dataIt = currentFetcher.pollSplitRecords();
+            if (dataIt != null) {
+                // try to switch to read snapshot split if there are new added snapshot
+                SnapshotSplit nextSplit = snapshotSplits.poll();
+                if (nextSplit != null) {
+                    closeStreamFetcher();
+                    LOG.info("It's turn to switch next fetch reader to snapshot split reader");
+                    submitSnapshotSplit(nextSplit);
+                }
+                return ChangeEventRecords.forRecords(STREAM_SPLIT_ID, dataIt);
+            } else {
+                // null will be returned after receiving suspend stream event
+                // finish current stream split reading
+                closeStreamFetcher();
+                return finishedSplit();
+            }
+        } else {
+            throw new IllegalStateException("Unsupported reader type.");
         }
     }
 
@@ -176,5 +219,84 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
                 ChangeEventRecords.forFinishedSplit(currentSplitId);
         currentSplitId = null;
         return finishedRecords;
+    }
+
+    /**
+     * Finishes new added snapshot split, mark the stream split as finished too, we will add the
+     * stream split back in {@code MySqlSourceReader}.
+     */
+    private ChangeEventRecords forNewAddedTableFinishedSplit(
+            final String splitId, final Iterator<SourceRecords> recordsForSplit) {
+        final Set<String> finishedSplits = new HashSet<>();
+        finishedSplits.add(splitId);
+        finishedSplits.add(STREAM_SPLIT_ID);
+        currentSplitId = null;
+        return new ChangeEventRecords(splitId, recordsForSplit, finishedSplits);
+    }
+
+    private ChangeEventRecords forRecords(Iterator<SourceRecords> dataIt) {
+        if (currentFetcher instanceof IncrementalSourceScanFetcher) {
+            final ChangeEventRecords finishedRecords =
+                    ChangeEventRecords.forSnapshotRecords(currentSplitId, dataIt);
+            closeScanFetcher();
+            return finishedRecords;
+        } else {
+            return ChangeEventRecords.forRecords(currentSplitId, dataIt);
+        }
+    }
+
+    private void submitSnapshotSplit(SnapshotSplit snapshotSplit) {
+        currentSplitId = snapshotSplit.splitId();
+        currentFetcher = getScanFetcher();
+        FetchTask<SourceSplitBase> fetchTask = dataSourceDialect.createFetchTask(snapshotSplit);
+        ((AbstractScanFetchTask) fetchTask).setSnapshotPhaseHooks(snapshotHooks);
+        currentFetcher.submitTask(fetchTask);
+    }
+
+    private void submitStreamSplit(StreamSplit streamSplit) {
+        currentSplitId = streamSplit.splitId();
+        currentFetcher = getStreamFetcher();
+        FetchTask<SourceSplitBase> fetchTask = dataSourceDialect.createFetchTask(streamSplit);
+        currentFetcher.submitTask(fetchTask);
+    }
+
+    private IncrementalSourceScanFetcher getScanFetcher() {
+        if (reusedScanFetcher == null) {
+            reusedScanFetcher =
+                    new IncrementalSourceScanFetcher(
+                            dataSourceDialect.createFetchTaskContext(sourceConfig), subtaskId);
+        }
+        return reusedScanFetcher;
+    }
+
+    private IncrementalSourceStreamFetcher getStreamFetcher() {
+        if (reusedStreamFetcher == null) {
+            reusedStreamFetcher =
+                    new IncrementalSourceStreamFetcher(
+                            dataSourceDialect.createFetchTaskContext(sourceConfig), subtaskId);
+        }
+        return reusedStreamFetcher;
+    }
+
+    private void closeScanFetcher() {
+        if (reusedScanFetcher != null) {
+            LOG.debug("Close snapshot reader {}", reusedScanFetcher.getClass().getCanonicalName());
+            reusedScanFetcher.close();
+            if (currentFetcher == reusedScanFetcher) {
+                currentFetcher = null;
+            }
+            reusedScanFetcher = null;
+        }
+    }
+
+    private void closeStreamFetcher() {
+        if (reusedStreamFetcher != null) {
+            LOG.debug("Close stream reader {}", reusedStreamFetcher.getClass().getCanonicalName());
+            reusedStreamFetcher.close();
+            if (currentFetcher == reusedStreamFetcher) {
+                currentFetcher = null;
+            }
+            reusedStreamFetcher = null;
+        }
     }
 }

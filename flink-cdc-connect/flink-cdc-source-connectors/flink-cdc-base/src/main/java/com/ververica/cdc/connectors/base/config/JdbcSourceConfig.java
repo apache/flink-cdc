@@ -20,6 +20,7 @@ import com.ververica.cdc.connectors.base.options.StartupOptions;
 import com.ververica.cdc.connectors.base.source.IncrementalSource;
 import io.debezium.config.Configuration;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
+import io.debezium.relational.RelationalTableFilters;
 
 import java.time.Duration;
 import java.util.List;
@@ -70,7 +71,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             int connectionPoolSize,
             String chunkKeyColumn,
             boolean skipSnapshotBackfill,
-            boolean scanNewlyAddedTableEnabled) {
+            boolean isScanNewlyAddedTableEnabled) {
         super(
                 startupOptions,
                 splitSize,
@@ -80,9 +81,9 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
                 includeSchemaChanges,
                 closeIdleReaders,
                 skipSnapshotBackfill,
+                isScanNewlyAddedTableEnabled,
                 dbzProperties,
-                dbzConfiguration,
-                scanNewlyAddedTableEnabled);
+                dbzConfiguration);
         this.driverClassName = driverClassName;
         this.hostname = hostname;
         this.port = port;
@@ -151,5 +152,14 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
 
     public String getChunkKeyColumn() {
         return chunkKeyColumn;
+    }
+
+    @Override
+    public boolean isScanNewlyAddedTableEnabled() {
+        return isScanNewlyAddedTableEnabled;
+    }
+
+    public RelationalTableFilters getTableFilters() {
+        return getDbzConnectorConfig().getTableFilters();
     }
 }

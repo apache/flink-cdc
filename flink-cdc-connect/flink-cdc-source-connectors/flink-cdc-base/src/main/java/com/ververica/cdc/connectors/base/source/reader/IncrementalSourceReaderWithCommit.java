@@ -16,11 +16,11 @@
 
 package com.ververica.cdc.connectors.base.source.reader;
 
-import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 
+import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.dialect.DataSourceDialect;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
@@ -37,11 +37,12 @@ import java.util.function.Supplier;
 /**
  * Record the LSN of checkpoint {@link StreamSplit}, which can be used to submit to the CDC source.
  */
+@Experimental
 public class IncrementalSourceReaderWithCommit extends IncrementalSourceReader {
     private static final Logger LOG =
             LoggerFactory.getLogger(IncrementalSourceReaderWithCommit.class);
 
-    private final TreeMap<Long, Offset> lastCheckPointOffset;
+    protected final TreeMap<Long, Offset> lastCheckpointOffsets;
     private long maxCompletedCheckpointId;
 
     public IncrementalSourceReaderWithCommit(
@@ -49,7 +50,7 @@ public class IncrementalSourceReaderWithCommit extends IncrementalSourceReader {
             Supplier supplier,
             RecordEmitter recordEmitter,
             Configuration config,
-            SourceReaderContext context,
+            IncrementalSourceReaderContext incrementalSourceReaderContext,
             SourceConfig sourceConfig,
             SourceSplitSerializer sourceSplitSerializer,
             DataSourceDialect dialect) {
@@ -58,11 +59,11 @@ public class IncrementalSourceReaderWithCommit extends IncrementalSourceReader {
                 supplier,
                 recordEmitter,
                 config,
-                context,
+                incrementalSourceReaderContext,
                 sourceConfig,
                 sourceSplitSerializer,
                 dialect);
-        this.lastCheckPointOffset = new TreeMap<>();
+        this.lastCheckpointOffsets = new TreeMap<>();
         this.maxCompletedCheckpointId = 0;
     }
 
@@ -76,7 +77,8 @@ public class IncrementalSourceReaderWithCommit extends IncrementalSourceReader {
                 .map(SourceSplitBase::asStreamSplit)
                 .ifPresent(
                         streamSplit -> {
-                            lastCheckPointOffset.put(checkpointId, streamSplit.getStartingOffset());
+                            lastCheckpointOffsets.put(
+                                    checkpointId, streamSplit.getStartingOffset());
                             LOG.debug(
                                     "Starting offset of stream split is: {}, and checkpoint id is {}.",
                                     streamSplit.getStartingOffset(),
@@ -91,9 +93,9 @@ public class IncrementalSourceReaderWithCommit extends IncrementalSourceReader {
         // checkpointId might be for a checkpoint that was triggered earlier. see
         // CheckpointListener#notifyCheckpointComplete(long).
         if (checkpointId > maxCompletedCheckpointId) {
-            Offset offset = lastCheckPointOffset.get(checkpointId);
+            Offset offset = lastCheckpointOffsets.get(checkpointId);
             dialect.notifyCheckpointComplete(checkpointId, offset);
-            lastCheckPointOffset.headMap(checkpointId, true).clear();
+            lastCheckpointOffsets.headMap(checkpointId, true).clear();
             maxCompletedCheckpointId = checkpointId;
         }
     }

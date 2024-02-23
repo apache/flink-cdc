@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
 
 import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isInitialAssigningFinished;
 import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isNewlyAddedAssigningFinished;
-import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isSuspended;
+import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isNewlyAddedAssigningSnapshotFinished;
 
 /** Assigner for Hybrid split which contains snapshot splits and stream splits. */
 public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigner {
@@ -118,8 +118,8 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
 
     @Override
     public Optional<SourceSplitBase> getNext() {
-        if (isSuspended(getAssignerStatus())) {
-            // do not assign split until the assigner received SuspendBinlogReaderAckEvent
+        if (isNewlyAddedAssigningSnapshotFinished(getAssignerStatus())) {
+            // do not assign split until the adding table process finished
             return Optional.empty();
         }
         if (snapshotSplitAssigner.noMoreSplits()) {
@@ -140,7 +140,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                         streamSplit);
                 return Optional.of(streamSplit);
             } else if (isNewlyAddedAssigningFinished(snapshotSplitAssigner.getAssignerStatus())) {
-                // do not need to create binlog, but send event to wake up the binlog reader
+                // do not need to create stream split, but send event to wake up the binlog reader
                 isStreamSplitAssigned = true;
                 return Optional.empty();
             } else {
@@ -196,23 +196,23 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     }
 
     @Override
-    public boolean noMoreSplits() {
-        return snapshotSplitAssigner.noMoreSplits() && isStreamSplitAssigned;
-    }
-
-    @Override
     public AssignerStatus getAssignerStatus() {
         return snapshotSplitAssigner.getAssignerStatus();
     }
 
     @Override
-    public void suspend() {
-        snapshotSplitAssigner.suspend();
+    public void startAssignNewlyAddedTables() {
+        snapshotSplitAssigner.startAssignNewlyAddedTables();
     }
 
     @Override
-    public void wakeup() {
-        snapshotSplitAssigner.wakeup();
+    public void onStreamSplitUpdated() {
+        snapshotSplitAssigner.onStreamSplitUpdated();
+    }
+
+    @Override
+    public boolean noMoreSplits() {
+        return snapshotSplitAssigner.noMoreSplits() && isStreamSplitAssigned;
     }
 
     @Override

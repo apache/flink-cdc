@@ -27,7 +27,7 @@ import java.util.Properties;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * A builder to build a SourceFunction which can read snapshot and continue to consume binlog for
+ * A builder to build a SourceFunction which can read snapshot and continue to consume wal log for
  * PostgreSQL.
  */
 @Deprecated
