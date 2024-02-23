@@ -51,6 +51,7 @@ import java.util.Properties;
 
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CHUNK_META_GROUP_SIZE;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CONNECTION_POOL_SIZE;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CONNECT_MAX_RETRIES;
@@ -148,7 +149,8 @@ public class PostgreSQLTableFactoryTest {
                         StartupOptions.initial(),
                         null,
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -160,6 +162,7 @@ public class PostgreSQLTableFactoryTest {
         options.put("debezium.snapshot.mode", "never");
         options.put("changelog-mode", "upsert");
         options.put("scan.incremental.snapshot.backfill.skip", "true");
+        options.put("scan.newly-added-table.enabled", "true");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
@@ -191,6 +194,7 @@ public class PostgreSQLTableFactoryTest {
                         StartupOptions.initial(),
                         null,
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
+                        true,
                         true);
         assertEquals(expectedSource, actualSource);
     }
@@ -233,7 +237,8 @@ public class PostgreSQLTableFactoryTest {
                         StartupOptions.initial(),
                         null,
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
@@ -285,7 +290,8 @@ public class PostgreSQLTableFactoryTest {
                         StartupOptions.initial(),
                         null,
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -327,7 +333,8 @@ public class PostgreSQLTableFactoryTest {
                         StartupOptions.latest(),
                         null,
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 

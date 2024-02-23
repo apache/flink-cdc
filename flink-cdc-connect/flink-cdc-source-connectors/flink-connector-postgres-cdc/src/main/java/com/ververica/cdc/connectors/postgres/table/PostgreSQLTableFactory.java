@@ -44,6 +44,7 @@ import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
+import static com.ververica.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static com.ververica.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CHANGELOG_MODE;
 import static com.ververica.cdc.connectors.postgres.source.config.PostgresSourceOptions.CHUNK_META_GROUP_SIZE;
@@ -112,6 +113,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 
         boolean closeIdlerReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
+        boolean isScanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -155,7 +157,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 startupOptions,
                 chunkKeyColumn,
                 closeIdlerReaders,
-                skipSnapshotBackfill);
+                skipSnapshotBackfill,
+                isScanNewlyAddedTableEnabled);
     }
 
     @Override
@@ -196,6 +199,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(HEARTBEAT_INTERVAL);
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
+        options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         return options;
     }
 

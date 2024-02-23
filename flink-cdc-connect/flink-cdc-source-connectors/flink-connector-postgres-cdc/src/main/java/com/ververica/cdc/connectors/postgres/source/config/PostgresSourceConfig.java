@@ -20,7 +20,6 @@ import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
-import io.debezium.relational.RelationalTableFilters;
 
 import javax.annotation.Nullable;
 
@@ -62,7 +61,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             int connectMaxRetries,
             int connectionPoolSize,
             @Nullable String chunkKeyColumn,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            boolean isScanNewlyAddedTableEnabled) {
         super(
                 startupOptions,
                 databaseList,
@@ -88,7 +88,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 connectionPoolSize,
                 chunkKeyColumn,
                 skipSnapshotBackfill,
-                false);
+                isScanNewlyAddedTableEnabled);
         this.subtaskId = subtaskId;
     }
 
@@ -103,9 +103,5 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
     @Override
     public PostgresConnectorConfig getDbzConnectorConfig() {
         return new PostgresConnectorConfig(getDbzConfiguration());
-    }
-
-    public RelationalTableFilters getTableFilters() {
-        return getDbzConnectorConfig().getTableFilters();
     }
 }

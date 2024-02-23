@@ -19,8 +19,6 @@ package com.ververica.cdc.connectors.postgres.source;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
-import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -40,6 +38,7 @@ import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import com.ververica.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import com.ververica.cdc.connectors.postgres.PostgresTestBase;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
+import com.ververica.cdc.connectors.postgres.testutils.PostgresTestUtils;
 import com.ververica.cdc.connectors.postgres.testutils.TestTable;
 import com.ververica.cdc.connectors.postgres.testutils.UniqueDatabase;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
@@ -62,18 +61,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.postgres.testutils.PostgresTestUtils.hasNextData;
+import static com.ververica.cdc.connectors.postgres.testutils.PostgresTestUtils.triggerFailover;
+import static com.ververica.cdc.connectors.postgres.testutils.PostgresTestUtils.waitUntilJobRunning;
 import static java.lang.String.format;
-import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
@@ -163,21 +158,27 @@ public class PostgresSourceITCase extends PostgresTestBase {
     @Test
     public void testReadSingleTableWithSingleParallelism() throws Exception {
         testPostgresParallelSource(
-                1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers"});
+                1,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"customers"});
     }
 
     @Test
     public void testReadSingleTableWithMultipleParallelism() throws Exception {
         testPostgresParallelSource(
-                4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"customers"});
+                4,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"customers"});
     }
 
     @Test
     public void testReadMultipleTableWithSingleParallelism() throws Exception {
         testPostgresParallelSource(
                 1,
-                FailoverType.NONE,
-                FailoverPhase.NEVER,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
                 new String[] {"customers", "customers_1"});
     }
 
@@ -185,8 +186,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
     public void testReadMultipleTableWithMultipleParallelism() throws Exception {
         testPostgresParallelSource(
                 4,
-                FailoverType.NONE,
-                FailoverPhase.NEVER,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
                 new String[] {"customers", "customers_1"});
     }
 
@@ -194,37 +195,51 @@ public class PostgresSourceITCase extends PostgresTestBase {
     @Test
     public void testTaskManagerFailoverInSnapshotPhase() throws Exception {
         testPostgresParallelSource(
-                FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"customers", "customers_1"});
+                PostgresTestUtils.FailoverType.TM,
+                PostgresTestUtils.FailoverPhase.SNAPSHOT,
+                new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testTaskManagerFailoverInStreamPhase() throws Exception {
         testPostgresParallelSource(
-                FailoverType.TM, FailoverPhase.STREAM, new String[] {"customers", "customers_1"});
+                PostgresTestUtils.FailoverType.TM,
+                PostgresTestUtils.FailoverPhase.STREAM,
+                new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testJobManagerFailoverInSnapshotPhase() throws Exception {
         testPostgresParallelSource(
-                FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"customers", "customers_1"});
+                PostgresTestUtils.FailoverType.JM,
+                PostgresTestUtils.FailoverPhase.SNAPSHOT,
+                new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testJobManagerFailoverInStreamPhase() throws Exception {
         testPostgresParallelSource(
-                FailoverType.JM, FailoverPhase.STREAM, new String[] {"customers", "customers_1"});
+                PostgresTestUtils.FailoverType.JM,
+                PostgresTestUtils.FailoverPhase.STREAM,
+                new String[] {"customers", "customers_1"});
     }
 
     @Test
     public void testTaskManagerFailoverSingleParallelism() throws Exception {
         testPostgresParallelSource(
-                1, FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"customers"});
+                1,
+                PostgresTestUtils.FailoverType.TM,
+                PostgresTestUtils.FailoverPhase.SNAPSHOT,
+                new String[] {"customers"});
     }
 
     @Test
     public void testJobManagerFailoverSingleParallelism() throws Exception {
         testPostgresParallelSource(
-                1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"customers"});
+                1,
+                PostgresTestUtils.FailoverType.JM,
+                PostgresTestUtils.FailoverPhase.SNAPSHOT,
+                new String[] {"customers"});
     }
 
     @Test
@@ -234,8 +249,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 testPostgresParallelSource(
                         1,
                         scanStartupMode,
-                        FailoverType.NONE,
-                        FailoverPhase.NEVER,
+                        PostgresTestUtils.FailoverType.NONE,
+                        PostgresTestUtils.FailoverPhase.NEVER,
                         new String[] {"customers_no_pk"},
                         RestartStrategies.noRestart(),
                         false,
@@ -253,8 +268,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
             testPostgresParallelSource(
                     1,
                     scanStartupMode,
-                    FailoverType.NONE,
-                    FailoverPhase.NEVER,
+                    PostgresTestUtils.FailoverType.NONE,
+                    PostgresTestUtils.FailoverPhase.NEVER,
                     new String[] {"customers_no_pk"},
                     RestartStrategies.noRestart(),
                     false,
@@ -267,8 +282,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
         testPostgresParallelSource(
                 DEFAULT_PARALLELISM,
                 DEFAULT_SCAN_STARTUP_MODE,
-                FailoverType.TM,
-                FailoverPhase.SNAPSHOT,
+                PostgresTestUtils.FailoverType.TM,
+                PostgresTestUtils.FailoverPhase.SNAPSHOT,
                 new String[] {"customers"},
                 RestartStrategies.fixedDelayRestart(1, 0),
                 true,
@@ -321,12 +336,18 @@ public class PostgresSourceITCase extends PostgresTestBase {
         // first step: check the snapshot data
         if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             checkSnapshotData(
-                    tableResult, FailoverType.JM, FailoverPhase.STREAM, new String[] {"customers"});
+                    tableResult,
+                    PostgresTestUtils.FailoverType.JM,
+                    PostgresTestUtils.FailoverPhase.STREAM,
+                    new String[] {"customers"});
         }
 
         // second step: check the stream data
         checkStreamDataWithDDLDuringFailover(
-                tableResult, FailoverType.JM, FailoverPhase.STREAM, new String[] {"customers"});
+                tableResult,
+                PostgresTestUtils.FailoverType.JM,
+                PostgresTestUtils.FailoverPhase.STREAM,
+                new String[] {"customers"});
 
         tableResult.getJobClient().get().cancel().get();
     }
@@ -561,8 +582,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
     @Test
     public void testNewLsnCommittedWhenCheckpoint() throws Exception {
         int parallelism = 1;
-        FailoverType failoverType = FailoverType.JM;
-        FailoverPhase failoverPhase = FailoverPhase.STREAM;
+        PostgresTestUtils.FailoverType failoverType = PostgresTestUtils.FailoverType.JM;
+        PostgresTestUtils.FailoverPhase failoverPhase = PostgresTestUtils.FailoverPhase.STREAM;
         String[] captureCustomerTables = new String[] {"customers"};
         RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration =
                 RestartStrategies.fixedDelayRestart(1, 0);
@@ -634,8 +655,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
             testPostgresParallelSource(
                     1,
                     scanStartupMode,
-                    FailoverType.NONE,
-                    FailoverPhase.NEVER,
+                    PostgresTestUtils.FailoverType.NONE,
+                    PostgresTestUtils.FailoverPhase.NEVER,
                     new String[] {"customers"},
                     RestartStrategies.noRestart(),
                     false,
@@ -732,7 +753,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
     }
 
     private void testPostgresParallelSource(
-            FailoverType failoverType, FailoverPhase failoverPhase, String[] captureCustomerTables)
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
+            String[] captureCustomerTables)
             throws Exception {
         testPostgresParallelSource(
                 DEFAULT_PARALLELISM, failoverType, failoverPhase, captureCustomerTables);
@@ -740,8 +763,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
     private void testPostgresParallelSource(
             int parallelism,
-            FailoverType failoverType,
-            FailoverPhase failoverPhase,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
         testPostgresParallelSource(
@@ -758,8 +781,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
     private void testPostgresParallelSource(
             int parallelism,
             String scanStartupMode,
-            FailoverType failoverType,
-            FailoverPhase failoverPhase,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
             boolean skipSnapshotBackfill,
@@ -829,8 +852,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
     private void checkSnapshotData(
             TableResult tableResult,
-            FailoverType failoverType,
-            FailoverPhase failoverPhase,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
         String[] snapshotForSingleTable =
@@ -867,7 +890,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         JobID jobId = tableResult.getJobClient().get().getJobID();
 
         // trigger failover after some snapshot splits read finished
-        if (failoverPhase == FailoverPhase.SNAPSHOT && iterator.hasNext()) {
+        if (failoverPhase == PostgresTestUtils.FailoverPhase.SNAPSHOT && iterator.hasNext()) {
             triggerFailover(
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(3000));
         }
@@ -878,8 +901,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
     private void checkStreamData(
             TableResult tableResult,
-            FailoverType failoverType,
-            FailoverPhase failoverPhase,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
         waitUntilJobRunning(tableResult);
@@ -895,7 +918,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         // wait for the stream reading
         Thread.sleep(2000L);
 
-        if (failoverPhase == FailoverPhase.STREAM) {
+        if (failoverPhase == PostgresTestUtils.FailoverPhase.STREAM) {
             triggerFailover(
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
             waitUntilJobRunning(tableResult);
@@ -920,8 +943,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
     private void checkStreamDataWithHook(
             TableResult tableResult,
-            FailoverType failoverType,
-            FailoverPhase failoverPhase,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
         waitUntilJobRunning(tableResult);
@@ -964,7 +987,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         countDownLatch.await();
         waitUntilJobRunning(tableResult);
 
-        if (failoverPhase == FailoverPhase.STREAM) {
+        if (failoverPhase == PostgresTestUtils.FailoverPhase.STREAM) {
             triggerFailover(
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
             waitUntilJobRunning(tableResult);
@@ -989,8 +1012,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
     private void checkStreamDataWithDDLDuringFailover(
             TableResult tableResult,
-            FailoverType failoverType,
-            FailoverPhase failoverPhase,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
         waitUntilJobRunning(tableResult);
@@ -1007,7 +1030,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         Thread.sleep(2000L);
 
         // update database during stream fail over period
-        if (failoverPhase == FailoverPhase.STREAM) {
+        if (failoverPhase == PostgresTestUtils.FailoverPhase.STREAM) {
             triggerFailover(
                     failoverType,
                     jobId,
@@ -1071,6 +1094,16 @@ public class PostgresSourceITCase extends PostgresTestBase {
         return rows.stream().map(stringifier).collect(Collectors.toList());
     }
 
+    public static List<String> fetchRows(Iterator<Row> iter, int size) {
+        List<String> rows = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            Row row = iter.next();
+            rows.add(row.toString());
+            size--;
+        }
+        return rows;
+    }
+
     /**
      * Make some changes on the specified customer table. Changelog in string could be accessed by
      * {@link #firstPartStreamEvents}.
@@ -1126,76 +1159,5 @@ public class PostgresSourceITCase extends PostgresTestBase {
         properties.put("password", customDatabase.getPassword());
         properties.put("dbname", customDatabase.getDatabaseName());
         return createConnection(properties);
-    }
-
-    // ------------------------------------------------------------------------
-    //  test utilities
-    // ------------------------------------------------------------------------
-
-    /** The type of failover. */
-    private enum FailoverType {
-        TM,
-        JM,
-        NONE
-    }
-
-    /** The phase of failover. */
-    private enum FailoverPhase {
-        SNAPSHOT,
-        STREAM,
-        NEVER
-    }
-
-    private static void triggerFailover(
-            FailoverType type, JobID jobId, MiniCluster miniCluster, Runnable afterFailAction)
-            throws Exception {
-        switch (type) {
-            case TM:
-                restartTaskManager(miniCluster, afterFailAction);
-                break;
-            case JM:
-                triggerJobManagerFailover(jobId, miniCluster, afterFailAction);
-                break;
-            case NONE:
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + type);
-        }
-    }
-
-    private static void triggerJobManagerFailover(
-            JobID jobId, MiniCluster miniCluster, Runnable afterFailAction) throws Exception {
-        final HaLeadershipControl haLeadershipControl = miniCluster.getHaLeadershipControl().get();
-        haLeadershipControl.revokeJobMasterLeadership(jobId).get();
-        afterFailAction.run();
-        haLeadershipControl.grantJobMasterLeadership(jobId).get();
-    }
-
-    private static void restartTaskManager(MiniCluster miniCluster, Runnable afterFailAction)
-            throws Exception {
-        miniCluster.terminateTaskManager(0).get();
-        afterFailAction.run();
-        miniCluster.startTaskManager();
-    }
-
-    private void waitUntilJobRunning(TableResult tableResult)
-            throws InterruptedException, ExecutionException {
-        do {
-            Thread.sleep(5000L);
-        } while (tableResult.getJobClient().get().getJobStatus().get() != RUNNING);
-    }
-
-    private boolean hasNextData(final CloseableIterator<?> iterator)
-            throws InterruptedException, ExecutionException {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        try {
-            FutureTask<Boolean> future = new FutureTask(iterator::hasNext);
-            executor.execute(future);
-            return future.get(3, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            return false;
-        } finally {
-            executor.shutdown();
-        }
     }
 }
