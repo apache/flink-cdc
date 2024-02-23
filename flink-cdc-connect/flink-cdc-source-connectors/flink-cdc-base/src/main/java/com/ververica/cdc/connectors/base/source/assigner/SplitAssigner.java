@@ -107,14 +107,14 @@ public interface SplitAssigner {
     /** Gets the split assigner status, see {@code AssignerStatus}. */
     AssignerStatus getAssignerStatus();
 
-    /**
-     * Suspends the assigner under {@link AssignerStatus#INITIAL_ASSIGNING_FINISHED} or {@link
-     * AssignerStatus#NEWLY_ADDED_ASSIGNING_FINISHED}.
-     */
-    void suspend();
+    /** Starts assign newly added tables. */
+    void startAssignNewlyAddedTables();
 
-    /** Wakes up the assigner under {@link AssignerStatus#SUSPENDED}. */
-    void wakeup();
+    /**
+     * Callback to handle the stream split has been updated in the newly added tables process. This
+     * is useful to check the newly added tables has been finished or not.
+     */
+    void onStreamSplitUpdated();
 
     /**
      * Called to close the assigner, in case it holds on to any resources, like threads or network

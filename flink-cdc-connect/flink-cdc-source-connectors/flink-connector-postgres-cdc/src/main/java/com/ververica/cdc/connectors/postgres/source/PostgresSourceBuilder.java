@@ -35,6 +35,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
+import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReaderContext;
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReaderWithCommit;
 import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceSplitReader;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
@@ -307,19 +308,22 @@ public class PostgresSourceBuilder<T> {
                     new SourceReaderMetrics(readerContext.metricGroup());
 
             sourceReaderMetrics.registerMetrics();
+            IncrementalSourceReaderContext incrementalSourceReaderContext =
+                    new IncrementalSourceReaderContext(readerContext);
             Supplier<IncrementalSourceSplitReader<JdbcSourceConfig>> splitReaderSupplier =
                     () ->
                             new IncrementalSourceSplitReader<>(
                                     readerContext.getIndexOfSubtask(),
                                     dataSourceDialect,
                                     sourceConfig,
+                                    incrementalSourceReaderContext,
                                     snapshotHooks);
             return new IncrementalSourceReaderWithCommit(
                     elementsQueue,
                     splitReaderSupplier,
                     createRecordEmitter(sourceConfig, sourceReaderMetrics),
                     readerContext.getConfiguration(),
-                    readerContext,
+                    incrementalSourceReaderContext,
                     sourceConfig,
                     sourceSplitSerializer,
                     dataSourceDialect);

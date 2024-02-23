@@ -42,7 +42,6 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected StartupOptions startupOptions = StartupOptions.initial();
     protected boolean includeSchemaChanges = false;
     protected boolean closeIdleReaders = false;
-    protected boolean scanNewlyAddedTableEnabled = false;
     protected double distributionFactorUpper =
             SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue();
     protected double distributionFactorLower =
@@ -58,6 +57,8 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected String chunkKeyColumn;
     protected boolean skipSnapshotBackfill =
             JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue();
+    protected boolean scanNewlyAddedTableEnabled =
+            JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue();
 
     /** Integer port number of the database server. */
     public JdbcSourceConfigFactory hostname(String hostname) {
@@ -183,12 +184,6 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
         return this;
     }
 
-    /** Whether the {@link SourceConfig} should scan the newly added tables or not. */
-    public JdbcSourceConfigFactory scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
-        this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
-        return this;
-    }
-
     /** The Debezium connector properties. For example, "snapshot.mode". */
     public JdbcSourceConfigFactory debeziumProperties(Properties properties) {
         this.dbzProperties = properties;
@@ -238,15 +233,22 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
      * Whether to skip backfill in snapshot reading phase.
      *
      * <p>If backfill is skipped, changes on captured tables during snapshot phase will be consumed
-     * later in binlog reading phase instead of being merged into the snapshot.
+     * later in stream reading phase instead of being merged into the snapshot.
      *
-     * <p>WARNING: Skipping backfill might lead to data inconsistency because some binlog events
+     * <p>WARNING: Skipping backfill might lead to data inconsistency because some change log events
      * happened within the snapshot phase might be replayed (only at-least-once semantic is
      * promised). For example updating an already updated value in snapshot, or deleting an already
-     * deleted entry in snapshot. These replayed binlog events should be handled specially.
+     * deleted entry in snapshot. These replayed change log events should be handled specially.
      */
-    public void skipSnapshotBackfill(boolean skipSnapshotBackfill) {
+    public JdbcSourceConfigFactory skipSnapshotBackfill(boolean skipSnapshotBackfill) {
         this.skipSnapshotBackfill = skipSnapshotBackfill;
+        return this;
+    }
+
+    /** Whether the {@link SourceConfig} should scan the newly added tables or not. */
+    public JdbcSourceConfigFactory scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
+        this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        return this;
     }
 
     @Override

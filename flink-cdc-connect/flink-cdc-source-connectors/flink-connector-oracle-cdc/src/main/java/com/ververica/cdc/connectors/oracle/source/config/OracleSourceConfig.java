@@ -20,7 +20,6 @@ import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.options.StartupOptions;
 import io.debezium.config.Configuration;
 import io.debezium.connector.oracle.OracleConnectorConfig;
-import io.debezium.relational.RelationalTableFilters;
 
 import javax.annotation.Nullable;
 
@@ -99,10 +98,6 @@ public class OracleSourceConfig extends JdbcSourceConfig {
 
     public Configuration getOriginDbzConnectorConfig() {
         return super.getDbzConfiguration();
-    }
-
-    public RelationalTableFilters getTableFilters() {
-        return getDbzConnectorConfig().getTableFilters();
     }
 
     @Nullable

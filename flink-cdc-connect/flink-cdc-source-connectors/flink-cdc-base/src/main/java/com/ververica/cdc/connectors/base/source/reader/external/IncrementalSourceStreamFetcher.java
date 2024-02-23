@@ -212,8 +212,15 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
             return true;
         }
 
-        return !maxSplitHighWatermarkMap.containsKey(tableId)
-                && taskContext.getTableFilter().isIncluded(tableId);
+        // Use still need to capture new sharding table if user disable scan new added table,
+        // The history records for all new added tables(including sharding table and normal table)
+        // will be capture after restore from a savepoint if user enable scan new added table
+        if (!taskContext.getSourceConfig().isScanNewlyAddedTableEnabled()) {
+            // the new added sharding table without history records
+            return !maxSplitHighWatermarkMap.containsKey(tableId)
+                    && taskContext.getTableFilter().isIncluded(tableId);
+        }
+        return false;
     }
 
     private void configureFilter() {
@@ -221,13 +228,13 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
                 currentStreamSplit.getFinishedSnapshotSplitInfos();
         Map<TableId, List<FinishedSnapshotSplitInfo>> splitsInfoMap = new HashMap<>();
         Map<TableId, Offset> tableIdOffsetPositionMap = new HashMap<>();
-        // latest-offset mode
-        if (finishedSplitInfos.isEmpty()) {
+        // startup mode which is stream only
+        if (taskContext.getSourceConfig().getStartupOptions().isStreamOnly()) {
             for (TableId tableId : currentStreamSplit.getTableSchemas().keySet()) {
                 tableIdOffsetPositionMap.put(tableId, currentStreamSplit.getStartingOffset());
             }
         }
-        // initial mode
+        // startup mode which includes snapshot phase
         else {
             for (FinishedSnapshotSplitInfo finishedSplitInfo : finishedSplitInfos) {
                 TableId tableId = finishedSplitInfo.getTableId();

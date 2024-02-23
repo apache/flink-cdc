@@ -26,16 +26,23 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import com.ververica.cdc.common.annotation.Experimental;
 import com.ververica.cdc.connectors.base.config.SourceConfig;
+import com.ververica.cdc.connectors.base.source.assigner.HybridSplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.SplitAssigner;
 import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsState;
 import com.ververica.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsAckEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsReportEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsRequestEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.LatestFinishedSplitsNumberEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.LatestFinishedSplitsNumberRequestEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitAssignedEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitMetaEvent;
 import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitMetaRequestEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitUpdateAckEvent;
+import com.ververica.cdc.connectors.base.source.meta.events.StreamSplitUpdateRequestEvent;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import com.ververica.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +56,8 @@ import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import static com.ververica.cdc.connectors.base.source.assigner.AssignerStatus.isNewlyAddedAssigningSnapshotFinished;
+
 /**
  * Incremental source enumerator that enumerates receive the split request and assign the split to
  * source readers.
@@ -59,15 +68,17 @@ public class IncrementalSourceEnumerator
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceEnumerator.class);
     private static final long CHECK_EVENT_INTERVAL = 30_000L;
 
-    private final SplitEnumeratorContext<SourceSplitBase> context;
+    protected final SplitEnumeratorContext<SourceSplitBase> context;
     private final SourceConfig sourceConfig;
-    private final SplitAssigner splitAssigner;
+    protected final SplitAssigner splitAssigner;
 
     // using TreeSet to prefer assigning stream split to task-0 for easier debug
-    private final TreeSet<Integer> readersAwaitingSplit;
+    protected final TreeSet<Integer> readersAwaitingSplit;
     private List<List<FinishedSnapshotSplitInfo>> finishedSnapshotSplitMeta;
 
     private Boundedness boundedness;
+
+    @Nullable protected Integer streamSplitTaskId = null;
 
     public IncrementalSourceEnumerator(
             SplitEnumeratorContext<SourceSplitBase> context,
@@ -84,6 +95,7 @@ public class IncrementalSourceEnumerator
     @Override
     public void start() {
         splitAssigner.open();
+        requestStreamSplitUpdateIfNeed();
         this.context.callAsync(
                 this::getRegisteredReader,
                 this::syncWithReaders,
@@ -105,12 +117,20 @@ public class IncrementalSourceEnumerator
     @Override
     public void addSplitsBack(List<SourceSplitBase> splits, int subtaskId) {
         LOG.debug("Incremental Source Enumerator adds splits back: {}", splits);
+        Optional<SourceSplitBase> streamSplit =
+                splits.stream().filter(SourceSplitBase::isStreamSplit).findAny();
+        if (streamSplit.isPresent()) {
+            LOG.info("The enumerator adds add stream split back: {}", streamSplit);
+            this.streamSplitTaskId = null;
+        }
         splitAssigner.addSplits(splits);
     }
 
     @Override
     public void addReader(int subtaskId) {
-        // do nothing
+        // send StreamSplitUpdateRequestEvent to source reader after newly added table
+        // snapshot splits finished.
+        requestStreamSplitUpdateIfNeed();
     }
 
     @Override
@@ -124,6 +144,8 @@ public class IncrementalSourceEnumerator
                     (FinishedSnapshotSplitsReportEvent) sourceEvent;
             Map<String, Offset> finishedOffsets = reportEvent.getFinishedOffsets();
             splitAssigner.onFinishedSplits(finishedOffsets);
+            requestStreamSplitUpdateIfNeed();
+
             // send acknowledge event
             FinishedSnapshotSplitsAckEvent ackEvent =
                     new FinishedSnapshotSplitsAckEvent(new ArrayList<>(finishedOffsets.keySet()));
@@ -133,6 +155,21 @@ public class IncrementalSourceEnumerator
                     "The enumerator receives request for stream split meta from subtask {}.",
                     subtaskId);
             sendStreamMetaRequestEvent(subtaskId, (StreamSplitMetaRequestEvent) sourceEvent);
+        } else if (sourceEvent instanceof LatestFinishedSplitsNumberRequestEvent) {
+            LOG.info(
+                    "The enumerator receives request from subtask {} for the latest finished splits number after added newly tables. ",
+                    subtaskId);
+            handleLatestFinishedSplitNumberRequest(subtaskId);
+        } else if (sourceEvent instanceof StreamSplitUpdateAckEvent) {
+            LOG.info(
+                    "The enumerator receives event that the streamSplit split has been updated from subtask {}. ",
+                    subtaskId);
+            splitAssigner.onStreamSplitUpdated();
+        } else if (sourceEvent instanceof StreamSplitAssignedEvent) {
+            LOG.info(
+                    "The enumerator receives notice from subtask {} for the stream split assignment. ",
+                    subtaskId);
+            this.streamSplitTaskId = subtaskId;
         }
     }
 
@@ -156,7 +193,7 @@ public class IncrementalSourceEnumerator
 
     // ------------------------------------------------------------------------------------------
 
-    private void assignSplits() {
+    protected void assignSplits() {
         final Iterator<Integer> awaitingReader = readersAwaitingSplit.iterator();
 
         while (awaitingReader.hasNext()) {
@@ -168,7 +205,7 @@ public class IncrementalSourceEnumerator
                 continue;
             }
 
-            if (shouldCloseIdleReader()) {
+            if (shouldCloseIdleReader(nextAwaiting)) {
                 // close idle readers when snapshot phase finished.
                 context.signalNoMoreSplits(nextAwaiting);
                 awaitingReader.remove();
@@ -180,16 +217,20 @@ public class IncrementalSourceEnumerator
             if (split.isPresent()) {
                 final SourceSplitBase sourceSplit = split.get();
                 context.assignSplit(sourceSplit, nextAwaiting);
+                if (sourceSplit instanceof StreamSplit) {
+                    this.streamSplitTaskId = nextAwaiting;
+                }
                 awaitingReader.remove();
                 LOG.info("Assign split {} to subtask {}", sourceSplit, nextAwaiting);
             } else {
                 // there is no available splits by now, skip assigning
+                requestStreamSplitUpdateIfNeed();
                 break;
             }
         }
     }
 
-    private boolean shouldCloseIdleReader() {
+    private boolean shouldCloseIdleReader(int nextAwaiting) {
         // When no unassigned split anymore, Signal NoMoreSplitsEvent to awaiting reader in two
         // situations:
         // 1. When Set StartupMode = snapshot mode(also bounded), there's no more splits in the
@@ -197,16 +238,19 @@ public class IncrementalSourceEnumerator
         // 2. When set scan.incremental.close-idle-reader.enabled = true, there's no more splits in
         // the assigner.
         return splitAssigner.noMoreSplits()
-                && (boundedness == Boundedness.BOUNDED || (sourceConfig.isCloseIdleReaders()));
+                && (boundedness == Boundedness.BOUNDED
+                        || (sourceConfig.isCloseIdleReaders()
+                                && streamSplitTaskId != null
+                                && streamSplitTaskId != (nextAwaiting)));
     }
 
-    private int[] getRegisteredReader() {
+    protected int[] getRegisteredReader() {
         return this.context.registeredReaders().keySet().stream()
                 .mapToInt(Integer::intValue)
                 .toArray();
     }
 
-    private void syncWithReaders(int[] subtaskIds, Throwable t) {
+    protected void syncWithReaders(int[] subtaskIds, Throwable t) {
         if (t != null) {
             throw new FlinkRuntimeException("Failed to list obtain registered readers due to:", t);
         }
@@ -219,6 +263,29 @@ public class IncrementalSourceEnumerator
             for (int subtaskId : subtaskIds) {
                 context.sendEventToSourceReader(
                         subtaskId, new FinishedSnapshotSplitsRequestEvent());
+            }
+        }
+
+        requestStreamSplitUpdateIfNeed();
+    }
+
+    private void requestStreamSplitUpdateIfNeed() {
+        if (isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())) {
+            // If enumerator knows which reader is assigned stream split, just send to this reader,
+            // nor sends to all registered readers.
+            if (streamSplitTaskId != null) {
+                LOG.info(
+                        "The enumerator requests subtask {} to update the stream split after newly added table.",
+                        streamSplitTaskId);
+                context.sendEventToSourceReader(
+                        streamSplitTaskId, new StreamSplitUpdateRequestEvent());
+            } else {
+                for (int reader : getRegisteredReader()) {
+                    LOG.info(
+                            "The enumerator requests subtask {} to update the stream split after newly added table.",
+                            reader);
+                    context.sendEventToSourceReader(reader, new StreamSplitUpdateRequestEvent());
+                }
             }
         }
     }
@@ -256,6 +323,15 @@ public class IncrementalSourceEnumerator
                     "Received invalid request meta group id {}, the invalid meta group id range is [0, {}]",
                     requestMetaGroupId,
                     finishedSnapshotSplitMeta.size() - 1);
+        }
+    }
+
+    private void handleLatestFinishedSplitNumberRequest(int subtaskId) {
+        if (splitAssigner instanceof HybridSplitAssigner) {
+            context.sendEventToSourceReader(
+                    subtaskId,
+                    new LatestFinishedSplitsNumberEvent(
+                            splitAssigner.getFinishedSplitInfos().size()));
         }
     }
 }

@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.ververica.cdc.connectors.base.source.assigner.state;
+package com.ververica.cdc.connectors.base.source.assigner.state.version5;
 
-import com.ververica.cdc.connectors.base.source.assigner.AssignerStatus;
+import com.ververica.cdc.connectors.base.source.assigner.state.PendingSplitsState;
 import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
 import com.ververica.cdc.connectors.base.source.meta.offset.Offset;
 import com.ververica.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
@@ -26,10 +26,13 @@ import io.debezium.relational.history.TableChanges;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
-/** A {@link PendingSplitsState} for pending snapshot splits. */
-public class SnapshotPendingSplitsState extends PendingSplitsState {
+/**
+ * The 5th version of PendingSplitsStateSerializer. The modification of the 6th version: Change
+ * isAssignerFinished(boolean) to assignStatus in SnapshotPendingSplitsState to represent a more
+ * comprehensive assignment status.
+ */
+public class SnapshotPendingSplitsStateVersion5 extends PendingSplitsState {
 
     /** The tables in the checkpoint. */
     private final List<TableId> remainingTables;
@@ -55,8 +58,11 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
      */
     private final Map<String, Offset> splitFinishedOffsets;
 
-    /** The {@link AssignerStatus} that indicates the snapshot assigner status. */
-    private final AssignerStatus assignerStatus;
+    /**
+     * Whether the snapshot split assigner is finished, which indicates there is no more splits and
+     * all records of splits have been completely processed in the pipeline.
+     */
+    private final boolean isAssignerFinished;
 
     /** Whether the table identifier is case sensitive. */
     private final boolean isTableIdCaseSensitive;
@@ -66,13 +72,13 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     private final Map<TableId, TableChanges.TableChange> tableSchemas;
 
-    public SnapshotPendingSplitsState(
+    public SnapshotPendingSplitsStateVersion5(
             List<TableId> alreadyProcessedTables,
             List<SchemalessSnapshotSplit> remainingSplits,
             Map<String, SchemalessSnapshotSplit> assignedSplits,
             Map<TableId, TableChanges.TableChange> tableSchemas,
             Map<String, Offset> splitFinishedOffsets,
-            AssignerStatus assignerStatus,
+            boolean isAssignerFinished,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed) {
@@ -80,7 +86,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
         this.splitFinishedOffsets = splitFinishedOffsets;
-        this.assignerStatus = assignerStatus;
+        this.isAssignerFinished = isAssignerFinished;
         this.remainingTables = remainingTables;
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
@@ -107,8 +113,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return splitFinishedOffsets;
     }
 
-    public AssignerStatus getSnapshotAssignerStatus() {
-        return assignerStatus;
+    public boolean isAssignerFinished() {
+        return isAssignerFinished;
     }
 
     public List<TableId> getRemainingTables() {
@@ -121,59 +127,5 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     public boolean isRemainingTablesCheckpointed() {
         return isRemainingTablesCheckpointed;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof SnapshotPendingSplitsState)) {
-            return false;
-        }
-        SnapshotPendingSplitsState that = (SnapshotPendingSplitsState) o;
-        return Objects.equals(assignerStatus, that.assignerStatus)
-                && isTableIdCaseSensitive == that.isTableIdCaseSensitive
-                && isRemainingTablesCheckpointed == that.isRemainingTablesCheckpointed
-                && Objects.equals(remainingTables, that.remainingTables)
-                && Objects.equals(alreadyProcessedTables, that.alreadyProcessedTables)
-                && Objects.equals(remainingSplits, that.remainingSplits)
-                && Objects.equals(assignedSplits, that.assignedSplits)
-                && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(
-                remainingTables,
-                alreadyProcessedTables,
-                remainingSplits,
-                assignedSplits,
-                splitFinishedOffsets,
-                assignerStatus,
-                isTableIdCaseSensitive,
-                isRemainingTablesCheckpointed);
-    }
-
-    @Override
-    public String toString() {
-        return "SnapshotPendingSplitsState{"
-                + "remainingTables="
-                + remainingTables
-                + ", alreadyProcessedTables="
-                + alreadyProcessedTables
-                + ", remainingSplits="
-                + remainingSplits
-                + ", assignedSplits="
-                + assignedSplits
-                + ", splitFinishedOffsets="
-                + splitFinishedOffsets
-                + ", assignerStatus="
-                + assignerStatus
-                + ", isTableIdCaseSensitive="
-                + isTableIdCaseSensitive
-                + ", isRemainingTablesCheckpointed="
-                + isRemainingTablesCheckpointed
-                + '}';
     }
 }

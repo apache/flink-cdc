@@ -17,6 +17,7 @@
 package com.ververica.cdc.connectors.mongodb.source.reader;
 
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsAddition;
+import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
 
 import com.ververica.cdc.connectors.base.source.meta.split.ChangeEventRecords;
 import com.ververica.cdc.connectors.base.source.meta.split.SnapshotSplit;
@@ -115,11 +116,15 @@ public class MongoDBSnapshotSplitReaderTest extends MongoDBSourceTestBase {
         LinkedList<SnapshotSplit> snapshotSplits = new LinkedList<>(splitter.split(splitContext));
         assertTrue(snapshotSplits.size() > 0);
 
-        IncrementalSourceReaderContext sourceReaderContext =
-                new IncrementalSourceReaderContext(null);
+        IncrementalSourceReaderContext incrementalSourceReaderContext =
+                new IncrementalSourceReaderContext(new TestingReaderContext());
         IncrementalSourceSplitReader<MongoDBSourceConfig> snapshotSplitReader =
                 new IncrementalSourceSplitReader<>(
-                        0, dialect, sourceConfig, SnapshotPhaseHooks.empty(), sourceReaderContext);
+                        0,
+                        dialect,
+                        sourceConfig,
+                        incrementalSourceReaderContext,
+                        SnapshotPhaseHooks.empty());
 
         int retry = 0;
         long actualCount = 0;

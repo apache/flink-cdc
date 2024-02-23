@@ -218,7 +218,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private void captureNewlyAddedTables() {
         // Don't scan newly added table in snapshot mode.
         if (sourceConfig.isScanNewlyAddedTableEnabled()
-                || !sourceConfig.getStartupOptions().isSnapshotOnly()) {
+                && !sourceConfig.getStartupOptions().isSnapshotOnly()) {
             // check whether we got newly added tables
             try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
                 final List<TableId> currentCapturedTables =
@@ -441,7 +441,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         // we need a complete checkpoint before mark this assigner to be finished, to wait for
         // all records of snapshot splits are completely processed
         if (checkpointIdToFinish == null
-                && !isSnapshotAssigningFinished(assignerStatus)
+                && isAssigningSnapshotSplits(assignerStatus)
                 && allSnapshotSplitsFinished()) {
             checkpointIdToFinish = checkpointId;
         }

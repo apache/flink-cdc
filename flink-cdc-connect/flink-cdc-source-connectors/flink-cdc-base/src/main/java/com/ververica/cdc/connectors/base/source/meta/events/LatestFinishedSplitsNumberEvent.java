@@ -18,31 +18,30 @@ package com.ververica.cdc.connectors.base.source.meta.events;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 
-import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
-import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
-
 /**
- * The {@link SourceEvent} that {@link IncrementalSourceEnumerator} sends to {@link
- * IncrementalSourceReader} to pass the latest finished snapshot splits size.
+ * The {@link SourceEvent} that {@link
+ * com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator} sends to {@link
+ * com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader} to pass the latest
+ * finished snapshot splits number.
  */
-public class LatestFinishedSplitsSizeEvent implements SourceEvent {
+public class LatestFinishedSplitsNumberEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
-    private final int latestFinishedSplitsSize;
+    private final int latestFinishedSplitsNumber;
 
-    public LatestFinishedSplitsSizeEvent(int latestFinishedSplitsSize) {
-        this.latestFinishedSplitsSize = latestFinishedSplitsSize;
+    public LatestFinishedSplitsNumberEvent(int latestFinishedSplitsNumber) {
+        this.latestFinishedSplitsNumber = latestFinishedSplitsNumber;
     }
 
-    public int getLatestFinishedSplitsSize() {
-        return latestFinishedSplitsSize;
+    public int getLatestFinishedSplitsNumber() {
+        return latestFinishedSplitsNumber;
     }
 
     @Override
     public String toString() {
-        return "LatestFinishedSplitsSizeEvent{"
-                + "latestFinishedSplitsSize="
-                + latestFinishedSplitsSize
+        return "LatestFinishedSplitsNumberEvent{"
+                + "latestFinishedSplitsNumber="
+                + latestFinishedSplitsNumber
                 + '}';
     }
 }

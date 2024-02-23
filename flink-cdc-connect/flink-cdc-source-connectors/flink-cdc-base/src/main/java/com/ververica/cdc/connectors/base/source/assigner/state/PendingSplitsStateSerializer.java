@@ -40,7 +40,16 @@ import java.util.Map;
 import static com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSerializer.readTableSchemas;
 import static com.ververica.cdc.connectors.base.source.meta.split.SourceSplitSerializer.writeTableSchemas;
 
-/** The {@link SimpleVersionedSerializer Serializer} for the {@link PendingSplitsState}. */
+/**
+ * The {@link SimpleVersionedSerializer Serializer} for the {@link PendingSplitsState}. The
+ * modification of the 6th version:
+ *
+ * <p>1. Change isAssignerFinished(boolean) to assignStatus in SnapshotPendingSplitsState to
+ * represent a more comprehensive assignment status.
+ *
+ * <p>2. Add streamSplitTaskId(int) to HybridPendingSplitsState, which represents the task ID
+ * assigned to the stream split.
+ */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
     private static final int VERSION = 6;

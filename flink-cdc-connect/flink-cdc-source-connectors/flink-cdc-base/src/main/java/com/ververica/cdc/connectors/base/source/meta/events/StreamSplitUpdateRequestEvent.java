@@ -18,16 +18,15 @@ package com.ververica.cdc.connectors.base.source.meta.events;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 
-import com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
-import com.ververica.cdc.connectors.base.source.reader.IncrementalSourceReader;
-
 /**
- * The {@link SourceEvent} that {@link IncrementalSourceReader} sends to {@link
- * IncrementalSourceEnumerator} to ask the latest finished snapshot splits size.
+ * The {@link SourceEvent} that {@link
+ * com.ververica.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator} broadcasts to
+ * {@link com.ververica.cdc.connectors.base.source.reader.IncrementalSourceSplitReader} to tell the
+ * source reader to update the stream split after newly added table snapshot splits finished.
  */
-public class LatestFinishedSplitsSizeRequestEvent implements SourceEvent {
+public class StreamSplitUpdateRequestEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
-    public LatestFinishedSplitsSizeRequestEvent() {}
+    public StreamSplitUpdateRequestEvent() {}
 }

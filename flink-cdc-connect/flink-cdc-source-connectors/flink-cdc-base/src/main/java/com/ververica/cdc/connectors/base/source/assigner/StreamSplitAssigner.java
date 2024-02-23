@@ -119,20 +119,20 @@ public class StreamSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public boolean noMoreSplits() {
-        return isStreamSplitAssigned;
-    }
-
-    @Override
     public AssignerStatus getAssignerStatus() {
         return AssignerStatus.INITIAL_ASSIGNING_FINISHED;
     }
 
     @Override
-    public void suspend() {}
+    public void startAssignNewlyAddedTables() {}
 
     @Override
-    public void wakeup() {}
+    public void onStreamSplitUpdated() {}
+
+    @Override
+    public boolean noMoreSplits() {
+        return isStreamSplitAssigned;
+    }
 
     @Override
     public void close() {}

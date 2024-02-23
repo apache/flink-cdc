@@ -22,7 +22,6 @@ import com.ververica.cdc.connectors.base.config.SourceConfig;
 import com.ververica.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.FetchTask;
-import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
@@ -58,8 +57,4 @@ public interface JdbcDataSourceDialect extends DataSourceDialect<JdbcSourceConfi
 
     @Override
     FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase);
-
-    @Override
-    JdbcSourceFetchTaskContext createFetchTaskContext(
-            SourceSplitBase sourceSplitBase, JdbcSourceConfig taskSourceConfig);
 }

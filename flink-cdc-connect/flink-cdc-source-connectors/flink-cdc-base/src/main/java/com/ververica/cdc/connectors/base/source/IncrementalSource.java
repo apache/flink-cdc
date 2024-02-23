@@ -121,7 +121,7 @@ public class IncrementalSource<T, C extends SourceConfig>
                 new SourceReaderMetrics(readerContext.metricGroup());
 
         sourceReaderMetrics.registerMetrics();
-        IncrementalSourceReaderContext sourceReaderContext =
+        IncrementalSourceReaderContext incrementalSourceReaderContext =
                 new IncrementalSourceReaderContext(readerContext);
         Supplier<IncrementalSourceSplitReader<C>> splitReaderSupplier =
                 () ->
@@ -129,14 +129,14 @@ public class IncrementalSource<T, C extends SourceConfig>
                                 readerContext.getIndexOfSubtask(),
                                 dataSourceDialect,
                                 sourceConfig,
-                                snapshotHooks,
-                                sourceReaderContext);
+                                incrementalSourceReaderContext,
+                                snapshotHooks);
         return new IncrementalSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,
                 createRecordEmitter(sourceConfig, sourceReaderMetrics),
                 readerContext.getConfiguration(),
-                sourceReaderContext,
+                incrementalSourceReaderContext,
                 sourceConfig,
                 sourceSplitSerializer,
                 dataSourceDialect);
@@ -198,6 +198,7 @@ public class IncrementalSource<T, C extends SourceConfig>
             throw new UnsupportedOperationException(
                     "Unsupported restored PendingSplitsState: " + checkpoint);
         }
+
         return new IncrementalSourceEnumerator(
                 enumContext, sourceConfig, splitAssigner, getBoundedness());
     }

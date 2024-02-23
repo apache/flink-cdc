@@ -234,7 +234,7 @@ public class MySqlSourceOptions {
                     .booleanType()
                     .defaultValue(false)
                     .withDescription(
-                            "Whether capture the scan the newly added tables or not, by default is false.");
+                            "Whether capture the scan the newly added tables or not, by default is false. This option is only useful when we start the job from a savepoint/checkpoint.");
 
     @Experimental
     public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =
