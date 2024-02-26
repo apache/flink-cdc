@@ -41,7 +41,7 @@ export FLINK_HOME=/path/to/your/flink/home
 ```yaml
 source:
   type: mysql
-  host: localhost
+  hostname: localhost
   port: 3306
   username: admin
   password: pass
