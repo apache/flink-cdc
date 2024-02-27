@@ -25,10 +25,11 @@ import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.table.api.ValidationException;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+
 
 import java.util.HashMap;
 import java.util.List;
@@ -44,14 +45,12 @@ public class StarRocksDataSinkFactoryTest {
                 FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);
 
-        Configuration conf =
-                Configuration.fromMap(
-                        ImmutableMap.<String, String>builder()
-                                .put("jdbc-url", "jdbc:mysql://127.0.0.1:9030")
-                                .put("load-url", "127.0.0.1:8030")
-                                .put("username", "root")
-                                .put("password", "")
-                                .build());
+        Map configMap = new HashMap<>();
+        configMap.put("jdbc-url", "jdbc:mysql://127.0.0.1:9030");
+        configMap.put("load-url", "127.0.0.1:8030");
+        configMap.put("username", "root");
+        configMap.put("password", "");
+        Configuration conf = Configuration.fromMap(configMap);
         DataSink dataSink =
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(

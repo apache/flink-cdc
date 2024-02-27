@@ -19,11 +19,11 @@ package org.apache.flink.cdc.connectors.vitess;
 
 import org.apache.flink.cdc.debezium.Validator;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.Maps;
-
 import io.debezium.connector.vitess.VitessConnector;
 
 import java.io.Serializable;
+import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
@@ -35,12 +35,23 @@ public class VitessValidator implements Validator, Serializable {
     private final Map<String, String> configuration;
 
     public VitessValidator(Properties properties) {
-        this.configuration = Maps.fromProperties(properties);
+        this.configuration = fromProperties(properties);
     }
 
     @Override
     public void validate() {
         VitessConnector c = new VitessConnector();
         c.validate(configuration);
+    }
+
+    private Map<String, String> fromProperties(Properties properties) {
+        Map map = new HashMap();
+        Enumeration<?> e = properties.propertyNames();
+
+        while (e.hasMoreElements()) {
+            String key = (String) e.nextElement();
+            map.put(key, properties.getProperty(key));
+        }
+        return map;
     }
 }

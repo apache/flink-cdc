@@ -164,6 +164,13 @@ limitations under the License.
             <artifactId>commons-lang3</artifactId>
             <version>${commons-lang3.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-shaded-guava</artifactId>
+            <version>31.1-jre-${flink.shaded.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

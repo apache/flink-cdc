@@ -104,18 +104,6 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
             <version>${flink.version}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- Checked the dependencies of the Flink project and below is a feasible reference. -->
-        <!--  Use flink shaded guava  18.0-13.0 for flink 1.13   -->
-        <!--  Use flink shaded guava  30.1.1-jre-14.0 for flink-1.14  -->
-        <!--  Use flink shaded guava  30.1.1-jre-15.0 for flink-1.15  -->
-        <!--  Use flink shaded guava  30.1.1-jre-15.0 for flink-1.16  -->
-        <!--  Use flink shaded guava  30.1.1-jre-16.1 for flink-1.17  -->
-        <!--  Use flink shaded guava  31.1-jre-17.0   for flink-1.18  -->
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-shaded-guava</artifactId>
-            <version>30.1.1-jre-16.1</version>
-        </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-mysql-cdc</artifactId>
@@ -178,8 +166,6 @@ This guide provides a simple `pom.xml` example for packaging DataStream job JARs
                                     <include>com.google.guava:*</include>
                                     <include>com.esri.geometry:esri-geometry-api</include>
                                     <include>com.zaxxer:HikariCP</include>
-                                    <!--  Include fixed version 30.1.1-jre-16.0 of flink shaded guava  -->
-                                    <include>org.apache.flink:flink-shaded-guava</include>
                                 </includes>
                             </artifactSet>
                             <relocations>

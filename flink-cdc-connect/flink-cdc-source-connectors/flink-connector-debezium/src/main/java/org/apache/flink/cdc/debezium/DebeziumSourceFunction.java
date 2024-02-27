@@ -47,8 +47,6 @@ import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import io.debezium.document.DocumentReader;
 import io.debezium.document.DocumentWriter;
 import io.debezium.embedded.Connect;
@@ -69,7 +67,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.flink.cdc.debezium.internal.Handover.ClosedException.isGentlyClosedException;
@@ -215,9 +212,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
     public void open(Configuration parameters) throws Exception {
         validator.validate();
         super.open(parameters);
-        ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("debezium-engine").build();
-        this.executor = Executors.newSingleThreadExecutor(threadFactory);
+        this.executor = Executors.newSingleThreadExecutor(r -> new Thread("debezium-engine"));
         this.handover = new Handover();
         this.changeConsumer = new DebeziumChangeConsumer(handover);
     }

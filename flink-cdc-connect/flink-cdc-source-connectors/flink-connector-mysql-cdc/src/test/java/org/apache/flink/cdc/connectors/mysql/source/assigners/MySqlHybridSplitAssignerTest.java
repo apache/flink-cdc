@@ -34,8 +34,6 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.RowType;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
-
 import io.debezium.relational.TableId;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -43,6 +41,7 @@ import org.junit.Test;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -76,7 +75,8 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
         RowType splitKeyType =
                 (RowType) DataTypes.ROW(DataTypes.FIELD("id", DataTypes.BIGINT())).getLogicalType();
 
-        List<TableId> alreadyProcessedTables = Lists.newArrayList(tableId);
+        List<TableId> alreadyProcessedTables = Collections.emptyList();
+        alreadyProcessedTables.add(tableId);
         List<MySqlSchemalessSnapshotSplit> remainingSplits = new ArrayList<>();
 
         Map<String, MySqlSchemalessSnapshotSplit> assignedSplits = new HashMap<>();

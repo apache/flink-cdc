@@ -29,10 +29,9 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
+import org.apache.flink.cdc.connectors.mysql.utils.ThreadUtil;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
-
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
@@ -97,11 +96,9 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             StatefulTaskContext statefulTaskContext, int subtaskId, SnapshotPhaseHooks hooks) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
-                new ThreadFactoryBuilder()
-                        .setNameFormat("debezium-reader-" + subtaskId)
-                        .setUncaughtExceptionHandler(
-                                (thread, throwable) -> setReadException(throwable))
-                        .build();
+                ThreadUtil.buildThreadFactory(
+                        "debezium-reader-" + subtaskId,
+                        (thread, throwable) -> setReadException(throwable));
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.hooks = hooks;
         this.currentTaskRunning = false;

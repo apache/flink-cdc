@@ -29,10 +29,9 @@ import org.apache.flink.cdc.connectors.mysql.source.utils.ChunkUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
 import org.apache.flink.cdc.connectors.mysql.table.StartupMode;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
+import org.apache.flink.cdc.connectors.mysql.utils.ThreadUtil;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
-
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventType;
@@ -89,8 +88,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
 
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
         this.statefulTaskContext = statefulTaskContext;
-        ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("binlog-reader-" + subTaskId).build();
+        ThreadFactory threadFactory = ThreadUtil.buildThreadFactory("binlog-reader-" + subTaskId);
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
         this.pureBinlogPhaseTables = new HashSet<>();

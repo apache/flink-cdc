@@ -42,8 +42,6 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,7 +73,7 @@ public class IncrementalSourceEnumerator
 
     // using TreeSet to prefer assigning stream split to task-0 for easier debug
     protected final TreeSet<Integer> readersAwaitingSplit;
-    private List<List<FinishedSnapshotSplitInfo>> finishedSnapshotSplitMeta;
+    private List<FinishedSnapshotSplitInfo> finishedSnapshotSplitMeta;
 
     private Boundedness boundedness;
 
@@ -302,9 +300,7 @@ public class IncrementalSourceEnumerator
                 throw new FlinkRuntimeException(
                         "The assigner offer empty finished split information, this should not happen");
             }
-            finishedSnapshotSplitMeta =
-                    Lists.partition(
-                            finishedSnapshotSplitInfos, sourceConfig.getSplitMetaGroupSize());
+            finishedSnapshotSplitMeta = finishedSnapshotSplitInfos;
         }
         final int requestMetaGroupId = requestEvent.getRequestMetaGroupId();
         final int totalFinishedSplitSizeOfReader = requestEvent.getTotalFinishedSplitSize();
@@ -324,7 +320,7 @@ public class IncrementalSourceEnumerator
             context.sendEventToSourceReader(subTask, metadataEvent);
         } else if (finishedSnapshotSplitMeta.size() > requestMetaGroupId) {
             List<FinishedSnapshotSplitInfo> metaToSend =
-                    finishedSnapshotSplitMeta.get(requestMetaGroupId);
+                    getPartition(requestMetaGroupId, sourceConfig.getSplitMetaGroupSize());
             StreamSplitMetaEvent metadataEvent =
                     new StreamSplitMetaEvent(
                             requestEvent.getSplitId(),
@@ -352,5 +348,16 @@ public class IncrementalSourceEnumerator
                     new LatestFinishedSplitsNumberEvent(
                             splitAssigner.getFinishedSplitInfos().size()));
         }
+    }
+
+    private List<FinishedSnapshotSplitInfo> getPartition(int index, int size) {
+        int start = index * size;
+        int end = Math.min(start + size, finishedSnapshotSplitMeta.size());
+        return finishedSnapshotSplitMeta.subList(start, end);
+    }
+
+    private int getPartitionNumber(int partitionSize) {
+        return finishedSnapshotSplitMeta.size() / partitionSize
+                + (finishedSnapshotSplitMeta.size() % partitionSize == 0 ? 0 : 1);
     }
 }
