@@ -462,8 +462,15 @@ under the License.
                                         submodules, ${flink.version} will be resolved as the actual Flink version.
                                     -->
                                     <include>org.apache.flink:flink-shaded-force-shading</include>
+                                    <include>org.apache.flink:flink-shaded-guava</include>
                                 </includes>
                             </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>flink.shaded.guava</pattern>
+                                    <shadedPattern>cdc.flink.shaded.guava</shadedPattern>
+                                </relocation>
+                            </relocations>
                         </configuration>
                     </execution>
                 </executions>
