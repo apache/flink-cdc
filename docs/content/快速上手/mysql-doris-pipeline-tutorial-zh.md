@@ -222,9 +222,9 @@ sink 添加 `table.create.properties.replication_num` 参数是由于 Docker 镜
 ### 同步变更
 进入 MySQL 容器
 
-    ```shell
-    docker-compose exec mysql mysql -uroot -p123456
-    ```
+   ```shell
+   docker-compose exec mysql mysql -uroot -p123456
+   ```
 
 接下来，修改 MySQL 数据库中表的数据，Doris 中显示的订单数据也将实时更新：
 1. 在 MySQL 的 `orders` 表中插入一条数据
