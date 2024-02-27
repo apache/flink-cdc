@@ -162,9 +162,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
             statement.execute(
                     "EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'products', @role_name = NULL, @supports_net_changes = 0, @capture_instance = 'dbo_products_v2';");
 
-            statement.execute(
-                    "INSERT INTO inventory.dbo.products (name,description,weight,volume) VALUES ('bicycle','short distance travel tools',0.5,1.1);");
-            statement.execute("DELETE FROM inventory.dbo.products WHERE id=112;");
+            statement.execute("UPDATE inventory.dbo.products SET volume='1.2' WHERE id=110;");
         }
 
         waitForSinkSize("sink", 20);
@@ -186,7 +184,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
          * | 107 | rocks              | box of assorted rocks                                   |    5.1 |   null |
          * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |   null |
          * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |   null |
-         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |   null |
+         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |   1.2  |
          * +-----+--------------------+---------------------------------------------------------+--------+--------+
          * </pre>
          */
