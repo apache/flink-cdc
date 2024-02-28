@@ -24,4 +24,6 @@ package com.ververica.cdc.connectors.tidb.table;
 public enum StartupMode {
     INITIAL,
     LATEST_OFFSET,
+
+    TIMESTAMP
 }

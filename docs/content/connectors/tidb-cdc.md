@@ -97,7 +97,15 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for TiDB CDC consumer, valid enumerations are "initial" and "latest-offset".</td>
+      <td>Optional startup mode for TiDB CDC consumer, valid enumerations are 
+          <code>'initial'</code>,<code>'latest-offset'</code> or <code>'timestamp'</code>.</td>
+    </tr>
+    <tr>
+        <td>scan.startup.timestamp</td>
+        <td>optional</td>
+        <td style="word-wrap: break-word;">0</td>
+        <td>Long</td>
+        <td>Timestamp in seconds of the start point, only used for <code>'timestamp'</code> startup mode.</td>
     </tr>
     <tr>
       <td>pd-addresses</td>

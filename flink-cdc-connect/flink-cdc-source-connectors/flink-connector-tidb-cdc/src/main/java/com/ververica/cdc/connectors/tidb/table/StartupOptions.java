@@ -23,12 +23,15 @@ public final class StartupOptions {
 
     public final StartupMode startupMode;
 
+    /** Timestamp in seconds of the start point, only used for 'timestamp' startup mode. */
+    public final Long startupTimestamp;
+
     /**
      * Performs an initial snapshot on the monitored database tables upon first startup, and
      * continue to read the latest CDC events.
      */
     public static StartupOptions initial() {
-        return new StartupOptions(StartupMode.INITIAL);
+        return new StartupOptions(StartupMode.INITIAL, null);
     }
 
     /**
@@ -36,16 +39,23 @@ public final class StartupOptions {
      * the latest CDC events which means only have the changes since the connector was started.
      */
     public static StartupOptions latest() {
-        return new StartupOptions(StartupMode.LATEST_OFFSET);
+        return new StartupOptions(StartupMode.LATEST_OFFSET, null);
     }
 
-    private StartupOptions(StartupMode startupMode) {
+    public static StartupOptions timestamp(Long startupTimestamp) {
+        return new StartupOptions(StartupMode.TIMESTAMP, startupTimestamp);
+    }
+
+    private StartupOptions(StartupMode startupMode, Long startupTimestamp) {
         this.startupMode = startupMode;
+        this.startupTimestamp = startupTimestamp;
 
         switch (startupMode) {
             case INITIAL:
 
             case LATEST_OFFSET:
+
+            case TIMESTAMP:
                 break;
 
             default:

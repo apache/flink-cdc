@@ -35,6 +35,7 @@ import java.util.Set;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.DATABASE_NAME;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.PD_ADDRESSES;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.SCAN_STARTUP_MODE;
+import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.SCAN_STARTUP_TIMESTAMP;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_GET_CONCURRENCY;
 import static com.ververica.cdc.connectors.tidb.TDBSourceOptions.TIKV_BATCH_SCAN_CONCURRENCY;
@@ -98,6 +99,7 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
 
     private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
     private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
+    private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMP = "timestamp";
 
     private static StartupOptions getStartupOptions(ReadableConfig config) {
         String modeString = config.get(SCAN_STARTUP_MODE);
@@ -108,6 +110,9 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
 
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
+
+            case SCAN_STARTUP_MODE_VALUE_TIMESTAMP:
+                return StartupOptions.timestamp(config.get(SCAN_STARTUP_TIMESTAMP));
 
             default:
                 throw new ValidationException(
