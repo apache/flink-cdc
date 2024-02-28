@@ -23,6 +23,7 @@ import com.ververica.cdc.connectors.base.config.JdbcSourceConfig;
 import com.ververica.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import com.ververica.cdc.connectors.base.experimental.EmbeddedFlinkDatabaseHistory;
 import com.ververica.cdc.connectors.base.experimental.config.MySqlSourceConfig;
+import com.ververica.cdc.connectors.base.experimental.handler.MySqlSchemaChangeEventHandler;
 import com.ververica.cdc.connectors.base.experimental.offset.BinlogOffset;
 import com.ververica.cdc.connectors.base.experimental.utils.MySqlUtils;
 import com.ververica.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
@@ -69,7 +70,6 @@ import static com.ververica.cdc.connectors.base.experimental.offset.BinlogOffset
 public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceFetchTaskContext.class);
-
     private final MySqlConnection connection;
     private final BinaryLogClient binaryLogClient;
     private final MySqlEventMetadataProvider metadataProvider;
@@ -144,7 +144,8 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         connectorConfig.getTableFilters().dataCollectionFilter(),
                         DataChangeEvent::new,
                         metadataProvider,
-                        schemaNameAdjuster);
+                        schemaNameAdjuster,
+                        new MySqlSchemaChangeEventHandler());
 
         final MySqlChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new MySqlChangeEventSourceMetricsFactory(
