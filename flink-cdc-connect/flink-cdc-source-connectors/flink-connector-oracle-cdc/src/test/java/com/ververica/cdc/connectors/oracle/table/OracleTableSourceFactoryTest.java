@@ -83,7 +83,7 @@ public class OracleTableSourceFactoryTest {
     private static final String MY_LOCALHOST = "localhost";
     private static final String MY_USERNAME = "flinkuser";
     private static final String MY_PASSWORD = "flinkpw";
-    private static final String MY_DATABASE = "myDB";
+    private static final String MY_DATABASE = "MYDB";
     private static final String MY_TABLE = "myTable";
     private static final String MY_SCHEMA = "mySchema";
     private static final Properties PROPERTIES = new Properties();
