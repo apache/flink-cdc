@@ -22,6 +22,7 @@ import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.composer.definition.PipelineDef;
 import com.ververica.cdc.composer.definition.RouteDef;
+import com.ververica.cdc.composer.definition.SchemaRouteDef;
 import com.ververica.cdc.composer.definition.SinkDef;
 import com.ververica.cdc.composer.definition.SourceDef;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,15 @@ class YamlPipelineDefinitionParserTest {
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
         assertThat(pipelineDef).isEqualTo(minimizedDef);
+    }
+
+    @Test
+    void testSchemaRoutesDefinition() throws Exception {
+        URL resource =
+                Resources.getResource("definitions/pipeline-definition-with-schemaRoute.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(defWithSchemaRoute);
     }
 
     @Test
@@ -268,4 +278,37 @@ class YamlPipelineDefinitionParserTest {
                     Collections.emptyList(),
                     null,
                     new Configuration());
+
+    private final PipelineDef defWithSchemaRoute =
+            new PipelineDef(
+                    new SourceDef(
+                            "mysql",
+                            "MySQL Source",
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("hostname", "localhost")
+                                            .put("port", "3306")
+                                            .put("username", "admin")
+                                            .put("password", "password")
+                                            .put("tables", "adb.*, app_db.\\.*")
+                                            .build())),
+                    new SinkDef(
+                            "doris",
+                            "Doris Sink",
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("fenodes", "localhost:8030")
+                                            .put("username", "admin")
+                                            .put("password", "password")
+                                            .build())),
+                    Collections.singletonList(
+                            new RouteDef("app_db.order.*", "ods_db.ods_orders", null)),
+                    Collections.singletonList(new SchemaRouteDef("adb", "ods_db", "adb_", null)),
+                    null,
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("name", "source-database-sync-pipe")
+                                    .put("parallelism", "1")
+                                    .put("enable-schema-evolution", "true")
+                                    .build()));
 }

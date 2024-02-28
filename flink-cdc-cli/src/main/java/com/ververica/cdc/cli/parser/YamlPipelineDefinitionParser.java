@@ -24,6 +24,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YA
 import com.ververica.cdc.common.configuration.Configuration;
 import com.ververica.cdc.composer.definition.PipelineDef;
 import com.ververica.cdc.composer.definition.RouteDef;
+import com.ververica.cdc.composer.definition.SchemaRouteDef;
 import com.ververica.cdc.composer.definition.SinkDef;
 import com.ververica.cdc.composer.definition.SourceDef;
 
@@ -52,6 +53,10 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String ROUTE_SOURCE_TABLE_KEY = "source-table";
     private static final String ROUTE_SINK_TABLE_KEY = "sink-table";
     private static final String ROUTE_DESCRIPTION_KEY = "description";
+    private static final String ROUTE_SOURCE_DATABASE = "source-database";
+    private static final String ROUTE_SINK_DATABASE = "sink-database";
+    private static final String ROUTE_TABLE_PREFIX = "table-prefix";
+    private static final String ROUTE_TABLE_SUFFIX = "table-suffix";
 
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
@@ -79,8 +84,18 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
         // Routes are optional
         List<RouteDef> routeDefs = new ArrayList<>();
+        List<SchemaRouteDef> schemaRouteDefs = new ArrayList<>();
         Optional.ofNullable(root.get(ROUTE_KEY))
-                .ifPresent(node -> node.forEach(route -> routeDefs.add(toRouteDef(route))));
+                .ifPresent(
+                        node ->
+                                node.forEach(
+                                        route -> {
+                                            if (route.hasNonNull(ROUTE_SOURCE_TABLE_KEY)) {
+                                                routeDefs.add(toRouteDef(route));
+                                            } else if (route.hasNonNull(ROUTE_SOURCE_DATABASE)) {
+                                                schemaRouteDefs.add(toschemaRouteDef(route));
+                                            }
+                                        }));
 
         // Pipeline configs are optional
         Configuration userPipelineConfig = toPipelineConfig(root.get(PIPELINE_KEY));
@@ -90,7 +105,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         pipelineConfig.addAll(globalPipelineConfig);
         pipelineConfig.addAll(userPipelineConfig);
 
-        return new PipelineDef(sourceDef, sinkDef, routeDefs, null, pipelineConfig);
+        return new PipelineDef(
+                sourceDef, sinkDef, routeDefs, schemaRouteDefs, null, pipelineConfig);
     }
 
     private SourceDef toSourceDef(JsonNode sourceNode) {
@@ -145,6 +161,31 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                         .map(JsonNode::asText)
                         .orElse(null);
         return new RouteDef(sourceTable, sinkTable, description);
+    }
+
+    private SchemaRouteDef toschemaRouteDef(JsonNode route) {
+        String sourceDatabase =
+                checkNotNull(
+                                route.get(ROUTE_SOURCE_DATABASE),
+                                "Missing required field \"%s\" in mapper configuration",
+                                ROUTE_SOURCE_DATABASE)
+                        .asText();
+        String sinkDatabase =
+                checkNotNull(
+                                route.get(ROUTE_SINK_DATABASE),
+                                "Missing required field \"%s\" in mapper configuration",
+                                ROUTE_SINK_DATABASE)
+                        .asText();
+        String tablePrefix =
+                Optional.ofNullable(route.get(ROUTE_TABLE_PREFIX))
+                        .map(JsonNode::asText)
+                        .orElse(null);
+        String tableSuffix =
+                Optional.ofNullable(route.get(ROUTE_TABLE_SUFFIX))
+                        .map(JsonNode::asText)
+                        .orElse(null);
+
+        return new SchemaRouteDef(sourceDatabase, sinkDatabase, tablePrefix, tableSuffix);
     }
 
     private Configuration toPipelineConfig(JsonNode pipelineConfigNode) {
