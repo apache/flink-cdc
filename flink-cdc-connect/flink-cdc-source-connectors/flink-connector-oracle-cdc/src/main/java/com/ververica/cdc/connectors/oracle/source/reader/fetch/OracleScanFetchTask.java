@@ -231,7 +231,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
 
         private static class OracleSnapshotContext
                 extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
-                        OraclePartition, OracleOffsetContext> {
+                OraclePartition, OracleOffsetContext> {
 
             public OracleSnapshotContext(OraclePartition partition) throws SQLException {
                 super(partition, "");
@@ -274,16 +274,16 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                     selectSql);
 
             try (PreparedStatement selectStatement =
-                            readTableSplitDataStatement(
-                                    jdbcConnection,
-                                    selectSql,
-                                    snapshotSplit.getSplitStart() == null,
-                                    snapshotSplit.getSplitEnd() == null,
-                                    snapshotSplit.getSplitStart(),
-                                    snapshotSplit.getSplitEnd(),
-                                    snapshotSplit.getSplitKeyType().getFieldCount(),
-                                    connectorConfig.getQueryFetchSize());
-                    ResultSet rs = selectStatement.executeQuery()) {
+                         readTableSplitDataStatement(
+                                 jdbcConnection,
+                                 selectSql,
+                                 snapshotSplit.getSplitStart() == null,
+                                 snapshotSplit.getSplitEnd() == null,
+                                 snapshotSplit.getSplitStart(),
+                                 snapshotSplit.getSplitEnd(),
+                                 snapshotSplit.getSplitKeyType().getFieldCount(),
+                                 connectorConfig.getQueryFetchSize());
+                 ResultSet rs = selectStatement.executeQuery()) {
 
                 ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);
                 long rows = 0;

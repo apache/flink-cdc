@@ -69,13 +69,13 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
         // eagerly initialize the executor, because OffsetStorageWriter will use it later
         start();
 
-        Map<String, ?> conf = config.originals();
-        if (!conf.containsKey(OFFSET_STATE_VALUE)) {
+        Map<String, ?> configMap = config.originals();
+        if (!configMap.containsKey(OFFSET_STATE_VALUE)) {
             // a normal startup from clean state, not need to initialize the offset
             return;
         }
 
-        String stateJson = (String) conf.get(OFFSET_STATE_VALUE);
+        String stateJson = (String) configMap.get(OFFSET_STATE_VALUE);
         DebeziumOffsetSerializer serializer = new DebeziumOffsetSerializer();
         DebeziumOffset debeziumOffset;
         try {
@@ -85,11 +85,11 @@ public class FlinkOffsetBackingStore implements OffsetBackingStore {
             throw new RuntimeException(e);
         }
 
-        String engineName = (String) conf.get(EmbeddedEngine.ENGINE_NAME.name());
+        String engineName = (String) configMap.get(EmbeddedEngine.ENGINE_NAME.name());
         Converter keyConverter = new JsonConverter();
         Converter valueConverter = new JsonConverter();
         keyConverter.configure(config.originals(), true);
-        Map<String, Object> valueConfigs = new HashMap<>(conf);
+        Map<String, Object> valueConfigs = new HashMap<>(configMap);
         valueConfigs.put("schemas.enable", false);
         valueConverter.configure(valueConfigs, true);
         OffsetStorageWriter offsetWriter =
