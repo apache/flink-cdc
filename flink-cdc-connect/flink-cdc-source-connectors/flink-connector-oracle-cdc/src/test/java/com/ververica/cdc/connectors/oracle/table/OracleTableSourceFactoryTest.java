@@ -120,7 +120,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SERVER_TIME_ZONE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -156,7 +157,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
-                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SERVER_TIME_ZONE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -196,7 +198,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
-                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SERVER_TIME_ZONE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -211,6 +214,7 @@ public class OracleTableSourceFactoryTest {
         int connectPoolSize = 10;
         double distributionFactorUpper = 40.5;
         double distributionFactorLower = 0.01;
+        String serverTimeZone = "UTC";
         options.put("port", "1521");
         options.put("hostname", MY_LOCALHOST);
         options.put("debezium.snapshot.mode", "initial");
@@ -234,6 +238,7 @@ public class OracleTableSourceFactoryTest {
         options.put(
                 JdbcSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.key(),
                 String.valueOf(distributionFactorLower));
+        options.put(JdbcSourceOptions.SERVER_TIME_ZONE.key(), serverTimeZone);
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
@@ -262,7 +267,8 @@ public class OracleTableSourceFactoryTest {
                         distributionFactorLower,
                         null,
                         true,
-                        true);
+                        true,
+                        serverTimeZone);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -299,7 +305,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
-                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SERVER_TIME_ZONE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -336,7 +343,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
-                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SERVER_TIME_ZONE.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -377,7 +385,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
-                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SERVER_TIME_ZONE.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");

@@ -30,6 +30,7 @@ import com.ververica.cdc.connectors.base.utils.OptionUtils;
 import com.ververica.cdc.debezium.table.DebeziumOptions;
 
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -41,6 +42,7 @@ import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.HOSTNA
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
+import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.SERVER_TIME_ZONE;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
 import static com.ververica.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 import static com.ververica.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
@@ -106,6 +108,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
 
         boolean closeIdlerReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
+        String serverTimeZone = config.get(SERVER_TIME_ZONE);
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -115,6 +118,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
             validateIntegerOption(CONNECT_MAX_RETRIES, connectMaxRetries, 0);
             validateDistributionFactorUpper(distributionFactorUpper);
             validateDistributionFactorLower(distributionFactorLower);
+            validateServerTimeZone(serverTimeZone);
         }
 
         OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
@@ -142,7 +146,8 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 distributionFactorLower,
                 chunkKeyColumn,
                 closeIdlerReaders,
-                skipSnapshotBackfill);
+                skipSnapshotBackfill,
+                serverTimeZone);
     }
 
     @Override
@@ -167,6 +172,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         options.add(URL);
         options.add(HOSTNAME);
         options.add(PORT);
+        options.add(SERVER_TIME_ZONE);
         options.add(SCAN_STARTUP_MODE);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
@@ -242,5 +248,16 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                         0.0d,
                         1.0d,
                         distributionFactorLower));
+    }
+
+    /** Checks the value of given server timezone is valid. */
+    private void validateServerTimeZone(String serverTimeZone) {
+        checkState(
+                ZoneId.getAvailableZoneIds().contains(serverTimeZone),
+                String.format(
+                        "Invalid value for option '%s'. Supported values are [%s], but was: %s",
+                        SERVER_TIME_ZONE.key(),
+                        String.join(", ", ZoneId.getAvailableZoneIds()),
+                        serverTimeZone));
     }
 }
