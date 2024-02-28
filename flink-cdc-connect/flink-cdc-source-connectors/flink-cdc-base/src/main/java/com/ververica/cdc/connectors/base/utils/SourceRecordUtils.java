@@ -45,9 +45,10 @@ public class SourceRecordUtils {
     private SourceRecordUtils() {}
 
     public static final String SCHEMA_CHANGE_EVENT_KEY_NAME =
-            "io.debezium.connector.mysql.SchemaChangeKey";
+            "io.debezium.connector.*.SchemaChangeKey";
     public static final String SCHEMA_HEARTBEAT_EVENT_KEY_NAME =
             "io.debezium.connector.common.Heartbeat";
+
     private static final DocumentReader DOCUMENT_READER = DocumentReader.defaultReader();
 
     /** Converts a {@link ResultSet} row to an array of Objects. */
@@ -95,7 +96,7 @@ public class SourceRecordUtils {
 
     public static boolean isSchemaChangeEvent(SourceRecord sourceRecord) {
         Schema keySchema = sourceRecord.keySchema();
-        return keySchema != null && SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name());
+        return keySchema != null && (keySchema.name().matches(SCHEMA_CHANGE_EVENT_KEY_NAME));
     }
 
     public static boolean isDataChangeRecord(SourceRecord record) {

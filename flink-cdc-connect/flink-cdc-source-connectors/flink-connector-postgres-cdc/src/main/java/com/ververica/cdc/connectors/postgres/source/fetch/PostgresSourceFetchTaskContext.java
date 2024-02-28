@@ -27,6 +27,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import com.ververica.cdc.connectors.postgres.source.PostgresDialect;
 import com.ververica.cdc.connectors.postgres.source.config.PostgresSourceConfig;
+import com.ververica.cdc.connectors.postgres.source.handler.PostgresSchemaChangeEventHandler;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffset;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffsetUtils;
@@ -222,7 +223,8 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         dbzConfig.getTableFilters().dataCollectionFilter(),
                         DataChangeEvent::new,
                         metadataProvider,
-                        schemaNameAdjuster);
+                        schemaNameAdjuster,
+                        new PostgresSchemaChangeEventHandler());
 
         this.postgresDispatcher =
                 new PostgresEventDispatcher<>(

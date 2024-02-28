@@ -26,6 +26,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import com.ververica.cdc.connectors.sqlserver.source.config.SqlServerSourceConfig;
 import com.ververica.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
+import com.ververica.cdc.connectors.sqlserver.source.handler.SqlServerSchemaChangeEventHandler;
 import com.ververica.cdc.connectors.sqlserver.source.offset.LsnOffset;
 import com.ververica.cdc.connectors.sqlserver.source.utils.SqlServerUtils;
 import io.debezium.connector.base.ChangeEventQueue;
@@ -152,7 +153,8 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
                         connectorConfig.getTableFilters().dataCollectionFilter(),
                         DataChangeEvent::new,
                         metadataProvider,
-                        schemaNameAdjuster);
+                        schemaNameAdjuster,
+                        new SqlServerSchemaChangeEventHandler());
 
         this.snapshotReceiver = dispatcher.getSnapshotChangeEventReceiver();
 

@@ -27,6 +27,7 @@ import com.ververica.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import com.ververica.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import com.ververica.cdc.connectors.base.utils.SourceRecordUtils;
 import com.ververica.cdc.connectors.oracle.source.config.OracleSourceConfig;
+import com.ververica.cdc.connectors.oracle.source.handler.OracleSchemaChangeEventHandler;
 import com.ververica.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import com.ververica.cdc.connectors.oracle.source.utils.OracleUtils;
 import com.ververica.cdc.connectors.oracle.util.ChunkUtils;
@@ -142,7 +143,8 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         connectorConfig.getTableFilters().dataCollectionFilter(),
                         DataChangeEvent::new,
                         metadataProvider,
-                        schemaNameAdjuster);
+                        schemaNameAdjuster,
+                        new OracleSchemaChangeEventHandler());
 
         final OracleChangeEventSourceMetricsFactory changeEventSourceMetricsFactory =
                 new OracleChangeEventSourceMetricsFactory(
