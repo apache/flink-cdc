@@ -103,7 +103,7 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
     }
 
     private MySqlRecords pollSplitRecords() throws InterruptedException {
-        Iterator<SourceRecords> dataIt;
+        Iterator<SourceRecords> dataIt = null;
         if (currentReader == null) {
             // (1) Reads binlog split firstly and then read snapshot split
             if (binlogSplits.size() > 0) {
@@ -122,7 +122,11 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
             } else {
                 LOG.info("No available split to read.");
             }
-            dataIt = currentReader.pollSplitRecords();
+            if (currentReader != null) {
+                dataIt = currentReader.pollSplitRecords();
+            } else {
+                currentSplitId = null;
+            }
             return dataIt == null ? finishedSplit() : forRecords(dataIt);
         } else if (currentReader instanceof SnapshotSplitReader) {
             // (2) try to switch to binlog split reading util current snapshot split finished
