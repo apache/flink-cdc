@@ -56,6 +56,7 @@ import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOpti
 import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.SCHEMA_NAME;
 import static com.ververica.cdc.connectors.oracle.source.config.OracleSourceOptions.URL;
 import static com.ververica.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** Factory for creating configured instance of {@link OracleTableSource}. */
@@ -75,6 +76,16 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
         String databaseName = config.get(DATABASE_NAME);
+        checkNotNull(databaseName);
+        // During the incremental phase, Debezium uses the uppercase database name.
+        // However, during the snapshot phase, the database name is user-configurable.
+        // To avoid inconsistencies between the database names in the snapshot and incremental
+        // phases,
+        // it is necessary to convert the database name to uppercase when constructing the Oracle
+        // Source.
+        // For more details, please refer to:
+        // https://github.com/ververica/flink-cdc-connectors/pull/2088.
+        databaseName = databaseName.toUpperCase();
         String tableName = config.get(TABLE_NAME);
         String schemaName = config.get(SCHEMA_NAME);
         int port = config.get(PORT);
