@@ -18,7 +18,6 @@ package com.ververica.cdc.connectors.mysql.source.utils;
 
 import org.apache.flink.table.types.logical.RowType;
 
-import com.ververica.cdc.common.utils.StringUtils;
 import com.ververica.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher.WatermarkKind;
 import com.ververica.cdc.connectors.mysql.debezium.reader.DebeziumReader;
 import com.ververica.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -29,6 +28,7 @@ import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.util.SchemaNameAdjuster;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -392,7 +392,7 @@ public class RecordUtils {
         Struct value = (Struct) dataRecord.value();
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         String tableName = source.getString(TABLE_NAME_KEY);
-        return !StringUtils.isNullOrWhitespaceOnly(tableName);
+        return StringUtils.isNotBlank(tableName);
     }
 
     public static Object[] getSplitKey(
