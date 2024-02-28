@@ -354,9 +354,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
 
     @Test
     public void testSnapshotOnlyModeWithDMLPostHighWaterMark() throws Exception {
+        // The data number is 21, set fetchSize = 22 to test the job is bounded.
         List<String> records =
                 testBackfillWhenWritingEvents(
-                        false, 21, USE_POST_HIGHWATERMARK_HOOK, StartupOptions.snapshot());
+                        false, 22, USE_POST_HIGHWATERMARK_HOOK, StartupOptions.snapshot());
         List<String> expectedRecords =
                 Arrays.asList(
                         "+I[101, user_1, Shanghai, 123567891234]",
@@ -385,9 +386,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
 
     @Test
     public void testSnapshotOnlyModeWithDMLPreHighWaterMark() throws Exception {
+        // The data number is 21, set fetchSize = 22 to test the job is bounded.
         List<String> records =
                 testBackfillWhenWritingEvents(
-                        false, 21, USE_PRE_HIGHWATERMARK_HOOK, StartupOptions.snapshot());
+                        false, 22, USE_PRE_HIGHWATERMARK_HOOK, StartupOptions.snapshot());
         List<String> expectedRecords =
                 Arrays.asList(
                         "+I[101, user_1, Shanghai, 123567891234]",
