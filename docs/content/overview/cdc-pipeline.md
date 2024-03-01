@@ -60,7 +60,7 @@ For example, we could use `yaml` files to define a mysql source
 ```yaml
 source:
   type: mysql
-  name: mysql-source   #optional，description information
+  hostname: mysql-source   #optional，description information
   host: localhost
   port: 3306
   username: admin
