@@ -443,10 +443,10 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
 
-import com.ververica.cdc.connectors.oceanbase.OceanBaseSource;
-import com.ververica.cdc.connectors.oceanbase.source.RowDataOceanBaseDeserializationSchema;
-import com.ververica.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
-import com.ververica.cdc.connectors.oceanbase.table.StartupMode;
+import org.apache.flink.cdc.connectors.oceanbase.OceanBaseSource;
+import org.apache.flink.cdc.connectors.oceanbase.source.RowDataOceanBaseDeserializationSchema;
+import org.apache.flink.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
+import org.apache.flink.cdc.connectors.oceanbase.table.StartupMode;
 
 import java.time.ZoneId;
 import java.util.Arrays;

@@ -17,9 +17,9 @@
 
 package io.debezium.connector.postgresql;
 
+import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffset;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import com.ververica.cdc.connectors.postgres.source.offset.PostgresOffset;
 import io.debezium.connector.postgresql.connection.Lsn;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.time.Conversions;
