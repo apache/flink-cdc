@@ -95,6 +95,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
         int parallelism = pipelineDef.getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
 
+        if (pipelineDef.getConfig().contains(PipelineOptions.CHECKPOINT_INTERVAL_MS)) {
+            int interval = pipelineDef.getConfig().get(PipelineOptions.CHECKPOINT_INTERVAL_MS);
+            env.enableCheckpointing(interval);
+        }
+
         // Source
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
         DataStream<Event> stream =

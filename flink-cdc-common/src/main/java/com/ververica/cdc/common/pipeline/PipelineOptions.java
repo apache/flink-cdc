@@ -84,5 +84,11 @@ public class PipelineOptions {
                     .withDescription(
                             "The unique ID for schema operator. This ID will be used for inter-operator communications and must be unique across operators.");
 
+    public static final ConfigOption<Integer> CHECKPOINT_INTERVAL_MS =
+            ConfigOptions.key("checkpoint.interval.ms")
+                    .intType()
+                    .noDefaultValue()
+                    .withDescription("Checkpoint interval time of the pipeline");
+
     private PipelineOptions() {}
 }
