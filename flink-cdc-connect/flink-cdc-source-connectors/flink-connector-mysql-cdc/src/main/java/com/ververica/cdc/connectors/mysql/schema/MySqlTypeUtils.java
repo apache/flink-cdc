@@ -49,6 +49,7 @@ public class MySqlTypeUtils {
     private static final String INTEGER_UNSIGNED = "INTEGER UNSIGNED";
     private static final String INTEGER_UNSIGNED_ZEROFILL = "INTEGER UNSIGNED ZEROFILL";
     private static final String BIGINT = "BIGINT";
+    private static final String LONG = "LONG";
     private static final String SERIAL = "SERIAL";
     private static final String BIGINT_UNSIGNED = "BIGINT UNSIGNED";
     private static final String BIGINT_UNSIGNED_ZEROFILL = "BIGINT UNSIGNED ZEROFILL";
@@ -153,6 +154,7 @@ public class MySqlTypeUtils {
             case MEDIUMINT_UNSIGNED:
             case MEDIUMINT_UNSIGNED_ZEROFILL:
             case BIGINT:
+            case LONG:
                 return DataTypes.BIGINT();
             case BIGINT_UNSIGNED:
             case BIGINT_UNSIGNED_ZEROFILL:
