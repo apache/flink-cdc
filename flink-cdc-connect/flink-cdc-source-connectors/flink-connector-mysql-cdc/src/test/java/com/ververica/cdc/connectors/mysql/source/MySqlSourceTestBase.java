@@ -50,7 +50,8 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     protected static final Logger LOG = LoggerFactory.getLogger(MySqlSourceTestBase.class);
 
     protected static final int DEFAULT_PARALLELISM = 4;
-    protected static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
+    protected static final MySqlContainer MYSQL_CONTAINER =
+            createMySqlContainer(MySqlVersion.V5_7, true);
 
     @Rule
     public final MiniClusterWithClientResource miniClusterResource =
@@ -70,14 +71,15 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     }
 
     @AfterClass
-    public static void stopContainers() {
+    public static void stopContainers() throws Exception {
         LOG.info("Stopping containers...");
         MYSQL_CONTAINER.stop();
         LOG.info("Containers are stopped.");
     }
 
-    protected static MySqlContainer createMySqlContainer(MySqlVersion version) {
-        return createMySqlContainer(version, "docker/server-gtids/my.cnf");
+    protected static MySqlContainer createMySqlContainer(MySqlVersion version, boolean enableGtid) {
+        String configPath = enableGtid ? "docker/server-gtids/my.cnf" : "docker/server/my.cnf";
+        return createMySqlContainer(version, configPath);
     }
 
     protected static MySqlContainer createMySqlContainer(MySqlVersion version, String configPath) {
