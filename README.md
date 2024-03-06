@@ -3,7 +3,7 @@
 CDC Connectors for Apache Flink<sup>®</sup> is a set of source connectors for Apache Flink<sup>®</sup>, ingesting changes from different databases using change data capture (CDC).
 CDC Connectors for Apache Flink<sup>®</sup> integrates Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
 
-This README is meant as a brief walkthrough on the core features of CDC Connectors for Apache Flink<sup>®</sup>. For a fully detailed documentation, please see [Documentation](https://ververica.github.io/flink-cdc-connectors/master/).
+This README is meant as a brief walkthrough on the core features of CDC Connectors for Apache Flink<sup>®</sup>. For a fully detailed documentation, please see [Documentation](https://apache.github.io/flink-cdc/).
 
 ## Supported (Tested) Databases
 
@@ -73,8 +73,10 @@ During the execution of the flink-cdc.sh script, the CDC task configuration is p
 We need several steps to setup a Flink cluster with the provided connector.
 
 1. Setup a Flink cluster with version 1.14+ and Java 8+ installed.
-2. Download the connector SQL jars from the [Download](https://github.com/ververica/flink-cdc-connectors/releases) page (or [build yourself](#building-from-source)).
+2. Download the connector SQL jars from the [Download](https://github.com/apache/flink-cdc/releases) page (or [build yourself](#building-from-source)).
+
 3. Put the downloaded jars under `FLINK_HOME/lib/`.
+
 4. Restart the Flink cluster.
 
 The example shows how to create a MySQL CDC source in [Flink SQL Client](https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/table/sqlclient/) and execute queries on it.
@@ -156,7 +158,7 @@ public class MySqlSourceExample {
     - At least Java 8
 
 ```
-git clone https://github.com/ververica/flink-cdc-connectors.git
+git clone https://github.com/apache/flink-cdc.git
 cd flink-cdc-connectors
 mvn clean install -DskipTests
 ```
@@ -169,7 +171,7 @@ The code in this repository is licensed under the [Apache Software License 2](ht
 
 ## Contributing
 
-CDC Connectors for Apache Flink<sup>®</sup> welcomes anyone that wants to help out in any way, whether that includes reporting problems, helping with documentation, or contributing code changes to fix bugs, add tests, or implement new features. You can report problems to request features in the [GitHub Issues](https://github.com/ververica/flink-cdc-connectors/issues).
+CDC Connectors for Apache Flink<sup>®</sup> welcomes anyone that wants to help out in any way, whether that includes reporting problems, helping with documentation, or contributing code changes to fix bugs, add tests, or implement new features. You can report problems to request features in the [GitHub Issues](https://github.com/apache/flink-cdc/issues).
 
 ### Code Contribute
 
@@ -190,7 +192,7 @@ git checkout -b my_feature
 ```bash
 git push origin my_feature
 ```
-6. Open a PR to https://github.com/ververica/flink-cdc-connectors
+6. Open a PR to https://github.com/apache/flink-cdc
 
 ### Code Style
 
@@ -255,4 +257,4 @@ The contribution step is the same as the code contribution. We use markdown as t
    </div>
 
 ## Documents
-To get started, please see https://ververica.github.io/flink-cdc-connectors/
+To get started, please see https://apache.github.io/flink-cdc/
