@@ -225,7 +225,7 @@ _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapsh
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
-import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 
 public class Db2SourceExample {
   public static void main(String[] args) throws Exception {
