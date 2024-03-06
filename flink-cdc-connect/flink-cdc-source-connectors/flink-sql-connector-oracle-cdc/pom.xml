@@ -20,7 +20,7 @@ limitations under the License.
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <artifactId>flink-cdc-source-connectors</artifactId>
-        <groupId>com.ververica</groupId>
+        <groupId>org.apache.flink</groupId>
         <version>${revision}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -29,7 +29,7 @@ limitations under the License.
 
     <dependencies>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-oracle-cdc</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -57,9 +57,9 @@ limitations under the License.
                                     <include>io.debezium:debezium-core</include>
                                     <incldue>io.debezium:debezium-ddl-parser</incldue>
                                     <include>io.debezium:debezium-connector-oracle</include>
-                                    <include>com.ververica:flink-connector-debezium</include>
-                                    <include>com.ververica:flink-cdc-base</include>
-                                    <include>com.ververica:flink-connector-oracle-cdc</include>
+                                    <include>org.apache.flink:flink-connector-debezium</include>
+                                    <include>org.apache.flink:flink-cdc-base</include>
+                                    <include>org.apache.flink:flink-connector-oracle-cdc</include>
                                     <include>org.antlr:antlr4-runtime</include>
                                     <include>com.github.jsqlparser:jsqlparser</include>
                                     <include>com.oracle.ojdbc:*</include>
@@ -89,31 +89,31 @@ limitations under the License.
                                 <relocation>
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.org.apache.kafka
+                                        org.apache.flink.cdc.connectors.shaded.org.apache.kafka
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.antlr</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.org.antlr
+                                        org.apache.flink.cdc.connectors.shaded.org.antlr
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.com.google
+                                        org.apache.flink.cdc.connectors.shaded.com.google
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.fasterxml</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.com.fasterxml
+                                        org.apache.flink.cdc.connectors.shaded.com.fasterxml
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>net.sf.jsqlparser</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.net.sf.jsqlparser
+                                        org.apache.flink.cdc.connectors.shaded.net.sf.jsqlparser
                                     </shadedPattern>
                                 </relocation>
                             </relocations>

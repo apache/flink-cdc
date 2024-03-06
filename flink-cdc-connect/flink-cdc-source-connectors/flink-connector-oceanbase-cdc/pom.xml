@@ -20,7 +20,7 @@ limitations under the License.
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <artifactId>flink-cdc-source-connectors</artifactId>
-        <groupId>com.ververica</groupId>
+        <groupId>org.apache.flink</groupId>
         <version>${revision}</version>
     </parent>
     <properties>
@@ -36,7 +36,7 @@ limitations under the License.
     <dependencies>
         <!-- Debezium dependencies -->
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-debezium</artifactId>
             <version>${project.version}</version>
             <exclusions>
@@ -48,7 +48,7 @@ limitations under the License.
         </dependency>
 
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-common</artifactId>
             <version>${project.version}</version>
         </dependency>

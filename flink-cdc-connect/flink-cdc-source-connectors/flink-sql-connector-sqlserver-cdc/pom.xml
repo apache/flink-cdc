@@ -20,7 +20,7 @@ limitations under the License.
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <artifactId>flink-cdc-source-connectors</artifactId>
-        <groupId>com.ververica</groupId>
+        <groupId>org.apache.flink</groupId>
         <version>${revision}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -29,7 +29,7 @@ limitations under the License.
 
     <dependencies>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-sqlserver-cdc</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -56,9 +56,9 @@ limitations under the License.
                                     <include>io.debezium:debezium-embedded</include>
                                     <include>io.debezium:debezium-core</include>
                                     <include>io.debezium:debezium-connector-sqlserver</include>
-                                    <include>com.ververica:flink-connector-debezium</include>
-                                    <include>com.ververica:flink-cdc-base</include>
-                                    <include>com.ververica:flink-connector-sqlserver-cdc</include>
+                                    <include>org.apache.flink:flink-connector-debezium</include>
+                                    <include>org.apache.flink:flink-cdc-base</include>
+                                    <include>org.apache.flink:flink-connector-sqlserver-cdc</include>
                                     <include>com.microsoft.sqlserver:*</include>
                                     <include>org.apache.kafka:*</include>
                                     <include>com.fasterxml.*:*</include>
@@ -85,19 +85,19 @@ limitations under the License.
                                 <relocation>
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.org.apache.kafka
+                                        org.apache.flink.cdc.connectors.shaded.org.apache.kafka
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.com.google
+                                        org.apache.flink.cdc.connectors.shaded.com.google
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.fasterxml</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.com.fasterxml
+                                        org.apache.flink.cdc.connectors.shaded.com.fasterxml
                                     </shadedPattern>
                                 </relocation>
                             </relocations>
