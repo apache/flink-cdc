@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -54,6 +55,7 @@ import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.C
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.CONNECT_TIMEOUT;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.HEARTBEAT_INTERVAL;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
+import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.IGNORE_NOPRIMARYKEY_TABLE;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static com.ververica.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
@@ -93,6 +95,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
         String tables = config.get(TABLES);
+        boolean ignoreNoPrimaryKeyTable = config.get(IGNORE_NOPRIMARYKEY_TABLE);
 
         String serverId = validateAndGetServerId(config);
         ZoneId serverTimeZone = getServerTimeZone(config);
@@ -151,7 +154,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .jdbcProperties(getJdbcProperties(configMap));
 
         Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
-        String[] capturedTables = getTableList(configFactory.createConfig(0), selectors);
+        String[] capturedTables =
+                getTableList(configFactory.createConfig(0), selectors, ignoreNoPrimaryKeyTable);
         if (capturedTables.length == 0) {
             throw new IllegalArgumentException(
                     "Cannot find any table by the option 'tables' = " + tables);
@@ -211,11 +215,23 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     private static final String SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET = "specific-offset";
     private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMP = "timestamp";
 
-    private static String[] getTableList(MySqlSourceConfig sourceConfig, Selectors selectors) {
-        return MySqlSchemaUtils.listTables(sourceConfig, null).stream()
-                .filter(selectors::isMatch)
-                .map(TableId::toString)
-                .toArray(String[]::new);
+    private static String[] getTableList(
+            MySqlSourceConfig sourceConfig, Selectors selectors, boolean ignorePrimaryKeyTable) {
+        if (ignorePrimaryKeyTable) {
+            List<TableId> noPrimaryKeyTables =
+                    MySqlSchemaUtils.listNoPrimaryKeyTables(sourceConfig, null);
+            LOG.info("\t List of tables ignored without primary keys are: {}", noPrimaryKeyTables);
+
+            return MySqlSchemaUtils.listPrimaryKeyTables(sourceConfig, null).stream()
+                    .filter(selectors::isMatch)
+                    .map(TableId::toString)
+                    .toArray(String[]::new);
+        } else {
+            return MySqlSchemaUtils.listTables(sourceConfig, null).stream()
+                    .filter(selectors::isMatch)
+                    .map(TableId::toString)
+                    .toArray(String[]::new);
+        }
     }
 
     private static StartupOptions getStartupOptions(Configuration config) {
