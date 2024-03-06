@@ -15,7 +15,7 @@
 source:
   type: mysql
   name: source-database
-  host: localhost
+  hostname: localhost
   port: 3306
   username: admin
   password: pass
