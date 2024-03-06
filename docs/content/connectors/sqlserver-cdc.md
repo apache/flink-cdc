@@ -342,8 +342,8 @@ The SQLServer CDC connector can also be a DataStream source. You can create a So
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
-import com.ververica.cdc.connectors.sqlserver.SqlServerSource;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.flink.cdc.connectors.sqlserver.SqlServerSource;
 
 public class SqlServerSourceExample {
   public static void main(String[] args) throws Exception {
@@ -373,10 +373,10 @@ The SQLServer CDC incremental connector (after 2.4.0) can be used as the followi
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import com.ververica.cdc.connectors.base.options.StartupOptions;
-import com.ververica.cdc.connectors.sqlserver.source.SqlServerSourceBuilder;
-import com.ververica.cdc.connectors.sqlserver.source.SqlServerSourceBuilder.SqlServerIncrementalSource;
-import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.cdc.connectors.sqlserver.source.SqlServerSourceBuilder;
+import org.apache.flink.cdc.connectors.sqlserver.source.SqlServerSourceBuilder.SqlServerIncrementalSource;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 
 public class SqlServerIncrementalSourceExample {
     public static void main(String[] args) throws Exception {

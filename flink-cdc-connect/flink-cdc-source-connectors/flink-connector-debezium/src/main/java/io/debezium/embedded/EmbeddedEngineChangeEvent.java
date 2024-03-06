@@ -6,7 +6,8 @@
 
 package io.debezium.embedded;
 
-import com.ververica.cdc.debezium.internal.DebeziumChangeFetcher;
+import org.apache.flink.cdc.debezium.internal.DebeziumChangeFetcher;
+
 import io.debezium.engine.ChangeEvent;
 import io.debezium.engine.RecordChangeEvent;
 import org.apache.kafka.connect.source.SourceRecord;

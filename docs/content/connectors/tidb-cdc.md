@@ -241,10 +241,10 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.util.Collector;
 
-import com.ververica.cdc.connectors.tidb.TDBSourceOptions;
-import com.ververica.cdc.connectors.tidb.TiDBSource;
-import com.ververica.cdc.connectors.tidb.TiKVChangeEventDeserializationSchema;
-import com.ververica.cdc.connectors.tidb.TiKVSnapshotEventDeserializationSchema;
+import org.apache.flink.cdc.connectors.tidb.TDBSourceOptions;
+import org.apache.flink.cdc.connectors.tidb.TiDBSource;
+import org.apache.flink.cdc.connectors.tidb.TiKVChangeEventDeserializationSchema;
+import org.apache.flink.cdc.connectors.tidb.TiKVSnapshotEventDeserializationSchema;
 import org.tikv.kvproto.Cdcpb;
 import org.tikv.kvproto.Kvrpcpb;
 

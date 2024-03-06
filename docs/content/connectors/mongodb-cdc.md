@@ -448,8 +448,8 @@ The MongoDB CDC connector can also be a DataStream source. You can create a Sour
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
-import com.ververica.cdc.connectors.mongodb.MongoDBSource;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.flink.cdc.connectors.mongodb.MongoDBSource;
 
 public class MongoDBSourceExample {
     public static void main(String[] args) throws Exception {
@@ -476,8 +476,8 @@ The MongoDB CDC incremental connector (after 2.3.0) can be used as the following
 ```java
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import com.ververica.cdc.connectors.mongodb.source.MongoDBSource;
-import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.flink.cdc.connectors.mongodb.source.MongoDBSource;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 
 public class MongoDBIncrementalSourceExample {
     public static void main(String[] args) throws Exception {
