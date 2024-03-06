@@ -28,4 +28,6 @@ doris-pipeline
 doris-pipeline(ZH)
 starrocks-pipeline
 starrocks-pipeline(ZH)
+kafka-pipeline
+kafka-pipeline(ZH)
 ```

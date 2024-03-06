@@ -135,8 +135,12 @@ public class DataTypeUtils {
                         toFlinkDataType(children.get(0)), toFlinkDataType(children.get(1)));
             case ROW:
                 Preconditions.checkState(!CollectionUtil.isNullOrEmpty(children));
-                return org.apache.flink.table.api.DataTypes.ROW(
-                        children.toArray(new org.apache.flink.table.types.DataType[] {}));
+                org.apache.flink.table.types.DataType[] dataTypes =
+                        new org.apache.flink.table.types.DataType[children.size()];
+                for (int i = 0; i < dataTypes.length; i++) {
+                    dataTypes[i] = toFlinkDataType(children.get(i));
+                }
+                return org.apache.flink.table.api.DataTypes.ROW(dataTypes);
             default:
                 throw new IllegalArgumentException("Illegal type: " + type);
         }
