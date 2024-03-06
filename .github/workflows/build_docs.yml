@@ -13,33 +13,74 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: build_docs
- 
-# execute this docs build workflow automatically when new push happens in any branch
+name: "Build documentation"
+
 on:
   push:
-    paths:
-      - 'docs/**'
- 
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  schedule:
+    - cron: '0 0 * * *' # Deploy every day
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
- 
-  build_docs_job:
+  build-documentation:
+    if: github.repository == 'apache/flink-cdc'
     runs-on: ubuntu-latest
-    container: debian:buster-slim
- 
+    strategy:
+      max-parallel: 1
+      matrix:
+        branch:
+          - master
+          - release-3.0
+
     steps:
- 
-    - name: Prereqs
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        apt-get update
-        apt-get install -y git
-        git clone "https://token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" .
-      shell: bash
- 
-    - name: Execute script to build our documentation and update pages
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: "docs/build_docs.sh"
-      shell: bash
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ matrix.branch }}
+
+      - name: Set branch environment variable
+        run: |
+          currentBranch=$(git branch --show-current)
+          
+          echo "flink_branch=${currentBranch}" >> ${GITHUB_ENV}
+          
+          if [ "${currentBranch}" = "master" ]; then
+          echo "flink_alias=release-3.1" >> ${GITHUB_ENV}
+          elif [ "${currentBranch}" = "release-3.0" ]; then
+          echo "flink_alias=stable" >> ${GITHUB_ENV}
+          fi
+
+      - name: Build documentation
+        run: |
+          docker run --rm --volume "$PWD:/root/flink-cdc" chesnay/flink-ci:java_8_11_17_21_maven_386 bash -c "cd /root/flink-cdc && chmod +x ./.github/workflows/docs.sh && ./.github/workflows/docs.sh"
+
+      - name: Upload documentation
+        uses: burnett01/rsync-deployments@5.2
+        with:
+          switches: --archive --compress
+          path: docs/target/
+          remote_path: ${{ secrets.NIGHTLIES_RSYNC_PATH }}/flink/flink-cdc-docs-${{ env.flink_branch }}/
+          remote_host: ${{ secrets.NIGHTLIES_RSYNC_HOST }}
+          remote_port: ${{ secrets.NIGHTLIES_RSYNC_PORT }}
+          remote_user: ${{ secrets.NIGHTLIES_RSYNC_USER }}
+          remote_key: ${{ secrets.NIGHTLIES_RSYNC_KEY }}
+
+      - name: Upload documentation alias
+        if: env.flink_alias != ''
+        uses: burnett01/rsync-deployments@5.2
+        with:
+          switches: --archive --compress
+          path: docs/target/
+          remote_path: ${{ secrets.NIGHTLIES_RSYNC_PATH }}/flink/flink-cdc-docs-${{ env.flink_alias }}/
+          remote_host: ${{ secrets.NIGHTLIES_RSYNC_HOST }}
+          remote_port: ${{ secrets.NIGHTLIES_RSYNC_PORT }}
+          remote_user: ${{ secrets.NIGHTLIES_RSYNC_USER }}
+          remote_key: ${{ secrets.NIGHTLIES_RSYNC_KEY }}

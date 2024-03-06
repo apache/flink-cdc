@@ -19,10 +19,16 @@ on:
     branches:
       - master
       - release-*
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
   pull_request:
     branches:
       - master
       - release-*
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

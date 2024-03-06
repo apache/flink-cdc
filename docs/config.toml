@@ -1,0 +1,93 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+baseURL = '//nightlies.apache.org/flink/flink-cdc-docs-master'
+languageCode = 'en-us'
+title = 'Apache Flink CDC'
+enableGitInfo = false
+theme = "book"
+pygmentsUseClasses = true
+
+[params]
+  # Flag whether this is a stable version or not.
+  # Used for the quickstart page.
+  IsStable = false
+
+  # Flag to indicate whether an outdated warning should be shown.
+  ShowOutDatedWarning = false
+
+  # This is the version referenced in the docs. Please only use these variables
+  # to reference a specific Flink version, because this is the only place where
+  # we change the version for the complete docs when forking of a release branch
+  # etc.
+  # The full version string as referenced in Maven (e.g. 1.2.1)
+  Version = "3.1-SNAPSHOT"
+
+  # For stable releases, leave the bugfix version out (e.g. 1.2). For snapshot
+  # release this should be the same as the regular version
+  VersionTitle = "3.1-SNAPSHOT"
+
+  # The branch for this version of Apache Flink CDC
+  Branch = "master"
+
+  # The GitHub repository for Apache Flink CDC
+  Repo = "//github.com/apache/flink-cdc"
+
+  GithubRepo = "https://github.com/apache/flink-cdc.git"
+
+  ProjectHomepage = "//flink.apache.org"
+
+  # External links at the bottom
+  # of the menu
+  MenuLinks = [
+    ["Project Homepage", "//flink.apache.org"],
+    ["JavaDocs", "//nightlies.apache.org/flink/flink-cdc-docs-master/api/java/"],
+  ]
+
+  PreviousDocs = [
+    ["3.0", "https://nightlies.apache.org/flink-cdc/flink-cdc-docs-release-3.0"],
+  ]
+
+[markup]
+[markup.goldmark.renderer]
+  unsafe = true
+
+[languages]
+[languages.en]
+languageName = 'English'
+contentDir = 'content'
+weight = 1
+
+[languages.zh]
+languageName = '中文版'
+contentDir = 'content.zh'
+weight = 2
+
+[module]
+[[module.imports.mounts]]
+source = 'content'
+target = 'content'
+lang = 'en'
+[[module.imports.mounts]]
+source = 'content.zh'
+target = 'content'
+lang = 'zh'
+[[module.imports.mounts]]
+source = 'layouts'
+target = 'layouts'
+[[module.imports.mounts]]
+source = 'data'
+target = 'data'
