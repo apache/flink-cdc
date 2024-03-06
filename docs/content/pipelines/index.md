@@ -28,4 +28,6 @@ doris-pipeline
 doris-pipeline(ZH)
 starrocks-pipeline
 starrocks-pipeline(ZH)
+paimon-pipeline
+paimon-pipeline(ZH)
 ```
