@@ -134,3 +134,34 @@ pipeline:
   name: mysql-to-kafka-pipeline
   parallelism: 1
 ```
+
+## Command Line
+
+We provide a script file `flink-cdc.sh` under the `bin` directory for submitting tasks, which can be used in the following ways:
+
+### Submit to a Flink cluster
+```shell
+bash bin/flink-cdc.sh mysql-to-doris.yaml
+```
+
+### Submit to local cluster
+```shell
+bash bin/flink-cdc.sh mysql-to-doris.yaml --use-mini-cluster true
+```
+
+### Starting a Job from a Savepoint 
+```shell
+bash bin/flink-cdc.sh mysql-to-doris.yaml --s hdfs:///flink/savepoint-1537
+```
+
+### CLI Options
+| Option | LongOption        | Description                                                                                                                                                                                                                                                                                                                                                                       |
+|------|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| -h   | --help            | Display help message                                                                                                                                                                                                                                                                                                                                                              |
+|      | --use-mini-cluster | Use Flink MiniCluster to run the pipeline                                                                                                                                                                                                                                                                                                                                         |
+|      | --flink-home | Path of Flink home directory                                                                                                                                                                                                                                                                                                                                                      |
+|      | --global-config | Path of the global configuration file for Flink CDC pipelines                                                                                                                                                                                                                                                                                                                     |
+|      | --jar | JARs to be submitted together with the pipeline                                                                                                                                                                                                                                                                                                                                   |
+| -s   | --fromSavepoint               | Path to a savepoint to restore the job from (for example hdfs:///flink/savepoint-1537)                                                                                                                                                                                                                                                                                            |
+| -cm  | --claimMode                   | Defines how should we restore from the given savepoint. Supported options:[claim - claim ownership of the savepoint and delete once it is subsumed, no_claim (default) - do not claim ownership, the first checkpoint will not reuse any files from the restored one, legacy - the old behaviour, do not assume ownership of the savepoint files, but can reuse some shared files |
+| -n   | --allowNonRestoredState       | Allow to skip savepoint state that cannot be restored. You need to allow this if you removed an operator from your program that was part of the program when the savepoint was triggered.                                                                                                                                                                                         |
