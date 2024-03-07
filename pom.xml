@@ -294,13 +294,16 @@ limitations under the License.
                     </licenseFamilies>
                     <excludes>
                         <!-- Additional files like .gitignore etc.-->
+                        <exclude>**/README.md</exclude>
                         <exclude>**/.*/**</exclude>
                         <!-- Generated content -->
                         <exclude>**/target/**</exclude>
                         <!-- Build files -->
                         <exclude>**/*.iml</exclude>
                         <!-- Docs -->
-                        <exclude>**/*.md</exclude>
+                        <exclude>docs/themes/book/**</exclude>
+                        <exclude>docs/static/**</exclude>
+                        <exclude>docs/assets/github.css</exclude>
                         <exclude>docs/Makefile</exclude>
                         <exclude>docs/Dockerfile</exclude>
                         <exclude>docs/make.bat</exclude>
@@ -511,8 +514,13 @@ limitations under the License.
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
+                <version>2.9.1</version>
                 <configuration>
-                    <doclint>none</doclint>
+                    <quiet>true</quiet>
+                    <detectOfflineLinks>false</detectOfflineLinks>
+                    <additionalJOptions combine.children="append">
+                        <additionalJOption>-Xdoclint:none</additionalJOption>
+                    </additionalJOptions>
                 </configuration>
             </plugin>
 
