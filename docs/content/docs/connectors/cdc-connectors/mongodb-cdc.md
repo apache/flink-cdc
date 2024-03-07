@@ -43,7 +43,7 @@ In order to setup the MongoDB CDC connector, the following table provides depend
 
 Download [flink-sql-connector-mongodb-cdc-3.0-SNAPSHOT.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mongodb-cdc/3.0-SNAPSHOT/flink-sql-connector-mongodb-cdc-3.0-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-mongodb-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-mongodb-cdc-2.2.1.jar](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-mongodb-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-mongodb-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mongodb-cdc), the released version will be available in the Maven central warehouse.
 
 Setup MongoDB
 ----------------
@@ -449,8 +449,8 @@ The MongoDB CDC connector can also be a DataStream source. You can create a Sour
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
-import org.apache.flink.cdc.connectors.mongodb.MongoDBSource;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.mongodb.MongoDBSource;
 
 public class MongoDBSourceExample {
     public static void main(String[] args) throws Exception {
@@ -477,8 +477,8 @@ The MongoDB CDC incremental connector (after 2.3.0) can be used as the following
 ```java
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.cdc.connectors.mongodb.source.MongoDBSource;
-import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.mongodb.source.MongoDBSource;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 
 public class MongoDBIncrementalSourceExample {
     public static void main(String[] args) throws Exception {

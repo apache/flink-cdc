@@ -225,8 +225,8 @@ The Incremental Reading feature of Vitess CDC Source only exposes in SQL current
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
-import org.apache.flink.cdc.connectors.vitess.VitessSource;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.vitess.VitessSource;
 
 public class VitessSourceExample {
   public static void main(String[] args) throws Exception {

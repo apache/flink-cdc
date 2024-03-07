@@ -43,7 +43,7 @@ In order to setup the Oracle CDC connector, the following table provides depende
 
 Download [flink-sql-connector-oracle-cdc-3.0-SNAPSHOT.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oracle-cdc/3.0-SNAPSHOT/flink-sql-connector-oracle-cdc-3.0-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-oracle-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-oracle-cdc-2.3.0.jar](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-oracle-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-oracle-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oracle-cdc), the released version will be available in the Maven central warehouse.
 
 Setup Oracle
 ----------------
@@ -509,10 +509,10 @@ The Oracle CDC connector can also be a DataStream source. There are two modes fo
 #### Incremental Snapshot based DataStream (Experimental)
 
 ```java
-import org.apache.flink.cdc.connectors.base.options.StartupOptions;
-import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
-import org.apache.flink.cdc.connectors.oracle.source.OracleSourceBuilder;
-import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.base.options.StartupOptions;
+import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.oracle.source.OracleSourceBuilder;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -561,8 +561,8 @@ public class OracleParallelSourceExample {
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
-import org.apache.flink.cdc.connectors.oracle.OracleSource;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.oracle.OracleSource;
 
 public class OracleSourceExample {
   public static void main(String[] args) throws Exception {

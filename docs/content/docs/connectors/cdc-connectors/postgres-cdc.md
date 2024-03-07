@@ -43,7 +43,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
 
 Download flink-sql-connector-postgres-cdc-3.0-SNAPSHOT.jar and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-postgres-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-postgres-cdc-2.3.0.jar](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-postgres-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-postgres-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-postgres-cdc), the released version will be available in the Maven central warehouse.
 
 How to create a Postgres CDC table
 ----------------
@@ -444,10 +444,10 @@ The Postgres CDC connector can also be a DataStream source. There are two modes 
 #### Incremental Snapshot based DataStream (Experimental)
 
 ```java
-import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
-import org.apache.flink.cdc.connectors.postgres.source.PostgresSourceBuilder;
-import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
-import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
+import com.ververica.cdc.connectors.postgres.source.PostgresSourceBuilder;
+import com.ververica.cdc.debezium.DebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -495,8 +495,8 @@ public class PostgresParallelSourceExample {
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
-import org.apache.flink.cdc.connectors.postgres.PostgreSQLSource;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.postgres.PostgreSQLSource;
 
 public class PostgreSQLSourceExample {
   public static void main(String[] args) throws Exception {

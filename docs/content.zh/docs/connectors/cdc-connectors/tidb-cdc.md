@@ -43,7 +43,7 @@ In order to setup the TiDB CDC connector, the following table provides dependenc
 
 Download [flink-sql-connector-tidb-cdc-3.0-SNAPSHOT.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-tidb-cdc/3.0-SNAPSHOT/flink-sql-connector-tidb-cdc-3.0-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-tidb-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-tidb-cdc-2.2.1.jar](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc), the released version will be available in the Maven central warehouse.
+**Note:** flink-sql-connector-tidb-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-tidb-cdc-2.2.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-tidb-cdc), the released version will be available in the Maven central warehouse.
 
 How to create a TiDB CDC table
 ----------------
@@ -241,10 +241,10 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.util.Collector;
 
-import org.apache.flink.cdc.connectors.tidb.TDBSourceOptions;
-import org.apache.flink.cdc.connectors.tidb.TiDBSource;
-import org.apache.flink.cdc.connectors.tidb.TiKVChangeEventDeserializationSchema;
-import org.apache.flink.cdc.connectors.tidb.TiKVSnapshotEventDeserializationSchema;
+import com.ververica.cdc.connectors.tidb.TDBSourceOptions;
+import com.ververica.cdc.connectors.tidb.TiDBSource;
+import com.ververica.cdc.connectors.tidb.TiKVChangeEventDeserializationSchema;
+import com.ververica.cdc.connectors.tidb.TiKVSnapshotEventDeserializationSchema;
 import org.tikv.kvproto.Cdcpb;
 import org.tikv.kvproto.Kvrpcpb;
 

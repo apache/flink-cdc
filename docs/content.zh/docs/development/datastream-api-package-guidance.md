@@ -42,7 +42,7 @@ flink 1.17.2  flink mysql cdc 2.4.2
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.apache.flink</groupId>
+    <groupId>com.ververica</groupId>
     <artifactId>FlinkCDCTest</artifactId>
     <version>1.0-SNAPSHOT</version>
 
@@ -121,7 +121,7 @@ flink 1.17.2  flink mysql cdc 2.4.2
             <version>30.1.1-jre-16.1</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.flink</groupId>
+            <groupId>com.ververica</groupId>
             <artifactId>flink-connector-mysql-cdc</artifactId>
             <version>2.4.2</version>
         </dependency>
@@ -190,35 +190,35 @@ flink 1.17.2  flink mysql cdc 2.4.2
                                 <relocation>
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.org.apache.kafka
+                                        com.ververica.cdc.connectors.shaded.org.apache.kafka
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.antlr</pattern>
                                     <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.org.antlr
+                                        com.ververica.cdc.connectors.shaded.org.antlr
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.fasterxml</pattern>
                                     <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.com.fasterxml
+                                        com.ververica.cdc.connectors.shaded.com.fasterxml
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.com.google
+                                        com.ververica.cdc.connectors.shaded.com.google
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.esri.geometry</pattern>
-                                    <shadedPattern>org.apache.flink.cdc.connectors.shaded.com.esri.geometry</shadedPattern>
+                                    <shadedPattern>com.ververica.cdc.connectors.shaded.com.esri.geometry</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.zaxxer</pattern>
                                     <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.com.zaxxer
+                                        com.ververica.cdc.connectors.shaded.com.zaxxer
                                     </shadedPattern>
                                 </relocation>
                             </relocations>
@@ -241,8 +241,8 @@ package org.apache.flink.flink.cdc;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
-import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.mysql.source.MySqlSource;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 
 public class CdcTest {
     public static void main(String[] args) throws Exception {

@@ -121,7 +121,7 @@ Include following Maven dependency (available through Maven Central):
 
 ```
 <dependency>
-  <groupId>org.apache.flink</groupId>
+  <groupId>com.ververica</groupId>
   <!-- add the dependency matching your database -->
   <artifactId>flink-connector-mysql-cdc</artifactId>
   <!-- The dependency is available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself. -->
@@ -131,8 +131,8 @@ Include following Maven dependency (available through Maven Central):
 
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
-import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 
 public class MySqlBinlogSourceExample {
   public static void main(String[] args) throws Exception {

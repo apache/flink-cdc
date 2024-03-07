@@ -55,7 +55,7 @@ put it under `<FLINK_HOME>/lib/`.
 
 **Note:** flink-sql-connector-db2-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users 
 need to download the source code and compile the corresponding jar. Users should use the released version, such as 
-[flink-sql-connector-db2-cdc-2.3.0.jar](https://mvnrepository.com/artifact/org.apache.flink/flink-connector-db2-cdc), 
+[flink-sql-connector-db2-cdc-2.3.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-db2-cdc), 
 the released version will be available in the Maven central warehouse.
 
 Setup Db2 server
@@ -225,7 +225,7 @@ _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapsh
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
-import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 
 public class Db2SourceExample {
   public static void main(String[] args) throws Exception {
