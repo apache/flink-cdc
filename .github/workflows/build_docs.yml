@@ -17,14 +17,13 @@ name: "Build documentation"
 
 on:
   push:
+    paths:
+      - 'docs/**'
     branches:
       - master
-  pull_request:
-    branches:
-      - master
+      - release-*
   schedule:
     - cron: '0 0 * * *' # Deploy every day
-
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
