@@ -119,6 +119,8 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
                     "UPDATE products_source SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
             stat.execute("UPDATE products_source SET weight='5.17' WHERE id=111;");
             stat.execute("DELETE FROM products_source WHERE id=111;");
+            // add schema change event in the last.
+            stat.execute("CREATE TABLE new_table (id int, age int);");
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
             throw e;
