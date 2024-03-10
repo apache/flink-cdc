@@ -56,6 +56,8 @@ import static org.apache.flink.table.api.DataTypes.ROW;
 /** The utils for Db2 data source. */
 public class Db2Utils {
 
+    private static final String EVENT_SERIAL_NO_KEY = "event_serial_no";
+
     public Db2Utils() {}
 
     public static Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)
@@ -207,14 +209,18 @@ public class Db2Utils {
         }
         Lsn changeLsn = Lsn.valueOf(offsetStrMap.get(SourceInfo.CHANGE_LSN_KEY));
         Lsn commitLsn = Lsn.valueOf(offsetStrMap.get(SourceInfo.COMMIT_LSN_KEY));
-        return new LsnOffset(changeLsn, commitLsn);
+        Long eventSerialNo = null;
+        if (offsetStrMap.get(EVENT_SERIAL_NO_KEY) != null) {
+            eventSerialNo = Long.parseLong(offsetStrMap.get(EVENT_SERIAL_NO_KEY));
+        }
+        return new LsnOffset(changeLsn, commitLsn, eventSerialNo);
     }
 
     /** Fetch current largest log sequence number (LSN) of the database. */
     public static LsnOffset currentLsn(Db2Connection connection) {
         try {
             Lsn maxLsn = connection.getMaxLsn();
-            return new LsnOffset(maxLsn, maxLsn);
+            return new LsnOffset(maxLsn, maxLsn, null);
         } catch (SQLException e) {
             throw new FlinkRuntimeException(e.getMessage(), e);
         }

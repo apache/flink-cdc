@@ -45,7 +45,7 @@ public class Db2ParallelSourceExampleTest extends Db2TestBase {
                         .username(DB2_CONTAINER.getUsername())
                         .password(DB2_CONTAINER.getPassword())
                         .deserializer(new JsonDebeziumDeserializationSchema())
-                        .startupOptions(StartupOptions.latest())
+                        .startupOptions(StartupOptions.initial())
                         .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();

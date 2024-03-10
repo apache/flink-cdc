@@ -240,7 +240,8 @@ public class Db2ConnectorITCase extends Db2TestBase {
                                 + "    DATE_C DATE,\n"
                                 + "    TIME_C TIME(0),\n"
                                 + "    DEFAULT_NUMERIC_C DECIMAL,\n"
-                                + "    TIMESTAMP_PRECISION_C TIMESTAMP(9)\n"
+                                + "    TIMESTAMP_PRECISION_C TIMESTAMP(9),\n"
+                                + "    PRIMARY KEY (ID) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'db2-cdc',"
                                 + " 'hostname' = '%s',"
@@ -275,7 +276,8 @@ public class Db2ConnectorITCase extends Db2TestBase {
                         + "    date_c DATE,\n"
                         + "    time_c TIME(0),\n"
                         + "    default_numeric_c DECIMAL,\n"
-                        + "    timestamp_precision_c TIMESTAMP(9)\n"
+                        + "    timestamp_precision_c TIMESTAMP(9),\n"
+                        + "    PRIMARY KEY (id) NOT ENFORCED"
                         + ") WITH ("
                         + " 'connector' = 'values',"
                         + " 'sink-insert-only' = 'false'"
@@ -293,12 +295,11 @@ public class Db2ConnectorITCase extends Db2TestBase {
             statement.execute("UPDATE DB2INST1.FULL_TYPES SET SMALL_C=0 WHERE ID=1;");
         }
 
-        waitForSinkSize("sink", 3);
+        waitForSinkSize("sink", 2);
 
         List<String> expected =
                 Arrays.asList(
                         "+I(1,32767,65535,2147483647,5.5,6.6,123.12345,404.4,Hello World,a,abc,2020-07-17T18:00:22.123,2020-07-17,18:00:22,500,2020-07-17T18:00:22.123456789)",
-                        "-U(1,32767,65535,2147483647,5.5,6.6,123.12345,404.4,Hello World,a,abc,2020-07-17T18:00:22.123,2020-07-17,18:00:22,500,2020-07-17T18:00:22.123456789)",
                         "+U(1,0,65535,2147483647,5.5,6.6,123.12345,404.4,Hello World,a,abc,2020-07-17T18:00:22.123,2020-07-17,18:00:22,500,2020-07-17T18:00:22.123456789)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertEquals(expected, actual);
@@ -315,7 +316,8 @@ public class Db2ConnectorITCase extends Db2TestBase {
                                 + " ID INT NOT NULL,"
                                 + " NAME STRING,"
                                 + " DESCRIPTION STRING,"
-                                + " WEIGHT DECIMAL(10,3)"
+                                + " WEIGHT DECIMAL(10,3),"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'db2-cdc',"
                                 + " 'hostname' = '%s',"
@@ -364,7 +366,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
             statement.execute("DELETE FROM DB2INST1.PRODUCTS WHERE ID=111");
         }
 
-        waitForSinkSize("sink", 7);
+        waitForSinkSize("sink", 5);
 
         String[] expected =
                 new String[] {"110,jacket,new water resistent white wind breaker,0.500"};

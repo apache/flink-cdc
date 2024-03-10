@@ -84,7 +84,8 @@ Flink SQL> CREATE TABLE products (
      ID INT NOT NULL,
      NAME STRING,
      DESCRIPTION STRING,
-     WEIGHT DECIMAL(10,3)
+     WEIGHT DECIMAL(10,3),
+     PRIMARY KEY(ID) NOT ENFORCED
      ) WITH (
      'connector' = 'db2-cdc',
      'hostname' = 'localhost',

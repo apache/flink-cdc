@@ -33,7 +33,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Copied from Debezium 1.9.7.Final. {@link JdbcConnection} extension to be used with IBM Db2
+ * Copied from Debezium 1.9.8.Final. {@link JdbcConnection} extension to be used with IBM Db2
  *
  * @author Horia Chiorean (hchiorea@redhat.com), Jiri Pechanec, Peter Urbanetz
  */

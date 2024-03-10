@@ -32,8 +32,9 @@ public class LsnOffset extends Offset {
             new LsnOffset(Lsn.valueOf(new byte[] {Byte.MIN_VALUE}));
     public static final LsnOffset NO_STOPPING_OFFSET =
             new LsnOffset(Lsn.valueOf(new byte[] {Byte.MAX_VALUE}));
+    private static final String EVENT_SERIAL_NO_KEY = "event_serial_no";
 
-    public LsnOffset(Lsn changeLsn, Lsn commitLsn) {
+    public LsnOffset(Lsn changeLsn, Lsn commitLsn, Long eventSerialNo) {
         Map<String, String> offsetMap = new HashMap<>();
 
         if (changeLsn != null && changeLsn.isAvailable()) {
@@ -42,12 +43,15 @@ public class LsnOffset extends Offset {
         if (commitLsn != null && commitLsn.isAvailable()) {
             offsetMap.put(SourceInfo.COMMIT_LSN_KEY, commitLsn.toString());
         }
+        if (eventSerialNo != null) {
+            offsetMap.put(EVENT_SERIAL_NO_KEY, String.valueOf(eventSerialNo));
+        }
 
         this.offset = offsetMap;
     }
 
     public LsnOffset(Lsn changeLsn) {
-        this(changeLsn, null);
+        this(changeLsn, null, null);
     }
 
     @Override

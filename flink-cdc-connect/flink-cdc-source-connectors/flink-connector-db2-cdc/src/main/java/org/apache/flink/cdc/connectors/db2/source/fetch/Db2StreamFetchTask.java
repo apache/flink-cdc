@@ -125,7 +125,7 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
         public void afterHandleLsn(Db2Partition partition, Lsn toLsn) {
             // check do we need to stop for fetch redo logs for snapshot split.
             if (isBoundedRead()) {
-                LsnOffset currentLsnOffset = new LsnOffset(null, toLsn);
+                LsnOffset currentLsnOffset = new LsnOffset(null, toLsn, null);
                 Offset endingOffset = lsnSplit.getEndingOffset();
                 if (currentLsnOffset.isAtOrAfter(endingOffset)) {
                     // send streaming end event

@@ -141,11 +141,16 @@ public class Db2TestBase {
                     .until(
                             () -> {
                                 try {
-                                    String sql =
+                                    String removeSql =
                                             String.format(
                                                     "CALL ASNCDC.REMOVETABLE('DB2INST1', '%s')",
                                                     tableName);
-                                    connection.createStatement().execute(sql);
+                                    connection.createStatement().execute(removeSql);
+                                    String reinitSql =
+                                            String.format(
+                                                    "VALUES ASNCDC.ASNCDCSERVICES('reinit','asncdc');",
+                                                    tableName);
+                                    connection.createStatement().execute(reinitSql);
                                     return true;
                                 } catch (SQLException e) {
                                     LOG.warn(

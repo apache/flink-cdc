@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.db2.table;
 
+import org.apache.flink.cdc.connectors.base.options.StartupMode;
+
 import java.util.Objects;
 
 /** Debezium startup options. */

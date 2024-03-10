@@ -27,11 +27,17 @@ import java.util.Map;
 
 /** A factory to create {@link LsnOffset}. */
 public class LsnFactory extends OffsetFactory {
+    private static final String EVENT_SERIAL_NO_KEY = "event_serial_no";
+
     @Override
     public Offset newOffset(Map<String, String> offset) {
         Lsn changeLsn = Lsn.valueOf(offset.get(SourceInfo.CHANGE_LSN_KEY));
         Lsn commitLsn = Lsn.valueOf(offset.get(SourceInfo.COMMIT_LSN_KEY));
-        return new LsnOffset(changeLsn, commitLsn);
+        Long eventSerialNo = null;
+        if (offset.get(EVENT_SERIAL_NO_KEY) != null) {
+            eventSerialNo = Long.valueOf(offset.get(EVENT_SERIAL_NO_KEY));
+        }
+        return new LsnOffset(changeLsn, commitLsn, eventSerialNo);
     }
 
     @Override
