@@ -154,7 +154,7 @@ Flink SQL> CREATE TABLE orders (
 );
 ```
 
-You can also try the quickstart tutorial that sync data from OceanBase to Elasticsearch, please refer [Flink CDC Tutorial](https://ververica.github.io/flink-cdc-connectors/release-2.3//content/quickstart/oceanbase-tutorial.html) for more information.
+You can also try the quickstart tutorial that sync data from OceanBase to Elasticsearch, please refer [Flink CDC Tutorial](../../../try-flink-cdc/cdc-connectors/oceanbase-tutorial) for more information.
 
 Connector Options
 ----------------

@@ -23,3 +23,35 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
+
+
+## Try Flink CDC
+
+
+### Pipeline Connectors
+
+[MySQL to Doris](./pipeline-connectors/mysql-doris-pipeline-tutorial)
+
+[MySQL to StarRocks](./pipeline-connectors/mysql-starrocks-pipeline-tutorial)
+
+
+### CDC Connectors
+
+[MongoDB Tutorial](./cdc-connectors/mongodb-tutorial)
+
+[Mysql & Postgres Tutorial](./cdc-connectors/mysql-postgres-tutorial)
+
+[OceanBase Tutorial](./cdc-connectors/oceanbase-tutorial)
+
+[Oracle Tutorial](./cdc-connectors/oracle-tutorial)
+
+[PolarDB-X Tutorial](./cdc-connectors/polardbx-tutorial)
+
+[SqlServer Tutorial](./cdc-connectors/sqlserver-tutorial)
+
+[TiDB Tutorial](./cdc-connectors/tidb-tutorial)
+
+[Db2 Tutorial](./cdc-connectors/db2-tutorial)
+
+[Building a Real-time Data Lake with Flink CDC](./cdc-connectors/build-real-time-data-lake-tutorial)
+
