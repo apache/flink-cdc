@@ -15,15 +15,13 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.oceanbase.table;
+package org.apache.flink.cdc.connectors.oceanbase.utils;
 
-import org.apache.flink.cdc.common.annotation.Internal;
+/** Utils for OceanBase. */
+public class OceanBaseUtils {
 
-import java.io.Serializable;
-
-/** A converter converts OceanBase record metadata into Flink internal data structures. */
-@FunctionalInterface
-@Internal
-public interface OceanBaseMetadataConverter extends Serializable {
-    Object read(OceanBaseRecord record);
+    public static boolean isOceanBaseDriver(String driverClass) {
+        return "com.oceanbase.jdbc.Driver".equals(driverClass)
+                || "com.alipay.oceanbase.jdbc.Driver".equals(driverClass);
+    }
 }

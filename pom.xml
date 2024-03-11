@@ -85,7 +85,6 @@ limitations under the License.
         <slf4j.version>1.7.36</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
         <spotless.version>2.4.2</spotless.version>
-        <oblogclient.version>1.1.0</oblogclient.version>
         <commons-lang3.version>3.12.0</commons-lang3.version>
         <json-path.version>2.7.0</json-path.version>
         <junit5.version>5.10.1</junit5.version>

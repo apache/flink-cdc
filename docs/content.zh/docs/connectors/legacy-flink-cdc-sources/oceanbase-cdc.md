@@ -28,32 +28,84 @@ under the License.
 
 OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。本文介绍了如何设置 OceanBase CDC 连接器以对 OceanBase 进行 SQL 查询。
 
-## 依赖
+
+### OceanBase CDC 方案
+
+名词解释:
+
+- *OceanBase CE*: OceanBase 社区版。OceanBase 的开源版本，兼容 MySQL https://github.com/oceanbase/oceanbase 。
+- *OceanBase EE*: OceanBase 企业版。OceanBase 的商业版本，支持 MySQL 和 Oracle 两种兼容模式 https://www.oceanbase.com 。
+- *OceanBase Cloud*: OceanBase 云数据库 https://www.oceanbase.com/product/cloud 。
+- *Log Proxy CE*: OceanBase 日志代理服务社区版。单独使用时支持 CDC 模式，是一个获取 OceanBase 社区版事务日志（commit log）的代理服务 https://github.com/oceanbase/oblogproxy 。
+- *Log Proxy EE*: OceanBase 日志代理服务企业版。单独使用时支持 CDC 模式，是一个获取 OceanBase 企业版事务日志（commit log）的代理服务，目前仅在 OceanBase Cloud 上提供有限的支持, 详情请咨询相关技术支持。
+- *Binlog Service CE*: OceanBase Binlog 服务社区版。OceanBase 社区版的一个兼容 MySQL 复制协议的解决方案，详情参考 Log Proxy CE Binlog 模式的文档。
+- *Binlog Service EE*: OceanBase Binlog 服务企业版。OceanBase 企业版 MySQL 模式的一个兼容 MySQL 复制协议的解决方案，仅可在阿里云使用，详情见[操作指南](https://www.alibabacloud.com/help/zh/apsaradb-for-oceanbase/latest/binlog-overview)。
+- *MySQL Driver*: `mysql-connector-java`，可用于 OceanBase 社区版和 OceanBase 企业版 MySQL 模式。
+- *OceanBase Driver*: OceanBase JDBC 驱动，支持所有版本的 MySQL 和 Oracle 兼容模式 https://github.com/oceanbase/obconnector-j 。
+
+OceanBase CDC 源端读取方案：
+
+<div class="wy-table-responsive">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left">数据库类型</th>
+                <th class="text-left">支持的驱动</th>
+                <th class="text-left">CDC 连接器</th>
+                <th class="text-left">其他用到的组件</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td rowspan="2">OceanBase CE</td>
+                <td>
+                    MySQL Driver: 5.1.4x, 8.0.x <br>
+                    OceanBase Driver: 2.4.x
+                </td>
+                <td>OceanBase CDC Connector</td>
+                <td>Log Proxy CE</td>
+            </tr>
+            <tr>
+                <td>MySQL Driver: 8.0.x</td>
+                <td>MySQL CDC Connector</td>
+                <td>Binlog Service CE</td>
+            </tr>
+            <tr>
+                <td rowspan="2">OceanBase EE (MySQL 模式)</td>
+                <td>
+                    MySQL Driver: 5.1.4x, 8.0.x <br>
+                    OceanBase Driver: 2.4.x
+                </td>
+                <td>OceanBase CDC Connector</td>
+                <td>Log Proxy EE</td>
+            </tr>
+            <tr>
+                <td>MySQL Driver: 8.0.x</td>
+                <td>MySQL CDC Connector</td>
+                <td>Binlog Service EE</td>
+            </tr>
+            <tr>
+                <td>OceanBase EE (Oracle 模式)</td>
+                <td>OceanBase Driver: 2.4.x</td>
+                <td>OceanBase CDC Connector</td>
+                <td>Log Proxy EE (CDC 模式)</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+注意: 对于使用 OceanBase 社区版或 OceanBase 企业版 MySQL 模式的用户，我们推荐参考  [MySQL CDC 的文档](mysql-cdc.md)，使用 MySQL CDC 连接器搭配 Binlog 服务。
+
+依赖
+------------
 
 为了使用 OceanBase CDC 连接器，您必须提供相关的依赖信息。以下依赖信息适用于使用自动构建工具（如 Maven 或 SBT）构建的项目和带有 SQL JAR 包的 SQL 客户端。
-为了使用 OceanBase CDC 连接器，您必须提供相关的依赖信息。以下依赖信息适用于使用自动构建工具（如 Maven 或 SBT）构建的项目和带有 SQL JAR 包的 SQL 客户端。
 
-```xml
-<dependency>
-   <groupId>org.apache.flink</groupId>
-   <artifactId>flink-connector-oceanbase-cdc</artifactId>
-   <!--  请使用已发布的版本依赖，snapshot 版本的依赖需要本地自行编译。 -->
-   <version>3.1-SNAPSHOT</version>
-</dependency>
+### Maven dependency
 
-```
+{{< artifact flink-connector-oceanbase-cdc >}}
 
-如果您是要连接企业版的 OceanBase，您可能需要使用 OceanBase 官方的 JDBC 驱动，这时需要引入如下依赖。
-
-```xml
-<dependency>
-   <groupId>com.oceanbase</groupId>
-   <artifactId>oceanbase-client</artifactId>
-   <version>2.4.2</version>
-</dependency>
-```
-
-## 下载 SQL 客户端 JAR 包
+### SQL Client JAR
 
 ```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
@@ -61,19 +113,44 @@ OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。�
 
 **注意:** 参考 [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oceanbase-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
-由于开源许可证的原因，我们不能在上述 cdc jar 文件中包含 OceanBase 的官方 JDBC 驱动，如果您需要使用它，可以从[这里](https://repo1.maven.org/maven2/com/oceanbase/oceanbase-client/2.4.2/oceanbase-client-2.4.2.jar)下载，然后放到 `<FLINK_HOME>/lib/` 目录下，同时需要将配置项 `jdbc.driver` 设为 `com.oceanbase.jdbc.Driver`。
+由于 MySQL Driver 和 OceanBase Driver 使用的开源协议都与 Flink CDC 项目不兼容，我们无法在 jar 包中提供驱动。 您可能需要手动配置以下依赖：
 
-### 配置 OceanBase 数据库和 oblogproxy 服务
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">依赖名称</th>
+        <th class="text-left">说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="https://mvnrepository.com/artifact/mysql/mysql-connector-java/8.0.27">mysql:mysql-connector-java:8.0.27</a></td>
+        <td>用于连接到 OceanBase 数据库的 MySQL 租户。</td>
+      </tr>
+    </tbody>
+    <tbody>
+      <tr>
+        <td><a href="https://mvnrepository.com/artifact/com.oceanbase/oceanbase-client/2.4.9">com.oceanbase:oceanbase-client:2.4.9</a></td>
+        <td>用于连接到 OceanBase 数据库的 MySQL 或 Oracle 租户。</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+配置 OceanBase 数据库和 Log Proxy 服务
+----------------------
 
 1. 按照 [文档](https://github.com/oceanbase/oceanbase#quick-start) 配置 OceanBase 集群。
 2. 在 sys 租户中，为 oblogproxy 创建一个带密码的用户。
 
-    ```bash
-    mysql -h${host} -P${port} -uroot
-    mysql> SHOW TENANT;
-    mysql> CREATE USER ${sys_username} IDENTIFIED BY '${sys_password}';
-    mysql> GRANT ALL PRIVILEGES ON *.* TO ${sys_username} WITH GRANT OPTION;
-    ```
+   ```shell
+   mysql -h${host} -P${port} -uroot
+   
+   mysql> SHOW TENANT;
+   mysql> CREATE USER ${sys_username} IDENTIFIED BY '${sys_password}';
+   mysql> GRANT ALL PRIVILEGES ON *.* TO ${sys_username} WITH GRANT OPTION;
+   ```
 
 3. 为你想要监控的租户创建一个用户，这个用户用来读取快照数据和变化事件数据。
 4. OceanBase 社区版用户需要获取`rootserver-list`，可以使用以下命令获取：
@@ -87,9 +164,10 @@ OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。�
     mysql> show parameters like 'obconfig_url';
     ```
 
-5. 按照 [文档](https://github.com/oceanbase/oblogproxy#getting-started) 配置 oblogproxy。
+5. 设置 OceanBase LogProxy。 对于OceanBase社区版的用户，您可以按照[此文档](https://www.oceanbase.com/docs/community-oblogproxy-doc-1000000000531984)进行操作。
 
-## 创建 OceanBase CDC 表
+创建 OceanBase CDC 表
+----------------
 
 使用以下命令，创建 OceanBase CDC 表：
 
@@ -158,12 +236,13 @@ Flink SQL> CREATE TABLE orders (
 
 您也可以访问 Flink CDC 官网文档，快速体验将数据从 OceanBase 导入到 Elasticsearch。更多信息，参考 [Flink CDC 官网文档](https://nightlies.apache.org/flink/flink-cdc-docs-release-3.0/docs/connectors/legacy-flink-cdc-sources/tutorials/oceanbase-tutorial/)。
 
-## OceanBase CDC 连接器选项
+OceanBase CDC 连接器选项
+----------------
 
 OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表所示。
 
 *注意*：连接器支持两种方式来指定需要监听的表，两种方式同时使用时会监听两种方式匹配的所有表。
-1. 使用 `database-name` 和 `table-name` 匹配正则表达式中的数据库和表名。 由于`obcdc`（以前的`liboblog`）现在只支持`fnmatch`匹配，我们不能直接使用正则过滤 changelog 事件，所以通过两个选项去匹配去指定监听表只能在`initial`启动模式下使用。
+1. 使用 `database-name` 和 `table-name` 匹配正则表达式中的数据库和表名。
 2. 使用 `table-list` 去匹配数据库名和表名的准确列表。
 
 <div class="highlight">
@@ -187,11 +266,12 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
             </tr>
             <tr>
                 <td>scan.startup.mode</td>
-                <td>是</td>
-                <td style="word-wrap: break-word;">无</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">initial</td>
                 <td>String</td>
-                <td>指定 OceanBase CDC 消费者的启动模式。可取值为<code>'initial'</code>,<code>'latest-offset'</code> or
-                    <code>'timestamp'</code>。</td>
+                <td>指定 OceanBase CDC 消费者的启动模式。可取值为
+                    <code>'initial'</code>，<code>'latest-offset'</code>，<code>'timestamp'</code> 或 <code>'snapshot'</code>。
+                </td>
             </tr>
             <tr>
                 <td>scan.startup.timestamp</td>
@@ -216,7 +296,7 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
             </tr>
             <tr>
                 <td>tenant-name</td>
-                <td>是</td>
+                <td>否</td>
                 <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
                 <td>待监控 OceanBase 数据库的租户名，应该填入精确值。</td>
@@ -226,14 +306,14 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
                 <td>否</td>
                 <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>待监控 OceanBase 数据库的数据库名，应该是正则表达式，该选项只支持和 'initial' 模式一起使用。</td>
+                <td>待监控 OceanBase 数据库的数据库名，应该是正则表达式。</td>
             </tr>
             <tr>
                 <td>table-name</td>
                 <td>否</td>
                 <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>待监控 OceanBase 数据库的表名，应该是正则表达式，该选项只支持和 'initial' 模式一起使用。</td>
+                <td>待监控 OceanBase 数据库的表名，应该是正则表达式。</td>
             </tr>
             <tr>
                 <td>table-list</td>
@@ -244,14 +324,14 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
             </tr>
             <tr>
                 <td>hostname</td>
-                <td>否</td>
+                <td>是</td>
                 <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
                 <td>OceanBase 数据库或 OceanBbase 代理 ODP 的 IP 地址或主机名。</td>
             </tr>
             <tr>
                 <td>port</td>
-                <td>否</td>
+                <td>是</td>
                 <td style="word-wrap: break-word;">无</td>
                 <td>Integer</td>
                 <td>
@@ -278,14 +358,14 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
             </tr>
             <tr>
                 <td>logproxy.host</td>
-                <td>是</td>
+                <td>否</td>
                 <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
                 <td>OceanBase 日志代理服务 的 IP 地址或主机名。</td>
             </tr>
             <tr>
                 <td>logproxy.port</td>
-                <td>是</td>
+                <td>否</td>
                 <td style="word-wrap: break-word;">无</td>
                 <td>Integer</td>
                 <td>OceanBase 日志代理服务 的端口号。</td>
@@ -328,7 +408,7 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
             <tr>
                 <td>jdbc.driver</td>
                 <td>否</td>
-                <td style="word-wrap: break-word;">com.mysql.jdbc.Driver</td>
+                <td style="word-wrap: break-word;">com.mysql.cj.jdbc.Driver</td>
                 <td>String</td>
                 <td>全量读取时使用的 jdbc 驱动类名。</td>
             </tr>
@@ -339,11 +419,19 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
                 <td>String</td>
                 <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'。</td>
             </tr>
+            <tr>
+                <td>obcdc.properties.*</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
+                <td>String</td>
+                <td>传递自定义 <code>libobcdc</code> 属性的选项，如 'obcdc.properties.sort_trans_participants' = '1'。详情参见 <a href="https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000000510698">obcdc 配置项说明</a>。</td>
+            </tr>
         </tbody>
     </table>
 </div>
 
-## 支持的元数据
+支持的元数据
+----------------
 
 在创建表时，您可以使用以下格式的元数据作为只读列（VIRTUAL）。
 
@@ -358,13 +446,18 @@ OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表
     <tbody>
         <tr>
             <td>tenant_name</td>
-            <td>STRING NOT NULL</td>
+            <td>STRING</td>
             <td>当前记录所属的租户名称。</td>
         </tr>
         <tr>
             <td>database_name</td>
-            <td>STRING NOT NULL</td>
-            <td>当前记录所属的库名。</td>
+            <td>STRING</td>
+            <td>当前记录所属的 db 名。</td>
+        </tr>
+        <tr>
+            <td>schema_name</td>
+            <td>STRING</td>
+            <td>当前记录所属的 schema 名。</td>
         </tr>
         <tr>
             <td>table_name</td>
@@ -406,10 +499,13 @@ CREATE TABLE products (
    'port' = '2881',
    'rootserver-list' = '127.0.0.1:2882:2881',
    'logproxy.host' = '127.0.0.1',
-   'logproxy.port' = '2983');
+   'logproxy.port' = '2983',
+   'working-mode' = 'memory'
+);
 ```
 
-## 特性
+特性
+--------
 
 ### At-Least-Once 处理
 
@@ -424,6 +520,7 @@ OceanBase 数据库是一个分布式数据库，它的日志也分散在不同�
 - `initial`（默认）：在首次启动时对受监视的数据库表执行初始快照，并继续读取最新的提交日志。
 - `latest-offset`：首次启动时，不对受监视的数据库表执行快照，仅从连接器启动时读取提交日志。
 - `timestamp`：在首次启动时不对受监视的数据库表执行初始快照，仅从指定的 `scan.startup.timestamp` 读取最新的提交日志。
+- `snapshot`: 仅对受监视的数据库表执行初始快照。
 
 ### 消费提交日志
 
@@ -434,65 +531,31 @@ OceanBase CDC 连接器使用 [oblogclient](https://github.com/oceanbase/oblogcl
 OceanBase CDC 连接器也可以作为 DataStream Source 使用。您可以按照如下创建一个 SourceFunction：
 
 ```java
-import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.cdc.connectors.oceanbase.OceanBaseSource;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.catalog.Column;
-import org.apache.flink.table.catalog.ResolvedSchema;
-import org.apache.flink.table.catalog.UniqueConstraint;
-import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
-import org.apache.flink.table.types.logical.RowType;
-
-import org.apache.flink.cdc.connectors.oceanbase.OceanBaseSource;
-import org.apache.flink.cdc.connectors.oceanbase.source.RowDataOceanBaseDeserializationSchema;
-import org.apache.flink.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
-import org.apache.flink.cdc.connectors.oceanbase.table.StartupMode;
-
-import java.time.ZoneId;
-import java.util.Arrays;
-import java.util.Collections;
 
 public class OceanBaseSourceExample {
    public static void main(String[] args) throws Exception {
-      ResolvedSchema resolvedSchema =
-              new ResolvedSchema(
-                      Arrays.asList(
-                              Column.physical("id", DataTypes.INT().notNull()),
-                              Column.physical("name", DataTypes.STRING().notNull())),
-                      Collections.emptyList(),
-                      UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
-
-      RowType physicalDataType =
-              (RowType) resolvedSchema.toPhysicalRowDataType().getLogicalType();
-      TypeInformation<RowData> resultTypeInfo = InternalTypeInfo.of(physicalDataType);
-      String serverTimeZone = "+00:00";
-
-      OceanBaseDeserializationSchema<RowData> deserializer =
-              RowDataOceanBaseDeserializationSchema.newBuilder()
-                      .setPhysicalRowType(physicalDataType)
-                      .setResultTypeInfo(resultTypeInfo)
-                      .setServerTimeZone(ZoneId.of(serverTimeZone))
-                      .build();
-
-      SourceFunction<RowData> oceanBaseSource =
-              OceanBaseSource.<RowData>builder()
-                      .rsList("127.0.0.1:2882:2881")
-                      .startupMode(StartupMode.INITIAL)
+      SourceFunction<String> oceanBaseSource =
+              OceanBaseSource.<String>builder()
+                      .startupOptions(StartupOptions.initial())
+                      .hostname("127.0.0.1")
+                      .port(2881)
                       .username("user@test_tenant")
                       .password("pswd")
+                      .compatibleMode("mysql")
+                      .jdbcDriver("com.mysql.cj.jdbc.Driver")
                       .tenantName("test_tenant")
                       .databaseName("^test_db$")
                       .tableName("^test_table$")
-                      .hostname("127.0.0.1")
-                      .port(2881)
-                      .compatibleMode("mysql")
-                      .jdbcDriver("com.mysql.jdbc.Driver")
                       .logProxyHost("127.0.0.1")
                       .logProxyPort(2983)
-                      .serverTimeZone(serverTimeZone)
-                      .deserializer(deserializer)
+                      .rsList("127.0.0.1:2882:2881")
+                      .serverTimeZone("+08:00")
+                      .deserializer(new JsonDebeziumDeserializationSchema())
                       .build();
 
       StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -506,7 +569,8 @@ public class OceanBaseSourceExample {
 }
 ```
 
-## 数据类型映射
+数据类型映射
+----------------
 
 ### Mysql 模式
 
@@ -591,7 +655,8 @@ public class OceanBaseSourceExample {
                 <td>
                     NUMERIC(p, s)<br>
                     DECIMAL(p, s)<br>
-                    where 38 < p <=65 </td>
+                    where 38 < p <=65<br>
+                </td>
                 <td>STRING</td>
                 <td>
                     DECIMAL 等同于 NUMERIC。在 OceanBase 数据库中，DECIMAL 数据类型的精度最高为 65。<br>
@@ -631,7 +696,7 @@ public class OceanBaseSourceExample {
             </tr>
             <tr>
                 <td>BIT(n)</td>
-                <td>BINARY(⌈n/8⌉)</td>
+                <td>BINARY(⌈(n + 7) / 8⌉)</td>
                 <td></td>
             </tr>
             <tr>

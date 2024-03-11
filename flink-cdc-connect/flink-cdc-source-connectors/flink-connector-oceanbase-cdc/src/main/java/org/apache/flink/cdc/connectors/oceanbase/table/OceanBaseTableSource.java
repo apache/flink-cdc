@@ -18,8 +18,12 @@
 package org.apache.flink.cdc.connectors.oceanbase.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.oceanbase.OceanBaseSource;
-import org.apache.flink.cdc.connectors.oceanbase.source.RowDataOceanBaseDeserializationSchema;
+import org.apache.flink.cdc.connectors.oceanbase.source.converter.OceanBaseDeserializationConverterFactory;
+import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.flink.cdc.debezium.table.MetadataConverter;
+import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
@@ -47,7 +51,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
 
     private final ResolvedSchema physicalSchema;
 
-    private final StartupMode startupMode;
+    private final StartupOptions startupOptions;
     private final String username;
     private final String password;
     private final String tenantName;
@@ -58,7 +62,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     private final String serverTimeZone;
 
     private final String hostname;
-    private final Integer port;
+    private final int port;
     private final String compatibleMode;
     private final String jdbcDriver;
     private final Properties jdbcProperties;
@@ -71,6 +75,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     private final String configUrl;
     private final String workingMode;
     private final Properties obcdcProperties;
+    private final Properties debeziumProperties;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -84,7 +89,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
 
     public OceanBaseTableSource(
             ResolvedSchema physicalSchema,
-            StartupMode startupMode,
+            StartupOptions startupOptions,
             String username,
             String password,
             String tenantName,
@@ -94,7 +99,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
             String serverTimeZone,
             Duration connectTimeout,
             String hostname,
-            Integer port,
+            int port,
             String compatibleMode,
             String jdbcDriver,
             Properties jdbcProperties,
@@ -105,30 +110,32 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
             String rsList,
             String configUrl,
             String workingMode,
-            Properties obcdcProperties) {
+            Properties obcdcProperties,
+            Properties debeziumProperties) {
         this.physicalSchema = physicalSchema;
-        this.startupMode = checkNotNull(startupMode);
+        this.startupOptions = checkNotNull(startupOptions);
         this.username = checkNotNull(username);
         this.password = checkNotNull(password);
-        this.tenantName = checkNotNull(tenantName);
+        this.tenantName = tenantName;
         this.databaseName = databaseName;
         this.tableName = tableName;
         this.tableList = tableList;
         this.serverTimeZone = serverTimeZone;
         this.connectTimeout = connectTimeout;
-        this.hostname = hostname;
+        this.hostname = checkNotNull(hostname);
         this.port = port;
         this.compatibleMode = compatibleMode;
         this.jdbcDriver = jdbcDriver;
         this.jdbcProperties = jdbcProperties;
-        this.logProxyHost = checkNotNull(logProxyHost);
-        this.logProxyPort = checkNotNull(logProxyPort);
+        this.logProxyHost = logProxyHost;
+        this.logProxyPort = logProxyPort;
         this.logProxyClientId = logProxyClientId;
         this.startupTimestamp = startupTimestamp;
         this.rsList = rsList;
         this.configUrl = configUrl;
         this.workingMode = workingMode;
         this.obcdcProperties = obcdcProperties;
+        this.debeziumProperties = debeziumProperties;
 
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
@@ -143,20 +150,25 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext context) {
         RowType physicalDataType =
                 (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
-        OceanBaseMetadataConverter[] metadataConverters = getMetadataConverters();
+        MetadataConverter[] metadataConverters = getMetadataConverters();
         TypeInformation<RowData> resultTypeInfo = context.createTypeInformation(producedDataType);
 
-        RowDataOceanBaseDeserializationSchema deserializer =
-                RowDataOceanBaseDeserializationSchema.newBuilder()
+        DebeziumDeserializationSchema<RowData> deserializer =
+                RowDataDebeziumDeserializeSchema.newBuilder()
                         .setPhysicalRowType(physicalDataType)
                         .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(resultTypeInfo)
-                        .setServerTimeZone(ZoneId.of(serverTimeZone))
+                        .setServerTimeZone(
+                                serverTimeZone == null
+                                        ? ZoneId.systemDefault()
+                                        : ZoneId.of(serverTimeZone))
+                        .setUserDefinedConverterFactory(
+                                OceanBaseDeserializationConverterFactory.instance())
                         .build();
 
         OceanBaseSource.Builder<RowData> builder =
                 OceanBaseSource.<RowData>builder()
-                        .startupMode(startupMode)
+                        .startupOptions(startupOptions)
                         .username(username)
                         .password(password)
                         .tenantName(tenantName)
@@ -178,13 +190,14 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         .configUrl(configUrl)
                         .workingMode(workingMode)
                         .obcdcProperties(obcdcProperties)
+                        .debeziumProperties(debeziumProperties)
                         .deserializer(deserializer);
         return SourceFunctionProvider.of(builder.build(), false);
     }
 
-    protected OceanBaseMetadataConverter[] getMetadataConverters() {
+    protected MetadataConverter[] getMetadataConverters() {
         if (metadataKeys.isEmpty()) {
-            return new OceanBaseMetadataConverter[0];
+            return new MetadataConverter[0];
         }
         return metadataKeys.stream()
                 .map(
@@ -194,7 +207,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                                         .findFirst()
                                         .orElseThrow(IllegalStateException::new))
                 .map(OceanBaseReadableMetadata::getConverter)
-                .toArray(OceanBaseMetadataConverter[]::new);
+                .toArray(MetadataConverter[]::new);
     }
 
     @Override
@@ -217,7 +230,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
         OceanBaseTableSource source =
                 new OceanBaseTableSource(
                         physicalSchema,
-                        startupMode,
+                        startupOptions,
                         username,
                         password,
                         tenantName,
@@ -238,7 +251,8 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         rsList,
                         configUrl,
                         workingMode,
-                        obcdcProperties);
+                        obcdcProperties,
+                        debeziumProperties);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -254,7 +268,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
         }
         OceanBaseTableSource that = (OceanBaseTableSource) o;
         return Objects.equals(this.physicalSchema, that.physicalSchema)
-                && Objects.equals(this.startupMode, that.startupMode)
+                && Objects.equals(this.startupOptions, that.startupOptions)
                 && Objects.equals(this.username, that.username)
                 && Objects.equals(this.password, that.password)
                 && Objects.equals(this.tenantName, that.tenantName)
@@ -276,6 +290,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(this.configUrl, that.configUrl)
                 && Objects.equals(this.workingMode, that.workingMode)
                 && Objects.equals(this.obcdcProperties, that.obcdcProperties)
+                && Objects.equals(this.debeziumProperties, that.debeziumProperties)
                 && Objects.equals(this.producedDataType, that.producedDataType)
                 && Objects.equals(this.metadataKeys, that.metadataKeys);
     }
@@ -284,7 +299,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     public int hashCode() {
         return Objects.hash(
                 physicalSchema,
-                startupMode,
+                startupOptions,
                 username,
                 password,
                 tenantName,
@@ -306,6 +321,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 configUrl,
                 workingMode,
                 obcdcProperties,
+                debeziumProperties,
                 producedDataType,
                 metadataKeys);
     }
