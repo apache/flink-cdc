@@ -24,10 +24,11 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetChangeResultRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.WaitChangeResultResponse;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
@@ -76,7 +77,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
      * This method is guaranteed to not be called concurrently with other methods of the operator.
      */
     @Override
-    public void processElement(StreamRecord<Event> streamRecord) {
+    public void processElement(StreamRecord<Event> streamRecord) throws InterruptedException {
         Event event = streamRecord.getValue();
         if (event instanceof SchemaChangeEvent) {
             TableId tableId = ((SchemaChangeEvent) event).tableId();
@@ -91,7 +92,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     // ----------------------------------------------------------------------------------
 
-    private void handleSchemaChangeEvent(TableId tableId, SchemaChangeEvent schemaChangeEvent) {
+    private void handleSchemaChangeEvent(TableId tableId, SchemaChangeEvent schemaChangeEvent)
+            throws InterruptedException {
         // The request will need to send a FlushEvent or block until flushing finished
         SchemaChangeResponse response = requestSchemaChange(tableId, schemaChangeEvent);
         if (response.isShouldSendFlushEvent()) {
@@ -111,8 +113,13 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         return sendRequestToCoordinator(new SchemaChangeRequest(tableId, schemaChangeEvent));
     }
 
-    private ReleaseUpstreamResponse requestReleaseUpstream() {
-        return sendRequestToCoordinator(new ReleaseUpstreamRequest());
+    private void requestReleaseUpstream() throws InterruptedException {
+        CoordinationResponse coordinationRequest =
+                sendRequestToCoordinator(new ReleaseUpstreamRequest());
+        while (coordinationRequest instanceof WaitChangeResultResponse) {
+            Thread.sleep(1000);
+            coordinationRequest = sendRequestToCoordinator(new GetChangeResultRequest());
+        }
     }
 
     private <REQUEST extends CoordinationRequest, RESPONSE extends CoordinationResponse>

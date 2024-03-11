@@ -26,6 +26,7 @@ import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamReques
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.WaitChangeResultResponse;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
 import org.slf4j.Logger;
@@ -33,11 +34,15 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistryRequestHandler.RequestStatus.RECEIVED_RELEASE_REQUEST;
 import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
@@ -45,7 +50,7 @@ import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationRe
 /** A handler to deal with all requests and events for {@link SchemaRegistry}. */
 @Internal
 @NotThreadSafe
-public class SchemaRegistryRequestHandler {
+public class SchemaRegistryRequestHandler implements Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(SchemaRegistryRequestHandler.class);
 
     /** The {@link MetadataApplier} for every table. */
@@ -62,6 +67,12 @@ public class SchemaRegistryRequestHandler {
     private final List<PendingSchemaChange> pendingSchemaChanges;
     /** Sink writers which have sent flush success events for the request. */
     private final Set<Integer> flushedSinkWriters;
+    /** Status of the execution of current schema change request. */
+    private boolean succeedApplyChange;
+    /** Actual exception if failed to apply schema change. */
+    private Exception actualException;
+    /** Executor service to execute schema change. */
+    private final ExecutorService threadPool;
 
     public SchemaRegistryRequestHandler(
             MetadataApplier metadataApplier, SchemaManager schemaManager) {
@@ -70,6 +81,8 @@ public class SchemaRegistryRequestHandler {
         this.flushedSinkWriters = new HashSet<>();
         this.pendingSchemaChanges = new LinkedList<>();
         this.schemaManager = schemaManager;
+        threadPool = Executors.newSingleThreadExecutor();
+        succeedApplyChange = false;
     }
 
     /**
@@ -80,7 +93,13 @@ public class SchemaRegistryRequestHandler {
      */
     private void applySchemaChange(TableId tableId, SchemaChangeEvent changeEvent) {
         LOG.debug("Apply schema change {} to table {}.", changeEvent, tableId);
-        metadataApplier.applySchemaChange(changeEvent);
+        succeedApplyChange = false;
+        try {
+            metadataApplier.applySchemaChange(changeEvent);
+            succeedApplyChange = true;
+        } catch (Exception e) {
+            actualException = e;
+        }
     }
 
     /**
@@ -100,7 +119,9 @@ public class SchemaRegistryRequestHandler {
             }
             CompletableFuture<CoordinationResponse> response =
                     CompletableFuture.completedFuture(wrap(new SchemaChangeResponse(true)));
-            schemaManager.applySchemaChange(request.getSchemaChangeEvent());
+            if (request.getSchemaChangeEvent() instanceof CreateTableEvent) {
+                schemaManager.applySchemaChange(request.getSchemaChangeEvent());
+            }
             pendingSchemaChanges.add(new PendingSchemaChange(request, response));
             pendingSchemaChanges.get(0).startToWaitForReleaseRequest();
             return response;
@@ -140,19 +161,58 @@ public class SchemaRegistryRequestHandler {
      * @param tableId the subtask in SchemaOperator and table that the FlushEvent is about
      * @param sinkSubtask the sink subtask succeed flushing
      */
-    public void flushSuccess(TableId tableId, int sinkSubtask) {
+    public void flushSuccess(TableId tableId, int sinkSubtask) throws InterruptedException {
         flushedSinkWriters.add(sinkSubtask);
         if (flushedSinkWriters.equals(activeSinkWriters)) {
             LOG.info(
                     "All sink subtask have flushed for table {}. Start to apply schema change.",
                     tableId.toString());
             PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
-            applySchemaChange(tableId, waitFlushSuccess.getChangeRequest().getSchemaChangeEvent());
-            waitFlushSuccess.getResponseFuture().complete(wrap(new ReleaseUpstreamResponse()));
+            SchemaChangeEvent schemaChangeEvent =
+                    waitFlushSuccess.getChangeRequest().getSchemaChangeEvent();
+            threadPool.submit(
+                    () ->
+                            applySchemaChange(
+                                    tableId,
+                                    waitFlushSuccess.getChangeRequest().getSchemaChangeEvent()));
+            Thread.sleep(1000);
+            if (succeedApplyChange) {
+                if (!(schemaChangeEvent instanceof CreateTableEvent)
+                        || !schemaManager.schemaExists(tableId)) {
+                    schemaManager.applySchemaChange(schemaChangeEvent);
+                }
+                waitFlushSuccess.getResponseFuture().complete(wrap(new ReleaseUpstreamResponse()));
 
+                if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
+                    startNextSchemaChangeRequest();
+                }
+            } else {
+                if (actualException != null) {
+                    throw new RuntimeException("failed to apply schema change.", actualException);
+                }
+                waitFlushSuccess.getResponseFuture().complete(wrap(new WaitChangeResultResponse()));
+            }
+        }
+    }
+
+    public CompletableFuture<CoordinationResponse> getSchemaChangeResult() {
+        PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
+        SchemaChangeEvent schemaChangeEvent =
+                waitFlushSuccess.getChangeRequest().getSchemaChangeEvent();
+        if (succeedApplyChange) {
+            if (!(schemaChangeEvent instanceof CreateTableEvent)
+                    || !schemaManager.schemaExists(schemaChangeEvent.tableId())) {
+                schemaManager.applySchemaChange(schemaChangeEvent);
+            }
             if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
                 startNextSchemaChangeRequest();
             }
+            return CompletableFuture.supplyAsync(() -> wrap(new ReleaseUpstreamResponse()));
+        } else {
+            if (actualException != null) {
+                throw new RuntimeException("failed to apply schema change.", actualException);
+            }
+            return CompletableFuture.supplyAsync(() -> wrap(new WaitChangeResultResponse()));
         }
     }
 
@@ -176,6 +236,13 @@ public class SchemaRegistryRequestHandler {
                 pendingSchemaChange.startToWaitForReleaseRequest();
                 break;
             }
+        }
+    }
+
+    @Override
+    public void close() throws IOException {
+        if (threadPool != null) {
+            threadPool.shutdown();
         }
     }
 
