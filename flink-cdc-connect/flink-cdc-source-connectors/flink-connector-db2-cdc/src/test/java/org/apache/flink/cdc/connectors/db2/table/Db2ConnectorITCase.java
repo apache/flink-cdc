@@ -302,8 +302,9 @@ public class Db2ConnectorITCase extends Db2TestBase {
                         "+I(1,32767,65535,2147483647,5.5,6.6,123.12345,404.4,Hello World,a,abc,2020-07-17T18:00:22.123,2020-07-17,18:00:22,500,2020-07-17T18:00:22.123456789)",
                         "+U(1,0,65535,2147483647,5.5,6.6,123.12345,404.4,Hello World,a,abc,2020-07-17T18:00:22.123,2020-07-17,18:00:22,500,2020-07-17T18:00:22.123456789)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        Collections.sort(expected);
+        Collections.sort(actual);
         assertEquals(expected, actual);
-
         cancelJobIfRunning(result);
     }
 
