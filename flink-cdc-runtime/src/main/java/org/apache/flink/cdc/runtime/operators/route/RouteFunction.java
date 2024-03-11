@@ -19,14 +19,9 @@ package org.apache.flink.cdc.runtime.operators.route;
 
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.cdc.common.event.AddColumnEvent;
-import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.ChangeEvent;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
-import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Selectors;
@@ -36,6 +31,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.common.utils.ChangeEventUtils.recreateDataChangeEvent;
+import static org.apache.flink.cdc.common.utils.ChangeEventUtils.recreateSchemaChangeEvent;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkState;
 
 /** A map function that applies user-defined routing logics. */
@@ -113,59 +110,5 @@ public class RouteFunction extends RichMapFunction<Event, Event> {
                 String.format(
                         "Unsupported change event with type \"%s\"",
                         event.getClass().getCanonicalName()));
-    }
-
-    private DataChangeEvent recreateDataChangeEvent(
-            DataChangeEvent dataChangeEvent, TableId tableId) {
-        switch (dataChangeEvent.op()) {
-            case INSERT:
-                return DataChangeEvent.insertEvent(
-                        tableId, dataChangeEvent.after(), dataChangeEvent.meta());
-            case UPDATE:
-                return DataChangeEvent.updateEvent(
-                        tableId,
-                        dataChangeEvent.before(),
-                        dataChangeEvent.after(),
-                        dataChangeEvent.meta());
-            case REPLACE:
-                return DataChangeEvent.replaceEvent(
-                        tableId, dataChangeEvent.after(), dataChangeEvent.meta());
-            case DELETE:
-                return DataChangeEvent.deleteEvent(
-                        tableId, dataChangeEvent.before(), dataChangeEvent.meta());
-            default:
-                throw new UnsupportedOperationException(
-                        String.format(
-                                "Unsupported operation type \"%s\" in data change event",
-                                dataChangeEvent.op()));
-        }
-    }
-
-    private SchemaChangeEvent recreateSchemaChangeEvent(
-            SchemaChangeEvent schemaChangeEvent, TableId tableId) {
-        if (schemaChangeEvent instanceof CreateTableEvent) {
-            CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
-            return new CreateTableEvent(tableId, createTableEvent.getSchema());
-        }
-        if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
-            AlterColumnTypeEvent alterColumnTypeEvent = (AlterColumnTypeEvent) schemaChangeEvent;
-            return new AlterColumnTypeEvent(tableId, alterColumnTypeEvent.getTypeMapping());
-        }
-        if (schemaChangeEvent instanceof RenameColumnEvent) {
-            RenameColumnEvent renameColumnEvent = (RenameColumnEvent) schemaChangeEvent;
-            return new RenameColumnEvent(tableId, renameColumnEvent.getNameMapping());
-        }
-        if (schemaChangeEvent instanceof DropColumnEvent) {
-            DropColumnEvent dropColumnEvent = (DropColumnEvent) schemaChangeEvent;
-            return new DropColumnEvent(tableId, dropColumnEvent.getDroppedColumnNames());
-        }
-        if (schemaChangeEvent instanceof AddColumnEvent) {
-            AddColumnEvent addColumnEvent = (AddColumnEvent) schemaChangeEvent;
-            return new AddColumnEvent(tableId, addColumnEvent.getAddedColumns());
-        }
-        throw new UnsupportedOperationException(
-                String.format(
-                        "Unsupported schema change event with type \"%s\"",
-                        schemaChangeEvent.getClass().getCanonicalName()));
     }
 }

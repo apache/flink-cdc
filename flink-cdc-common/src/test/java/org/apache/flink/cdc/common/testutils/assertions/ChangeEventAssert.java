@@ -40,7 +40,8 @@ public class ChangeEventAssert<SELF extends AbstractAssert<SELF, EVENT>, EVENT e
             failWithActualExpectedAndMessage(
                     actual.tableId(),
                     tableId,
-                    "Table ID of the DataChangeEvent is not as expected");
+                    "Table ID of the %s is not as expected",
+                    actual.getClass().getSimpleName());
         }
         return myself;
     }
