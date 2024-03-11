@@ -57,6 +57,7 @@ limitations under the License.
                                     <include>io.debezium:debezium-core</include>
                                     <include>io.debezium:debezium-ddl-parser</include>
                                     <include>io.debezium:debezium-connector-mysql</include>
+                                    <include>com.ververica:flink-cdc-common</include>
                                     <include>com.ververica:flink-connector-debezium</include>
                                     <include>com.ververica:flink-connector-mysql-cdc</include>
                                     <include>org.antlr:antlr4-runtime</include>
