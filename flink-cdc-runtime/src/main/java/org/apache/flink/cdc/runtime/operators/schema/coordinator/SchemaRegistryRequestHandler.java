@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -55,6 +56,8 @@ public class SchemaRegistryRequestHandler {
     /** Schema manager holding schema for all tables. */
     private final SchemaManager schemaManager;
 
+    private final SchemaDerivation schemaDerivation;
+
     /**
      * Not applied SchemaChangeRequest before receiving all flush success events for its table from
      * sink writers.
@@ -64,12 +67,15 @@ public class SchemaRegistryRequestHandler {
     private final Set<Integer> flushedSinkWriters;
 
     public SchemaRegistryRequestHandler(
-            MetadataApplier metadataApplier, SchemaManager schemaManager) {
+            MetadataApplier metadataApplier,
+            SchemaManager schemaManager,
+            SchemaDerivation schemaDerivation) {
         this.metadataApplier = metadataApplier;
         this.activeSinkWriters = new HashSet<>();
         this.flushedSinkWriters = new HashSet<>();
         this.pendingSchemaChanges = new LinkedList<>();
         this.schemaManager = schemaManager;
+        this.schemaDerivation = schemaDerivation;
     }
 
     /**
@@ -96,13 +102,22 @@ public class SchemaRegistryRequestHandler {
                     request.getTableId().toString());
             if (request.getSchemaChangeEvent() instanceof CreateTableEvent
                     && schemaManager.schemaExists(request.getTableId())) {
-                return CompletableFuture.completedFuture(wrap(new SchemaChangeResponse(false)));
+                return CompletableFuture.completedFuture(
+                        wrap(new SchemaChangeResponse(Collections.emptyList())));
             }
-            CompletableFuture<CoordinationResponse> response =
-                    CompletableFuture.completedFuture(wrap(new SchemaChangeResponse(true)));
             schemaManager.applySchemaChange(request.getSchemaChangeEvent());
-            pendingSchemaChanges.add(new PendingSchemaChange(request, response));
-            pendingSchemaChanges.get(0).startToWaitForReleaseRequest();
+            List<SchemaChangeEvent> derivedSchemaChangeEvents =
+                    schemaDerivation.applySchemaChange(request.getSchemaChangeEvent());
+            CompletableFuture<CoordinationResponse> response =
+                    CompletableFuture.completedFuture(
+                            wrap(new SchemaChangeResponse(derivedSchemaChangeEvents)));
+            if (!derivedSchemaChangeEvents.isEmpty()) {
+                PendingSchemaChange pendingSchemaChange =
+                        new PendingSchemaChange(request, response);
+                pendingSchemaChange.derivedSchemaChangeEvents = derivedSchemaChangeEvents;
+                pendingSchemaChanges.add(pendingSchemaChange);
+                pendingSchemaChanges.get(0).startToWaitForReleaseRequest();
+            }
             return response;
         } else {
             LOG.info("There are already processing requests. Wait for processing.");
@@ -147,7 +162,8 @@ public class SchemaRegistryRequestHandler {
                     "All sink subtask have flushed for table {}. Start to apply schema change.",
                     tableId.toString());
             PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
-            applySchemaChange(tableId, waitFlushSuccess.getChangeRequest().getSchemaChangeEvent());
+            waitFlushSuccess.derivedSchemaChangeEvents.forEach(
+                    schemaChangeEvent -> applySchemaChange(tableId, schemaChangeEvent));
             waitFlushSuccess.getResponseFuture().complete(wrap(new ReleaseUpstreamResponse()));
 
             if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
@@ -166,21 +182,27 @@ public class SchemaRegistryRequestHandler {
                     && schemaManager.schemaExists(request.getTableId())) {
                 pendingSchemaChange
                         .getResponseFuture()
-                        .complete(wrap(new SchemaChangeResponse(false)));
+                        .complete(wrap(new SchemaChangeResponse(Collections.emptyList())));
                 pendingSchemaChanges.remove(0);
             } else {
                 schemaManager.applySchemaChange(request.getSchemaChangeEvent());
+                List<SchemaChangeEvent> derivedSchemaChangeEvents =
+                        schemaDerivation.applySchemaChange(request.getSchemaChangeEvent());
                 pendingSchemaChange
                         .getResponseFuture()
-                        .complete(wrap(new SchemaChangeResponse(true)));
-                pendingSchemaChange.startToWaitForReleaseRequest();
-                break;
+                        .complete(wrap(new SchemaChangeResponse(derivedSchemaChangeEvents)));
+                if (!derivedSchemaChangeEvents.isEmpty()) {
+                    pendingSchemaChange.derivedSchemaChangeEvents = derivedSchemaChangeEvents;
+                    pendingSchemaChange.startToWaitForReleaseRequest();
+                    break;
+                }
             }
         }
     }
 
     private static class PendingSchemaChange {
         private final SchemaChangeRequest changeRequest;
+        private List<SchemaChangeEvent> derivedSchemaChangeEvents;
         private CompletableFuture<CoordinationResponse> responseFuture;
         private RequestStatus status;
 
