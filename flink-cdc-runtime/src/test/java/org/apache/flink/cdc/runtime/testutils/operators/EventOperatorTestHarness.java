@@ -41,6 +41,7 @@ import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 import org.apache.flink.streaming.util.MockStreamConfig;
 import org.apache.flink.util.OutputTag;
 
+import java.util.Collections;
 import java.util.LinkedList;
 
 /**
@@ -72,7 +73,8 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
                         "SchemaOperator",
                         new MockOperatorCoordinatorContext(
                                 SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
-                        new CollectingMetadataApplier());
+                        new CollectingMetadataApplier(),
+                        Collections.emptyList());
         schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
     }
 

@@ -17,7 +17,9 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
@@ -43,6 +45,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -88,22 +91,27 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     /** Schema manager for tracking schemas of all tables. */
     private SchemaManager schemaManager = new SchemaManager();
 
+    private SchemaDerivation schemaDerivation;
+
     public SchemaRegistry(
             String operatorName,
             OperatorCoordinator.Context context,
-            MetadataApplier metadataApplier) {
+            MetadataApplier metadataApplier,
+            List<Tuple2<Selectors, TableId>> routes) {
         this.context = context;
         this.operatorName = operatorName;
         this.failedReasons = new HashMap<>();
         this.metadataApplier = metadataApplier;
         schemaManager = new SchemaManager();
-        requestHandler = new SchemaRegistryRequestHandler(metadataApplier, schemaManager);
+        schemaDerivation = new SchemaDerivation(schemaManager, routes, new HashMap<>());
     }
 
     @Override
     public void start() throws Exception {
         LOG.info("Starting SchemaRegistry for {}.", operatorName);
         this.failedReasons.clear();
+        requestHandler =
+                new SchemaRegistryRequestHandler(metadataApplier, schemaManager, schemaDerivation);
         LOG.info("Started SchemaRegistry for {}.", operatorName);
     }
 
@@ -181,7 +189,9 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             schemaManager =
                     SchemaManager.SERIALIZER.deserialize(
                             schemaManagerSerializerVersion, serializedSchemaManager);
-            requestHandler = new SchemaRegistryRequestHandler(metadataApplier, schemaManager);
+            requestHandler =
+                    new SchemaRegistryRequestHandler(
+                            metadataApplier, schemaManager, schemaDerivation);
         }
     }
 

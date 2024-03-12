@@ -17,10 +17,12 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.event;
 
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -34,14 +36,14 @@ public class SchemaChangeResponse implements CoordinationResponse {
      * Whether the SchemaOperator need to buffer data and the SchemaOperatorCoordinator need to wait
      * for flushing.
      */
-    private final boolean shouldSendFlushEvent;
+    private final List<SchemaChangeEvent> schemaChangeEvents;
 
-    public SchemaChangeResponse(boolean shouldSendFlushEvent) {
-        this.shouldSendFlushEvent = shouldSendFlushEvent;
+    public SchemaChangeResponse(List<SchemaChangeEvent> schemaChangeEvents) {
+        this.schemaChangeEvents = schemaChangeEvents;
     }
 
-    public boolean isShouldSendFlushEvent() {
-        return shouldSendFlushEvent;
+    public List<SchemaChangeEvent> getSchemaChangeEvents() {
+        return schemaChangeEvents;
     }
 
     @Override
@@ -53,11 +55,11 @@ public class SchemaChangeResponse implements CoordinationResponse {
             return false;
         }
         SchemaChangeResponse response = (SchemaChangeResponse) o;
-        return shouldSendFlushEvent == response.shouldSendFlushEvent;
+        return schemaChangeEvents.equals(response.schemaChangeEvents);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(shouldSendFlushEvent);
+        return Objects.hash(schemaChangeEvents);
     }
 }
