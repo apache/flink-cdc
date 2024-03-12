@@ -33,7 +33,13 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeFamily;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
+import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
+import org.apache.flink.core.memory.DataInputViewStreamWrapper;
+import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -106,6 +112,51 @@ public class SchemaDerivation {
 
         // No routes are matched
         return Collections.singletonList(schemaChangeEvent);
+    }
+
+    public Map<TableId, Set<TableId>> getDerivationMapping() {
+        return derivationMapping;
+    }
+
+    public static void serializeDerivationMapping(
+            SchemaDerivation schemaDerivation, DataOutputStream out) throws IOException {
+        TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
+        // Serialize derivation mapping in SchemaDerivation
+        Map<TableId, Set<TableId>> derivationMapping = schemaDerivation.getDerivationMapping();
+        out.write(derivationMapping.size());
+        for (Map.Entry<TableId, Set<TableId>> entry : derivationMapping.entrySet()) {
+            // Routed table ID
+            TableId routedTableId = entry.getKey();
+            tableIdSerializer.serialize(routedTableId, new DataOutputViewStreamWrapper(out));
+            // Original table IDs
+            Set<TableId> originalTableIds = entry.getValue();
+            out.writeInt(originalTableIds.size());
+            for (TableId originalTableId : originalTableIds) {
+                tableIdSerializer.serialize(originalTableId, new DataOutputViewStreamWrapper(out));
+            }
+        }
+    }
+
+    public static Map<TableId, Set<TableId>> deserializerDerivationMapping(DataInputStream in)
+            throws IOException {
+        TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
+        int derivationMappingSize = in.readInt();
+        Map<TableId, Set<TableId>> derivationMapping = new HashMap<>(derivationMappingSize);
+        for (int i = 0; i < derivationMappingSize; i++) {
+            // Routed table ID
+            TableId routedTableId =
+                    tableIdSerializer.deserialize(new DataInputViewStreamWrapper(in));
+            // Original table IDs
+            int numOriginalTables = in.readInt();
+            Set<TableId> originalTableIds = new HashSet<>(numOriginalTables);
+            for (int j = 0; j < numOriginalTables; j++) {
+                TableId originalTableId =
+                        tableIdSerializer.deserialize(new DataInputViewStreamWrapper(in));
+                originalTableIds.add(originalTableId);
+            }
+            derivationMapping.put(routedTableId, originalTableIds);
+        }
+        return derivationMapping;
     }
 
     private List<SchemaChangeEvent> handleRenameColumnEvent(

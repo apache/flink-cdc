@@ -47,6 +47,7 @@ import java.io.DataOutputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
@@ -85,6 +86,8 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     /** Metadata applier for applying schema changes to external system. */
     private final MetadataApplier metadataApplier;
 
+    private final List<Tuple2<Selectors, TableId>> routes;
+
     /** The request handler that handle all requests and events. */
     private SchemaRegistryRequestHandler requestHandler;
 
@@ -102,16 +105,17 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
         this.operatorName = operatorName;
         this.failedReasons = new HashMap<>();
         this.metadataApplier = metadataApplier;
+        this.routes = routes;
         schemaManager = new SchemaManager();
         schemaDerivation = new SchemaDerivation(schemaManager, routes, new HashMap<>());
+        requestHandler =
+                new SchemaRegistryRequestHandler(metadataApplier, schemaManager, schemaDerivation);
     }
 
     @Override
     public void start() throws Exception {
         LOG.info("Starting SchemaRegistry for {}.", operatorName);
         this.failedReasons.clear();
-        requestHandler =
-                new SchemaRegistryRequestHandler(metadataApplier, schemaManager, schemaDerivation);
         LOG.info("Started SchemaRegistry for {}.", operatorName);
     }
 
@@ -149,6 +153,8 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             byte[] serializedSchemaManager = SchemaManager.SERIALIZER.serialize(schemaManager);
             out.writeInt(serializedSchemaManager.length);
             out.write(serializedSchemaManager);
+            // Serialize SchemaDerivation mapping
+            SchemaDerivation.serializeDerivationMapping(schemaDerivation, out);
             resultFuture.complete(baos.toByteArray());
         }
     }
@@ -189,6 +195,9 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             schemaManager =
                     SchemaManager.SERIALIZER.deserialize(
                             schemaManagerSerializerVersion, serializedSchemaManager);
+            Map<TableId, Set<TableId>> derivationMapping =
+                    SchemaDerivation.deserializerDerivationMapping(in);
+            schemaDerivation = new SchemaDerivation(schemaManager, routes, derivationMapping);
             requestHandler =
                     new SchemaRegistryRequestHandler(
                             metadataApplier, schemaManager, schemaDerivation);
