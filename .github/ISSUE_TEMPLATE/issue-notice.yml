@@ -1,0 +1,43 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Read Notice on Creating New Issues
+description: We have moved to Apache Jira for managing issues
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for choosing Flink CDC! 
+
+        As required by Apache Flink, please report bugs or new features on [Apache Jira](https://issues.apache.org/jira) under the project `Flink` using component tag `Flink CDC`. 
+
+        You can also initiate discussions in Apache Flink's dev mailing list (dev@flink.apache.org) for technical issues.
+
+        If you have any questions about using Flink CDC, please use Flink user mailing list (user@flink.apache.org)
+        
+        Please note that issues created here on GitHub will be **ignored and automatically closed**.
+  - type: checkboxes
+    attributes:
+      label: Please don't check the box below
+      options:
+        - label: I'm aware that bugs and new features should be reported on Apache Jira or Flink mailing list instead of here
+          required: true
+  - type: checkboxes
+    attributes:
+      label: Again, please don't check the box below
+      options:
+        - label: I'm aware that new issues on GitHub will be ignored and automatically closed.
+          required: true
+
