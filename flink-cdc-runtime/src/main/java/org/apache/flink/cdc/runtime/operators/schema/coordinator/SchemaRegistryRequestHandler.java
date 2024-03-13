@@ -24,9 +24,9 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeProcessingResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResponse;
-import org.apache.flink.cdc.runtime.operators.schema.event.WaitChangeResultResponse;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
 import org.slf4j.Logger;
@@ -68,11 +68,11 @@ public class SchemaRegistryRequestHandler implements Closeable {
     /** Sink writers which have sent flush success events for the request. */
     private final Set<Integer> flushedSinkWriters;
     /** Status of the execution of current schema change request. */
-    private boolean succeedApplyChange;
+    private boolean isSchemaChangeApplying;
     /** Actual exception if failed to apply schema change. */
-    private Exception actualException;
+    private Exception schemaChangeException;
     /** Executor service to execute schema change. */
-    private final ExecutorService threadPool;
+    private final ExecutorService schemaChangeThreadPool;
 
     public SchemaRegistryRequestHandler(
             MetadataApplier metadataApplier, SchemaManager schemaManager) {
@@ -81,8 +81,8 @@ public class SchemaRegistryRequestHandler implements Closeable {
         this.flushedSinkWriters = new HashSet<>();
         this.pendingSchemaChanges = new LinkedList<>();
         this.schemaManager = schemaManager;
-        threadPool = Executors.newSingleThreadExecutor();
-        succeedApplyChange = false;
+        schemaChangeThreadPool = Executors.newSingleThreadExecutor();
+        isSchemaChangeApplying = true;
     }
 
     /**
@@ -93,12 +93,14 @@ public class SchemaRegistryRequestHandler implements Closeable {
      */
     private void applySchemaChange(TableId tableId, SchemaChangeEvent changeEvent) {
         LOG.debug("Apply schema change {} to table {}.", changeEvent, tableId);
-        succeedApplyChange = false;
+        isSchemaChangeApplying = true;
+        schemaChangeException = null;
         try {
             metadataApplier.applySchemaChange(changeEvent);
-            succeedApplyChange = true;
         } catch (Exception e) {
-            actualException = e;
+            this.schemaChangeException = e;
+        } finally {
+            this.isSchemaChangeApplying = false;
         }
     }
 
@@ -170,13 +172,20 @@ public class SchemaRegistryRequestHandler implements Closeable {
             PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
             SchemaChangeEvent schemaChangeEvent =
                     waitFlushSuccess.getChangeRequest().getSchemaChangeEvent();
-            threadPool.submit(
+            schemaChangeThreadPool.submit(
                     () ->
                             applySchemaChange(
                                     tableId,
                                     waitFlushSuccess.getChangeRequest().getSchemaChangeEvent()));
             Thread.sleep(1000);
-            if (succeedApplyChange) {
+            if (schemaChangeException != null) {
+                throw new RuntimeException("failed to apply schema change.", schemaChangeException);
+            }
+            if (isSchemaChangeApplying) {
+                waitFlushSuccess
+                        .getResponseFuture()
+                        .complete(wrap(new SchemaChangeProcessingResponse()));
+            } else {
                 if (!(schemaChangeEvent instanceof CreateTableEvent)
                         || !schemaManager.schemaExists(tableId)) {
                     schemaManager.applySchemaChange(schemaChangeEvent);
@@ -186,11 +195,6 @@ public class SchemaRegistryRequestHandler implements Closeable {
                 if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
                     startNextSchemaChangeRequest();
                 }
-            } else {
-                if (actualException != null) {
-                    throw new RuntimeException("failed to apply schema change.", actualException);
-                }
-                waitFlushSuccess.getResponseFuture().complete(wrap(new WaitChangeResultResponse()));
             }
         }
     }
@@ -199,7 +203,12 @@ public class SchemaRegistryRequestHandler implements Closeable {
         PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
         SchemaChangeEvent schemaChangeEvent =
                 waitFlushSuccess.getChangeRequest().getSchemaChangeEvent();
-        if (succeedApplyChange) {
+        if (schemaChangeException != null) {
+            throw new RuntimeException("failed to apply schema change.", schemaChangeException);
+        }
+        if (isSchemaChangeApplying) {
+            return CompletableFuture.supplyAsync(() -> wrap(new SchemaChangeProcessingResponse()));
+        } else {
             if (!(schemaChangeEvent instanceof CreateTableEvent)
                     || !schemaManager.schemaExists(schemaChangeEvent.tableId())) {
                 schemaManager.applySchemaChange(schemaChangeEvent);
@@ -208,11 +217,6 @@ public class SchemaRegistryRequestHandler implements Closeable {
                 startNextSchemaChangeRequest();
             }
             return CompletableFuture.supplyAsync(() -> wrap(new ReleaseUpstreamResponse()));
-        } else {
-            if (actualException != null) {
-                throw new RuntimeException("failed to apply schema change.", actualException);
-            }
-            return CompletableFuture.supplyAsync(() -> wrap(new WaitChangeResultResponse()));
         }
     }
 
@@ -241,8 +245,8 @@ public class SchemaRegistryRequestHandler implements Closeable {
 
     @Override
     public void close() throws IOException {
-        if (threadPool != null) {
-            threadPool.shutdown();
+        if (schemaChangeThreadPool != null) {
+            schemaChangeThreadPool.shutdown();
         }
     }
 

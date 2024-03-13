@@ -17,10 +17,16 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.event;
 
-import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
+import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
+import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
-/** request for get change result. */
-public class GetChangeResultRequest implements CoordinationRequest {
+/**
+ * The response for {@link SchemaChangeResultRequest} or {@link ReleaseUpstreamRequest} from {@link
+ * SchemaRegistry} to {@link SchemaOperator} if not apply {@link SchemaChangeEvent} in time.
+ */
+public class SchemaChangeProcessingResponse implements CoordinationResponse {
 
     private static final long serialVersionUID = 1L;
 }
