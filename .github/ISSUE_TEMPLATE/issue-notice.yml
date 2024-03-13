@@ -40,4 +40,28 @@ body:
       options:
         - label: I'm aware that new issues on GitHub will be ignored and automatically closed.
           required: true
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        感谢您选择 Flink CDC! 
 
+        由于 Apache Flink 的要求，请在 [Apache Jira](https://issues.apache.org/jira) 的 `Flink` 项目下使用 `Flink CDC` 标签来反馈缺陷或新功能。
+
+        您也可以在 Apache Flink 的开发者邮件列表（dev@flink.apache.org）中对技术问题发起讨论。
+
+        如果您有关于使用 Flink CDC 的问题，请在 Flink 用户邮件列表（user@flink.apache.org）中咨询。
+
+        请注意，在此创建的 GitHub issue 会被**忽略且自动关闭**。
+  - type: checkboxes
+    attributes:
+      label: 请不要勾选以下选项
+      options:
+        - label: 我已知悉缺陷和新功能需要在 Apache Jira 或 Flink 邮件列表中反馈，而不是在这里创建新 issue。
+          required: true
+  - type: checkboxes
+    attributes:
+      label: 也请不要勾选以下选项
+      options:
+        - label: 我已知悉 GitHub 上的新 issue 会被忽略且自动关闭。
+          required: true
