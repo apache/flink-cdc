@@ -114,11 +114,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     }
 
     private void requestReleaseUpstream() throws InterruptedException {
-        CoordinationResponse coordinationRequest =
+        CoordinationResponse coordinationResponse =
                 sendRequestToCoordinator(new ReleaseUpstreamRequest());
-        while (coordinationRequest instanceof SchemaChangeProcessingResponse) {
+        while (coordinationResponse instanceof SchemaChangeProcessingResponse) {
             Thread.sleep(1000);
-            coordinationRequest = sendRequestToCoordinator(new SchemaChangeResultRequest());
+            coordinationResponse = sendRequestToCoordinator(new SchemaChangeResultRequest());
         }
     }
 
