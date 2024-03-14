@@ -82,7 +82,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
         this.pendingSchemaChanges = new LinkedList<>();
         this.schemaManager = schemaManager;
         schemaChangeThreadPool = Executors.newSingleThreadExecutor();
-        isSchemaChangeApplying = true;
+        isSchemaChangeApplying = false;
     }
 
     /**
