@@ -1,0 +1,67 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Read Notice on Creating New Issues
+description: We have moved to Apache Jira for managing issues
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for choosing Flink CDC! 
+
+        As required by Apache Flink, please report bugs or new features on [Apache Jira](https://issues.apache.org/jira) under the project `Flink` using component tag `Flink CDC`. 
+
+        You can also initiate discussions in Apache Flink's dev mailing list (dev@flink.apache.org) for technical issues.
+
+        If you have any questions about using Flink CDC, please use Flink user mailing list (user@flink.apache.org)
+        
+        Please note that issues created here on GitHub will be **ignored and automatically closed**.
+  - type: checkboxes
+    attributes:
+      label: Please don't check the box below
+      options:
+        - label: I'm aware that bugs and new features should be reported on Apache Jira or Flink mailing list instead of here
+          required: true
+  - type: checkboxes
+    attributes:
+      label: Again, please don't check the box below
+      options:
+        - label: I'm aware that new issues on GitHub will be ignored and automatically closed.
+          required: true
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        感谢您选择 Flink CDC! 
+
+        由于 Apache Flink 的要求，请在 [Apache Jira](https://issues.apache.org/jira) 的 `Flink` 项目下使用 `Flink CDC` 标签来反馈缺陷或新功能。
+
+        您也可以在 Apache Flink 的开发者邮件列表（dev@flink.apache.org）中对技术问题发起讨论。
+
+        如果您有关于使用 Flink CDC 的问题，请在 Flink 用户邮件列表（user@flink.apache.org）中咨询。
+
+        请注意，在此创建的 GitHub issue 会被**忽略且自动关闭**。
+  - type: checkboxes
+    attributes:
+      label: 请不要勾选以下选项
+      options:
+        - label: 我已知悉缺陷和新功能需要在 Apache Jira 或 Flink 邮件列表中反馈，而不是在这里创建新 issue。
+          required: true
+  - type: checkboxes
+    attributes:
+      label: 也请不要勾选以下选项
+      options:
+        - label: 我已知悉 GitHub 上的新 issue 会被忽略且自动关闭。
+          required: true
