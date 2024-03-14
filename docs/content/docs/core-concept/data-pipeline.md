@@ -1,7 +1,9 @@
 ---
-title: Apache Flink CDC
+title: "Data Pipeline"
+weight: 1
 type: docs
-bookToc: false
+aliases:
+  - /core-concept/data-pipeline/
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -21,18 +23,3 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
-
-#### 
-
-<div style="text-align: center">
-  <h1>
-    Flink CDC: Change Data Capture Solution Of Apache Flink
-  </h1>
-<h4 style="color: #696969">Set of source connectors for Apache Flink® directly ingesting changes coming from different databases using Change Data Capture(CDC).</h4>
-</div>
-
-Flink CDC integrates Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
-
-{{< img src="/fig/cdc-flow.png" alt="Stateful Functions" width="50%" >}}
-
-Flink CDC supports ingesting snapshot data and real time changes from databases to Flink® and then transform and sink to various downstream systems.

@@ -36,23 +36,3 @@ Flink CDC integrates Debezium as the engine to capture data changes. So it can f
 {{< img src="/fig/cdc-flow.png" alt="Stateful Functions" width="50%" >}}
 
 Flink CDC supports ingesting snapshot data and real time changes from databases to Flink® and then transform and sink to various downstream systems.
-
-{{< columns >}}
-## Try Flink CDC
-
-If you’re interested in playing around with Flink CDC, check out our [quick
-start]({{< ref "docs/try-flink-cdc" >}}). It provides multiple examples to submit and execute a Flink CDC job on a Flink cluster.
-
-<--->
-
-## Get Help with Flink CDC
-
-If you get stuck, check out our [community support
-resources](https://flink.apache.org/community.html). In particular, Apache
-Flink’s user mailing list is consistently ranked as one of the most active of
-any Apache project, and is a great way to get help quickly.
-
-{{< /columns >}}
-
-Flink CDC is developed under the umbrella of [Apache
-Flink](https://flink.apache.org/).
