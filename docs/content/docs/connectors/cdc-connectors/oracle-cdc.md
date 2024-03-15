@@ -522,7 +522,7 @@ public class OracleParallelSourceExample {
 
     public static void main(String[] args) throws Exception {
         Properties debeziumProperties = new Properties();
-        debeziumProperties.setProperty("log.mining.strategy", "online_catalog");
+        debeziumProperties.setProperty("debezium.log.mining.strategy", "online_catalog");
 
         JdbcIncrementalSource<String> oracleChangeEventSource =
                 new OracleSourceBuilder()
