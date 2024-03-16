@@ -72,7 +72,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
 
     public static final String DB2_IMAGE = "ibmcom/db2";
     public static final String DB2_CUSTOM_IMAGE = "custom/db2-cdc:1.4";
-    private static DockerImageName DEBEZIUM_DOCKER_IMAGE_NAME;
+    private static DockerImageName debeziumDockerImageName;
     private static boolean db2AsnAgentRunning = false;
     private static Db2Container db2Container;
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
@@ -93,7 +93,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
 
     @BeforeClass
     public static void beforeClass() {
-        DEBEZIUM_DOCKER_IMAGE_NAME =
+        debeziumDockerImageName =
                 DockerImageName.parse(
                                 new ImageFromDockerfile(DB2_CUSTOM_IMAGE)
                                         .withDockerfile(getFilePath("docker/db2/Dockerfile"))
@@ -106,7 +106,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
         super.before();
         LOG.info("Starting db2 containers...");
         db2Container =
-                new Db2Container(DEBEZIUM_DOCKER_IMAGE_NAME)
+                new Db2Container(debeziumDockerImageName)
                         .withDatabaseName("testdb")
                         .withUsername("db2inst1")
                         .withPassword("flinkpw")
