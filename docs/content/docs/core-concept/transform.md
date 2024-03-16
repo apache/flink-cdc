@@ -23,3 +23,10 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
+
+# Definition
+The transform module helps users delete and expand data columns based on the data columns in the table.      
+What's more, it also helps users filter some unnecessary data during the synchronization process.
+
+# Example
+This feature has not been implemented in version 3.0, but it will be completed in version 3.1, please wait for the next major version release.
