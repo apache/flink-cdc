@@ -26,6 +26,7 @@ import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
@@ -71,12 +72,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
 
     public static final String DB2_IMAGE = "ibmcom/db2";
     public static final String DB2_CUSTOM_IMAGE = "custom/db2-cdc:1.4";
-    private static final DockerImageName DEBEZIUM_DOCKER_IMAGE_NAME =
-            DockerImageName.parse(
-                            new ImageFromDockerfile(DB2_CUSTOM_IMAGE)
-                                    .withDockerfile(getFilePath("docker/db2/Dockerfile"))
-                                    .get())
-                    .asCompatibleSubstituteFor(DB2_IMAGE);
+    private static DockerImageName DEBEZIUM_DOCKER_IMAGE_NAME;
     private static boolean db2AsnAgentRunning = false;
     private static Db2Container db2Container;
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
@@ -93,6 +89,16 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
             params.add(new Object[] {flinkVersion, false});
         }
         return params;
+    }
+
+    @BeforeClass
+    public static void beforeClass() {
+        DEBEZIUM_DOCKER_IMAGE_NAME =
+                DockerImageName.parse(
+                                new ImageFromDockerfile(DB2_CUSTOM_IMAGE)
+                                        .withDockerfile(getFilePath("docker/db2/Dockerfile"))
+                                        .get())
+                        .asCompatibleSubstituteFor(DB2_IMAGE);
     }
 
     @Before
