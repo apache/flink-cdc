@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
+import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeProcessingResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
@@ -32,6 +33,7 @@ import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResultReq
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
@@ -132,6 +134,13 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         } catch (Exception e) {
             throw new IllegalStateException(
                     "Failed to send request to coordinator: " + request.toString(), e);
+        }
+    }
+
+    @Override
+    public void initializeState(StateInitializationContext context) throws Exception {
+        if (context.isRestored()) {
+            sendRequestToCoordinator(new RefreshPendingListsRequest());
         }
     }
 }

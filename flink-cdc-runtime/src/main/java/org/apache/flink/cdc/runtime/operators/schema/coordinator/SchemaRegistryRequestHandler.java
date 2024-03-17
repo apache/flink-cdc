@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeProcessingResponse;
@@ -197,6 +198,11 @@ public class SchemaRegistryRequestHandler implements Closeable {
                 }
             }
         }
+    }
+
+    public CompletableFuture<CoordinationResponse> refreshPendingLists() {
+        pendingSchemaChanges.clear();
+        return CompletableFuture.completedFuture(wrap(new RefreshPendingListsResponse()));
     }
 
     public CompletableFuture<CoordinationResponse> getSchemaChangeResult() {
