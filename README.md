@@ -3,7 +3,7 @@
 CDC Connectors for Apache Flink<sup>®</sup> is a set of source connectors for Apache Flink<sup>®</sup>, ingesting changes from different databases using change data capture (CDC).
 CDC Connectors for Apache Flink<sup>®</sup> integrates Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
 
-This README is meant as a brief walkthrough on the core features of CDC Connectors for Apache Flink<sup>®</sup>. For a fully detailed documentation, please see [Documentation](https://ververica.github.io/flink-cdc-connectors/master/).
+This README is meant as a brief walkthrough on the core features of CDC Connectors for Apache Flink<sup>®</sup>. For a fully detailed documentation, please see [Documentation](https://apache.github.io/flink-cdc/master/).
 
 ## Supported (Tested) Databases
 
@@ -255,4 +255,4 @@ The contribution step is the same as the code contribution. We use markdown as t
    </div>
 
 ## Documents
-To get started, please see https://ververica.github.io/flink-cdc-connectors/
+To get started, please see https://apache.github.io/flink-cdc/
