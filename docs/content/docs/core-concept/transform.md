@@ -29,4 +29,4 @@ under the License.
 What's more, it also helps users filter some unnecessary data during the synchronization process.
 
 # Example
-This feature has not been implemented now.
+This feature will support soon.
