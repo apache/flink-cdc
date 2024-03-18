@@ -30,16 +30,16 @@ Route specifies the rule of matching a list of source-table and mapping to sink-
 # Parameters
 To describe a route, the follows are required:  
 
-| parameter             | meaning         |
-|-----------------------|--------------------------|
-| source-table     | Source table id, supports regular expressions   |
-| sink-table | Sink table id, supports regular expressions           |
-| description                 | Routing rule description(optional, default value provided)                    |
+| parameter    | meaning                                            | optional/required |
+|--------------|----------------------------------------------------|-------------------|
+| source-table | Source table id, supports regular expressions      | required          |
+| sink-table   | Sink table id, supports regular expressions        | required          |
+| description  | Routing rule description(a default value provided) | optional          |
 
 A route module can contain a list of source-table/sink-table rules.
 
 # Example
-## one to one
+## Route one Data Source table to one Data Sink table
 if synchronize the table `web_order` in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route：
 
 ```yaml
@@ -49,7 +49,7 @@ route:
     description: sync table to one destination table with given prefix ods_
 ```
 
-## many to one
+## Route multiple Data Source tables to one Data Sink table
 What's more, if you want to synchronize the sharding tables in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route：
 ```yaml
 route:
@@ -58,7 +58,7 @@ route:
     description: sync sharding tables to one destination table
 ```
 
-## many rules
+## Complex Route via combining route rules
 What's more, if you want to specify many different mapping rules, we can use this yaml file to define this route：
 ```yaml
 route:

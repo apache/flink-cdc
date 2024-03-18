@@ -25,14 +25,14 @@ under the License.
 -->
 
 # Definition
-Since events in Flink CDC flow from the upstream to the downstream in a pipeline manner, the data synchronization task is also referred as a Data Pipeline.
+Since events in Flink CDC flow from the upstream to the downstream in a pipeline manner, the whole ETL task is referred as a **Data Pipeline**.
 
 # Parameters
 A pipeline corresponds to a chain of operators in Flink.   
 To describe a Data Pipeline, the following parts are required:
 - [source](data-source.md)
 - [sink](data-sink.md)
-- [pipeline](data-pipeline.md#global-parameters) (global parameters)
+- [pipeline](data-pipeline.md#pipeline-configurations) (Pipeline Configurations)
 
 the following parts are optional:
 - [route](route.md)
@@ -40,7 +40,7 @@ the following parts are optional:
 
 # Example
 ## Only required
-We could use this concise yaml file to define a pipeline:
+We could use following yaml file to define a concise Data Pipeline describing synchronize all tables under MySQL app_db database to Doris :
 
 ```yaml
    source:
@@ -63,7 +63,7 @@ We could use this concise yaml file to define a pipeline:
 ```
 
 ## With optional
-We could use this complicated yaml file to define a pipeline:
+We could use following yaml file to define a complicated Data Pipeline describing synchronize all tables under MySQL app_db database to Doris and give specific target database name ods_db and specific target table name prefix ods_ :
 
 ```yaml
    source:
@@ -92,11 +92,11 @@ We could use this complicated yaml file to define a pipeline:
      parallelism: 2
 ```
 
-# Global Parameters
-The following parameters are global parameters of the pipeline:
+# Pipeline Configurations
+The following config options of Data Pipeline level are supported:
 
-| parameter   | meaning         |
-|-------------|--------------------------|
-| name        | The name of the pipeline, which will be submitted to the Flink cluster as the job name.     |
-| parallelism  | The global parallelism of the pipeline.           |
-| local-time-zone | The local time zone defines current session time zone id.                    |
+| parameter       | meaning                                                                                 | optional/required |
+|-----------------|-----------------------------------------------------------------------------------------|-------------------|
+| name            | The name of the pipeline, which will be submitted to the Flink cluster as the job name. | optional          |
+| parallelism     | The global parallelism of the pipeline.                                                 | required          |
+| local-time-zone | The local time zone defines current session time zone id.                               | optional          |

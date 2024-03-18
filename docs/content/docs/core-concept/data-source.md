@@ -31,11 +31,11 @@ A Data Source can read data from multiple tables simultaneously.
 # Parameters
 To describe a data source, the follows are required:
 
-| parameter                   | meaning                                                                      |
-|-----------------------------|------------------------------------------------------------------------------|
-| type                        | The type of the source, such as mysql.                                       |
-| name                        | The name of the source, which is user-defined (optional, with a default value provided). |
-| other custom configurations | custom configurations for the source to specify the connection config and table config. |
+| parameter                   | meaning                                                                                 | optional/required |
+|-----------------------------|-----------------------------------------------------------------------------------------|-------------------|
+| type                        | The type of the source, such as mysql.                                                  | required          |
+| name                        | The name of the source, which is user-defined (a default value provided).               | optional          |
+| other custom configurations | custom configurations for the source to specify the connection config and table config. | optional          |
 
 # Example
 We could use yaml files to define a mysql source:
