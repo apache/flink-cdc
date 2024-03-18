@@ -23,3 +23,52 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
+
+# Definition
+**Route** specifies the rule of matching a list of source-table and mapping to sink-table. The most typical scenario is the merge of sub-databases and sub-tables, routing multiple upstream source tables to the same sink table.
+
+# Parameters
+To describe a route, the follows are required:  
+
+| parameter    | meaning                                            | optional/required |
+|--------------|----------------------------------------------------|-------------------|
+| source-table | Source table id, supports regular expressions      | required          |
+| sink-table   | Sink table id, supports regular expressions        | required          |
+| description  | Routing rule description(a default value provided) | optional          |
+
+A route module can contain a list of source-table/sink-table rules.
+
+# Example
+## Route one Data Source table to one Data Sink table
+if synchronize the table `web_order` in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route：
+
+```yaml
+route:
+    source-table: mydb.web_order
+    sink-table: mydb.ods_web_order
+    description: sync table to one destination table with given prefix ods_
+```
+
+## Route multiple Data Source tables to one Data Sink table
+What's more, if you want to synchronize the sharding tables in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route：
+```yaml
+route:
+    source-table: mydb\.*
+    sink-table: mydb.ods_web_order
+    description: sync sharding tables to one destination table
+```
+
+## Complex Route via combining route rules
+What's more, if you want to specify many different mapping rules, we can use this yaml file to define this route：
+```yaml
+route:
+  - source-table: mydb.orders
+    sink-table: ods_db.ods_orders
+    description: sync orders table to orders
+  - source-table: mydb.shipments
+    sink-table: ods_db.ods_shipments
+    description: sync shipments table to ods_shipments
+  - source-table: mydb.products
+    sink-table: ods_db.ods_products
+    description: sync products table to ods_products
+```

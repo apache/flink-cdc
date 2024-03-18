@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="[https://github.com/apache/flink-cdc](https://nightlies.apache.org/flink/flink-cdc-docs-stable/)"><img src="docs/static/FlinkCDC-logo.png" alt="Flink CDC" style="width: 200px;"></a>
+  <a href="[https://github.com/apache/flink-cdc](https://nightlies.apache.org/flink/flink-cdc-docs-stable/)"><img src="docs/static/fig/flink-cdc-logo.png" alt="Flink CDC" style="width: 200px;"></a>
 </p>
 <p align="center">
     <strong><em>A Streaming Data Integration Tool</em></strong>
@@ -19,20 +19,25 @@
 </a>
 </p>
 
-Flink CDC aims to provide users with a more **concise real time and batch data integration**. Users can configure their data synchronization logic using **yaml** api, and submit their jobs to Flink cluster easily. The framework prioritizes efficient end-to-end data integration and offers enhanced functionalities such as full database synchronization, sharding table synchronization, schema evolution and data transformation.    
-The following graph shows the architecture layering of Flink CDC:
+
+Flink CDC is a distributed data integration tool for real time data and batch data. Flink CDC brings the simplicity 
+and elegance of data integration via YAML to describe the data movement and transformation in a 
+[Data Pipeline](docs/content/docs/core-concept/data-pipeline.md).
+
+
+The Flink CDC prioritizes efficient end-to-end data integration and offers enhanced functionalities such as 
+full database synchronization, sharding table synchronization, schema evolution and data transformation.
 
 ![Flink CDC framework desigin](docs/static/fig/architecture.png)
 
-To learn more about concept of pipeline design, visit our [core-concept](docs/content/docs/core-concept/data-pipeline.md).
+
 
 ### Getting Started
 
-1. Create a Flink cluster [Apache Flink](https://nightlies.apache.org/flink/flink-docs-master/docs/try-flink/local_installation/#starting-and-stopping-a-local-cluster) and set up `FLINK_HOME` environment variable.
-2. Download and unzip tar of Flink CDC from [release page](https://github.com/apache/flink-cdc/releases), and put jars of pipeline connector to `lib` directory.
-3. Create a **yaml** file to describe the expected data source and data sink.    
-   The following file named `mysql-to-doris.yaml` provides a concise template:
-  ```
+1. Prepare a [Apache Flink](https://nightlies.apache.org/flink/flink-docs-master/docs/try-flink/local_installation/#starting-and-stopping-a-local-cluster) cluster and set up `FLINK_HOME` environment variable.
+2. [Download](https://github.com/apache/flink-cdc/releases) Flink CDC tar, unzip it and put jars of pipeline connector to Flink `lib` directory.
+3. Create a **YAML** file to describe the data source and data sink, the following example synchronizes all tables under MySQL app_db database to Doris :
+  ```yaml
       source:
        type: mysql
        name: MySQL Source
@@ -55,29 +60,44 @@ To learn more about concept of pipeline design, visit our [core-concept](docs/co
        parallelism: 4
   ```
 4. Submit pipeline job using `flink-cdc.sh` script.
- ```
+ ```shell
   bash bin/flink-cdc.sh /path/mysql-to-doris.yaml
  ```
-5. View job execution status through Flink WebUI or target database.
+5. View job execution status through Flink WebUI or downstream database.
 
-Try it out yourself with our more detailed [tutorial](docs/content/docs/get-started/quickstart/mysql-to-doris.md). See [connector overview](docs/content/docs/connectors/overview.md) to view a comprehensive catalog of the connectors currently provided and understand more detailed configuration parameters.
+Try it out yourself with our more detailed [tutorial](docs/content/docs/get-started/quickstart/mysql-to-doris.md). 
+You can also see [connector overview](docs/content/docs/connectors/overview.md) to view a comprehensive catalog of the
+connectors currently provided and understand more detailed configurations.
+
+
 
 ### Join the Community
 
-There are many ways to participate in the Apache Flink CDC community. The [mailing lists](https://flink.apache.org/what-is-flink/community/#mailing-lists) are the primary place where all Flink committers are present. For user support and questions use the user mailing list. If you've found a problem of Flink CDC, please create a [Flink jira](https://issues.apache.org/jira/projects/FLINK/summary) and tag it with the `Flink CDC` tag.   
+There are many ways to participate in the Apache Flink CDC community. The
+[mailing lists](https://flink.apache.org/what-is-flink/community/#mailing-lists) are the primary place where all Flink
+committers are present. For user support and questions use the user mailing list. If you've found a problem of Flink CDC,
+please create a [Flink jira](https://issues.apache.org/jira/projects/FLINK/summary) and tag it with the `Flink CDC` tag.   
 Bugs and feature requests can either be discussed on the dev mailing list or on Jira.
+
+
 
 ### Contributing
 
-To contribute to Flink CDC, please see our [Developer Guide](docs/content/docs/developer-guide/contribute-to-flink-cdc.md) and [APIs Guide](docs/content/docs/developer-guide/understand-flink-cdc-api.md).
+Welcome to contribute to Flink CDC, please see our [Developer Guide](docs/content/docs/developer-guide/contribute-to-flink-cdc.md)
+and [APIs Guide](docs/content/docs/developer-guide/understand-flink-cdc-api.md).
+
+
 
 ### License
 
 [Apache 2.0 License](LICENSE).
 
+
+
 ### Special Thanks
 
-The Flink CDC community welcomes everyone who is willing to contribute, whether it's through submitting bug reports, enhancing the documentation, or submitting code contributions for bug fixes, test additions, or new feature development.     
+The Flink CDC community welcomes everyone who is willing to contribute, whether it's through submitting bug reports,
+enhancing the documentation, or submitting code contributions for bug fixes, test additions, or new feature development.     
 Thanks to all contributors for their enthusiastic contributions.
 
 <a href="https://github.com/apache/flink-cdc/graphs/contributors">

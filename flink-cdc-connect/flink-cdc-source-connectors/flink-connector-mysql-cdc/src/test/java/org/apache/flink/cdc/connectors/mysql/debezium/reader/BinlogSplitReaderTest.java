@@ -987,8 +987,8 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         }
         binlogReader.close();
 
-        assertNotNull(snapshotSplitReader.getExecutorService());
-        assertTrue(snapshotSplitReader.getExecutorService().isTerminated());
+        assertNotNull(binlogReader.getExecutorService());
+        assertTrue(binlogReader.getExecutorService().isTerminated());
 
         return actual;
     }

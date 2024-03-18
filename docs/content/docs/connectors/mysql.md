@@ -24,16 +24,15 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# MySQL CDC Pipeline Connector
+# MySQL Connector
 
-The MySQL CDC Pipeline Connector allows for reading snapshot data and incremental data from MySQL database and provides end-to-end full-database data synchronization capabilities.
-This document describes how to setup the MySQL CDC Pipeline connector.
+MySQL connector allows reading snapshot data and incremental data from MySQL database and provides end-to-end full-database data synchronization capabilities.
+This document describes how to setup the MySQL connector.
 
 
-How to create Pipeline
-----------------
+## Example
 
-The pipeline for reading data from MySQL and sink to Doris can be defined as follows:
+An example of the pipeline for reading data from MySQL and sink to Doris can be defined as follows:
 
 ```yaml
 source:
@@ -58,8 +57,7 @@ pipeline:
    parallelism: 4
 ```
 
-Pipeline Connector Options
-----------------
+## Connector Options
 
 <div class="highlight">
 <table class="colwidths-auto docutils">
@@ -245,8 +243,7 @@ Pipeline Connector Options
 </table>
 </div>
 
-Startup Reading Position
---------
+## Startup Reading Position
 
 The config option `scan.startup.mode` specifies the startup mode for MySQL CDC consumer. The valid enumerations are:
 
@@ -259,16 +256,15 @@ The config option `scan.startup.mode` specifies the startup mode for MySQL CDC c
 - `timestamp`: Skip snapshot phase and start reading binlog events from a specific timestamp.
 
 
-Data Type Mapping
-----------------
+## Data Type Mapping
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left" style="width:30%;">MySQL type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html"></a></th>
-        <th class="text-left" style="width:10%;">CDC type</th>
-        <th class="text-left" style="width:60%;">NOTE</th>
+        <th class="text-left" style="width:30%;"><a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html">MySQL type</a></th>
+        <th class="text-left" style="width:10%;">Flink CDC type</th>
+        <th class="text-left" style="width:60%;">Note</th>
       </tr>
     </thead>
     <tbody>

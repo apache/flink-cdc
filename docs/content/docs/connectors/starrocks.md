@@ -24,17 +24,16 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# StarRocks Pipeline Connector
+# StarRocks Connector
 
-The StarRocks Pipeline connector can be used as the *Data Sink* of the pipeline, and write data to [StarRocks](https://github.com/StarRocks/starrocks). This document describes how to set up the StarRocks Pipeline connector.
+StarRocks connector can be used as the *Data Sink* of the pipeline, and write data to [StarRocks](https://github.com/StarRocks/starrocks). This document describes how to set up the StarRocks connector.
 
 ## What can the connector do?
 * Create table automatically if not exist
 * Schema change synchronization
 * Data synchronization
 
-How to create Pipeline
-----------------
+## Example
 
 The pipeline for reading data from MySQL and sink to StarRocks can be defined as follows:
 
@@ -62,8 +61,8 @@ pipeline:
    parallelism: 2
 ```
 
-Pipeline Connector Options
-----------------
+## Connector Options
+
 <div class="highlight">
 <table class="colwidths-auto docutils">
    <thead>
@@ -220,8 +219,8 @@ Pipeline Connector Options
 </table>    
 </div>
 
-Usage Notes
---------
+
+## Usage Notes
 
 * Only support StarRocks primary key table, so the source table must have primary keys.
 
@@ -244,15 +243,14 @@ Usage Notes
   to write data to StarRocks. You can see [sink documentation](https://github.com/StarRocks/starrocks-connector-for-apache-flink/blob/main/docs/content/connector-sink.md)
   for how it works. 
 
-Data Type Mapping
-----------------
+## Data Type Mapping
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">CDC type</th>
+        <th class="text-left">Flink CDC type</th>
         <th class="text-left">StarRocks type</th>
-        <th class="text-left" style="width:60%;">NOTE</th>
+        <th class="text-left" style="width:60%;">Note</th>
       </tr>
     </thead>
     <tbody>
