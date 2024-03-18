@@ -30,13 +30,13 @@ Since events in Flink CDC flow from the upstream to the downstream in a pipeline
 # Parameters
 A pipeline corresponds to a chain of operators in Flink.   
 To describe a Data Pipeline, the following parts are required:
-- [source](data-source.md)
-- [sink](data-sink.md)
-- [pipeline](data-pipeline.md#pipeline-configurations) (Pipeline Configurations)
+- [source]({{< ref "docs/core-concept/data-source" >}})
+- [sink]({{< ref "docs/core-concept/data-sink" >}})
+- [pipeline](#pipeline-configurations)
 
 the following parts are optional:
-- [route](route.md)
-- [transform](transform.md)
+- [route]({{< ref "docs/core-concept/route" >}})
+- [transform]({{< ref "docs/core-concept/transform" >}})
 
 # Example
 ## Only required

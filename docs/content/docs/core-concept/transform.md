@@ -29,4 +29,4 @@ The transform module helps users delete and expand data columns based on the dat
 What's more, it also helps users filter some unnecessary data during the synchronization process.
 
 # Example
-This feature has not been implemented in version 3.0, but it will be completed in version 3.1, please wait for the next major version release.
+This feature has not been implemented now.
