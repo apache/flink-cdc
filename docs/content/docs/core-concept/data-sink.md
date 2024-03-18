@@ -31,11 +31,11 @@ A Data Sink can write to multiple tables simultaneously.
 # Parameters
 To describe a data sink, the follows are required:
 
-| parameter                   | meaning                                                                               | optional/required |
-|-----------------------------|---------------------------------------------------------------------------------------|-------------------|
-| type                        | The type of the sink, such as doris or starrocks.                                     | required          |
-| name                        | The name of the sink, which is user-defined (a default value provided).               | optional          |
-| other custom configurations | custom configurations for the sink to specify the connection config and table config. | optional          |
+| parameter                   | meaning                                                                                         | optional/required |
+|-----------------------------|-------------------------------------------------------------------------------------------------|-------------------|
+| type                        | The type of the sink, such as doris or starrocks.                                               | required          |
+| name                        | The name of the sink, which is user-defined (a default value provided).                         | optional          |
+| configurations of Data Sink | Configurations to build the Data Sink e.g. connection configurations and sink table properties. | optional          |
 
 # Example
 We could use this yaml file to define a doris sink:
