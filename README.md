@@ -35,7 +35,7 @@ picture displays the architecture layering of Flink CDC:
 1. Prepare a Flink cluster [Apache Flink](https://nightlies.apache.org/flink/flink-docs-master/docs/try-flink/local_installation/#starting-and-stopping-a-local-cluster) and set up `FLINK_HOME` environment variable.
 2. Download and unzip tar of Flink CDC from [release page](https://github.com/apache/flink-cdc/releases), and put jars of pipeline connector to `lib` directory.
 3. Create a **YAML** file to describe the data source and data sink, the following example synchronizes all tables under MySQL app_db database to Doris :
-  ```
+  ```yaml
       source:
        type: mysql
        name: MySQL Source
