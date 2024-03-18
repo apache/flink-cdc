@@ -24,13 +24,12 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Doris Pipeline Connector
+# Doris Connector
 
-This article introduces of Doris Pipeline Connector
-
+This article introduces of Doris Connector
 
 ## Example
-----------------
+
 
 ```yaml
 source:
@@ -50,8 +49,7 @@ pipeline:
 
 ```
 
-## Pipeline options
-----------------
+## Connector Options
 
 <div class="highlight">
 <table class="colwidths-auto docutils">
@@ -180,17 +178,16 @@ pipeline:
      </tbody>
 </table>
 </div>
-## Data Type Mapping
 
-----------------
+## Data Type Mapping
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left" style="width:10%;">CDC type</th>
-        <th class="text-left" style="width:30%;">Doris type<a href="https://doris.apache.org/docs/dev/sql-manual/sql-reference/Data-Types/BOOLEAN/"></a></th>
-        <th class="text-left" style="width:60%;">NOTE</th>
+        <th class="text-left" style="width:10%;">Flink CDC Type</th>
+        <th class="text-left" style="width:30%;"><a href="https://doris.apache.org/docs/dev/sql-manual/sql-reference/Data-Types/BOOLEAN/">Doris Type</a></th>
+        <th class="text-left" style="width:60%;">Note</th>
       </tr>
     </thead>
     <tbody>
