@@ -23,3 +23,131 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
+
+# Introduction
+
+[Apache Hadoop YARN](https://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/YARN.html) is a resource provider popular with many data processing frameworks.
+Flink services are submitted to YARN's ResourceManager, which spawns containers on machines managed by YARN NodeManagers. Flink deploys its JobManager and TaskManager instances into such containers.
+
+Flink can dynamically allocate and de-allocate TaskManager resources depending on the number of processing slots required by the job(s) running on the JobManager.
+
+## Preparation
+
+This *Getting Started* section assumes a functional YARN environment, starting from version 2.10.2. YARN environments are provided most conveniently through services such as Amazon EMR, Google Cloud DataProc or products like Cloudera. [Manually setting up a YARN environment locally](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/SingleCluster.html) or [on a cluster](https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/ClusterSetup.html) is not recommended for following through this *Getting Started* tutorial.
+
+- Make sure your YARN cluster is ready for accepting Flink applications by running `yarn top`. It should show no error messages.
+- Download a recent Flink distribution from the [download page](https://flink.apache.org/downloads/) and unpack it.
+- **Important** Make sure that the `HADOOP_CLASSPATH` environment variable is set up (it can be checked by running `echo $HADOOP_CLASSPATH`). If not, set it up using
+
+```bash
+export HADOOP_CLASSPATH=`hadoop classpath`
+```
+
+## Session Mode
+
+Flink runs on all UNIX-like environments, i.e. Linux, Mac OS X, and Cygwin (for Windows).  
+You can refer [overview](../connectors/pipeline-connectors/overview.md) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
+then extract the archive:
+
+```bash
+tar -xzf flink-*.tgz
+```
+
+You should set `FLINK_HOME` environment variables like:
+
+```bash
+export FLINK_HOME=/path/flink-*
+```
+
+### Starting a Flink Session on YARN
+
+Once you've made sure that the `HADOOP_CLASSPATH` environment variable is set, you can launch a Flink on YARN session:
+
+```bash
+# we assume to be in the root directory of 
+# the unzipped Flink distribution
+
+# export HADOOP_CLASSPATH
+export HADOOP_CLASSPATH=`hadoop classpath`
+
+# Start YARN session
+./bin/yarn-session.sh --detached
+
+# Stop YARN session (replace the application id based 
+# on the output of the yarn-session.sh command)
+echo "stop" | ./bin/yarn-session.sh -id application_XXXXX_XXX
+```
+
+After starting YARN session, you can now access the Flink Web UI through the URL printed in the last lines of the command output, or through the YARN ResourceManager web UI.
+
+Then, you need to add two configs to your flink-conf.yaml:
+
+```yaml
+rest.bind-port: {{REST_PORT}}
+rest.address: {{NODE_IP}}
+```
+
+{{REST_PORT}} and {{NODE_IP}} should be replaced by the actual values of your JobManager Web Interface.
+
+### Set up Flink CDC
+Download the tar file of Flink CDC from [release page](https://github.com/apache/flink-cdc/releases), then extract the archive:
+
+```bash
+tar -xzf flink-cdc-*.tar.gz
+```
+
+flink-cdc directory will contain four directories: `bin`,`lib`,`log`,`conf`.
+
+Download the connector package listed below and move it to the `lib` directory.    
+**Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
+- [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
+- [Apache Doris pipeline connector 3.0.0](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-doris/3.0.0/flink-cdc-pipeline-connector-doris-3.0.0.jar)
+
+### Submit a Flink CDC Job
+Here is an example file for synchronizing the entire database `mysql-to-doris.yaml`：
+
+```yaml
+################################################################################
+# Description: Sync MySQL all tables to Doris
+################################################################################
+source:
+ type: mysql
+ hostname: localhost
+ port: 3306
+ username: root
+ password: 123456
+ tables: app_db.\.*
+ server-id: 5400-5404
+ server-time-zone: UTC
+
+sink:
+ type: doris
+ fenodes: 127.0.0.1:8030
+ username: root
+ password: ""
+
+pipeline:
+ name: Sync MySQL Database to Doris
+ parallelism: 2
+
+```
+
+You need to modify the configuration file according to your needs.
+Finally, submit job to Flink Standalone cluster using Cli.
+
+```bash
+cd /path/flink-cdc-*
+./bin/flink-cdc.sh mysql-to-doris.yaml
+```
+
+After successful submission, the return information is as follows：
+
+```bash
+Pipeline has been submitted to cluster.
+Job ID: ae30f4580f1918bebf16752d4963dc54
+Job Description: Sync MySQL Database to Doris
+```
+
+We can find a job  named `Sync MySQL Database to Doris` is running through Flink Web UI.
+
+Please note that submitting to application mode cluster and per-job mode cluster are not supported for now.
