@@ -140,7 +140,9 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
         if (context.isRestored()) {
-            sendRequestToCoordinator(new RefreshPendingListsRequest());
+            if (getRuntimeContext().getIndexOfThisSubtask() == 0) {
+                sendRequestToCoordinator(new RefreshPendingListsRequest());
+            }
         }
     }
 }
