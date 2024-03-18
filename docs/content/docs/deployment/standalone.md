@@ -23,3 +23,109 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
+
+# Introduction
+Standalone mode is Flink’s simplest deployment mode. This short guide will show you how to download the latest stable version of Flink, install, and run it.     
+You will also run an example Flink CDC job and view it in the web UI.
+
+
+## Preparation
+
+Flink runs on all UNIX-like environments, i.e. Linux, Mac OS X, and Cygwin (for Windows).  
+You can refer [overview]({{< ref "docs/connectors/overview" >}}) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
+then extract the archive:
+
+```bash
+tar -xzf flink-*.tgz
+```
+
+You should set `FLINK_HOME` environment variables like:
+
+```bash
+export FLINK_HOME=/path/flink-*
+```
+
+### Start and stop a local cluster
+
+To start a local cluster, run the bash script that comes with Flink:
+
+```bash
+cd /path/flink-*
+./bin/start-cluster.sh
+```
+
+Flink is now running as a background process. You can check its status with the following command:
+
+```bash
+ps aux | grep flink
+```
+
+You should be able to navigate to the web UI at [localhost:8081](http://localhost:8081) to view
+the Flink dashboard and see that the cluster is up and running.
+
+To quickly stop the cluster and all running components, you can use the provided script:
+
+```bash
+./bin/stop-cluster.sh
+```
+
+## Set up Flink CDC
+Download the tar file of Flink CDC from [release page](https://github.com/apache/flink-cdc/releases), then extract the archive:
+
+```bash
+tar -xzf flink-cdc-*.tar.gz
+```
+
+flink-cdc directory will contain four directories: `bin`,`lib`,`log`,`conf`. 
+
+Download the connector package listed below and move it to the `lib` directory.    
+**Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
+- [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
+- [Apache Doris pipeline connector 3.0.0](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-doris/3.0.0/flink-cdc-pipeline-connector-doris-3.0.0.jar)
+
+
+## Submit a Flink CDC Job
+Here is an example file for synchronizing the entire database `mysql-to-doris.yaml`：
+
+```yaml
+################################################################################
+# Description: Sync MySQL all tables to Doris
+################################################################################
+source:
+ type: mysql
+ hostname: localhost
+ port: 3306
+ username: root
+ password: 123456
+ tables: app_db.\.*
+ server-id: 5400-5404
+ server-time-zone: UTC
+
+sink:
+ type: doris
+ fenodes: 127.0.0.1:8030
+ username: root
+ password: ""
+
+pipeline:
+ name: Sync MySQL Database to Doris
+ parallelism: 2
+```
+
+You need to modify the configuration file according to your needs.     
+Finally, submit job to Flink Standalone cluster using Cli.
+
+```bash
+cd /path/flink-cdc-*
+./bin/flink-cdc.sh mysql-to-doris.yaml
+```
+
+After successful submission, the return information is as follows：
+
+```bash
+Pipeline has been submitted to cluster.
+Job ID: ae30f4580f1918bebf16752d4963dc54
+Job Description: Sync MySQL Database to Doris
+```
+
+We can find a job  named `Sync MySQL Database to Doris` is running through Flink Web UI.
