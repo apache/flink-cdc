@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="[https://github.com/apache/flink-cdc](https://nightlies.apache.org/flink/flink-cdc-docs-stable/)"><img src="docs/static/fig/FlinkCDC-logo.png" alt="Flink CDC" style="width: 375px;"></a>
+  <a href="[https://github.com/apache/flink-cdc](https://nightlies.apache.org/flink/flink-cdc-docs-stable/)"><img src="docs/static/fig/flinkcdc-logo.png" alt="Flink CDC" style="width: 375px;"></a>
 </p>
 <p align="center">
 <a href="https://github.com/apache/flink-cdc/" target="_blank">
