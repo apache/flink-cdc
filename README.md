@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="[https://github.com/apache/flink-cdc](https://nightlies.apache.org/flink/flink-cdc-docs-stable/)"><img src="docs/static/FlinkCDC.png" alt="Flink CDC" style="width: 200px;"></a>
+  <a href="[https://github.com/apache/flink-cdc](https://nightlies.apache.org/flink/flink-cdc-docs-stable/)"><img src="docs/static/FlinkCDC-logo.png" alt="Flink CDC" style="width: 200px;"></a>
 </p>
 <p align="center">
     <strong><em>A Streaming Data Integration Tool</em></strong>
@@ -22,7 +22,7 @@
 Flink CDC aims to provide users with a more **concise real time and batch data integration**. Users can configure their data synchronization logic using **yaml** api, and submit their jobs to Flink cluster easily. The framework prioritizes efficient end-to-end data integration and offers enhanced functionalities such as full database synchronization, sharding table synchronization, schema evolution and data transformation.    
 The following graph shows the architecture layering of Flink CDC:
 
-![Flink CDC framework desigin](docs/static/FrameWork.png)
+![Flink CDC framework desigin](docs/static/fig/architecture.png)
 
 To learn more about concept of pipeline design, visit our [core-concept](docs/content/docs/core-concept/data-pipeline.md).
 
