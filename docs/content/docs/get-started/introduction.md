@@ -26,12 +26,12 @@ under the License.
 
 # Welcome to Flink CDC 🎉
 
-Flink CDC is a stream data integration framework that aims to provide users with
-a more robust API. It allows users to configure their data synchronization logic
-through customized Flink operators and job submission tools. The framework
-prioritizes optimizing the task submission process and offers enhanced
-functionalities such as whole database synchronization, sharding, and schema
-change synchronization.
+Flink CDC is a streaming data integration tool that aims to provide users with
+a more robust API. It allows users to describe their ETL pipeline logic via YAML
+elegantly and help users automatically generating customized Flink operators and
+submitting job. Flink CDC prioritizes optimizing the task submission process and
+offers enhanced functionalities such as schema evolution, data transformation,
+full database synchronization and exactly-once semantic.
 
 Deeply integrated with and powered by Apache Flink, Flink CDC provides:
 
@@ -41,7 +41,7 @@ Deeply integrated with and powered by Apache Flink, Flink CDC provides:
 * ✅ Synchronization of entire databases
 * ✅ Schema evolution capability
 
-## How to use Flink CDC
+## How to Use Flink CDC
 
 Flink CDC provides an YAML-formatted user API that more suitable for data
 integration scenarios. Here's an example YAML file defining a data pipeline that
@@ -76,7 +76,7 @@ and deployed to a designated Flink cluster. Please refer to [Core Concept]({{<
 ref "docs/core-concept/data-pipeline" >}}) to get full documentation of all
 supported functionalities of a pipeline.
 
-## Write your first Flink CDC pipeline
+## Write Your First Flink CDC Pipeline
 
 Explore Flink CDC document to get hands on your first real-time data integration
 pipeline:
