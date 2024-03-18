@@ -19,14 +19,16 @@
 </a>
 </p>
 
+
 Flink CDC is a distributed data integration tool for real time data and batch data. Flink CDC brings the simplicity 
 and elegance of data integration via YAML to describe the data movement and transformation in a 
-[Data Pipeline](docs/content/docs/core-concept/data-pipeline.md). The Flink CDC framework prioritizes efficient 
-end-to-end data integration and offers enhanced functionalities such as full database synchronization,
-sharding table synchronization, schema evolution and data transformation.
+[Data Pipeline](docs/content/docs/core-concept/data-pipeline.md).
+
+
+The Flink CDC prioritizes efficient end-to-end data integration and offers enhanced functionalities such as 
+full database synchronization, sharding table synchronization, schema evolution and data transformation.
 
 ![Flink CDC framework desigin](docs/static/fig/architecture.png)
-
 
 
 
