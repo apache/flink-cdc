@@ -60,7 +60,7 @@ full database synchronization, sharding table synchronization, schema evolution 
        parallelism: 4
   ```
 4. Submit pipeline job using `flink-cdc.sh` script.
- ```
+ ```shell
   bash bin/flink-cdc.sh /path/mysql-to-doris.yaml
  ```
 5. View job execution status through Flink WebUI or downstream database.
