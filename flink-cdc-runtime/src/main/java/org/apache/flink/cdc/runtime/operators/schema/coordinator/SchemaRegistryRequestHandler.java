@@ -98,6 +98,14 @@ public class SchemaRegistryRequestHandler implements Closeable {
         schemaChangeException = null;
         try {
             metadataApplier.applySchemaChange(changeEvent);
+            if (!(changeEvent instanceof CreateTableEvent)
+                    || !schemaManager.schemaExists(tableId)) {
+                schemaManager.applySchemaChange(changeEvent);
+            }
+            PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
+            if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
+                startNextSchemaChangeRequest();
+            }
         } catch (Exception e) {
             this.schemaChangeException = e;
         } finally {
@@ -171,8 +179,6 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     "All sink subtask have flushed for table {}. Start to apply schema change.",
                     tableId.toString());
             PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
-            SchemaChangeEvent schemaChangeEvent =
-                    waitFlushSuccess.getChangeRequest().getSchemaChangeEvent();
             schemaChangeThreadPool.submit(
                     () ->
                             applySchemaChange(
@@ -187,15 +193,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
                         .getResponseFuture()
                         .complete(wrap(new SchemaChangeProcessingResponse()));
             } else {
-                if (!(schemaChangeEvent instanceof CreateTableEvent)
-                        || !schemaManager.schemaExists(tableId)) {
-                    schemaManager.applySchemaChange(schemaChangeEvent);
-                }
                 waitFlushSuccess.getResponseFuture().complete(wrap(new ReleaseUpstreamResponse()));
-
-                if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
-                    startNextSchemaChangeRequest();
-                }
             }
         }
     }
@@ -206,22 +204,12 @@ public class SchemaRegistryRequestHandler implements Closeable {
     }
 
     public CompletableFuture<CoordinationResponse> getSchemaChangeResult() {
-        PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
-        SchemaChangeEvent schemaChangeEvent =
-                waitFlushSuccess.getChangeRequest().getSchemaChangeEvent();
         if (schemaChangeException != null) {
             throw new RuntimeException("failed to apply schema change.", schemaChangeException);
         }
         if (isSchemaChangeApplying) {
             return CompletableFuture.supplyAsync(() -> wrap(new SchemaChangeProcessingResponse()));
         } else {
-            if (!(schemaChangeEvent instanceof CreateTableEvent)
-                    || !schemaManager.schemaExists(schemaChangeEvent.tableId())) {
-                schemaManager.applySchemaChange(schemaChangeEvent);
-            }
-            if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
-                startNextSchemaChangeRequest();
-            }
             return CompletableFuture.supplyAsync(() -> wrap(new ReleaseUpstreamResponse()));
         }
     }
