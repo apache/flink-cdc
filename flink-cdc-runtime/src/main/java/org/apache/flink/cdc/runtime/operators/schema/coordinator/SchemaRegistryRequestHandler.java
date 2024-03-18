@@ -200,6 +200,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
 
     public CompletableFuture<CoordinationResponse> refreshPendingLists() {
         pendingSchemaChanges.clear();
+        flushedSinkWriters.clear();
         return CompletableFuture.completedFuture(wrap(new RefreshPendingListsResponse()));
     }
 
