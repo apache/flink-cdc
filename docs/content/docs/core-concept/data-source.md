@@ -25,7 +25,7 @@ under the License.
 -->
 
 # Definition
-Data Source is used to access metadata and read the changed data from external systems.   
+**Data Source** is used to access metadata and read the changed data from external systems.   
 A Data Source can read data from multiple tables simultaneously.
 
 # Parameters

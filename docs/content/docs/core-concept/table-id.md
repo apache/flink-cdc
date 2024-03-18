@@ -25,7 +25,7 @@ under the License.
 -->
 
 # Definition
-When connecting to external systems, it is necessary to establish a mapping relationship with the storage objects of the external system. This is what Table Id refers to.
+When connecting to external systems, it is necessary to establish a mapping relationship with the storage objects of the external system. This is what **Table Id** refers to.
 
 # Example
 To be compatible with most external systems, the Table Id is represented by a 3-tuple : (namespace, schemaName, tableName).   

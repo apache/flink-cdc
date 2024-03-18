@@ -25,7 +25,7 @@ under the License.
 -->
 
 # Definition
-Route specifies the rule of matching a list of source-table and mapping to sink-table. The most typical scenario is the merge of sub-databases and sub-tables, routing multiple upstream source tables to the same sink table.
+**Route** specifies the rule of matching a list of source-table and mapping to sink-table. The most typical scenario is the merge of sub-databases and sub-tables, routing multiple upstream source tables to the same sink table.
 
 # Parameters
 To describe a route, the follows are required:  

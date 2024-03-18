@@ -25,7 +25,7 @@ under the License.
 -->
 
 # Definition
-The Data Sink is used to apply schema changes and write change data to external systems.    
+**Data Sink** is used to apply schema changes and write change data to external systems.    
 A Data Sink can write to multiple tables simultaneously.
 
 # Parameters

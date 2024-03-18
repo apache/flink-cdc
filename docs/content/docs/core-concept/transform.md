@@ -25,7 +25,7 @@ under the License.
 -->
 
 # Definition
-The transform module helps users delete and expand data columns based on the data columns in the table.      
+**Transform** module helps users delete and expand data columns based on the data columns in the table.      
 What's more, it also helps users filter some unnecessary data during the synchronization process.
 
 # Example
