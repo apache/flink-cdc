@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="[https://github.com/apache/flink-cdc](https://nightlies.apache.org/flink/flink-cdc-docs-stable/)"><img src="docs/fig/static/flink-cdc-logo.png" alt="Flink CDC" style="width: 200px;"></a>
+  <a href="[https://github.com/apache/flink-cdc](https://nightlies.apache.org/flink/flink-cdc-docs-stable/)"><img src="docs/static/fig/flink-cdc-logo.png" alt="Flink CDC" style="width: 200px;"></a>
 </p>
 <p align="center">
     <strong><em>A Streaming Data Integration Tool</em></strong>
