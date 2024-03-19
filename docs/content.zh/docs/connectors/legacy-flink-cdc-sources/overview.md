@@ -24,10 +24,11 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# CDC Connectors for Apache Flink
+# Legacy CDC sources for Apache Flink
 
-CDC Connectors for Apache Flink<sup>®</sup> is a set of source connectors for <a href="https://flink.apache.org/">Apache Flink<sup>®</sup></a>, ingesting changes from different databases using change data capture (CDC).
-The CDC Connectors for Apache Flink<sup>®</sup> integrate Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
+Flink CDC sources is a set of source connectors for <a href="https://flink.apache.org/">Apache Flink<sup>®</sup></a>, ingesting changes from different databases using change data capture (CDC).
+Some CDC sources integrate Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
+
 
 {{< img src="/fig/cdc-flow.png" width="600px" alt="Flink CDC" >}}
 
@@ -35,15 +36,15 @@ The CDC Connectors for Apache Flink<sup>®</sup> integrate Debezium as the engin
 
 | Connector                         | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver                    |
 |-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------|
-| [mongodb-cdc](mongodb-cdc.md)     | <li> [MongoDB](https://www.mongodb.com): 3.6, 4.x, 5.0                                                                                                                                                                                                                                                                                                                                                 | MongoDB Driver: 4.3.4     |
-| [mysql-cdc](mysql-cdc.md)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.28       |
-| [oceanbase-cdc](oceanbase-cdc.md) | <li> [OceanBase CE](https://open.oceanbase.com): 3.1.x, 4.x <li> [OceanBase EE](https://www.oceanbase.com/product/oceanbase): 2.x, 3.x, 4.x                                                                                                                                                                                                                                                            | OceanBase Driver: 2.4.x   |
-| [oracle-cdc](oracle-cdc.md)       | <li> [Oracle](https://www.oracle.com/index.html): 11, 12, 19, 21                                                                                                                                                                                                                                                                                                                                       | Oracle Driver: 19.3.0.0   |
-| [postgres-cdc](postgres-cdc.md)   | <li> [PostgreSQL](https://www.postgresql.org): 9.6, 10, 11, 12, 13, 14                                                                                                                                                                                                                                                                                                                                 | JDBC Driver: 42.5.1       |
-| [sqlserver-cdc](sqlserver-cdc.md) | <li> [Sqlserver](https://www.microsoft.com/sql-server): 2012, 2014, 2016, 2017, 2019                                                                                                                                                                                                                                                                                                                   | JDBC Driver: 9.4.1.jre8   | 
-| [tidb-cdc](tidb-cdc.md)           | <li> [TiDB](https://www.pingcap.com/): 5.1.x, 5.2.x, 5.3.x, 5.4.x, 6.0.0                                                                                                                                                                                                                                                                                                                               | JDBC Driver: 8.0.27       | 
-| [db2-cdc](db2-cdc.md)             | <li> [Db2](https://www.ibm.com/products/db2): 11.5                                                                                                                                                                                                                                                                                                                                                     | Db2 Driver: 11.5.0.0      |
-| [vitess-cdc](vitess-cdc.md)       | <li> [Vitess](https://vitess.io/): 8.0.x, 9.0.x                                                                                                                                                                                                                                                                                                                                                        | MySql JDBC Driver: 8.0.26 |
+| [mongodb-cdc](../mongodb-cdc)     | <li> [MongoDB](https://www.mongodb.com): 3.6, 4.x, 5.0                                                                                                                                                                                                                                                                                                                                                 | MongoDB Driver: 4.3.4     |
+| [mysql-cdc](../mysql-cdc)         | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.28       |
+| [oceanbase-cdc](../oceanbase-cdc) | <li> [OceanBase CE](https://open.oceanbase.com): 3.1.x, 4.x <li> [OceanBase EE](https://www.oceanbase.com/product/oceanbase): 2.x, 3.x, 4.x                                                                                                                                                                                                                                                            | OceanBase Driver: 2.4.x   |
+| [oracle-cdc](../oracle-cdc)       | <li> [Oracle](https://www.oracle.com/index.html): 11, 12, 19, 21                                                                                                                                                                                                                                                                                                                                       | Oracle Driver: 19.3.0.0   |
+| [postgres-cdc](../postgres-cdc)   | <li> [PostgreSQL](https://www.postgresql.org): 9.6, 10, 11, 12, 13, 14                                                                                                                                                                                                                                                                                                                                 | JDBC Driver: 42.5.1       |
+| [sqlserver-cdc](../sqlserver-cdc) | <li> [Sqlserver](https://www.microsoft.com/sql-server): 2012, 2014, 2016, 2017, 2019                                                                                                                                                                                                                                                                                                                   | JDBC Driver: 9.4.1.jre8   | 
+| [tidb-cdc](../tidb-cdc)           | <li> [TiDB](https://www.pingcap.com/): 5.1.x, 5.2.x, 5.3.x, 5.4.x, 6.0.0                                                                                                                                                                                                                                                                                                                               | JDBC Driver: 8.0.27       | 
+| [db2-cdc](../db2-cdc)             | <li> [Db2](https://www.ibm.com/products/db2): 11.5                                                                                                                                                                                                                                                                                                                                                     | Db2 Driver: 11.5.0.0      |
+| [vitess-cdc](../vitess-cdc)       | <li> [Vitess](https://vitess.io/): 8.0.x, 9.0.x                                                                                                                                                                                                                                                                                                                                                        | MySql JDBC Driver: 8.0.26 |
 
 ## Supported Flink Versions
 The following table shows the version mapping between Flink<sup>®</sup> CDC Connectors and Flink<sup>®</sup>:
@@ -70,24 +71,24 @@ The following table shows the version mapping between Flink<sup>®</sup> CDC Con
 
 The following table shows the current features of the connector:
 
-| Connector                         | No-lock Read | Parallel Read | Exactly-once Read | Incremental Snapshot Read |
-|-----------------------------------|--------------|---------------|-------------------|---------------------------|
-| [mongodb-cdc](mongodb-cdc.md)     | ✅            | ✅             | ✅                 | ✅                         |
-| [mysql-cdc](mysql-cdc.md)         | ✅            | ✅             | ✅                 | ✅                         |
-| [oracle-cdc](oracle-cdc.md)       | ✅            | ✅             | ✅                 | ✅                         |
-| [postgres-cdc](postgres-cdc.md)   | ✅            | ✅             | ✅                 | ✅                         |
-| [sqlserver-cdc](sqlserver-cdc.md) | ✅            | ✅             | ✅                 | ✅                         |
-| [oceanbase-cdc](oceanbase-cdc.md) | ❌            | ❌             | ❌                 | ❌                         |
-| [tidb-cdc](tidb-cdc.md)           | ✅            | ❌             | ✅                 | ❌                         |
-| [db2-cdc](db2-cdc.md)             | ❌            | ❌             | ✅                 | ❌                         |
-| [vitess-cdc](vitess-cdc.md)       | ✅            | ❌             | ✅                 | ❌                         |
+| Connector                      | No-lock Read | Parallel Read | Exactly-once Read | Incremental Snapshot Read |
+|--------------------------------|--------------|---------------|-------------------|---------------------------|
+| [mongodb-cdc](../mongodb-cdc)  | ✅            | ✅             | ✅                 | ✅                         |
+| [mysql-cdc](../mysql-cdc)      | ✅            | ✅             | ✅                 | ✅                         |
+| [oracle-cdc](../oracle-cdc)    | ✅            | ✅             | ✅                 | ✅                         |
+| [postgres-cdc](../postgres-cdc) | ✅            | ✅             | ✅                 | ✅                         |
+| [sqlserver-cdc](../sqlserver-cdc) | ✅            | ✅             | ✅                 | ✅                         |
+| [oceanbase-cdc](../oceanbase-cdc) | ❌            | ❌             | ❌                 | ❌                         |
+| [tidb-cdc](../tidb-cdc)        | ✅            | ❌             | ✅                 | ❌                         |
+| [db2-cdc](../db2-cdc)          | ❌            | ❌             | ✅                 | ❌                         |
+| [vitess-cdc](../vitess-cdc)    | ✅            | ❌             | ✅                 | ❌                         |
 
 ## Usage for Table/SQL API
 
 We need several steps to setup a Flink cluster with the provided connector.
 
 1. Setup a Flink cluster with version 1.12+ and Java 8+ installed.
-2. Download the connector SQL jars from the [Downloads](../downloads.md) page (or [build yourself](#building-from-source)).
+2. Download the connector SQL jars from the [Downloads](https://github.com/apache/flink-cdc/releases) page (or [build yourself](#building-from-source)).
 3. Put the downloaded jars under `FLINK_HOME/lib/`.
 4. Restart the Flink cluster.
 
@@ -303,5 +304,20 @@ you can construct `JsonDebeziumDeserializationSchema` as following:
  JsonDebeziumDeserializationSchema schema = 
       new JsonDebeziumDeserializationSchema(true, customConverterConfigs);
 ```
+
+## Building from source
+
+Prerequisites:
+- git
+- Maven
+- At least Java 8
+
+```
+git clone https://github.com/apache/flink-cdc.git
+cd flink-cdc
+mvn clean install -DskipTests
+```
+
+The dependencies are now available in your local `.m2` repository.
 
 {{< top >}}

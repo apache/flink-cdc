@@ -34,7 +34,7 @@ describes how to setup the db2 CDC connector to run SQL queries against Db2 data
 
 | Connector             | Database                                           | Driver               |
 |-----------------------|----------------------------------------------------|----------------------|
-| [Db2-cdc](db2-cdc.md) | <li> [Db2](https://www.ibm.com/products/db2): 11.5 | Db2 Driver: 11.5.0.0 |
+| [Db2-cdc](../db2-cdc) | <li> [Db2](https://www.ibm.com/products/db2): 11.5 | Db2 Driver: 11.5.0.0 |
 
 Dependencies
 ------------
@@ -53,9 +53,8 @@ using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR
 Download flink-sql-connector-db2-cdc-3.0-SNAPSHOT.jar and 
 put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-db2-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users 
-need to download the source code and compile the corresponding jar. Users should use the released version, such as 
-[flink-sql-connector-db2-cdc-2.3.0.jar](https://mvnrepository.com/artifact/org.apache.flink/flink-connector-db2-cdc), 
+**Note:** flink-sql-connector-db2-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users should use the released version, such as
+[flink-sql-connector-db2-cdc-3.0.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-db2-cdc),
 the released version will be available in the Maven central warehouse.
 
 Setup Db2 server
