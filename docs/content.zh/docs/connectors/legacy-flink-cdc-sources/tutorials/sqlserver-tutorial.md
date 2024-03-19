@@ -3,7 +3,7 @@ title: "SqlServer Tutorial"
 weight: 6
 type: docs
 aliases:
-- /get-started/quickstart/using-legacy-sources/sqlserver-tutorial.html
+- /connectors/legacy-flink-cdc-sources/tutorials/sqlserver-tutorial.html
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

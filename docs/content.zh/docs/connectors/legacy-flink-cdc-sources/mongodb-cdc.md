@@ -52,7 +52,7 @@ Setup MongoDB
 - MongoDB version
 
   MongoDB version >= 3.6 <br>
-  We use [change streams](https://docs.mongodb.com/manual/changeStreams/) feature (new in version 3.6) to capture change data.
+We use [change streams](https://docs.mongodb.com/manual/changeStreams/) feature (new in version 3.6) to capture change data.
 
 - Cluster Deployment
 

@@ -50,7 +50,7 @@ Flink CDC 项目通过众多贡献者的代码贡献来维护，改进和拓展�
 
 如果您想要为 Flink CDC 贡献代码，可以通过如下的方式。
 
-1. 首先在 [Flink jira](https://issues.<br/>apache.org/jira/projects/FLINK/issues) 的想要负责的 issue 
+1. 首先在 [Flink jira](https://issues.<br/>apache.org/jira/projects/FLINK/issues) 的想要负责的 issue
    下评论（最好在评论中解释下对于这个问题的理解，和后续的设计，如果可能的话也可以提供下 POC 的代码）。
 2. 在这个 issue 被分配给你后，开始进行开发实现（提交信息请遵循`[FLINK-xxx][xxx] xxxxxxx`的格式）。
 3. 开发完成后可以向 [Flink CDC](https://github.com/apache/flink-cdc) 项目提交 PR（请确保 Clone 的项目 committer 有操作权限）。
@@ -65,7 +65,7 @@ Flink CDC 项目通过众多贡献者的代码贡献来维护，改进和拓展�
 
 评审时，需要检查对应的 PR 是否合理的描述了本次修改的内容，能否支持评审人较快的理解和评审代码。对于比较琐碎的修改，不需要提供太过详细的信息。
 
-2. 提交的 PR 代码质量是否符合标准？ 
+2. 提交的 PR 代码质量是否符合标准？
 
 - 代码是否遵循正确的软件开发习惯？
 - 代码是否正确，鲁棒性如何，是否便于维护和拓展，是否是可测试的？

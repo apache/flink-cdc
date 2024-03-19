@@ -3,7 +3,7 @@ title: "PolarDB-X Tutorial"
 weight: 5
 type: docs
 aliases:
-- /get-started/quickstart/using-legacy-sources/mongodb-tutorial.html
+- /connectors/legacy-flink-cdc-sources/tutorials/mongodb-tutorial.html
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
