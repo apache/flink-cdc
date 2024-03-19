@@ -48,7 +48,7 @@ If you have problems setting up a Kubernetes cluster, please take a look at [how
 ## Session Mode
 
 Flink runs on all UNIX-like environments, i.e. Linux, Mac OS X, and Cygwin (for Windows).  
-You can refer [overview](../connectors/pipeline-connectors/overview.md) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
+You can refer [overview]({{< ref "docs/connectors/overview" >}}) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
 then extract the archive:
 
 ```bash
