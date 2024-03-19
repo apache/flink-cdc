@@ -42,6 +42,10 @@ In order to setup the Vitess CDC connector, the following table provides depende
 
 Download [flink-sql-connector-vitess-cdc-3.0-SNAPSHOT.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-vitess-cdc/3.0-SNAPSHOT/flink-sql-connector-vitess-cdc-3.0-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
 
+**Note:** flink-sql-connector-vitess-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users should use the released version, such as
+[flink-sql-connector-vitess-cdc-3.0.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-vitess-cdc),
+the released version will be available in the Maven central warehouse.
+
 Setup Vitess server
 ----------------
 
