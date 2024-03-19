@@ -76,12 +76,10 @@ Download the tar file of Flink CDC from [release page](https://github.com/apache
 tar -xzf flink-cdc-*.tar.gz
 ```
 
-flink-cdc directory will contain four directories: `bin`,`lib`,`log`,`conf`. 
+Extracted `flink-cdc` contains four directories: `bin`,`lib`,`log` and `conf`.
 
-Download the connector package listed below and move it to the `lib` directory.    
-**Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
-- [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
-- [Apache Doris pipeline connector 3.0.0](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-doris/3.0.0/flink-cdc-pipeline-connector-doris-3.0.0.jar)
+Download the connector jars from [release page](https://github.com/apache/flink-cdc/releases), and move it to the `lib` directory.    
+Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on specific branch by yourself.
 
 
 ## Submit a Flink CDC Job
@@ -112,7 +110,10 @@ pipeline:
  parallelism: 2
 ```
 
-You need to modify the configuration file according to your needs.     
+You need to modify the configuration file according to your needs, refer to connectors more information.
+- [MySQL pipeline connector]({{< ref "docs/connectors/mysql.md" >}})
+- [Apache Doris pipeline connector]({{< ref "docs/connectors/doris.md" >}})
+
 Finally, submit job to Flink Standalone cluster using Cli.
 
 ```bash
@@ -128,4 +129,4 @@ Job ID: ae30f4580f1918bebf16752d4963dc54
 Job Description: Sync MySQL Database to Doris
 ```
 
-We can find a job  named `Sync MySQL Database to Doris` is running through Flink Web UI.
+Then you can find a job named `Sync MySQL Database to Doris` running through Flink Web UI. 
