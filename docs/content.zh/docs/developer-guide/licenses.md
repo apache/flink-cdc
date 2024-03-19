@@ -24,15 +24,15 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Licenses
+# 许可证
 
-Flink CDC is licensed under [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+Flink CDC 使用的是 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) 许可。
 
-If you have any question regarding licenses, just contact us.
+如果对于 Flink CDC 的许可证有问题，可以通过邮件列表联系我们。
 
 # Apache Software Foundation
 
-You could know more about ASF as follows.
+您可以通过以下一些链接了解更多关于 ASF 的信息。
 
 - [Apache Software Foundation](https://www.apache.org/)
 - [License](https://www.apache.org/licenses/)
