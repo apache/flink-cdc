@@ -1,9 +1,8 @@
 ---
 title: "FAQ"
-icon: <i class="fa fa-question title appetizer" aria-hidden="true"></i>
-bold: true
+# bold: true
 bookCollapseSection: true
-weight: 4
+weight: 6
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

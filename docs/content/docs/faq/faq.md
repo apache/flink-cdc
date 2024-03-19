@@ -1,9 +1,9 @@
 ---
-title: "FAQ"
+title: "Frequently Asked Questions"
 weight: 1
 type: docs
 aliases:
-- /faq/faq.html
+- /faq/faq
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

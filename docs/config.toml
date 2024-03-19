@@ -24,7 +24,7 @@ pygmentsUseClasses = true
 [params]
   # Flag whether this is a stable version or not.
   # Used for the quickstart page.
-  IsStable = false
+  IsStable = true
 
   # Flag to indicate whether an outdated warning should be shown.
   ShowOutDatedWarning = false
@@ -34,7 +34,7 @@ pygmentsUseClasses = true
   # we change the version for the complete docs when forking of a release branch
   # etc.
   # The full version string as referenced in Maven (e.g. 1.2.1)
-  Version = "3.0"
+  Version = "3.0.1"
 
   # For stable releases, leave the bugfix version out (e.g. 1.2). For snapshot
   # release this should be the same as the regular version
@@ -58,7 +58,7 @@ pygmentsUseClasses = true
   ]
 
   PreviousDocs = [
-    ["3.0", "https://nightlies.apache.org/flink-cdc/flink-cdc-docs-release-3.0"],
+    ["3.0", "https://nightlies.apache.org/flink/flink-cdc-docs-release-3.0"],
   ]
 
 [markup]
