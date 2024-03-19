@@ -3,7 +3,7 @@ title: "Building a Real-time Data Lake with Flink CDC"
 weight: 999
 type: docs
 aliases:
-- /development/build-real-time-data-lake-tutorial.html
+- /connectors/legacy-flink-cdc-sources/tutorials/build-real-time-data-lake-tutorial.html
 
 ---
 

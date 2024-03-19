@@ -3,7 +3,7 @@ title: "OceanBase Tutorial"
 weight: 3
 type: docs
 aliases:
-- /get-started/quickstart/using-legacy-sources/oceanbase-tutorial.html
+- /connectors/legacy-flink-cdc-sources/tutorials/oceanbase-tutorial.html
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

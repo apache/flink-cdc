@@ -26,7 +26,7 @@ under the License.
 
 # Streaming ELT from MySQL to Doris
 
-This tutorial is to show how to quickly build a Streaming ELT job from MySQL to Doris using Flink CDC, including the
+This tutorial is to show how to quickly build a Streaming ELT job from MySQL to StarRocks using Flink CDC, including the
 feature of sync all table of one database, schema change evolution and sync sharding tables into one table.  
 All exercises in this tutorial are performed in the Flink CDC CLI, and the entire process uses standard SQL syntax,
 without a single line of Java/Scala code or IDE installation.

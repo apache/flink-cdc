@@ -3,7 +3,7 @@ title: "Db2 Tutorial"
 weight: 8
 type: docs
 aliases:
-- /get-started/quickstart/using-legacy-sources/db2-tutorial.html
+- /connectors/legacy-flink-cdc-sources/tutorials/db2-tutorial.html
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

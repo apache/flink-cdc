@@ -1,7 +1,7 @@
 ---
-title: "Using Legacy Sources"
+title: Tutorials
 bookCollapseSection: true
-weight: 3
+weight: 999
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

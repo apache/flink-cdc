@@ -3,7 +3,7 @@ title: "MySQL & PostgreSQL Tutorial"
 weight: 2
 type: docs
 aliases:
-- /get-started/quickstart/using-legacy-sources/mysql-postgres-tutorial.html
+- /connectors/legacy-flink-cdc-sources/tutorials/mysql-postgres-tutorial.html
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

@@ -1,6 +1,6 @@
 ---
 title: "DataStream API Package Guidance"
-weight: 999
+weight: 998
 type: docs
 aliases:
 - /connectors/legacy-flink-cdc-sources/datastream-api-package-guidance

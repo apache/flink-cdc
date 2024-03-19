@@ -3,7 +3,7 @@ title: "TiDB Tutorial"
 weight: 7
 type: docs
 aliases:
-- /get-started/quickstart/using-legacy-sources/tidb-tutorial.html
+- /connectors/legacy-flink-cdc-sources/tutorials/tidb-tutorial.html
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
