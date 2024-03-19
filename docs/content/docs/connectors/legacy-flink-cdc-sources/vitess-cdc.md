@@ -261,7 +261,7 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">MySQL type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html"></a></th>
+        <th class="text-left">MySQL type<a href="https://dev.mysql.com/doc/refman/8.0/en/data-types.html"></a></th>
         <th class="text-left">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
       </tr>
     </thead>
