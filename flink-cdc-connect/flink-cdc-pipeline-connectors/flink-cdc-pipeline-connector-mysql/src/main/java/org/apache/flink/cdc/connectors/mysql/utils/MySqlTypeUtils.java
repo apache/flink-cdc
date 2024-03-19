@@ -198,7 +198,7 @@ public class MySqlTypeUtils {
                         ? DataTypes.TIMESTAMP_LTZ(column.length())
                         : DataTypes.TIMESTAMP_LTZ(0);
             case CHAR:
-                return DataTypes.CHAR(column.length());
+                return column.length() > 0 ? DataTypes.CHAR(column.length()) : DataTypes.CHAR(1);
             case VARCHAR:
                 return DataTypes.VARCHAR(column.length());
             case TINYTEXT:
@@ -218,7 +218,9 @@ public class MySqlTypeUtils {
             case MULTILINESTRING:
                 return DataTypes.STRING();
             case BINARY:
-                return DataTypes.BINARY(column.length());
+                return column.length() > 0
+                        ? DataTypes.BINARY(column.length())
+                        : DataTypes.BINARY(1);
             case VARBINARY:
                 return DataTypes.VARBINARY(column.length());
             case TINYBLOB:
