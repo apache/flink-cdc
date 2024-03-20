@@ -66,14 +66,12 @@ pipeline:
   parallelism: 2
 ```
 
-通过使用 `flink-cdc.sh` 提交 YAML 文件，一个 Flink 作业将会被编译并部署到指定的 Flink 集群。
-By submitting the YAML file with `flink-cdc.sh`, 请参考 [核心概念]({{<
-ref "docs/core-concept/data-pipeline" >}}) 以获取 Pipeline 支持的所有功能的完整文档说明。
+通过使用 `flink-cdc.sh` 提交 YAML 文件，一个 Flink 作业将会被编译并部署到指定的 Flink 集群。 
+请参考 [核心概念]({{<ref "docs/core-concept/data-pipeline" >}}) 以获取 Pipeline 支持的所有功能的完整文档说明。
 
 ## 编写你的第一个 Flink CDC Pipeline
 
-Explore Flink CDC document to get hands on your first real-time data integration
-pipeline:
+浏览 Flink CDC 文档，开始创建您的第一个实时数据集成管道(Pipeline)。
 
 ### 快速开始
 
