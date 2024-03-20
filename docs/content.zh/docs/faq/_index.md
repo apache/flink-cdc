@@ -1,5 +1,5 @@
 ---
-title: "FAQ"
+title: "常见问题"
 # bold: true
 bookCollapseSection: true
 weight: 6

@@ -1,5 +1,5 @@
 ---
-title: Developer Guide
+title: 开发者指南
 bold: true
 bookCollapseSection: true
 weight: 5

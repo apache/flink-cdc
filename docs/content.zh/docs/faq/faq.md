@@ -1,5 +1,5 @@
 ---
-title: "Frequently Asked Questions"
+title: "常见问题汇总"
 weight: 1
 type: docs
 aliases:

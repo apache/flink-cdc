@@ -1,5 +1,5 @@
 ---
-title: Connectors
+title: 连接器
 bold: true
 bookCollapseSection: true
 weight: 3

@@ -1,5 +1,5 @@
 ---
-title: "Get Started"
+title: "入门指南"
 bold: true
 bookCollapseSection: true
 weight: 1

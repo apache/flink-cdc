@@ -1,5 +1,5 @@
 ---
-title: "OceanBase Tutorial"
+title: "OceanBase 教程"
 weight: 3
 type: docs
 aliases:

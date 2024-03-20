@@ -1,5 +1,5 @@
 ---
-title: "Quickstart"
+title: "快速开始"
 bookCollapseSection: true
 weight: 2
 ---

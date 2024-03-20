@@ -1,5 +1,5 @@
 ---
-title: "MySQL to Doris"
+title: "MySQL 同步到 Doris"
 weight: 1
 type: docs
 aliases:

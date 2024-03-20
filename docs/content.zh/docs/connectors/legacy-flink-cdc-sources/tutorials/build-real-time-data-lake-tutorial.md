@@ -1,5 +1,5 @@
 ---
-title: "Building a Real-time Data Lake with Flink CDC"
+title: "使用 Flink CDC 构建实时数据湖"
 weight: 999
 type: docs
 aliases:

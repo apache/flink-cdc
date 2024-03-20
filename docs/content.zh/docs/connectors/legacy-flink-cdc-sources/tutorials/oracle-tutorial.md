@@ -1,5 +1,5 @@
 ---
-title: "Oracle Tutorial"
+title: "Oracle 教程"
 weight: 4
 type: docs
 aliases:
