@@ -39,4 +39,30 @@ public class StringUtils {
         }
         return true;
     }
+
+    /**
+     * Convert underline and space case to camel case.
+     *
+     * @param str The string to convert
+     * @return String which is camel case.
+     */
+    public static String convertToCamelCase(String str) {
+        StringBuilder result = new StringBuilder();
+        if (isNullOrWhitespaceOnly(str)) {
+            return "";
+        } else if (!str.contains("_") && !str.contains(" ")) {
+            return str.toLowerCase();
+        }
+        String[] camels = str.split("[_| ]");
+        for (String camel : camels) {
+            if (camel.isEmpty()) {
+                continue;
+            }
+            result.append(camel.substring(0, 1).toUpperCase());
+            result.append(camel.substring(1).toLowerCase());
+        }
+        StringBuilder ret = new StringBuilder(result.substring(0, 1).toLowerCase());
+        ret.append(result.substring(1, result.toString().length()));
+        return ret.toString();
+    }
 }

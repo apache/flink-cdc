@@ -139,6 +139,34 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
         return new DataChangeEvent(tableId, null, after, OperationType.REPLACE, meta);
     }
 
+    /**
+     * Updates the before of a {@link DataChangeEvent} instance that describes the event with meta
+     * info.
+     */
+    public static DataChangeEvent projectBefore(
+            DataChangeEvent dataChangeEvent, RecordData projectedBefore) {
+        return new DataChangeEvent(
+                dataChangeEvent.tableId,
+                projectedBefore,
+                dataChangeEvent.after,
+                dataChangeEvent.op,
+                dataChangeEvent.meta);
+    }
+
+    /**
+     * Updates the after of a {@link DataChangeEvent} instance that describes the event with meta
+     * info.
+     */
+    public static DataChangeEvent projectAfter(
+            DataChangeEvent dataChangeEvent, RecordData projectedAfter) {
+        return new DataChangeEvent(
+                dataChangeEvent.tableId,
+                dataChangeEvent.before,
+                projectedAfter,
+                dataChangeEvent.op,
+                dataChangeEvent.meta);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
