@@ -1,5 +1,5 @@
 ---
-title: "常见问题汇总"
+title: "通用FAQ"
 weight: 1
 type: docs
 aliases:
