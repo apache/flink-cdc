@@ -24,9 +24,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Demo: Oracle CDC to Elasticsearch
+# 演示: Oracle CDC 导入 Elasticsearch
 
-**Create `docker-compose.yml` file using following contents:**
+**创建`docker-compose.yml`文件，内容如下所示:**
 
 ```
 version: '2.1'
@@ -58,35 +58,36 @@ services:
       - "5601:5601"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-```
-The Docker Compose environment consists of the following containers:
-- Oracle: Oracle 19c database.
-- Elasticsearch: store the join result of the `orders` and `products` table.
-- Kibana: mainly used to visualize the data in Elasticsearch
+``` 
+该 Docker Compose 中包含的容器有:
+- Oracle: Oracle 19c 数据库
+- Elasticsearch: `orders` 表将和 `products` 表进行join，join的结果写入Elasticsearch中
+- Kibana: 可视化 Elasticsearch 中的数据
 
-To start all containers, run the following command in the directory that contains the docker-compose.yml file.
+在 docker-compose.yml 所在目录下运行如下命令以启动所有容器：
 ```shell
 docker-compose up -d
 ```
-This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. 
-Run docker ps to check whether these containers are running properly. You can also visit http://localhost:5601/ to see if Kibana is running normally.
+该命令会以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。
+你可以通过 docker ps 来观察上述的容器是否正常启动了。 也可以访问 http://localhost:5601/ 来查看 Kibana 是否运行正常。
+另外可以通过如下命令停止所有的容器：
 
-Don’t forget to run the following command to stop all containers after you finished the tutorial:
 ```shell
 docker-compose down
-```
+````
 
-**Download following JAR package to `<FLINK_HOME>/lib`**
+**下载以下 jar 包到 `<FLINK_HOME>/lib/`:**
 
-**Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release-branches by yourself.**
+*下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译*
 
 - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-- [flink-sql-connector-oracle-cdc-3.0-SNAPSHOT.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oracle-cdc/3.0-SNAPSHOT/flink-sql-connector-oracle-cdc-3.0-SNAPSHOT.jar)
+- [flink-sql-connector-oracle-cdc-2.4.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oracle-cdc/2.4.0/flink-sql-connector-oracle-cdc-2.4.0.jar)
 
 
-**Preparing data in Oracle database**
+**在 Oracle 数据库中准备数据**
 
-Introduce the tables in Oracle:
+创建数据库和表 `products`，`orders`，并插入数据：
+
 ```shell
 docker-compose exec oracle sqlplus debezium/dbz@localhost:1521/ORCLCDB
 ```
@@ -147,9 +148,7 @@ INSERT INTO DEBEZIUM.ORDERS VALUES (1003, TO_TIMESTAMP('2020-07-30 12:00:30.0010
 INSERT INTO DEBEZIUM.ORDERS VALUES (1004, TO_TIMESTAMP('2020-07-30 15:22:00.001000', 'YYYY-MM-DD HH24:MI:SS.FF'), 'Jark', 1, 104);
 ```
 
-**Launch a Flink cluster and start a Flink SQL CLI**
-
-Execute following SQL statements in the Flink SQL CLI:
+**然后启动 Flink 集群，再启动 SQL CLI:**
 
 ```sql
 -- Flink SQL
@@ -210,13 +209,13 @@ Flink SQL> INSERT INTO enriched_orders
  LEFT JOIN products AS p ON o.PRODUCT_ID = p.ID;
 ```
 
-**Check result in Elasticsearch**
+**检查 ElasticSearch 中的结果**
 
-Check the data has been written to Elasticsearch successfully, you can visit [Kibana](http://localhost:5601/) to see the data.
+检查最终的结果是否写入ElasticSearch中, 可以在[Kibana](http://localhost:5601/)看到ElasticSearch中的数据
 
-**Make changes in Oracle and watch result in Elasticsearch**
+**在 Oracle 制造一些变更，观察 ElasticSearch 中的结果**
 
-Enter Oracle's container to make some changes in Oracle, then you can see the result in Elasticsearch will change after executing every SQL statement:
+进入Oracle容器中并通过如下的SQL语句对Oracle数据库进行一些修改, 然后就可以看到每执行一条SQL语句，Elasticsearch中的数据都会实时更新。
 
 ```shell
 docker-compose exec oracle sqlplus debezium/dbz@localhost:1521/ORCLCDB

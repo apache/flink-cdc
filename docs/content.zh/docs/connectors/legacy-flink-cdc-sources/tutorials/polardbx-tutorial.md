@@ -24,24 +24,18 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Demo: PolarDB-X CDC to Elasticsearch
+# 演示: PolarDB-X CDC 导入 Elasticsearch
 
-This tutorial is to show how to quickly build streaming ETL for PolarDB-X with Flink CDC.
+本示例我们通过演示 PolarDB-X 借助 Flink-CDC 将数据导入至 Elasticsearch 来介绍 PolarDB-X 的增量订阅能力，你可以前往:[PolarDB-X](https://github.com/ApsaraDB/galaxysql) 了解更多细节。
 
-Assuming we are running an e-commerce business. The product and order data stored in PolarDB-X.
-We want to enrich the orders using the product table, and then load the enriched orders to ElasticSearch in real time.
+### 准备教程所需要的组件
+我们假设你运行在一台 MacOS 或者 Linux 机器上，并且已经安装 docker.
 
-In the following sections, we will describe how to use Flink PolarDB-X CDC to implement it.
-All exercises in this tutorial are performed in the Flink SQL CLI, and the entire process uses standard SQL syntax, without a single line of Java/Scala code or IDE installation.
+#### 配置并启动容器
 
-## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+配置 `docker-compose.yml`。
 
-### Starting components required
-The components required in this demo are all managed in containers, so we will use `docker-compose` to start them.
-
-Create `docker-compose.yml` file using following contents:
-```
+```yaml
 version: '2.1'
 services:
   polardbx:
@@ -76,105 +70,96 @@ services:
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock'
 ```
-The Docker Compose environment consists of the following containers:
-- PolarDB-X: the `products`,`orders` tables will be store in the database. They will be joined enrich the orders.
-- Elasticsearch: mainly used as a data sink to store enriched orders.
-- Kibana: used to visualize the data in Elasticsearch.
+该 Docker Compose 中包含的容器有：
+- PolarDB-X: 商品表 `products` 和 订单表 `orders` 将存储在该数据库中， 这两张表将进行关联，得到一张包含更多信息的订单表 `enriched_orders`
+- Elasticsearch: 最终的订单表 `enriched_orders` 将写到 Elasticsearch
+- Kibana: 用来可视化 ElasticSearch 的数据
 
-To start all containers, run the following command in the directory that contains the `docker-compose.yml` file.
+在 `docker-compose.yml` 所在目录下执行下面的命令来启动本教程需要的组件：
+
 ```shell
 docker-compose up -d
 ```
-This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run docker ps to check whether these containers are running properly.
-We can also visit [http://localhost:5601/](http://localhost:5601/) to see if Kibana is running normally.
+该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过 docker ps 来观察上述的容器是否正常启动了，也可以通过访问 [http://localhost:5601/](http://localhost:5601/) 来查看 Kibana 是否运行正常
 
-### Preparing Flink and JAR package required
-1. Download [Flink 1.18.0](https://archive.apache.org/dist/flink/flink-1.18.0/flink-1.18.0-bin-scala_2.12.tgz) and unzip it to the directory `flink-1.18.0`
-2. Download following JAR package required and put them under `flink-1.18.0/lib/`:
 
-   **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
-    - flink-sql-connector-mysql-cdc-3.0-SNAPSHOT.jar
-    - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-   
-### Preparing data in databases
-#### Preparing data in PolarDB-X
-1. Enter PolarDB-X Database:
-    ```shell
-   mysql -h127.0.0.1 -P8527 -upolardbx_root -p"123456"
-    ```
-2. Create tables and populate data:
-    ```sql
-    -- PolarDB-X
-   CREATE TABLE products (
-   id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-   name VARCHAR(255) NOT NULL,
-   description VARCHAR(512)
-   ) AUTO_INCREMENT = 101;
-   
-   INSERT INTO products
-   VALUES (default,"scooter","Small 2-wheel scooter"),
-   (default,"car battery","12V car battery"),
-   (default,"12-pack drill bits","12-pack of drill bits with sizes ranging from #40 to #3"),
-   (default,"hammer","12oz carpenter's hammer"),
-   (default,"hammer","14oz carpenter's hammer"),
-   (default,"hammer","16oz carpenter's hammer"),
-   (default,"rocks","box of assorted rocks"),
-   (default,"jacket","water resistent black wind breaker"),
-   (default,"spare tire","24 inch spare tire");
-   
-   
-   CREATE TABLE orders (
-   order_id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-   order_date DATETIME NOT NULL,
-   customer_name VARCHAR(255) NOT NULL,
-   price DECIMAL(10, 5) NOT NULL,
-   product_id INTEGER NOT NULL,
-   order_status BOOLEAN NOT NULL -- Whether order has been placed
-   ) AUTO_INCREMENT = 10001;
-   
-   INSERT INTO orders
-   VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
-   (default, '2020-07-30 10:11:09', 'Sally', 15.00, 105, false),
-   (default, '2020-07-30 12:00:30', 'Edward', 25.25, 106, false);
-    ```
-   
-## Starting Flink cluster and Flink SQL CLI
+### 准备数据：
 
-1. Use the following command to change to the Flink directory:
-    ```
-    cd flink-1.18.0
-    ```
-   
-2. Use the following command to start a Flink cluster:
-    ```shell
-    ./bin/start-cluster.sh
-    ```
+使用已创建的用户名和密码进行登陆PolarDB-X。
 
-   Then we can visit [http://localhost:8081/](http://localhost:8081/) to see if Flink is running normally, and the web page looks like:
-
-   {{< img src="/fig/mysql-postgres-tutorial/flink-ui.png" alt="Flink UI" >}}
-
-3. Use the following command to start a Flink SQL CLI:
-    ```shell
-    ./bin/sql-client.sh
-    ```
-   We should see the welcome screen of the CLI client.
-
-   {{< img src="/fig/mysql-postgres-tutorial/flink-sql-client.png" alt="Flink SQL Client" >}}
-
-## Creating tables using Flink DDL in Flink SQL CLI
-First, enable checkpoints every 3 seconds
-```sql
--- Flink SQL                   
-Flink SQL> SET execution.checkpointing.interval = 3s;
+```shell
+mysql -h127.0.0.1 -P8527 -upolardbx_root -p"123456"
 ```
 
-Then, create tables that capture the change data from the corresponding database tables.
 ```sql
--- Flink SQL
+CREATE DATABASE mydb;
+USE mydb;
+
+-- 创建一张产品表，并写入一些数据
+CREATE TABLE products (
+                          id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                          name VARCHAR(255) NOT NULL,
+                          description VARCHAR(512)
+) AUTO_INCREMENT = 101;
+
+INSERT INTO products
+VALUES (default,"scooter","Small 2-wheel scooter"),
+       (default,"car battery","12V car battery"),
+       (default,"12-pack drill bits","12-pack of drill bits with sizes ranging from #40 to #3"),
+       (default,"hammer","12oz carpenter's hammer"),
+       (default,"hammer","14oz carpenter's hammer"),
+       (default,"hammer","16oz carpenter's hammer"),
+       (default,"rocks","box of assorted rocks"),
+       (default,"jacket","water resistent black wind breaker"),
+       (default,"spare tire","24 inch spare tire");
+
+
+-- 创建一张订单表，并写入一些数据
+CREATE TABLE orders (
+                        order_id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                        order_date DATETIME NOT NULL,
+                        customer_name VARCHAR(255) NOT NULL,
+                        price DECIMAL(10, 5) NOT NULL,
+                        product_id INTEGER NOT NULL,
+                        order_status BOOLEAN NOT NULL -- Whether order has been placed
+) AUTO_INCREMENT = 10001;
+
+INSERT INTO orders
+VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
+       (default, '2020-07-30 10:11:09', 'Sally', 15.00, 105, false),
+       (default, '2020-07-30 12:00:30', 'Edward', 25.25, 106, false);
+```
+
+### 下载 Flink 和所需要的依赖包
+1. 下载 [Flink 1.17.0](https://archive.apache.org/dist/flink/flink-1.17.0/flink-1.17.0-bin-scala_2.12.tgz) 并将其解压至目录 `flink-1.17.0`
+2. 下载下面列出的依赖包，并将它们放到目录 `flink-1.17.0/lib/` 下
+
+```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译```
+- 用于订阅PolarDB-X Binlog: [flink-sql-connector-mysql-cdc-2.4.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.4.0/flink-sql-connector-mysql-cdc-2.4.0.jar)
+- 用于写入Elasticsearch: [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
+3. 启动flink服务:
+```shell
+./bin/start-cluster.sh
+```
+
+我们可以访问 [http://localhost:8081/](http://localhost:8081/) 看到Flink正常运行:
+
+{{< img src="/fig/mysql-postgres-tutorial/flink-ui.png" alt="Flink UI" >}}
+
+
+4. 启动Flink SQL CLI:
+```shell
+./bin/sql-client.sh
+```
+
+### 在 Flink SQL CLI 中使用 Flink DDL 创建表
+
+
+```sql
+-- 设置间隔时间为3秒                       
 Flink SQL> SET execution.checkpointing.interval = 3s;
 
--- create source table2 - orders
+-- 创建source1 -订单表
 Flink SQL> CREATE TABLE orders (
    order_id INT,
    order_date TIMESTAMP(0),
@@ -193,7 +178,7 @@ Flink SQL> CREATE TABLE orders (
 	'table-name' = 'orders'
  );
 
--- create source table2 - products
+-- 创建source2 -产品表
 CREATE TABLE products (
     id INT,
     name STRING,
@@ -208,12 +193,8 @@ CREATE TABLE products (
 	'database-name' = 'mydb',
 	'table-name' = 'products'
 );
-```
 
-Finally, create `enriched_orders` table that is used to load data to the Elasticsearch.
-```sql
--- Flink SQL
--- create sink table - enrich_orders
+-- 创建sink - 关联后的结果表
 Flink SQL> CREATE TABLE enriched_orders (
    order_id INT,
    order_date TIMESTAMP(0),
@@ -229,12 +210,8 @@ Flink SQL> CREATE TABLE enriched_orders (
      'hosts' = 'http://localhost:9200',
      'index' = 'enriched_orders'
  );
-```
 
-## Enriching orders and load to ElasticSearch
-Use Flink SQL to join the `order` table with the `products` table to enrich orders and write to the Elasticsearch.
-```sql
--- Flink SQL
+-- 执行读取和写入   
 Flink SQL> INSERT INTO enriched_orders
   SELECT o.order_id,
     o.order_date,
@@ -247,41 +224,35 @@ Flink SQL> INSERT INTO enriched_orders
  FROM orders AS o
  LEFT JOIN products AS p ON o.product_id = p.id;
 ```
-Now, the enriched orders should be shown in Kibana.
-Visit [http://localhost:5601/app/kibana#/management/kibana/index_pattern](http://localhost:5601/app/kibana#/management/kibana/index_pattern) to create an index pattern `enriched_orders`.
 
-{{< img src="/fig/mysql-postgres-tutorial/kibana-create-index-pattern.png" alt="Create Index Pattern" >}}
+### 在 Kibana 中查看数据
 
-Visit [http://localhost:5601/app/kibana#/discover](http://localhost:5601/app/kibana#/discover) to find the enriched orders.
+访问  [http://localhost:5601/app/kibana#/management/kibana/index_pattern](http://localhost:5601/app/kibana#/management/kibana/index_pattern)
 
-{{< img src="/fig/mysql-postgres-tutorial/kibana-detailed-orders.png" alt="Find enriched Orders" >}}
+创建 index pattern `enriched_orders`，之后可以在 [http://localhost:5601/app/kibana#/discover](http://localhost:5601/app/kibana#/discover) 看到写入的数据了。
 
-Next, do some change in the databases, and then the enriched orders shown in Kibana will be updated after each step in real time.
-1. Insert a new order in PolarDB-X
-   ```sql
-   --PolarDB-X
-   INSERT INTO orders
-   VALUES (default, '2020-07-30 15:22:00', 'Jark', 29.71, 104, false);
-   ```
-2. Update the order status in PolarDB-X
-   ```sql
-   --PolarDB-X
-   UPDATE orders SET order_status = true WHERE order_id = 10004;
-   ```
-3. Delete the order in PolarDB-X
-   ```sql
-   --PolarDB-X
-   DELETE FROM orders WHERE order_id = 10004;
-   ```
-   The changes of enriched orders in Kibana are as follows:
-   {{< img src="/fig/mysql-postgres-tutorial/kibana-detailed-orders-changes.gif" alt="Enriched Orders Changes" >}}
-   
-## Clean up
-After finishing the tutorial, run the following command to stop all containers in the directory of `docker-compose.yml`:
+### 修改监听表数据，查看增量数据变动
+
+在PolarDB-X中依次执行如下修改操作，每执行一步就刷新一次 Kibana，可以看到 Kibana 中显示的订单数据将实时更新。
+
+```sql
+INSERT INTO orders VALUES (default, '2020-07-30 15:22:00', 'Jark', 29.71, 104, false);
+
+UPDATE orders SET order_status = true WHERE order_id = 10004;
+
+DELETE FROM orders WHERE order_id = 10004;
+```
+
+### 环境清理
+
+在 `docker-compose.yml` 文件所在的目录下执行如下命令停止所有容器：
+
 ```shell
 docker-compose down
 ```
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.18.0`:
+
+进入Flink的部署目录，停止 Flink 集群：
+
 ```shell
 ./bin/stop-cluster.sh
 ```
