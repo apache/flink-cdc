@@ -26,9 +26,9 @@ under the License.
 
 # Doris Connector
 
-This article introduces of Doris Connector
+本文介绍了Pipeline Doris Connector的使用。
 
-## Example
+## 示例
 
 
 ```yaml
@@ -49,145 +49,145 @@ pipeline:
 
 ```
 
-## Connector Options
+## 连接器配置项
 
 <div class="highlight">
 <table class="colwidths-auto docutils">
-     <thead>
-       <tr>
-         <th class="text-left" style="width: 10%">Option</th>
-         <th class="text-left" style="width: 8%">Required</th>
-         <th class="text-left" style="width: 7%">Default</th>
-         <th class="text-left" style="width: 10%">Type</th>
-         <th class="text-left" style="width: 65%">Description</th>
-       </tr>
-     </thead>
-     <tbody>
-     <tr>
-       <td>type</td>
-       <td>required</td>
-       <td style="word-wrap: break-word;">(none)</td>
-       <td>String</td>
-       <td>Specify the Sink to use, here is <code>'doris'</code>.</td>
-     </tr>
-     <tr>
-       <td>name</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">(none)</td>
-       <td>String</td>
-       <td> Name of PipeLine </td>
-     </tr>
+    <thead>
       <tr>
-       <td>fenodes</td>
-       <td>required</td>
-       <td style="word-wrap: break-word;">(none)</td>
-       <td>String</td>
-       <td>Http address of Doris cluster FE, such as 127.0.0.1:8030 </td>
-     </tr>
-      <tr>
-       <td>benodes</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">(none)</td>
-       <td>String</td>
-       <td>Http address of Doris cluster BE, such as 127.0.0.1:8040 </td>
-     </tr>
+        <th class="text-left" style="width: 10%">Option</th>
+        <th class="text-left" style="width: 8%">Required</th>
+        <th class="text-left" style="width: 7%">Default</th>
+        <th class="text-left" style="width: 10%">Type</th>
+        <th class="text-left" style="width: 65%">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td>type</td>
+      <td>required</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>指定要使用的Sink, 这里是 <code>'doris'</code>.</td>
+    </tr>
+    <tr>
+      <td>name</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td> PipeLine的名称 </td>
+    </tr>
      <tr>
-       <td>jdbc-url</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">(none)</td>
-       <td>String</td>
-       <td>JDBC address of Doris cluster, for example: jdbc:mysql://127.0.0.1:9030/db</td>
-     </tr>
+      <td>fenodes</td>
+      <td>required</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Doris集群FE的Http地址, 比如 127.0.0.1:8030 </td>
+    </tr>
      <tr>
-       <td>username</td>
-       <td>required</td>
-       <td style="word-wrap: break-word;">(none)</td>
-       <td>String</td>
-       <td>Username of Doris cluster</td>
-     </tr>
-     <tr>
-       <td>password</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">(none)</td>
-       <td>String</td>
-       <td>Password for Doris cluster</td>
-     </tr>
-     <tr>
-       <td>auto-redirect</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">false</td>
-       <td>String</td>
-       <td> Whether to write through FE redirection and directly connect to BE to write </td>
-     </tr>
-     <tr>
-       <td>sink.enable.batch-mode</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">true</td>
-       <td>Boolean</td>
-       <td> Whether to use the batch method to write to Doris </td>
-     </tr>
-     <tr>
-       <td>sink.flush.queue-size</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">2</td>
-       <td>Integer</td>
-       <td> Queue size for batch writing
-       </td>
-     </tr>
-     <tr>
-       <td>sink.buffer-flush.max-rows</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">50000</td>
-       <td>Integer</td>
-       <td>Maximum number of Flush records in a single batch</td>
-     </tr>
-     <tr>
-       <td>sink.buffer-flush.max-bytes</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">10485760(10MB)</td>
-       <td>Integer</td>
-       <td>Maximum number of bytes flushed in a single batch</td>
-     </tr>
-     <tr>
-       <td>sink.buffer-flush.interval</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">10s</td>
-       <td>String</td>
-       <td>Flush interval duration. If this time is exceeded, the data will be flushed asynchronously</td>
-     </tr>
-     <tr>
-       <td>sink.properties.</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">(none)</td>
-       <td>String</td>
-       <td> Parameters of StreamLoad.
-         For example: <code> sink.properties.strict_mode: true</code>.
-         See more about <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-reference/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad Properties properties</a></td>
-       </td>
-     </tr>
-     <tr>
-       <td>table.create.properties.*</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">(none)</td>
-       <td>String</td>
-       <td>Create the Properties configuration of the table.
-         For example: <code> table.create.properties.replication_num: 1</code>.
-         See more about <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-reference/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table Properties properties</a></td>
-       </td>
-     </tr>
-     </tbody>
+      <td>benodes</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Doris集群BE的Http地址, 比如 127.0.0.1:8040 </td>
+    </tr>
+    <tr>
+      <td>jdbc-url</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Doris集群的JDBC地址，比如：jdbc:mysql://127.0.0.1:9030/db</td>
+    </tr>
+    <tr>
+      <td>username</td>
+      <td>required</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Doris集群的用户名</td>
+    </tr> 
+    <tr>
+      <td>password</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Doris集群的密码</td>
+    </tr>
+    <tr>
+      <td>auto-redirect</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>String</td>
+      <td> 是否通过FE重定向写入，直连BE写入 </td>
+    </tr>
+    <tr>
+      <td>sink.enable.batch-mode</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td> 是否使用攒批方式写入Doris </td>
+    </tr>
+    <tr>
+      <td>sink.flush.queue-size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">2</td>
+      <td>Integer</td>
+      <td> 攒批写入的队列大小
+      </td>
+    </tr>
+    <tr>
+      <td>sink.buffer-flush.max-rows</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">50000</td>
+      <td>Integer</td>
+      <td>单个批次最大Flush的记录数</td>
+    </tr>
+    <tr>
+      <td>sink.buffer-flush.max-bytes</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">10485760(10MB)</td>
+      <td>Integer</td>
+      <td>单个批次最大Flush的字节数</td>
+    </tr>
+    <tr>
+      <td>sink.buffer-flush.interval</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">10s</td>
+      <td>String</td>
+      <td>Flush的间隔时长，超过这个时间，将异步Flush数据</td>
+    </tr>
+    <tr>
+      <td>sink.properties.</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>StreamLoad的参数。
+        For example: <code> sink.properties.strict_mode: true</code>.
+        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-reference/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad的Properties 属性</a></td> 
+      </td>
+    </tr>
+    <tr>
+      <td>table.create.properties.*</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>创建表的Properties配置。
+        For example: <code> table.create.properties.replication_num: 1</code>.
+        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-reference/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table 的  Properties 属性</a></td> 
+      </td>
+    </tr>
+    </tbody>
 </table>
 </div>
 
-## Data Type Mapping
+## 数据类型映射
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left" style="width:10%;">Flink CDC Type</th>
-        <th class="text-left" style="width:30%;"><a href="https://doris.apache.org/docs/dev/sql-manual/sql-reference/Data-Types/BOOLEAN/">Doris Type</a></th>
-        <th class="text-left" style="width:60%;">Note</th>
+        <th class="text-left" style="width:10%;">CDC type</th>
+        <th class="text-left" style="width:30%;">Doris type<a href="https://doris.apache.org/docs/dev/sql-manual/sql-reference/Data-Types/BOOLEAN/"></a></th>
+        <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
     <tbody>
@@ -251,12 +251,12 @@ pipeline:
     <tr>
       <td>CHAR(n)</td>
       <td>CHAR(n*3)</td>
-      <td>In Doris, strings are stored in UTF-8 encoding, so English characters occupy 1 byte and Chinese characters occupy 3 bytes. The length here is multiplied by 3. The maximum length of CHAR is 255. Once exceeded, it will automatically be converted to VARCHAR type.</td>
+      <td>在Doris中，字符串是以UTF-8编码存储的，所以英文字符占1个字节，中文字符占3个字节。这里的长度统一乘3，CHAR最大的长度是255，超过后会自动转为VARCHAR类型</td>
     </tr>
     <tr>
       <td>VARCHAR(n)</td>
       <td>VARCHAR(n*3)</td>
-      <td>Same as above. The length here is multiplied by 3. The maximum length of VARCHAR is 65533. Once exceeded, it will automatically be converted to STRING type.</td>
+      <td>同上，这里的长度统一乘3，VARCHAR最大的长度是65533，超过后会自动转为STRING类型</td>
     </tr>
     <tr>
       <td>
