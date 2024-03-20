@@ -41,9 +41,17 @@ public class SchemaUtils {
      * RecordData.
      */
     public static List<RecordData.FieldGetter> createFieldGetters(Schema schema) {
-        List<RecordData.FieldGetter> fieldGetters = new ArrayList<>(schema.getColumns().size());
-        for (int i = 0; i < schema.getColumns().size(); i++) {
-            fieldGetters.add(RecordData.createFieldGetter(schema.getColumns().get(i).getType(), i));
+        return createFieldGetters(schema.getColumns());
+    }
+
+    /**
+     * create a list of {@link RecordData.FieldGetter} from given {@link Column} to get Object from
+     * RecordData.
+     */
+    public static List<RecordData.FieldGetter> createFieldGetters(List<Column> columns) {
+        List<RecordData.FieldGetter> fieldGetters = new ArrayList<>(columns.size());
+        for (int i = 0; i < columns.size(); i++) {
+            fieldGetters.add(RecordData.createFieldGetter(columns.get(i).getType(), i));
         }
         return fieldGetters;
     }
@@ -69,11 +77,6 @@ public class SchemaUtils {
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
         LinkedList<Column> columns = new LinkedList<>(oldSchema.getColumns());
         for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
-            if (columns.contains(columnWithPosition.getAddColumn())) {
-                throw new IllegalArgumentException(
-                        columnWithPosition.getAddColumn().getName()
-                                + " of AddColumnEvent is already existed");
-            }
             switch (columnWithPosition.getPosition()) {
                 case FIRST:
                     {
@@ -123,14 +126,6 @@ public class SchemaUtils {
     }
 
     private static Schema applyDropColumnEvent(DropColumnEvent event, Schema oldSchema) {
-        event.getDroppedColumnNames()
-                .forEach(
-                        column -> {
-                            if (!oldSchema.getColumn(column).isPresent()) {
-                                throw new IllegalArgumentException(
-                                        column + " of DropColumnEvent is not existed");
-                            }
-                        });
         List<Column> columns =
                 oldSchema.getColumns().stream()
                         .filter(
@@ -141,14 +136,6 @@ public class SchemaUtils {
     }
 
     private static Schema applyRenameColumnEvent(RenameColumnEvent event, Schema oldSchema) {
-        event.getNameMapping()
-                .forEach(
-                        (name, newName) -> {
-                            if (!oldSchema.getColumn(name).isPresent()) {
-                                throw new IllegalArgumentException(
-                                        name + " of RenameColumnEvent is not existed");
-                            }
-                        });
         List<Column> columns = new ArrayList<>();
         oldSchema
                 .getColumns()
@@ -165,14 +152,6 @@ public class SchemaUtils {
     }
 
     private static Schema applyAlterColumnTypeEvent(AlterColumnTypeEvent event, Schema oldSchema) {
-        event.getTypeMapping()
-                .forEach(
-                        (name, newType) -> {
-                            if (!oldSchema.getColumn(name).isPresent()) {
-                                throw new IllegalArgumentException(
-                                        name + " of AlterColumnTypeEvent is not existed");
-                            }
-                        });
         List<Column> columns = new ArrayList<>();
         oldSchema
                 .getColumns()
