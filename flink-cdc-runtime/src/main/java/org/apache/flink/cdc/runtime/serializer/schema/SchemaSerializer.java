@@ -43,6 +43,8 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
             new ListSerializer<>(ColumnSerializer.INSTANCE);
     private final ListSerializer<String> primaryKeysSerializer =
             new ListSerializer<>(StringSerializer.INSTANCE);
+    private final ListSerializer<String> partitionKeysSerializer =
+            new ListSerializer<>(StringSerializer.INSTANCE);
     private final MapSerializer<String, String> optionsSerializer =
             new MapSerializer<>(StringSerializer.INSTANCE, StringSerializer.INSTANCE);
     private final StringSerializer stringSerializer = StringSerializer.INSTANCE;
@@ -62,6 +64,7 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
         return Schema.newBuilder()
                 .setColumns(columnsSerializer.copy(from.getColumns()))
                 .primaryKey(primaryKeysSerializer.copy(from.primaryKeys()))
+                .partitionKey(partitionKeysSerializer.copy(from.partitionKeys()))
                 .options(optionsSerializer.copy(from.options()))
                 .comment(stringSerializer.copy(from.comment()))
                 .build();
@@ -81,6 +84,7 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
     public void serialize(Schema record, DataOutputView target) throws IOException {
         columnsSerializer.serialize(record.getColumns(), target);
         primaryKeysSerializer.serialize(record.primaryKeys(), target);
+        partitionKeysSerializer.serialize(record.partitionKeys(), target);
         optionsSerializer.serialize(record.options(), target);
         stringSerializer.serialize(record.comment(), target);
     }
@@ -90,6 +94,7 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
         return Schema.newBuilder()
                 .setColumns(columnsSerializer.deserialize(source))
                 .primaryKey(primaryKeysSerializer.deserialize(source))
+                .partitionKey(partitionKeysSerializer.deserialize(source))
                 .options(optionsSerializer.deserialize(source))
                 .comment(stringSerializer.deserialize(source))
                 .build();
