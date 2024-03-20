@@ -51,6 +51,8 @@ public class Schema implements Serializable {
 
     private final List<String> primaryKeys;
 
+    private final List<String> partitionKeys;
+
     private final Map<String, String> options;
 
     private final @Nullable String comment;
@@ -65,6 +67,20 @@ public class Schema implements Serializable {
             @Nullable String comment) {
         this.columns = columns;
         this.primaryKeys = primaryKeys;
+        this.options = options;
+        this.comment = comment;
+        this.partitionKeys = new ArrayList<>();
+    }
+
+    private Schema(
+            List<Column> columns,
+            List<String> primaryKeys,
+            List<String> partitionKeys,
+            Map<String, String> options,
+            @Nullable String comment) {
+        this.columns = columns;
+        this.primaryKeys = primaryKeys;
+        this.partitionKeys = partitionKeys;
         this.options = options;
         this.comment = comment;
     }
@@ -94,6 +110,11 @@ public class Schema implements Serializable {
     /** Returns the primary keys of the table or data collection. */
     public List<String> primaryKeys() {
         return primaryKeys;
+    }
+
+    /** Returns the partition keys of the table or data collection. */
+    public List<String> partitionKeys() {
+        return partitionKeys;
     }
 
     /** Returns the options of the table or data collection. */
@@ -139,7 +160,12 @@ public class Schema implements Serializable {
 
     /** Returns a copy of the schema with a replaced list of {@Column}. */
     public Schema copy(List<Column> columns) {
-        return new Schema(columns, new ArrayList<>(primaryKeys), new HashMap<>(options), comment);
+        return new Schema(
+                columns,
+                new ArrayList<>(primaryKeys),
+                new ArrayList<>(partitionKeys),
+                new HashMap<>(options),
+                comment);
     }
 
     @Override
@@ -153,13 +179,14 @@ public class Schema implements Serializable {
         Schema schema = (Schema) o;
         return Objects.equals(columns, schema.columns)
                 && Objects.equals(primaryKeys, schema.primaryKeys)
+                && Objects.equals(partitionKeys, schema.partitionKeys)
                 && Objects.equals(options, schema.options)
                 && Objects.equals(comment, schema.comment);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(columns, primaryKeys, options, comment);
+        return Objects.hash(columns, primaryKeys, partitionKeys, options, comment);
     }
 
     // -----------------------------------------------------------------------------------
@@ -200,6 +227,9 @@ public class Schema implements Serializable {
         }
         sb.append("}");
         sb.append(", primaryKeys=").append(String.join(";", primaryKeys));
+        if (!partitionKeys.isEmpty()) {
+            sb.append(", partitionKeys=").append(String.join(";", partitionKeys));
+        }
         sb.append(", options=").append(describeOptions());
 
         return sb.toString();
@@ -213,6 +243,7 @@ public class Schema implements Serializable {
 
         private List<Column> columns;
         private List<String> primaryKeys;
+        private List<String> partitionKeys;
         private final Map<String, String> options;
         private @Nullable String comment;
 
@@ -221,9 +252,32 @@ public class Schema implements Serializable {
 
         public Builder() {
             this.primaryKeys = new ArrayList<>();
+            this.partitionKeys = new ArrayList<>();
             this.options = new HashMap<>();
             this.columns = new ArrayList<>();
             this.columnNames = new HashSet<>();
+        }
+
+        /**
+         * Declares a partition key constraint for a set of given columns. Partition key uniquely
+         * identify a row in a table. Neither of columns in a partition can be nullable.
+         *
+         * @param columnNames columns that form a unique primary key
+         */
+        public Builder partitionKey(String... columnNames) {
+            this.partitionKeys = Arrays.asList(columnNames);
+            return this;
+        }
+
+        /**
+         * Declares a partition key constraint for a set of given columns. Partition key uniquely
+         * identify a row in a table. Neither of columns in a partition can be nullable.
+         *
+         * @param columnNames columns that form a unique primary key
+         */
+        public Builder partitionKey(List<String> columnNames) {
+            this.partitionKeys = new ArrayList<>(columnNames);
+            return this;
         }
 
         /** Adopts all fields of the given row as physical columns of the schema. */
@@ -367,7 +421,7 @@ public class Schema implements Serializable {
 
         /** Returns an instance of a {@link Schema}. */
         public Schema build() {
-            return new Schema(columns, primaryKeys, options, comment);
+            return new Schema(columns, primaryKeys, partitionKeys, options, comment);
         }
     }
 }
