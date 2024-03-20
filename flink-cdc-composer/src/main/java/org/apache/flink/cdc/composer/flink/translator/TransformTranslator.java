@@ -19,6 +19,9 @@ package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.composer.definition.TransformDef;
+import org.apache.flink.cdc.runtime.operators.transform.TransformDataOperator;
+import org.apache.flink.cdc.runtime.operators.transform.TransformSchemaOperator;
+import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
@@ -32,7 +35,21 @@ public class TransformTranslator {
         if (transforms.isEmpty()) {
             return input;
         }
-        return input;
+
+        TransformSchemaOperator.Builder transformSchemaFunctionBuilder =
+                TransformSchemaOperator.newBuilder();
+        for (TransformDef transform : transforms) {
+            if (transform.isValidProjection()) {
+                transformSchemaFunctionBuilder.addTransform(
+                        transform.getSourceTable(),
+                        transform.getProjection().get(),
+                        transform.getPrimaryKeys(),
+                        transform.getPartitionKeys(),
+                        transform.getTableOptions());
+            }
+        }
+        return input.transform(
+                "Transform:Schema", new EventTypeInfo(), transformSchemaFunctionBuilder.build());
     }
 
     public DataStream<Event> translateData(
@@ -43,6 +60,20 @@ public class TransformTranslator {
         if (transforms.isEmpty()) {
             return input;
         }
-        return input;
+
+        TransformDataOperator.Builder transformDataFunctionBuilder =
+                TransformDataOperator.newBuilder();
+        for (TransformDef transform : transforms) {
+            if (transform.isValidProjection() || transform.isValidFilter()) {
+                transformDataFunctionBuilder.addTransform(
+                        transform.getSourceTable(),
+                        transform.isValidProjection() ? transform.getProjection().get() : null,
+                        transform.isValidFilter() ? transform.getFilter().get() : null);
+            }
+        }
+        transformDataFunctionBuilder.addSchemaOperatorID(schemaOperatorID);
+        transformDataFunctionBuilder.addTimezone(timezone);
+        return input.transform(
+                "Transform:Data", new EventTypeInfo(), transformDataFunctionBuilder.build());
     }
 }
