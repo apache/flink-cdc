@@ -1,6 +1,6 @@
 ---
 title: "使用 Flink CDC 构建实时数据湖"
-weight: 999
+weight: 998
 type: docs
 aliases:
 - /connectors/legacy-flink-cdc-sources/tutorials/build-real-time-data-lake-tutorial.html
@@ -26,7 +26,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 基于 Flink CDC 同步 MySQL 分库分表构建实时数据湖
+# 使用 Flink CDC 构建实时数据湖
 
 在 OLTP 系统中，为了解决单表数据量大的问题，通常采用分库分表的方式将单个大表进行拆分以提高系统的吞吐量。
 但是为了方便数据分析，通常需要将分库分表拆分出的表在同步到数据仓库、数据湖时，再合并成一个大表。

@@ -1,6 +1,6 @@
 ---
-title: "MySQL & PostgreSQL 教程"
-weight: 2
+title: "使用 Flink CDC 构建 Streaming ETL"
+weight: 999
 type: docs
 aliases:
 - /connectors/legacy-flink-cdc-sources/tutorials/mysql-postgres-tutorial.html
@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# 基于 Flink CDC 构建 MySQL 和 Postgres 的 Streaming ETL
+# 使用 Flink CDC 构建 Streaming ETL
 
 这篇教程将展示如何基于 Flink CDC 快速构建 MySQL 和 Postgres 的流式 ETL。本教程的演示都将在 Flink SQL CLI 中进行，只涉及 SQL，无需一行 Java/Scala 代码，也无需安装 IDE。
 
