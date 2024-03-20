@@ -23,46 +23,46 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 -->
-## General FAQ
+## 通用FAQ
 
-### Q1: Why can't I download Flink-sql-connector-mysql-cdc-2.2-snapshot jar, why doesn't Maven warehouse rely on XXX snapshot?
+### Q1: 为啥没法下载 flink-sql-connector-mysql-cdc-2.2-SNAPSHOT.jar ，maven 仓库为啥没有 xxx-SNAPSHOT 依赖？
 
-Like the mainstream Maven project version management, XXX snapshot version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as flink-sql-connector-mysql-cdc-2.1 0.jar, the released version will be available in the Maven central warehouse.
+和主流的 maven 项目版本管理相同，xxx-SNAPSHOT 版本都是对应开发分支的代码，需要用户自己下载源码并编译对应的jar， 用户应该使用已经 release 过的版本，比如 flink-sql-connector-mysql-cdc-2.1.0.jar，release 过的版本maven中心仓库才会有。
 
-### Q2: When should I use Flink SQL connector XXX Jar? When should I  Flink connector XXX jar? What's the difference between the two?
+### Q2: 什么时候使用 flink-sql-connector-xxx.jar，什么时候使用 flink-connector-xxx.jar，两者有啥区别?
 
-The dependency management of each connector in Flink CDC project is consistent with that in Flink project. Flink SQL connector XX is a fat jar. In addition to the code of connector, it also enters all the third-party packages that connector depends on into the shade and provides them to SQL jobs. Users only need to add the fat jar in the flink/lib directory. The Flink connector XX has only the code of the connector and does not contain the required dependencies. It is used by DataStream jobs. Users need to manage the required three-party package dependencies. Conflicting dependencies need to be excluded and shaded by themselves.
+Flink CDC 项目中各个connector的依赖管理和Flink 项目中 connector 保持一致。flink-sql-connector-xx 是胖包，除了connector的代码外，还把 connector 依赖的所有三方包 shade 后打入，提供给 SQL 作业使用，用户只需要在 lib目录下添加该胖包即可。flink-connector-xx 只有该 connector 的代码，不包含其所需的依赖，提供 datastream 作业使用，用户需要自己管理所需的三方包依赖，有冲突的依赖需要自己做 exclude, shade 处理。
 
-### Q3: Why change the package name from com.alibaba.ververica changed to org.apache.flink?  Why can't the 2. X version be found in Maven warehouse?
+### Q3: 为啥把包名从 com.alibaba.ververica 改成 org.apache.flink? 为啥 maven 仓库里找不到 2.x 版本？
 
-Flink CDC project changes the group ID from com.alibaba.ververica changed to org.apache.flink since 2.0.0 version, this is to make the project more community neutral and more convenient for developers of various companies to build. So look for 2.x in Maven warehouse package, the path is /org/apache/flink.
+
+Flink CDC 项目 从 2.0.0 版本将 group id 从com.alibaba.ververica 改成 com.ververica, 自 3.1 版本从将 group id 从 com.ververica 改成 org.apache.flink。
+这是为了让项目更加社区中立，让各个公司的开发者共建时更方便。所以在maven仓库找 2.x 的包时，路径是 /com/ververica；找3.1及以上版本的包时，路径是/org/apache/flink
 
 ## MySQL CDC FAQ
 
-### Q1: I use CDC 2.x version , only full data can be read, but binlog data cannot be read. What's the matter?
+### Q1: 使用CDC 2.x版本，只能读取全量数据，无法读取增量（binlog） 数据，怎么回事？
 
-CDC 2.0 supports lock free algorithm and concurrent reading. In order to ensure the order of full data + incremental data, it relies on Flink's checkpoint mechanism, so the job needs to be configured with checkpoint.
-
-Configuration method in SQL job:
+CDC 2.0 支持了无锁算法，支持并发读取，为了保证全量数据 + 增量数据的顺序性，依赖Flink 的 checkpoint机制，所以作业需要配置 checkpoint。 SQL 作业中配置方式：
 
 ```sql
 Flink SQL> SET 'execution.checkpointing.interval' = '3s';    
 ```
 
-DataStream job configuration mode:
+DataStream 作业配置方式：
 
 ```java
 StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 env.enableCheckpointing(3000);  
 ```
 
-### Q2: Using MySQL CDC DataStream API, the timestamp field read in the incremental phase has a time zone difference of 8 hours. What's the matter?
+此外，如果某些数据库的只读实例是简化过binlog的，比如阿里云RDS MySQL 5.6 只读实例，其binlog不含有变更数据，自然无法获得所需增量数据
 
-When parsing the timestamp field in binlog data, CDC will use the server time zone information configured in the job, that is, the time zone of the MySQL server. If this time zone is not consistent with the time zone of your MySQL server, this problem will occur.
+### Q2: 使用 MySQL CDC，增量阶段读取出来的 timestamp 字段时区相差8小时，怎么回事呢？
 
-In addition, if the serializer is customized in the DataStream job.
+在解析binlog数据中的timestamp字段时，cdc 会使用到作业里配置的server-time-zone信息，也就是MySQL服务器的时区，如果这个时区没有和你的MySQL服务器时区一致，就会出现这个问题。
 
-such as MyDeserializer implements DebeziumDeserializationSchema, when the customized serializer parses the timestamp type data, it needs to refer to the analysis of the timestamp type in RowDataDebeziumDeserializeSchema and use the given time zone information.
+此外，如果是在DataStream作业中自定义列化器如 MyDeserializer implements DebeziumDeserializationSchema, 自定义的序列化器在解析 timestamp 类型数据时，需要参考下 RowDataDebeziumDeserializeSchema 中对 timestamp 类型的解析，用时给定的时区信息。
 
 ```
 private TimestampData convertToTimestamp(Object dbzObj, Schema schema) {
@@ -83,9 +83,9 @@ private TimestampData convertToTimestamp(Object dbzObj, Schema schema) {
     }
 ```
 
-### Q3: Does MySQL CDC support listening to slave database? How to configure slave database?
+### Q3: mysql cdc支持监听从库吗？从库需要如何配置？
 
-Yes, the slave database needs to be configured with log slave updates = 1, so that the slave instance can also write the data synchronized from the master instance to the binlog file of the slave database. If the master database has enabled gtid mode, the slave database also needs to be enabled.
+支持的，从库需要配置 log-slave-updates = 1 使从实例也能将从主实例同步的数据写入从库的 binlog 文件中，如果主库开启了gtid mode，从库也需要开启。
 
 ```
 log-slave-updates = 1
@@ -93,23 +93,21 @@ gtid_mode = on
 enforce_gtid_consistency = on 
 ```
 
-### Q4: I want to synchronize sub databases and sub tables. How should I configure them?
+### Q4: 我想同步分库分表，应该如何配置？
 
-In the with parameter of MySQL CDC table, both table name and database name support regular configuration, such as 'table name ' = 'user_ '.' Can match table name  'user_ 1, user_ 2,user_ A ' table.
+通过 mysql cdc 表的with参数中，表名和库名均支持正则配置，比如 'table-name' ='user_.' 可以匹配表名 user_1, user_2,user_a表，注意正则匹配任意字符是'.' 而不是 '*', 其中点号表示任意字符，星号表示0个或多个，database-name也如此。
 
-Note that any regular matching character is'. ' Instead of '*', where the dot represents any character, the asterisk represents 0 or more, and so does database name, that the shared table should be in the same schema.
+### Q5: 我想跳过存量读取阶段，只读取 binlog 数据，怎么配置？
 
-### Q5: I want to skip the stock reading phase and only read binlog data. How to configure it?
-
-In the with parameter of MySQL CDC table
+在 mysql cdc 表的 with 参数中指定 'scan.startup.mode' = 'latest-offset' 即可。
 
 ```
 'scan.startup.mode' = 'latest-offset'.
 ```
 
-### Q6: I want to get DDL events in the database. What should I do? Is there a demo?
+### Q6: 我想获取数据库中的 DDL事件，怎么办，有demo吗？
 
-Flink CDC provides DataStream API `MysqlSource` since version 2.1. Users can configure includeschemachanges to indicate whether DDL events are required. After obtaining DDL events, they can write code for next processing.
+CDC 2.1 版本提供了 DataStream API： MysqlSource， 用户可以配置 includeSchemaChanges 表示是否需要DDL 事件，获取到 DDL 事件后自己写代码处理。
 
 ```java
  public void consumingAllEvents() throws Exception {
@@ -130,13 +128,15 @@ Flink CDC provides DataStream API `MysqlSource` since version 2.1. Users can con
     }
 ```
 
-### Q7: How to synchronize the whole MySQL database? Does Flink CDC support it?
+### Q7: MySQL 整库同步怎么做, Flink CDC 支持吗？
 
-The DataStream API provided in Q6 has enabled users to obtain DDL change events and data change events. On this basis, users need to develop DataStream jobs according to their own business logic and downstream storage.
+Flink CDC 支持的.
+1. Q6 中 提供的 DataStream API 已经可以让用户获取 DDL 变更事件和数据变更事件，用户需要在此基础上，根据自己的业务逻辑和下游存储进行 DataStream 作业开发。
+2. Flink CDC 3.0以上版本支持以Pipeline的形式对Mysql整库同步。
 
-### Q8: In the same MySQL instance, the table of one database cannot synchronize incremental data, but other databases works fine. Why?
+### Q8: 同一个实例下，某个库的表无法同步增量数据，其他库都可以，这是为啥？
 
-Users can check Binlog_Ignore_DB and Binlog_Do_DB through the `show master status` command
+这个问题是因为 mysql 服务器 可以配置 binlog 过滤器，忽略了某些库的 binlog。用户可以通过 show master status 命令查看 Binlog_Ignore_DB 和 Binlog_Do_DB。
 
 ```mysql
 mysql> show master status;
@@ -147,49 +147,47 @@ mysql> show master status;
 +------------------+----------+--------------+------------------+----------------------+
 ```
 
-### Q9: The job reports an error the connector is trying to read binlog starting at GTIDs xxx and binlog file 'binlog.000064', pos=89887992, skipping 4 events plus 1 rows, but this is no longer available on the server. Reconfigure the connector to use a snapshot when needed, What should I do?
+### Q9: 作业报错 The connector is trying to read binlog starting at GTIDs xxx and binlog file 'binlog.000064', pos=89887992, skipping 4 events plus 1 rows, but this is no longer available on the server. Reconfigure the connector to use a snapshot when needed，怎么办呢？
 
-This error occurs because the binlog file being read by the job has been cleaned up on the MySQL server. Generally, the expiration time of the binlog file retained on the MySQL server is too short. You can set this value higher, such as 7 days.
+出现这种错误是 作业正在读取的binlog文件在 MySQL 服务器已经被清理掉，这种情况一般是 MySQL 服务器上保留的 binlog 文件过期时间太短，可以将该值设置大一点，比如7天。
 
 ```mysql
 mysql> show variables like 'expire_logs_days';
 mysql> set global expire_logs_days=7;
 ```
 
-In another case, the binlog consumption of the Flink CDC job is too slow. Generally, sufficient resources can be allocated.
+还有种情况是 flink cdc 作业消费binlog 太慢，这种一般分配足够的资源即可。
 
-### Q10: The job reports an error ConnectException: A slave with the same server_uuid/server_id as this slave has connected to the master,What should I do?
+### Q10: 作业报错 ConnectException: A slave with the same server_uuid/server_id as this slave has connected to the master，怎么办呢？
 
-This error occurs because the server ID used in the job conflicts with the server ID used by other jobs or other synchronization tools. The server ID needs to be globally unique. The server ID is an int type integer. In CDC 2.x In version, each concurrency of the source requires a server ID. it is recommended to reasonably plan the server ID. for example, if the source of the job is set to four concurrency, you can configure 'server ID' = '5001-5004', so that each source task will not conflict.
+出现这种错误是 作业里使用的 server id 和其他作业或其他同步工具使用的server id 冲突了，server id 需要全局唯一，server id 是一个int类型整数。 在 CDC 2.x 版本中，source 的每个并发都需要一个server id，建议合理规划好server id，比如作业的 source 设置成了四个并发，可以配置 'server-id' = '5001-5004', 这样每个 source task 就不会冲突了。
 
-### Q11: The job reports an error ConnectException: Received DML ‘…’ for processing, binlog probably contains events generated with statement or mixed based replication format,What should I do?
+### Q11: 作业报错 ConnectException: Received DML ‘…’ for processing, binlog probably contains events generated with statement or mixed based replication format，怎么办呢？
 
-This error occurs because the MySQL server is not configured correctly. You need to check the binlog is format row? You can view it through the following command
-
+出现这种错误是 MySQL 服务器配置不对，需要检查下 binlog_format 是不是 ROW? 可以通过下面的命令查看
 ```mysql
 mysql> show variables like '%binlog_format%'; 
 ```
 
-### Q12: The job reports an error Mysql8.0 Public Key Retrieval is not allowed,What should I do?
+### Q12: 作业报错 Mysql8.0 Public Key Retrieval is not allowed， 怎么办呢?
 
-This is because the MySQL user configured by the user uses sha256 password authentication and requires TLS and other protocols to transmit passwords. A simple method is to allow MySQL users to support original password access.
+这是因为用户配置的 MySQL 用户 使用的是 sha256 密码认证，需要 TLS 等协议传输密码。一种简单的方法是使允许 MySQL用户 支持原始密码方式访问。
 
 ```mysql
 mysql> ALTER USER 'username'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password';
 mysql> FLUSH PRIVILEGES; 
 ```
 
-### Q13: The job reports an error EventDataDeserializationException: Failed to deserialize data of EventHeaderV4 .... Caused by: java.net.SocketException: Connection reset,What should I do?
+### Q13: 作业报错 EventDataDeserializationException: Failed to deserialize data of EventHeaderV4 .... Caused by: java.net.SocketException: Connection reset， 怎么办呢 ?
 
-This problem is generally caused by the network. First, check the network between the Flink cluster and the database, and then increase the network parameters of the MySQL server.
+这个问题一般是网络原因或者数据库繁忙引起，首先排查flink 集群 到 数据库之间的网络情况，其次可以调大 MySQL 服务器的网络参数。
 
 ```mysql
 mysql> set global slave_net_timeout = 120; 
 mysql> set global thread_pool_idle_timeout = 120;
 ```
 
-Or try to use the flink configuration as follows.
-
+或者采用下面的Flink配置：
 ```
 execution.checkpointing.interval=10min
 execution.checkpointing.tolerable-failed-checkpoints=100
@@ -198,35 +196,33 @@ restart-strategy.fixed-delay.attempts=2147483647
 restart-strategy.fixed-delay.delay= 30s
 ```
 
-If there is bad back pressure in the job, this problem may happen too. Then you need to handle the back pressure in the job first.
+如果作业存在反压，也可能出现这个问题。你需要先处理作业的反压。
 
-### Q14: The job reports an error The slave is connecting using CHANGE MASTER TO MASTER_AUTO_POSITION = 1, but the master has purged binary logs containing GTIDs that the slave requires,What should I do?
+### Q14: 作业报错 The slave is connecting using CHANGE MASTER TO MASTER_AUTO_POSITION = 1, but the master has purged binary logs containing GTIDs that the slave requires. 怎么办呢 ?
 
-The reason for this problem is that the reading of the full volume phase of the job is too slow. After reading the full volume phase, the previously recorded gtid site at the beginning of the full volume phase has been cleared by mysql. This can increase the save time of binlog files on the MySQL server, or increase the concurrency of source to make the full volume phase read faster.
+出现这个问题的原因是的作业全量阶段读取太慢，在全量阶段读完后，之前记录的全量阶段开始时的 gtid 位点已经被 mysql 清理掉了。这种可以增大 mysql 服务器上 binlog 文件的保存时间，也可以调大 source 的并发，让全量阶段读取更快。
 
-### Q15: How to config `tableList` option when build MySQL CDC source in DataStream API?
+### Q15: 在 DataStream API中构建MySQL CDC源时如何配置tableList选项？
 
-The `tableList` option requires table name with database name rather than table name in DataStream API. For MySQL CDC source, the `tableList` option value should like ‘my_db.my_table’.
+tableList选项要求表名使用数据库名，而不是DataStream API中的表名。对于MySQL CDC源代码，tableList选项值应该类似于‘my_db.my_table’。
 
 ## Postgres CDC FAQ
 
-### Q1: It is found that the disk utilization rate of PG server is high. What is the reason why wal is not released?
+### Q1: 发现 PG 服务器磁盘使用率高，WAL 不释放 是什么原因？
 
-Flink Postgres CDC will only update the LSN in the Postgres slot when the checkpoint is completed. Therefore, if you find that the disk utilization is high, please first confirm whether the checkpoint is turned on.
+Flink Postgres CDC 只会在 checkpoint 完成的时候更新 Postgres slot 中的 LSN。因此如果发现磁盘使用率高的情况下，请先确认 checkpoint 是否开启。
 
-### Q2: Flink Postgres CDC returns null for decimal types exceeding the maximum precision (38, 18) in synchronous Postgres
+### Q2: Flink Postgres CDC 同步 Postgres 中将 超过最大精度（38，18）的 DECIMAL 类型返回 NULL
 
-In Flink, if the precision of the received data is greater than the precision of the type declared in Flink, the data will be processed as null. You can configure the corresponding 'debezium decimal. handling. Mode '='string' process the read data with string type
+Flink 中如果收到数据的 precision 大于在 Flink 中声明的类型的 precision 时，会将数据处理成 NULL。此时可以配置相应'debezium.decimal.handling.mode' = 'string' 将读取的数据用 STRING 类型 来处理。
 
-### Q3: Flink Postgres CDC prompts that toast data is not transmitted. What is the reason?
+### Q3: Flink Postgres CDC 提示未传输 TOAST 数据，是什么原因？
 
-Please ensure that the replica identity is full first. The toast data is relatively large. In order to save the size of wal, if the toast data is not changed, the wal2json plugin will not bring toast data to the updated data. To avoid this problem, you can use 'debezium schema. refresh. mode'='columns_ diff_ exclude_ unchanged_ Toast 'to solve.
+请先确保 REPLICA IDENTITY 是 FULL。 TOAST 的数据比较大，为了节省 wal 的大小，如果 TOAST 数据没有变更，那么 wal2json plugin 就不会在更新后的数据中带上 toast 数据。为了避免这个问题，可以通过 'debezium.schema.refresh.mode'='columns_diff_exclude_unchanged_toast'来解决。
 
-### Q4: The job reports an error replication slot "XXXX" is active. What should I do?
+### Q4: 作业报错 Replication slot "xxxx" is active， 怎么办？
 
-Currently, Flink Postgres CDC does not release the slot manually after the job exits. There are two ways to solve this problem
-
-- Go to Postgres and manually execute the following command
+当前 Flink Postgres CDC 在作业退出后并不会手动释放 slot。前往 Postgres 中手动执行以下命令：
 
 ```
 select pg_drop_replication_slot('rep_slot');
@@ -234,29 +230,28 @@ select pg_drop_replication_slot('rep_slot');
 select pg_terminate_backend(162564); select pg_drop_replication_slot('rep_slot');
 ```
 
-- Add 'debezium.slot.drop.on.stop'='true' to PG source with parameter to automatically clean up the slot after the job stops
+### Q5: 作业有脏数据，比如非法的日期，有参数可以配置可以过滤吗？
 
-### Q5: Jobs have dirty data, such as illegal dates. Are there parameters that can be configured and filtered?
+可以的，可以在 Flink CDC 表的with 参数里 加下 'debezium.event.deserialization.failure.handling.mode'='warn' 参数，跳过脏数据，将脏数据打印到WARN日志里。 也可以配置 'debezium.event.deserialization.failure.handling.mode'='ignore'， 直接跳过脏数据，不打印脏数据到日志。
 
-Yes, you can add configure. In the with parameter of the Flink CDC table  'debezium.event.deserialization.failure.handling.mode'='warn' parameter, skip dirty data and print dirty data to warn log. You can also configure 'debezium.event.deserialization.failure.handling.mode'='ignore', skip dirty data directly and do not print dirty data to the log.
 
-### Q6: How to config `tableList` option when build Postgres CDC source in DataStream API?
+### Q6: 在DataStream API中构建Postgres CDC源时如何配置tableList选项？
 
-The `tableList` option requires table name with schema name rather than table name in DataStream API. For Postgres CDC source, the `tableList` option value should like ‘my_schema.my_table’.
+tableList选项要求表名使用架构名，而不是DataStream API中的表名。对于Postgres CDC source，tableList选项值应为‘my_schema.my_table’。
 
 ## MongoDB CDC FAQ
 
-### Q1: Does mongodb CDC support full + incremental read and read-only incremental?
+### Q1: MongoDB CDC 支持 全量+增量读 和 只读增量吗？
 
-Yes, the default is full + incremental reading; Use copy The existing = false parameter is set to read-only increment.
+支持，默认为 全量+增量 读取；使用copy.existing=false参数设置为只读增量。
 
-### Q2: Does mongodb CDC support recovery from checkpoint? What is the principle?
+### Q2: MongoDB CDC 支持从 checkpoint 恢复吗? 原理是怎么样的呢？
 
-Yes, the checkpoint will record the resumetoken of the changestream. During recovery, the changestream can be restored through the resumetoken. Where resumetoken corresponds to oplog RS (mongodb change log collection), oplog RS is a fixed capacity collection. When the corresponding record of resumetoken is in oplog When RS does not exist, an exception of invalid resumetoken may occur. In this case, you can set the appropriate oplog Set size of RS to avoid oplog RS retention time is too short, you can refer to https://docs.mongodb.com/manual/tutorial/change-oplog-size/ In addition, the resumetoken can be refreshed through the newly arrived change record and heartbeat record.
+支持，checkpoint 会记录 ChangeStream 的 resumeToken，恢复的时候可以通过resumeToken重新恢复ChangeStream。其中 resumeToken 对应 `oplog.rs` (MongoDB 变更日志collection) 的位置，`oplog.rs` 是一个固定容量的 collection。当 resumeToken 对应的记录在 `oplog.rs` 中不存在的时候，可能会出现 Invalid resumeToken 的异常。这种情况，在使用时可以设置合适`oplog.rs`的集合大小，避免`oplog.rs`保留时间过短，可以参考 https://docs.mongodb.com/manual/tutorial/change-oplog-size/ 另外，resumeToken 可以通过新到的变更记录和 heartbeat 记录来刷新。
 
-### Q3: Does mongodb CDC support outputting - U (update_before) messages?
+### Q3: MongoDB CDC 支持输出 -U（update_before，更新前镜像值）消息吗？
 
-Mongodb original oplog RS has only insert, update, replace and delete operation types. It does not retain the information before update. It cannot output - U messages. It can only realize the update semantics in Flink. When using mongodbtablesource, Flink planner will automatically perform changelognormalize optimization, fill in the missing - U messages, and output complete + I, - u, + U, and - D messages. The cost of changelognormalize optimization is that the node will save the status of all previous keys. Therefore, if the DataStream job directly uses mongodbsource, without the optimization of Flink planner, changelognormalize will not be performed automatically, so - U messages cannot be obtained directly. To obtain the pre update image value, you need to manage the status yourself. If you don't want to manage the status yourself, you can convert mongodbtablesource to changelogstream or retractstream and supplement the pre update image value with the optimization ability of Flink planner. An example is as follows:
+MongoDB 原始的 `oplog.rs` 只有 INSERT, UPDATE, REPLACE, DELETE 这几种操作类型，没有保留更新前的信息，不能输出-U 消息，在 Flink 中只能实现 UPSERT 语义。在使用MongoDBTableSource 时，Flink planner 会自动进行 ChangelogNormalize 优化，补齐缺失的 -U 消息，输出完整的 +I, -U， +U， -D 四种消息， 代价是 ChangelogNormalize 优化的代价是该节点会保存之前所有 key 的状态。所以，如果是 DataStream 作业直接使用 MongoDBSource，如果没有 Flink planner 的优化，将不会自动进行 ChangelogNormalize，所以不能直接获取 —U 消息。想要获取更新前镜像值，需要自己管理状态，如果不希望自己管理状态，可以将 MongoDBTableSource 转换为 ChangelogStream 或者 RetractStream，借助 Flink planner 的优化能力补齐更新前镜像值，示例如下：
 
 ```
     tEnv.executeSql("CREATE TABLE orders ( ... ) WITH ( 'connector'='mongodb-cdc',... )");
@@ -275,39 +270,35 @@ Mongodb original oplog RS has only insert, update, replace and delete operation 
 
 ### Q4: Does mongodb CDC support subscribing to multiple collections?
 
-Only the collection of the whole database can be subscribed, but some collection filtering functions are not supported. For example, if the database is configured as' mgdb 'and the collection is an empty string, all collections under the' mgdb 'database will be subscribed.
+仅支持订阅整库的 collection，筛选部分 collection 功能还不支持，例如配置 database 为 'mgdb'，collection 为空字符串，则会订阅 'mgdb' 库下所有 collection。
 
-### Q5: Does mongodb CDC support setting multiple concurrent reads?
 
-Not yet supported.
+### Q5: MongoDB CDC 支持 MongoDB 的版本是哪些？
 
-### Q6: What versions of mongodb are supported by mongodb CDC?
+MongoDB CDC 基于 ChangeStream 特性实现，ChangeStream 是 MongoDB 3.6 推出的新特性。MongoDB CDC 理论上支持 3.6 以上版本，建议运行版本 >= 4.0, 在低于3.6版本执行时，会出现错误: Unrecognized pipeline stage name: '$changeStream' 。
 
-Mongodb CDC is implemented based on the changestream feature, which is a new feature launched by mongodb 3.6. Mongodb CDC theoretically supports versions above 3.6. It is recommended to run version > = 4.0. When executing versions lower than 3.6, an error will occur: unrecognized pipeline stage name: '$changestream'.
+### Q6: MongoDB CDC 支持 MongoDB 的运行模式是什么？
 
-### Q7: What is the operation mode of mongodb supported by mongodb CDC?
+ChangeStream 需要 MongoDB 以副本集或者分片模式运行，本地测试可以使用单机版副本集 rs.initiate() 。在 standalone 模式下会出现错误：The $changestage is only supported on replica sets.
 
-Changestream requires mongodb to run in replica set or fragment mode. Local tests can use stand-alone replica set rs.initiate().
 
-Errors occur in standalone mode : The $changestage is only supported on replica sets.
+### Q7: MongoDB CDC 报错用户名密码错误, 但其他组件使用该用户名密码都能正常连接，这是什么原因？
 
-### Q8: Mongodb CDC reports an error. The user name and password are incorrect, but other components can connect normally with this user name and password. What is the reason?
+If 如果用户是创建在需要连接的db 下，需要在with参数里加下 'connection.options' = 'authSource=用户所在的db'。
 
-If the user is creating a DB that needs to be connected, add 'connection' to the with parameter Options' ='authsource = DB where the user is located '.
+### Q8:  MongoDB CDC 是否支持 debezium 相关的参数？
 
-### Q9: Does mongodb CDC support debezium related parameters?
+不支持的，因为 MongoDB CDC 连接器是在 Flink CDC 项目中独立开发，并不依赖Debezium项目，所以不支持。
 
-The mongodb CDC connector is not supported because it is independently developed in the Flink CDC project and does not rely on the debezium project.
+### Q9: MongoDB CDC 全量读取阶段，作业失败后，可以从 checkpoint 继续读取吗？
 
-### Q10: In the mongodb CDC full reading phase, can I continue reading from the checkpoint after the job fails?
-
-In the full reading phase, mongodb CDC does not do checkpoint until the full reading phase is completed. If it fails in the full reading phase, mongodb CDC will read the stock data again.
+MongoDB CDC 全量读取阶段是不做 checkpoint 的，直到全量阶段读取完后才开始作 checkpoint，如果在全量读取阶段失败，MongoDB CDC 会重新读取存量数据。
 
 ## Oracle CDC FAQ
 
-### Q1: Oracle CDC's archive logs grow rapidly and read logs slowly?
+### Q1: Oracle CDC 的归档日志增长很快，且读取 log 慢？
 
-The online mining mode can be used without writing the data dictionary to the redo log, but it cannot process DDL statements. The default policy of the production environment reads the log slowly, and the default policy will write the data dictionary information to the redo log, resulting in a large increase in the log volume. You can add the following debezium configuration items. " log. mining. strategy' = 'online_ catalog','log. mining. continuous. mine' = 'true'。 If you use SQL, you need to prefix the configuration item with 'debezium.', Namely:
+可以使用在线挖掘的模式，不写入数据字典到 redo log 中，但是这样无法处理 DDL 语句。 生产环境默认策略读取 log 较慢，且默认策略会写入数据字典信息到 redo log 中导致日志量增加较多，可以添加如下 debezium 的配置项。 'log.mining.strategy' = 'online_catalog','log.mining.continuous.mine' = 'true'。如果使用 SQL 的方式，则需要在配置项中加上前缀 'debezium.',即：
 
 ```
 'debezium.log.mining.strategy' = 'online_catalog',
@@ -315,16 +306,14 @@ The online mining mode can be used without writing the data dictionary to the re
 ```
 
 
-### Q2: Operation error caused by: io debezium. DebeziumException: Supplemental logging not configured for table xxx.  Use command: alter table XXX add supplementary log data (all) columns?
+### Q2: 作业报错 Caused by: io.debezium.DebeziumException: Supplemental logging not configured for table xxx. Use command: ALTER TABLE xxx ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS， 怎么办呢？
 
-For Oracle version 11, debezium will set tableidcasesensitive to true by default, resulting in the table name being updated to lowercase. Therefore, the table completion log setting cannot be queried in Oracle, resulting in the false alarm of "supplementary logging not configured for table error".
+对于 oracle11 版本，debezium 会默认把 tableIdCaseInsensitive 设置为true, 导致表名被更新为小写，因此在oracle中查询不到 这个表补全日志设置，导致误报这个Supplemental logging not configured for table 错误”。 添加 debezium 的配置项 'database.tablename.case.insensitive' = 'false'， 如果使用 SQL 的方式，则在表的 option 中添加配置项 'debezium.database.tablename.case.insensitive' = 'false'
 
-If it is the DataStream API, add the configuration item of debezium 'database.tablename.case.insensitive' = 'false'. If the SQL API is used, add the configuration item 'debezium.database.tablename.case.insensitive' = 'false' in the option of the table
+### Q3: Oracle CDC 如何切换成 XStream 的方式？
 
-### Q3: How does Oracle CDC switch to XStream?
+添加 debezium 的配置项 'database.connection.adpter' = 'xstream'， 如果使用 SQL 的方式，则在表的 option 中添加配置项 'debezium.database.connection.adpter' = 'xstream'
 
-Add configuration item  'database.connection.adpter' = 'xstream', please use the configuration item 'debezium.database.connection.adpter' = 'xstream' if you're using SQL API.
+### Q4: Oracle CDC 的 database-name 和 schema-name 分别是什么?
 
-### Q4: What are the database name and schema name of Oracle CDC
-
-Database name is the name of the database example, that is, the SID of Oracle. Schema name is the schema corresponding to the table. Generally speaking, a user corresponds to a schema. The schema name of the user is equal to the user name and is used as the default schema of the user. Therefore, schema name is generally the user name for creating the table, but if a schema is specified when creating the table, the specified schema is schema name. For example, use create table AAAA If TestTable (XXXX) is successfully created, AAAA is schema name.
+database-name 是数据库示例的名字，也就是 Oracle 的 SID schema-name 是表对应的 schema，一般而言，一个用户就对应一个 schema, 该用户的 schema 名等于用户名，并作为该用户缺省 schema。所以 schema-name 一般都是创建这个表的用户名，但是如果创建表的时候指定了 schema，则指定的 schema 则为 schema-name。 比如用 CREATE TABLE aaaa.testtable(xxxx) 的方式成功创建了表 testtable， 则 aaaa 为 schema-name。
