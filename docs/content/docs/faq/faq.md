@@ -246,17 +246,19 @@ The `tableList` option requires table name with schema name rather than table na
 
 ## MongoDB CDC FAQ
 
-### Q1: Does mongodb CDC support full + incremental read and read-only incremental?
+### Q1: Does MongoDB CDC support full + incremental read and read-only incremental?
 
-Yes, the default is full + incremental reading; Use copy The existing = false parameter is set to read-only increment.
+Yes, the default is full + incremental reading; Using 'scan.startup.mode' = 'latest-offset' parameter can set to read-only incremental.
 
-### Q2: Does mongodb CDC support recovery from checkpoint? What is the principle?
+### Q2: Does MongoDB CDC support recovery from checkpoint? What is the principle?
 
-Yes, the checkpoint will record the resumetoken of the changestream. During recovery, the changestream can be restored through the resumetoken. Where resumetoken corresponds to oplog RS (mongodb change log collection), oplog RS is a fixed capacity collection. When the corresponding record of resumetoken is in oplog When RS does not exist, an exception of invalid resumetoken may occur. In this case, you can set the appropriate oplog Set size of RS to avoid oplog RS retention time is too short, you can refer to https://docs.mongodb.com/manual/tutorial/change-oplog-size/ In addition, the resumetoken can be refreshed through the newly arrived change record and heartbeat record.
+Yes, the checkpoint will record the resumeToken of the changeStream. During recovery, the changeStream can be restored through the resumeToken. Where resumeToken corresponds to `oplog.rs` (Change log collection in MongoDB), `oplog.rs` is a fixed capacity collection. When the corresponding record of resumeToken does not exist in `oplog.rs`, an Invalid resumeToken Exception may occur. In this case, you can set the appropriate size of `oplog.rs` to avoid retention time of `oplog.rs` is too short, you can refer to https://docs.mongodb.com/manual/tutorial/change-oplog-size/. In addition, the resumeToken can be refreshed through the newly arrived change record and heartbeat record.
 
-### Q3: Does mongodb CDC support outputting - U (update_before) messages?
+### Q3: Does MongoDB CDC support outputting - U (update_before) messages?
 
-Mongodb original oplog RS has only insert, update, replace and delete operation types. It does not retain the information before update. It cannot output - U messages. It can only realize the update semantics in Flink. When using mongodbtablesource, Flink planner will automatically perform changelognormalize optimization, fill in the missing - U messages, and output complete + I, - u, + U, and - D messages. The cost of changelognormalize optimization is that the node will save the status of all previous keys. Therefore, if the DataStream job directly uses mongodbsource, without the optimization of Flink planner, changelognormalize will not be performed automatically, so - U messages cannot be obtained directly. To obtain the pre update image value, you need to manage the status yourself. If you don't want to manage the status yourself, you can convert mongodbtablesource to changelogstream or retractstream and supplement the pre update image value with the optimization ability of Flink planner. An example is as follows:
+In MongoDB versions >= 6.0, if MongoDB enable [document preimages](https://www.mongodb.com/docs/atlas/app-services/mongodb/preimages/), setting 'scan.full-changelog' = 'true' in Flink SQL can make source output -U messages, so ChangelogNormalize operator can be removed.
+
+In MongoDB versions < 6.0, the original `oplog.rs` in MongoDB only has operation types including insert, update, replace and delete. It does not save the information before update, so it cannot output - U messages. It can only realize the UPSERT semantics in Flink. When using MongoDBTableSource, Flink planner will automatically perform ChangelogNormalize optimization, fill in the missing - U messages, and output complete + I, - U, + U, and - D messages. The cost of ChangelogNormalize optimization is that the operator will save the states of all previous keys. Therefore, if the DataStream job directly uses MongoDBSource, without the optimization of Flink planner, ChangelogNormalize will not be performed automatically, so - U messages cannot be obtained directly. To obtain the pre update image value, you need to manage the status yourself. If you don't want to manage the status yourself, you can convert MongodbTableSource to changelogstream or retractstream and supplement the pre update image value with the optimization ability of Flink planner. An example is as follows:
 
 ```
     tEnv.executeSql("CREATE TABLE orders ( ... ) WITH ( 'connector'='mongodb-cdc',... )");
@@ -271,33 +273,27 @@ Mongodb original oplog RS has only insert, update, replace and delete operation 
     env.execute();
 ```
 
+### Q4: Does MongoDB CDC support subscribing multiple collections?
 
+All collections in database can be subscribed. For example, if database is configured as ' mgdb' and collection is configured as an empty string, all collections under 'mgdb' database will be subscribed.
 
-### Q4: Does mongodb CDC support subscribing to multiple collections?
+It also supports subscribing collections using regular expressions. If the name of the collections to be monitored contains special characters used in regular expressions, then the collection parameter must be configured as a fully qualified namespace ("database-name.collection-name"), otherwise the changes to the corresponding collections cannot be captured.
 
-Only the collection of the whole database can be subscribed, but some collection filtering functions are not supported. For example, if the database is configured as' mgdb 'and the collection is an empty string, all collections under the' mgdb 'database will be subscribed.
+### Q5: Which versions of MongoDB are supported by MongoDB CDC?
 
-### Q5: What versions of mongodb are supported by mongodb CDC?
+MongoDB CDC is implemented based on the ChangeStream feature, which is a new feature introduced in MongoDB 3.6. Mongodb CDC theoretically supports versions >= 3.6. It is recommended to run on version >= 4.0. When executed on versions < 3.6, an error will occur: Unrecognized pipeline stage name: '$changeStream'.
 
-Mongodb CDC is implemented based on the changestream feature, which is a new feature launched by mongodb 3.6. Mongodb CDC theoretically supports versions above 3.6. It is recommended to run version > = 4.0. When executing versions lower than 3.6, an error will occur: unrecognized pipeline stage name: '$changestream'.
+### Q6: Which operational modes of MongoDB are supported by MongoDB CDC?
 
-### Q6: What is the operation mode of mongodb supported by mongodb CDC?
+ChangeStream requires MongoDB to run in replica set or sharded cluster mode. For local test, a single-node replica set can be initialized with `rs.initiate()`. An error will occur in standalone mode: The $changeStream stage is only supported on replica sets.
 
-Changestream requires mongodb to run in replica set or fragment mode. Local tests can use stand-alone replica set rs.initiate().
+### Q7: MongoDB CDC reports an error. The username and password are incorrect, but other components can connect normally with this username and password. What is the reason?
 
-Errors occur in standalone mode : The $changestage is only supported on replica sets.
+If the user is not created in the default admin database, you need to add parameter 'connection.options' = 'authSource={{ database where the user is created }}'.
 
-### Q7: Mongodb CDC reports an error. The user name and password are incorrect, but other components can connect normally with this user name and password. What is the reason?
+### Q8: Does MongoDB CDC support debezium related parameters?
 
-If the user is creating a DB that needs to be connected, add 'connection' to the with parameter Options' ='authsource = DB where the user is located '.
-
-### Q8: Does mongodb CDC support debezium related parameters?
-
-The mongodb CDC connector is not supported because it is independently developed in the Flink CDC project and does not rely on the debezium project.
-
-### Q9: In the mongodb CDC full reading phase, can I continue reading from the checkpoint after the job fails?
-
-In the full reading phase, mongodb CDC does not do checkpoint until the full reading phase is completed. If it fails in the full reading phase, mongodb CDC will read the stock data again.
+It is not supported, because MongoDB CDC connector is developed independently in the Flink CDC project and does not rely on the debezium project.
 
 ## Oracle CDC FAQ
 
