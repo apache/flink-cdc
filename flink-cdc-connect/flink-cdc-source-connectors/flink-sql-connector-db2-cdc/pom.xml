@@ -60,6 +60,10 @@ limitations under the License.
                                 <includes>
                                     <include>*:*</include>
                                 </includes>
+                                <excludes>
+                                    <exclude>org.codehaus.janino:*</exclude>
+                                    <exclude>org.apache.calcite:*</exclude>
+                                </excludes>
                             </artifactSet>
                             <filters>
                                 <filter>
