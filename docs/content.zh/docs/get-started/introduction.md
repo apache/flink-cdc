@@ -1,5 +1,5 @@
 ---
-title: "Introduction"
+title: "项目介绍"
 weight: 1
 type: docs
 aliases:

@@ -1,5 +1,5 @@
 ---
-title: "Understand Flink CDC API"
+title: "理解 Flink CDC API"
 weight: 1
 type: docs
 aliases:

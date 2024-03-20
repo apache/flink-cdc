@@ -1,5 +1,5 @@
 ---
-title: "TiDB Tutorial"
+title: "TiDB 教程"
 weight: 7
 type: docs
 aliases:

@@ -1,5 +1,5 @@
 ---
-title: "SqlServer Tutorial"
+title: "SqlServer 教程"
 weight: 6
 type: docs
 aliases:

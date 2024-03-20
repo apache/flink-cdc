@@ -1,5 +1,5 @@
 ---
-title: "Core Concept"
+title: "核心概念"
 bold: true
 bookCollapseSection: true
 weight: 2

@@ -1,5 +1,5 @@
 ---
-title: "MongoDB Tutorial"
+title: "MongoDB 教程"
 weight: 1
 type: docs
 aliases:

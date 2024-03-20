@@ -1,5 +1,5 @@
 ---
-title: "Contribute to Flink CDC"
+title: "向 Flink CDC 提交贡献"
 weight: 2
 type: docs
 aliases:
