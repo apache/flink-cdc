@@ -1,5 +1,5 @@
 ---
-title: "SqlServer Tutorial"
+title: "SqlServer 教程"
 weight: 6
 type: docs
 aliases:
@@ -24,9 +24,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Demo: SqlServer CDC to Elasticsearch
+# 演示: SqlServer CDC 导入 Elasticsearch
 
-**Create `docker-compose.yml` file using following contents:**
+**创建 `docker-compose.yml` 文件，内容如下所示：**
 
 ```
 version: '2.1'
@@ -67,35 +67,35 @@ services:
      volumes:
        - /var/run/docker.sock:/var/run/docker.sock
 ``` 
-The Docker Compose environment consists of the following containers:
-- SqlServer: SqlServer database.
-- Elasticsearch: store the join result of the `orders` and `products` table.
-- Kibana: mainly used to visualize the data in Elasticsearch.
+该 Docker Compose 中包含的容器有：
+- SqlServer：SqlServer 数据库。
+- Elasticsearch：`orders` 表将和 `products` 表进行 join，join 的结果写入 Elasticsearch 中。
+- Kibana：可视化 Elasticsearch 中的数据。
 
-To start all containers, run the following command in the directory that contains the docker-compose.yml file:
+在 docker-compose.yml 所在目录下运行如下命令以启动所有容器：
 ```shell
 docker-compose up -d
 ```
-This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode.
-Run docker ps to check whether these containers are running properly. You can also visit http://localhost:5601/ to see if Kibana is running normally.
+该命令会以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。
+你可以通过 docker ps 来观察上述的容器是否正常启动了。 也可以访问 http://localhost:5601/ 来查看 Kibana 是否运行正常。
 
-Don’t forget to run the following command to stop and remove all containers after you finished the tutorial:
+另外可以通过如下命令停止并删除所有的容器：
 
 ```shell
 docker-compose down
 ````
 
-**Download following JAR package to `<FLINK_HOME>/lib`:**
+**下载以下 jar 包到 `<FLINK_HOME>/lib/`：**
 
-**Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
+```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译```
 
 - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-- [flink-sql-connector-sqlserver-cdc-3.0-SNAPSHOT.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-sqlserver-cdc/3.0-SNAPSHOT/flink-sql-connector-sqlserver-cdc-3.0-SNAPSHOT.jar)
+- [flink-sql-connector-sqlserver-cdc-2.4.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-sqlserver-cdc/2.4.0/flink-sql-connector-sqlserver-cdc-2.4.0.jar)
 
 
-**Preparing data in SqlServer database**
+**在 SqlServer 数据库中准备数据**
 
-Create databases/tables and populate data
+创建数据库和表 `products`，`orders`，并插入数据：
 
  ```sql
  -- Sqlserver
@@ -150,7 +150,7 @@ Create databases/tables and populate data
  EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'orders', @role_name = NULL, @supports_net_changes = 0;
  GO
  ```
-**Launch a Flink cluster and start a Flink SQL CLI:**
+**然后启动 Flink 集群，再启动 SQL CLI：**
 
 ```sql
 -- Flink SQL
@@ -209,13 +209,13 @@ Flink SQL> INSERT INTO enriched_orders
   LEFT JOIN products AS p ON o.product_id = p.id;
 ```
 
-**Check result in Elasticsearch**
+**检查 ElasticSearch 中的结果**
 
-Check the data has been written to Elasticsearch successfully, you can visit [Kibana](http://localhost:5601/) to see the data.
+检查最终的结果是否写入 ElasticSearch 中，可以在 [Kibana](http://localhost:5601/) 看到 ElasticSearch 中的数据。
 
-**Make changes in SqlServer and watch result in Elasticsearch**
+**在 SqlServer 制造一些变更，观察 ElasticSearch 中的结果**
 
-Do some changes in the databases, and then the enriched orders shown in Kibana will be updated after each step in real time.
+通过如下的 SQL 语句对 SqlServer 数据库进行一些修改，然后就可以看到每执行一条 SQL 语句，Elasticsearch 中的数据都会实时更新。
 
 ```sql
 INSERT INTO orders(order_date,purchaser,quantity,product_id) VALUES ('22-FEB-2016', 1006, 22, 107);

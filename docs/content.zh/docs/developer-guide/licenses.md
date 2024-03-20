@@ -1,5 +1,5 @@
 ---
-title: "Licenses"
+title: "许可证"
 weight: 3
 type: docs
 aliases:

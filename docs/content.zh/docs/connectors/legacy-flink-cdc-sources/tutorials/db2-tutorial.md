@@ -1,6 +1,6 @@
 ---
-title: "Db2 Tutorial"
-weight: 8
+title: "Db2 教程"
+weight: 2
 type: docs
 aliases:
 - /connectors/legacy-flink-cdc-sources/tutorials/db2-tutorial.html

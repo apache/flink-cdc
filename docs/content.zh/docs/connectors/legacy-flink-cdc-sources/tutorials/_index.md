@@ -1,5 +1,5 @@
 ---
-title: Tutorials
+title: "Legacy CDC Sources 教程"
 bookCollapseSection: true
 weight: 999
 ---

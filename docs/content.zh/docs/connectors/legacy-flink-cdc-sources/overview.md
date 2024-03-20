@@ -1,5 +1,5 @@
 ---
-title: "Overview"
+title: "概览"
 weight: 1
 type: docs
 aliases:
@@ -24,12 +24,12 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Legacy CDC sources for Apache Flink
+# Legacy CDC sources
 
-Flink CDC sources is a set of source connectors for <a href="https://flink.apache.org/">Apache Flink<sup>®</sup></a>, ingesting changes from different databases using change data capture (CDC).
+Legacy CDC sources is a set of source connectors for <a href="https://flink.apache.org/">Apache Flink<sup>®</sup></a>, ingesting changes from different databases using change data capture (CDC).
 Some CDC sources integrate Debezium as the engine to capture data changes. So it can fully leverage the ability of Debezium. See more about what is [Debezium](https://github.com/debezium/debezium).
 
-You can also read [tutorials]({{< ref "docs/connectors/legacy-flink-cdc-sources/tutorials/mysql-postgres-tutorial" >}}) about how to use these sources.
+You can also read [tutorials]({{< ref "docs/connectors/legacy-flink-cdc-sources/tutorials/build-streaming-etl-tutorial" >}}) about how to use these sources.
 
 {{< img src="/fig/cdc-flow.png" width="600px" alt="Flink CDC" >}}
 

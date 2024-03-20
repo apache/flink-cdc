@@ -1,5 +1,5 @@
 ---
-title: "Overview"
+title: "概览"
 weight: 1
 type: docs
 aliases:
@@ -26,10 +26,7 @@ under the License.
 
 # Connectors
 
-Flink CDC provides several source and sink connectors to interact with external
-systems. You can use these connectors out-of-box, by adding released JARs to
-your Flink CDC environment, and specifying the connector in your YAML pipeline
-definition.
+Flink CDC 提供了多个Source和Sink连接器来与外部系统交互。您可以直接使用这些连接器，只需将 JAR 文件添加到您的 Flink CDC 环境中，并在您的 YAML Pipeline定义中指定所需的连接器。
 
 ## Supported Connectors
 
@@ -41,16 +38,9 @@ definition.
 
 ## Develop Your Own Connector
 
-If provided connectors cannot fulfill your requirement, you can always develop
-your own connector to get your external system involved in Flink CDC pipelines.
-Check out [Flink CDC APIs]({{< ref "docs/developer-guide/understand-flink-cdc-api" >}})
-to learn how to develop your own connectors.
+如果现有的连接器无法满足您的需求，您可以自行开发自己的连接器，以将您的外部系统集成到 Flink CDC 数据管道中。查阅 [Flink CDC APIs]({{< ref "docs/developer-guide/understand-flink-cdc-api" >}}) 了解如何开发您自己的连接器。
 
 ## Legacy Flink CDC Sources
-
-Flink CDC sources introduces before 3.0 are still available as normal Flink 
-connector sources. You can find more details in the 
-[overview page]({{< ref "docs/connectors/legacy-flink-cdc-sources/overview" >}})
-of legacy Flink CDC sources.
+在 3.0 版本之前引入的 Flink CDC Source 仍然可以作为普通的 Flink 连接器使用。您可以在 [Legacy CDC Sources/概览]({{< ref "docs/connectors/legacy-flink-cdc-sources/overview" >}}) 中找到更多详细信息。
 
 {{< top >}}

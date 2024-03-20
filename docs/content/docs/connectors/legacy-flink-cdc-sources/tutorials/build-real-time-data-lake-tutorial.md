@@ -1,6 +1,6 @@
 ---
 title: "Building a Real-time Data Lake with Flink CDC"
-weight: 999
+weight: 998
 type: docs
 aliases:
 - /connectors/legacy-flink-cdc-sources/tutorials/build-real-time-data-lake-tutorial.html
@@ -26,7 +26,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Using Flink CDC to synchronize data from MySQL sharding tables and build real-time data lake
+# Building a Real-time Data Lake with Flink CDC
 
 For OLTP databases, to deal with a huge number of data in a single table, we usually do database and table sharding to get better throughput.
 But sometimes, for convenient analysis, we need to merge them into one table when loading them to data warehouse or data lake.

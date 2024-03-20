@@ -1,5 +1,5 @@
 ---
-title: "MySQL to Doris"
+title: "MySQL 同步到 Doris"
 weight: 1
 type: docs
 aliases:
@@ -24,66 +24,63 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Streaming ELT from MySQL to Doris
+# Streaming ELT 同步 MySQL 到  Doris
 
-This tutorial is to show how to quickly build a Streaming ELT job from MySQL to Doris using Flink CDC, including the
-feature of sync all table of one database, schema change evolution and sync sharding tables into one table.  
-All exercises in this tutorial are performed in the Flink CDC CLI, and the entire process uses standard SQL syntax,
-without a single line of Java/Scala code or IDE installation.
+这篇教程将展示如何基于 Flink CDC 快速构建 MySQL 到 Doris 的 Streaming ELT 作业，包含整库同步、表结构变更同步和分库分表同步的功能。
+本教程的演示都将在 Flink CDC CLI 中进行，无需一行 Java/Scala 代码，也无需安装 IDE。
 
-## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+## 准备阶段
+准备一台已经安装了 Docker 的 Linux 或者 MacOS 电脑。
 
-### Prepare Flink Standalone cluster
-1. Download [Flink 1.18.0](https://archive.apache.org/dist/flink/flink-1.18.0/flink-1.18.0-bin-scala_2.12.tgz) ，unzip and get flink-1.18.0 directory.   
-   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.18.0 is located.
+### 准备 Flink Standalone 集群
+1. 下载 [Flink 1.18.0](https://archive.apache.org/dist/flink/flink-1.18.0/flink-1.18.0-bin-scala_2.12.tgz)，解压后得到 flink-1.18.0 目录。
+   使用下面的命令跳转至 Flink 目录下，并且设置 FLINK_HOME 为 flink-1.18.0 所在目录。
 
    ```shell
    cd flink-1.18.0
    ```
 
-2. Enable checkpointing by appending the following parameters to the conf/flink-conf.yaml configuration file to perform a checkpoint every 3 seconds.
+2. 通过在 conf/flink-conf.yaml 配置文件追加下列参数开启 checkpoint，每隔 3 秒做一次 checkpoint。
 
    ```yaml
    execution.checkpointing.interval: 3000
    ```
 
-3. Start the Flink cluster using the following command.
+3. 使用下面的命令启动 Flink 集群。
 
    ```shell
    ./bin/start-cluster.sh
    ```  
 
-If successfully started, you can access the Flink Web UI at [http://localhost:8081/](http://localhost:8081/), as shown below.
+启动成功的话，可以在 [http://localhost:8081/](http://localhost:8081/)访问到 Flink Web UI，如下所示：
 
 {{< img src="/fig/mysql-doris-tutorial/flink-ui.png" alt="Flink UI" >}}
 
-Executing `start-cluster.sh` multiple times can start multiple `TaskManager`s.
+多次执行 `start-cluster.sh` 可以拉起多个 TaskManager。
 
-### Prepare docker compose
-The following tutorial will prepare the required components using `docker-compose`.
+### 准备 Docker 环境
+接下来的教程将以 `docker-compose` 的方式准备所需要的组件。
 
-1. Host Machine Configuration  
-Since `Doris` requires memory mapping support for operation, execute the following command on the host machine:
+1. 宿主机配置
+   由于 Doris 的运行需要内存映射支持，需在宿主机执行如下命令:
 
    ```shell
    sysctl -w vm.max_map_count=2000000
    ```
-Due to the different ways of implementing containers internally on MacOS, it may not be possible to directly modify the value of max_map_count on the host during deployment. You need to create the following containers first:
-
+MacOS 由于内部实现容器的方式不同，在部署时宿主机直接修改max_map_count值可能无法成功，需要先创建以下容器：
    ```shell
    docker run -it --privileged --pid=host --name=change_count debian nsenter -t 1 -m -u -n -i sh
    ```
 
-The container was created successfully executing the following command:
+容器创建成功执行以下命令：
    ```shell
    sysctl -w vm.max_map_count=2000000
    ```
 
-Then `exit` exits and creates the Doris Docker cluster.
+然后 `exit` 退出，创建 Doris Docker 集群。
 
-2. Start docker compose
-   Create a `docker-compose.yml` file using the content provided below:
+2. docker 镜像启动
+   使用下面的内容创建一个 `docker-compose.yml` 文件：
 
    ```yaml
    version: '2.1'
@@ -104,76 +101,77 @@ Then `exit` exits and creates the Doris Docker cluster.
          - MYSQL_PASSWORD=mysqlpw
    ```
 
-The Docker Compose should include the following services (containers):
-- MySQL: include a database named `app_db` 
-- Doris: to store tables from MySQL
+该 Docker Compose 中包含的容器有：
+- MySQL: 包含商品信息的数据库 `app_db` 
+- Doris: 存储从 MySQL 中根据规则映射过来的结果表
 
-To start all containers, run the following command in the directory that contains the `docker-compose.yml` file.
+在 `docker-compose.yml` 所在目录下执行下面的命令来启动本教程需要的组件：
 
    ```shell
    docker-compose up -d
    ```
 
-This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run docker ps to check whether these containers are running properly. You can also visit [http://localhost:8030/](http://localhost:8030/) to check whether Doris is running.
-#### Prepare records for MySQL
-1. Enter MySQL container
+该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过 docker ps 来观察上述的容器是否正常启动了，也可以通过访问[http://localhost:8030/](http://localhost:8030/) 来查看 Doris 是否运行正常。
+
+#### 在 MySQL 数据库中准备数据
+1. 进入 MySQL 容器
 
    ```shell
    docker-compose exec mysql mysql -uroot -p123456
    ```
 
-2. create `app_db` database and `orders`,`products`,`shipments` tables, then insert records
+2. 创建数据库 `app_db` 和表 `orders`,`products`,`shipments`，并插入数据
 
     ```sql
-    -- create database
+    -- 创建数据库
     CREATE DATABASE app_db;
    
     USE app_db;
    
-   -- create orders table
+   -- 创建 orders 表
    CREATE TABLE `orders` (
    `id` INT NOT NULL,
    `price` DECIMAL(10,2) NOT NULL,
    PRIMARY KEY (`id`)
    );
    
-   -- insert records
+   -- 插入数据
    INSERT INTO `orders` (`id`, `price`) VALUES (1, 4.00);
    INSERT INTO `orders` (`id`, `price`) VALUES (2, 100.00);
    
-   -- create shipments table
+   -- 创建 shipments 表
    CREATE TABLE `shipments` (
    `id` INT NOT NULL,
    `city` VARCHAR(255) NOT NULL,
    PRIMARY KEY (`id`)
    );
    
-   -- insert records
+   -- 插入数据
    INSERT INTO `shipments` (`id`, `city`) VALUES (1, 'beijing');
    INSERT INTO `shipments` (`id`, `city`) VALUES (2, 'xian');
    
-   -- create products table
+   -- 创建 products 表
    CREATE TABLE `products` (
    `id` INT NOT NULL,
    `product` VARCHAR(255) NOT NULL,
    PRIMARY KEY (`id`)
    );
    
-   -- insert records
+   -- 插入数据
    INSERT INTO `products` (`id`, `product`) VALUES (1, 'Beer');
    INSERT INTO `products` (`id`, `product`) VALUES (2, 'Cap');
    INSERT INTO `products` (`id`, `product`) VALUES (3, 'Peanut');
     ```
 
 #### Create database in Doris
-`Doris` connector currently does not support automatic database creation and needs to first create a database corresponding to the write table.
-1. Enter Doris Web UI。  
+`Doris` 暂时不支持自动创建数据库，需要先创建写入表对应的数据库。
+1. 进入 Doris Web UI。  
    [http://localhost:8030/](http://localhost:8030/)  
-   The default username is `root`, and the default password is empty.
+   默认的用户名为 `root`，默认密码为空。
 
    {{< img src="/fig/mysql-doris-tutorial/doris-ui.png" alt="Doris UI" >}}
 
-2. Create `app_db` database through Web UI.
+2. 通过 Web UI 创建 `app_db` 数据库
 
     ```sql
    create database app_db;
@@ -181,18 +179,18 @@ This command automatically starts all the containers defined in the Docker Compo
 
    {{< img src="/fig/mysql-doris-tutorial/doris-create-table.png" alt="Doris create table" >}}
 
-## Submit job using FlinkCDC cli
-1. Download the binary compressed packages listed below and extract them to the directory ` flink cdc-3.0.0 '`：    
-   [flink-cdc-3.0.0-bin.tar.gz](https://github.org/apache/flink/flink-cdc-connectors/releases/download/release-3.0.0/flink-cdc-3.0.0-bin.tar.gz)
-   flink-cdc-3.0.0 directory will contain four directory `bin`,`lib`,`log`,`conf`.
+## 通过 FlinkCDC cli 提交任务
+1. 下载下面列出的二进制压缩包，并解压得到目录  ` flink cdc-3.0.0 '`：    
+   [flink-cdc-3.0.0-bin.tar.gz](https://github.com/ververica/flink-cdc-connectors/releases/download/release-3.0.0/flink-cdc-3.0.0-bin.tar.gz).
+   flink-cdc-3.0.0 下会包含 `bin`、`lib`、`log`、`conf` 四个目录。
 
-2. Download the connector package listed below and move it to the `lib` directory  
-   **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
-    - [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
-    - [Apache Doris pipeline connector 3.0.0](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-doris/3.0.0/flink-cdc-pipeline-connector-doris-3.0.0.jar)
+2. 下载下面列出的 connector 包，并且移动到 `lib` 目录下
+   **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译.**
+    - [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
+    - [Apache Doris pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-doris/3.0.0/flink-cdc-pipeline-connector-doris-3.0.0.jar)
 
-3. Write task configuration yaml file 
-  Here is an example file for synchronizing the entire database `mysql-to-doris.yaml`：
+3.编写任务配置 yaml 文件
+下面给出了一个整库同步的示例文件 `mysql-to-doris.yaml`：
 
    ```yaml
    ################################################################################
@@ -221,70 +219,69 @@ This command automatically starts all the containers defined in the Docker Compo
      parallelism: 2
    
    ```
-   
-Notice that:  
-`tables: app_db.\.*` in source synchronize all tables in `app_db` through Regular Matching.   
-`table.create.properties.replication_num` in sink is because there is only one Doris BE node in the Docker image.
 
-4. Finally, submit job to Flink Standalone cluster using Cli.
+其中：
+source 中的 `tables: app_db.\.*` 通过正则匹配同步 `app_db` 下的所有表。
+sink 添加 `table.create.properties.replication_num` 参数是由于 Docker 镜像中只有一个 Doris BE 节点。
+
+4. 最后，通过命令行提交任务到 Flink Standalone cluster
    ```shell
    bash bin/flink-cdc.sh mysql-to-doris.yaml
    ```
-After successful submission, the return information is as follows：
+提交成功后，返回信息如：
    ```shell
    Pipeline has been submitted to cluster.
    Job ID: ae30f4580f1918bebf16752d4963dc54
    Job Description: Sync MySQL Database to Doris
    ```
- We can find a job  named `Sync MySQL Database to Doris` is running through Flink Web UI.   
+在 Flink Web UI，可以看到一个名为 `Sync MySQL Database to Doris` 的任务正在运行。 
 
 {{< img src="/fig/mysql-doris-tutorial/mysql-to-doris.png" alt="MySQL-to-Doris" >}}
 
-We can find that tables are created and inserted through Doris Web UI.   
+打开 Doris 的 Web UI，可以看到数据表已经被创建出来，数据能成功写入。 
 
 {{< img src="/fig/mysql-doris-tutorial/doris-display-data.png" alt="Doris display data" >}}
 
-### Synchronize Schema and Data changes
-Enter MySQL container
+### 同步变更
+进入 MySQL 容器
 
     ```shell
     docker-compose exec mysql mysql -uroot -p123456
     ```
 
-Then, modify schema and record in MySQL, and the tables of Doris will change the same in real time：
-1. insert one record in `orders` from MySQL:   
+接下来，修改 MySQL 数据库中表的数据，Doris 中显示的订单数据也将实时更新：
+1. 在 MySQL 的 `orders` 表中插入一条数据 
 
    ```sql
    INSERT INTO app_db.orders (id, price) VALUES (3, 100.00);
    ```
 
-2. add one column in `orders` from MySQL:   
+2. 在 MySQL 的 `orders` 表中增加一个字段
 
    ```sql
    ALTER TABLE app_db.orders ADD amount varchar(100) NULL;
    ```   
 
-3. update one record in `orders` from MySQL:   
+3. 在 MySQL 的 `orders` 表中更新一条数据
 
    ```sql
    UPDATE app_db.orders SET price=100.00, amount=100.00 WHERE id=1;
    ```
-4. delete one record in `orders` from MySQL:
+4. 在 MySQL 的 `orders` 表中删除一条数据
 
    ```sql
    DELETE FROM app_db.orders WHERE id=2;
    ```
 
-Refresh the Doris Web UI every time you execute a step, and you can see that the `orders` table displayed in Doris will be updated in real-time, like the following：
+每执行一步就刷新一次 Doris Web UI，可以看到 Doris 中显示的 orders 数据将实时更新，如下所示：
 
 {{< img src="/fig/mysql-doris-tutorial/doris-display-result.png" alt="Doris display result" >}}
 
-Similarly, by modifying the 'shipments' and' products' tables, you can also see the results of synchronized changes in real-time in Doris.
+同样的，去修改 `shipments`, `products` 表，也能在 Doris 中实时看到同步变更的结果。
 
 ### Route the changes
-Flink CDC provides the configuration to route the table structure/data of the source table to other table names.   
-With this ability, we can achieve functions such as table name, database name replacement, and whole database synchronization.
-Here is an example file for using `route` feature:
+Flink CDC 提供了将源表的表结构/数据路由到其他表名的配置，借助这种能力，我们能够实现表名库名替换，整库同步等功能。
+下面提供一个配置文件说明：
    ```yaml
    ################################################################################
    # Description: Sync MySQL all tables to Doris
@@ -321,8 +318,8 @@ Here is an example file for using `route` feature:
       parallelism: 2
    ```
 
-Using the upper `route` configuration, we can synchronize the table schema and data of `app_db.orders` to `ods_db.ods_orders`, thus achieving the function of database migration.   
-Specifically, `source-table` support regular expression matching with multiple tables to synchronize sharding databases and tables. like the following：
+通过上面的 `route` 配置，会将 `app_db.orders` 表的结构和数据同步到 `ods_db.ods_orders` 中。从而实现数据库迁移的功能。
+特别地，`source-table` 支持正则表达式匹配多表，从而实现分库分表同步的功能，例如下面的配置：
 
    ```yaml
    route:
@@ -330,16 +327,14 @@ Specifically, `source-table` support regular expression matching with multiple t
        sink-table: ods_db.ods_orders
    ```
 
-In this way, we can synchronize sharding tables like `app_db.order01`、`app_db.order02`、`app_db.order03` into one ods_db.ods_orders tables.      
-Warning that there is currently no support for scenarios where the same primary key data exists in multiple tables, which will be supported in future versions.
+这样，就可以将诸如 `app_db.order01`、`app_db.order02`、`app_db.order03` 的表汇总到 ods_db.ods_orders 中。注意，目前还不支持多表中存在相同主键数据的场景，将在后续版本支持。
 
-## Clean up
-After finishing the tutorial, run the following command to stop all containers in the directory of `docker-compose.yml`:
-
+## 环境清理
+本教程结束后，在 `docker-compose.yml` 文件所在的目录下执行如下命令停止所有容器：
    ```shell
    docker-compose down
    ```
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.18.0`:
+在 Flink 所在目录 `flink-1.18.0` 下执行如下命令停止 Flink 集群：
 
    ```shell
    ./bin/stop-cluster.sh

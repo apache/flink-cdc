@@ -24,18 +24,26 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# OceanBase CDC Connector
+# OceanBase CDC 连接器
 
-The OceanBase CDC connector allows for reading snapshot data and incremental data from OceanBase. This document describes how to set up the OceanBase CDC connector to run SQL queries against OceanBase.
+OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。本文介绍了如何设置 OceanBase CDC 连接器以对 OceanBase 进行 SQL 查询。
 
-Dependencies
-------------
+## 依赖
 
-In order to set up the OceanBase CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
+为了使用 OceanBase CDC 连接器，您必须提供相关的依赖信息。以下依赖信息适用于使用自动构建工具（如 Maven 或 SBT）构建的项目和带有 SQL JAR 包的 SQL 客户端。
+为了使用 OceanBase CDC 连接器，您必须提供相关的依赖信息。以下依赖信息适用于使用自动构建工具（如 Maven 或 SBT）构建的项目和带有 SQL JAR 包的 SQL 客户端。
 
-{{< artifact flink-connector-oceanbase-cdc >}}
+```xml
+<dependency>
+   <groupId>org.apache.flink</groupId>
+   <artifactId>flink-connector-oceanbase-cdc</artifactId>
+   <!--  请使用已发布的版本依赖，snapshot 版本的依赖需要本地自行编译。 -->
+   <version>3.1-SNAPSHOT</version>
+</dependency>
 
-If you want to use OceanBase JDBC driver to connect to the enterprise edition database, you should also include the following dependency in your class path.
+```
+
+如果您是要连接企业版的 OceanBase，您可能需要使用 OceanBase 官方的 JDBC 驱动，这时需要引入如下依赖。
 
 ```xml
 <dependency>
@@ -45,57 +53,51 @@ If you want to use OceanBase JDBC driver to connect to the enterprise edition da
 </dependency>
 ```
 
-### SQL Client JAR
+## 下载 SQL 客户端 JAR 包
 
-```Download link is available only for stable releases.```
+```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
-Download [flink-sql-connector-oceanbase-cdc-3.0-SNAPSHOT.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oceanbase-cdc/3.0-SNAPSHOT/flink-sql-connector-oceanbase-cdc-3.0-SNAPSHOT.jar) and put it under `<FLINK_HOME>/lib/`.
+下载[flink-sql-connector-oceanbase-cdc-3.0-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-connector-oceanbase-cdc/3.0.0/flink-connector-oceanbase-cdc-3.0.0.jar)  到 `<FLINK_HOME>/lib/` 目录下。
 
-**Note:** flink-sql-connector-oceanbase-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users need to download the source code and compile the corresponding jar. Users should use the released version, such as [flink-sql-connector-oceanbase-cdc-3.0.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oceanbase-cdc), the released version will be available in the Maven central warehouse.
+**注意:** flink-sql-connector-oceanbase-cdc-XXX-SNAPSHOT 版本是开发分支`release-XXX`对应的快照版本，快照版本用户需要下载源代码并编译相应的 jar。用户应使用已经发布的版本，例如 [flink-sql-connector-oceanbase-cdc-3.0.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oceanbase-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
-For JDBC driver, the cdc jar above already contains MySQL JDBC driver 5.1.47, which is our recommended version. Due to the license issue, we can not include the OceanBase JDBC driver in the cdc jar. If you need to use it, you can download it from [here](https://repo1.maven.org/maven2/com/oceanbase/oceanbase-client/2.4.2/oceanbase-client-2.4.2.jar) and put it under `<FLINK_HOME>/lib/`, you also need to set the start option `jdbc.driver` to `com.oceanbase.jdbc.Driver`.
+对于 JDBC 驱动，上述的 cdc jar 文件中已经包含了我们推荐的 MySQL 驱动版本 5.1.47。由于开源许可证的原因，我们不能在上述 cdc jar 文件中包含 OceanBase 的官方 JDBC 驱动，如果您需要使用它，可以从[这里](https://repo1.maven.org/maven2/com/oceanbase/oceanbase-client/2.4.2/oceanbase-client-2.4.2.jar)下载，然后放到 `<FLINK_HOME>/lib/` 目录下，同时需要将配置项 `jdbc.driver` 设为 `com.oceanbase.jdbc.Driver`。
 
-Setup OceanBase and LogProxy Server
-----------------------
+### 配置 OceanBase 数据库和 oblogproxy 服务
 
-1. Set up the OceanBase cluster following the [doc](https://github.com/oceanbase/oceanbase#quick-start).
+1. 按照 [文档](https://github.com/oceanbase/oceanbase#quick-start) 配置 OceanBase 集群。
+2. 在 sys 租户中，为 oblogproxy 创建一个带密码的用户。
 
-2. Create a user with password in `sys` tenant, this user is used in OceanBase LogProxy.
-
-   ```shell
-   mysql -h${host} -P${port} -uroot
-   
-   mysql> SHOW TENANT;
-   mysql> CREATE USER ${sys_username} IDENTIFIED BY '${sys_password}';
-   mysql> GRANT ALL PRIVILEGES ON *.* TO ${sys_username} WITH GRANT OPTION;
-   ```
-
-3. Create a user in the tenant you want to monitor, this is used to read data for snapshot and change event.
-
-4. For users of OceanBase Community Edition, you need to get the `rootserver-list`. You can use the following command to get the value:
-
-    ```shell
-    mysql> show parameters like 'rootservice_list';
+    ```bash
+    mysql -h${host} -P${port} -uroot
+    mysql> SHOW TENANT;
+    mysql> CREATE USER ${sys_username} IDENTIFIED BY '${sys_password}';
+    mysql> GRANT ALL PRIVILEGES ON *.* TO ${sys_username} WITH GRANT OPTION;
     ```
 
-   For users of OceanBase Enterprise Edition, you need to get the `config-url`. You can use the following command to get the value:
+3. 为你想要监控的租户创建一个用户，这个用户用来读取快照数据和变化事件数据。
+4. OceanBase 社区版用户需要获取`rootserver-list`，可以使用以下命令获取：
+
+    ```bash
+    mysql> SHOW PARAMETERS LIKE 'rootservice_list';
+    ```
+   OceanBase 企业版用户需要获取 `config-url`，可以使用以下命令获取：
 
     ```shell
     mysql> show parameters like 'obconfig_url';
     ```
 
-5. Setup OceanBase LogProxy. For users of OceanBase Community Edition, you can follow the [quick start](https://github.com/oceanbase/oblogproxy#getting-started).
+5. 按照 [文档](https://github.com/oceanbase/oblogproxy#getting-started) 配置 oblogproxy。
 
-How to create a OceanBase CDC table
-----------------
+## 创建 OceanBase CDC 表
 
-The OceanBase CDC table can be defined as following:
+使用以下命令，创建 OceanBase CDC 表：
 
 ```sql
--- checkpoint every 3000 milliseconds                       
+-- 每 3 秒做一次 checkpoint，用于测试，生产配置建议 5 到 10 分钟                  
 Flink SQL> SET 'execution.checkpointing.interval' = '3s';
 
--- register a OceanBase table 'orders' in Flink SQL
+-- 在 Flink SQL 中创建 OceanBase 表 `orders`
 Flink SQL> CREATE TABLE orders (
     order_id     INT,
     order_date   TIMESTAMP(0),
@@ -120,11 +122,11 @@ Flink SQL> CREATE TABLE orders (
     'working-mode' = 'memory'
 );
 
--- read snapshot and binlogs from orders table
+-- 从表 orders 中读取快照数据和 binlog 数据
 Flink SQL> SELECT * FROM orders;
 ```
 
-If you want to use OceanBase Oracle mode, you need to add the OceanBase jdbc jar file to Flink and set up the enterprise edition of oblogproxy, then you can create a table in Flink as following:
+如果您使用的是企业版的 OceanBase Oracle 模式，您需要先添加 OceanBase 的官方 JDBC 驱动 jar 包到 Flink 环境，并且部署企业版的 oblogproxy 服务，然后通过以下命令创建 OceanBase CDC 表：
 
 ```sql
 Flink SQL> CREATE TABLE orders (
@@ -154,235 +156,230 @@ Flink SQL> CREATE TABLE orders (
 );
 ```
 
-You can also try the quickstart tutorial that sync data from OceanBase to Elasticsearch, please refer [Flink CDC Tutorial]({{< ref "docs/connectors/legacy-flink-cdc-sources/tutorials/oceanbase-tutorial" >}}) for more information.
+您也可以访问 Flink CDC 官网文档，快速体验将数据从 OceanBase 导入到 Elasticsearch。更多信息，参考 [Flink CDC 官网文档](https://nightlies.apache.org/flink/flink-cdc-docs-release-3.0/docs/connectors/legacy-flink-cdc-sources/tutorials/oceanbase-tutorial/)。
 
-Connector Options
-----------------
+## OceanBase CDC 连接器选项
 
-The OceanBase CDC Connector contains some options for both sql and stream api as the following sheet. 
+OceanBase CDC 连接器包括用于 SQL 和 DataStream API 的选项，如下表所示。
 
-*Note*: The connector supports two ways to specify the table list to listen to, and will get the union of the results when both way are used at the same time.
-1. Use `database-name` and `table-name` to match database and table names in regex. As the `obcdc` (former `liboblog`) only supports `fnmatch` now, we can't use regex directly to filter change events, so these two options can only be used in `initial` startup mode.
-2. Use `table-list` to match the exact value of database and table names.
+*注意*：连接器支持两种方式来指定需要监听的表，两种方式同时使用时会监听两种方式匹配的所有表。
+1. 使用 `database-name` 和 `table-name` 匹配正则表达式中的数据库和表名。 由于`obcdc`（以前的`liboblog`）现在只支持`fnmatch`匹配，我们不能直接使用正则过滤 changelog 事件，所以通过两个选项去匹配去指定监听表只能在`initial`启动模式下使用。
+2. 使用 `table-list` 去匹配数据库名和表名的准确列表。
 
 <div class="highlight">
     <table class="colwidths-auto docutils">
         <thead>
             <tr>
-                <th class="text-left" style="width: 10%">Option</th>
-                <th class="text-left" style="width: 8%">Required</th>
-                <th class="text-left" style="width: 7%">Default</th>
-                <th class="text-left" style="width: 10%">Type</th>
-                <th class="text-left" style="width: 65%">Description</th>
+                <th class="text-left" style="width: 10%">配置项</th>
+                <th class="text-left" style="width: 8%">是否必选</th>
+                <th class="text-left" style="width: 7%">默认值</th>
+                <th class="text-left" style="width: 10%">类型</th>
+                <th class="text-left" style="width: 65%">描述</th>
             </tr>
         </thead>
         <tbody>
             <tr>
                 <td>connector</td>
-                <td>required</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>Specify what connector to use, here should be <code>'oceanbase-cdc'</code>.</td>
+                <td>指定要使用的连接器，此处为 <code>'oceanbase-cdc'</code>。</td>
             </tr>
             <tr>
                 <td>scan.startup.mode</td>
-                <td>required</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>Specify the startup mode for OceanBase CDC consumer, valid enumerations are
-                    <code>'initial'</code>,<code>'latest-offset'</code> or <code>'timestamp'</code>.
-                </td>
+                <td>指定 OceanBase CDC 消费者的启动模式。可取值为<code>'initial'</code>,<code>'latest-offset'</code> or
+                    <code>'timestamp'</code>。</td>
             </tr>
             <tr>
                 <td>scan.startup.timestamp</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>Long</td>
-                <td>Timestamp in seconds of the start point, only used for <code>'timestamp'</code> startup mode.</td>
+                <td>起始点的时间戳，单位为秒。仅在启动模式为 <code>'timestamp'</code> 时可用。</td>
             </tr>
             <tr>
                 <td>username</td>
-                <td>required</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>Username to be used when connecting to OceanBase.</td>
+                <td>连接 OceanBase 数据库的用户的名称。</td>
             </tr>
             <tr>
                 <td>password</td>
-                <td>required</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>Password to be used when connecting to OceanBase.</td>
+                <td>连接 OceanBase 数据库时使用的密码。</td>
             </tr>
             <tr>
                 <td>tenant-name</td>
-                <td>required</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>Tenant name of OceanBase to monitor, should be exact value.</td>
+                <td>待监控 OceanBase 数据库的租户名，应该填入精确值。</td>
             </tr>
             <tr>
                 <td>database-name</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>Database name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.</td>
+                <td>待监控 OceanBase 数据库的数据库名，应该是正则表达式，该选项只支持和 'initial' 模式一起使用。</td>
             </tr>
             <tr>
                 <td>table-name</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>Table name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.</td>
+                <td>待监控 OceanBase 数据库的表名，应该是正则表达式，该选项只支持和 'initial' 模式一起使用。</td>
             </tr>
             <tr>
                 <td>table-list</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>List of full names of tables, separated by commas, e.g. "db1.table1, db2.table2".</td>
+                <td>待监控 OceanBase 数据库的全路径的表名列表，逗号分隔，如："db1.table1, db2.table2"。</td>
             </tr>
             <tr>
                 <td>hostname</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>IP address or hostname of the OceanBase database server or OceanBase Proxy server.</td>
+                <td>OceanBase 数据库或 OceanBbase 代理 ODP 的 IP 地址或主机名。</td>
             </tr>
             <tr>
                 <td>port</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>Integer</td>
-                <td>Integer port number to connect to OceanBase. It can be the SQL port of OceanBase server, which is 2881 by default, or the port of OceanBase proxy service, which is 2883 by default.</td>
+                <td>
+                    OceanBase 数据库服务器的整数端口号。可以是 OceanBase 服务器的 SQL 端口号（默认值为 2881）<br>
+                    或 OceanBase代理服务的端口号（默认值为 2883）</td>
             </tr>
             <tr>
                 <td>connect.timeout</td>
-                <td>optional</td>
+                <td>否</td>
                 <td style="word-wrap: break-word;">30s</td>
                 <td>Duration</td>
-                <td>The maximum time that the connector should wait after trying to connect to the OceanBase database server before timing out.</td>
+                <td>连接器在尝试连接到 OceanBase 数据库服务器超时前的最长时间。</td>
             </tr>
             <tr>
                 <td>server-time-zone</td>
-                <td>optional</td>
+                <td>否</td>
                 <td style="word-wrap: break-word;">+00:00</td>
                 <td>String</td>
-                <td>The session timezone which controls how temporal types are converted to STRING in OceanBase. Can be UTC offset in format "±hh:mm", or named time zones if the time zone information tables in the mysql database have been created and populated.</td>
+                <td>
+                    数据库服务器中的会话时区，用户控制 OceanBase 的时间类型如何转换为 STRING。<br>
+                    合法的值可以是格式为"±hh:mm"的 UTC 时区偏移量，<br>
+                    如果 mysql 数据库中的时区信息表已创建，合法的值则可以是创建的时区。
+                </td>
             </tr>
             <tr>
                 <td>logproxy.host</td>
-                <td>required</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>Hostname or IP address of OceanBase log proxy service.</td>
+                <td>OceanBase 日志代理服务 的 IP 地址或主机名。</td>
             </tr>
             <tr>
                 <td>logproxy.port</td>
-                <td>required</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>是</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>Integer</td>
-                <td>Port number of OceanBase log proxy service.</td>
+                <td>OceanBase 日志代理服务 的端口号。</td>
             </tr>
             <tr>
                 <td>logproxy.client.id</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">By rule.</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">规则生成</td>
                 <td>String</td>
-                <td>Id of a log proxy client connection, will be in format {flink_ip}_{process_id}_{timestamp}_{thread_id}_{tenant} by default.</td>
+                <td>OceanBase日志代理服务的客户端连接 ID，默认值的生成规则是 {flink_ip}_{process_id}_{timestamp}_{thread_id}_{tenant}。</td>
             </tr>
             <tr>
                 <td>rootserver-list</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>The semicolon-separated list of OceanBase root servers in format `ip:rpc_port:sql_port`, required for OceanBase CE.</td>
+                <td>OceanBase root 服务器列表，服务器格式为 `ip:rpc_port:sql_port`，<br>多个服务器地址使用英文分号 `;` 隔开，OceanBase 社区版本必填。</td>
             </tr>
             <tr>
                 <td>config-url</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>The url to get the server info from the config server, required for OceanBase EE.</td>
+                <td>从配置服务器获取服务器信息的 url, OceanBase 企业版本必填。</td>
             </tr>
             <tr>
                 <td>working-mode</td>
-                <td>optional</td>
+                <td>否</td>
                 <td style="word-wrap: break-word;">storage</td>
                 <td>String</td>
-                <td>Working mode of `obcdc` in LogProxy, can be `storage` or `memory`.</td>
+                <td>日志代理中 `libobcdc` 的工作模式 , 可以是 `storage` 或 `memory`。</td>
             </tr>
             <tr>
                 <td>compatible-mode</td>
-                <td>optional</td>
+                <td>否</td>
                 <td style="word-wrap: break-word;">mysql</td>
                 <td>String</td>
-                <td>Compatible mode of OceanBase, can be `mysql` or `oracle`.</td>
+                <td>OceanBase 的兼容模式，可以是 `mysql` 或 `oracle`。</td>
             </tr>
             <tr>
                 <td>jdbc.driver</td>
-                <td>optional</td>
+                <td>否</td>
                 <td style="word-wrap: break-word;">com.mysql.jdbc.Driver</td>
                 <td>String</td>
-                <td>JDBC driver class for snapshot reading.</td>
+                <td>全量读取时使用的 jdbc 驱动类名。</td>
             </tr>
             <tr>
                 <td>jdbc.properties.*</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>否</td>
+                <td style="word-wrap: break-word;">无</td>
                 <td>String</td>
-                <td>Option to pass custom JDBC URL properties. User can pass custom properties like 'jdbc.properties.useSSL' = 'false'.</td>
-            </tr>
-            <tr>
-                <td>obcdc.properties.*</td>
-                <td>optional</td>
-                <td style="word-wrap: break-word;">(none)</td>
-                <td>String</td>
-                <td>Option to pass custom configurations to the <code>libobcdc</code>, eg: 'obcdc.properties.sort_trans_participants' = '1'. Please refer to <a href="https://en.oceanbase.com/docs/common-oceanbase-database-10000000000872541">obcdc parameters</a> for more details.</td>
+                <td>传递自定义 JDBC URL 属性的选项。用户可以传递自定义属性，如 'jdbc.properties.useSSL' = 'false'。</td>
             </tr>
         </tbody>
     </table>
 </div>
 
-Available Metadata
-----------------
+## 支持的元数据
 
-The following format metadata can be exposed as read-only (VIRTUAL) columns in a table definition.
+在创建表时，您可以使用以下格式的元数据作为只读列（VIRTUAL）。
 
 <table class="colwidths-auto docutils">
     <thead>
         <tr>
-            <th class="text-left" style="width: 15%">Key</th>
-            <th class="text-left" style="width: 30%">DataType</th>
-            <th class="text-left" style="width: 55%">Description</th>
+            <th class="text-left" style="width: 15%">列名</th>
+            <th class="text-left" style="width: 30%">数据类型</th>
+            <th class="text-left" style="width: 55%">描述</th>
         </tr>
     </thead>
     <tbody>
         <tr>
             <td>tenant_name</td>
             <td>STRING NOT NULL</td>
-            <td>Name of the tenant that contains the row.</td>
+            <td>当前记录所属的租户名称。</td>
         </tr>
         <tr>
             <td>database_name</td>
             <td>STRING NOT NULL</td>
-            <td>Name of the database that contains the row.</td>
+            <td>当前记录所属的库名。</td>
         </tr>
         <tr>
             <td>table_name</td>
             <td>STRING NOT NULL</td>
-            <td>Name of the table that contains the row.</td>
+            <td>当前记录所属的表名称。</td>
         </tr>
         <tr>
             <td>op_ts</td>
             <td>TIMESTAMP_LTZ(3) NOT NULL</td>
-            <td>It indicates the time that the change was made in the database. <br>
-                If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
+            <td>该值表示此修改在数据库中发生的时间。如果这条记录是该表在快照阶段读取的记录，则该值返回 0。</td>
         </tr>
     </tbody>
 </table>
 
-The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
+如下 SQL 展示了如何在表中使用这些元数据列：
 
 ```sql
 CREATE TABLE products (
@@ -409,35 +406,32 @@ CREATE TABLE products (
    'port' = '2881',
    'rootserver-list' = '127.0.0.1:2882:2881',
    'logproxy.host' = '127.0.0.1',
-   'logproxy.port' = '2983',
-   'working-mode' = 'memory'
-);
+   'logproxy.port' = '2983');
 ```
 
-Features
---------
+## 特性
 
-### At-Least-Once Processing
+### At-Least-Once 处理
 
-The OceanBase CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **at-least-once processing**.
+OceanBase CDC 连接器是一个 Flink Source 连接器。它将首先读取数据库快照，然后再读取变化事件，并进行 **At-Least-Once 处理**。
 
-OceanBase is a kind of distributed database whose log files are distributed on different servers. As there is no position information like MySQL binlog offset, we can only use timestamp as the position mark. In order to ensure the completeness of reading data, `liboblog` (a C++ library to read OceanBase log record) might read some log data before the given timestamp. So in this way we may read duplicate data whose timestamp is around the start point, and only 'at-least-once' can be guaranteed.
+OceanBase 数据库是一个分布式数据库，它的日志也分散在不同的服务器上。由于没有类似 MySQL binlog 偏移量的位置信息，OceanBase 数据库用时间戳作为位置标记。为确保读取完整的数据，liboblog（读取 OceanBase 日志记录的 C++ 库）可能会在给定的时间戳之前读取一些日志数据。因此，OceanBase 数据库可能会读到起始点附近时间戳的重复数据，可保证 **At-Least-Once 处理**。
 
-### Startup Reading Position
+### 启动模式
 
-The config option `scan.startup.mode` specifies the startup mode for OceanBase CDC consumer. The valid enumerations are:
+配置选项 `scan.startup.mode` 指定 OceanBase CDC 连接器的启动模式。可用取值包括：
 
-- `initial`: Performs an initial snapshot on the monitored table upon first startup, and continue to read the latest commit log.
-- `latest-offset`: Never to perform snapshot on the monitored table upon first startup and just read the latest commit log since the connector is started.
-- `timestamp`: Never to perform snapshot on the monitored table upon first startup and just read the commit log from the given `scan.startup.timestamp`.
+- `initial`（默认）：在首次启动时对受监视的数据库表执行初始快照，并继续读取最新的提交日志。
+- `latest-offset`：首次启动时，不对受监视的数据库表执行快照，仅从连接器启动时读取提交日志。
+- `timestamp`：在首次启动时不对受监视的数据库表执行初始快照，仅从指定的 `scan.startup.timestamp` 读取最新的提交日志。
 
-### Consume Commit Log
+### 消费提交日志
 
-The OceanBase CDC Connector using [oblogclient](https://github.com/oceanbase/oblogclient) to consume commit log from OceanBase LogProxy.
+OceanBase CDC 连接器使用 [oblogclient](https://github.com/oceanbase/oblogclient) 消费 OceanBase日志代理服务 中的事务日志。
 
 ### DataStream Source
 
-The OceanBase CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:
+OceanBase CDC 连接器也可以作为 DataStream Source 使用。您可以按照如下创建一个 SourceFunction：
 
 ```java
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -451,10 +445,10 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.logical.RowType;
 
-import org.apache.flink.cdc.connectors.oceanbase.OceanBaseSource;
-import org.apache.flink.cdc.connectors.oceanbase.source.RowDataOceanBaseDeserializationSchema;
-import org.apache.flink.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
-import org.apache.flink.cdc.connectors.oceanbase.table.StartupMode;
+import com.ververica.cdc.connectors.oceanbase.OceanBaseSource;
+import com.ververica.cdc.connectors.oceanbase.source.RowDataOceanBaseDeserializationSchema;
+import com.ververica.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
+import com.ververica.cdc.connectors.oceanbase.table.StartupMode;
 
 import java.time.ZoneId;
 import java.util.Arrays;
@@ -511,25 +505,27 @@ public class OceanBaseSourceExample {
    }
 }
 ```
-Data Type Mapping
-----------------
 
-### Mysql Mode
+## 数据类型映射
+
+### Mysql 模式
 
 <div class="wy-table-responsive">
     <table class="colwidths-auto docutils">
         <thead>
             <tr>
-                <th class="text-left">OceanBase type</th>
-                <th class="text-left">Flink SQL type</th>
-                <th class="text-left">NOTE</th>
+                <th class="text-left">OceanBase 数据类型</th>
+                <th class="text-left">Flink SQL 类型</th>
+                <th class="text-left">描述</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td>BOOLEAN<br>
+                <td>
+                    BOOLEAN<br>
                     TINYINT(1)<br>
-                    BIT(1)</td>
+                    BIT(1)
+                </td>
                 <td>BOOLEAN</td>
                 <td></td>
             </tr>
@@ -541,7 +537,8 @@ Data Type Mapping
             <tr>
                 <td>
                     SMALLINT<br>
-                    TINYINT UNSIGNED</td>
+                    TINYINT UNSIGNED
+                </td>
                 <td>SMALLINT</td>
                 <td></td>
             </tr>
@@ -549,14 +546,16 @@ Data Type Mapping
                 <td>
                     INT<br>
                     MEDIUMINT<br>
-                    SMALLINT UNSIGNED</td>
+                    SMALLINT UNSIGNED
+                </td>
                 <td>INT</td>
                 <td></td>
             </tr>
             <tr>
                 <td>
                     BIGINT<br>
-                    INT UNSIGNED</td>
+                    INT UNSIGNED
+                </td>
                 <td>BIGINT</td>
                 <td></td>
             </tr>
@@ -568,7 +567,7 @@ Data Type Mapping
             <tr>
                 <td>
                     REAL<br>
-                    FLOAT<br>
+                    FLOAT
                 </td>
                 <td>FLOAT</td>
                 <td></td>
@@ -584,8 +583,7 @@ Data Type Mapping
                 <td>
                     NUMERIC(p, s)<br>
                     DECIMAL(p, s)<br>
-                    where p <= 38<br>
-                </td>
+                    where p <= 38 </td>
                 <td>DECIMAL(p, s)</td>
                 <td></td>
             </tr>
@@ -593,13 +591,13 @@ Data Type Mapping
                 <td>
                     NUMERIC(p, s)<br>
                     DECIMAL(p, s)<br>
-                    where 38 < p <=65<br>
-                </td>
+                    where 38 < p <=65 </td>
                 <td>STRING</td>
-                <td>DECIMAL is equivalent to NUMERIC. The precision for DECIMAL data type is up to 65 in OceanBase, but
-                    the precision for DECIMAL is limited to 38 in Flink.
-                    So if you define a decimal column whose precision is greater than 38, you should map it to STRING to
-                    avoid precision loss.</td>
+                <td>
+                    DECIMAL 等同于 NUMERIC。在 OceanBase 数据库中，DECIMAL 数据类型的精度最高为 65。<br>
+                    但在 Flink 中，DECIMAL 的最高精度为 38。因此，<br>
+                    如果你定义了一个精度大于 38 的 DECIMAL 列，你应当将其映射为 STRING，以避免精度损失。
+                </td>
             </tr>
             <tr>
                 <td>DATE</td>
@@ -633,7 +631,7 @@ Data Type Mapping
             </tr>
             <tr>
                 <td>BIT(n)</td>
-                <td>BINARY(⌈(n + 7) / 8⌉)</td>
+                <td>BINARY(⌈n/8⌉)</td>
                 <td></td>
             </tr>
             <tr>
@@ -651,7 +649,7 @@ Data Type Mapping
                     TINYTEXT<br>
                     TEXT<br>
                     MEDIUMTEXT<br>
-                    LONGTEXT<br>
+                    LONGTEXT
                 </td>
                 <td>STRING</td>
                 <td></td>
@@ -661,7 +659,7 @@ Data Type Mapping
                     TINYBLOB<br>
                     BLOB<br>
                     MEDIUMBLOB<br>
-                    LONGBLOB<br>
+                    LONGBLOB
                 </td>
                 <td>BYTES</td>
                 <td></td>
@@ -679,18 +677,21 @@ Data Type Mapping
             <tr>
                 <td>SET</td>
                 <td>ARRAY&lt;STRING&gt;</td>
-                <td>As the SET data type in OceanBase is a string object that can have zero or more values, it should always be mapped to an array of string</td>
+                <td>
+                    因为 OceanBase 的 SET 类型是用包含一个或多个值的字符串对象表示，<br>
+                    所以映射到 Flink 时是一个字符串数组
+                </td>
             </tr>
             <tr>
                 <td>JSON</td>
                 <td>STRING</td>
-                <td>The JSON data type  will be converted into STRING with JSON format in Flink.</td>
+                <td>JSON 类型的数据在 Flink 中会转化为 JSON 格式的字符串</td>
             </tr>
         </tbody>
     </table>
 </div>
 
-### Oracle Mode
+### Oracle 模式
 
 <div class="wy-table-responsive">
     <table class="colwidths-auto docutils">
