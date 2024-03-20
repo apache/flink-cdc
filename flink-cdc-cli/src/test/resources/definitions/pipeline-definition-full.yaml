@@ -43,6 +43,9 @@ transform:
   - source-table: mydb.app_order_.*
     projection: id, order_id, TO_UPPER(product_name)
     filter: id > 10 AND order_id > 100
+    primary-keys: id
+    partition-keys: product_name
+    table-options: comment=app order
     description: project fields from source table
   - source-table: mydb.web_order_.*
     projection: CONCAT(id, order_id) as uniq_id, *
