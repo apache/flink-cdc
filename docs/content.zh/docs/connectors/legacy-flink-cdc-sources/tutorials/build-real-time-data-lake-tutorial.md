@@ -1,6 +1,6 @@
 ---
 title: "使用 Flink CDC 构建实时数据湖"
-weight: 999
+weight: 998
 type: docs
 aliases:
 - /connectors/legacy-flink-cdc-sources/tutorials/build-real-time-data-lake-tutorial.html
@@ -26,130 +26,117 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Using Flink CDC to synchronize data from MySQL sharding tables and build real-time data lake
+# 使用 Flink CDC 构建实时数据湖
 
-For OLTP databases, to deal with a huge number of data in a single table, we usually do database and table sharding to get better throughput.
-But sometimes, for convenient analysis, we need to merge them into one table when loading them to data warehouse or data lake.
+在 OLTP 系统中，为了解决单表数据量大的问题，通常采用分库分表的方式将单个大表进行拆分以提高系统的吞吐量。
+但是为了方便数据分析，通常需要将分库分表拆分出的表在同步到数据仓库、数据湖时，再合并成一个大表。
 
-This tutorial will show how to use Flink CDC to build a real-time data lake for such a scenario.
-You can walk through the tutorial easily in the docker environment. The entire process uses standard SQL syntax without a single line of Java/Scala code or IDE installation.
+这篇教程将展示如何使用 Flink CDC 构建实时数据湖来应对这种场景，本教程的演示基于 Docker，只涉及 SQL，无需一行 Java/Scala 代码，也无需安装 IDE，你可以很方便地在自己的电脑上完成本教程的全部内容。
 
-The following sections will take the pipeline from MySQL to [Iceberg](https://iceberg.apache.org/) as an example. The overview of the architecture is as follows:
+接下来将以数据从 MySQL 同步到 [Iceberg](https://iceberg.apache.org/) 为例展示整个流程，架构图如下所示：
 
 {{< img src="/fig/real-time-data-lake-tutorial/real-time-data-lake-tutorial.png" alt="Real-time data lake with Flink CDC" >}}
 
-You can also use other data sources like Oracle/Postgres and sinks like Hudi to build your own pipeline.
+你也可以使用不同的 source 比如 Oracle/Postgres 和 sink 比如 Hudi 来构建自己的 ETL 流程。
 
-## Preparation
-Prepare a Linux or MacOS computer with Docker installed.
+## 准备阶段
+准备一台已经安装了 Docker 的 Linux 或者 MacOS 电脑。
 
-## Preparing JAR package required
-**Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release-branches by yourself.**
-- flink-sql-connector-mysql-cdc-3.0-SNAPSHOT.jar
-- [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
-- [iceberg-flink-runtime-1.16-1.3.1.jar](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime-1.16/1.3.1/iceberg-flink-runtime-1.16-1.3.1.jar)
+### 准备教程所需要的组件
+接下来的教程将以 `docker-compose` 的方式准备所需要的组件。
 
+使用下面的内容创建一个 `docker-compose.yml` 文件：
+```
+version: '2.1'
+services:
+  sql-client:
+    user: flink:flink
+    image: yuxialuo/flink-sql-client:1.13.2.v1 
+    depends_on:
+      - jobmanager
+      - mysql
+    environment:
+      FLINK_JOBMANAGER_HOST: jobmanager
+      MYSQL_HOST: mysql
+    volumes:
+      - shared-tmpfs:/tmp/iceberg
+  jobmanager:
+    user: flink:flink
+    image: flink:1.13.2-scala_2.11
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+    volumes:
+      - shared-tmpfs:/tmp/iceberg
+  taskmanager:
+    user: flink:flink
+    image: flink:1.13.2-scala_2.11
+    depends_on:
+      - jobmanager
+    command: taskmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 2
+    volumes:
+      - shared-tmpfs:/tmp/iceberg
+  mysql:
+    image: debezium/example-mysql:1.1
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+      - MYSQL_USER=mysqluser
+      - MYSQL_PASSWORD=mysqlpw
 
+volumes:
+  shared-tmpfs:
+    driver: local
+    driver_opts:
+      type: "tmpfs"
+      device: "tmpfs"
+```
 
-### Starting components required
-The components required in this tutorial are all managed in containers, so we will use `docker-compose` to start them.
+该 Docker Compose 中包含的容器有：
+- SQL-Client: Flink SQL Client, 用来提交 SQL 查询和查看 SQL 的执行结果
+- Flink Cluster：包含 Flink JobManager 和 Flink TaskManager，用来执行 Flink SQL
+- MySQL：作为分库分表的数据源，存储本教程的 `user` 表
 
-1. Create `Dockerfile` file using following contents:
-   ```dockerfile
-   FROM flink:1.16.0-scala_2.12
-   # Place the downloaded jar packages in the lib directory at the same level.
-   COPY ./lib /opt/flink/lib
-   RUN apt-get update && apt-get install tree
-   ```
+***注意：***
+1. 为了简化整个教程，本教程需要的 jar 包都已经被打包进 SQL-Client 容器中了，镜像的构建脚本可以在 [GitHub](https://github.com/luoyuxia/flink-cdc-tutorial/tree/main/flink-cdc-iceberg-demo/sql-client) 上找到。
+   如果你想要在自己的 Flink 环境运行本教程，需要下载下面列出的包并且把它们放在 Flink 所在目录的 lib 目录下，即 `FLINK_HOME/lib/`。
 
-2. Create `docker-compose.yml` file using following contents:
-   ```yml
-   version: '2.1'
-   services:
-      sql-client:
-         user: flink:flink
-         build: .
-         command: bin/sql-client.sh
-         depends_on:
-            - jobmanager
-            - mysql
-         environment:
-            - MYSQL_HOST=mysql
-            - |
-               FLINK_PROPERTIES=
-               jobmanager.rpc.address: jobmanager
-               rest.address: jobmanager           
-         volumes:
-            - shared-tmpfs:/tmp/iceberg
-      jobmanager:
-         user: flink:flink
-         build: .
-         ports:
-            - "8081:8081"
-         command: jobmanager
-         environment:
-            - |
-               FLINK_PROPERTIES=
-               jobmanager.rpc.address: jobmanager
-         volumes:
-            - shared-tmpfs:/tmp/iceberg
-      taskmanager:
-         user: flink:flink
-         build: .
-         depends_on:
-            - jobmanager
-         command: taskmanager
-         environment:
-            - |
-               FLINK_PROPERTIES=
-               jobmanager.rpc.address: jobmanager
-               taskmanager.numberOfTaskSlots: 2
-         volumes:
-            - shared-tmpfs:/tmp/iceberg
-      mysql:
-         image: debezium/example-mysql:1.1
-         ports:
-            - "3306:3306"
-         environment:
-            - MYSQL_ROOT_PASSWORD=123456
-            - MYSQL_USER=mysqluser
-            - MYSQL_PASSWORD=mysqlpw
-   
-   volumes:
-      shared-tmpfs:
-         driver: local
-         driver_opts:
-            type: "tmpfs"
-            device: "tmpfs"
-   ```
+   **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译**
 
-   The Docker Compose environment consists of the following containers:
-   - SQL-Client: Flink SQL Client, used to submit queries and visualize their results.
-   - Flink Cluster: a Flink JobManager and a Flink TaskManager container to execute queries.
-   - MySQL: mainly used as a data source to store the sharding table.
+   - [flink-sql-connector-mysql-cdc-2.4.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/2.4.0/flink-sql-connector-mysql-cdc-2.4.0.jar)
+   - [flink-shaded-hadoop-2-uber-2.7.5-10.0.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/2.7.5-10.0/flink-shaded-hadoop-2-uber-2.7.5-10.0.jar)
+   - [iceberg-flink-1.13-runtime-0.13.0-SNAPSHOT.jar](https://raw.githubusercontent.com/luoyuxia/flink-cdc-tutorial/main/flink-cdc-iceberg-demo/sql-client/lib/iceberg-flink-1.13-runtime-0.13.0-SNAPSHOT.jar)
 
-3. To start all containers, run the following command in the directory that contains the `docker-compose.yml` file:
-   ```shell
-   docker-compose up -d
-   ```
-   This command automatically starts all the containers defined in the Docker Compose configuration in a detached mode. Run `docker ps` to check whether these containers are running properly.
-   We can also visit [http://localhost:8081/](http://localhost:8081/) to see if Flink is running normally.
+   目前支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包还没有发布，所以我们在这里提供了一个支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包，这个 jar 包是基于 Iceberg 的 master 分支打包的。
+   当 Iceberg 0.13.0 版本发布后，你也可以在 [apache official repository](https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-flink-runtime/) 下载到支持 Flink 1.13 的 `iceberg-flink-runtime` jar 包。
+2. 本教程接下来用到的容器相关的命令都需要在 `docker-compose.yml` 所在目录下执行
 
-
-***Note:***
-* If you want to run with your own Flink environment, remember to download the jar packages and then put them to `FLINK_HOME/lib/`.
-* All the following commands involving `docker-compose` should be executed in the directory of the `docker-compose.yml` file.
+在 `docker-compose.yml` 所在目录下执行下面的命令来启动本教程需要的组件：
+```shell
+docker-compose up -d
+```
+该命令将以 detached 模式自动启动 Docker Compose 配置中定义的所有容器。你可以通过 `docker ps` 来观察上述的容器是否正常启动了，也可以通过访问 [http://localhost:8081/](http://localhost:8081//) 来查看 Flink 是否运行正常。
 
 {{< img src="/fig/real-time-data-lake-tutorial/flink-ui.png" alt="Flink UI" >}}
 
-### Preparing data in databases
-1. Enter mysql's container:
+### 准备数据
+1. 进入 MySQL 容器中
     ```shell
     docker-compose exec mysql mysql -uroot -p123456
     ```
-2. Create databases/tables and populate data:
+2. 创建数据和表，并填充数据
 
-   Create a logical sharding table `user` sharded in different databases and tables physically.
+   创建两个不同的数据库，并在每个数据库中创建两个表，作为 `user` 表分库分表下拆分出的表。
    ```sql
     CREATE DATABASE db_1;
     USE db_1;
@@ -193,30 +180,28 @@ The components required in this tutorial are all managed in containers, so we wi
    INSERT INTO user_2 VALUES (220,"user_220","Shanghai","123567891234","user_220@foo.com");
    ```
 
-## Creating tables using Flink DDL in Flink SQL CLI
-First, use the following command to enter the Flink SQL CLI Container:
+## 在 Flink SQL CLI 中使用 Flink DDL 创建表
+首先，使用如下的命令进入 Flink SQL CLI 容器中：
 ```shell
-docker-compose run sql-client
+docker-compose exec sql-client ./sql-client
 ```
-
-We should see the welcome screen of the CLI client:
+我们可以看到如下界面：
 
 {{< img src="/fig/real-time-data-lake-tutorial/flink-sql-client.png" alt="Flink SQL Client" >}}
 
-Then do the following steps in Flink SQL CLI:
+然后，进行如下步骤：
+1. 开启 checkpoint，每隔3秒做一次 checkpoint
 
-1. Enable checkpoints every 3 seconds
-   
-   Checkpoint is disabled by default, we need to enable it to commit Iceberg transactions.
-   Besides, the beginning of mysql-cdc binlog phase also requires waiting a complete checkpoint to avoid disorder of binlog records.
+   Checkpoint 默认是不开启的，我们需要开启 Checkpoint 来让 Iceberg 可以提交事务。
+   并且，mysql-cdc 在 binlog 读取阶段开始前，需要等待一个完整的 checkpoint 来避免 binlog 记录乱序的情况。
    ```sql
    -- Flink SQL                   
    Flink SQL> SET execution.checkpointing.interval = 3s;
    ```
-2. Create MySQL sharding source table 
+2. 创建 MySQL 分库分表 source 表
 
-   Create a source table that captures the data from the logical sharding table `user`. Here, we use regex to match all the physical tables.
-   Besides, the table defines metadata column to identify which database/table the record comes from.
+   创建 source 表 `user_source` 来捕获MySQL中所有 `user` 表的数据，在表的配置项 `database-name` , `table-name` 使用正则表达式来匹配这些表。
+   并且，`user_source` 表也定义了 metadata 列来区分数据是来自哪个数据库和表。
    ```sql
    -- Flink SQL
    Flink SQL> CREATE TABLE user_source (
@@ -238,10 +223,10 @@ Then do the following steps in Flink SQL CLI:
        'table-name' = 'user_[0-9]+'
      );
    ```
-3. Create Iceberg sink table
+3. 创建 Iceberg sink 表
 
-   Create a sink table `all_users_sink` used to load data to Iceberg.
-   We define `database_name`, `table_name` and `id` as a combined primary key, because `id` maybe not unique across different databases and tables.
+   创建 sink 表 `all_users_sink`，用来将数据加载至 Iceberg 中。
+   在这个 sink 表，考虑到不同的 MySQL 数据库表的 `id` 字段的值可能相同，我们定义了复合主键 (`database_name`, `table_name`, `id`)。
    ```sql
    -- Flink SQL
    Flink SQL> CREATE TABLE all_users_sink (
@@ -262,68 +247,66 @@ Then do the following steps in Flink SQL CLI:
      );
    ```
 
-## Streaming to Iceberg
-1. Streaming write data from MySQL to Iceberg using the following Flink SQL:
+## 流式写入 Iceberg
+
+1. 使用下面的 Flink SQL 语句将数据从 MySQL 写入 Iceberg 中
    ```sql
    -- Flink SQL
    Flink SQL> INSERT INTO all_users_sink select * from user_source;
    ```
-   It will start a streaming job which will synchronize historical and incremental data from MySQL to Iceberg continuously.
-   The running job can be found in [Flink UI](http://localhost:8081/#/job/running), and it looks like:
-   
-   
+   上述命令将会启动一个流式作业，源源不断将 MySQL 数据库中的全量和增量数据同步到 Iceberg 中。
+   在 [Flink UI](http://localhost:8081/#/job/running) 上可以看到这个运行的作业：
+
    {{< img src="/fig/real-time-data-lake-tutorial/flink-cdc-iceberg-running-job.png" alt="CDC to Iceberg Running Job" >}}
-   
-   Then, we can use the following command to see the files written to Iceberg: 
+
+   然后我们就可以使用如下的命令看到 Iceberg 中的写入的文件：
    ```shell
    docker-compose exec sql-client tree /tmp/iceberg/warehouse/default_database/
    ```
-   It should look like:
+   如下所示：
 
    {{< img src="/fig/real-time-data-lake-tutorial/files-in-iceberg.png" alt="Files in Iceberg" >}}
 
-   The actual files may differ in your environment, but the structure of the directory should be similar.
+   在你的运行环境中，实际的文件可能与上面的截图不相同，但是整体的目录结构应该相似。
 
-2. Use the following Flink SQL to query the data written to `all_users_sink`:
+2. 使用下面的 Flink SQL 语句查询表 `all_users_sink` 中的数据
    ```sql
    -- Flink SQL
    Flink SQL> SELECT * FROM all_users_sink;
    ```
-   We can see the data queried in the Flink SQL CLI:
-   
+   在 Flink SQL CLI 中我们可以看到如下查询结果：
+
    {{< img src="/fig/real-time-data-lake-tutorial/data_in_iceberg.png" alt="Data in Iceberg" >}}
-   
-3. Make some changes in the MySQL databases, and then the data in Iceberg table `all_users_sink` will also change in real time.
-   
-   (3.1) Insert a new user in table `db_1.user_1`
+
+3. 修改 MySQL 中表的数据，Iceberg 中的表 `all_users_sink` 中的数据也将实时更新：
+
+   (3.1) 在 `db_1.user_1` 表中插入新的一行
    ```sql
    --- db_1
    INSERT INTO db_1.user_1 VALUES (111,"user_111","Shanghai","123567891234","user_111@foo.com");
    ```
 
-   (3.2) Update a user in table `db_1.user_2`
+   (3.2) 更新 `db_1.user_2` 表的数据
    ```sql
    --- db_1
    UPDATE db_1.user_2 SET address='Beijing' WHERE id=120;
    ```
 
-   (3.3) Delete a user in table `db_2.user_2`
+   (3.3) 在 `db_2.user_2` 表中删除一行
    ```sql
    --- db_2
    DELETE FROM db_2.user_2 WHERE id=220;
    ```
+   每执行一步，我们就可以在 Flink Client CLI 中使用 `SELECT * FROM all_users_sink` 查询表 `all_users_sink` 来看到数据的变化。
 
-   After executing each step, we can query the table `all_users_sink` using `SELECT * FROM all_users_sink` in Flink SQL CLI to see the changes.
-   
-   The final query result is as follows:
-   
+   最后的查询结果如下所示：
+
    {{< img src="/fig/real-time-data-lake-tutorial/final-data-in-iceberg.png" alt="Final Data in Iceberg" >}}
 
-   From the latest result in Iceberg, we can see that there is a new record of `(db_1, user_1, 111)`, and the address of `(db_1, user_2, 120)` has been updated to `Beijing`.
-   Besides, the record of `(db_2, user_2, 220)` has been deleted. The result is exactly the same with the changes we did in MySQL.
-   
-## Clean up
-After finishing the tutorial, run the following command in the directory of `docker-compose.yml` to stop all containers:
+   从 Iceberg 的最新结果中可以看到新增了`(db_1, user_1, 111)`的记录，`(db_1, user_2, 120)`的地址更新成了 `Beijing`，且`(db_2, user_2, 220)`的记录被删除了，与我们在 MySQL 做的数据更新完全一致。
+
+## 环境清理
+本教程结束后，在 `docker-compose.yml` 文件所在的目录下执行如下命令停止所有容器：
 ```shell
 docker-compose down
 ```

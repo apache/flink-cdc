@@ -24,9 +24,9 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Demo: MongoDB CDC to Elasticsearch
+# 演示: MongoDB CDC 导入 Elasticsearch
 
-1. Create `docker-compose.yml` file using following contents: 
+1. 下载 `docker-compose.yml`
 
 ```
 version: '2.1'
@@ -62,20 +62,20 @@ services:
       - "5601:5601"
 ```
 
-2. Enter Mongodb's container and initialize replica set and data:
+2. 进入 MongoDB 容器，初始化副本集和数据:
 ```
 docker-compose exec mongo /usr/bin/mongo -u mongouser -p mongopw
 ```
 
 ```javascript
-// 1. initialize replica set
+// 1. 初始化副本集
 rs.initiate();
 rs.status();
 
-// 2. switch database
+// 2. 切换数据库
 use mgdb;
 
-// 3. initialize data
+// 3. 初始化数据
 db.orders.insertMany([
   {
     order_id: 101,
@@ -131,21 +131,21 @@ db.customers.insertMany([
 ]);
 ```
 
-3. Download following JAR package to `<FLINK_HOME>/lib/`:
+3. 下载以下 jar 包到 `<FLINK_HOME>/lib/`:
 
-```Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself. ```
+```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译```
 
 - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-- [flink-sql-connector-mongodb-cdc-3.0-SNAPSHOT.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mongodb-cdc/3.0-SNAPSHOT/flink-sql-connector-mongodb-cdc-3.0-SNAPSHOT.jar)
+- [flink-sql-connector-mongodb-cdc-2.4.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/2.4.0/flink-sql-connector-mongodb-cdc-2.4.0.jar)
 
-4. Launch a Flink cluster, then start a Flink SQL CLI and execute following SQL statements inside: 
+4. 然后启动 Flink 集群，再启动 SQL CLI.
 
 ```sql
 -- Flink SQL
--- checkpoint every 3000 milliseconds                       
+-- 设置间隔时间为3秒                       
 Flink SQL> SET execution.checkpointing.interval = 3s;
 
--- set local time zone as Asia/Shanghai
+-- 设置本地时区为 Asia/Shanghai
 Flink SQL> SET table.local-time-zone = Asia/Shanghai;
 
 Flink SQL> CREATE TABLE orders (
@@ -210,34 +210,34 @@ Flink SQL> INSERT INTO enriched_orders
    LEFT JOIN customers AS c ON o.customer_id = c.customer_id;
 ```
 
-5. Make some changes in MongoDB, then check the result in Elasticsearch: 
+5. 修改 MongoDB 里面的数据，观察 elasticsearch 里的结果。
 
 ```javascript
-db.orders.insert({ 
-  order_id: 104, 
-  order_date: ISODate("2020-07-30T12:00:30.001Z"),
-  customer_id: 1004,
-  price: NumberDecimal("25.25"),
-  product: { 
-    name: 'rocks',
-    description: 'box of assorted rocks'
-  },
-  order_status: false
+db.orders.insert({
+    order_id: 104,
+    order_date: ISODate("2020-07-30T12:00:30.001Z"),
+    customer_id: 1004,
+    price: NumberDecimal("25.25"),
+    product: {
+        name: 'rocks',
+        description: 'box of assorted rocks'
+    },
+    order_status: false
 });
 
-db.customers.insert({ 
-  customer_id: 1004,
-  name: 'Jacob', 
-  address: 'Shanghai' 
+db.customers.insert({
+    customer_id: 1004,
+    name: 'Jacob',
+    address: 'Shanghai'
 });
 
 db.orders.updateOne(
-  { order_id: 104 },
-  { $set: { order_status: true } }
+    { order_id: 104 },
+    { $set: { order_status: true } }
 );
 
 db.orders.deleteOne(
-  { order_id : 104 }
+    { order_id : 104 }
 );
 ```
 

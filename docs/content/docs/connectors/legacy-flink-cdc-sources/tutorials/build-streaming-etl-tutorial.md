@@ -1,6 +1,6 @@
 ---
-title: "MySQL & PostgreSQL Tutorial"
-weight: 2
+title: "Building a Streaming ETL with Flink CDC"
+weight: 999
 type: docs
 aliases:
 - /connectors/legacy-flink-cdc-sources/tutorials/mysql-postgres-tutorial.html
@@ -24,7 +24,7 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Streaming ETL for MySQL and PostgreSQL with Flink CDC
+# Building a Streaming ETL with Flink CDC
 
 This tutorial is to show how to quickly build streaming ETL for MySQL and Postgres with Flink CDC.
 
