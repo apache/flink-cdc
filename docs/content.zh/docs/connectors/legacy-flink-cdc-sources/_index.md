@@ -1,5 +1,5 @@
 ---
-title: Legacy Flink CDC Sources
+title: Legacy CDC Sources
 bookCollapseSection: true
 weight: 5
 ---

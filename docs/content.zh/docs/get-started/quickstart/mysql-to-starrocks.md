@@ -1,5 +1,5 @@
 ---
-title: "MySQL to StarRocks"
+title: "MySQL 同步到 StarRocks"
 weight: 2
 type: docs
 aliases:

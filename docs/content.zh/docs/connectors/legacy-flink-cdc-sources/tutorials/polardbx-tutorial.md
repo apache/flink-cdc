@@ -1,5 +1,5 @@
 ---
-title: "PolarDB-X Tutorial"
+title: "PolarDB-X 教程"
 weight: 5
 type: docs
 aliases:

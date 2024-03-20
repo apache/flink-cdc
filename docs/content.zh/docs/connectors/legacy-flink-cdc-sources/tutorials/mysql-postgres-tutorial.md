@@ -1,5 +1,5 @@
 ---
-title: "MySQL & PostgreSQL Tutorial"
+title: "MySQL & PostgreSQL 教程"
 weight: 2
 type: docs
 aliases:

@@ -1,5 +1,5 @@
 ---
-title: "Db2 Tutorial"
+title: "Db2 教程"
 weight: 8
 type: docs
 aliases:

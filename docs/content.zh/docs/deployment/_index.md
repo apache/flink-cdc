@@ -1,5 +1,5 @@
 ---
-title: Deployment
+title: 部署模式
 bold: true
 bookCollapseSection: true
 weight: 4
