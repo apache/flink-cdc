@@ -35,7 +35,7 @@ The dependency management of each connector in Flink CDC project is consistent w
 
 ### Q3: Why change the package name from com.alibaba.ververica changed to org.apache.flink?  Why can't the 2. X version be found in Maven warehouse?
 
-Flink CDC project changes the group ID from com.alibaba.ververica changed to org.apache.flink since 2.0.0 version, this is to make the project more community neutral and more convenient for developers of various companies to build. So look for 2.x in Maven warehouse package, the path is /org/apache/flink.
+Flink CDC project changes the group ID from com.alibaba.ververica changed to org.apache.flink since 2.0.0 version, this is to make the project more community neutral and more convenient for developers of various companies to build. So look for 2.x in Maven warehouse package, the path is /com/ververica, while the path of 3.1+ is /org/apache/flink.
 
 ## MySQL CDC FAQ
 
@@ -132,7 +132,8 @@ Flink CDC provides DataStream API `MysqlSource` since version 2.1. Users can con
 
 ### Q7: How to synchronize the whole MySQL database? Does Flink CDC support it?
 
-The DataStream API provided in Q6 has enabled users to obtain DDL change events and data change events. On this basis, users need to develop DataStream jobs according to their own business logic and downstream storage.
+1. The DataStream API provided in Q6 has enabled users to obtain DDL change events and data change events. On this basis, users need to develop DataStream jobs according to their own business logic and downstream storage.
+2. Flink CDC provides the pipeline to synchronize the whole MySQL database Since version 3.0.
 
 ### Q8: In the same MySQL instance, the table of one database cannot synchronize incremental data, but other databases works fine. Why?
 
@@ -224,9 +225,9 @@ Please ensure that the replica identity is full first. The toast data is relativ
 
 ### Q4: The job reports an error replication slot "XXXX" is active. What should I do?
 
-Currently, Flink Postgres CDC does not release the slot manually after the job exits. There are two ways to solve this problem
+Currently, Flink Postgres CDC does not release the slot manually after the job exits. 
 
-- Go to Postgres and manually execute the following command
+Go to Postgres and manually execute the following command.
 
 ```
 select pg_drop_replication_slot('rep_slot');
@@ -234,7 +235,6 @@ select pg_drop_replication_slot('rep_slot');
 select pg_terminate_backend(162564); select pg_drop_replication_slot('rep_slot');
 ```
 
-- Add 'debezium.slot.drop.on.stop'='true' to PG source with parameter to automatically clean up the slot after the job stops
 
 ### Q5: Jobs have dirty data, such as illegal dates. Are there parameters that can be configured and filtered?
 
@@ -277,29 +277,25 @@ Mongodb original oplog RS has only insert, update, replace and delete operation 
 
 Only the collection of the whole database can be subscribed, but some collection filtering functions are not supported. For example, if the database is configured as' mgdb 'and the collection is an empty string, all collections under the' mgdb 'database will be subscribed.
 
-### Q5: Does mongodb CDC support setting multiple concurrent reads?
-
-Not yet supported.
-
-### Q6: What versions of mongodb are supported by mongodb CDC?
+### Q5: What versions of mongodb are supported by mongodb CDC?
 
 Mongodb CDC is implemented based on the changestream feature, which is a new feature launched by mongodb 3.6. Mongodb CDC theoretically supports versions above 3.6. It is recommended to run version > = 4.0. When executing versions lower than 3.6, an error will occur: unrecognized pipeline stage name: '$changestream'.
 
-### Q7: What is the operation mode of mongodb supported by mongodb CDC?
+### Q6: What is the operation mode of mongodb supported by mongodb CDC?
 
 Changestream requires mongodb to run in replica set or fragment mode. Local tests can use stand-alone replica set rs.initiate().
 
 Errors occur in standalone mode : The $changestage is only supported on replica sets.
 
-### Q8: Mongodb CDC reports an error. The user name and password are incorrect, but other components can connect normally with this user name and password. What is the reason?
+### Q7: Mongodb CDC reports an error. The user name and password are incorrect, but other components can connect normally with this user name and password. What is the reason?
 
 If the user is creating a DB that needs to be connected, add 'connection' to the with parameter Options' ='authsource = DB where the user is located '.
 
-### Q9: Does mongodb CDC support debezium related parameters?
+### Q8: Does mongodb CDC support debezium related parameters?
 
 The mongodb CDC connector is not supported because it is independently developed in the Flink CDC project and does not rely on the debezium project.
 
-### Q10: In the mongodb CDC full reading phase, can I continue reading from the checkpoint after the job fails?
+### Q9: In the mongodb CDC full reading phase, can I continue reading from the checkpoint after the job fails?
 
 In the full reading phase, mongodb CDC does not do checkpoint until the full reading phase is completed. If it fails in the full reading phase, mongodb CDC will read the stock data again.
 
@@ -325,6 +321,6 @@ If it is the DataStream API, add the configuration item of debezium 'database.ta
 
 Add configuration item  'database.connection.adpter' = 'xstream', please use the configuration item 'debezium.database.connection.adpter' = 'xstream' if you're using SQL API.
 
-### Q4: What are the database name and schema name of Oracle CDC
+### Q4: What are the database name and schema name of Oracle CDC?
 
 Database name is the name of the database example, that is, the SID of Oracle. Schema name is the schema corresponding to the table. Generally speaking, a user corresponds to a schema. The schema name of the user is equal to the user name and is used as the default schema of the user. Therefore, schema name is generally the user name for creating the table, but if a schema is specified when creating the table, the specified schema is schema name. For example, use create table AAAA If TestTable (XXXX) is successfully created, AAAA is schema name.
