@@ -203,6 +203,15 @@ pipeline:
       <td>连接池大小。</td>
     </tr>
     <tr>
+      <td>table.exclude.list</td>
+      <td>required</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>需要排除的 MySQL 数据库的表名。表名支持正则表达式，以监视满足正则表达式的多个表。<br>
+          需要注意的是，点号（.）被视为数据库和表名的分隔符。 如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
+          例如，db0.\.*, db1.user_table_[0-9]+, db[1-2].[app|web]order_\.*</td>
+    </tr>
+    <tr>
       <td>jdbc.properties.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">20</td>

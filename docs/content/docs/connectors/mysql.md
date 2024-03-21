@@ -206,6 +206,16 @@ pipeline:
           <td>The connection pool size.</td>
     </tr>
     <tr>
+      <td>table.exclude.list</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Table name of the MySQL database to exclude. The table-name also supports regular expressions to monitor multiple tables that satisfy the regular expressions. <br>
+          It is important to note that the dot (.) is treated as a delimiter for database and table names. 
+          If there is a need to use a dot (.) in a regular expression to match any character, it is necessary to escape the dot with a backslash.<br>
+          eg. db0.\.*, db1.user_table_[0-9]+, db[1-2].[app|web]order_\.*</td>
+    </tr>
+    <tr>
           <td>jdbc.properties.*</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">20</td>

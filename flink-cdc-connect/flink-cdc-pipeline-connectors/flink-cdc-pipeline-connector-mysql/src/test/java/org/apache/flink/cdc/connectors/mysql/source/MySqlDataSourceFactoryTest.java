@@ -28,11 +28,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
-import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
-import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
-import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
-import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.*;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLE_EXCLUDE_LIST;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -77,6 +74,49 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
         assertThatThrownBy(() -> factory.createDataSource(context))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot find any table by the option 'tables' = " + tables);
+    }
+
+    @Test
+    public void testExcludeTable() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        // db has three tables , table.list= (products,orders shipments)
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        String tableExcludeList = inventoryDatabase.getDatabaseName() + ".prod\\.orders";
+        options.put(TABLE_EXCLUDE_LIST.key(), tableExcludeList);
+
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+        assertThat(dataSource.getSourceConfig().getTableList())
+                .isNotEqualTo(Arrays.asList(inventoryDatabase.getDatabaseName() + ".orders"));
+    }
+
+    @Test
+    public void testExcludeAllTable() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        String tableExcludeList = inventoryDatabase.getDatabaseName() + ".prod\\.*";
+        options.put(TABLE_EXCLUDE_LIST.key(), tableExcludeList);
+
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "Cannot find any table with by the option 'table.exclude.list'  = "
+                                + tableExcludeList);
     }
 
     class MockContext implements Factory.Context {
