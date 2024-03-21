@@ -204,7 +204,7 @@ pipeline:
     </tr>
     <tr>
       <td>table.exclude.list</td>
-      <td>required</td>
+      <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>需要排除的 MySQL 数据库的表名。表名支持正则表达式，以监视满足正则表达式的多个表。<br>
