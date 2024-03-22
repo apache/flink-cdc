@@ -48,14 +48,12 @@ using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR
 
 ### SQL Client JAR
 
-```Download link is available only for stable releases.```
-
-Download flink-sql-connector-db2-cdc-3.0-SNAPSHOT.jar and 
+Download [flink-sql-connector-db2-cdc-3.0.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-db2-cdc/3.0.1/flink-sql-connector-db2-cdc-3.0.1.jar) and 
 put it under `<FLINK_HOME>/lib/`.
 
-**Note:** flink-sql-connector-db2-cdc-XXX-SNAPSHOT version is the code corresponding to the development branch. Users should use the released version, such as
-[flink-sql-connector-db2-cdc-3.0.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-connector-db2-cdc),
-the released version will be available in the Maven central warehouse.
+**Note:** Refer to 
+[flink-sql-connector-db2-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-db2-cdc),
+more released versions will be available in the Maven central warehouse.
 
 Setup Db2 server
 ----------------
