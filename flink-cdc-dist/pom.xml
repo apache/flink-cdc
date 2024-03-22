@@ -79,7 +79,7 @@ limitations under the License.
                             <relocations>
                                 <relocation>
                                     <pattern>org.apache.commons.cli</pattern>
-                                    <shadedPattern>com.ververica.cdc.shaded.com.apache.commons.cli</shadedPattern>
+                                    <shadedPattern>org.apache.flink.cdc.shaded.com.apache.commons.cli</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>

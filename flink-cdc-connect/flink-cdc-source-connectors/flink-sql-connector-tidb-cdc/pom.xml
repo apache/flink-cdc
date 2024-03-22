@@ -65,13 +65,13 @@ limitations under the License.
                                 <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.com.google
+                                        org.apache.flink.cdc.connectors.shaded.com.google
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>io.grpc</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.io.grpc
+                                        org.apache.flink.cdc.connectors.shaded.io.grpc
                                     </shadedPattern>
                                 </relocation>
                             </relocations>

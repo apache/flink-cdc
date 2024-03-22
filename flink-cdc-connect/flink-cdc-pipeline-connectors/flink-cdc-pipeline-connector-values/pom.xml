@@ -84,19 +84,19 @@ limitations under the License.
                                 <relocation>
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.org.apache.kafka
+                                        org.apache.flink.cdc.connectors.shaded.org.apache.kafka
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.com.google
+                                        org.apache.flink.cdc.connectors.shaded.com.google
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.fasterxml</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.com.fasterxml
+                                        org.apache.flink.cdc.connectors.shaded.com.fasterxml
                                     </shadedPattern>
                                 </relocation>
                             </relocations>

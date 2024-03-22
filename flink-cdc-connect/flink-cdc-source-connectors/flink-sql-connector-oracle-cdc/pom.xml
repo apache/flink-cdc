@@ -89,31 +89,31 @@ limitations under the License.
                                 <relocation>
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.org.apache.kafka
+                                        org.apache.flink.cdc.connectors.shaded.org.apache.kafka
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.antlr</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.org.antlr
+                                        org.apache.flink.cdc.connectors.shaded.org.antlr
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.com.google
+                                        org.apache.flink.cdc.connectors.shaded.com.google
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.fasterxml</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.com.fasterxml
+                                        org.apache.flink.cdc.connectors.shaded.com.fasterxml
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>net.sf.jsqlparser</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.net.sf.jsqlparser
+                                        org.apache.flink.cdc.connectors.shaded.net.sf.jsqlparser
                                     </shadedPattern>
                                 </relocation>
                             </relocations>

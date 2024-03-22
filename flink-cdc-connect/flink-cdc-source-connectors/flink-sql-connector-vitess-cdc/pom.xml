@@ -61,15 +61,15 @@ limitations under the License.
                             <relocations>
                                 <relocation>
                                     <pattern>io.grpc</pattern>
-                                    <shadedPattern>com.ververica.cdc.connectors.vitess.shaded.io.grpc</shadedPattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.vitess.shaded.io.grpc</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>io.netty</pattern>
-                                    <shadedPattern>com.ververica.cdc.connectors.vitess.shaded.io.netty</shadedPattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.vitess.shaded.io.netty</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.google</pattern>
-                                    <shadedPattern>com.ververica.cdc.connectors.vitess.shaded.com.google</shadedPattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.vitess.shaded.com.google</shadedPattern>
                                 </relocation>
                             </relocations>
                             <filters>
