@@ -262,7 +262,7 @@ The config option `scan.startup.mode` specifies the startup mode for MySQL CDC c
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left" style="width:30%;"><a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html">MySQL type</a></th>
+        <th class="text-left" style="width:30%;"><a href="https://dev.mysql.com/doc/refman/8.0/en/data-types.html">MySQL type</a></th>
         <th class="text-left" style="width:10%;">Flink CDC type</th>
         <th class="text-left" style="width:60%;">Note</th>
       </tr>

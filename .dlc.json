@@ -1,0 +1,35 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^http://localhost"
+    },
+    {
+      "pattern": "^#"
+    },
+    {
+      "pattern": "^{"
+    },
+    {
+      "pattern": "^https://repo1.maven.org/maven2/org/apache/flink.*SNAPSHOT.*"
+    },
+    {
+      "pattern": "^https://mvnrepository.com"
+    },
+    {
+      "pattern": "^https://img.shields.io"
+    },
+    {
+      "pattern": "^https://twitter.com*"
+    }
+  ],
+  "timeout": "30s",
+  "retryOn429": true,
+  "retryCount": 10,
+  "fallbackRetryDelay": "1000s",
+  "aliveStatusCodes": [
+    0,
+    200,
+    401,
+    403
+  ]
+}
