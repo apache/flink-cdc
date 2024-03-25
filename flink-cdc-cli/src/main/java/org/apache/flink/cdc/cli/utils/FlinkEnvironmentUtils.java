@@ -20,6 +20,7 @@ package org.apache.flink.cdc.cli.utils;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -27,10 +28,16 @@ import java.util.List;
 public class FlinkEnvironmentUtils {
 
     private static final String FLINK_CONF_DIR = "conf";
-    private static final String FLINK_CONF_FILENAME = "flink-conf.yaml";
+    private static final String OLD_FLINK_CONF_FILENAME = "flink-conf.yaml";
+    private static final String NEW_FLINK_CONF_FILENAME = "config.yaml";
 
     public static Configuration loadFlinkConfiguration(Path flinkHome) throws Exception {
-        Path flinkConfPath = flinkHome.resolve(FLINK_CONF_DIR).resolve(FLINK_CONF_FILENAME);
+        Path flinkConfPath = flinkHome.resolve(FLINK_CONF_DIR).resolve(OLD_FLINK_CONF_FILENAME);
+        // If the old version of the configuration file does not exist, then attempt to use the new
+        // version of the file name.
+        if (!Files.exists(flinkConfPath)) {
+            flinkConfPath = flinkHome.resolve(FLINK_CONF_DIR).resolve(NEW_FLINK_CONF_FILENAME);
+        }
         return ConfigurationUtils.loadMapFormattedConfig(flinkConfPath);
     }
 
