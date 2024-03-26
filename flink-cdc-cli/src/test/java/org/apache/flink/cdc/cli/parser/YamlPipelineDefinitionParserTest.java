@@ -22,6 +22,7 @@ import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
+import org.apache.flink.cdc.composer.definition.TransformDef;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
@@ -179,7 +180,23 @@ class YamlPipelineDefinitionParserTest {
                                     "mydb.default.web_order",
                                     "odsdb.default.ods_web_order",
                                     "sync table to with given prefix ods_")),
-                    null,
+                    Arrays.asList(
+                            new TransformDef(
+                                    "mydb.app_order_.*",
+                                    "id, order_id, TO_UPPER(product_name)",
+                                    "id > 10 AND order_id > 100",
+                                    "id",
+                                    "product_name",
+                                    "comment=app order",
+                                    "project fields from source table"),
+                            new TransformDef(
+                                    "mydb.web_order_.*",
+                                    "CONCAT(id, order_id) as uniq_id, *",
+                                    "uniq_id > 10",
+                                    null,
+                                    null,
+                                    null,
+                                    "add new uniq_id for each row")),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -223,7 +240,23 @@ class YamlPipelineDefinitionParserTest {
                                     "mydb.default.web_order",
                                     "odsdb.default.ods_web_order",
                                     "sync table to with given prefix ods_")),
-                    null,
+                    Arrays.asList(
+                            new TransformDef(
+                                    "mydb.app_order_.*",
+                                    "id, order_id, TO_UPPER(product_name)",
+                                    "id > 10 AND order_id > 100",
+                                    "id",
+                                    "product_name",
+                                    "comment=app order",
+                                    "project fields from source table"),
+                            new TransformDef(
+                                    "mydb.web_order_.*",
+                                    "CONCAT(id, order_id) as uniq_id, *",
+                                    "uniq_id > 10",
+                                    null,
+                                    null,
+                                    null,
+                                    "add new uniq_id for each row")),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -257,7 +290,7 @@ class YamlPipelineDefinitionParserTest {
                     Collections.singletonList(
                             new RouteDef(
                                     "mydb.default.app_order_.*", "odsdb.default.app_order", null)),
-                    null,
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("parallelism", "4")
@@ -268,6 +301,6 @@ class YamlPipelineDefinitionParserTest {
                     new SourceDef("mysql", null, new Configuration()),
                     new SinkDef("kafka", null, new Configuration()),
                     Collections.emptyList(),
-                    null,
+                    Collections.emptyList(),
                     new Configuration());
 }

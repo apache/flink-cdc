@@ -53,6 +53,7 @@ public class SchemaSerializerTest extends SerializerTestBase<Schema> {
                     .metadataColumn("m3", DataTypes.TIMESTAMP_LTZ(), "mKey", "comment")
                     .option("option", "fake")
                     .primaryKey(Collections.singletonList("col1"))
+                    .partitionKey(Collections.singletonList("m2"))
                     .build(),
             Schema.newBuilder()
                     .physicalColumn("col1", DataTypes.BIGINT())
