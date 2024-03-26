@@ -301,6 +301,57 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
                                             Column.physicalColumn("cols5", DataTypes.BOOLEAN())))));
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`products` ADD COLUMN `cols6` VARCHAR(45) DEFAULT 'default_value';",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            tableId,
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "cols6",
+                                                    DataTypes.VARCHAR(45),
+                                                    null,
+                                                    "default_value"),
+                                            AddColumnEvent.ColumnPosition.LAST,
+                                            null))));
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`products` ADD COLUMN `cols7` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            tableId,
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "cols7",
+                                                    DataTypes.TIMESTAMP_LTZ(0).notNull(),
+                                                    null,
+                                                    "1970-01-01 00:00:00"),
+                                            AddColumnEvent.ColumnPosition.LAST,
+                                            null))));
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`products` ADD COLUMN `cols8` TIMESTAMP NOT NULL DEFAULT NOW();",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            tableId,
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "cols8",
+                                                    DataTypes.TIMESTAMP_LTZ(0).notNull(),
+                                                    null,
+                                                    "1970-01-01 00:00:00"),
+                                            AddColumnEvent.ColumnPosition.LAST,
+                                            null))));
         }
         List<Event> actual = fetchResults(events, expected.size());
         assertThat(actual).isEqualTo(expected);
@@ -311,7 +362,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                 tableId,
                 Schema.newBuilder()
                         .physicalColumn("id", DataTypes.INT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
                         .physicalColumn("description", DataTypes.VARCHAR(512))
                         .physicalColumn("weight", DataTypes.FLOAT())
                         .primaryKey(Collections.singletonList("id"))

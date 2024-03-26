@@ -32,6 +32,11 @@ public class PhysicalColumn extends Column {
         super(name, type, comment);
     }
 
+    public PhysicalColumn(
+            String name, DataType type, @Nullable String comment, @Nullable String defaultValue) {
+        super(name, type, comment, defaultValue);
+    }
+
     @Override
     public boolean isPhysical() {
         return true;
@@ -39,11 +44,11 @@ public class PhysicalColumn extends Column {
 
     @Override
     public Column copy(DataType newType) {
-        return new PhysicalColumn(name, newType, comment);
+        return new PhysicalColumn(name, newType, comment, defaultValueExpression);
     }
 
     @Override
     public Column copy(String newName) {
-        return new PhysicalColumn(newName, type, comment);
+        return new PhysicalColumn(newName, type, comment, defaultValueExpression);
     }
 }
