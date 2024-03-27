@@ -19,7 +19,7 @@ limitations under the License.
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>com.ververica</groupId>
+        <groupId>org.apache.flink</groupId>
         <artifactId>flink-cdc-pipeline-connectors</artifactId>
         <version>${revision}</version>
     </parent>
@@ -28,7 +28,7 @@ limitations under the License.
 
     <dependencies>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-composer</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>

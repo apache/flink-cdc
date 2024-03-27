@@ -20,7 +20,7 @@ limitations under the License.
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <artifactId>flink-cdc-source-connectors</artifactId>
-        <groupId>com.ververica</groupId>
+        <groupId>org.apache.flink</groupId>
         <version>${revision}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -29,7 +29,7 @@ limitations under the License.
 
     <dependencies>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-tidb-cdc</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -52,8 +52,8 @@ limitations under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
-                                    <include>com.ververica:flink-connector-debezium</include>
-                                    <include>com.ververica:flink-connector-tidb-cdc</include>
+                                    <include>org.apache.flink:flink-connector-debezium</include>
+                                    <include>org.apache.flink:flink-connector-tidb-cdc</include>
                                     <include>org.tikv:tikv-client-java</include>
                                     <include>com.google.protobuf:*</include>
                                     <include>io.grpc:*</include>
@@ -65,13 +65,13 @@ limitations under the License.
                                 <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.com.google
+                                        org.apache.flink.cdc.connectors.shaded.com.google
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>io.grpc</pattern>
                                     <shadedPattern>
-                                        com.ververica.cdc.connectors.shaded.io.grpc
+                                        org.apache.flink.cdc.connectors.shaded.io.grpc
                                     </shadedPattern>
                                 </relocation>
                             </relocations>
