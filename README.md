@@ -35,7 +35,7 @@ full database synchronization, sharding table synchronization, schema evolution 
 2. [Download](https://github.com/apache/flink-cdc/releases) Flink CDC tar, unzip it and put jars of pipeline connector to Flink `lib` directory.
 3. Create a **YAML** file to describe the data source and data sink, the following example synchronizes all tables under MySQL app_db database to Doris :
   ```yaml
-      source:
+    source:
        type: mysql
        name: MySQL Source
        hostname: 127.0.0.1
