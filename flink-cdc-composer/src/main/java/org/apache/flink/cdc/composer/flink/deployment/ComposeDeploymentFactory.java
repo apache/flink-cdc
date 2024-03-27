@@ -21,7 +21,7 @@ import org.apache.flink.cdc.composer.PipelineDeploymentExecutor;
 
 import org.apache.commons.cli.CommandLine;
 
-/** Create deployment methods corresponding to different goals */
+/** Create deployment methods corresponding to different goals. */
 public class ComposeDeploymentFactory {
 
     public PipelineDeploymentExecutor getFlinkComposeExecutor(CommandLine commandLine)

@@ -39,6 +39,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+/** deploy flink cdc job by native k8s application mode. */
 public class K8SApplicationDeploymentExecutor implements PipelineDeploymentExecutor {
 
     private static final Logger LOG =

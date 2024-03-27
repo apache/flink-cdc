@@ -24,7 +24,7 @@ import org.apache.commons.cli.CommandLine;
 import java.nio.file.Path;
 import java.util.List;
 
-/** PipelineDeploymentExecutor to execute flink cdc job from different target */
+/** PipelineDeploymentExecutor to execute flink cdc job from different target. */
 public interface PipelineDeploymentExecutor {
 
     PipelineExecution.ExecutionInfo deploy(
