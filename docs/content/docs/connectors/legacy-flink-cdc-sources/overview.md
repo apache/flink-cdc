@@ -81,7 +81,7 @@ The following table shows the current features of the connector:
 | [sqlserver-cdc]({{< ref "docs/connectors/legacy-flink-cdc-sources/sqlserver-cdc" >}}) | ✅            | ✅             | ✅                 | ✅                         |
 | [oceanbase-cdc]({{< ref "docs/connectors/legacy-flink-cdc-sources/oceanbase-cdc" >}}) | ❌            | ❌             | ❌                 | ❌                         |
 | [tidb-cdc]({{< ref "docs/connectors/legacy-flink-cdc-sources/tidb-cdc" >}})           | ✅            | ❌             | ✅                 | ❌                         |
-| [db2-cdc]({{< ref "docs/connectors/legacy-flink-cdc-sources/db2-cdc" >}})             | ❌            | ❌             | ✅                 | ❌                         |
+| [db2-cdc]({{< ref "docs/connectors/legacy-flink-cdc-sources/db2-cdc" >}})             | ✅            | ✅             | ✅                 | ✅                         |
 | [vitess-cdc]({{< ref "docs/connectors/legacy-flink-cdc-sources/vitess-cdc" >}})       | ✅            | ❌             | ✅                 | ❌                         |
 
 ## Usage for Table/SQL API

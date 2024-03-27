@@ -111,9 +111,8 @@ Flink SQL> CREATE TABLE products (
     'port' = '50000',
     'username' = 'db2inst1',
     'password' = 'admin',
-    'database-name' = 'testdb',
-    'schema-name' = 'DB2INST1',  
-    'table-name' = 'PRODUCTS'
+    'database-name' = 'TESTDB',
+    'table-name' = 'DB2INST1.PRODUCTS'
   );
   
 Flink SQL> CREATE TABLE es_products (

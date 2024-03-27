@@ -15,14 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.db2.table;
+package org.apache.flink.cdc.connectors.db2.source.dialect;
 
-/**
- * Startup modes for the Db2 CDC Consumer.
- *
- * @see StartupOptions
- */
-public enum StartupMode {
-    INITIAL,
-    LATEST_OFFSET
+import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
+import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
+
+/** Factory to create {@link JdbcConnectionPoolFactory} for SQL Server. */
+public class Db2PooledDataSourceFactory extends JdbcConnectionPoolFactory {
+
+    private static final String URL_PATTERN = "jdbc:db2://%s:%s/%s";
+
+    @Override
+    public String getJdbcUrl(JdbcSourceConfig sourceConfig) {
+        String hostName = sourceConfig.getHostname();
+        int port = sourceConfig.getPort();
+        String database = sourceConfig.getDatabaseList().get(0);
+        return String.format(URL_PATTERN, hostName, port, database);
+    }
 }
