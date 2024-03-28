@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.starrocks.sink;
 
 import org.apache.flink.cdc.common.types.CharType;
+import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.VarCharType;
 
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
@@ -73,6 +74,68 @@ public class CdcDataTypeTransformerTest {
         assertEquals(StarRocksUtils.VARCHAR, smallLengthColumn.getDataType());
         assertEquals(Integer.valueOf(3), smallLengthColumn.getColumnSize().orElse(null));
         assertTrue(smallLengthColumn.isNullable());
+    }
+
+    @Test
+    public void testDecimalForPrimaryKey() {
+        // map to Int of StarRocks if primary key column with precision < 10 and scale = 0
+        StarRocksColumn.Builder intLengthBuilder =
+                new StarRocksColumn.Builder().setColumnName("primary_key").setOrdinalPosition(0);
+        new DecimalType(9, 0)
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(true, intLengthBuilder));
+        StarRocksColumn intLengthColumn = intLengthBuilder.build();
+        assertEquals("primary_key", intLengthColumn.getColumnName());
+        assertEquals(0, intLengthColumn.getOrdinalPosition());
+        assertEquals(StarRocksUtils.INT, intLengthColumn.getDataType());
+        assertTrue(intLengthColumn.isNullable());
+
+        // map to BigInt of StarRocks if primary key column with precision < 19 and scale = 0
+        StarRocksColumn.Builder bigIntLengthBuilder =
+                new StarRocksColumn.Builder().setColumnName("primary_key").setOrdinalPosition(0);
+        new DecimalType(10, 0)
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(true, bigIntLengthBuilder));
+        StarRocksColumn bigIntLengthColumn = bigIntLengthBuilder.build();
+        assertEquals("primary_key", bigIntLengthColumn.getColumnName());
+        assertEquals(0, bigIntLengthColumn.getOrdinalPosition());
+        assertEquals(StarRocksUtils.BIGINT, bigIntLengthColumn.getDataType());
+        assertTrue(bigIntLengthColumn.isNullable());
+
+        // map to LARGEINT of StarRocks if primary key column with precision < 18 and scale = 0
+        StarRocksColumn.Builder unsignedBigIntLengthBuilder =
+                new StarRocksColumn.Builder().setColumnName("primary_key").setOrdinalPosition(0);
+        new DecimalType(20, 0)
+                .accept(
+                        new StarRocksUtils.CdcDataTypeTransformer(
+                                true, unsignedBigIntLengthBuilder));
+        StarRocksColumn unsignedBigIntLengthColumn = unsignedBigIntLengthBuilder.build();
+        assertEquals("primary_key", unsignedBigIntLengthColumn.getColumnName());
+        assertEquals(0, unsignedBigIntLengthColumn.getOrdinalPosition());
+        assertEquals(StarRocksUtils.LARGEINT, unsignedBigIntLengthColumn.getDataType());
+        assertTrue(unsignedBigIntLengthColumn.isNullable());
+
+        // map to Varchar of StarRocks if primary key column with precision >= 38 and scale = 0
+        StarRocksColumn.Builder outOfBoundLengthBuilder =
+                new StarRocksColumn.Builder().setColumnName("primary_key").setOrdinalPosition(0);
+        new DecimalType(38, 0)
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(true, outOfBoundLengthBuilder));
+        StarRocksColumn outOfBoundColumn = outOfBoundLengthBuilder.build();
+        assertEquals("primary_key", outOfBoundColumn.getColumnName());
+        assertEquals(0, outOfBoundColumn.getOrdinalPosition());
+        assertEquals(StarRocksUtils.VARCHAR, outOfBoundColumn.getDataType());
+        assertEquals(Integer.valueOf(38), outOfBoundColumn.getColumnSize().orElse(null));
+        assertTrue(unsignedBigIntLengthColumn.isNullable());
+
+        // map to Varchar of StarRocks if primary key column with scale > 0
+        StarRocksColumn.Builder scaleBuilder =
+                new StarRocksColumn.Builder().setColumnName("primary_key").setOrdinalPosition(0);
+        new DecimalType(12, 1)
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(true, scaleBuilder));
+        StarRocksColumn scaleBoundColumn = scaleBuilder.build();
+        assertEquals("primary_key", scaleBoundColumn.getColumnName());
+        assertEquals(0, scaleBoundColumn.getOrdinalPosition());
+        assertEquals(StarRocksUtils.VARCHAR, scaleBoundColumn.getDataType());
+        assertEquals(Integer.valueOf(12), scaleBoundColumn.getColumnSize().orElse(null));
+        assertTrue(unsignedBigIntLengthColumn.isNullable());
     }
 
     @Test

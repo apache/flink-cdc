@@ -129,7 +129,7 @@ public class StarRocksUtils {
      * @param fieldType the element type of the RecordData
      * @param fieldPos the element position of the RecordData
      * @param zoneId the time zone used when converting from <code>TIMESTAMP WITH LOCAL TIME ZONE
-     *     </code>
+     *                  </code>
      */
     public static RecordData.FieldGetter createFieldGetter(
             DataType fieldType, int fieldPos, ZoneId zoneId) {
@@ -297,10 +297,29 @@ public class StarRocksUtils {
 
         @Override
         public StarRocksColumn.Builder visit(DecimalType decimalType) {
-            builder.setDataType(DECIMAL);
+            // StarRocks is not support Decimal as primary key, so decimal should be cast to INT,
+            // BIGINT, LARGEINT or VARHCAR.
+            if (!isPrimaryKeys) {
+                builder.setDataType(DECIMAL);
+                builder.setColumnSize(decimalType.getPrecision());
+                builder.setDecimalDigits(decimalType.getScale());
+            } else if (decimalType.getPrecision() < 10 && decimalType.getScale() == 0) {
+                // Int is range from [-2,147,483,648, 2,147,483,647],
+                // some data with precision of 10 is out of range.
+                builder.setDataType(INT);
+            } else if (decimalType.getPrecision() < 19 && decimalType.getScale() == 0) {
+                // BigInt is range from [-9,223.372,036,854,775,808~9,223.372,036,854,775,807],
+                // some data with precision of 19 is out of range.
+                builder.setDataType(BIGINT);
+            } else if (decimalType.getPrecision() < 38 && decimalType.getScale() == 0) {
+                // LargeInt is range from [-1.701411835E38 ~ 1.701411835E38],
+                // some data with precision of 38 is out of range.
+                builder.setDataType(LARGEINT);
+            } else {
+                builder.setDataType(VARCHAR);
+                builder.setColumnSize(Math.min(decimalType.getPrecision(), MAX_VARCHAR_SIZE));
+            }
             builder.setNullable(decimalType.isNullable());
-            builder.setColumnSize(decimalType.getPrecision());
-            builder.setDecimalDigits(decimalType.getScale());
             return builder;
         }
 
