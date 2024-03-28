@@ -33,9 +33,13 @@ public class StreamSplitMetaRequestEvent implements SourceEvent {
     private final String splitId;
     private final int requestMetaGroupId;
 
-    public StreamSplitMetaRequestEvent(String splitId, int requestMetaGroupId) {
+    private final int totalFinishedSplitSize;
+
+    public StreamSplitMetaRequestEvent(
+            String splitId, int requestMetaGroupId, int totalFinishedSplitSize) {
         this.splitId = splitId;
         this.requestMetaGroupId = requestMetaGroupId;
+        this.totalFinishedSplitSize = totalFinishedSplitSize;
     }
 
     public String getSplitId() {
@@ -44,5 +48,9 @@ public class StreamSplitMetaRequestEvent implements SourceEvent {
 
     public int getRequestMetaGroupId() {
         return requestMetaGroupId;
+    }
+
+    public int getTotalFinishedSplitSize() {
+        return totalFinishedSplitSize;
     }
 }

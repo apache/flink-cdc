@@ -57,7 +57,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 
-import java.lang.reflect.Field;
 import java.sql.SQLException;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -893,6 +892,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         + " 'database-name' = '%s',"
                         + " 'table-name' = '%s',"
                         + " 'scan.incremental.snapshot.chunk.size' = '2',"
+                        + " 'chunk-meta.group.size' = '2',"
                         + " 'server-time-zone' = 'UTC',"
                         + " 'server-id' = '%s',"
                         + " 'scan.newly-added-table.enabled' = 'true'"
@@ -919,19 +919,12 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
 
     private StreamExecutionEnvironment getStreamExecutionEnvironment(
             String finishedSavePointPath, int parallelism) throws Exception {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        Configuration configuration = new Configuration();
         if (finishedSavePointPath != null) {
-            // restore from savepoint
-            // hack for test to visit protected TestStreamEnvironment#getConfiguration() method
-            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-            Class<?> clazz =
-                    classLoader.loadClass(
-                            "org.apache.flink.streaming.api.environment.StreamExecutionEnvironment");
-            Field field = clazz.getDeclaredField("configuration");
-            field.setAccessible(true);
-            Configuration configuration = (Configuration) field.get(env);
             configuration.setString(SavepointConfigOptions.SAVEPOINT_PATH, finishedSavePointPath);
         }
+        StreamExecutionEnvironment env =
+                StreamExecutionEnvironment.getExecutionEnvironment(configuration);
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 100L));

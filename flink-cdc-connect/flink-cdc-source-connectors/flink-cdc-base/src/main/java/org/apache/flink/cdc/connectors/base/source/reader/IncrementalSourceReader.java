@@ -418,11 +418,19 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
         StreamSplit streamSplit = uncompletedStreamSplits.get(metadataEvent.getSplitId());
         if (streamSplit != null) {
             final int receivedMetaGroupId = metadataEvent.getMetaGroupId();
+            final int receivedTotalFinishedSplitSize = metadataEvent.getTotalFinishedSplitSize();
             final int expectedMetaGroupId =
                     getNextMetaGroupId(
                             streamSplit.getFinishedSnapshotSplitInfos().size(),
                             sourceConfig.getSplitMetaGroupSize());
-            if (receivedMetaGroupId == expectedMetaGroupId) {
+            if (receivedTotalFinishedSplitSize < streamSplit.getTotalFinishedSplitSize()) {
+                LOG.info(
+                        "Update total finished split size from {} to {}",
+                        streamSplit.getTotalFinishedSplitSize(),
+                        receivedTotalFinishedSplitSize);
+                streamSplit = toNormalStreamSplit(streamSplit, receivedTotalFinishedSplitSize);
+                uncompletedStreamSplits.put(streamSplit.splitId(), streamSplit);
+            } else if (receivedMetaGroupId == expectedMetaGroupId) {
                 Set<String> existedSplitsOfLastGroup =
                         getExistedSplitsOfLastGroup(
                                 streamSplit.getFinishedSnapshotSplitInfos(),
@@ -461,7 +469,8 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                             streamSplit.getFinishedSnapshotSplitInfos().size(),
                             sourceConfig.getSplitMetaGroupSize());
             StreamSplitMetaRequestEvent splitMetaRequestEvent =
-                    new StreamSplitMetaRequestEvent(splitId, nextMetaGroupId);
+                    new StreamSplitMetaRequestEvent(
+                            splitId, nextMetaGroupId, streamSplit.getTotalFinishedSplitSize());
             context.sendSourceEventToCoordinator(splitMetaRequestEvent);
         } else {
             LOG.info("The meta of stream split {} has been collected success", splitId);
