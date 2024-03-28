@@ -33,12 +33,12 @@ Bug报告，提议新的功能，加入社区邮件列表的讨论，贡献代�
 
 Flink CDC 社区的贡献不仅限于为项目贡献代码，下面列举了一些可以在社区贡献的内容。
 
-| 贡献方式  | 更多信息                                                                                                                                                                                 |
+| 贡献方式  | 更多信息                                                                                                                                                                            |
 |:------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 提交BUG | 为了提交问题，您需要首先在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 建立对应的issue，并在`Component/s`选择`Flink CDC`。然后在问题描述中详细描述遇到的问题的信息，如果可能的话，最好提供一下能够复现问题的操作步骤。              |
+| 提交BUG | 为了提交问题，您需要首先在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 建立对应的issue，并在`Component/s`选择`Flink CDC`。然后在问题描述中详细描述遇到的问题的信息，如果可能的话，最好提供一下能够复现问题的操作步骤。         |
 | 贡献代码  | 请阅读 <a href="#code-contribution-guide">贡献代码指导</a>                                                                                                                                    |
 | 代码评审  | 请阅读 <a href="#code-review-guide">代码评审指导</a>                                                                                                                                          |
-| 用户支持  | 通过 [Flink 用户邮件列表](https://flink.apache.org/what-is-flink/community/#mailing-lists) 来帮助回复用户问题，在 [Flink jira](https://issues.<br/>apache.org/jira/projects/FLINK/issues) 可以查询到最新的已知问题。 |
+| 用户支持  | 通过 [Flink 用户邮件列表](https://flink.apache.org/what-is-flink/community/#mailing-lists) 来帮助回复用户问题，在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 可以查询到最新的已知问题。 |
 
 如果还有其他问题，可以通过 Flink Dev 邮件列表寻求帮助。
 
@@ -50,7 +50,7 @@ Flink CDC 项目通过众多贡献者的代码贡献来维护，改进和拓展�
 
 如果您想要为 Flink CDC 贡献代码，可以通过如下的方式。
 
-1. 首先在 [Flink jira](https://issues.<br/>apache.org/jira/projects/FLINK/issues) 的想要负责的 issue
+1. 首先在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 的想要负责的 issue
    下评论（最好在评论中解释下对于这个问题的理解，和后续的设计，如果可能的话也可以提供下 POC 的代码）。
 2. 在这个 issue 被分配给你后，开始进行开发实现（提交信息请遵循`[FLINK-xxx][xxx] xxxxxxx`的格式）。
 3. 开发完成后可以向 [Flink CDC](https://github.com/apache/flink-cdc) 项目提交 PR（请确保 Clone 的项目 committer 有操作权限）。

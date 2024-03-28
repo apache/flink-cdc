@@ -16,6 +16,12 @@
 name: "Build documentation"
 
 on:
+  pull_request:
+    branches:
+      - master
+      - release-*
+    paths:
+      - 'docs/**'
   push:
     paths:
       - 'docs/**'
@@ -30,8 +36,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-documentation:
+
+  markdown-link-check:
     if: github.repository == 'apache/flink-cdc'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - uses: gaurav-nelson/github-action-markdown-link-check@1.0.15
+        with:
+          config-file: '.dlc.json'
+
+  build-documentation:
+    if: github.event_name != 'pull_request' && github.repository == 'apache/flink-cdc'
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 1

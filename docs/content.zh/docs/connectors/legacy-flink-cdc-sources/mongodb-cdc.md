@@ -427,8 +427,8 @@ MongoDB CDC 连接器也可以是一个数据流源。 你可以创建 SourceFun
 ```java
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
-import com.ververica.cdc.connectors.mongodb.MongoDBSource;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.flink.cdc.connectors.mongodb.MongoDBSource;
 
 public class MongoDBSourceExample {
     public static void main(String[] args) throws Exception {
@@ -455,8 +455,8 @@ MongoDB CDC 增量连接器（2.3.0 之后）可以使用，如下所示：
 ```java
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import com.ververica.cdc.connectors.mongodb.source.MongoDBSource;
-import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.flink.cdc.connectors.mongodb.source.MongoDBSource;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 
 public class MongoDBIncrementalSourceExample {
     public static void main(String[] args) throws Exception {
