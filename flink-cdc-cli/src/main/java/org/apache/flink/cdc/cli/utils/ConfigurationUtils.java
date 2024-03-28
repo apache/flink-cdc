@@ -18,15 +18,21 @@
 package org.apache.flink.cdc.cli.utils;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.client.deployment.executors.LocalExecutor;
+import org.apache.flink.client.deployment.executors.RemoteExecutor;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
+import org.apache.commons.cli.CommandLine;
+
 import java.io.FileNotFoundException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+
+import static org.apache.flink.cdc.cli.CliFrontendOptions.TARGET;
 
 /** Utilities for handling {@link Configuration}. */
 public class ConfigurationUtils {
@@ -47,5 +53,12 @@ public class ConfigurationUtils {
                             "Failed to load config file \"%s\" to key-value pairs", configPath),
                     e);
         }
+    }
+
+    public static boolean isDeploymentMode(CommandLine commandLine) {
+        String target = commandLine.getOptionValue(TARGET);
+        return target != null
+                && !target.equalsIgnoreCase(LocalExecutor.NAME)
+                && !target.equalsIgnoreCase(RemoteExecutor.NAME);
     }
 }
