@@ -63,6 +63,12 @@ limitations under the License.
                             </artifactSet>
                             <relocations>
                                 <relocation>
+                                    <pattern>org.apache.kafka</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.shaded.org.apache.kafka
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>
                                         org.apache.flink.cdc.connectors.shaded.com.google

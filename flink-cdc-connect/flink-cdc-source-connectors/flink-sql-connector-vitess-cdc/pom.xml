@@ -60,6 +60,12 @@ limitations under the License.
                             </artifactSet>
                             <relocations>
                                 <relocation>
+                                    <pattern>org.apache.kafka</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.shaded.org.apache.kafka
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
                                     <pattern>io.grpc</pattern>
                                     <shadedPattern>org.apache.flink.cdc.connectors.vitess.shaded.io.grpc</shadedPattern>
                                 </relocation>
