@@ -32,9 +32,9 @@ describes how to setup the db2 CDC connector to run SQL queries against Db2 data
 
 ## Supported Databases
 
-| Connector             | Database                                           | Driver               |
-|-----------------------|----------------------------------------------------|----------------------|
-| [Db2-cdc](../db2-cdc) | <li> [Db2](https://www.ibm.com/products/db2): 11.5 | Db2 Driver: 11.5.0.0 |
+| Connector | Database                                           | Driver               |
+|-----------|----------------------------------------------------|----------------------|
+| Db2-cdc   | <li> [Db2](https://www.ibm.com/products/db2): 11.5 | Db2 Driver: 11.5.0.0 |
 
 Dependencies
 ------------

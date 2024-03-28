@@ -165,7 +165,7 @@ under the License.
           <p style="text-align: left; color: #BF74F1; font-size: x-large; padding: 0">Try Flink CDC</p>
           <p style="text-align: left;">
         Flink CDC provides a series of quick start demos without any dependencies or java code. A Linux or MacOS computer with Docker installed is enough. 
-        Please check out our <a href="docs/get-started/introduction">Quick Start</a> for more information.
+        Please check out our <a href="{{< ref "docs/get-started/introduction" >}}">Quick Start</a> for more information.
          </p>
     </div>
     <div style="flex: 1;"></div>
