@@ -93,7 +93,9 @@ class FlinkPipelineComposerITCase {
 
     @Test
     void testSingleSplitSingleTable() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -147,7 +149,9 @@ class FlinkPipelineComposerITCase {
 
     @Test
     void testSingleSplitMultipleTables() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -211,7 +215,9 @@ class FlinkPipelineComposerITCase {
 
     @Test
     void testMultiSplitsSingleTable() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -241,7 +247,7 @@ class FlinkPipelineComposerITCase {
         PipelineExecution execution = composer.compose(pipelineDef);
         execution.execute();
 
-        // Check result in ValuesDatabase
+        // Check a result in ValuesDatabase
         List<String> table1Results = ValuesDatabase.getResults(TABLE_1);
         assertThat(table1Results)
                 .contains(
