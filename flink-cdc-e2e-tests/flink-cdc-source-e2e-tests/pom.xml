@@ -40,6 +40,14 @@ limitations under the License.
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-cdc-e2e-utils</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Drivers -->
         <dependency>
             <groupId>mysql</groupId>
