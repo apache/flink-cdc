@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /** Utilities for handling {@link DataType}s. */
-class DataTypeUtils {
+public class DataTypeUtils {
     /**
      * Returns the conversion class for the given {@link DataType} that is used by the table runtime
      * as internal data structure.
