@@ -88,7 +88,7 @@ public class DataTypeUtilsTest {
             };
 
     @Test
-    public void testToFlinkDataType() {
+    void testToFlinkDataType() {
         List<DataField> list =
                 IntStream.range(0, allTypes.length)
                         .mapToObj(i -> DataTypes.FIELD("f" + i, allTypes[i]))
