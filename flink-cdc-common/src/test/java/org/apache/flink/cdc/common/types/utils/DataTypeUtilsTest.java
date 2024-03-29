@@ -88,16 +88,16 @@ public class DataTypeUtilsTest {
             };
 
     @Test
-    void testToFlinkDataType() {
+    public void testToFlinkDataType() {
         List<DataField> list =
-                IntStream.range(0, allTypes.length)
-                        .mapToObj(i -> DataTypes.FIELD("f" + i, allTypes[i]))
+                IntStream.range(0, ALL_TYPES.length)
+                        .mapToObj(i -> DataTypes.FIELD("f" + i, ALL_TYPES[i]))
                         .collect(Collectors.toList());
 
         org.apache.flink.table.types.DataType dataType =
                 DataTypeUtils.toFlinkDataType(new RowType(list));
 
-        org.apache.flink.table.types.DataType targetDataType =
+        org.apache.flink.table.types.DataType expectedDataType =
                 ROW(
                         FIELD("f0", BOOLEAN()),
                         FIELD("f1", BYTES()),
@@ -127,6 +127,6 @@ public class DataTypeUtilsTest {
                         FIELD("f25", ROW(FIELD("f1", STRING()), FIELD("f2", STRING(), "desc"))),
                         FIELD("f26", ROW(SMALLINT(), STRING())));
 
-        assertEquals(dataType, targetDataType);
+        assertThat(dataType).isEqualTo(expectedDataType);
     }
 }
