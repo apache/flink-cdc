@@ -50,11 +50,11 @@ import static org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_TIME_ZONE;
 import static org.apache.flink.table.api.DataTypes.TINYINT;
 import static org.apache.flink.table.api.DataTypes.VARBINARY;
 import static org.apache.flink.table.api.DataTypes.VARCHAR;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** A test for the {@link org.apache.flink.cdc.common.types.utils.DataTypeUtils}. */
 public class DataTypeUtilsTest {
-    private final DataType[] allTypes =
+    private static final DataType[] allTypes =
             new DataType[] {
                 DataTypes.BOOLEAN(),
                 DataTypes.BYTES(),
