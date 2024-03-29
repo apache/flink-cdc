@@ -54,7 +54,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** A test for the {@link org.apache.flink.cdc.common.types.utils.DataTypeUtils}. */
 public class DataTypeUtilsTest {
-    private static final DataType[] allTypes =
+    private static final DataType[] ALL_TYPES =
             new DataType[] {
                 DataTypes.BOOLEAN(),
                 DataTypes.BYTES(),
