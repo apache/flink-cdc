@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
+import org.apache.flink.cdc.common.types.DataField;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
@@ -139,26 +140,22 @@ public class DataTypeUtils {
                 RowType rowType = (RowType) type;
                 List<org.apache.flink.table.api.DataTypes.Field> fields =
                         rowType.getFields().stream()
-                                .map(
-                                        dataField ->
-                                                dataField.getDescription() == null
-                                                        ? org.apache.flink.table.api.DataTypes
-                                                                .FIELD(
-                                                                        dataField.getName(),
-                                                                        toFlinkDataType(
-                                                                                dataField
-                                                                                        .getType()))
-                                                        : org.apache.flink.table.api.DataTypes
-                                                                .FIELD(
-                                                                        dataField.getName(),
-                                                                        toFlinkDataType(
-                                                                                dataField
-                                                                                        .getType()),
-                                                                        dataField.getDescription()))
+                                .map(DataTypeUtils::toFlinkDataTypeField)
                                 .collect(Collectors.toList());
                 return org.apache.flink.table.api.DataTypes.ROW(fields);
             default:
                 throw new IllegalArgumentException("Illegal type: " + type);
         }
+    }
+
+    private static org.apache.flink.table.api.DataTypes.Field toFlinkDataTypeField(
+            DataField dataField) {
+        return dataField.getDescription() == null
+                ? org.apache.flink.table.api.DataTypes.FIELD(
+                        dataField.getName(), toFlinkDataType(dataField.getType()))
+                : org.apache.flink.table.api.DataTypes.FIELD(
+                        dataField.getName(),
+                        toFlinkDataType(dataField.getType()),
+                        dataField.getDescription());
     }
 }
