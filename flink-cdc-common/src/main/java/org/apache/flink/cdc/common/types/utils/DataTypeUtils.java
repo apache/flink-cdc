@@ -140,22 +140,11 @@ public class DataTypeUtils {
                 RowType rowType = (RowType) type;
                 List<org.apache.flink.table.api.DataTypes.Field> fields =
                         rowType.getFields().stream()
-                                .map(DataTypeUtils::toFlinkDataTypeField)
+                                .map(DataField::toFlinkDataTypeField)
                                 .collect(Collectors.toList());
                 return org.apache.flink.table.api.DataTypes.ROW(fields);
             default:
                 throw new IllegalArgumentException("Illegal type: " + type);
         }
-    }
-
-    private static org.apache.flink.table.api.DataTypes.Field toFlinkDataTypeField(
-            DataField dataField) {
-        return dataField.getDescription() == null
-                ? org.apache.flink.table.api.DataTypes.FIELD(
-                        dataField.getName(), toFlinkDataType(dataField.getType()))
-                : org.apache.flink.table.api.DataTypes.FIELD(
-                        dataField.getName(),
-                        toFlinkDataType(dataField.getType()),
-                        dataField.getDescription());
     }
 }

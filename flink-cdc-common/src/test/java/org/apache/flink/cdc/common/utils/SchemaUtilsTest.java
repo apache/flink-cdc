@@ -27,7 +27,8 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 
-import org.junit.jupiter.api.Test;
+import org.junit.Assert;
+import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,13 +36,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 /** A test for the {@link org.apache.flink.cdc.common.utils.SchemaUtils}. */
-class SchemaUtilsTest {
+public class SchemaUtilsTest {
 
     @Test
-    void testApplySchemaChangeEvent() {
+    public void testApplySchemaChangeEvent() {
         TableId tableId = TableId.parse("default.default.table1");
         Schema schema =
                 Schema.newBuilder()
@@ -56,13 +55,13 @@ class SchemaUtilsTest {
                         Column.physicalColumn("col3", DataTypes.STRING())));
         AddColumnEvent addColumnEvent = new AddColumnEvent(tableId, addedColumns);
         schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
-        assertThat(schema)
-                .isEqualTo(
-                        Schema.newBuilder()
-                                .physicalColumn("col1", DataTypes.STRING())
-                                .physicalColumn("col2", DataTypes.STRING())
-                                .physicalColumn("col3", DataTypes.STRING())
-                                .build());
+        Assert.assertEquals(
+                schema,
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col3", DataTypes.STRING())
+                        .build());
 
         // add new column before existed column
         addedColumns = new ArrayList<>();
@@ -73,14 +72,14 @@ class SchemaUtilsTest {
                         "col3"));
         addColumnEvent = new AddColumnEvent(tableId, addedColumns);
         schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
-        assertThat(schema)
-                .isEqualTo(
-                        Schema.newBuilder()
-                                .physicalColumn("col1", DataTypes.STRING())
-                                .physicalColumn("col2", DataTypes.STRING())
-                                .physicalColumn("col4", DataTypes.STRING())
-                                .physicalColumn("col3", DataTypes.STRING())
-                                .build());
+        Assert.assertEquals(
+                schema,
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col4", DataTypes.STRING())
+                        .physicalColumn("col3", DataTypes.STRING())
+                        .build());
 
         // add new column after existed column
         addedColumns = new ArrayList<>();
@@ -91,15 +90,15 @@ class SchemaUtilsTest {
                         "col4"));
         addColumnEvent = new AddColumnEvent(tableId, addedColumns);
         schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
-        assertThat(schema)
-                .isEqualTo(
-                        Schema.newBuilder()
-                                .physicalColumn("col1", DataTypes.STRING())
-                                .physicalColumn("col2", DataTypes.STRING())
-                                .physicalColumn("col4", DataTypes.STRING())
-                                .physicalColumn("col5", DataTypes.STRING())
-                                .physicalColumn("col3", DataTypes.STRING())
-                                .build());
+        Assert.assertEquals(
+                schema,
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col4", DataTypes.STRING())
+                        .physicalColumn("col5", DataTypes.STRING())
+                        .physicalColumn("col3", DataTypes.STRING())
+                        .build());
 
         // add column in first position
         addedColumns = new ArrayList<>();
@@ -110,29 +109,29 @@ class SchemaUtilsTest {
                         null));
         addColumnEvent = new AddColumnEvent(tableId, addedColumns);
         schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
-        assertThat(schema)
-                .isEqualTo(
-                        Schema.newBuilder()
-                                .physicalColumn("col0", DataTypes.STRING())
-                                .physicalColumn("col1", DataTypes.STRING())
-                                .physicalColumn("col2", DataTypes.STRING())
-                                .physicalColumn("col4", DataTypes.STRING())
-                                .physicalColumn("col5", DataTypes.STRING())
-                                .physicalColumn("col3", DataTypes.STRING())
-                                .build());
+        Assert.assertEquals(
+                schema,
+                Schema.newBuilder()
+                        .physicalColumn("col0", DataTypes.STRING())
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col4", DataTypes.STRING())
+                        .physicalColumn("col5", DataTypes.STRING())
+                        .physicalColumn("col3", DataTypes.STRING())
+                        .build());
 
         // drop columns
         DropColumnEvent dropColumnEvent =
                 new DropColumnEvent(tableId, Arrays.asList("col3", "col5"));
         schema = SchemaUtils.applySchemaChangeEvent(schema, dropColumnEvent);
-        assertThat(schema)
-                .isEqualTo(
-                        Schema.newBuilder()
-                                .physicalColumn("col0", DataTypes.STRING())
-                                .physicalColumn("col1", DataTypes.STRING())
-                                .physicalColumn("col2", DataTypes.STRING())
-                                .physicalColumn("col4", DataTypes.STRING())
-                                .build());
+        Assert.assertEquals(
+                schema,
+                Schema.newBuilder()
+                        .physicalColumn("col0", DataTypes.STRING())
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col4", DataTypes.STRING())
+                        .build());
 
         // rename columns
         Map<String, String> nameMapping = new HashMap<>();
@@ -140,14 +139,14 @@ class SchemaUtilsTest {
         nameMapping.put("col4", "newCol4");
         RenameColumnEvent renameColumnEvent = new RenameColumnEvent(tableId, nameMapping);
         schema = SchemaUtils.applySchemaChangeEvent(schema, renameColumnEvent);
-        assertThat(schema)
-                .isEqualTo(
-                        Schema.newBuilder()
-                                .physicalColumn("col0", DataTypes.STRING())
-                                .physicalColumn("col1", DataTypes.STRING())
-                                .physicalColumn("newCol2", DataTypes.STRING())
-                                .physicalColumn("newCol4", DataTypes.STRING())
-                                .build());
+        Assert.assertEquals(
+                schema,
+                Schema.newBuilder()
+                        .physicalColumn("col0", DataTypes.STRING())
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("newCol2", DataTypes.STRING())
+                        .physicalColumn("newCol4", DataTypes.STRING())
+                        .build());
 
         // alter column types
         Map<String, DataType> typeMapping = new HashMap<>();
@@ -155,13 +154,13 @@ class SchemaUtilsTest {
         typeMapping.put("newCol4", DataTypes.VARCHAR(10));
         AlterColumnTypeEvent alterColumnTypeEvent = new AlterColumnTypeEvent(tableId, typeMapping);
         schema = SchemaUtils.applySchemaChangeEvent(schema, alterColumnTypeEvent);
-        assertThat(schema)
-                .isEqualTo(
-                        Schema.newBuilder()
-                                .physicalColumn("col0", DataTypes.STRING())
-                                .physicalColumn("col1", DataTypes.STRING())
-                                .physicalColumn("newCol2", DataTypes.VARCHAR(10))
-                                .physicalColumn("newCol4", DataTypes.VARCHAR(10))
-                                .build());
+        Assert.assertEquals(
+                schema,
+                Schema.newBuilder()
+                        .physicalColumn("col0", DataTypes.STRING())
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("newCol2", DataTypes.VARCHAR(10))
+                        .physicalColumn("newCol4", DataTypes.VARCHAR(10))
+                        .build());
     }
 }
