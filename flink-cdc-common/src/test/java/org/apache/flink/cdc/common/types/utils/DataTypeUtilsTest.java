@@ -22,7 +22,7 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -53,7 +53,7 @@ import static org.apache.flink.table.api.DataTypes.VARCHAR;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** A test for the {@link org.apache.flink.cdc.common.types.utils.DataTypeUtils}. */
-public class DataTypeUtilsTest {
+class DataTypeUtilsTest {
     private static final DataType[] ALL_TYPES =
             new DataType[] {
                 DataTypes.BOOLEAN(),
@@ -88,7 +88,7 @@ public class DataTypeUtilsTest {
             };
 
     @Test
-    public void testToFlinkDataType() {
+    void testToFlinkDataType() {
         List<DataField> list =
                 IntStream.range(0, ALL_TYPES.length)
                         .mapToObj(i -> DataTypes.FIELD("f" + i, ALL_TYPES[i]))
