@@ -24,8 +24,10 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
+import org.apache.flink.cdc.common.sink.FlinkSinkFunctionProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.composer.definition.SinkDef;
+import org.apache.flink.cdc.runtime.operators.sink.DataSinkOperator;
 import org.apache.flink.cdc.runtime.operators.sink.DataSinkWriterOperatorFactory;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
@@ -34,6 +36,10 @@ import org.apache.flink.streaming.api.connector.sink2.WithPostCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.flink.streaming.api.transformations.LegacySinkTransformation;
+import org.apache.flink.streaming.api.transformations.PhysicalTransformation;
 import org.apache.flink.streaming.runtime.operators.sink.CommitterOperatorFactory;
 
 /** Translator used to build {@link DataSink} for given {@link DataStream}. */
@@ -56,6 +62,12 @@ public class DataSinkTranslator {
             FlinkSinkProvider sinkProvider = (FlinkSinkProvider) eventSinkProvider;
             Sink<Event> sink = sinkProvider.getSink();
             sinkTo(input, sink, sinkName, schemaOperatorID);
+        } else if (eventSinkProvider instanceof FlinkSinkFunctionProvider) {
+            // SinkFunction
+            FlinkSinkFunctionProvider sinkFunctionProvider =
+                    (FlinkSinkFunctionProvider) eventSinkProvider;
+            SinkFunction<Event> sinkFunction = sinkFunctionProvider.getSinkFunction();
+            sinkTo(input, sinkFunction, sinkName, schemaOperatorID);
         }
     }
 
@@ -78,6 +90,23 @@ public class DataSinkTranslator {
                     CommittableMessageTypeInfo.noOutput(),
                     new DataSinkWriterOperatorFactory<>(sink, schemaOperatorID));
         }
+    }
+
+    private void sinkTo(
+            DataStream<Event> input,
+            SinkFunction<Event> sinkFunction,
+            String sinkName,
+            OperatorID schemaOperatorID) {
+        DataSinkOperator sinkOperator = new DataSinkOperator(sinkFunction, schemaOperatorID);
+        final StreamExecutionEnvironment executionEnvironment = input.getExecutionEnvironment();
+        PhysicalTransformation<Event> transformation =
+                new LegacySinkTransformation<>(
+                        input.getTransformation(),
+                        SINK_WRITER_PREFIX + sinkName,
+                        sinkOperator,
+                        executionEnvironment.getParallelism(),
+                        false);
+        executionEnvironment.addOperator(transformation);
     }
 
     private <CommT> void addCommittingTopology(

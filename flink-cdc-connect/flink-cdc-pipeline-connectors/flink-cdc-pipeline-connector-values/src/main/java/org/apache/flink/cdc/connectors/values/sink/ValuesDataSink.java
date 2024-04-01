@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
+import org.apache.flink.cdc.common.sink.FlinkSinkFunctionProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
@@ -49,14 +50,22 @@ public class ValuesDataSink implements DataSink, Serializable {
 
     private final boolean print;
 
-    public ValuesDataSink(boolean materializedInMemory, boolean print) {
+    private final boolean legacy;
+
+    public ValuesDataSink(boolean materializedInMemory, boolean print, boolean lagacy) {
         this.materializedInMemory = materializedInMemory;
         this.print = print;
+        this.legacy = lagacy;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        return FlinkSinkProvider.of(new ValuesSink(materializedInMemory, print));
+        if (!legacy) {
+            return FlinkSinkProvider.of(new ValuesSink(materializedInMemory, print));
+        } else {
+            return FlinkSinkFunctionProvider.of(
+                    new ValuesDataSinkFunction(materializedInMemory, print));
+        }
     }
 
     @Override

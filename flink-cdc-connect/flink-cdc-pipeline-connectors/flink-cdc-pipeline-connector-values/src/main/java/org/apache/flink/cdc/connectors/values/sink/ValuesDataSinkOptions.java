@@ -35,4 +35,10 @@ public class ValuesDataSinkOptions {
                     .booleanType()
                     .defaultValue(true)
                     .withDescription("True if the Event should be print to console.");
+
+    public static final ConfigOption<Boolean> LEGACY_ENABLED =
+            ConfigOptions.key("legacy.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("False if use SinkFunction, while true if use Sink V2");
 }
