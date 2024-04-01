@@ -18,7 +18,7 @@ under the License.
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <artifactId>flink-cdc-pipeline-connectors</artifactId>
-        <groupId>com.ververica</groupId>
+        <groupId>org.apache.flink</groupId>
         <version>${revision}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -26,7 +26,7 @@ under the License.
     <artifactId>flink-cdc-pipeline-connector-paimon</artifactId>
 
     <properties>
-        <paimon.version>0.6.0-incubating</paimon.version>
+        <paimon.version>0.7.0-incubating</paimon.version>
         <hadoop.version>2.8.5</hadoop.version>
         <hive.version>2.3.9</hive.version>
         <mockito.version>3.4.6</mockito.version>
@@ -42,7 +42,7 @@ under the License.
 
         <!-- test -->
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-composer</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>

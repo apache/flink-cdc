@@ -31,18 +31,8 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.util.CollectionUtil;
 
-import com.ververica.cdc.common.data.ArrayData;
-import com.ververica.cdc.common.data.DecimalData;
-import com.ververica.cdc.common.data.MapData;
-import com.ververica.cdc.common.data.RecordData;
-import com.ververica.cdc.common.data.StringData;
-import com.ververica.cdc.common.data.TimestampData;
-import com.ververica.cdc.common.data.ZonedTimestampData;
-import com.ververica.cdc.common.types.DataType;
-import com.ververica.cdc.common.types.DataTypes;
-import com.ververica.cdc.common.utils.Preconditions;
-
 import java.util.List;
+import java.util.stream.Collectors;
 
 /** Utilities for handling {@link DataType}s. */
 public class DataTypeUtils {
