@@ -36,9 +36,10 @@ import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.runtime.operators.sink.CommitterOperatorFactory;
 
-/** Translator for building sink into the DataStream. */
+/** Translator used to build {@link DataSink} for given {@link DataStream}. */
 @Internal
 public class DataSinkTranslator {
+
     private static final String SINK_WRITER_PREFIX = "Sink Writer: ";
     private static final String SINK_COMMITTER_PREFIX = "Sink Committer: ";
 

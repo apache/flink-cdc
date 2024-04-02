@@ -27,7 +27,10 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 
 import java.util.List;
 
-/** Translator for transform schema. */
+/**
+ * Translator used to build {@link TransformSchemaOperator} and {@link TransformDataOperator} for
+ * event transform.
+ */
 public class TransformTranslator {
 
     public DataStream<Event> translateSchema(

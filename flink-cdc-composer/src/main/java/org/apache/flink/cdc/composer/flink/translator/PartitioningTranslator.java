@@ -28,7 +28,10 @@ import org.apache.flink.cdc.runtime.typeutils.PartitioningEventTypeInfo;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
-/** Translator for building partitioning related transformations. */
+/**
+ * Translator used to build {@link PrePartitionOperator}, {@link EventPartitioner} and {@link
+ * PostPartitionProcessor} which are responsible for events partition.
+ */
 @Internal
 public class PartitioningTranslator {
 
