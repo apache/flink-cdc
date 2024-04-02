@@ -118,7 +118,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -154,7 +155,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
-                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -164,6 +166,7 @@ public class OracleTableSourceFactoryTest {
         options.put("port", "1521");
         options.put("hostname", MY_LOCALHOST);
         options.put("debezium.snapshot.mode", "initial");
+        options.put(SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
@@ -194,7 +197,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
-                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -220,6 +224,7 @@ public class OracleTableSourceFactoryTest {
         options.put(SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE.key(), String.valueOf(fetchSize));
         options.put(SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.key(), "true");
         options.put(SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.key(), "true");
+        options.put(SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
 
         options.put(
                 JdbcSourceOptions.CONNECT_TIMEOUT.key(),
@@ -260,6 +265,7 @@ public class OracleTableSourceFactoryTest {
                         distributionFactorLower,
                         null,
                         true,
+                        true,
                         true);
         assertEquals(expectedSource, actualSource);
     }
@@ -297,7 +303,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
-                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -334,7 +341,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
-                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -375,7 +383,8 @@ public class OracleTableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
-                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");
