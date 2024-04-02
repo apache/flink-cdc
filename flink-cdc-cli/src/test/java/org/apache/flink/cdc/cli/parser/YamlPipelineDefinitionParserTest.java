@@ -17,11 +17,16 @@
 
 package org.apache.flink.cdc.cli.parser;
 
+import org.apache.flink.cdc.cli.utils.FlinkEnvironmentUtils;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
+import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
+import org.apache.flink.streaming.api.CheckpointingMode;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.yarn.configuration.YarnConfigOptions;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
@@ -122,7 +127,7 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
-    void testInvalidTimeZone() throws Exception {
+    void testInvalidTimeZone() {
         URL resource = Resources.getResource("definitions/pipeline-definition-minimized.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         assertThatThrownBy(
@@ -141,6 +146,28 @@ class YamlPipelineDefinitionParserTest {
                                 + " such as 'America/Los_Angeles' to include daylight saving time. "
                                 + "Fixed offsets are supported using 'GMT-08:00' or 'GMT+08:00'. "
                                 + "Or use 'UTC' without time zone and daylight saving time.");
+    }
+
+    @Test
+    public void testApplyFlinkConfigToEnv() throws Exception {
+        URL resource = Resources.getResource("definitions/pipeline-definition-full.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+
+        FlinkPipelineComposer composer =
+                FlinkEnvironmentUtils.createComposer(
+                        false,
+                        new Configuration(),
+                        pipelineDef.getConfig(),
+                        Collections.emptyList());
+
+        StreamExecutionEnvironment env = composer.getEnv();
+        assertThat(env.getCheckpointingMode()).isEqualTo(CheckpointingMode.EXACTLY_ONCE);
+        assertThat(env.getCheckpointConfig().getCheckpointInterval()).isEqualTo(10000L);
+        assertThat(env.getConfiguration().get(YarnConfigOptions.APPLICATION_QUEUE))
+                .isEqualTo("flink-cdc");
+        assertThat(env.getConfiguration().get(YarnConfigOptions.STAGING_DIRECTORY))
+                .isEqualTo("/tmp/flink-cdc");
     }
 
     private final PipelineDef fullDef =
@@ -185,6 +212,8 @@ class YamlPipelineDefinitionParserTest {
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
                                     .put("enable-schema-evolution", "false")
+                                    .put("execution.checkpointing.interval", "10000")
+                                    .put("execution.checkpointing.mode", "EXACTLY_ONCE")
                                     .build()));
 
     private final PipelineDef fullDefWithGlobalConf =
@@ -230,6 +259,8 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "4")
                                     .put("enable-schema-evolution", "false")
                                     .put("foo", "bar")
+                                    .put("execution.checkpointing.interval", "10000")
+                                    .put("execution.checkpointing.mode", "EXACTLY_ONCE")
                                     .build()));
 
     private final PipelineDef defWithOptional =
