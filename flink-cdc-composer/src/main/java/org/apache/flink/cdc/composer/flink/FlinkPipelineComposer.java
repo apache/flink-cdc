@@ -96,27 +96,24 @@ public class FlinkPipelineComposer implements PipelineComposer {
         int parallelism = pipelineDef.getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
 
-        // Source
+        // Build Source Operator
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
         DataStream<Event> stream =
                 sourceTranslator.translate(pipelineDef.getSource(), env, pipelineDef.getConfig());
 
-        // Transform Schema
+        // Build TransformSchemaOperator for processing Schema Event
         TransformTranslator transformTranslator = new TransformTranslator();
         stream = transformTranslator.translateSchema(stream, pipelineDef.getTransforms());
-
-        // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
                         pipelineDef
                                 .getConfig()
                                 .get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR),
                         pipelineDef.getConfig().get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID));
-
         OperatorIDGenerator schemaOperatorIDGenerator =
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
 
-        // Transform Data
+        // Build TransformDataOperator for processing Data Event
         stream =
                 transformTranslator.translateData(
                         stream,
@@ -124,24 +121,24 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         schemaOperatorIDGenerator.generate(),
                         pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
 
-        // Route
+        // Build Router used to route Event
         RouteTranslator routeTranslator = new RouteTranslator();
         stream = routeTranslator.translate(stream, pipelineDef.getRoute());
 
-        // Create sink in advance as schema operator requires MetadataApplier
+        // Build DataSink in advance as schema operator requires MetadataApplier
         DataSink dataSink = createDataSink(pipelineDef.getSink(), pipelineDef.getConfig());
 
         stream =
                 schemaOperatorTranslator.translate(
                         stream, parallelism, dataSink.getMetadataApplier());
 
-        // Add partitioner
+        // Build Partitioner used to shuffle Event
         PartitioningTranslator partitioningTranslator = new PartitioningTranslator();
         stream =
                 partitioningTranslator.translate(
                         stream, parallelism, parallelism, schemaOperatorIDGenerator.generate());
 
-        // Sink
+        // Build Sink Operator
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
         sinkTranslator.translate(
                 pipelineDef.getSink(), stream, dataSink, schemaOperatorIDGenerator.generate());

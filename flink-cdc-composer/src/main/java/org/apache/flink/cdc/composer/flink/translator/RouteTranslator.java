@@ -26,8 +26,9 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 
 import java.util.List;
 
-/** Translator for router. */
+/** Translator used to build {@link RouteFunction}. */
 public class RouteTranslator {
+
     public DataStream<Event> translate(DataStream<Event> input, List<RouteDef> routes) {
         if (routes.isEmpty()) {
             return input;

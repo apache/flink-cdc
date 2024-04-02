@@ -32,13 +32,11 @@ import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.flink.FlinkEnvironmentUtils;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-/**
- * Translator for building source and generate a {@link
- * org.apache.flink.streaming.api.datastream.DataStream}.
- */
+/** Translator used to build {@link DataSource} which will generate a {@link DataStream}. */
 @Internal
 public class DataSourceTranslator {
 
