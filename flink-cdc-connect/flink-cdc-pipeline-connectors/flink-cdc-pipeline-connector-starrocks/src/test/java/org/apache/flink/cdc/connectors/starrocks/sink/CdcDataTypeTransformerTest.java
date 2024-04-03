@@ -101,8 +101,23 @@ public class CdcDataTypeTransformerTest {
         assertEquals("primary_key", primaryKeyColumn.getColumnName());
         assertEquals(1, primaryKeyColumn.getOrdinalPosition());
         assertEquals(StarRocksUtils.VARCHAR, primaryKeyColumn.getDataType());
-        assertEquals(Integer.valueOf(20), primaryKeyColumn.getColumnSize().orElse(null));
+        assertEquals(Integer.valueOf(22), primaryKeyColumn.getColumnSize().orElse(null));
         assertTrue(!primaryKeyColumn.isNullable());
+
+        // Map to VARCHAR of StarRocks if column is DECIMAL type and primary key
+        // DECIMAL(20,0) is common in cdc pipeline, for example, the upstream cdc source is unsigned
+        // BIGINT.
+        StarRocksColumn.Builder unsignedBigIntKeyBuilder =
+                new StarRocksColumn.Builder().setColumnName("primary_key").setOrdinalPosition(1);
+        new DecimalType(20, 0)
+                .notNull()
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(true, unsignedBigIntKeyBuilder));
+        StarRocksColumn unsignedBigIntColumn = unsignedBigIntKeyBuilder.build();
+        assertEquals("primary_key", unsignedBigIntColumn.getColumnName());
+        assertEquals(1, unsignedBigIntColumn.getOrdinalPosition());
+        assertEquals(StarRocksUtils.VARCHAR, unsignedBigIntColumn.getDataType());
+        assertEquals(Integer.valueOf(22), unsignedBigIntColumn.getColumnSize().orElse(null));
+        assertTrue(!unsignedBigIntColumn.isNullable());
     }
 
     @Test

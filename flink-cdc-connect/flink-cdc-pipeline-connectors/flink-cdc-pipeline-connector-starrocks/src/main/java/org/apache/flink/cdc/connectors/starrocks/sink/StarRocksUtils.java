@@ -305,7 +305,9 @@ public class StarRocksUtils {
                 builder.setDecimalDigits(decimalType.getScale());
             } else {
                 builder.setDataType(VARCHAR);
-                builder.setColumnSize(Math.min(decimalType.getPrecision(), MAX_VARCHAR_SIZE));
+                // For a DecimalType with precision N, we may need N + 2 characters to store it as a
+                // string (one for negative sign, and one for decimal point)
+                builder.setColumnSize(Math.min(decimalType.getPrecision() + 2, MAX_VARCHAR_SIZE));
             }
             builder.setNullable(decimalType.isNullable());
             return builder;
