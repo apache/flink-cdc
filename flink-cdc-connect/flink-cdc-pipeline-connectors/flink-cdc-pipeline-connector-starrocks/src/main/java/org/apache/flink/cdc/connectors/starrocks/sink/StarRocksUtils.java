@@ -297,10 +297,17 @@ public class StarRocksUtils {
 
         @Override
         public StarRocksColumn.Builder visit(DecimalType decimalType) {
-            builder.setDataType(DECIMAL);
+            // StarRocks does not support Decimal as primary key, so decimal should be cast to
+            // VARCHAR.
+            if (!isPrimaryKeys) {
+                builder.setDataType(DECIMAL);
+                builder.setColumnSize(decimalType.getPrecision());
+                builder.setDecimalDigits(decimalType.getScale());
+            } else {
+                builder.setDataType(VARCHAR);
+                builder.setColumnSize(Math.min(decimalType.getPrecision(), MAX_VARCHAR_SIZE));
+            }
             builder.setNullable(decimalType.isNullable());
-            builder.setColumnSize(decimalType.getPrecision());
-            builder.setDecimalDigits(decimalType.getScale());
             return builder;
         }
 

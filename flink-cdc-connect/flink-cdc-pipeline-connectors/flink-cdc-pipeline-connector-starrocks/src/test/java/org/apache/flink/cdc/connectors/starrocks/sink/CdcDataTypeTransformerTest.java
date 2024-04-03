@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.starrocks.sink;
 
 import org.apache.flink.cdc.common.types.CharType;
+import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.VarCharType;
 
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
@@ -73,6 +74,35 @@ public class CdcDataTypeTransformerTest {
         assertEquals(StarRocksUtils.VARCHAR, smallLengthColumn.getDataType());
         assertEquals(Integer.valueOf(3), smallLengthColumn.getColumnSize().orElse(null));
         assertTrue(smallLengthColumn.isNullable());
+    }
+
+    @Test
+    public void testDecimalForPrimaryKey() {
+        // Map to DECIMAL of StarRocks if column is DECIMAL type and not primary key.
+        StarRocksColumn.Builder noPrimaryKeyBuilder =
+                new StarRocksColumn.Builder().setColumnName("no_primary_key").setOrdinalPosition(0);
+        new DecimalType(20, 1)
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(false, noPrimaryKeyBuilder));
+        StarRocksColumn noPrimaryKeyColumn = noPrimaryKeyBuilder.build();
+        assertEquals("no_primary_key", noPrimaryKeyColumn.getColumnName());
+        assertEquals(0, noPrimaryKeyColumn.getOrdinalPosition());
+        assertEquals(StarRocksUtils.DECIMAL, noPrimaryKeyColumn.getDataType());
+        assertEquals(Integer.valueOf(20), noPrimaryKeyColumn.getColumnSize().orElse(null));
+        assertEquals(Integer.valueOf(1), noPrimaryKeyColumn.getDecimalDigits().get());
+        assertTrue(noPrimaryKeyColumn.isNullable());
+
+        // Map to VARCHAR of StarRocks if column is DECIMAL type and primary key.
+        StarRocksColumn.Builder primaryKeyBuilder =
+                new StarRocksColumn.Builder().setColumnName("primary_key").setOrdinalPosition(1);
+        new DecimalType(20, 1)
+                .notNull()
+                .accept(new StarRocksUtils.CdcDataTypeTransformer(true, primaryKeyBuilder));
+        StarRocksColumn primaryKeyColumn = primaryKeyBuilder.build();
+        assertEquals("primary_key", primaryKeyColumn.getColumnName());
+        assertEquals(1, primaryKeyColumn.getOrdinalPosition());
+        assertEquals(StarRocksUtils.VARCHAR, primaryKeyColumn.getDataType());
+        assertEquals(Integer.valueOf(20), primaryKeyColumn.getColumnSize().orElse(null));
+        assertTrue(!primaryKeyColumn.isNullable());
     }
 
     @Test
