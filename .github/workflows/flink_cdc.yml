@@ -135,6 +135,11 @@ jobs:
         with:
           maven-version: 3.8.6
 
+      - name: Cache Docker images
+        uses: ScribeMD/docker-cache@0.5.0
+        with:
+          key: docker-${{ runner.os }}-${{ hashFiles(paths) }}
+
       - name: Compile and test ${{ matrix.module }}
         timeout-minutes: 90
         run: |
