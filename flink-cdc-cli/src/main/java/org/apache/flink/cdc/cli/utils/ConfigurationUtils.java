@@ -26,6 +26,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YA
 import java.io.FileNotFoundException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Map;
 
 /** Utilities for handling {@link Configuration}. */
@@ -37,15 +38,34 @@ public class ConfigurationUtils {
         }
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
         try {
-            Map<String, String> configMap =
+            Map<String, Object> configMap =
                     mapper.readValue(
-                            configPath.toFile(), new TypeReference<Map<String, String>>() {});
-            return Configuration.fromMap(configMap);
+                            configPath.toFile(), new TypeReference<Map<String, Object>>() {});
+            return Configuration.fromMap(flattenConfigMap(configMap));
         } catch (Exception e) {
             throw new IllegalStateException(
                     String.format(
                             "Failed to load config file \"%s\" to key-value pairs", configPath),
                     e);
+        }
+    }
+
+    private static Map<String, String> flattenConfigMap(Map<String, Object> configMap) {
+        Map<String, String> result = new HashMap<>();
+        flattenConfigMapHelper(configMap, "", result);
+        return result;
+    }
+
+    private static void flattenConfigMapHelper(
+            Map<String, Object> configMap, String currentPath, Map<String, String> result) {
+        for (Map.Entry<String, Object> entry : configMap.entrySet()) {
+            String updatedPath =
+                    currentPath.isEmpty() ? entry.getKey() : currentPath + "." + entry.getKey();
+            if (entry.getValue() instanceof Map) {
+                flattenConfigMapHelper((Map<String, Object>) entry.getValue(), updatedPath, result);
+            } else {
+                result.put(updatedPath, entry.getValue().toString());
+            }
         }
     }
 }
