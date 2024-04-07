@@ -51,17 +51,17 @@ public class ValuesDataSink implements DataSink, Serializable {
 
     private final boolean print;
 
-    private final String sinkType;
+    private final String sinkApi;
 
-    public ValuesDataSink(boolean materializedInMemory, boolean print, String sinkType) {
+    public ValuesDataSink(boolean materializedInMemory, boolean print, String sinkApi) {
         this.materializedInMemory = materializedInMemory;
         this.print = print;
-        this.sinkType = sinkType;
+        this.sinkApi = sinkApi;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        if (SinkType.SINK_V2.equals(SinkType.getSinkType(sinkType))) {
+        if (SinkApiEnum.SINK_V2.equals(SinkApiEnum.getSinkApi(sinkApi))) {
             return FlinkSinkProvider.of(new ValuesSink(materializedInMemory, print));
         } else {
             return FlinkSinkFunctionProvider.of(
@@ -168,7 +168,7 @@ public class ValuesDataSink implements DataSink, Serializable {
         public void close() {}
     }
 
-    public enum SinkType{
+    public enum SinkApiEnum{
         /**
          * Sink based on SinkFunction
          */
@@ -180,15 +180,15 @@ public class ValuesDataSink implements DataSink, Serializable {
         SINK_V2;
 
 
-        static SinkType getSinkType(String sinkType) {
-            switch (sinkType.toLowerCase()) {
+        static SinkApiEnum getSinkApi(String sinkApi) {
+            switch (sinkApi.toLowerCase()) {
                 case "sinkfunction":
                     return SINK_FUNCTION;
                 case "sinkv2":
                     return SINK_V2;
                 default:
                     throw new ValidationException(
-                            String.format("Invalid sink type '%s'.", sinkType));
+                            String.format("Invalid sink api '%s'.", sinkApi));
             }
         }
     }

@@ -36,9 +36,9 @@ public class ValuesDataSinkOptions {
                     .defaultValue(true)
                     .withDescription("True if the Event should be print to console.");
 
-    public static final ConfigOption<String> SINK_TYPE =
-            ConfigOptions.key("sinkType")
+    public static final ConfigOption<String> SINK_API =
+            ConfigOptions.key("sink.api")
                     .stringType()
                     .defaultValue("SinkV2")
-                    .withDescription("The sink type on which the sink is based: SinkFunction or SinkV2.");
+                    .withDescription("The sink api on which the sink is based: SinkFunction or SinkV2.");
 }

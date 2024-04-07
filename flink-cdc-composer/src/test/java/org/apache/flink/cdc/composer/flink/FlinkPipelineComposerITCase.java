@@ -97,7 +97,7 @@ class FlinkPipelineComposerITCase {
 
     @ParameterizedTest
     @ValueSource(strings = {"SinkFunction", "SinkV2"})
-    void testSingleSplitSingleTable(String sinkType) throws Exception {
+    void testSingleSplitSingleTable(String sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -111,7 +111,7 @@ class FlinkPipelineComposerITCase {
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
-        sinkConfig.set(ValuesDataSinkOptions.SINK_TYPE, sinkType);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline
@@ -153,7 +153,7 @@ class FlinkPipelineComposerITCase {
 
     @ParameterizedTest
     @ValueSource(strings = {"SinkFunction", "SinkV2"})
-    void testSingleSplitMultipleTables(String sinkType) throws Exception {
+    void testSingleSplitMultipleTables(String sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -167,7 +167,7 @@ class FlinkPipelineComposerITCase {
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
-        sinkConfig.set(ValuesDataSinkOptions.SINK_TYPE, sinkType);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline
@@ -219,7 +219,7 @@ class FlinkPipelineComposerITCase {
 
     @ParameterizedTest
     @ValueSource(strings = {"SinkFunction", "SinkV2"})
-    void testMultiSplitsSingleTable(String sinkType) throws Exception {
+    void testMultiSplitsSingleTable(String sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -233,7 +233,7 @@ class FlinkPipelineComposerITCase {
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
-        sinkConfig.set(ValuesDataSinkOptions.SINK_TYPE, sinkType);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline
