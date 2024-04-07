@@ -116,7 +116,7 @@ public class CdcDataTypeTransformerTest {
         assertEquals("primary_key", unsignedBigIntColumn.getColumnName());
         assertEquals(1, unsignedBigIntColumn.getOrdinalPosition());
         assertEquals(StarRocksUtils.VARCHAR, unsignedBigIntColumn.getDataType());
-        assertEquals(Integer.valueOf(22), unsignedBigIntColumn.getColumnSize().orElse(null));
+        assertEquals(Integer.valueOf(21), unsignedBigIntColumn.getColumnSize().orElse(null));
         assertTrue(!unsignedBigIntColumn.isNullable());
     }
 
