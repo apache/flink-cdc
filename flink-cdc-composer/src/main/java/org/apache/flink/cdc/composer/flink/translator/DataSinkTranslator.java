@@ -97,7 +97,8 @@ public class DataSinkTranslator {
             SinkFunction<Event> sinkFunction,
             String sinkName,
             OperatorID schemaOperatorID) {
-        DataSinkFunctionOperator sinkOperator = new DataSinkFunctionOperator(sinkFunction, schemaOperatorID);
+        DataSinkFunctionOperator sinkOperator =
+                new DataSinkFunctionOperator(sinkFunction, schemaOperatorID);
         final StreamExecutionEnvironment executionEnvironment = input.getExecutionEnvironment();
         PhysicalTransformation<Event> transformation =
                 new LegacySinkTransformation<>(

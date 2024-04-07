@@ -26,6 +26,7 @@ import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.connectors.values.ValuesDatabase;
 import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
+import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceOptions;
@@ -36,7 +37,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -96,8 +97,8 @@ class FlinkPipelineComposerITCase {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SinkFunction", "SinkV2"})
-    void testSingleSplitSingleTable(String sinkApi) throws Exception {
+    @EnumSource
+    void testSingleSplitSingleTable(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -152,8 +153,8 @@ class FlinkPipelineComposerITCase {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SinkFunction", "SinkV2"})
-    void testSingleSplitMultipleTables(String sinkApi) throws Exception {
+    @EnumSource
+    void testSingleSplitMultipleTables(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -218,8 +219,8 @@ class FlinkPipelineComposerITCase {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SinkFunction", "SinkV2"})
-    void testMultiSplitsSingleTable(String sinkApi) throws Exception {
+    @EnumSource
+    void testMultiSplitsSingleTable(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source

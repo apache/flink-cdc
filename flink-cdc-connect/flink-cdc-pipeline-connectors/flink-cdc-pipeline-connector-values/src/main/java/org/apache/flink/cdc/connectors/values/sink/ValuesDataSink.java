@@ -35,7 +35,6 @@ import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.values.ValuesDatabase;
-import org.apache.flink.table.api.ValidationException;
 
 import java.io.Serializable;
 import java.util.HashMap;
@@ -51,9 +50,9 @@ public class ValuesDataSink implements DataSink, Serializable {
 
     private final boolean print;
 
-    private final String sinkApi;
+    private final SinkApi sinkApi;
 
-    public ValuesDataSink(boolean materializedInMemory, boolean print, String sinkApi) {
+    public ValuesDataSink(boolean materializedInMemory, boolean print, SinkApi sinkApi) {
         this.materializedInMemory = materializedInMemory;
         this.print = print;
         this.sinkApi = sinkApi;
@@ -61,7 +60,7 @@ public class ValuesDataSink implements DataSink, Serializable {
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        if (SinkApiEnum.SINK_V2.equals(SinkApiEnum.getSinkApi(sinkApi))) {
+        if (SinkApi.SINK_V2.equals(sinkApi)) {
             return FlinkSinkProvider.of(new ValuesSink(materializedInMemory, print));
         } else {
             return FlinkSinkFunctionProvider.of(
@@ -168,28 +167,12 @@ public class ValuesDataSink implements DataSink, Serializable {
         public void close() {}
     }
 
-    public enum SinkApiEnum{
-        /**
-         * Sink based on SinkFunction
-         */
+    /** SinkApi which sink based on. */
+    public enum SinkApi {
+        /** Sink based on SinkFunction. */
         SINK_FUNCTION,
 
-        /**
-         * Sink based on SinkV2
-         */
+        /** Sink based on SinkV2. */
         SINK_V2;
-
-
-        static SinkApiEnum getSinkApi(String sinkApi) {
-            switch (sinkApi.toLowerCase()) {
-                case "sinkfunction":
-                    return SINK_FUNCTION;
-                case "sinkv2":
-                    return SINK_V2;
-                default:
-                    throw new ValidationException(
-                            String.format("Invalid sink api '%s'.", sinkApi));
-            }
-        }
     }
 }
