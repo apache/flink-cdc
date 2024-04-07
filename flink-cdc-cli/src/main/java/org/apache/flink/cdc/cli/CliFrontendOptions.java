@@ -55,7 +55,7 @@ public class CliFrontendOptions {
 
     public static final Option SAVEPOINT_PATH_OPTION =
             Option.builder("s")
-                    .longOpt("fromSavepoint")
+                    .longOpt("from-savepoint")
                     .hasArg(true)
                     .desc(
                             "Path to a savepoint to restore the job from (for example hdfs:///flink/savepoint-1537")
@@ -63,7 +63,7 @@ public class CliFrontendOptions {
 
     public static final Option SAVEPOINT_CLAIM_MODE =
             Option.builder("cm")
-                    .longOpt("claimMode")
+                    .longOpt("claim-mode")
                     .hasArg(true)
                     .desc(
                             "Defines how should we restore from the given savepoint. Supported options: "
@@ -76,7 +76,7 @@ public class CliFrontendOptions {
 
     public static final Option SAVEPOINT_ALLOW_NON_RESTORED_OPTION =
             Option.builder("n")
-                    .longOpt("allowNonRestoredState")
+                    .longOpt("allow-nonRestored-state")
                     .hasArg(false)
                     .desc(
                             "Allow to skip savepoint state that cannot be restored. "
