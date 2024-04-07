@@ -48,14 +48,14 @@ import java.util.Set;
  * <p>The operator is always part of a sink pipeline and is the first operator.
  */
 @Internal
-public class DataSinkOperator extends StreamSink<Event> {
+public class DataSinkFunctionOperator extends StreamSink<Event> {
 
     private SchemaEvolutionClient schemaEvolutionClient;
     private final OperatorID schemaOperatorID;
     /** A set of {@link TableId} that already processed {@link CreateTableEvent}. */
     private final Set<TableId> processedTableIds;
 
-    public DataSinkOperator(SinkFunction<Event> userFunction, OperatorID schemaOperatorID) {
+    public DataSinkFunctionOperator(SinkFunction<Event> userFunction, OperatorID schemaOperatorID) {
         super(userFunction);
         this.schemaOperatorID = schemaOperatorID;
         processedTableIds = new HashSet<>();

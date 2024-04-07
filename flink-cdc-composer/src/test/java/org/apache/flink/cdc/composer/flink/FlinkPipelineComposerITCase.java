@@ -96,8 +96,8 @@ class FlinkPipelineComposerITCase {
     }
 
     @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void testSingleSplitSingleTable(boolean useLegacySink) throws Exception {
+    @ValueSource(strings = {"SinkFunction", "SinkV2"})
+    void testSingleSplitSingleTable(String sinkType) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -111,7 +111,7 @@ class FlinkPipelineComposerITCase {
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
-        sinkConfig.set(ValuesDataSinkOptions.LEGACY_ENABLED, useLegacySink);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_TYPE, sinkType);
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline
@@ -152,8 +152,8 @@ class FlinkPipelineComposerITCase {
     }
 
     @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void testSingleSplitMultipleTables(boolean useLegacySink) throws Exception {
+    @ValueSource(strings = {"SinkFunction", "SinkV2"})
+    void testSingleSplitMultipleTables(String sinkType) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -167,7 +167,7 @@ class FlinkPipelineComposerITCase {
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
-        sinkConfig.set(ValuesDataSinkOptions.LEGACY_ENABLED, useLegacySink);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_TYPE, sinkType);
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline
@@ -218,8 +218,8 @@ class FlinkPipelineComposerITCase {
     }
 
     @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void testMultiSplitsSingleTable(boolean useLegacySink) throws Exception {
+    @ValueSource(strings = {"SinkFunction", "SinkV2"})
+    void testMultiSplitsSingleTable(String sinkType) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -233,7 +233,7 @@ class FlinkPipelineComposerITCase {
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
-        sinkConfig.set(ValuesDataSinkOptions.LEGACY_ENABLED, useLegacySink);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_TYPE, sinkType);
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline

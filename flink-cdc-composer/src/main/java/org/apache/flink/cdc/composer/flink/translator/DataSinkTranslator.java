@@ -27,7 +27,7 @@ import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkFunctionProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.composer.definition.SinkDef;
-import org.apache.flink.cdc.runtime.operators.sink.DataSinkOperator;
+import org.apache.flink.cdc.runtime.operators.sink.DataSinkFunctionOperator;
 import org.apache.flink.cdc.runtime.operators.sink.DataSinkWriterOperatorFactory;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
@@ -97,7 +97,7 @@ public class DataSinkTranslator {
             SinkFunction<Event> sinkFunction,
             String sinkName,
             OperatorID schemaOperatorID) {
-        DataSinkOperator sinkOperator = new DataSinkOperator(sinkFunction, schemaOperatorID);
+        DataSinkFunctionOperator sinkOperator = new DataSinkFunctionOperator(sinkFunction, schemaOperatorID);
         final StreamExecutionEnvironment executionEnvironment = input.getExecutionEnvironment();
         PhysicalTransformation<Event> transformation =
                 new LegacySinkTransformation<>(

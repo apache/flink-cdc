@@ -36,9 +36,9 @@ public class ValuesDataSinkOptions {
                     .defaultValue(true)
                     .withDescription("True if the Event should be print to console.");
 
-    public static final ConfigOption<Boolean> LEGACY_ENABLED =
-            ConfigOptions.key("legacy.enabled")
-                    .booleanType()
-                    .defaultValue(false)
-                    .withDescription("False if use SinkFunction, while true if use Sink V2");
+    public static final ConfigOption<String> SINK_TYPE =
+            ConfigOptions.key("sinkType")
+                    .stringType()
+                    .defaultValue("SinkV2")
+                    .withDescription("The sink type on which the sink is based: SinkFunction or SinkV2.");
 }

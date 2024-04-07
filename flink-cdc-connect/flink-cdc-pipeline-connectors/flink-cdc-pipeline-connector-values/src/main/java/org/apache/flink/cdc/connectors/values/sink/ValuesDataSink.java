@@ -35,6 +35,7 @@ import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.values.ValuesDatabase;
+import org.apache.flink.table.api.ValidationException;
 
 import java.io.Serializable;
 import java.util.HashMap;
@@ -50,17 +51,17 @@ public class ValuesDataSink implements DataSink, Serializable {
 
     private final boolean print;
 
-    private final boolean legacy;
+    private final String sinkType;
 
-    public ValuesDataSink(boolean materializedInMemory, boolean print, boolean lagacy) {
+    public ValuesDataSink(boolean materializedInMemory, boolean print, String sinkType) {
         this.materializedInMemory = materializedInMemory;
         this.print = print;
-        this.legacy = lagacy;
+        this.sinkType = sinkType;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        if (!legacy) {
+        if (SinkType.SINK_V2.equals(SinkType.getSinkType(sinkType))) {
             return FlinkSinkProvider.of(new ValuesSink(materializedInMemory, print));
         } else {
             return FlinkSinkFunctionProvider.of(
@@ -165,5 +166,30 @@ public class ValuesDataSink implements DataSink, Serializable {
 
         @Override
         public void close() {}
+    }
+
+    public enum SinkType{
+        /**
+         * Sink based on SinkFunction
+         */
+        SINK_FUNCTION,
+
+        /**
+         * Sink based on SinkV2
+         */
+        SINK_V2;
+
+
+        static SinkType getSinkType(String sinkType) {
+            switch (sinkType.toLowerCase()) {
+                case "sinkfunction":
+                    return SINK_FUNCTION;
+                case "sinkv2":
+                    return SINK_V2;
+                default:
+                    throw new ValidationException(
+                            String.format("Invalid sink type '%s'.", sinkType));
+            }
+        }
     }
 }
