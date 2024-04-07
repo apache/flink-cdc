@@ -103,7 +103,8 @@ public class DorisRowConverter implements Serializable {
                 return (index, val) ->
                         val.getTimestamp(index, DataTypeChecks.getPrecision(type))
                                 .toLocalDateTime()
-                                .format(DorisEventSerializer.DATE_TIME_FORMATTER);
+                                .toString()
+                                .replace('T', ' ');
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return (index, val) ->
                         ZonedDateTime.ofInstant(
@@ -112,7 +113,8 @@ public class DorisRowConverter implements Serializable {
                                                 .toInstant(),
                                         pipelineZoneId)
                                 .toLocalDateTime()
-                                .format(DorisEventSerializer.DATE_TIME_FORMATTER);
+                                .toString()
+                                .replace('T', ' ');
             case TIMESTAMP_WITH_TIME_ZONE:
                 final int zonedP = ((ZonedTimestampType) type).getPrecision();
                 return (index, val) -> val.getTimestamp(index, zonedP).toTimestamp();
