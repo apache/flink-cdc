@@ -310,6 +310,11 @@ public class IncrementalSourceEnumerator
         final int totalFinishedSplitSizeOfReader = requestEvent.getTotalFinishedSplitSize();
         final int totalFinishedSplitSizeOfEnumerator = splitAssigner.getFinishedSplitInfos().size();
         if (totalFinishedSplitSizeOfReader > totalFinishedSplitSizeOfEnumerator) {
+            LOG.warn(
+                    "Total finished split size of subtask {} is {}, while total finished split size of enumerator is only {}. Try to truncate it",
+                    subTask,
+                    totalFinishedSplitSizeOfReader,
+                    totalFinishedSplitSizeOfEnumerator);
             StreamSplitMetaEvent metadataEvent =
                     new StreamSplitMetaEvent(
                             requestEvent.getSplitId(),

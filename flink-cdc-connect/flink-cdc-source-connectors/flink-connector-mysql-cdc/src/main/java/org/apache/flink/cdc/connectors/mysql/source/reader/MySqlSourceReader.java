@@ -402,6 +402,11 @@ public class MySqlSourceReader<T>
                             binlogSplit.getFinishedSnapshotSplitInfos().size(),
                             sourceConfig.getSplitMetaGroupSize());
             if (receivedTotalFinishedSplitSize < binlogSplit.getTotalFinishedSplitSize()) {
+                LOG.warn(
+                        "Source reader {} receives out of bound finished split size. The received finished split size is {}, but expected is {}, truncate it",
+                        subtaskId,
+                        receivedTotalFinishedSplitSize,
+                        binlogSplit.getTotalFinishedSplitSize());
                 binlogSplit =
                         MySqlBinlogSplit.toNormalBinlogSplit(
                                 binlogSplit, receivedTotalFinishedSplitSize);

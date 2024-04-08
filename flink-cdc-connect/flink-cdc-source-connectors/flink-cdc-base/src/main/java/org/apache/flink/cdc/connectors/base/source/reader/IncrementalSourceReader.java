@@ -424,10 +424,11 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
                             streamSplit.getFinishedSnapshotSplitInfos().size(),
                             sourceConfig.getSplitMetaGroupSize());
             if (receivedTotalFinishedSplitSize < streamSplit.getTotalFinishedSplitSize()) {
-                LOG.info(
-                        "Update total finished split size from {} to {}",
-                        streamSplit.getTotalFinishedSplitSize(),
-                        receivedTotalFinishedSplitSize);
+                LOG.warn(
+                        "Source reader {} receives out of bound finished split size. The received finished split size is {}, but expected is {}, truncate it",
+                        subtaskId,
+                        receivedTotalFinishedSplitSize,
+                        streamSplit.getTotalFinishedSplitSize());
                 streamSplit = toNormalStreamSplit(streamSplit, receivedTotalFinishedSplitSize);
                 uncompletedStreamSplits.put(streamSplit.splitId(), streamSplit);
             } else if (receivedMetaGroupId == expectedMetaGroupId) {

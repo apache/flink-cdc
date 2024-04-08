@@ -301,6 +301,11 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         final int totalFinishedSplitSizeOfReader = requestEvent.getTotalFinishedSplitSize();
         final int totalFinishedSplitSizeOfEnumerator = splitAssigner.getFinishedSplitInfos().size();
         if (totalFinishedSplitSizeOfReader > totalFinishedSplitSizeOfEnumerator) {
+            LOG.warn(
+                    "Total finished split size of subtask {} is {}, while total finished split size of Enumerator is only {}. Try to truncate it",
+                    subTask,
+                    totalFinishedSplitSizeOfReader,
+                    totalFinishedSplitSizeOfEnumerator);
             BinlogSplitMetaEvent metadataEvent =
                     new BinlogSplitMetaEvent(
                             requestEvent.getSplitId(),

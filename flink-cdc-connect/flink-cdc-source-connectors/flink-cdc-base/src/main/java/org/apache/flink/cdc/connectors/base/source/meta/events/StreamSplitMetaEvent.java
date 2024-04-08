@@ -22,6 +22,8 @@ import org.apache.flink.cdc.connectors.base.source.enumerator.IncrementalSourceE
 import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReader;
 
+import javax.annotation.Nullable;
+
 import java.util.List;
 
 /**
@@ -46,7 +48,10 @@ public class StreamSplitMetaEvent implements SourceEvent {
     private final int totalFinishedSplitSize;
 
     public StreamSplitMetaEvent(
-            String splitId, int metaGroupId, List<byte[]> metaGroup, int totalFinishedSplitSize) {
+            String splitId,
+            int metaGroupId,
+            @Nullable List<byte[]> metaGroup,
+            int totalFinishedSplitSize) {
         this.splitId = splitId;
         this.metaGroupId = metaGroupId;
         this.metaGroup = metaGroup;
