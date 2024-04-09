@@ -31,12 +31,12 @@ under the License.
             <p class="leading-normal text-xl text-white">
                 A streaming data integration tool
             </p>
-            <a href="docs/get-started/introduction" class="link-as-button mx-auto bg-white text-black font-bold my-4 px-8">
+            <a href="{{< ref "docs/get-started/introduction" >}}" class="link-as-button mx-auto bg-white text-black font-bold my-4 px-8">
                 Quick Start
             </a>
         </div>
         <div class="w-full md:w-3/5 py-6 text-center">
-            {{<img src="fig/cdc-flow.png" alt="Flink CDC Flow">}}
+            {{<img src="/fig/cdc-flow.png" alt="Flink CDC Flow">}}
         </div>
     </div>
     <div class="relative -mt-8 bg-purple">
@@ -71,7 +71,7 @@ under the License.
             </div>
             <div class="w-full flex justify-center	">
                 <div class="w-4/5">
-                    {{<img src="fig/index-yaml-example.png" alt="Flink CDC Example">}}
+                    {{<img src="/fig/index-yaml-example.png" alt="Flink CDC Example">}}
                 </div>
             </div>
         </div>
@@ -151,7 +151,7 @@ under the License.
                 </div>
                 <p class="text-sm my-0 text-center md:text-left">
                     Flink CDC provides a series of quick start demos without any dependencies or java code. A Linux or MacOS computer with Docker installed is enough.
-                    Please check out our <a href="docs/get-started/introduction">Quick Start</a> for more information.
+                    Please check out our <a href="{{< ref "docs/get-started/introduction" >}}">Quick Start</a> for more information.
                 </p>
             </div>
             <div class="w-full md:w-1/2 px-8 py-6 flex flex-col flex-grow flex-shrink">
