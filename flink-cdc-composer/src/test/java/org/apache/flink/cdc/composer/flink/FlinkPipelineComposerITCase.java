@@ -26,6 +26,7 @@ import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.connectors.values.ValuesDatabase;
 import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
+import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceOptions;
@@ -34,8 +35,9 @@ import org.apache.flink.test.junit5.MiniClusterExtension;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -94,8 +96,9 @@ class FlinkPipelineComposerITCase {
         System.setOut(standardOut);
     }
 
-    @Test
-    void testSingleSplitSingleTable() throws Exception {
+    @ParameterizedTest
+    @EnumSource
+    void testSingleSplitSingleTable(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -109,6 +112,7 @@ class FlinkPipelineComposerITCase {
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline
@@ -148,8 +152,9 @@ class FlinkPipelineComposerITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, ], after=[2, x], op=UPDATE, meta=()}");
     }
 
-    @Test
-    void testSingleSplitMultipleTables() throws Exception {
+    @ParameterizedTest
+    @EnumSource
+    void testSingleSplitMultipleTables(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -163,6 +168,7 @@ class FlinkPipelineComposerITCase {
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline
@@ -212,8 +218,9 @@ class FlinkPipelineComposerITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, 2], after=[2, x], op=UPDATE, meta=()}");
     }
 
-    @Test
-    void testMultiSplitsSingleTable() throws Exception {
+    @ParameterizedTest
+    @EnumSource
+    void testMultiSplitsSingleTable(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -227,6 +234,7 @@ class FlinkPipelineComposerITCase {
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline
@@ -253,8 +261,9 @@ class FlinkPipelineComposerITCase {
                         "default_namespace.default_schema.table1:col1=5;col2=5;col3=");
     }
 
-    @Test
-    void testTransform() throws Exception {
+    @ParameterizedTest
+    @EnumSource
+    void testTransform(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -268,6 +277,7 @@ class FlinkPipelineComposerITCase {
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup transform
@@ -310,8 +320,9 @@ class FlinkPipelineComposerITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, , 20], after=[2, x, 20], op=UPDATE, meta=()}");
     }
 
-    @Test
-    void testTransformTwice() throws Exception {
+    @ParameterizedTest
+    @EnumSource
+    void testTransformTwice(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -325,6 +336,7 @@ class FlinkPipelineComposerITCase {
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup transform

@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
+import org.apache.flink.cdc.common.sink.FlinkSinkFunctionProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
@@ -49,14 +50,22 @@ public class ValuesDataSink implements DataSink, Serializable {
 
     private final boolean print;
 
-    public ValuesDataSink(boolean materializedInMemory, boolean print) {
+    private final SinkApi sinkApi;
+
+    public ValuesDataSink(boolean materializedInMemory, boolean print, SinkApi sinkApi) {
         this.materializedInMemory = materializedInMemory;
         this.print = print;
+        this.sinkApi = sinkApi;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        return FlinkSinkProvider.of(new ValuesSink(materializedInMemory, print));
+        if (SinkApi.SINK_V2.equals(sinkApi)) {
+            return FlinkSinkProvider.of(new ValuesSink(materializedInMemory, print));
+        } else {
+            return FlinkSinkFunctionProvider.of(
+                    new ValuesDataSinkFunction(materializedInMemory, print));
+        }
     }
 
     @Override
@@ -156,5 +165,14 @@ public class ValuesDataSink implements DataSink, Serializable {
 
         @Override
         public void close() {}
+    }
+
+    /** SinkApi which sink based on. */
+    public enum SinkApi {
+        /** Sink based on SinkFunction. */
+        SINK_FUNCTION,
+
+        /** Sink based on SinkV2. */
+        SINK_V2;
     }
 }
