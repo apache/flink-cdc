@@ -717,7 +717,7 @@ _Step 3_: 从 savepoint 还原更新后的 Flink 作业。
 ```shell
 $ ./bin/flink run \
       --detached \ 
-      --fromSavepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
+      --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
 **注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) 了解更多详细信息。

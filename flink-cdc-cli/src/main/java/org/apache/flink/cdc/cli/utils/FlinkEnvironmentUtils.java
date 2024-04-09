@@ -19,6 +19,7 @@ package org.apache.flink.cdc.cli.utils;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
+import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -35,12 +36,16 @@ public class FlinkEnvironmentUtils {
     }
 
     public static FlinkPipelineComposer createComposer(
-            boolean useMiniCluster, Configuration flinkConfig, List<Path> additionalJars) {
+            boolean useMiniCluster,
+            Configuration flinkConfig,
+            List<Path> additionalJars,
+            SavepointRestoreSettings savepointSettings) {
         if (useMiniCluster) {
             return FlinkPipelineComposer.ofMiniCluster();
         }
-        return FlinkPipelineComposer.ofRemoteCluster(
-                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap()),
-                additionalJars);
+        org.apache.flink.configuration.Configuration configuration =
+                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap());
+        SavepointRestoreSettings.toConfiguration(savepointSettings, configuration);
+        return FlinkPipelineComposer.ofRemoteCluster(configuration, additionalJars);
     }
 }
