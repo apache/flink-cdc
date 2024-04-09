@@ -28,6 +28,27 @@ under the License.
 
 MySQL CDC Pipeline 连接器允许从 MySQL 数据库读取快照数据和增量数据，并提供端到端的整库数据同步能力。 本文描述了如何设置 MySQL CDC Pipeline 连接器。
 
+## 依赖配置
+
+由于 MySQL Connector 采用的 GPLv2 协议与 Flink CDC 项目不兼容，我们无法在 jar 包中提供 MySQL 连接器。
+您可能需要手动配置以下依赖：
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">依赖名称</th>
+        <th class="text-left">说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="https://mvnrepository.com/artifact/mysql/mysql-connector-java/8.0.27">mysql:mysql-connector-java:8.0.27</a></td>
+        <td>用于连接到 MySQL 数据库。</td>
+      </tr>
+    </tbody>
+</table>
+</div>
 
 ## 示例
 

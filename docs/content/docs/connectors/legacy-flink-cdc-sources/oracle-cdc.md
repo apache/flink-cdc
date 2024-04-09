@@ -45,6 +45,33 @@ Download [flink-sql-connector-oracle-cdc-3.0.1.jar](https://repo1.maven.org/mave
 
 **Note:** Refer to [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oracle-cdc), more released versions will be available in the Maven central warehouse.
 
+
+Since Oracle Connector's FUTC license is incompatible with Flink CDC project, we can't provide Oracle connector in prebuilt connector jar packages.
+You may need to configure the following dependencies manually.
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">Dependency Item</th>
+        <th class="text-left">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="https://mvnrepository.com/artifact/com.oracle.ojdbc/ojdbc8/19.3.0.0">com.oracle.ojdbc:ojdbc8:19.3.0.0</a></td>
+        <td>Used for connecting to Oracle database.</td>
+      </tr>
+    </tbody>
+    <tbody>
+      <tr>
+        <td><a href="https://mvnrepository.com/artifact/com.oracle.database.xml/xdb/19.3.0.0">com.oracle.database.xml:xdb:19.3.0.0</a></td>
+        <td>Used for storaging XML files.</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
 Setup Oracle
 ----------------
 You have to enable log archiving for Oracle database and define an Oracle user with appropriate permissions on all databases that the Debezium Oracle connector monitors.
