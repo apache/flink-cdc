@@ -175,9 +175,9 @@ public class MySqlValidator implements Validator {
         if (!rowValueOptions.equals(BINLOG_ROW_VALUE_OPTIONS)) {
             throw new ValidationException(
                     String.format(
-                            "The MySQL server is configured with binlog_row_value_options %s rather than %s, which is "
-                                    + "required for this connector to work properly. Change the MySQL configuration to use a "
-                                    + "binlog_row_image='' and restart the connector.",
+                            "The MySQL server is configured with binlog_row_value_options=%s, which is possible to cause losing some binlog events"
+                                    + "for the mysql cdc connector. Please remove the binlog_row_value_options setting in the MySQL server and rerun the job."
+                                    + "See more details at https://dev.mysql.com/doc/refman/8.0/en/replication-features-json.html.",
                             rowValueOptions, BINLOG_ROW_VALUE_OPTIONS));
         }
     }
