@@ -31,6 +31,8 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
+import org.apache.flink.cdc.common.types.BinaryType;
+import org.apache.flink.cdc.common.types.CharType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
@@ -303,24 +305,46 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                             Column.physicalColumn("cols5", DataTypes.BOOLEAN())))));
             statement.execute(
                     String.format(
-                            "ALTER TABLE `%s`.`products` ADD COLUMN `cols6` BINARY NULL;",
+                            "ALTER TABLE `%s`.`products` ADD COLUMN `cols6` BINARY(0) NULL;",
                             inventoryDatabase.getDatabaseName()));
             expected.add(
                     new AddColumnEvent(
                             tableId,
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("cols6", DataTypes.BINARY(1))))));
+                                            Column.physicalColumn(
+                                                    "cols6", BinaryType.ofEmptyLiteral())))));
             statement.execute(
                     String.format(
-                            "ALTER TABLE `%s`.`products` ADD COLUMN `cols7` CHAR NULL;",
+                            "ALTER TABLE `%s`.`products` ADD COLUMN `cols7` BINARY NULL;",
                             inventoryDatabase.getDatabaseName()));
             expected.add(
                     new AddColumnEvent(
                             tableId,
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("cols7", DataTypes.CHAR(1))))));
+                                            Column.physicalColumn("cols7", DataTypes.BINARY(1))))));
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`products` ADD COLUMN `cols8` CHAR(0) NULL;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            tableId,
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "cols8", CharType.ofEmptyLiteral())))));
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`products` ADD COLUMN `cols9` CHAR NULL;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            tableId,
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn("cols9", DataTypes.CHAR(1))))));
         }
         List<Event> actual = fetchResults(events, expected.size());
         assertThat(actual).isEqualTo(expected);

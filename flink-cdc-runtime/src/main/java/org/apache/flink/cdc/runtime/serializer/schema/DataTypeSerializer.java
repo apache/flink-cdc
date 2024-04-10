@@ -183,7 +183,10 @@ public class DataTypeSerializer extends TypeSerializer<DataType> {
         boolean isNullable = source.readBoolean();
         switch (dataTypeClass) {
             case BINARY:
-                return new BinaryType(isNullable, source.readInt());
+                int binaryLength = source.readInt();
+                return binaryLength == 0
+                        ? BinaryType.ofEmptyLiteral()
+                        : new BinaryType(isNullable, binaryLength);
             case ARRAY:
                 return new ArrayType(isNullable, this.deserialize(source));
             case BOOLEAN:
@@ -197,7 +200,10 @@ public class DataTypeSerializer extends TypeSerializer<DataType> {
             case VARBINARY:
                 return new VarBinaryType(isNullable, source.readInt());
             case CHAR:
-                return new CharType(isNullable, source.readInt());
+                int charLength = source.readInt();
+                return charLength == 0
+                        ? CharType.ofEmptyLiteral()
+                        : new CharType(isNullable, charLength);
             case SMALLINT:
                 return new SmallIntType(isNullable);
             case TIMESTAMP:

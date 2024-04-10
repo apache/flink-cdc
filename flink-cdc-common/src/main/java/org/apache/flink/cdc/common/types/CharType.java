@@ -64,13 +64,32 @@ public class CharType extends DataType {
         this(DEFAULT_LENGTH);
     }
 
+    /** Helper constructor for {@link #ofEmptyLiteral()} and {@link #copy(boolean)}. */
+    private CharType(int length, boolean isNullable) {
+        super(isNullable, DataTypeRoot.CHAR);
+        this.length = length;
+    }
+
+    /**
+     * The SQL standard defines that character string literals are allowed to be zero-length strings
+     * (i.e., to contain no characters) even though it is not permitted to declare a type that is
+     * zero.
+     *
+     * <p>This method enables this special kind of character string.
+     *
+     * <p>Zero-length character strings have no serializable string representation.
+     */
+    public static CharType ofEmptyLiteral() {
+        return new CharType(EMPTY_LITERAL_LENGTH, false);
+    }
+
     public int getLength() {
         return length;
     }
 
     @Override
     public DataType copy(boolean isNullable) {
-        return new CharType(isNullable, length);
+        return new CharType(length, isNullable);
     }
 
     @Override
