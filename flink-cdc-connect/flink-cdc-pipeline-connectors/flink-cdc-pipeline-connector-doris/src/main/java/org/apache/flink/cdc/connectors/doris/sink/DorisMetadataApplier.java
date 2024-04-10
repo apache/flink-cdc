@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeChecks;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.TimestampType;
@@ -41,7 +42,6 @@ import org.apache.doris.flink.catalog.doris.FieldSchema;
 import org.apache.doris.flink.catalog.doris.TableSchema;
 import org.apache.doris.flink.cfg.DorisOptions;
 import org.apache.doris.flink.exception.IllegalArgumentException;
-import org.apache.doris.flink.sink.schema.SchemaChangeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,12 +58,12 @@ import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TA
 public class DorisMetadataApplier implements MetadataApplier {
     private static final Logger LOG = LoggerFactory.getLogger(DorisMetadataApplier.class);
     private DorisOptions dorisOptions;
-    private SchemaChangeManager schemaChangeManager;
+    private DorisSchemaChangeManager schemaChangeManager;
     private Configuration config;
 
     public DorisMetadataApplier(DorisOptions dorisOptions, Configuration config) {
         this.dorisOptions = dorisOptions;
-        this.schemaChangeManager = new SchemaChangeManager(dorisOptions);
+        this.schemaChangeManager = new DorisSchemaChangeManager(dorisOptions);
         this.config = config;
     }
 
@@ -80,7 +80,7 @@ public class DorisMetadataApplier implements MetadataApplier {
             } else if (event instanceof RenameColumnEvent) {
                 applyRenameColumnEvent((RenameColumnEvent) event);
             } else if (event instanceof AlterColumnTypeEvent) {
-                throw new RuntimeException("Unsupported schema change event, " + event);
+                applyAlterColumnTypeEvent((AlterColumnTypeEvent) event);
             }
         } catch (Exception ex) {
             throw new RuntimeException(
@@ -190,6 +190,22 @@ public class DorisMetadataApplier implements MetadataApplier {
                     tableId.getTableName(),
                     entry.getKey(),
                     entry.getValue());
+        }
+    }
+
+    private void applyAlterColumnTypeEvent(AlterColumnTypeEvent event)
+            throws IOException, IllegalArgumentException {
+        TableId tableId = event.tableId();
+        Map<String, DataType> typeMapping = event.getTypeMapping();
+
+        for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
+            if (!schemaChangeManager.alterColumn(
+                    tableId.getSchemaName(),
+                    tableId.getTableName(),
+                    entry.getKey(),
+                    DorisTypeMapper.toDorisType(DataTypeUtils.toFlinkDataType(entry.getValue())))) {
+                LOG.warn("Altering column event {} has no effect.", event);
+            }
         }
     }
 }
