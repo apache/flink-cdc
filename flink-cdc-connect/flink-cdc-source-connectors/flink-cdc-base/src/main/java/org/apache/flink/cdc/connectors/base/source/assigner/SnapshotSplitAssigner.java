@@ -240,6 +240,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                     tableSchemas
                             .entrySet()
                             .removeIf(schema -> tablesToRemove.contains(schema.getKey()));
+                    LOG.info("Enumerator remove tables after restart: {}", tablesToRemove);
                     remainingSplits.removeIf(split -> tablesToRemove.contains(split.getTableId()));
                     remainingTables.removeAll(tablesToRemove);
                     alreadyProcessedTables.removeIf(tableId -> tablesToRemove.contains(tableId));
