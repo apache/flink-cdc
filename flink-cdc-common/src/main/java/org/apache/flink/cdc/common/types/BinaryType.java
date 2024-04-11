@@ -65,13 +65,32 @@ public final class BinaryType extends DataType {
         this(DEFAULT_LENGTH);
     }
 
+    /** Helper constructor for {@link #ofEmptyLiteral()} and {@link #copy(boolean)}. */
+    private BinaryType(int length, boolean isNullable) {
+        super(isNullable, DataTypeRoot.BINARY);
+        this.length = length;
+    }
+
+    /**
+     * The SQL standard defines that character string literals are allowed to be zero-length strings
+     * (i.e., to contain no characters) even though it is not permitted to declare a type that is
+     * zero. For consistent behavior, the same logic applies to binary strings.
+     *
+     * <p>This method enables this special kind of binary string.
+     *
+     * <p>Zero-length binary strings have no serializable string representation.
+     */
+    public static BinaryType ofEmptyLiteral() {
+        return new BinaryType(EMPTY_LITERAL_LENGTH, false);
+    }
+
     public int getLength() {
         return length;
     }
 
     @Override
     public DataType copy(boolean isNullable) {
-        return new BinaryType(isNullable, length);
+        return new BinaryType(length, isNullable);
     }
 
     @Override
