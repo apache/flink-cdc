@@ -33,20 +33,20 @@ public class FlinkEnvironmentUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvironmentUtils.class);
     private static final String FLINK_CONF_DIR = "conf";
-    private static final String OLD_FLINK_CONF_FILENAME = "flink-conf.yaml";
+    private static final String LEGACY_FLINK_CONF_FILENAME = "flink-conf.yaml";
     private static final String FLINK_CONF_FILENAME = "config.yaml";
 
     public static Configuration loadFlinkConfiguration(Path flinkHome) throws Exception {
         Path flinkConfPath = flinkHome.resolve(FLINK_CONF_DIR).resolve(FLINK_CONF_FILENAME);
         try {
-            return ConfigurationUtils.loadMapFormattedConfig(flinkConfPath);
+            return ConfigurationUtils.loadConfigFile(flinkConfPath);
         } catch (FileNotFoundException e) {
             LOG.warn(
-                    "Failed to load the new configuration file:{}. Trying to load the old configuration file:{}.",
+                    "Failed to load the configuration file from {}. Trying to use legacy YAML parser to load flink configuration file from {}.",
                     FLINK_CONF_FILENAME,
-                    OLD_FLINK_CONF_FILENAME);
-            return ConfigurationUtils.loadMapFormattedConfig(
-                    flinkHome.resolve(FLINK_CONF_DIR).resolve(OLD_FLINK_CONF_FILENAME));
+                    LEGACY_FLINK_CONF_FILENAME);
+            return ConfigurationUtils.loadConfigFile(
+                    flinkHome.resolve(FLINK_CONF_DIR).resolve(LEGACY_FLINK_CONF_FILENAME));
         }
     }
 

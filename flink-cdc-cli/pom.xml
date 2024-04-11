@@ -29,6 +29,7 @@ limitations under the License.
 
     <properties>
         <commons-cli.version>1.6.0</commons-cli.version>
+        <snakeyaml.version>2.6</snakeyaml.version>
     </properties>
 
     <dependencies>
@@ -37,7 +38,12 @@ limitations under the License.
             <artifactId>flink-cdc-common</artifactId>
             <version>${project.version}</version>
         </dependency>
-
+        <!-- YAML parser utilities -->
+        <dependency>
+            <groupId>org.snakeyaml</groupId>
+            <artifactId>snakeyaml-engine</artifactId>
+            <version>${snakeyaml.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-composer</artifactId>

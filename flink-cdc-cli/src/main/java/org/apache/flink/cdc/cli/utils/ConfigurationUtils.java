@@ -19,53 +19,41 @@ package org.apache.flink.cdc.cli.utils;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-
-import java.io.FileNotFoundException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Utilities for handling {@link Configuration}. */
 public class ConfigurationUtils {
-    public static Configuration loadMapFormattedConfig(Path configPath) throws Exception {
-        if (!Files.exists(configPath)) {
-            throw new FileNotFoundException(
-                    String.format("Cannot find configuration file at \"%s\"", configPath));
-        }
-        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-        try {
-            Map<String, Object> configMap =
-                    mapper.readValue(
-                            configPath.toFile(), new TypeReference<Map<String, Object>>() {});
-            return Configuration.fromMap(flattenConfigMap(configMap));
-        } catch (Exception e) {
-            throw new IllegalStateException(
-                    String.format(
-                            "Failed to load config file \"%s\" to key-value pairs", configPath),
-                    e);
-        }
+
+    private static final String KEY_SEPARATOR = ".";
+
+    public static Configuration loadConfigFile(Path configPath) throws Exception {
+        Map<String, Object> configMap = YamlParserUtils.loadYamlFile(configPath.toFile());
+        return Configuration.fromMap(flattenConfigMap(configMap, ""));
     }
 
-    private static Map<String, String> flattenConfigMap(Map<String, Object> configMap) {
-        Map<String, String> result = new HashMap<>();
-        flattenConfigMapHelper(configMap, "", result);
-        return result;
-    }
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> flattenConfigMap(
+            Map<String, Object> config, String keyPrefix) {
+        final Map<String, String> flattenedMap = new HashMap<>();
 
-    private static void flattenConfigMapHelper(
-            Map<String, Object> configMap, String currentPath, Map<String, String> result) {
-        for (Map.Entry<String, Object> entry : configMap.entrySet()) {
-            String updatedPath =
-                    currentPath.isEmpty() ? entry.getKey() : currentPath + "." + entry.getKey();
-            if (entry.getValue() instanceof Map) {
-                flattenConfigMapHelper((Map<String, Object>) entry.getValue(), updatedPath, result);
-            } else {
-                result.put(updatedPath, entry.getValue().toString());
-            }
-        }
+        config.forEach(
+                (key, value) -> {
+                    String flattenedKey = keyPrefix + key;
+                    if (value instanceof Map) {
+                        Map<String, Object> e = (Map<String, Object>) value;
+                        flattenedMap.putAll(flattenConfigMap(e, flattenedKey + KEY_SEPARATOR));
+                    } else {
+                        if (value instanceof List) {
+                            flattenedMap.put(flattenedKey, YamlParserUtils.toYAMLString(value));
+                        } else {
+                            flattenedMap.put(flattenedKey, value.toString());
+                        }
+                    }
+                });
+
+        return flattenedMap;
     }
 }
