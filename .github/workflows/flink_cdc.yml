@@ -89,6 +89,22 @@ env:
   flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 
 jobs:
+  license_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Set up Ruby environment
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Compiling jar packages
+        run: mvn --no-snapshot-updates -B package -DskipTests
+      - name: Run license check
+        run: gem install rubyzip && ./tools/ci/license_check.rb
+
   compile_and_test:
     # Only run the CI pipeline for the flink-cdc-connectors repository
 #    if: github.repository == 'apache/flink-cdc-connectors'
