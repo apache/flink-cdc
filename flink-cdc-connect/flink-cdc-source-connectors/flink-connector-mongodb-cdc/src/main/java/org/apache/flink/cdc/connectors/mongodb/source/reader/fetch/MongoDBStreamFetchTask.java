@@ -86,7 +86,6 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     private final Time time = new SystemTime();
     private boolean supportsStartAtOperationTime = true;
     private boolean supportsStartAfter = true;
-    private boolean resumeTokenExpired = false;
 
     public MongoDBStreamFetchTask(StreamSplit streamSplit) {
         this.streamSplit = streamSplit;
@@ -119,7 +118,8 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                         if (MongoUtils.checkIfResumeTokenExpires(e)) {
                             LOG.warn(
                                     "Resume token has expired, fallback to timestamp restart mode");
-                            resumeTokenExpired = true;
+                            ((ChangeStreamOffset) streamSplit.getStartingOffset())
+                                    .clearResumeToken();
                         }
                         changeStreamCursor = openChangeStreamCursor(descriptor);
                         next = Optional.ofNullable(changeStreamCursor.tryNext());
@@ -254,7 +254,7 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         BsonDocument resumeToken = offset.getResumeToken();
         BsonTimestamp timestamp = offset.getTimestamp();
 
-        if (resumeToken != null && !resumeTokenExpired) {
+        if (resumeToken != null) {
             if (supportsStartAfter) {
                 LOG.info("Open the change stream after the previous offset: {}", resumeToken);
                 changeStreamIterable.startAfter(resumeToken);
@@ -301,17 +301,9 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                         e.getErrorMessage(),
                         e.getErrorCode());
                 throw new FlinkRuntimeException("Unauthorized $changeStream operation", e);
-            } else if (MongoUtils.checkIfResumeTokenExpires(e)) {
-                resumeTokenExpired = true;
-                if (timestamp != null) {
-                    LOG.warn(
-                            "Resume token {} has expired, fallback to restart based on timestamp.",
-                            resumeToken);
-                    return openChangeStreamCursor(changeStreamDescriptor);
-                } else {
-                    throw new FlinkRuntimeException(
-                            "Resume token has expired, and no timestamp is available", e);
-                }
+            } else if (timestamp != null && MongoUtils.checkIfResumeTokenExpires(e)) {
+                ((ChangeStreamOffset) streamSplit.getStartingOffset()).clearResumeToken();
+                return openChangeStreamCursor(changeStreamDescriptor);
             } else {
                 LOG.error("Open change stream failed ", e);
                 throw new FlinkRuntimeException("Open change stream failed", e);

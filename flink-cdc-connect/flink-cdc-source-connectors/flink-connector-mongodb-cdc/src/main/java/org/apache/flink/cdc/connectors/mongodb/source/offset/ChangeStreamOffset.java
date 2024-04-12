@@ -73,6 +73,10 @@ public class ChangeStreamOffset extends Offset {
         offset.put(RESUME_TOKEN_FIELD, resumeToken.toJson());
     }
 
+    public void clearResumeToken() {
+        offset.remove(RESUME_TOKEN_FIELD);
+    }
+
     @Nullable
     public BsonDocument getResumeToken() {
         String resumeTokenJson = offset.get(RESUME_TOKEN_FIELD);
