@@ -21,6 +21,8 @@ import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
@@ -29,11 +31,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /** The split to describe the change log of database table(s). */
 public class StreamSplit extends SourceSplitBase {
+    private static final Logger LOG = LoggerFactory.getLogger(StreamSplit.class);
     public static final String STREAM_SPLIT_ID = "stream-split";
 
     private final Offset startingOffset;
@@ -179,9 +183,20 @@ public class StreamSplit extends SourceSplitBase {
      */
     public static StreamSplit filterOutdatedSplitInfos(
             StreamSplit streamSplit, Predicate<TableId> currentTableFilter) {
+
+        Set<TableId> tablesToRemove =
+                streamSplit.getFinishedSnapshotSplitInfos().stream()
+                        .filter(i -> !currentTableFilter.test(i.getTableId()))
+                        .map(split -> split.getTableId())
+                        .collect(Collectors.toSet());
+        if (tablesToRemove.isEmpty()) {
+            return streamSplit;
+        }
+
+        LOG.info("Reader remove tables after restart: {}", tablesToRemove);
         List<FinishedSnapshotSplitInfo> allFinishedSnapshotSplitInfos =
                 streamSplit.getFinishedSnapshotSplitInfos().stream()
-                        .filter(i -> currentTableFilter.test(i.getTableId()))
+                        .filter(i -> !tablesToRemove.contains(i.getTableId()))
                         .collect(Collectors.toList());
         Map<TableId, TableChange> previousTableSchemas = streamSplit.getTableSchemas();
         Map<TableId, TableChange> newTableSchemas = new HashMap<>();

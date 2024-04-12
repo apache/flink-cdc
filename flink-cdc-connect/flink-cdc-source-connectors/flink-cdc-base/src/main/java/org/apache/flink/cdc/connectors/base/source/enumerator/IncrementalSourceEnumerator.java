@@ -307,8 +307,22 @@ public class IncrementalSourceEnumerator
                             finishedSnapshotSplitInfos, sourceConfig.getSplitMetaGroupSize());
         }
         final int requestMetaGroupId = requestEvent.getRequestMetaGroupId();
-
-        if (finishedSnapshotSplitMeta.size() > requestMetaGroupId) {
+        final int totalFinishedSplitSizeOfReader = requestEvent.getTotalFinishedSplitSize();
+        final int totalFinishedSplitSizeOfEnumerator = splitAssigner.getFinishedSplitInfos().size();
+        if (totalFinishedSplitSizeOfReader > totalFinishedSplitSizeOfEnumerator) {
+            LOG.warn(
+                    "Total finished split size of subtask {} is {}, while total finished split size of enumerator is only {}. Try to truncate it",
+                    subTask,
+                    totalFinishedSplitSizeOfReader,
+                    totalFinishedSplitSizeOfEnumerator);
+            StreamSplitMetaEvent metadataEvent =
+                    new StreamSplitMetaEvent(
+                            requestEvent.getSplitId(),
+                            requestMetaGroupId,
+                            null,
+                            totalFinishedSplitSizeOfEnumerator);
+            context.sendEventToSourceReader(subTask, metadataEvent);
+        } else if (finishedSnapshotSplitMeta.size() > requestMetaGroupId) {
             List<FinishedSnapshotSplitInfo> metaToSend =
                     finishedSnapshotSplitMeta.get(requestMetaGroupId);
             StreamSplitMetaEvent metadataEvent =
@@ -317,13 +331,17 @@ public class IncrementalSourceEnumerator
                             requestMetaGroupId,
                             metaToSend.stream()
                                     .map(FinishedSnapshotSplitInfo::serialize)
-                                    .collect(Collectors.toList()));
+                                    .collect(Collectors.toList()),
+                            totalFinishedSplitSizeOfEnumerator);
             context.sendEventToSourceReader(subTask, metadataEvent);
         } else {
-            LOG.error(
-                    "Received invalid request meta group id {}, the invalid meta group id range is [0, {}]",
-                    requestMetaGroupId,
-                    finishedSnapshotSplitMeta.size() - 1);
+            throw new FlinkRuntimeException(
+                    String.format(
+                            "The enumerator received invalid request meta group id %s, the valid meta group id range is [0, %s]. Total finished split size of reader is %s, while the total finished split size of enumerator is %s.",
+                            requestMetaGroupId,
+                            finishedSnapshotSplitMeta.size() - 1,
+                            totalFinishedSplitSizeOfReader,
+                            totalFinishedSplitSizeOfEnumerator));
         }
     }
 

@@ -22,6 +22,8 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
@@ -29,10 +31,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /** The split to describe the binlog of MySql table(s). */
 public class MySqlBinlogSplit extends MySqlSplit {
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplit.class);
 
     private final BinlogOffset startingOffset;
     private final BinlogOffset endingOffset;
@@ -183,9 +187,19 @@ public class MySqlBinlogSplit extends MySqlSplit {
      */
     public static MySqlBinlogSplit filterOutdatedSplitInfos(
             MySqlBinlogSplit binlogSplit, Tables.TableFilter currentTableFilter) {
+        Set<TableId> tablesToRemove =
+                binlogSplit.getFinishedSnapshotSplitInfos().stream()
+                        .filter(i -> !currentTableFilter.isIncluded(i.getTableId()))
+                        .map(split -> split.getTableId())
+                        .collect(Collectors.toSet());
+        if (tablesToRemove.isEmpty()) {
+            return binlogSplit;
+        }
+
+        LOG.info("Reader remove tables after restart: {}", tablesToRemove);
         List<FinishedSnapshotSplitInfo> allFinishedSnapshotSplitInfos =
                 binlogSplit.getFinishedSnapshotSplitInfos().stream()
-                        .filter(i -> currentTableFilter.isIncluded(i.getTableId()))
+                        .filter(i -> !tablesToRemove.contains(i.getTableId()))
                         .collect(Collectors.toList());
         return new MySqlBinlogSplit(
                 binlogSplit.splitId,

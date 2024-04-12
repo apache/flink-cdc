@@ -32,9 +32,13 @@ public class BinlogSplitMetaRequestEvent implements SourceEvent {
     private final String splitId;
     private final int requestMetaGroupId;
 
-    public BinlogSplitMetaRequestEvent(String splitId, int requestMetaGroupId) {
+    private final int totalFinishedSplitSize;
+
+    public BinlogSplitMetaRequestEvent(
+            String splitId, int requestMetaGroupId, int totalFinishedSplitSize) {
         this.splitId = splitId;
         this.requestMetaGroupId = requestMetaGroupId;
+        this.totalFinishedSplitSize = totalFinishedSplitSize;
     }
 
     public String getSplitId() {
@@ -43,5 +47,9 @@ public class BinlogSplitMetaRequestEvent implements SourceEvent {
 
     public int getRequestMetaGroupId() {
         return requestMetaGroupId;
+    }
+
+    public int getTotalFinishedSplitSize() {
+        return totalFinishedSplitSize;
     }
 }
