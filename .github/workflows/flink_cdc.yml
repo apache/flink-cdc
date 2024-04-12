@@ -42,8 +42,11 @@ env:
   flink-cdc-runtime"
   
   MODULES_PIPELINE_CONNECTORS: "\
-  flink-cdc-connect/flink-cdc-pipeline-connectors"
-  
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks"
+
   MODULES_MYSQL: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc"
