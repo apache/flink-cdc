@@ -36,7 +36,7 @@ under the License.
             </a>
         </div>
         <div class="w-full md:w-3/5 py-6 text-center">
-            {{<img src="/fig/cdc-flow.png" alt="Flink CDC Flow">}}
+            {{< img src="/fig/cdc-flow.png" alt="Flink CDC Flow" >}}
         </div>
     </div>
     <div class="relative -mt-8 bg-purple">
@@ -71,7 +71,7 @@ under the License.
             </div>
             <div class="w-full flex justify-center	">
                 <div class="w-4/5">
-                    {{<img src="/fig/index-yaml-example.png" alt="Flink CDC Example">}}
+                    {{< img src="/fig/index-yaml-example.png" alt="Flink CDC Example" >}}
                 </div>
             </div>
         </div>
