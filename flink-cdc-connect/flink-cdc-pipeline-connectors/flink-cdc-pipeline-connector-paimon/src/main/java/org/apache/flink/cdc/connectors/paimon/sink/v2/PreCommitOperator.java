@@ -50,7 +50,7 @@ public class PreCommitOperator
 
     @Override
     public void processElement(StreamRecord<CommittableMessage<MultiTableCommittable>> element) {
-        if (element.isRecord() && element.getValue() instanceof CommittableWithLineage) {
+        if (element.getValue() instanceof CommittableWithLineage) {
             results.add(
                     ((CommittableWithLineage<MultiTableCommittable>) element.getValue())
                             .getCommittable());

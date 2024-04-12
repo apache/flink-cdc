@@ -59,11 +59,14 @@ public class TestMultiTableCommittableChannelComputer {
                     set.add(commit.getTable());
                     map.put(channel, set);
                 });
-        int count = 0;
+        Set<String> actualtables = new HashSet<>();
         for (Map.Entry<Integer, Set<String>> entry : map.entrySet()) {
-            count += entry.getValue().size();
+            actualtables.addAll(entry.getValue());
         }
+        Set<String> expectedTables =
+                new HashSet<>(
+                        Arrays.asList("table1", "table2", "table3", "table5", "table8", "table9"));
         // Not a table is appeared in more than one channel.
-        Assertions.assertEquals(6, count);
+        Assertions.assertEquals(actualtables, expectedTables);
     }
 }

@@ -167,7 +167,7 @@ public class DataTypeUtils {
                         : org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_TIME_ZONE(precision)
                                 .notNull();
             case ARRAY:
-                Preconditions.checkState(children != null && children.size() > 0);
+                Preconditions.checkState(children != null && !children.isEmpty());
                 return type.isNullable()
                         ? org.apache.flink.table.api.DataTypes.ARRAY(
                                 toFlinkDataType(children.get(0)))

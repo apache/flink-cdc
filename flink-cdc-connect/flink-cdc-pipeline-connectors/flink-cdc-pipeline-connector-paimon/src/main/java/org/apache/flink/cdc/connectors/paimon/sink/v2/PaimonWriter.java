@@ -95,7 +95,7 @@ public class PaimonWriter
     }
 
     @Override
-    public Collection<MultiTableCommittable> prepareCommit() throws IOException {
+    public Collection<MultiTableCommittable> prepareCommit() {
         Collection<MultiTableCommittable> allCommittables = new ArrayList<>(committables);
         committables.clear();
         return allCommittables;
@@ -178,15 +178,16 @@ public class PaimonWriter
     }
 
     private FileStoreTable getTable(Identifier tableId) {
-        FileStoreTable table = tables.get(tableId);
-        if (table == null) {
-            try {
-                table = (FileStoreTable) catalog.getTable(tableId);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-            tables.put(tableId, table);
-        }
+        FileStoreTable table =
+                tables.computeIfAbsent(
+                        tableId,
+                        id -> {
+                            try {
+                                return (FileStoreTable) catalog.getTable(tableId);
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
 
         if (table.bucketMode() != BucketMode.FIXED) {
             throw new UnsupportedOperationException(
@@ -201,7 +202,7 @@ public class PaimonWriter
      *
      * <p>this method will also be called when receiving {@link FlushEvent}, but we don't need to
      * commit the MultiTableCommittables immediately in this case, because {@link PaimonCommitter}
-     * support committing datas of different schemas.
+     * support committing data of different schemas.
      */
     @Override
     public void flush(boolean endOfInput) throws IOException {

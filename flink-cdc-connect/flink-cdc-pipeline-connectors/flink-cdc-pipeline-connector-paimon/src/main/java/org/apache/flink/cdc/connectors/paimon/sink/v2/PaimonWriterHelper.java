@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeChecks;
@@ -35,14 +36,17 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.flink.cdc.common.types.DataTypeChecks.getFieldCount;
+
 /** A helper class for {@link PaimonWriter} to create FieldGetter and GenericRow. */
 public class PaimonWriterHelper {
 
     /** create a list of {@link RecordData.FieldGetter} for {@link PaimonWriter}. */
     public static List<RecordData.FieldGetter> createFieldGetters(Schema schema, ZoneId zoneId) {
-        List<RecordData.FieldGetter> fieldGetters = new ArrayList<>(schema.getColumns().size());
-        for (int i = 0; i < schema.getColumns().size(); i++) {
-            fieldGetters.add(createFieldGetter(schema.getColumns().get(i).getType(), i, zoneId));
+        List<Column> columns = schema.getColumns();
+        List<RecordData.FieldGetter> fieldGetters = new ArrayList<>(columns.size());
+        for (int i = 0; i < columns.size(); i++) {
+            fieldGetters.add(createFieldGetter(columns.get(i).getType(), i, zoneId));
         }
         return fieldGetters;
     }
@@ -80,11 +84,6 @@ public class PaimonWriterHelper {
             case SMALLINT:
                 fieldGetter = row -> row.getShort(fieldPos);
                 break;
-            case INTEGER:
-            case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
-                fieldGetter = row -> row.getInt(fieldPos);
-                break;
             case BIGINT:
                 fieldGetter = row -> row.getLong(fieldPos);
                 break;
@@ -93,6 +92,11 @@ public class PaimonWriterHelper {
                 break;
             case DOUBLE:
                 fieldGetter = row -> row.getDouble(fieldPos);
+                break;
+            case INTEGER:
+            case DATE:
+            case TIME_WITHOUT_TIME_ZONE:
+                fieldGetter = row -> row.getInt(fieldPos);
                 break;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 fieldGetter =
@@ -116,6 +120,10 @@ public class PaimonWriterHelper {
                                                                 .toInstant(),
                                                         zoneId)
                                                 .toLocalDateTime());
+                break;
+            case ROW:
+                final int rowFieldCount = getFieldCount(fieldType);
+                fieldGetter = row -> row.getRow(fieldPos, rowFieldCount);
                 break;
             default:
                 throw new IllegalArgumentException(

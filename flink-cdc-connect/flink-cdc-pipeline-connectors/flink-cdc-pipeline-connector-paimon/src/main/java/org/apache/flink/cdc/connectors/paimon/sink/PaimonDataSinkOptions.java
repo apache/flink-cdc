@@ -62,6 +62,6 @@ public class PaimonDataSinkOptions {
                     .defaultValue("")
                     .withDescription(
                             "Partition keys for each partitioned table, allow setting multiple primary keys for multiTables. "
-                                    + "Each table are separated by ';', and each partition key are separated by ','. "
+                                    + "Tables are separated by ';', and partition keys are separated by ','. "
                                     + "For example, we can set partition.key of two tables by 'testdb.table1:id1,id2;testdb.table2:name'.");
 }

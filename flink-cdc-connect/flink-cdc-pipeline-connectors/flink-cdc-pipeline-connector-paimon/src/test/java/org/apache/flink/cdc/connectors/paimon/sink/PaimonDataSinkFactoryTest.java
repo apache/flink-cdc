@@ -41,7 +41,7 @@ public class PaimonDataSinkFactoryTest {
     public void testCreateDataSink() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("paimon", DataSinkFactory.class);
-        Assertions.assertTrue(sinkFactory instanceof PaimonDataSinkFactory);
+        Assertions.assertInstanceOf(PaimonDataSinkFactory.class, sinkFactory);
 
         Configuration conf =
                 Configuration.fromMap(
@@ -58,6 +58,6 @@ public class PaimonDataSinkFactoryTest {
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
-        Assertions.assertTrue(dataSink instanceof PaimonDataSink);
+        Assertions.assertInstanceOf(PaimonDataSink.class, dataSink);
     }
 }

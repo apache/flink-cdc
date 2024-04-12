@@ -96,7 +96,6 @@ public class PaimonMetadataApplier implements MetadataApplier {
         }
     }
 
-    /** TODO support partition column. */
     private void applyCreateTable(CreateTableEvent event)
             throws Catalog.DatabaseAlreadyExistException, Catalog.TableAlreadyExistException,
                     Catalog.DatabaseNotExistException {
@@ -115,7 +114,9 @@ public class PaimonMetadataApplier implements MetadataApplier {
                                                 DataTypeUtils.toFlinkDataType(column.getType())
                                                         .getLogicalType())));
         builder.primaryKey(schema.primaryKeys().toArray(new String[0]));
-        if (partitionMaps.containsKey(event.tableId())) {
+        if (schema.partitionKeys() != null && !schema.partitionKeys().isEmpty()) {
+            builder.partitionKeys(schema.partitionKeys());
+        } else if (partitionMaps.containsKey(event.tableId())) {
             builder.partitionKeys(partitionMaps.get(event.tableId()));
         }
         builder.options(tableOptions);

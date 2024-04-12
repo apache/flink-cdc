@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Committer;
 
-import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.sink.MultiTableCommittable;
 import org.apache.paimon.flink.sink.StoreMultiCommitter;
@@ -38,9 +37,12 @@ public class PaimonCommitter implements Committer<MultiTableCommittable> {
     private final StoreMultiCommitter storeMultiCommitter;
 
     public PaimonCommitter(Options catalogOptions, String commitUser) {
-        Catalog catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
         // flinkMetricGroup could be passed after FLIP-371.
-        storeMultiCommitter = new StoreMultiCommitter(() -> catalog, commitUser, null);
+        storeMultiCommitter =
+                new StoreMultiCommitter(
+                        () -> FlinkCatalogFactory.createPaimonCatalog(catalogOptions),
+                        commitUser,
+                        null);
     }
 
     @Override
