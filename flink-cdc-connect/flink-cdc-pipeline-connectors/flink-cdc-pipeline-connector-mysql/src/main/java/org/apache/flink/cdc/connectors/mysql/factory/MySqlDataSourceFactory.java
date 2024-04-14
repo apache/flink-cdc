@@ -96,7 +96,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
         String tables = config.get(TABLES);
-        String tableExcludeList = config.get(TABLE_EXCLUDE_LIST);
+        String tablesExclude = config.get(TABLE_EXCLUDE_LIST);
 
         String serverId = validateAndGetServerId(config);
         ZoneId serverTimeZone = getServerTimeZone(config);
@@ -160,17 +160,17 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
             throw new IllegalArgumentException(
                     "Cannot find any table by the option 'tables' = " + tables);
         }
-        if (tableExcludeList != null) {
+        if (tablesExclude != null) {
             Selectors selectExclude =
-                    new Selectors.SelectorsBuilder().includeTables(tableExcludeList).build();
+                    new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
             List<String> excludeTables = getTableList(configFactory.createConfig(0), selectExclude);
             if (!excludeTables.isEmpty()) {
                 capturedTables.removeAll(excludeTables);
             }
             if (capturedTables.isEmpty()) {
                 throw new IllegalArgumentException(
-                        "Cannot find any table with by the option 'table.exclude.list'  = "
-                                + tableExcludeList);
+                        "Cannot find any table with by the option 'tables.exclude'  = "
+                                + tablesExclude);
             }
         }
         configFactory.tableList(capturedTables.toArray(new String[0]));

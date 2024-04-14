@@ -234,7 +234,7 @@ public class MySqlDataSourceOptions {
 
     @Experimental
     public static final ConfigOption<String> TABLE_EXCLUDE_LIST =
-            ConfigOptions.key("table.exclude.list")
+            ConfigOptions.key("tables.exclude")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
