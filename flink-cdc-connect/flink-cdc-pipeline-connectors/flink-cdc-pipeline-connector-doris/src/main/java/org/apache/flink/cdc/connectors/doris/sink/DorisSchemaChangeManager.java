@@ -33,6 +33,10 @@ public class DorisSchemaChangeManager extends SchemaChangeManager {
 
     private static final String MODIFY_COLUMN_DDL = "ALTER TABLE %s MODIFY COLUMN %s %s";
 
+    // Error message response from Doris server when no alter change is applied.
+    private static final String ALTER_NO_CHANGE_ERROR_MESSAGE =
+            "Nothing is changed. please check your alter stmt.";
+
     public boolean alterColumn(
             String database, String table, String columnName, String newColumnType)
             throws IOException, IllegalArgumentException {
@@ -50,7 +54,7 @@ public class DorisSchemaChangeManager extends SchemaChangeManager {
             return this.schemaChange(
                     database, table, buildRequestParam(true, columnName), alterColumnDDL);
         } catch (DorisSchemaChangeException ex) {
-            if (ex.getMessage().contains("Nothing is changed. please check your alter stmt.")) {
+            if (ex.getMessage().contains(ALTER_NO_CHANGE_ERROR_MESSAGE)) {
                 // Doris doesn't allow ALTER statement without effects.
                 // We should ignore such exception since upstream connector
                 // might emit redundant AlterColumnTypeEvents.
