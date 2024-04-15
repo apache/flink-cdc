@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.doris.sink;
 
 import org.apache.doris.flink.catalog.doris.FieldSchema;
 import org.apache.doris.flink.cfg.DorisOptions;
+import org.apache.doris.flink.exception.DorisSchemaChangeException;
 import org.apache.doris.flink.exception.IllegalArgumentException;
 import org.apache.doris.flink.sink.schema.SchemaChangeManager;
 
@@ -48,7 +49,7 @@ public class DorisSchemaChangeManager extends SchemaChangeManager {
         try {
             return this.schemaChange(
                     database, table, buildRequestParam(true, columnName), alterColumnDDL);
-        } catch (RuntimeException ex) {
+        } catch (DorisSchemaChangeException ex) {
             if (ex.getMessage().contains("Nothing is changed. please check your alter stmt.")) {
                 // Doris doesn't allow ALTER statement without effects.
                 // We should ignore such exception since upstream connector
