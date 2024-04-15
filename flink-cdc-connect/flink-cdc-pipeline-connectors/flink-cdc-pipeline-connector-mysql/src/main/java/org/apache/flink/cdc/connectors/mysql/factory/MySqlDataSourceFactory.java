@@ -72,7 +72,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_ID;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
-import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLE_EXCLUDE_LIST;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
@@ -96,7 +96,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
         String tables = config.get(TABLES);
-        String tablesExclude = config.get(TABLE_EXCLUDE_LIST);
+        String tablesExclude = config.get(TABLES_EXCLUDE);
 
         String serverId = validateAndGetServerId(config);
         ZoneId serverTimeZone = getServerTimeZone(config);

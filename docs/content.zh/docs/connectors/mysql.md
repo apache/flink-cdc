@@ -112,7 +112,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>需要排除的 MySQL 数据库的表名,参数会在tables参数后发生排除作用。表名支持正则表达式，以排除满足正则表达式的多个表。<br>
+      <td>需要排除的 MySQL 数据库的表名，参数会在tables参数后发生排除作用。表名支持正则表达式，以排除满足正则表达式的多个表。<br>
           用法和tables参数相同</td>
     </tr>
     <tr>

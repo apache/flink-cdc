@@ -32,7 +32,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
-import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLE_EXCLUDE_LIST;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
@@ -81,6 +81,29 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testExcludeTable() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".\\.*");
+        String tableExclude = inventoryDatabase.getDatabaseName() + ".orders";
+        options.put(TABLES_EXCLUDE.key(), tableExclude);
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+        assertThat(dataSource.getSourceConfig().getTableList())
+                .isNotEqualTo(Arrays.asList(inventoryDatabase.getDatabaseName() + ".orders"))
+                .isEqualTo(
+                        Arrays.asList(
+                                inventoryDatabase.getDatabaseName() + ".customers",
+                                inventoryDatabase.getDatabaseName() + ".products"));
+    }
+
+    @Test
     public void testExcludeAllTable() {
         inventoryDatabase.createAndInitialize();
         Map<String, String> options = new HashMap<>();
@@ -90,7 +113,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
         options.put(PASSWORD.key(), TEST_PASSWORD);
         options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
         String tableExclude = inventoryDatabase.getDatabaseName() + ".prod\\.*";
-        options.put(TABLE_EXCLUDE_LIST.key(), tableExclude);
+        options.put(TABLES_EXCLUDE.key(), tableExclude);
         Factory.Context context = new MockContext(Configuration.fromMap(options));
 
         MySqlDataSourceFactory factory = new MySqlDataSourceFactory();

@@ -233,7 +233,7 @@ public class MySqlDataSourceOptions {
                             "Whether send schema change events, by default is true. If set to false, the schema changes will not be sent.");
 
     @Experimental
-    public static final ConfigOption<String> TABLE_EXCLUDE_LIST =
+    public static final ConfigOption<String> TABLES_EXCLUDE =
             ConfigOptions.key("tables.exclude")
                     .stringType()
                     .noDefaultValue()
