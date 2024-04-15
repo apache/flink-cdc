@@ -40,14 +40,14 @@ Paimon Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入
 
 ```yaml
 source:
-   type: mysql
-   name: MySQL Source
-   hostname: 127.0.0.1
-   port: 3306
-   username: admin
-   password: pass
-   tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
-   server-id: 5401-5404
+  type: mysql
+  name: MySQL Source
+  hostname: 127.0.0.1
+  port: 3306
+  username: admin
+  password: pass
+  tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
+  server-id: 5401-5404
 
 sink:
   type: paimon
@@ -56,8 +56,8 @@ sink:
   warehouse: /path/warehouse
 
 pipeline:
-   name: MySQL to Paimon Pipeline
-   parallelism: 2
+  name: MySQL to Paimon Pipeline
+  parallelism: 2
 ```
 
 Pipeline 连接器配置项

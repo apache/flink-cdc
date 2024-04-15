@@ -114,10 +114,10 @@ public class PaimonMetadataApplier implements MetadataApplier {
                                                 DataTypeUtils.toFlinkDataType(column.getType())
                                                         .getLogicalType())));
         builder.primaryKey(schema.primaryKeys().toArray(new String[0]));
-        if (schema.partitionKeys() != null && !schema.partitionKeys().isEmpty()) {
-            builder.partitionKeys(schema.partitionKeys());
-        } else if (partitionMaps.containsKey(event.tableId())) {
+        if (partitionMaps.containsKey(event.tableId())) {
             builder.partitionKeys(partitionMaps.get(event.tableId()));
+        } else if (schema.partitionKeys() != null && !schema.partitionKeys().isEmpty()) {
+            builder.partitionKeys(schema.partitionKeys());
         }
         builder.options(tableOptions);
         catalog.createTable(

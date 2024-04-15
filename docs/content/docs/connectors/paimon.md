@@ -40,14 +40,14 @@ The pipeline for reading data from MySQL and sink to Paimon can be defined as fo
 
 ```yaml
 source:
-   type: mysql
-   name: MySQL Source
-   hostname: 127.0.0.1
-   port: 3306
-   username: admin
-   password: pass
-   tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
-   server-id: 5401-5404
+  type: mysql
+  name: MySQL Source
+  hostname: 127.0.0.1
+  port: 3306
+  username: admin
+  password: pass
+  tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
+  server-id: 5401-5404
 
 sink:
   type: paimon
