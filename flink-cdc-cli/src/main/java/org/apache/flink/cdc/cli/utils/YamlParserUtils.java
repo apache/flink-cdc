@@ -18,8 +18,8 @@
 
 package org.apache.flink.cdc.cli.utils;
 
-import org.apache.flink.cdc.common.utils.MemorySize;
 import org.apache.flink.cdc.common.utils.TimeUtils;
+import org.apache.flink.configuration.MemorySize;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
