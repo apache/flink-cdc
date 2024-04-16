@@ -68,6 +68,7 @@ public class ValuesDataSourceITCase {
     private void executeDataStreamJob(ValuesDataSourceHelper.EventSetId type) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(3000);
+        env.setParallelism(2);
         env.setRestartStrategy(RestartStrategies.noRestart());
         FlinkSourceProvider sourceProvider =
                 (FlinkSourceProvider) new ValuesDataSource(type).getEventSourceProvider();
