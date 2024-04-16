@@ -63,13 +63,13 @@ public class RecordDataSerializer extends TypeSerializerSingleton<RecordData> {
     @Override
     public RecordData copy(RecordData from) {
         // BinaryRecordData is the only implementation of RecordData
-        return ((BinaryRecordData) from).copy();
+        return from == null ? null : ((BinaryRecordData) from).copy();
     }
 
     @Override
     public RecordData copy(RecordData from, RecordData reuse) {
         // BinaryRecordData is the only implementation of RecordData
-        return ((BinaryRecordData) from).copy((BinaryRecordData) reuse);
+        return from == null ? null : ((BinaryRecordData) from).copy((BinaryRecordData) reuse);
     }
 
     @Override
