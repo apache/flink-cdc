@@ -97,7 +97,7 @@ public class SchemaOperatorTest {
             int maxParallelism, int parallelism, int subtaskIndex, OperatorID opID)
             throws Exception {
         return new OneInputStreamOperatorTestHarness<>(
-                new SchemaOperator(),
+                new SchemaOperator(new ArrayList<>()),
                 maxParallelism,
                 parallelism,
                 subtaskIndex,
