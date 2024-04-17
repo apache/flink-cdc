@@ -109,7 +109,7 @@ public class DorisRowConverterTest {
         for (int i = 0; i < recordData.getArity(); i++) {
             DorisRowConverter.SerializationConverter converter =
                     DorisRowConverter.createNullableExternalConverter(
-                            columns.get(i).getType(), ZoneId.systemDefault());
+                            columns.get(i).getType(), ZoneId.of("GMT+08:00"));
             row.add(converter.serialize(i, recordData));
         }
         Assert.assertEquals(
