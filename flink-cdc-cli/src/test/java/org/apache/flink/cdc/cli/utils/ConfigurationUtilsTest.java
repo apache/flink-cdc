@@ -66,7 +66,8 @@ class ConfigurationUtilsTest {
                 ConfigOptions.key("taskmanager.memory.process.size").stringType().noDefaultValue(),
                 "1728m");
         CONFIG_OPTIONS.put(
-                ConfigOptions.key("taskmanager.numberOfTaskSlots").stringType().noDefaultValue(), "1");
+                ConfigOptions.key("taskmanager.numberOfTaskSlots").stringType().noDefaultValue(),
+                "1");
     }
 
     @ParameterizedTest
