@@ -458,7 +458,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
             // step 4: make changelog data for all collections before this round(also includes this
             // round),
             // test whether only this round collection's data is captured.
-            for (int i = round; i >= 0; i--) {
+            for (int i = 0; i <= round; i++) {
                 String collection = captureAddressCollections[i];
                 makeOplogForAddressTableInRound(database, collection, round);
             }
