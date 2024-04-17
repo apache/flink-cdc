@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.testutils.schema;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,9 +31,22 @@ import java.util.List;
 public class CollectingMetadataApplier implements MetadataApplier {
     private final List<SchemaChangeEvent> schemaChangeEvents = new ArrayList<>();
 
+    private final Duration duration;
+
+    public CollectingMetadataApplier(Duration duration) {
+        this.duration = duration;
+    }
+
     @Override
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
         schemaChangeEvents.add(schemaChangeEvent);
+        if (duration != null) {
+            try {
+                Thread.sleep(duration.toMillis());
+            } catch (Exception ignore) {
+
+            }
+        }
     }
 
     public List<SchemaChangeEvent> getSchemaChangeEvents() {

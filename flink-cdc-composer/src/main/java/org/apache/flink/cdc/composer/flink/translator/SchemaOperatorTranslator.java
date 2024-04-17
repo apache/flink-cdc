@@ -31,6 +31,7 @@ import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,10 +41,15 @@ public class SchemaOperatorTranslator {
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final String schemaOperatorUid;
 
+    private final Duration rpcTimeOut;
+
     public SchemaOperatorTranslator(
-            SchemaChangeBehavior schemaChangeBehavior, String schemaOperatorUid) {
+            SchemaChangeBehavior schemaChangeBehavior,
+            String schemaOperatorUid,
+            Duration rpcTimeOut) {
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.schemaOperatorUid = schemaOperatorUid;
+        this.rpcTimeOut = rpcTimeOut;
     }
 
     public DataStream<Event> translate(
@@ -83,7 +89,7 @@ public class SchemaOperatorTranslator {
                 input.transform(
                         "SchemaOperator",
                         new EventTypeInfo(),
-                        new SchemaOperatorFactory(metadataApplier, routingRules));
+                        new SchemaOperatorFactory(metadataApplier, routingRules, rpcTimeOut));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
     }
