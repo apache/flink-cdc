@@ -174,7 +174,7 @@ public class StreamSplit extends SourceSplitBase {
 
         return new StreamSplit(
                 streamSplit.splitId,
-                streamSplit.getStartingOffset(),
+                startingOffset,
                 streamSplit.getEndingOffset(),
                 splitInfos,
                 streamSplit.getTableSchemas(),
