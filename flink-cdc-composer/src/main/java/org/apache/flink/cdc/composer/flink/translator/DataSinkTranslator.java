@@ -85,7 +85,7 @@ public class DataSinkTranslator {
         if (sink instanceof TwoPhaseCommittingSink) {
             addCommittingTopology(sink, stream, sinkName, schemaOperatorID);
         } else {
-            input.transform(
+            stream.transform(
                     SINK_WRITER_PREFIX + sinkName,
                     CommittableMessageTypeInfo.noOutput(),
                     new DataSinkWriterOperatorFactory<>(sink, schemaOperatorID));
