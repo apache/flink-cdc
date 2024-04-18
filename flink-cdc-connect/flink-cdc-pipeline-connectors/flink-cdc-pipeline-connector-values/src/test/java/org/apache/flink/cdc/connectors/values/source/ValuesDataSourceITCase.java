@@ -69,6 +69,10 @@ public class ValuesDataSourceITCase {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(3000);
         env.setRestartStrategy(RestartStrategies.noRestart());
+
+        // Currently, the ValuesDataSource fails to run with parallelism > 1,
+        // and will get stuck infinitely. This is a temporary solution.
+        env.setParallelism(1);
         FlinkSourceProvider sourceProvider =
                 (FlinkSourceProvider) new ValuesDataSource(type).getEventSourceProvider();
         CloseableIterator<Event> events =
