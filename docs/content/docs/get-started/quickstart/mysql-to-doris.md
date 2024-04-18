@@ -247,9 +247,9 @@ We can find that tables are created and inserted through Doris Web UI.
 ### Synchronize Schema and Data changes
 Enter MySQL container
 
-    ```shell
-    docker-compose exec mysql mysql -uroot -p123456
-    ```
+```shell
+   docker-compose exec mysql mysql -uroot -p123456
+```
 
 Then, modify schema and record in MySQL, and the tables of Doris will change the same in real time：
 1. insert one record in `orders` from MySQL:   
