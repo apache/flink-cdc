@@ -122,6 +122,13 @@ Pipeline 连接器配置项
       <td>String</td>
       <td>将 Kafka 支持的参数传递给 pipeline，参考 <a href="https://kafka.apache.org/28/documentation.html#consumerconfigs">Kafka consume options</a>。 </td>
     </tr>
+    <tr>
+      <td>sink.custom-header</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Kafka 记录自定义的 Header。每个 Header 使用 ','分割， 键值使用 ':' 分割。举例来说，可以使用这种方式 'key1:value1,key2:value2'。 </td>
+    </tr>
     </tbody>
 </table>    
 </div>
@@ -214,7 +221,4 @@ Pipeline 连接器配置项
 </table>
 </div>
 
-FAQ
---------
-* [FAQ(English)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ)
-* [FAQ(中文)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ(ZH))
+{{< top >}}

@@ -120,6 +120,13 @@ Pipeline Connector Options
       <td>String</td>
       <td>Pass options of Kafka table to pipeline，See <a href="https://kafka.apache.org/28/documentation.html#consumerconfigs">Kafka consume options</a>. </td>
     </tr>
+    <tr>
+      <td>sink.custom-header</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>custom headers for each kafka record. Each header are separated by ',', separate key and value by ':'. For example, we can set headers like 'key1:value1,key2:value2'. </td>
+    </tr>
     </tbody>
 </table>    
 </div>
@@ -212,7 +219,4 @@ Data Type Mapping
 </table>
 </div>
 
-FAQ
---------
-* [FAQ(English)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ)
-* [FAQ(中文)](https://github.com/ververica/flink-cdc-connectors/wiki/FAQ(ZH))
+{{< top >}}

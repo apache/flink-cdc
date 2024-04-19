@@ -50,6 +50,8 @@ public class KafkaDataSink implements DataSink {
 
     final boolean addTableToHeaderEnabled;
 
+    final String customHeaders;
+
     public KafkaDataSink(
             DeliveryGuarantee deliveryGuarantee,
             Properties kafkaProperties,
@@ -57,7 +59,8 @@ public class KafkaDataSink implements DataSink {
             ZoneId zoneId,
             SerializationSchema<Event> valueSerialization,
             String topic,
-            boolean addTableToHeaderEnabled) {
+            boolean addTableToHeaderEnabled,
+            String customHeaders) {
         this.deliveryGuarantee = deliveryGuarantee;
         this.kafkaProperties = kafkaProperties;
         this.partitioner = partitioner;
@@ -65,6 +68,7 @@ public class KafkaDataSink implements DataSink {
         this.valueSerialization = valueSerialization;
         this.topic = topic;
         this.addTableToHeaderEnabled = addTableToHeaderEnabled;
+        this.customHeaders = customHeaders;
     }
 
     @Override
@@ -83,7 +87,8 @@ public class KafkaDataSink implements DataSink {
                                         partitioner,
                                         valueSerialization,
                                         topic,
-                                        addTableToHeaderEnabled))
+                                        addTableToHeaderEnabled,
+                                        customHeaders))
                         .build());
     }
 

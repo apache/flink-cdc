@@ -77,6 +77,8 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
         boolean addTableToHeaderEnabled =
                 context.getFactoryConfiguration()
                         .get(KafkaDataSinkOptions.SINK_ADD_TABLEID_TO_HEADER_ENABLED);
+        String customHeaders =
+                context.getFactoryConfiguration().get(KafkaDataSinkOptions.SINK_CUSTOM_HEADER);
         return new KafkaDataSink(
                 deliveryGuarantee,
                 kafkaProperties,
@@ -84,7 +86,8 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
                 zoneId,
                 valueSerialization,
                 topic,
-                addTableToHeaderEnabled);
+                addTableToHeaderEnabled,
+                customHeaders);
     }
 
     @Override

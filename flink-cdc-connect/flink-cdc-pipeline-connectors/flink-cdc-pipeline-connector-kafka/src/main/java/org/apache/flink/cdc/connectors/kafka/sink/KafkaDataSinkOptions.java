@@ -56,4 +56,11 @@ public class KafkaDataSinkOptions {
                     .defaultValue(false)
                     .withDescription(
                             "Optional. If this parameter is configured, a header with key of 'namespace','schemaName','tableName' will be added for each Kafka record.");
+
+    public static final ConfigOption<String> SINK_CUSTOM_HEADER =
+            key("sink.custom-header")
+                    .stringType()
+                    .defaultValue("")
+                    .withDescription(
+                            "custom headers for each kafka record. Each header are separated by ',', separate key and value by ':'. For example, we can set headers like 'key1:value1,key2:value2'.");
 }
