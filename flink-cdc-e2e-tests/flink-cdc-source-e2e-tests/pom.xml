@@ -41,7 +41,7 @@ limitations under the License.
 
     <dependencies>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-e2e-utils</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>

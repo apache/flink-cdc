@@ -36,7 +36,7 @@ limitations under the License.
 
     <dependencies>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-e2e-utils</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
@@ -57,53 +57,47 @@ limitations under the License.
             <scope>test</scope>
         </dependency>
 
-        <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>fastjson</artifactId>
-            <version>1.2.75</version>
-        </dependency>
-
         <!-- CDC connectors test utils -->
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-dist</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-mysql-cdc</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-pipeline-connector-values</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-pipeline-connector-mysql</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-pipeline-connector-doris</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-pipeline-connector-starrocks</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.ververica</groupId>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-test-util</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
@@ -186,7 +180,7 @@ limitations under the License.
                         </artifactItem>
 
                         <artifactItem>
-                            <groupId>com.ververica</groupId>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-cdc-dist</artifactId>
                             <version>${project.version}</version>
                             <destFileName>flink-cdc-dist.jar</destFileName>
@@ -196,7 +190,7 @@ limitations under the License.
                         </artifactItem>
 
                         <artifactItem>
-                            <groupId>com.ververica</groupId>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-cdc-pipeline-connector-values</artifactId>
                             <version>${project.version}</version>
                             <destFileName>values-cdc-pipeline-connector.jar</destFileName>
@@ -206,7 +200,7 @@ limitations under the License.
                         </artifactItem>
 
                         <artifactItem>
-                            <groupId>com.ververica</groupId>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-cdc-pipeline-connector-mysql</artifactId>
                             <version>${project.version}</version>
                             <destFileName>mysql-cdc-pipeline-connector.jar</destFileName>
@@ -216,7 +210,7 @@ limitations under the License.
                         </artifactItem>
 
                         <artifactItem>
-                            <groupId>com.ververica</groupId>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-cdc-pipeline-connector-doris</artifactId>
                             <version>${project.version}</version>
                             <destFileName>doris-cdc-pipeline-connector.jar</destFileName>
@@ -226,7 +220,7 @@ limitations under the License.
                         </artifactItem>
 
                         <artifactItem>
-                            <groupId>com.ververica</groupId>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-cdc-pipeline-connector-starrocks</artifactId>
                             <version>${project.version}</version>
                             <destFileName>starrocks-cdc-pipeline-connector.jar</destFileName>
