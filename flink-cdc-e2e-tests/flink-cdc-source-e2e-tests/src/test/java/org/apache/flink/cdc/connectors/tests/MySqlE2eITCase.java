@@ -43,6 +43,8 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-connector.jar");
 
+    private static final Path mySqlConnectorJar = TestUtils.getResource("mysql-connector-java.jar");
+
     @Test
     public void testMySqlCDC() throws Exception {
         List<String> sqlLines =
@@ -95,7 +97,7 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
                         "INSERT INTO products_sink",
                         "SELECT * FROM products_source;");
 
-        submitSQLJob(sqlLines, mysqlCdcJar, jdbcJar);
+        submitSQLJob(sqlLines, mysqlCdcJar, jdbcJar, mySqlConnectorJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         // generate binlogs
