@@ -68,10 +68,9 @@ Create a `docker-compose.yml` file using the content provided below:
    version: '2.1'
    services:
       StarRocks:
-         image: registry.starrocks.io/starrocks/allin1-ubuntu
+         image: starrocks/allin1-ubuntu:3.1.10
          ports:
-            - "8030:8030"
-            - "8040:8040"
+            - "8080:8080"
             - "9030:9030"
       MySQL:
          image: debezium/example-mysql:1.1
@@ -98,7 +97,7 @@ This command automatically starts all the containers defined in the Docker Compo
 1. Enter MySQL container
 
    ```shell
-   docker-compose exec mysql mysql -uroot -p123456
+   docker-compose exec MySQL mysql -uroot -p123456
    ```
 
 2. create `app_db` database and `orders`,`products`,`shipments` tables, then insert records
@@ -175,7 +174,7 @@ This command automatically starts all the containers defined in the Docker Compo
      type: starrocks
      name: StarRocks Sink
      jdbc-url: jdbc:mysql://127.0.0.1:9030
-     load-url: 127.0.0.1:8030
+     load-url: 127.0.0.1:8080
      username: root
      password: ""
      table.create.properties.replication_num: 1
