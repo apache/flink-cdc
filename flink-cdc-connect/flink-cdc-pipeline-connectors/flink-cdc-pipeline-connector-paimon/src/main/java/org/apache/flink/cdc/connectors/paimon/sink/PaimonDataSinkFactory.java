@@ -18,11 +18,14 @@
 package org.apache.flink.cdc.connectors.paimon.sink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonRecordEventSerializer;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonRecordSerializer;
 
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
@@ -82,19 +85,22 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
         String partitionKey =
                 context.getFactoryConfiguration().get(PaimonDataSinkOptions.PARTITION_KEY);
         Map<TableId, List<String>> partitionMaps = new HashMap<>();
-        for (String tables : partitionKey.split(";")) {
-            String[] splits = tables.split(":");
-            if (splits.length == 2) {
-                TableId tableId = TableId.parse(splits[0]);
-                List<String> partitions = Arrays.asList(splits[1].split(","));
-                partitionMaps.put(tableId, partitions);
-            } else {
-                throw new IllegalArgumentException(
-                        PaimonDataSinkOptions.PARTITION_KEY.key()
-                                + " is malformed, please refer to the documents");
+        if (!partitionKey.isEmpty()) {
+            for (String tables : partitionKey.split(";")) {
+                String[] splits = tables.split(":");
+                if (splits.length == 2) {
+                    TableId tableId = TableId.parse(splits[0]);
+                    List<String> partitions = Arrays.asList(splits[1].split(","));
+                    partitionMaps.put(tableId, partitions);
+                } else {
+                    throw new IllegalArgumentException(
+                            PaimonDataSinkOptions.PARTITION_KEY.key()
+                                    + " is malformed, please refer to the documents");
+                }
             }
         }
-        return new PaimonDataSink(options, tableOptions, zoneId, commitUser, partitionMaps);
+        PaimonRecordSerializer<Event> serializer = new PaimonRecordEventSerializer(zoneId);
+        return new PaimonDataSink(options, tableOptions, commitUser, partitionMaps, serializer);
     }
 
     @Override

@@ -173,8 +173,10 @@ public class PaimonSinkITCase {
             throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
                     Catalog.DatabaseNotExistException {
         initialize(metastore);
-        PaimonSink paimonSink = new PaimonSink(catalogOptions, ZoneId.systemDefault(), "admin");
-        PaimonWriter writer = paimonSink.createWriter(new MockInitContext());
+        PaimonSink<Event> paimonSink =
+                new PaimonSink<>(
+                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+        PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
 
         // insert
@@ -257,8 +259,10 @@ public class PaimonSinkITCase {
             throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
                     Catalog.DatabaseNotExistException {
         initialize(metastore);
-        PaimonSink paimonSink = new PaimonSink(catalogOptions, ZoneId.systemDefault(), "admin");
-        PaimonWriter writer = paimonSink.createWriter(new MockInitContext());
+        PaimonSink<Event> paimonSink =
+                new PaimonSink(
+                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+        PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
 
         // 1. receive only DataChangeEvents during one checkpoint
@@ -390,8 +394,10 @@ public class PaimonSinkITCase {
             throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
                     Catalog.DatabaseNotExistException {
         initialize(metastore);
-        PaimonSink paimonSink = new PaimonSink(catalogOptions, ZoneId.systemDefault(), "admin");
-        PaimonWriter writer = paimonSink.createWriter(new MockInitContext());
+        PaimonSink<Event> paimonSink =
+                new PaimonSink<>(
+                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+        PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
         List<Event> testEvents = createTestEvents();
         // create table

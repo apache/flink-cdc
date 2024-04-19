@@ -21,7 +21,6 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
-import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
@@ -34,30 +33,38 @@ import org.apache.paimon.flink.sink.MultiTableCommittableSerializer;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.table.sink.CommitMessageSerializer;
 
-import java.time.ZoneId;
-
 /**
  * A {@link Sink} for Paimon. Maintain this package until Paimon has it own sinkV2 implementation.
  */
-public class PaimonSink
-        implements TwoPhaseCommittingSink<Event, MultiTableCommittable>,
-                WithPreCommitTopology<Event, MultiTableCommittable> {
+public class PaimonSink<InputT>
+        implements TwoPhaseCommittingSink<InputT, MultiTableCommittable>,
+                WithPreCommitTopology<InputT, MultiTableCommittable> {
+
+    // provided a default commit user.
+    public static final String DEFAULT_COMMIT_USER = "admin";
 
     private final Options catalogOptions;
 
     private final String commitUser;
 
-    private final ZoneId zoneId;
+    private final PaimonRecordSerializer<InputT> serializer;
 
-    public PaimonSink(Options catalogOptions, ZoneId zoneId, String commitUser) {
+    public PaimonSink(Options catalogOptions, PaimonRecordSerializer<InputT> serializer) {
+        this.catalogOptions = catalogOptions;
+        this.serializer = serializer;
+        commitUser = DEFAULT_COMMIT_USER;
+    }
+
+    public PaimonSink(
+            Options catalogOptions, String commitUser, PaimonRecordSerializer<InputT> serializer) {
         this.catalogOptions = catalogOptions;
         this.commitUser = commitUser;
-        this.zoneId = zoneId;
+        this.serializer = serializer;
     }
 
     @Override
-    public PaimonWriter createWriter(InitContext context) {
-        return new PaimonWriter(catalogOptions, context.metricGroup(), zoneId, commitUser);
+    public PaimonWriter<InputT> createWriter(InitContext context) {
+        return new PaimonWriter<>(catalogOptions, context.metricGroup(), commitUser, serializer);
     }
 
     @Override
