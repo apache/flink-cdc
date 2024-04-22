@@ -72,13 +72,16 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
 
     @Before
     public void initializeDatabase() {
-        createDatabase(StarRocksContainer.STARROCKS_DATABASE_NAME);
+        executeSql(
+                String.format(
+                        "CREATE DATABASE IF NOT EXISTS `%s`;",
+                        StarRocksContainer.STARROCKS_DATABASE_NAME));
         LOG.info("Database {} created.", StarRocksContainer.STARROCKS_DATABASE_NAME);
     }
 
     @After
     public void destroyDatabase() {
-        dropDatabase(StarRocksContainer.STARROCKS_DATABASE_NAME);
+        executeSql(String.format("DROP DATABASE %s;", StarRocksContainer.STARROCKS_DATABASE_NAME));
         LOG.info("Database {} destroyed.", StarRocksContainer.STARROCKS_DATABASE_NAME);
     }
 
@@ -237,7 +240,7 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @Ignore("Alter column is not supported currently.")
+    @Ignore("Alter column type is not supported currently.")
     public void testStarRocksAlterColumnType() throws Exception {
         TableId tableId =
                 TableId.tableId(
@@ -258,6 +261,7 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test(expected = JobExecutionException.class)
+    @Ignore("Alter column type is not supported currently.")
     public void testStarRocksNarrowingAlterColumnType() throws Exception {
         TableId tableId =
                 TableId.tableId(

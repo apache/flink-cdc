@@ -32,20 +32,11 @@ import java.util.List;
 /** Docker container for StarRocks. */
 public class StarRocksContainer extends JdbcDatabaseContainer<StarRocksContainer> {
 
-    private static final String DOCKER_IMAGE_NAME = "starrocks/allin1-ubuntu:3.1.10";
+    private static final String DOCKER_IMAGE_NAME = "starrocks/allin1-ubuntu:3.2.6";
 
-    // FE node exposed ports
-    public static final int FE_HTTP_PORT = 8030;
+    // exposed ports
     public static final int FE_HTTP_SERVICE_PORT = 8080;
-    public static final int FE_RPC_PORT = 9020;
     public static final int FE_QUERY_PORT = 9030;
-    public static final int FE_EDIT_LOG_PORT = 9010;
-
-    // BE node exposed ports
-    public static final int BE_PORT = 9060;
-    public static final int BE_WEB_SERVER_PORT = 8040;
-    public static final int BE_HEARBEAT_SERVICE_PORT = 9050;
-    public static final int BE_BRPC_PORT = 8060;
 
     public static final String STARROCKS_DATABASE_NAME = "starrocks_database";
     public static final String STARROCKS_TABLE_NAME = "fallen_angel";
@@ -56,27 +47,13 @@ public class StarRocksContainer extends JdbcDatabaseContainer<StarRocksContainer
 
     public StarRocksContainer() {
         super(DockerImageName.parse(DOCKER_IMAGE_NAME));
-        setExposedPorts(
-                Arrays.asList(
-                        FE_HTTP_PORT,
-                        FE_HTTP_SERVICE_PORT,
-                        FE_RPC_PORT,
-                        FE_QUERY_PORT,
-                        FE_EDIT_LOG_PORT,
-                        BE_PORT,
-                        BE_WEB_SERVER_PORT,
-                        BE_HEARBEAT_SERVICE_PORT,
-                        BE_BRPC_PORT));
+        setExposedPorts(Arrays.asList(FE_HTTP_SERVICE_PORT, FE_QUERY_PORT));
         setNetwork(NETWORK);
     }
 
     public List<String> getLoadUrl() {
         return Collections.singletonList(
                 String.format("%s:%d", getHost(), getMappedPort(FE_HTTP_SERVICE_PORT)));
-    }
-
-    public String getTableIdentifier() {
-        return String.format("%s.%s", STARROCKS_DATABASE_NAME, STARROCKS_TABLE_NAME);
     }
 
     public void waitForLog(String regex, int count, int timeoutSeconds) {

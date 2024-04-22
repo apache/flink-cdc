@@ -80,7 +80,9 @@ public class StarRocksSinkTestBase extends TestLogger {
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(STARROCKS_CONTAINER)).join();
-        LOG.info("Waiting for backends to be available");
+        LOG.info("Waiting for StarRocks to launch");
+
+        long startWaitingTimestamp = System.currentTimeMillis();
 
         new LogMessageWaitStrategy()
                 .withRegEx(".*Enjoy the journal to StarRocks blazing-fast lake-house engine!.*\\s")
@@ -89,6 +91,18 @@ public class StarRocksSinkTestBase extends TestLogger {
                         Duration.of(DEFAULT_STARTUP_TIMEOUT_SECONDS, ChronoUnit.SECONDS))
                 .waitUntilReady(STARROCKS_CONTAINER);
 
+        while (!checkBackendAvailability()) {
+            try {
+                if (System.currentTimeMillis() - startWaitingTimestamp
+                        > DEFAULT_STARTUP_TIMEOUT_SECONDS * 1000) {
+                    throw new RuntimeException("StarRocks backend startup timed out.");
+                }
+                LOG.info("Waiting for backends to be available");
+                Thread.sleep(1000);
+            } catch (InterruptedException ignored) {
+                // ignore and check next round
+            }
+        }
         LOG.info("Containers are started.");
     }
 
@@ -119,7 +133,7 @@ public class StarRocksSinkTestBase extends TestLogger {
 
         @Override
         public ClassLoader getClassLoader() {
-            return this.getClassLoader();
+            return null;
         }
     }
 
@@ -128,7 +142,7 @@ public class StarRocksSinkTestBase extends TestLogger {
         return factory.createDataSink(new MockContext(factoryConfiguration));
     }
 
-    public static void createDatabase(String databaseName) {
+    public static void executeSql(String sql) {
         try {
             Container.ExecResult rs =
                     STARROCKS_CONTAINER.execInContainer(
@@ -137,18 +151,17 @@ public class StarRocksSinkTestBase extends TestLogger {
                             "-uroot",
                             "-P9030",
                             "-h127.0.0.1",
-                            String.format("-e CREATE DATABASE IF NOT EXISTS `%s`;", databaseName));
+                            "-e " + sql);
 
             if (rs.getExitCode() != 0) {
-                throw new RuntimeException("Failed to create database." + rs.getStderr());
+                throw new RuntimeException("Failed to execute SQL." + rs.getStderr());
             }
         } catch (Exception e) {
-            throw new RuntimeException("Failed to create database.", e);
+            throw new RuntimeException("Failed to execute SQL.", e);
         }
     }
 
-    public static void createTable(
-            String databaseName, String tableName, String primaryKey, List<String> schema) {
+    public static boolean checkBackendAvailability() {
         try {
             Container.ExecResult rs =
                     STARROCKS_CONTAINER.execInContainer(
@@ -157,57 +170,16 @@ public class StarRocksSinkTestBase extends TestLogger {
                             "-uroot",
                             "-P9030",
                             "-h127.0.0.1",
-                            String.format(
-                                    "-e CREATE TABLE `%s`.`%s` (%s) PRIMARY KEY (`%s`) DISTRIBUTED BY HASH(`%s`) BUCKETS 1 PROPERTIES (\"replication_num\" = \"1\");",
-                                    databaseName,
-                                    tableName,
-                                    String.join(", ", schema),
-                                    primaryKey,
-                                    primaryKey));
+                            "-e SHOW BACKENDS\\G");
 
             if (rs.getExitCode() != 0) {
-                throw new RuntimeException("Failed to create table." + rs.getStderr());
+                return false;
             }
+            return rs.getStdout()
+                    .contains("*************************** 1. row ***************************");
         } catch (Exception e) {
-            throw new RuntimeException("Failed to create table.", e);
-        }
-    }
-
-    public static void dropDatabase(String databaseName) {
-        try {
-            Container.ExecResult rs =
-                    STARROCKS_CONTAINER.execInContainer(
-                            "mysql",
-                            "--protocol=TCP",
-                            "-uroot",
-                            "-P9030",
-                            "-h127.0.0.1",
-                            String.format("-e DROP DATABASE %s;", databaseName));
-
-            if (rs.getExitCode() != 0) {
-                throw new RuntimeException("Failed to drop database." + rs.getStderr());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to drop database.", e);
-        }
-    }
-
-    public static void dropTable(String databaseName, String tableName) {
-        try {
-            Container.ExecResult rs =
-                    STARROCKS_CONTAINER.execInContainer(
-                            "mysql",
-                            "--protocol=TCP",
-                            "-uroot",
-                            "-P9030",
-                            "-h127.0.0.1",
-                            String.format("-e DROP TABLE %s.%s;", databaseName, tableName));
-
-            if (rs.getExitCode() != 0) {
-                throw new RuntimeException("Failed to drop table." + rs.getStderr());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to drop table.", e);
+            LOG.info("Failed to check backend status.", e);
+            return false;
         }
     }
 

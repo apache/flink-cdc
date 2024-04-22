@@ -64,28 +64,39 @@ public class StarRocksPipelineITCase extends StarRocksSinkTestBase {
 
     @Before
     public void initializeDatabaseAndTable() {
-        createDatabase(StarRocksContainer.STARROCKS_DATABASE_NAME);
+        executeSql(
+                String.format(
+                        "CREATE DATABASE IF NOT EXISTS `%s`;",
+                        StarRocksContainer.STARROCKS_DATABASE_NAME));
 
         LOG.info("Database {} created.", StarRocksContainer.STARROCKS_DATABASE_NAME);
 
-        createTable(
-                StarRocksContainer.STARROCKS_DATABASE_NAME,
-                StarRocksContainer.STARROCKS_TABLE_NAME,
-                "id",
-                Arrays.asList("id INT NOT NULL", "number DOUBLE", "name VARCHAR(51)"));
+        List<String> schema = Arrays.asList("id INT NOT NULL", "number DOUBLE", "name VARCHAR(51)");
+
+        executeSql(
+                String.format(
+                        "CREATE TABLE `%s`.`%s` (%s) PRIMARY KEY (`%s`) DISTRIBUTED BY HASH(`%s`) BUCKETS 1 PROPERTIES (\"replication_num\" = \"1\");",
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME,
+                        String.join(", ", schema),
+                        "id",
+                        "id"));
 
         LOG.info("Table {} created.", StarRocksContainer.STARROCKS_TABLE_NAME);
     }
 
     @After
     public void destroyDatabaseAndTable() {
-        dropTable(
-                StarRocksContainer.STARROCKS_DATABASE_NAME,
-                StarRocksContainer.STARROCKS_TABLE_NAME);
+
+        executeSql(
+                String.format(
+                        "DROP TABLE %s.%s;",
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME));
 
         LOG.info("Table {} destroyed.", StarRocksContainer.STARROCKS_TABLE_NAME);
 
-        dropDatabase(StarRocksContainer.STARROCKS_DATABASE_NAME);
+        executeSql(String.format("DROP DATABASE %s;", StarRocksContainer.STARROCKS_DATABASE_NAME));
 
         LOG.info("Database {} destroyed.", StarRocksContainer.STARROCKS_DATABASE_NAME);
     }
@@ -107,7 +118,7 @@ public class StarRocksPipelineITCase extends StarRocksSinkTestBase {
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
-                                new Object[] {17, 3.14, BinaryStringData.fromString("Doris Day")})),
+                                new Object[] {17, 3.14, BinaryStringData.fromString("StarRocks")})),
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
@@ -129,16 +140,15 @@ public class StarRocksPipelineITCase extends StarRocksSinkTestBase {
                 DataChangeEvent.updateEvent(
                         tableId,
                         generator.generate(
-                                new Object[] {17, 3.14, BinaryStringData.fromString("Doris Day")}),
+                                new Object[] {17, 3.14, BinaryStringData.fromString("StarRocks")}),
                         generator.generate(
                                 new Object[] {
-                                    17, 6.28, BinaryStringData.fromString("Doris Day")
+                                    17, 6.28, BinaryStringData.fromString("StarRocks")
                                 })));
     }
 
     @Test
     public void testValuesToStarRocks() throws Exception {
-        //        Thread.sleep(100000000);
         TableId tableId =
                 TableId.tableId(
                         StarRocksContainer.STARROCKS_DATABASE_NAME,
@@ -161,7 +171,7 @@ public class StarRocksPipelineITCase extends StarRocksSinkTestBase {
         env.execute("Values to StarRocks Sink");
 
         List<String> actual = fetchTableContent(tableId, 3);
-        List<String> expected = Arrays.asList("17 | 6.28 | Doris Day", "21 | 1.732 | Disenchanted");
+        List<String> expected = Arrays.asList("17 | 6.28 | StarRocks", "21 | 1.732 | Disenchanted");
 
         assertEqualsInAnyOrder(expected, actual);
     }
