@@ -65,7 +65,7 @@ under the License.
    version: '2.1'
    services:
      StarRocks:
-       image: starrocks/allin1-ubuntu:3.1.10
+       image: starrocks/allin1-ubuntu:3.2.6
        ports:
          - "8080:8080"
          - "9030:9030"
