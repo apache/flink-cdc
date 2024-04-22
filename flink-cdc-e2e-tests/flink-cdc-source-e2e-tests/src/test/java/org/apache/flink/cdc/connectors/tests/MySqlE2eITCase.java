@@ -43,7 +43,7 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-connector.jar");
 
-    private static final Path mySqlConnectorJar = TestUtils.getResource("mysql-connector-java.jar");
+    private static final Path mySqlConnectorJar = TestUtils.getResource("mysql-driver.jar");
 
     @Test
     public void testMySqlCDC() throws Exception {

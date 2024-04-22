@@ -56,6 +56,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Path db2CdcJar = TestUtils.getResource("db2-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+    private static final Path db2JccJar = TestUtils.getResource("db2-jcc.jar");
 
     public static final String DB2_IMAGE = "ibmcom/db2";
     public static final String DB2_CUSTOM_IMAGE = "custom/db2-cdc:1.4";
@@ -161,7 +162,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
                         "INSERT INTO products_sink",
                         "SELECT * FROM products_source;");
 
-        submitSQLJob(sqlLines, db2CdcJar, jdbcJar, mysqlDriverJar);
+        submitSQLJob(sqlLines, db2CdcJar, jdbcJar, mysqlDriverJar, db2JccJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         try (Connection conn = getDb2Connection();
