@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.db2.source;
 
+import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import org.apache.flink.cdc.connectors.db2.source.config.Db2SourceConfigFactory;
@@ -36,6 +37,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * <p>Check the Java docs of each individual method to learn more about the settings to build a
  * {@link Db2IncrementalSource}.
  */
+@PublicEvolving
 public class Db2SourceBuilder<T> {
 
     private final Db2SourceConfigFactory configFactory = new Db2SourceConfigFactory();

@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.db2.source;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.db2.Db2TestBase;
+import org.apache.flink.cdc.connectors.db2.source.Db2SourceBuilder.Db2IncrementalSource;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
@@ -43,10 +44,7 @@ import java.util.List;
 import static java.lang.String.format;
 import static org.testcontainers.containers.Db2Container.DB2_PORT;
 
-/**
- * IT tests for {@link
- * org.apache.flink.cdc.connectors.db2.source.Db2SourceBuilder.Db2IncrementalSource}.
- */
+/** IT tests for {@link Db2IncrementalSource}. */
 public class Db2SourceITCase extends Db2TestBase {
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);

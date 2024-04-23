@@ -23,6 +23,7 @@ import java.util.Objects;
 
 /** Debezium startup options. */
 public final class StartupOptions {
+
     public final StartupMode startupMode;
 
     /**

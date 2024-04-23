@@ -24,7 +24,7 @@ import io.debezium.relational.Column;
 
 import java.sql.Types;
 
-/** Utilities for converting from Db2 types to Flink types. */
+/** Utilities for converting from Db2 types to Flink SQL types. */
 public class Db2TypeUtils {
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
