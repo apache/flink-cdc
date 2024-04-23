@@ -29,7 +29,7 @@ import static io.debezium.connector.db2.SourceInfo.CHANGE_LSN_KEY;
 import static io.debezium.connector.db2.SourceInfo.COMMIT_LSN_KEY;
 
 /**
- * This SqlServerSchemaChangeEventHandler helps to parse the source struct in SchemaChangeEvent and
+ * This Db2SchemaChangeEventHandler helps to parse the source struct in SchemaChangeEvent and
  * generate source info.
  */
 public class Db2SchemaChangeEventHandler implements SchemaChangeEventHandler {

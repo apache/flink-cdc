@@ -35,6 +35,7 @@ import java.util.Set;
 
 /** Utils for Db2 connection. */
 public class Db2ConnectionUtils {
+
     private static final Logger LOG = LoggerFactory.getLogger(Db2ConnectionUtils.class);
 
     public static Db2Connection createDb2Connection(
