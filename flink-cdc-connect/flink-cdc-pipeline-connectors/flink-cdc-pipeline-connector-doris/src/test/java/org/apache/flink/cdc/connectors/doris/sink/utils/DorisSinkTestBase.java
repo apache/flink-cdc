@@ -156,9 +156,10 @@ public class DorisSinkTestBase extends TestLogger {
             if (rs.getExitCode() != 0) {
                 return false;
             }
-            LOG.info("Doris backend status:\n{}", rs.getStdout());
-            return rs.getStdout()
-                    .contains("*************************** 1. row ***************************");
+            String output = rs.getStdout();
+            LOG.info("Doris backend status:\n{}", output);
+            return output.contains("*************************** 1. row ***************************")
+                    && !output.contains("AvailCapacity: 1.000 B");
         } catch (Exception e) {
             LOG.info("Failed to check backend status.", e);
             return false;
@@ -219,7 +220,7 @@ public class DorisSinkTestBase extends TestLogger {
                             "-uroot",
                             "-P9030",
                             "-h127.0.0.1",
-                            String.format("-e DROP DATABASE %s;", databaseName));
+                            String.format("-e DROP DATABASE IF EXISTS %s;", databaseName));
 
             if (rs.getExitCode() != 0) {
                 throw new RuntimeException("Failed to drop database." + rs.getStderr());
@@ -238,7 +239,8 @@ public class DorisSinkTestBase extends TestLogger {
                             "-uroot",
                             "-P9030",
                             "-h127.0.0.1",
-                            String.format("-e DROP TABLE %s.%s;", databaseName, tableName));
+                            String.format(
+                                    "-e DROP TABLE IF EXISTS %s.%s;", databaseName, tableName));
 
             if (rs.getExitCode() != 0) {
                 throw new RuntimeException("Failed to drop table." + rs.getStderr());
