@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.tests.utils;
+package org.apache.flink.cdc.common.test.utils;
 
 import java.util.function.Function;
 

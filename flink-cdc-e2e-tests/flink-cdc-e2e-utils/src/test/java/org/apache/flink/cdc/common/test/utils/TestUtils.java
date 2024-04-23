@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.tests.utils;
+package org.apache.flink.cdc.common.test.utils;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -28,8 +28,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** General test utilities. */
-public enum TestUtils {
-    ;
+public class TestUtils {
 
     private static final ParameterProperty<Path> MODULE_DIRECTORY =
             new ParameterProperty<>("moduleDir", Paths::get);
@@ -37,19 +36,28 @@ public enum TestUtils {
     /**
      * Searches for a resource file matching the given regex in the given directory. This method is
      * primarily intended to be used for the initialization of static {@link Path} fields for
-     * resource file(i.e. jar, config file) that reside in the modules {@code target} directory.
+     * resource file(i.e. jar, config file). if resolvePaths is empty, this method will search file
+     * under the modules {@code target} directory. if resolvePaths is not empty, this method will
+     * search file under resolvePaths of current project.
      *
      * @param resourceNameRegex regex pattern to match against
-     * @return Path pointing to the matching jar
+     * @param resolvePaths an array of resolve paths of current project
+     * @return Path pointing to the matching file
      * @throws RuntimeException if none or multiple resource files could be found
      */
-    public static Path getResource(final String resourceNameRegex) {
+    public static Path getResource(final String resourceNameRegex, String... resolvePaths) {
         // if the property is not set then we are most likely running in the IDE, where the working
         // directory is the
         // module of the test that is currently running, which is exactly what we want
-        Path moduleDirectory = MODULE_DIRECTORY.get(Paths.get("").toAbsolutePath());
+        Path path = MODULE_DIRECTORY.get(Paths.get("").toAbsolutePath());
+        if (resolvePaths != null && resolvePaths.length > 0) {
+            path = path.getParent().getParent();
+            for (String resolvePath : resolvePaths) {
+                path = path.resolve(resolvePath);
+            }
+        }
 
-        try (Stream<Path> dependencyResources = Files.walk(moduleDirectory)) {
+        try (Stream<Path> dependencyResources = Files.walk(path)) {
             final List<Path> matchingResources =
                     dependencyResources
                             .filter(
