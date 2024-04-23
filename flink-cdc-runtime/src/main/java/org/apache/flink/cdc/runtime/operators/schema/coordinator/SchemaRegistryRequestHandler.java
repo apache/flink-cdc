@@ -107,14 +107,10 @@ public class SchemaRegistryRequestHandler implements Closeable {
             for (SchemaChangeEvent changeEvent : derivedSchemaChangeEvents) {
                 metadataApplier.applySchemaChange(changeEvent);
                 LOG.debug("Apply schema change {} to table {}.", changeEvent, tableId);
-                if (!(changeEvent instanceof CreateTableEvent)
-                        || !schemaManager.schemaExists(tableId)) {
-                    schemaManager.applySchemaChange(changeEvent);
-                }
-                PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
-                if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
-                    startNextSchemaChangeRequest();
-                }
+            }
+            PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
+            if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
+                startNextSchemaChangeRequest();
             }
         } catch (Exception e) {
             this.schemaChangeException = e;
