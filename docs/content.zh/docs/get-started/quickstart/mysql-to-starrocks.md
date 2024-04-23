@@ -65,10 +65,9 @@ under the License.
    version: '2.1'
    services:
      StarRocks:
-       image: registry.starrocks.io/starrocks/allin1-ubuntu
+       image: starrocks/allin1-ubuntu:3.2.6
        ports:
-         - "8030:8030"
-         - "8040:8040"
+         - "8080:8080"
          - "9030:9030"
      MySQL:
        image: debezium/example-mysql:1.1
@@ -95,7 +94,7 @@ under the License.
 1. 进入 MySQL 容器
 
    ```shell
-   docker-compose exec mysql mysql -uroot -p123456
+   docker-compose exec MySQL mysql -uroot -p123456
    ```
 
 2. 创建数据库 `app_db` 和表 `orders`,`products`,`shipments`，并插入数据
@@ -172,7 +171,7 @@ under the License.
      type: starrocks
      name: StarRocks Sink
      jdbc-url: jdbc:mysql://127.0.0.1:9030
-     load-url: 127.0.0.1:8030
+     load-url: 127.0.0.1:8080
      username: root
      password: ""
      table.create.properties.replication_num: 1
