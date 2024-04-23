@@ -169,7 +169,7 @@ public class CliFrontend {
         if (globalConfig != null) {
             Path globalConfigPath = Paths.get(globalConfig);
             LOG.info("Using global config in command line: {}", globalConfigPath);
-            return ConfigurationUtils.loadMapFormattedConfig(globalConfigPath);
+            return ConfigurationUtils.loadConfigFile(globalConfigPath);
         }
 
         // Fallback to Flink CDC home
@@ -178,7 +178,7 @@ public class CliFrontend {
             Path globalConfigPath =
                     Paths.get(flinkCdcHome).resolve("conf").resolve("flink-cdc.yaml");
             LOG.info("Using global config in FLINK_CDC_HOME: {}", globalConfigPath);
-            return ConfigurationUtils.loadMapFormattedConfig(globalConfigPath);
+            return ConfigurationUtils.loadConfigFile(globalConfigPath);
         }
 
         // Fallback to empty configuration
