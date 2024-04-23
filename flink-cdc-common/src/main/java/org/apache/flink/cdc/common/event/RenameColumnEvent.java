@@ -33,6 +33,8 @@ public class RenameColumnEvent implements SchemaChangeEvent {
     /** key => column name before changing, value => column name after changing. */
     private final Map<String, String> nameMapping;
 
+    private String ddlContent;
+
     public RenameColumnEvent(TableId tableId, Map<String, String> nameMapping) {
         this.tableId = tableId;
         this.nameMapping = nameMapping;
@@ -41,6 +43,16 @@ public class RenameColumnEvent implements SchemaChangeEvent {
     /** Returns the name mapping. */
     public Map<String, String> getNameMapping() {
         return nameMapping;
+    }
+
+    @Override
+    public String getDdlContent() {
+        return ddlContent;
+    }
+
+    @Override
+    public void setDdlContent(String ddlContent) {
+        this.ddlContent = ddlContent;
     }
 
     @Override

@@ -35,6 +35,8 @@ public class DropColumnEvent implements SchemaChangeEvent {
 
     private final List<String> droppedColumnNames;
 
+    private String ddlContent;
+
     public DropColumnEvent(TableId tableId, List<String> droppedColumnNames) {
         this.tableId = tableId;
         this.droppedColumnNames = droppedColumnNames;
@@ -42,6 +44,16 @@ public class DropColumnEvent implements SchemaChangeEvent {
 
     public List<String> getDroppedColumnNames() {
         return droppedColumnNames;
+    }
+
+    @Override
+    public String getDdlContent() {
+        return ddlContent;
+    }
+
+    @Override
+    public void setDdlContent(String ddlContent) {
+        this.ddlContent = ddlContent;
     }
 
     @Override
