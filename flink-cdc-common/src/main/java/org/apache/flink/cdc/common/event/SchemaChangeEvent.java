@@ -29,7 +29,10 @@ import java.io.Serializable;
 public interface SchemaChangeEvent extends ChangeEvent, Serializable {
 
     /** original ddl statement */
-    String getDdlContent();
+    default String getDdlContent() {
+        return null;
+    }
 
-    void setDdlContent(String ddlContent);
+    default void setDdlContent(String ddlContent) {
+    }
 }
