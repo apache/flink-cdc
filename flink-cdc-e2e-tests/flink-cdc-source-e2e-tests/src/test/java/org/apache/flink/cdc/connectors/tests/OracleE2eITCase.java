@@ -55,6 +55,8 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     private static final String INTER_CONTAINER_ORACLE_ALIAS = "oracle";
     private static final Path oracleCdcJar = TestUtils.getResource("oracle-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+    private static final Path oracleOjdbcJar = TestUtils.getResource("oracle-ojdbc.jar");
+    private static final Path oracleXdbJar = TestUtils.getResource("oracle-xdb.jar");
     public static final String ORACLE_IMAGE = "goodboy008/oracle-19.3.0-ee";
     private static OracleContainer oracle;
 
@@ -128,7 +130,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         "INSERT INTO products_sink",
                         "SELECT * FROM products_source;");
 
-        submitSQLJob(sqlLines, oracleCdcJar, jdbcJar, mysqlDriverJar);
+        submitSQLJob(sqlLines, oracleCdcJar, jdbcJar, mysqlDriverJar, oracleOjdbcJar, oracleXdbJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         // generate redo log

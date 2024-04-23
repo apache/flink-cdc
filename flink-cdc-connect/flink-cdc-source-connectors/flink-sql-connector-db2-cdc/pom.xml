@@ -63,6 +63,7 @@ limitations under the License.
                                 <excludes>
                                     <exclude>org.codehaus.janino:*</exclude>
                                     <exclude>org.apache.calcite:*</exclude>
+                                    <exclude>com.ibm.db2.jcc:*</exclude>
                                 </excludes>
                             </artifactSet>
                             <filters>
