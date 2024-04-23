@@ -55,6 +55,26 @@ put it under `<FLINK_HOME>/lib/`.
 [flink-sql-connector-db2-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-db2-cdc),
 more released versions will be available in the Maven central warehouse.
 
+由于 Db2 Connector 采用的 IPLA 协议与 Flink CDC 项目不兼容，我们无法在 jar 包中提供 Db2 连接器。
+您可能需要手动配置以下依赖：
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">依赖名称</th>
+        <th class="text-left">说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="https://mvnrepository.com/artifact/com.ibm.db2.jcc/db2jcc/db2jcc4">com.ibm.db2.jcc:db2jcc:db2jcc4</a></td>
+        <td>用于连接到 Db2 数据库。</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
 Setup Db2 server
 ----------------
 

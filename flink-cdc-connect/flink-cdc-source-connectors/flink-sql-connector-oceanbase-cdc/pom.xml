@@ -57,7 +57,6 @@ limitations under the License.
                                     <include>io.debezium:debezium-core</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
                                     <include>org.apache.flink:flink-connector-oceanbase-cdc</include>
-                                    <include>mysql:mysql-connector-java</include>
                                     <include>com.oceanbase:*</include>
                                     <include>io.netty:*</include>
                                     <include>com.google.protobuf:protobuf-java</include>
