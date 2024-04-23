@@ -21,18 +21,33 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.FileNotFoundException;
 import java.nio.file.Path;
 import java.util.List;
 
 /** Utilities for handling Flink configuration and environment. */
 public class FlinkEnvironmentUtils {
 
+    private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvironmentUtils.class);
     private static final String FLINK_CONF_DIR = "conf";
-    private static final String FLINK_CONF_FILENAME = "flink-conf.yaml";
+    private static final String LEGACY_FLINK_CONF_FILENAME = "flink-conf.yaml";
+    private static final String FLINK_CONF_FILENAME = "config.yaml";
 
     public static Configuration loadFlinkConfiguration(Path flinkHome) throws Exception {
         Path flinkConfPath = flinkHome.resolve(FLINK_CONF_DIR).resolve(FLINK_CONF_FILENAME);
-        return ConfigurationUtils.loadMapFormattedConfig(flinkConfPath);
+        try {
+            return ConfigurationUtils.loadConfigFile(flinkConfPath);
+        } catch (FileNotFoundException e) {
+            LOG.warn(
+                    "Failed to load the configuration file from {}. Trying to use legacy YAML parser to load flink configuration file from {}.",
+                    FLINK_CONF_FILENAME,
+                    LEGACY_FLINK_CONF_FILENAME);
+            return ConfigurationUtils.loadConfigFile(
+                    flinkHome.resolve(FLINK_CONF_DIR).resolve(LEGACY_FLINK_CONF_FILENAME));
+        }
     }
 
     public static FlinkPipelineComposer createComposer(

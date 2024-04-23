@@ -15,18 +15,37 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
-        <groupId>org.apache.flink</groupId>
         <artifactId>flink-cdc-pipeline-connectors</artifactId>
+        <groupId>org.apache.flink</groupId>
         <version>${revision}</version>
     </parent>
-    <artifactId>flink-cdc-pipeline-connector-doris</artifactId>
-    <name>flink-cdc-pipeline-connector-doris</name>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>flink-cdc-pipeline-connector-kafka</artifactId>
+
+    <properties>
+    </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-kafka</artifactId>
+            <version>3.0.2-${flink.major.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-json</artifactId>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Test dependencies -->
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-composer</artifactId>
@@ -35,16 +54,17 @@ limitations under the License.
         </dependency>
 
         <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-runtime</artifactId>
-            <version>${flink.version}</version>
-            <scope>provided</scope>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>kafka</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
         </dependency>
 
         <dependency>
-            <groupId>org.apache.doris</groupId>
-            <artifactId>flink-doris-connector-${flink.major.version}</artifactId>
-            <version>1.6.0</version>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-test-utils</artifactId>
+            <version>${flink.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -53,6 +73,7 @@ limitations under the License.
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
+                <version>3.1.1</version>
                 <executions>
                     <execution>
                         <id>shade-flink</id>
@@ -62,15 +83,17 @@ limitations under the License.
                         </goals>
                         <configuration>
                             <shadeTestJar>false</shadeTestJar>
-                            <artifactSet>
-                                <includes>
-                                    <include>org.apache.doris:*</include>
-                                </includes>
-                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache.kafka</pattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.kafka.shaded.org.apache.kafka</shadedPattern>
+                                </relocation>
+                            </relocations>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
         </plugins>
     </build>
+
 </project>

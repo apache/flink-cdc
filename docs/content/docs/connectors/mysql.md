@@ -110,6 +110,14 @@ pipeline:
           eg. db0.\.*, db1.user_table_[0-9]+, db[1-2].[app|web]order_\.*</td>
     </tr>
     <tr>
+      <td>tables.exclude</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Table name of the MySQL database to exclude, parameter will have an exclusion effect after the tables parameter. The table-name also supports regular expressions to exclude multiple tables that satisfy the regular expressions. <br>
+          The usage is the same as the tables parameter</td>
+    </tr>
+    <tr>
       <td>schema-change.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>

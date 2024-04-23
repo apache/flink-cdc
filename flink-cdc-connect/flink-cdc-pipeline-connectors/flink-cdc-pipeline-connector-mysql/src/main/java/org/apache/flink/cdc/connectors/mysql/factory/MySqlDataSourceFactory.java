@@ -42,9 +42,11 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
@@ -70,6 +72,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_ID;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
@@ -93,6 +96,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
         String tables = config.get(TABLES);
+        String tablesExclude = config.get(TABLES_EXCLUDE);
 
         String serverId = validateAndGetServerId(config);
         ZoneId serverTimeZone = getServerTimeZone(config);
@@ -151,12 +155,25 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .jdbcProperties(getJdbcProperties(configMap));
 
         Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
-        String[] capturedTables = getTableList(configFactory.createConfig(0), selectors);
-        if (capturedTables.length == 0) {
+        List<String> capturedTables = getTableList(configFactory.createConfig(0), selectors);
+        if (capturedTables.isEmpty()) {
             throw new IllegalArgumentException(
                     "Cannot find any table by the option 'tables' = " + tables);
         }
-        configFactory.tableList(capturedTables);
+        if (tablesExclude != null) {
+            Selectors selectExclude =
+                    new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
+            List<String> excludeTables = getTableList(configFactory.createConfig(0), selectExclude);
+            if (!excludeTables.isEmpty()) {
+                capturedTables.removeAll(excludeTables);
+            }
+            if (capturedTables.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Cannot find any table with by the option 'tables.exclude'  = "
+                                + tablesExclude);
+            }
+        }
+        configFactory.tableList(capturedTables.toArray(new String[0]));
 
         return new MySqlDataSource(configFactory);
     }
@@ -211,11 +228,11 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     private static final String SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET = "specific-offset";
     private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMP = "timestamp";
 
-    private static String[] getTableList(MySqlSourceConfig sourceConfig, Selectors selectors) {
+    private static List<String> getTableList(MySqlSourceConfig sourceConfig, Selectors selectors) {
         return MySqlSchemaUtils.listTables(sourceConfig, null).stream()
                 .filter(selectors::isMatch)
                 .map(TableId::toString)
-                .toArray(String[]::new);
+                .collect(Collectors.toList());
     }
 
     private static StartupOptions getStartupOptions(Configuration config) {
