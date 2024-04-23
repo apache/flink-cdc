@@ -156,6 +156,7 @@ public class DorisSinkTestBase extends TestLogger {
             if (rs.getExitCode() != 0) {
                 return false;
             }
+            LOG.info("Doris backend status:\n{}", rs.getStdout());
             return rs.getStdout()
                     .contains("*************************** 1. row ***************************");
         } catch (Exception e) {
