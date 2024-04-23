@@ -39,6 +39,8 @@ public final class AddColumnEvent implements SchemaChangeEvent {
 
     private final List<ColumnWithPosition> addedColumns;
 
+    private String ddlContent;
+
     public AddColumnEvent(TableId tableId, List<ColumnWithPosition> addedColumns) {
         this.tableId = tableId;
         this.addedColumns = addedColumns;
@@ -47,6 +49,16 @@ public final class AddColumnEvent implements SchemaChangeEvent {
     /** Returns the added columns. */
     public List<ColumnWithPosition> getAddedColumns() {
         return addedColumns;
+    }
+
+    @Override
+    public String getDdlContent() {
+        return this.ddlContent;
+    }
+
+    @Override
+    public void setDdlContent(String ddlContent) {
+        this.ddlContent = ddlContent;
     }
 
     /** relative Position of column. */

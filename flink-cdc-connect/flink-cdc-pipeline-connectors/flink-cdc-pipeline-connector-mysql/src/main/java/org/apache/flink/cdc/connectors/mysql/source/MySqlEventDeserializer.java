@@ -86,7 +86,9 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
                         historyRecord.document().getString(HistoryRecord.Fields.DDL_STATEMENTS);
                 customParser.setCurrentDatabase(databaseName);
                 customParser.parse(ddl, tables);
-                return customParser.getAndClearParsedEvents();
+                List<SchemaChangeEvent> changeEvents = customParser.getAndClearParsedEvents();
+                changeEvents.forEach(event -> event.setDdlContent(ddl));
+                return changeEvents;
             } catch (IOException e) {
                 throw new IllegalStateException("Failed to parse the schema change : " + record, e);
             }

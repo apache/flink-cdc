@@ -35,6 +35,8 @@ public class AlterColumnTypeEvent implements SchemaChangeEvent {
     /** key => column name, value => column type after changing. */
     private final Map<String, DataType> typeMapping;
 
+    private String ddlContent;
+
     public AlterColumnTypeEvent(TableId tableId, Map<String, DataType> typeMapping) {
         this.tableId = tableId;
         this.typeMapping = typeMapping;
@@ -43,6 +45,16 @@ public class AlterColumnTypeEvent implements SchemaChangeEvent {
     /** Returns the type mapping. */
     public Map<String, DataType> getTypeMapping() {
         return typeMapping;
+    }
+
+    @Override
+    public String getDdlContent() {
+        return ddlContent;
+    }
+
+    @Override
+    public void setDdlContent(String ddlContent) {
+        this.ddlContent = ddlContent;
     }
 
     @Override

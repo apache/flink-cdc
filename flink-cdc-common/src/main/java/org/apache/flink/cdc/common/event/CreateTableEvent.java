@@ -36,6 +36,8 @@ public class CreateTableEvent implements SchemaChangeEvent {
 
     private final Schema schema;
 
+    private String ddlContent;
+
     public CreateTableEvent(TableId tableId, Schema schema) {
         this.tableId = tableId;
         this.schema = schema;
@@ -44,6 +46,16 @@ public class CreateTableEvent implements SchemaChangeEvent {
     /** Returns the table schema. */
     public Schema getSchema() {
         return schema;
+    }
+
+    @Override
+    public String getDdlContent() {
+        return ddlContent;
+    }
+
+    @Override
+    public void setDdlContent(String ddlContent) {
+        this.ddlContent = ddlContent;
     }
 
     @Override

@@ -26,4 +26,13 @@ import java.io.Serializable;
  * system, such as CREATE, DROP, RENAME and so on.
  */
 @PublicEvolving
-public interface SchemaChangeEvent extends ChangeEvent, Serializable {}
+public interface SchemaChangeEvent extends ChangeEvent, Serializable {
+
+    /** original ddl statement */
+    default String getDdlContent() {
+        return null;
+    }
+
+    default void setDdlContent(String ddlContent) {
+    }
+}
