@@ -57,9 +57,7 @@ OceanBase CDC 连接器允许从 OceanBase 读取快照数据和增量数据。�
 
 ```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
-下载[flink-sql-connector-oceanbase-cdc-3.0-SNAPSHOT.jar](https://repo1.maven.org/maven2/com/ververica/flink-connector-oceanbase-cdc/3.0.0/flink-connector-oceanbase-cdc-3.0.0.jar)  到 `<FLINK_HOME>/lib/` 目录下。
-
-**注意:** flink-sql-connector-oceanbase-cdc-XXX-SNAPSHOT 版本是开发分支`release-XXX`对应的快照版本，快照版本用户需要下载源代码并编译相应的 jar。用户应使用已经发布的版本，例如 [flink-sql-connector-oceanbase-cdc-3.0.0.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oceanbase-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+下载[flink-sql-connector-oceanbase-cdc-3.0.1.jar](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oceanbase-cdc) 到 `<FLINK_HOME>/lib/` 目录下。
 
 对于 JDBC 驱动，上述的 cdc jar 文件中已经包含了我们推荐的 MySQL 驱动版本 5.1.47。由于开源许可证的原因，我们不能在上述 cdc jar 文件中包含 OceanBase 的官方 JDBC 驱动，如果您需要使用它，可以从[这里](https://repo1.maven.org/maven2/com/oceanbase/oceanbase-client/2.4.2/oceanbase-client-2.4.2.jar)下载，然后放到 `<FLINK_HOME>/lib/` 目录下，同时需要将配置项 `jdbc.driver` 设为 `com.oceanbase.jdbc.Driver`。
 
