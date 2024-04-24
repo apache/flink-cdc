@@ -15,28 +15,31 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.tests.utils;
+package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
-import java.util.function.Function;
+import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.schema.Schema;
 
-/** System-property based parameters for tests and resources. */
-public class ParameterProperty<V> {
+import java.time.ZoneId;
+import java.util.List;
 
-    private final String propertyName;
-    private final Function<String, V> converter;
+/** Keep a list of {@link RecordData.FieldGetter} for a specific {@link Schema}. */
+public class TableSchemaInfo {
 
-    public ParameterProperty(final String propertyName, final Function<String, V> converter) {
-        this.propertyName = propertyName;
-        this.converter = converter;
+    private final Schema schema;
+
+    private final List<RecordData.FieldGetter> fieldGetters;
+
+    public TableSchemaInfo(Schema schema, ZoneId zoneId) {
+        this.schema = schema;
+        this.fieldGetters = PaimonWriterHelper.createFieldGetters(schema, zoneId);
     }
 
-    /**
-     * Retrieves the value of this property, or the given default if no value was set.
-     *
-     * @return the value of this property, or the given default if no value was set
-     */
-    public V get(final V defaultValue) {
-        final String value = System.getProperty(propertyName);
-        return value == null ? defaultValue : converter.apply(value);
+    public Schema getSchema() {
+        return schema;
+    }
+
+    public List<RecordData.FieldGetter> getFieldGetters() {
+        return fieldGetters;
     }
 }

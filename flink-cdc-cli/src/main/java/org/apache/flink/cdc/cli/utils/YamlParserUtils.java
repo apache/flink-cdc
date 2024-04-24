@@ -82,7 +82,22 @@ public class YamlParserUtils {
             new Dump(flowDumperSettings, new FlinkConfigRepresenter(flowDumperSettings));
 
     private static final Load loader =
-            new Load(LoadSettings.builder().setSchema(new CoreSchema()).build());
+            new Load(
+                    LoadSettings.builder()
+                            .setSchema(new CoreSchema())
+                            .setAllowDuplicateKeys(false)
+                            .build());
+
+    private static final Load legacyLoader =
+            new Load(
+                    LoadSettings.builder()
+                            .setSchema(new CoreSchema())
+                            .setAllowDuplicateKeys(true)
+                            .build());
+
+    private static Load getYamlLoader(boolean allowDuplicateKeys) {
+        return allowDuplicateKeys ? legacyLoader : loader;
+    }
 
     /**
      * Loads the contents of the given YAML file into a map.
@@ -94,12 +109,29 @@ public class YamlParserUtils {
      * @throws YamlEngineException if the file cannot be parsed.
      * @throws IOException if an I/O error occurs while reading from the file stream.
      */
-    @SuppressWarnings("unchecked")
     public static synchronized @Nonnull Map<String, Object> loadYamlFile(File file)
             throws Exception {
+        return loadYamlFile(file, false);
+    }
+
+    /**
+     * Loads the contents of the given YAML file into a map.
+     *
+     * @param file the YAML file to load.
+     * @param allowDuplicateKeys whether to allow duplicated keys.
+     * @return a non-null map representing the YAML content. If the file is empty or only contains
+     *     comments, an empty map is returned.
+     * @throws FileNotFoundException if the YAML file is not found.
+     * @throws YamlEngineException if the file cannot be parsed.
+     * @throws IOException if an I/O error occurs while reading from the file stream.
+     */
+    @SuppressWarnings("unchecked")
+    public static synchronized @Nonnull Map<String, Object> loadYamlFile(
+            File file, boolean allowDuplicateKeys) throws Exception {
         try (FileInputStream inputStream = new FileInputStream((file))) {
             Map<String, Object> yamlResult =
-                    (Map<String, Object>) loader.loadFromInputStream(inputStream);
+                    (Map<String, Object>)
+                            getYamlLoader(allowDuplicateKeys).loadFromInputStream(inputStream);
             return yamlResult == null ? new HashMap<>() : yamlResult;
         } catch (FileNotFoundException e) {
             LOG.error("Failed to find YAML file", e);
