@@ -95,46 +95,92 @@ public class DataTypeUtils {
         int scale = DataTypes.getScale(type).orElse(0);
         switch (type.getTypeRoot()) {
             case CHAR:
-                return org.apache.flink.table.api.DataTypes.CHAR(length);
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.CHAR(length)
+                        : org.apache.flink.table.api.DataTypes.CHAR(length).notNull();
             case VARCHAR:
-                return org.apache.flink.table.api.DataTypes.VARCHAR(length);
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.VARCHAR(length)
+                        : org.apache.flink.table.api.DataTypes.VARCHAR(length).notNull();
             case BOOLEAN:
-                return org.apache.flink.table.api.DataTypes.BOOLEAN();
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.BOOLEAN()
+                        : org.apache.flink.table.api.DataTypes.BOOLEAN().notNull();
             case BINARY:
-                return org.apache.flink.table.api.DataTypes.BINARY(length);
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.BINARY(length)
+                        : org.apache.flink.table.api.DataTypes.BINARY(length).notNull();
             case VARBINARY:
-                return org.apache.flink.table.api.DataTypes.VARBINARY(length);
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.VARBINARY(length)
+                        : org.apache.flink.table.api.DataTypes.VARBINARY(length).notNull();
             case DECIMAL:
-                return org.apache.flink.table.api.DataTypes.DECIMAL(precision, scale);
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.DECIMAL(precision, scale)
+                        : org.apache.flink.table.api.DataTypes.DECIMAL(precision, scale).notNull();
             case TINYINT:
-                return org.apache.flink.table.api.DataTypes.TINYINT();
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.TINYINT()
+                        : org.apache.flink.table.api.DataTypes.TINYINT().notNull();
             case SMALLINT:
-                return org.apache.flink.table.api.DataTypes.SMALLINT();
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.SMALLINT()
+                        : org.apache.flink.table.api.DataTypes.SMALLINT().notNull();
             case INTEGER:
-                return org.apache.flink.table.api.DataTypes.INT();
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.INT()
+                        : org.apache.flink.table.api.DataTypes.INT().notNull();
             case DATE:
-                return org.apache.flink.table.api.DataTypes.DATE();
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.DATE()
+                        : org.apache.flink.table.api.DataTypes.DATE().notNull();
             case TIME_WITHOUT_TIME_ZONE:
-                return org.apache.flink.table.api.DataTypes.TIME(precision);
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.TIME(precision)
+                        : org.apache.flink.table.api.DataTypes.TIME(precision).notNull();
             case BIGINT:
-                return org.apache.flink.table.api.DataTypes.BIGINT();
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.BIGINT()
+                        : org.apache.flink.table.api.DataTypes.BIGINT().notNull();
             case FLOAT:
-                return org.apache.flink.table.api.DataTypes.FLOAT();
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.FLOAT()
+                        : org.apache.flink.table.api.DataTypes.FLOAT().notNull();
             case DOUBLE:
-                return org.apache.flink.table.api.DataTypes.DOUBLE();
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.DOUBLE()
+                        : org.apache.flink.table.api.DataTypes.DOUBLE().notNull();
             case TIMESTAMP_WITHOUT_TIME_ZONE:
-            case TIMESTAMP_WITH_TIME_ZONE:
-                return org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_TIME_ZONE(precision);
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.TIMESTAMP(precision)
+                        : org.apache.flink.table.api.DataTypes.TIMESTAMP(precision).notNull();
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(
-                        precision);
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(
+                                precision)
+                        : org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(
+                                        precision)
+                                .notNull();
+            case TIMESTAMP_WITH_TIME_ZONE:
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_TIME_ZONE(precision)
+                        : org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_TIME_ZONE(precision)
+                                .notNull();
             case ARRAY:
                 Preconditions.checkState(children != null && !children.isEmpty());
-                return org.apache.flink.table.api.DataTypes.ARRAY(toFlinkDataType(children.get(0)));
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.ARRAY(
+                                toFlinkDataType(children.get(0)))
+                        : org.apache.flink.table.api.DataTypes.ARRAY(
+                                toFlinkDataType(children.get(0)).notNull());
             case MAP:
                 Preconditions.checkState(children != null && children.size() > 1);
-                return org.apache.flink.table.api.DataTypes.MAP(
-                        toFlinkDataType(children.get(0)), toFlinkDataType(children.get(1)));
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.MAP(
+                                toFlinkDataType(children.get(0)), toFlinkDataType(children.get(1)))
+                        : org.apache.flink.table.api.DataTypes.MAP(
+                                toFlinkDataType(children.get(0)),
+                                toFlinkDataType(children.get(1)).notNull());
             case ROW:
                 Preconditions.checkState(!CollectionUtil.isNullOrEmpty(children));
                 RowType rowType = (RowType) type;
@@ -142,7 +188,9 @@ public class DataTypeUtils {
                         rowType.getFields().stream()
                                 .map(DataField::toFlinkDataTypeField)
                                 .collect(Collectors.toList());
-                return org.apache.flink.table.api.DataTypes.ROW(fields);
+                return type.isNullable()
+                        ? org.apache.flink.table.api.DataTypes.ROW(fields)
+                        : org.apache.flink.table.api.DataTypes.ROW(fields).notNull();
             default:
                 throw new IllegalArgumentException("Illegal type: " + type);
         }
