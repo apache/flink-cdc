@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.cli.parser;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.Test;
 
 import java.net.URL;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -87,6 +89,27 @@ class YamlPipelineDefinitionParserTest {
         PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
         assertThat(pipelineDef.getConfig().get(PIPELINE_LOCAL_TIME_ZONE))
                 .isNotEqualTo(PIPELINE_LOCAL_TIME_ZONE.defaultValue());
+    }
+
+    @Test
+    void testEvaluateDefaultRpcTimeOut() throws Exception {
+        URL resource = Resources.getResource("definitions/pipeline-definition-minimized.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef =
+                parser.parse(
+                        Paths.get(resource.toURI()),
+                        Configuration.fromMap(
+                                ImmutableMap.<String, String>builder()
+                                        .put(
+                                                PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT
+                                                        .key(),
+                                                "1h")
+                                        .build()));
+        assertThat(
+                        pipelineDef
+                                .getConfig()
+                                .get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT))
+                .isEqualTo(Duration.ofSeconds(60 * 60));
     }
 
     @Test
@@ -202,6 +225,7 @@ class YamlPipelineDefinitionParserTest {
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
                                     .put("enable-schema-evolution", "false")
+                                    .put("schema-operator.rpc-timeout", "1 h")
                                     .build()));
 
     private final PipelineDef fullDefWithGlobalConf =
@@ -262,6 +286,7 @@ class YamlPipelineDefinitionParserTest {
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
                                     .put("enable-schema-evolution", "false")
+                                    .put("schema-operator.rpc-timeout", "1 h")
                                     .put("foo", "bar")
                                     .build()));
 

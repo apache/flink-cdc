@@ -29,6 +29,7 @@ import org.apache.flink.streaming.api.operators.CoordinatedOperatorFactory;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
 
+import java.time.Duration;
 import java.util.List;
 
 /** Factory to create {@link SchemaOperator}. */
@@ -42,8 +43,10 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
     private final List<Tuple2<String, TableId>> routingRules;
 
     public SchemaOperatorFactory(
-            MetadataApplier metadataApplier, List<Tuple2<String, TableId>> routingRules) {
-        super(new SchemaOperator(routingRules));
+            MetadataApplier metadataApplier,
+            List<Tuple2<String, TableId>> routingRules,
+            Duration rpcTimeOut) {
+        super(new SchemaOperator(routingRules, rpcTimeOut));
         this.metadataApplier = metadataApplier;
         this.routingRules = routingRules;
     }

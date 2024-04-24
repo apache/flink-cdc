@@ -25,8 +25,10 @@ import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResultRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandler;
@@ -122,6 +124,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     @Override
     public void close() throws Exception {
         LOG.info("SchemaRegistry for {} closed.", operatorName);
+        requestHandler.close();
     }
 
     @Override
@@ -175,6 +178,10 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
         } else if (request instanceof GetSchemaRequest) {
             return CompletableFuture.completedFuture(
                     wrap(handleGetSchemaRequest(((GetSchemaRequest) request))));
+        } else if (request instanceof SchemaChangeResultRequest) {
+            return requestHandler.getSchemaChangeResult();
+        } else if (request instanceof RefreshPendingListsRequest) {
+            return requestHandler.refreshPendingLists();
         } else {
             throw new IllegalArgumentException("Unrecognized CoordinationRequest type: " + request);
         }

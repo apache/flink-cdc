@@ -23,11 +23,15 @@ import org.apache.flink.cdc.common.configuration.ConfigOptions;
 import org.apache.flink.cdc.common.configuration.description.Description;
 import org.apache.flink.cdc.common.configuration.description.ListElement;
 
+import java.time.Duration;
+
 import static org.apache.flink.cdc.common.configuration.description.TextElement.text;
 
 /** Predefined pipeline configuration options. */
 @PublicEvolving
 public class PipelineOptions {
+
+    public static final Duration DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT = Duration.ofMinutes(3);
 
     public static final ConfigOption<String> PIPELINE_NAME =
             ConfigOptions.key("name")
@@ -84,6 +88,13 @@ public class PipelineOptions {
                     .defaultValue("$$_schema_operator_$$")
                     .withDescription(
                             "The unique ID for schema operator. This ID will be used for inter-operator communications and must be unique across operators.");
+
+    public static final ConfigOption<Duration> PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT =
+            ConfigOptions.key("schema-operator.rpc-timeout")
+                    .durationType()
+                    .defaultValue(DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT)
+                    .withDescription(
+                            "The timeout time for SchemaOperator to wait downstream SchemaChangeEvent applying finished, the default value is 3 minutes.");
 
     private PipelineOptions() {}
 }
