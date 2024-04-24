@@ -53,6 +53,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.JDBC_URL;
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.LOAD_URL;
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.PASSWORD;
@@ -284,7 +285,10 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
         DataSink starRocksSink = createStarRocksDataSink(config);
 
         SchemaOperatorTranslator schemaOperatorTranslator =
-                new SchemaOperatorTranslator(SchemaChangeBehavior.EVOLVE, "$$_schema_operator_$$");
+                new SchemaOperatorTranslator(
+                        SchemaChangeBehavior.EVOLVE,
+                        "$$_schema_operator_$$",
+                        DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT);
 
         OperatorIDGenerator schemaOperatorIDGenerator =
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
