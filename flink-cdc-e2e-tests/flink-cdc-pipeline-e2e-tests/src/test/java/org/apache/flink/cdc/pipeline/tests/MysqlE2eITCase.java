@@ -110,7 +110,8 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                         mysqlInventoryDatabase.getDatabaseName());
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar);
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         waitUtilSpecificEvent(

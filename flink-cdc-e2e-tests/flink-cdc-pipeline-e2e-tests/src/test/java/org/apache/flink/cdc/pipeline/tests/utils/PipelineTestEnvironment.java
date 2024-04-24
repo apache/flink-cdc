@@ -174,8 +174,13 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         Files.write(script, pipelineJob.getBytes());
         jobManager.copyFileToContainer(
                 MountableFile.forHostPath(script), "/tmp/flinkCDC/conf/pipeline.yaml");
+        StringBuilder sb = new StringBuilder();
+        for (Path jar : jars) {
+            sb.append(" --jar /tmp/flinkCDC/lib/").append(jar.getFileName());
+        }
         String commands =
-                "/tmp/flinkCDC/bin/flink-cdc.sh /tmp/flinkCDC/conf/pipeline.yaml --flink-home /opt/flink";
+                "/tmp/flinkCDC/bin/flink-cdc.sh /tmp/flinkCDC/conf/pipeline.yaml --flink-home /opt/flink"
+                        + sb;
         ExecResult execResult = jobManager.execInContainer("bash", "-c", commands);
         LOG.info(execResult.getStdout());
         LOG.error(execResult.getStderr());
