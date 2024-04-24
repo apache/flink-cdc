@@ -30,7 +30,13 @@ public class ConfigurationUtils {
     private static final String KEY_SEPARATOR = ".";
 
     public static Configuration loadConfigFile(Path configPath) throws Exception {
-        Map<String, Object> configMap = YamlParserUtils.loadYamlFile(configPath.toFile());
+        return loadConfigFile(configPath, false);
+    }
+
+    public static Configuration loadConfigFile(Path configPath, boolean allowDuplicateKeys)
+            throws Exception {
+        Map<String, Object> configMap =
+                YamlParserUtils.loadYamlFile(configPath.toFile(), allowDuplicateKeys);
         return Configuration.fromMap(flattenConfigMap(configMap, ""));
     }
 

@@ -46,7 +46,7 @@ public class FlinkEnvironmentUtils {
                     FLINK_CONF_FILENAME,
                     LEGACY_FLINK_CONF_FILENAME);
             return ConfigurationUtils.loadConfigFile(
-                    flinkHome.resolve(FLINK_CONF_DIR).resolve(LEGACY_FLINK_CONF_FILENAME));
+                    flinkHome.resolve(FLINK_CONF_DIR).resolve(LEGACY_FLINK_CONF_FILENAME), true);
         }
     }
 

@@ -33,6 +33,9 @@ env.java.opts.all: --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-export
 # automatically configure the host name based on the hostname of the node where the
 # JobManager runs.
 
+# Legacy flink-conf.yaml allows duplicate keys in yaml.
+# This key is meant to check if the yaml parser is able to handle duplicate keys.
+jobmanager.rpc.address: shaded
 jobmanager.rpc.address: localhost
 
 # The RPC port where the JobManager is reachable.
