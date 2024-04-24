@@ -52,6 +52,7 @@ public interface FetchTask<Split> {
 
     /** Base context used in the execution of fetch task. */
     interface Context {
+
         void configure(SourceSplitBase sourceSplitBase);
 
         ChangeEventQueue<DataChangeEvent> getQueue();

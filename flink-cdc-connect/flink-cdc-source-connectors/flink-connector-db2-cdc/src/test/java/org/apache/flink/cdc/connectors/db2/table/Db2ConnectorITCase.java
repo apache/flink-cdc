@@ -55,6 +55,7 @@ import static org.testcontainers.containers.Db2Container.DB2_PORT;
 /** Integration tests for DB2 CDC source. */
 @RunWith(Parameterized.class)
 public class Db2ConnectorITCase extends Db2TestBase {
+
     private static final Logger LOG = LoggerFactory.getLogger(Db2ConnectorITCase.class);
 
     protected static final int DEFAULT_PARALLELISM = 2;

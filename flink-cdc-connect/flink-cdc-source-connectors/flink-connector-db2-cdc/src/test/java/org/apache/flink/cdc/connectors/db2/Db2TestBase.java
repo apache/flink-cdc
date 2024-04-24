@@ -17,9 +17,10 @@
 
 package org.apache.flink.cdc.connectors.db2;
 
+import org.apache.flink.util.FlinkRuntimeException;
+
 import org.apache.commons.lang3.StringUtils;
 import org.awaitility.Awaitility;
-import org.awaitility.core.ConditionTimeoutException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
@@ -44,6 +45,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -137,7 +139,7 @@ public class Db2TestBase {
 
         try {
             Awaitility.await(String.format("cdc remove table %s", tableName))
-                    .atMost(60, TimeUnit.SECONDS)
+                    .atMost(30, TimeUnit.SECONDS)
                     .until(
                             () -> {
                                 try {
@@ -161,13 +163,13 @@ public class Db2TestBase {
                                     return false;
                                 }
                             });
-        } catch (ConditionTimeoutException e) {
-            throw new IllegalStateException("Failed to cdc remove test table", e);
+        } catch (Exception e) {
+            throw new FlinkRuntimeException("Failed to remove cdc table " + tableName, e);
         }
 
         try {
             Awaitility.await(String.format("Dropping table %s", tableName))
-                    .atMost(60, TimeUnit.SECONDS)
+                    .atMost(30, TimeUnit.SECONDS)
                     .until(
                             () -> {
                                 try {
@@ -184,9 +186,46 @@ public class Db2TestBase {
                                     return false;
                                 }
                             });
-        } catch (ConditionTimeoutException e) {
-            throw new IllegalStateException("Failed to drop test database", e);
+        } catch (Exception e) {
+            throw new FlinkRuntimeException("Failed to drop table", e);
         }
+    }
+
+    private static boolean checkTableExists(Connection connection, String tableName) {
+        AtomicBoolean tableExists = new AtomicBoolean(false);
+        try {
+            Awaitility.await(String.format("check table %s exists or not", tableName))
+                    .atMost(30, TimeUnit.SECONDS)
+                    .until(
+                            () -> {
+                                try {
+                                    String tableExistSql =
+                                            String.format(
+                                                    "SELECT COUNT(*) FROM SYSCAT.TABLES WHERE TABNAME = '%s' AND "
+                                                            + "TABSCHEMA = 'DB2INST1';",
+                                                    tableName);
+                                    ResultSet resultSet =
+                                            connection
+                                                    .createStatement()
+                                                    .executeQuery(tableExistSql);
+                                    if (resultSet.next()) {
+                                        if (resultSet.getInt(1) == 1) {
+                                            tableExists.set(true);
+                                        }
+                                    }
+                                    return true;
+                                } catch (SQLException e) {
+                                    LOG.warn(
+                                            String.format(
+                                                    "check table %s exists failed", tableName),
+                                            e.getMessage());
+                                    return false;
+                                }
+                            });
+        } catch (Exception e) {
+            throw new FlinkRuntimeException("Failed to check table " + tableName + " exists", e);
+        }
+        return tableExists.get();
     }
 
     /**
@@ -199,19 +238,11 @@ public class Db2TestBase {
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-            String tableExistSql =
-                    String.format(
-                            "SELECT COUNT(*) FROM SYSCAT.TABLES WHERE TABNAME = '%s' AND "
-                                    + "TABSCHEMA = 'DB2INST1';",
-                            tableName);
-            ResultSet resultSet = statement.executeQuery(tableExistSql);
-            int count = 0;
-            if (resultSet.next()) {
-                count = resultSet.getInt(1);
-            }
-            if (count == 1) {
+            if (checkTableExists(connection, tableName)) {
                 LOG.info("{} table exist", tableName);
                 dropTestTable(connection, tableName.toUpperCase(Locale.ROOT));
+                // sleep 10 seconds to make sure ASN replication agent has been notified
+                Thread.sleep(10_000);
             }
             final List<String> statements =
                     Arrays.stream(
