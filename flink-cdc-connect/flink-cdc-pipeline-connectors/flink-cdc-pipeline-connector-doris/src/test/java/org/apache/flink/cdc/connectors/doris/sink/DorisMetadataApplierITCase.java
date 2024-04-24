@@ -56,6 +56,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.BENODES;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.FENODES;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.PASSWORD;
@@ -313,7 +314,10 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
         DataSink dorisSink = createDorisDataSink(config);
 
         SchemaOperatorTranslator schemaOperatorTranslator =
-                new SchemaOperatorTranslator(SchemaChangeBehavior.EVOLVE, "$$_schema_operator_$$");
+                new SchemaOperatorTranslator(
+                        SchemaChangeBehavior.EVOLVE,
+                        "$$_schema_operator_$$",
+                        DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT);
 
         OperatorIDGenerator schemaOperatorIDGenerator =
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
