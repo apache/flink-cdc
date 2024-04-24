@@ -32,7 +32,7 @@ This document describes how to setup the MySQL connector.
 ## Dependencies
 
 Since MySQL Connector's GPLv2 license is incompatible with Flink CDC project, we can't provide MySQL connector in prebuilt connector jar packages.
-You may need to configure the following dependencies manually.
+You may need to configure the following dependencies manually, and pass it with `--jar` argument of Flink CDC CLI when submitting YAML pipeline jobs.
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">

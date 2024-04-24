@@ -31,7 +31,7 @@ MySQL CDC Pipeline 连接器允许从 MySQL 数据库读取快照数据和增量
 ## 依赖配置
 
 由于 MySQL Connector 采用的 GPLv2 协议与 Flink CDC 项目不兼容，我们无法在 jar 包中提供 MySQL 连接器。
-您可能需要手动配置以下依赖：
+您可能需要手动配置以下依赖，并在提交 YAML 作业时使用 Flink CDC CLI 的 `--jar` 参数将其传入：
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">

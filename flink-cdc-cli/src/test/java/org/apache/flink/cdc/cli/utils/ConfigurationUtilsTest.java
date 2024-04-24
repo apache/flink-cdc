@@ -75,7 +75,8 @@ class ConfigurationUtilsTest {
     void loadConfigFile(String resourcePath) throws Exception {
         URL resource = Resources.getResource(resourcePath);
         Path path = Paths.get(resource.toURI());
-        Configuration configuration = ConfigurationUtils.loadConfigFile(path);
+        Configuration configuration =
+                ConfigurationUtils.loadConfigFile(path, resourcePath.endsWith("flink-conf.yaml"));
         Map<String, String> configMap = configuration.toMap();
         for (Map.Entry<ConfigOption<?>, Object> entry : CONFIG_OPTIONS.entrySet()) {
             String key = entry.getKey().key();
