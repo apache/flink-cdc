@@ -118,7 +118,10 @@ public class Db2SourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
         this.taskContext = new Db2TaskContext(connectorConfig, databaseSchema);
 
-        final int queueSize = getSourceConfig().getDbzConnectorConfig().getMaxQueueSize();
+        final int queueSize =
+                sourceSplitBase.isSnapshotSplit()
+                        ? getSourceConfig().getSplitSize()
+                        : getSourceConfig().getDbzConnectorConfig().getMaxQueueSize();
         this.queue =
                 new Builder<DataChangeEvent>()
                         .pollInterval(connectorConfig.getPollInterval())
