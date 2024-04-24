@@ -28,6 +28,9 @@ import com.oceanbase.clogproxy.client.config.ObReaderConfig;
 import org.apache.commons.lang3.StringUtils;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -217,7 +220,7 @@ public class OceanBaseSource {
             }
 
             if (serverTimeZone == null) {
-                serverTimeZone = "+00:00";
+                serverTimeZone = ZoneId.systemDefault().getId();
             }
 
             switch (startupOptions.startupMode) {
@@ -270,7 +273,12 @@ public class OceanBaseSource {
                 obReaderConfig.setUsername(username);
                 obReaderConfig.setPassword(password);
                 obReaderConfig.setStartTimestamp(startupTimestamp);
-                obReaderConfig.setTimezone(serverTimeZone);
+                obReaderConfig.setTimezone(
+                        DateTimeFormatter.ofPattern("xxx")
+                                .format(
+                                        ZoneId.of(serverTimeZone)
+                                                .getRules()
+                                                .getOffset(Instant.now())));
 
                 if (obcdcProperties != null && !obcdcProperties.isEmpty()) {
                     Map<String, String> extraConfigs = new HashMap<>();
