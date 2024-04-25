@@ -103,26 +103,25 @@ public class MysqlDebeziumTimeConverterITCase {
 
     @Test
     public void testReadDateConvertDataStreamInAsia() throws Exception {
-        testReadDateConvertDataStreamSource("Asia/Shanghai", true);
+        testReadDateConvertDataStreamSource("Asia/Shanghai");
     }
 
     @Test
     public void testReadDateConvertDataStreamInBerlin() throws Exception {
-        testReadDateConvertDataStreamSource("Europe/Berlin", false);
+        testReadDateConvertDataStreamSource("Europe/Berlin");
     }
 
     @Test
     public void testReadDateConvertSQLSourceInAsia() throws Exception {
-        testTemporalTypesWithMySqlServerTimezone("Asia/Shanghai", true);
+        testTemporalTypesWithMySqlServerTimezone("Asia/Shanghai");
     }
 
     @Test
     public void testReadDateConvertSQLSourceInBerlin() throws Exception {
-        testTemporalTypesWithMySqlServerTimezone("Europe/Berlin", false);
+        testTemporalTypesWithMySqlServerTimezone("Europe/Berlin");
     }
 
-    private void testReadDateConvertDataStreamSource(
-            String timezone, boolean connectionTimeZoneEnable) throws Exception {
+    private void testReadDateConvertDataStreamSource(String timezone) throws Exception {
         MySqlContainer mySqlContainer = createMySqlContainer(timezone);
         startContainers(mySqlContainer, timezone);
         UniqueDatabase db = getUniqueDatabase(mySqlContainer);
@@ -139,9 +138,7 @@ public class MysqlDebeziumTimeConverterITCase {
                         .serverTimeZone(timezone)
                         .username(db.getUsername())
                         .password(db.getPassword())
-                        .debeziumProperties(
-                                getDebeziumConfigurations(
-                                        connectionTimeZoneEnable ? timezone : defaultZone));
+                        .debeziumProperties(getDebeziumConfigurations(timezone));
         builder.deserializer(new JsonDebeziumDeserializationSchema());
         DataStreamSource<String> convertDataStreamSource =
                 env.fromSource(
@@ -163,8 +160,7 @@ public class MysqlDebeziumTimeConverterITCase {
         }
     }
 
-    private void testTemporalTypesWithMySqlServerTimezone(
-            String timezone, boolean connectionTimeZoneEnable) throws Exception {
+    private void testTemporalTypesWithMySqlServerTimezone(String timezone) throws Exception {
         MySqlContainer mySqlContainer = createMySqlContainer(timezone);
         startContainers(mySqlContainer, timezone);
         UniqueDatabase db = getUniqueDatabase(mySqlContainer);
@@ -196,7 +192,7 @@ public class MysqlDebeziumTimeConverterITCase {
                                 + " 'debezium.database.connectionTimeZone' = '%s',"
                                 + " 'debezium.datetime.format.date' = 'yyyy-MM-dd',"
                                 + " 'debezium.datetime.format.time' = 'HH:mm:ss',"
-                                + " 'debezium.datetime.format.datetime' = 'yyyy-MM-dd HH:mm:ss',"
+                                + " 'debezium.datetime.format.timezone' = '%s',"
                                 + " 'debezium.datetime.format.default.value.convert' = 'true'"
                                 + ")",
                         mySqlContainer.getHost(),
@@ -207,7 +203,8 @@ public class MysqlDebeziumTimeConverterITCase {
                         "initial",
                         timezone,
                         MysqlDebeziumTimeConverter.class.getName(),
-                        connectionTimeZoneEnable ? timezone : defaultZone);
+                        timezone,
+                        timezone);
         tEnv.executeSql(sourceDDL);
         TableResult tableResult = tEnv.executeSql("select * from customers");
         checkData(tableResult);
@@ -225,6 +222,7 @@ public class MysqlDebeziumTimeConverterITCase {
         debeziumProperties.setProperty("datetime.format.default.value.convert", "false");
         // If not set time convert maybe error
         debeziumProperties.setProperty("database.connectionTimeZone", timezone);
+        debeziumProperties.setProperty("datetime.format.timezone", timezone);
         LOG.info("Supplied debezium properties: {}", debeziumProperties);
         return debeziumProperties;
     }
@@ -269,6 +267,7 @@ public class MysqlDebeziumTimeConverterITCase {
         LOG.info("Starting containers with timezone {} ...", timezone);
         Startables.deepStart(Stream.of(mySqlContainer)).join();
         LOG.info("Containers are started.");
+        LOG.info("JVM System Clock Zone Id : {}", ZoneId.systemDefault());
     }
 
     protected UniqueDatabase getUniqueDatabase(MySqlContainer mySqlContainer) {

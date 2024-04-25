@@ -34,7 +34,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -64,8 +64,9 @@ public class MysqlDebeziumTimeConverter
     private final String[] DATE_TYPES = {"DATE", "DATETIME", "TIME", "TIMESTAMP"};
 
     protected static final String DATE_FORMAT = "yyyy-MM-dd";
-    protected static final String TIME_FORMAT = "HH:mm:ss";
+    protected static final String TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
     protected static final String DATETIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
+    protected ZoneId zoneId;
     protected static final String DEFAULT_DATE_FORMAT_PATTERN = "1970-01-01 00:00:00";
     protected DateTimeFormatter dateFormatter;
     protected DateTimeFormatter timeFormatter;
@@ -88,6 +89,10 @@ public class MysqlDebeziumTimeConverter
         this.dateFormatter = DateTimeFormatter.ofPattern(dateFormat);
         this.timeFormatter = DateTimeFormatter.ofPattern(timeFormat);
         this.datetimeFormatter = DateTimeFormatter.ofPattern(datetimeFormat);
+        this.zoneId =
+                ZoneId.of(
+                        properties.getProperty(
+                                "format.timezone", ZoneId.systemDefault().toString()));
     }
 
     @Override
@@ -163,7 +168,7 @@ public class MysqlDebeziumTimeConverter
         // So we have special handling for this case, which sidesteps the toInstant conversion.
         if (timestamp instanceof Timestamp) {
             Timestamp value = (Timestamp) timestamp;
-            ZonedDateTime zonedDateTime = value.toLocalDateTime().atZone(ZoneOffset.UTC);
+            ZonedDateTime zonedDateTime = value.toInstant().atZone(zoneId);
             return ConvertTimeBceUtil.resolveEra(value, zonedDateTime.format(timeFormatter));
         } else if (timestamp instanceof OffsetDateTime) {
             OffsetDateTime value = (OffsetDateTime) timestamp;
@@ -173,7 +178,7 @@ public class MysqlDebeziumTimeConverter
             return ConvertTimeBceUtil.resolveEra(
                     zonedDateTime.toLocalDate(), zonedDateTime.format(timeFormatter));
         } else if (timestamp instanceof Instant) {
-            OffsetDateTime dateTime = OffsetDateTime.ofInstant((Instant) timestamp, ZoneOffset.UTC);
+            OffsetDateTime dateTime = OffsetDateTime.ofInstant((Instant) timestamp, zoneId);
             ZonedDateTime timestampZt = ZonedDateTime.from(dateTime);
             LocalDate localDate = timestampZt.toLocalDate();
             return ConvertTimeBceUtil.resolveEra(localDate, timestampZt.format(timeFormatter));
@@ -184,7 +189,7 @@ public class MysqlDebeziumTimeConverter
             }
             // If init 1970-01-01T00:00:00Zd need to change
             Instant instant = Instant.parse(timestamp.toString());
-            OffsetDateTime dateTime = OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
+            OffsetDateTime dateTime = OffsetDateTime.ofInstant(instant, zoneId);
             ZonedDateTime timestampZt = ZonedDateTime.from(dateTime);
             LocalDate localDate = timestampZt.toLocalDate();
             return ConvertTimeBceUtil.resolveEra(localDate, timestampZt.format(timeFormatter));
@@ -200,9 +205,12 @@ public class MysqlDebeziumTimeConverter
         } else if (timestamp instanceof Instant) {
             // Incremental mode
             Instant time = (Instant) timestamp;
+            ZonedDateTime zonedDateTime = time.atZone(zoneId);
             return ConvertTimeBceUtil.resolveEra(
-                    time.atZone(ZoneOffset.UTC).toLocalDate(),
-                    time.atOffset(ZoneOffset.UTC).toLocalDateTime().format(datetimeFormatter));
+                    zonedDateTime.toLocalDate(),
+                    time.atOffset(zonedDateTime.getOffset())
+                            .toLocalDateTime()
+                            .format(datetimeFormatter));
         } else if (timestamp instanceof LocalDateTime) {
             LocalDateTime dateTime = (LocalDateTime) timestamp;
             LocalDate localDateTime = dateTime.toLocalDate();
