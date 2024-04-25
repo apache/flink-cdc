@@ -17,8 +17,6 @@
 
 package org.apache.flink.cdc.connectors.mysql.debezium.converters;
 
-import io.debezium.connector.mysql.converters.MysqlDebeziumTimeConverter;
-import io.debezium.data.Envelope;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.cdc.connectors.mysql.MySqlValidatorTest;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
@@ -28,15 +26,19 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
+
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.debezium.connector.mysql.converters.MysqlDebeziumTimeConverter;
+import io.debezium.data.Envelope;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -76,7 +78,8 @@ public class MysqlDebeziumTimeConverterITCase {
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
 
-    private static final Logger LOG = LoggerFactory.getLogger(MysqlDebeziumTimeConverterITCase.class);
+    private static final Logger LOG =
+            LoggerFactory.getLogger(MysqlDebeziumTimeConverterITCase.class);
 
     private static final String defaultZone = "GMT+8";
 
@@ -99,27 +102,28 @@ public class MysqlDebeziumTimeConverterITCase {
 
     @Test
     public void testReadDateConvertDataStreamInAsia() throws Exception {
-        testReadDateConvertDataStreamSource("Asia/Shanghai",true);
+        testReadDateConvertDataStreamSource("Asia/Shanghai", true);
     }
 
     @Test
     public void testReadDateConvertDataStreamInBerlin() throws Exception {
-        testReadDateConvertDataStreamSource("Europe/Berlin",false);
+        testReadDateConvertDataStreamSource("Europe/Berlin", false);
     }
 
     @Test
     public void testReadDateConvertSQLSourceInAsia() throws Exception {
-        testTemporalTypesWithMySqlServerTimezone("Asia/Shanghai",true);
+        testTemporalTypesWithMySqlServerTimezone("Asia/Shanghai", true);
     }
 
     @Test
     public void testReadDateConvertSQLSourceInBerlin() throws Exception {
-        testTemporalTypesWithMySqlServerTimezone("Europe/Berlin",false);
+        testTemporalTypesWithMySqlServerTimezone("Europe/Berlin", false);
     }
 
-    private void testReadDateConvertDataStreamSource(String timezone,boolean connectionTimeZoneEnable) throws Exception {
+    private void testReadDateConvertDataStreamSource(
+            String timezone, boolean connectionTimeZoneEnable) throws Exception {
         MySqlContainer mySqlContainer = createMySqlContainer(timezone);
-        startContainers(mySqlContainer,timezone);
+        startContainers(mySqlContainer, timezone);
         UniqueDatabase db = getUniqueDatabase(mySqlContainer);
         db.createAndInitialize();
         env.enableCheckpointing(1000L);
@@ -134,7 +138,9 @@ public class MysqlDebeziumTimeConverterITCase {
                         .serverTimeZone(timezone)
                         .username(db.getUsername())
                         .password(db.getPassword())
-                        .debeziumProperties(getDebeziumConfigurations(connectionTimeZoneEnable ? timezone :defaultZone));
+                        .debeziumProperties(
+                                getDebeziumConfigurations(
+                                        connectionTimeZoneEnable ? timezone : defaultZone));
         builder.deserializer(new JsonDebeziumDeserializationSchema());
         DataStreamSource<String> convertDataStreamSource =
                 env.fromSource(
@@ -147,20 +153,19 @@ public class MysqlDebeziumTimeConverterITCase {
 
     private void validTimestampValue(List<String> result) throws JsonProcessingException {
         ObjectMapper mapper = new ObjectMapper();
-        String[] timestampValues = new String []{"14:23:00","00:00:00","00:00:00"};
+        String[] timestampValues = new String[] {"14:23:00", "00:00:00", "00:00:00"};
         for (String after : result) {
             JsonNode jsonNode = mapper.readTree(after);
-            Assert.assertEquals(timestampValues[jsonNode.get(Envelope.FieldName.AFTER).get("id").asInt() -1],
-                    jsonNode.get("after").get(
-                    "test_timestamp").asText());
+            Assert.assertEquals(
+                    timestampValues[jsonNode.get(Envelope.FieldName.AFTER).get("id").asInt() - 1],
+                    jsonNode.get("after").get("test_timestamp").asText());
         }
     }
 
-
-
-    private void testTemporalTypesWithMySqlServerTimezone(String timezone,boolean connectionTimeZoneEnable) throws Exception {
+    private void testTemporalTypesWithMySqlServerTimezone(
+            String timezone, boolean connectionTimeZoneEnable) throws Exception {
         MySqlContainer mySqlContainer = createMySqlContainer(timezone);
-        startContainers(mySqlContainer,timezone);
+        startContainers(mySqlContainer, timezone);
         UniqueDatabase db = getUniqueDatabase(mySqlContainer);
         db.createAndInitialize();
         env.enableCheckpointing(1000L);
@@ -259,13 +264,13 @@ public class MysqlDebeziumTimeConverterITCase {
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
     }
 
-    protected void startContainers( MySqlContainer mySqlContainer,String timezone){
-        LOG.info("Starting containers with timezone {} ...",timezone);
+    protected void startContainers(MySqlContainer mySqlContainer, String timezone) {
+        LOG.info("Starting containers with timezone {} ...", timezone);
         Startables.deepStart(Stream.of(mySqlContainer)).join();
         LOG.info("Containers are started.");
     }
 
-    protected UniqueDatabase getUniqueDatabase(MySqlContainer mySqlContainer){
+    protected UniqueDatabase getUniqueDatabase(MySqlContainer mySqlContainer) {
         return new UniqueDatabase(mySqlContainer, "date_convert_test", "mysqluser", "mysqlpw");
     }
 
