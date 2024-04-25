@@ -18,17 +18,19 @@
 package org.apache.flink.cdc.connectors.oceanbase;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.oceanbase.source.OceanBaseRichSourceFunction;
-import org.apache.flink.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
-import org.apache.flink.cdc.connectors.oceanbase.table.StartupMode;
+import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 
 import com.oceanbase.clogproxy.client.config.ClientConf;
 import com.oceanbase.clogproxy.client.config.ObReaderConfig;
-import com.oceanbase.clogproxy.client.util.ClientIdGenerator;
 import org.apache.commons.lang3.StringUtils;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -47,7 +49,7 @@ public class OceanBaseSource {
     public static class Builder<T> {
 
         // common config
-        private StartupMode startupMode;
+        private StartupOptions startupOptions;
         private String username;
         private String password;
         private String tenantName;
@@ -73,11 +75,12 @@ public class OceanBaseSource {
         private String configUrl;
         private String workingMode;
         private Properties obcdcProperties;
+        private Properties debeziumProperties;
 
-        private OceanBaseDeserializationSchema<T> deserializer;
+        private DebeziumDeserializationSchema<T> deserializer;
 
-        public Builder<T> startupMode(StartupMode startupMode) {
-            this.startupMode = startupMode;
+        public Builder<T> startupOptions(StartupOptions startupOptions) {
+            this.startupOptions = startupOptions;
             return this;
         }
 
@@ -151,7 +154,7 @@ public class OceanBaseSource {
             return this;
         }
 
-        public Builder<T> logProxyPort(int logProxyPort) {
+        public Builder<T> logProxyPort(Integer logProxyPort) {
             this.logProxyPort = logProxyPort;
             return this;
         }
@@ -186,23 +189,44 @@ public class OceanBaseSource {
             return this;
         }
 
-        public Builder<T> deserializer(OceanBaseDeserializationSchema<T> deserializer) {
+        public Builder<T> debeziumProperties(Properties debeziumProperties) {
+            this.debeziumProperties = debeziumProperties;
+            return this;
+        }
+
+        public Builder<T> deserializer(DebeziumDeserializationSchema<T> deserializer) {
             this.deserializer = deserializer;
             return this;
         }
 
         public SourceFunction<T> build() {
-            switch (startupMode) {
-                case INITIAL:
-                    checkNotNull(hostname, "hostname shouldn't be null on startup mode 'initial'");
-                    checkNotNull(port, "port shouldn't be null on startup mode 'initial'");
-                    checkNotNull(
-                            compatibleMode,
-                            "compatibleMode shouldn't be null on startup mode 'initial'");
-                    checkNotNull(
-                            jdbcDriver, "jdbcDriver shouldn't be null on startup mode 'initial'");
-                    startupTimestamp = 0L;
+            checkNotNull(username, "username shouldn't be null");
+            checkNotNull(password, "password shouldn't be null");
+            checkNotNull(hostname, "hostname shouldn't be null");
+            checkNotNull(port, "port shouldn't be null");
+
+            if (startupOptions == null) {
+                startupOptions = StartupOptions.initial();
+            }
+            if (compatibleMode == null) {
+                compatibleMode = "mysql";
+            }
+            if (jdbcDriver == null) {
+                jdbcDriver = "com.mysql.cj.jdbc.Driver";
+            }
+
+            if (connectTimeout == null) {
+                connectTimeout = Duration.ofSeconds(30);
+            }
+
+            if (serverTimeZone == null) {
+                serverTimeZone = ZoneId.systemDefault().getId();
+            }
+
+            switch (startupOptions.startupMode) {
+                case SNAPSHOT:
                     break;
+                case INITIAL:
                 case LATEST_OFFSET:
                     startupTimestamp = 0L;
                     break;
@@ -213,15 +237,9 @@ public class OceanBaseSource {
                     break;
                 default:
                     throw new UnsupportedOperationException(
-                            startupMode + " mode is not supported.");
+                            startupOptions.startupMode + " mode is not supported.");
             }
 
-            if (!startupMode.equals(StartupMode.INITIAL)
-                    && (StringUtils.isNotEmpty(databaseName)
-                            || StringUtils.isNotEmpty(tableName))) {
-                throw new IllegalArgumentException(
-                        "If startup mode is not 'INITIAL', 'database-name' and 'table-name' must not be configured");
-            }
             if (StringUtils.isNotEmpty(databaseName) || StringUtils.isNotEmpty(tableName)) {
                 if (StringUtils.isEmpty(databaseName) || StringUtils.isEmpty(tableName)) {
                     throw new IllegalArgumentException(
@@ -233,57 +251,51 @@ public class OceanBaseSource {
                         "'database-name', 'table-name' or 'table-list' should be configured");
             }
 
-            if (serverTimeZone == null) {
-                serverTimeZone = "+00:00";
-            }
+            ClientConf clientConf = null;
+            ObReaderConfig obReaderConfig = null;
 
-            if (connectTimeout == null) {
-                connectTimeout = Duration.ofSeconds(30);
-            }
+            if (!startupOptions.isSnapshotOnly()) {
 
-            if (logProxyClientId == null) {
-                logProxyClientId =
-                        String.format(
-                                "%s_%s_%s",
-                                ClientIdGenerator.generate(),
-                                Thread.currentThread().getId(),
-                                checkNotNull(tenantName));
-            }
-            ClientConf clientConf =
-                    ClientConf.builder()
-                            .clientId(logProxyClientId)
-                            .connectTimeoutMs((int) connectTimeout.toMillis())
-                            .build();
+                checkNotNull(logProxyHost);
+                checkNotNull(logProxyPort);
+                checkNotNull(tenantName);
 
-            ObReaderConfig obReaderConfig = new ObReaderConfig();
-            if (StringUtils.isNotEmpty(rsList)) {
-                obReaderConfig.setRsList(rsList);
-            }
-            if (StringUtils.isNotEmpty(configUrl)) {
-                obReaderConfig.setClusterUrl(configUrl);
-            }
-            if (StringUtils.isNotEmpty(workingMode)) {
-                obReaderConfig.setWorkingMode(workingMode);
-            }
-            obReaderConfig.setUsername(username);
-            obReaderConfig.setPassword(password);
-            obReaderConfig.setStartTimestamp(startupTimestamp);
-            obReaderConfig.setTimezone(serverTimeZone);
+                obReaderConfig = new ObReaderConfig();
+                if (StringUtils.isNotEmpty(rsList)) {
+                    obReaderConfig.setRsList(rsList);
+                }
+                if (StringUtils.isNotEmpty(configUrl)) {
+                    obReaderConfig.setClusterUrl(configUrl);
+                }
+                if (StringUtils.isNotEmpty(workingMode)) {
+                    obReaderConfig.setWorkingMode(workingMode);
+                }
+                obReaderConfig.setUsername(username);
+                obReaderConfig.setPassword(password);
+                obReaderConfig.setStartTimestamp(startupTimestamp);
+                obReaderConfig.setTimezone(
+                        DateTimeFormatter.ofPattern("xxx")
+                                .format(
+                                        ZoneId.of(serverTimeZone)
+                                                .getRules()
+                                                .getOffset(Instant.now())));
 
-            if (obcdcProperties != null && !obcdcProperties.isEmpty()) {
-                Map<String, String> extraConfigs = new HashMap<>();
-                obcdcProperties.forEach((k, v) -> extraConfigs.put(k.toString(), v.toString()));
-                obReaderConfig.setExtraConfigs(extraConfigs);
+                if (obcdcProperties != null && !obcdcProperties.isEmpty()) {
+                    Map<String, String> extraConfigs = new HashMap<>();
+                    obcdcProperties.forEach((k, v) -> extraConfigs.put(k.toString(), v.toString()));
+                    obReaderConfig.setExtraConfigs(extraConfigs);
+                }
             }
 
             return new OceanBaseRichSourceFunction<>(
-                    StartupMode.INITIAL.equals(startupMode),
+                    startupOptions,
                     username,
                     password,
                     tenantName,
                     databaseName,
                     tableName,
                     tableList,
+                    serverTimeZone,
                     connectTimeout,
                     hostname,
                     port,
@@ -292,8 +304,9 @@ public class OceanBaseSource {
                     jdbcProperties,
                     logProxyHost,
                     logProxyPort,
-                    clientConf,
+                    logProxyClientId,
                     obReaderConfig,
+                    debeziumProperties,
                     deserializer);
         }
     }

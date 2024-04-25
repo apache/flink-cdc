@@ -18,60 +18,139 @@
 package org.apache.flink.cdc.connectors.oceanbase.table;
 
 import org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestBase;
-import org.apache.flink.runtime.minicluster.RpcServiceSharing;
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
-import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.table.utils.LegacyRowResource;
-import org.apache.flink.test.util.MiniClusterWithClientResource;
 
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.ClassRule;
-import org.junit.Rule;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.utility.MountableFile;
 
 import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 
-import static org.junit.Assert.assertTrue;
+/** Integration tests for OceanBase MySQL mode table source. */
+@RunWith(Parameterized.class)
+public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
-/** Integration tests for OceanBase change stream event SQL source. */
-public class OceanBaseConnectorITCase extends OceanBaseTestBase {
-
-    private static final int DEFAULT_PARALLELISM = 2;
+    private static final Logger LOG = LoggerFactory.getLogger(OceanBaseMySQLModeITCase.class);
 
     private final StreamExecutionEnvironment env =
-            StreamExecutionEnvironment.getExecutionEnvironment()
-                    .setParallelism(DEFAULT_PARALLELISM);
+            StreamExecutionEnvironment.getExecutionEnvironment();
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    private static final String NETWORK_MODE = "host";
+    private static final String OB_SYS_PASSWORD = "123456";
 
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .build());
+    @ClassRule
+    public static final GenericContainer<?> OB_SERVER =
+            new GenericContainer<>("oceanbase/oceanbase-ce:4.2.0.0")
+                    .withNetworkMode(NETWORK_MODE)
+                    .withEnv("MODE", "slim")
+                    .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
+                    .withEnv("OB_DATAFILE_SIZE", "1G")
+                    .withEnv("OB_LOG_DISK_SIZE", "4G")
+                    .withCopyFileToContainer(
+                            MountableFile.forClasspathResource("ddl/mysql/docker_init.sql"),
+                            "/root/boot/init.d/init.sql")
+                    .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
+                    .withStartupTimeout(Duration.ofMinutes(4))
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+
+    @ClassRule
+    public static final GenericContainer<?> LOG_PROXY =
+            new GenericContainer<>("whhe/oblogproxy:1.1.3_4x")
+                    .withNetworkMode(NETWORK_MODE)
+                    .withEnv("OB_SYS_PASSWORD", OB_SYS_PASSWORD)
+                    .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
+                    .withStartupTimeout(Duration.ofMinutes(1))
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+
+    @BeforeClass
+    public static void startContainers() {
+        LOG.info("Starting containers...");
+        Startables.deepStart(Stream.of(OB_SERVER, LOG_PROXY)).join();
+        LOG.info("Containers are started.");
+    }
+
+    @AfterClass
+    public static void stopContainers() {
+        LOG.info("Stopping containers...");
+        Stream.of(OB_SERVER, LOG_PROXY).forEach(GenericContainer::stop);
+        LOG.info("Containers are stopped.");
+    }
 
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
         env.enableCheckpointing(1000);
-        env.getCheckpointConfig().setCheckpointingMode(CheckpointingMode.AT_LEAST_ONCE);
         env.getCheckpointConfig().setMinPauseBetweenCheckpoints(500);
+    }
+
+    private final String rsList;
+
+    public OceanBaseMySQLModeITCase(
+            String username,
+            String password,
+            String hostname,
+            int port,
+            String logProxyHost,
+            int logProxyPort,
+            String tenant,
+            String rsList) {
+        super("mysql", username, password, hostname, port, logProxyHost, logProxyPort, tenant);
+        this.rsList = rsList;
+    }
+
+    @Parameterized.Parameters
+    public static List<Object[]> parameters() {
+        return Collections.singletonList(
+                new Object[] {
+                    "root@test",
+                    "123456",
+                    "127.0.0.1",
+                    2881,
+                    "127.0.0.1",
+                    2983,
+                    "test",
+                    "127.0.0.1:2882:2881"
+                });
+    }
+
+    @Override
+    protected String logProxyOptionsString() {
+        return super.logProxyOptionsString()
+                + " , "
+                + String.format(" 'rootserver-list' = '%s'", rsList);
+    }
+
+    @Override
+    protected Connection getJdbcConnection() throws SQLException {
+        return DriverManager.getConnection(
+                "jdbc:mysql://" + hostname + ":" + port + "/?useSSL=false", username, password);
     }
 
     @Test
@@ -87,29 +166,11 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " weight DECIMAL(20, 10),"
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
-                                + " 'connector' = 'oceanbase-cdc',"
-                                + " 'scan.startup.mode' = 'initial',"
-                                + " 'username' = '%s',"
-                                + " 'password' = '%s',"
-                                + " 'tenant-name' = '%s',"
-                                + " 'table-list' = '%s',"
-                                + " 'hostname' = '%s',"
-                                + " 'port' = '%s',"
-                                + " 'logproxy.host' = '%s',"
-                                + " 'logproxy.port' = '%s',"
-                                + " 'rootserver-list' = '%s',"
-                                + " 'working-mode' = 'memory',"
-                                + " 'jdbc.properties.useSSL' = 'false'"
+                                + initialOptionsString()
+                                + ", "
+                                + " 'table-list' = '%s'"
                                 + ")",
-                        getUsername(),
-                        getPassword(),
-                        getTenant(),
-                        "inventory.products",
-                        OB_SERVER.getHost(),
-                        getObServerSqlPort(),
-                        LOG_PROXY.getHost(),
-                        getLogProxyPort(),
-                        getRsList());
+                        "inventory.products");
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -132,19 +193,19 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
         waitForSinkSize("sink", 9);
         int snapshotSize = sinkSize("sink");
 
-        try (Connection connection = getJdbcConnection("inventory");
+        try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
-            statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
+                    "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
+            statement.execute("UPDATE inventory.products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
             statement.execute(
-                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+                    "INSERT INTO inventory.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
-            statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
-            statement.execute("DELETE FROM products WHERE id=111;");
+                    "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
 
         waitForSinkSize("sink", snapshotSize + 7);
@@ -197,7 +258,7 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
 
     @Test
     public void testMetadataColumns() throws Exception {
-        initializeTable("inventory_meta");
+        initializeTable("inventory");
 
         String sourceDDL =
                 String.format(
@@ -211,31 +272,13 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + " weight DECIMAL(20, 10),"
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
-                                + " 'connector' = 'oceanbase-cdc',"
-                                + " 'scan.startup.mode' = 'initial',"
-                                + " 'username' = '%s',"
-                                + " 'password' = '%s',"
-                                + " 'tenant-name' = '%s',"
+                                + initialOptionsString()
+                                + ","
                                 + " 'database-name' = '%s',"
-                                + " 'table-name' = '%s',"
-                                + " 'hostname' = '%s',"
-                                + " 'port' = '%s',"
-                                + " 'logproxy.host' = '%s',"
-                                + " 'logproxy.port' = '%s',"
-                                + " 'rootserver-list' = '%s',"
-                                + " 'working-mode' = 'memory',"
-                                + " 'jdbc.properties.useSSL' = 'false'"
+                                + " 'table-name' = '%s'"
                                 + ")",
-                        getUsername(),
-                        getPassword(),
-                        getTenant(),
-                        "^inventory_meta$",
-                        "^products$",
-                        OB_SERVER.getHost(),
-                        getObServerSqlPort(),
-                        LOG_PROXY.getHost(),
-                        getLogProxyPort(),
-                        getRsList());
+                        "^inventory$",
+                        "^products$");
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -261,10 +304,10 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
         waitForSinkSize("sink", 9);
         int snapshotSize = sinkSize("sink");
 
-        try (Connection connection = getJdbcConnection("inventory_meta");
+        try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
+                    "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
         }
 
         waitForSinkSize("sink", snapshotSize + 1);
@@ -272,35 +315,35 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
         List<String> expected =
                 Arrays.asList(
                         "+I("
-                                + getTenant()
-                                + ",inventory_meta,products,101,scooter,Small 2-wheel scooter,3.1400000000)",
+                                + tenant
+                                + ",inventory,products,101,scooter,Small 2-wheel scooter,3.1400000000)",
                         "+I("
-                                + getTenant()
-                                + ",inventory_meta,products,102,car battery,12V car battery,8.1000000000)",
+                                + tenant
+                                + ",inventory,products,102,car battery,12V car battery,8.1000000000)",
                         "+I("
-                                + getTenant()
-                                + ",inventory_meta,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
+                                + tenant
+                                + ",inventory,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
                         "+I("
-                                + getTenant()
-                                + ",inventory_meta,products,104,hammer,12oz carpenter's hammer,0.7500000000)",
+                                + tenant
+                                + ",inventory,products,104,hammer,12oz carpenter's hammer,0.7500000000)",
                         "+I("
-                                + getTenant()
-                                + ",inventory_meta,products,105,hammer,14oz carpenter's hammer,0.8750000000)",
+                                + tenant
+                                + ",inventory,products,105,hammer,14oz carpenter's hammer,0.8750000000)",
                         "+I("
-                                + getTenant()
-                                + ",inventory_meta,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
+                                + tenant
+                                + ",inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
                         "+I("
-                                + getTenant()
-                                + ",inventory_meta,products,107,rocks,box of assorted rocks,5.3000000000)",
+                                + tenant
+                                + ",inventory,products,107,rocks,box of assorted rocks,5.3000000000)",
                         "+I("
-                                + getTenant()
-                                + ",inventory_meta,products,108,jacket,water resistent black wind breaker,0.1000000000)",
+                                + tenant
+                                + ",inventory,products,108,jacket,water resistent black wind breaker,0.1000000000)",
                         "+I("
-                                + getTenant()
-                                + ",inventory_meta,products,109,spare tire,24 inch spare tire,22.2000000000)",
+                                + tenant
+                                + ",inventory,products,109,spare tire,24 inch spare tire,22.2000000000)",
                         "+U("
-                                + getTenant()
-                                + ",inventory_meta,products,106,hammer,18oz carpenter hammer,1.0000000000)");
+                                + tenant
+                                + ",inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertContainsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
@@ -309,11 +352,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
     @Test
     public void testAllDataTypes() throws Exception {
         String serverTimeZone = "+00:00";
-        try (Connection connection = getJdbcConnection("");
-                Statement statement = connection.createStatement()) {
-            statement.execute(String.format("SET GLOBAL time_zone = '%s';", serverTimeZone));
-        }
+        setGlobalTimeZone(serverTimeZone);
         tEnv.getConfig().setLocalTimeZone(ZoneId.of(serverTimeZone));
+
         initializeTable("column_type_test");
         String sourceDDL =
                 String.format(
@@ -343,9 +384,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + "    time_c TIME(0),\n"
                                 + "    datetime3_c TIMESTAMP(3),\n"
                                 + "    datetime6_c TIMESTAMP(6),\n"
-                                + "    timestamp_c TIMESTAMP_LTZ,\n"
-                                + "    timestamp3_c TIMESTAMP_LTZ(3),\n"
-                                + "    timestamp6_c TIMESTAMP_LTZ(6),\n"
+                                + "    timestamp_c TIMESTAMP,\n"
+                                + "    timestamp3_c TIMESTAMP(3),\n"
+                                + "    timestamp6_c TIMESTAMP(6),\n"
                                 + "    char_c CHAR(3),\n"
                                 + "    varchar_c VARCHAR(255),\n"
                                 + "    file_uuid BINARY(16),\n"
@@ -361,34 +402,15 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + "    json_c STRING,\n"
                                 + "    primary key (`id`) not enforced"
                                 + ") WITH ("
-                                + " 'connector' = 'oceanbase-cdc',"
-                                + " 'scan.startup.mode' = 'initial',"
-                                + " 'username' = '%s',"
-                                + " 'password' = '%s',"
-                                + " 'tenant-name' = '%s',"
+                                + initialOptionsString()
+                                + ","
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'server-time-zone' = '%s',"
-                                + " 'hostname' = '%s',"
-                                + " 'port' = '%s',"
-                                + " 'logproxy.host' = '%s',"
-                                + " 'logproxy.port' = '%s',"
-                                + " 'rootserver-list' = '%s',"
-                                + " 'working-mode' = 'memory',"
-                                + " 'jdbc.properties.useSSL' = 'false',"
-                                + " 'obcdc.properties.sort_trans_participants' = '1'"
+                                + " 'server-time-zone' = '%s'"
                                 + ")",
-                        getUsername(),
-                        getPassword(),
-                        getTenant(),
                         "^column_type_test$",
                         "^full_types$",
-                        serverTimeZone,
-                        OB_SERVER.getHost(),
-                        getObServerSqlPort(),
-                        LOG_PROXY.getHost(),
-                        getLogProxyPort(),
-                        getRsList());
+                        serverTimeZone);
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + "    `id` INT NOT NULL,\n"
@@ -421,7 +443,7 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                         + "    timestamp6_c TIMESTAMP(6),\n"
                         + "    char_c CHAR(3),\n"
                         + "    varchar_c VARCHAR(255),\n"
-                        + "    file_uuid BINARY(16),\n"
+                        + "    file_uuid STRING,\n"
                         + "    bit_c BINARY(8),\n"
                         + "    text_c STRING,\n"
                         + "    tiny_blob_c BYTES,\n"
@@ -441,23 +463,66 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
 
-        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM ob_source");
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT id,\n"
+                                + "bit1_c,\n"
+                                + "tiny1_c,\n"
+                                + "boolean_c,\n"
+                                + "tiny_c,\n"
+                                + "tiny_un_c,\n"
+                                + "small_c ,\n"
+                                + "small_un_c,\n"
+                                + "medium_c,\n"
+                                + "medium_un_c,\n"
+                                + "int11_c,\n"
+                                + "int_c,\n"
+                                + "int_un_c,\n"
+                                + "big_c,\n"
+                                + "big_un_c,\n"
+                                + "real_c,\n"
+                                + "float_c,\n"
+                                + "double_c,\n"
+                                + "decimal_c,\n"
+                                + "numeric_c,\n"
+                                + "big_decimal_c,\n"
+                                + "date_c,\n"
+                                + "time_c,\n"
+                                + "datetime3_c,\n"
+                                + "datetime6_c,\n"
+                                + "timestamp_c,\n"
+                                + "timestamp3_c,\n"
+                                + "timestamp6_c,\n"
+                                + "char_c,\n"
+                                + "varchar_c,\n"
+                                + "TO_BASE64(DECODE(file_uuid, 'UTF-8')),\n"
+                                + "bit_c,\n"
+                                + "text_c,\n"
+                                + "tiny_blob_c,\n"
+                                + "medium_blob_c,\n"
+                                + "blob_c,\n"
+                                + "long_blob_c,\n"
+                                + "year_c,\n"
+                                + "set_c,\n"
+                                + "enum_c,\n"
+                                + "json_c\n"
+                                + " FROM ob_source");
 
         waitForSinkSize("sink", 1);
         int snapshotSize = sinkSize("sink");
 
-        try (Connection connection = getJdbcConnection("column_type_test");
+        try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+                    "UPDATE column_type_test.full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
 
         waitForSinkSize("sink", snapshotSize + 1);
 
         List<String> expected =
                 Arrays.asList(
-                        "+I(1,false,true,true,127,255,32767,65535,8388607,16777215,2147483647,2147483647,4294967295,9223372036854775807,18446744073709551615,123.102,123.102,404.4443,123.4567,346,34567892.1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,abc,Hello World,[101, 26, -17, -65, -67, 8, 57, 15, 72, -17, -65, -67, -17, -65, -67, -17, -65, -67, 54, -17, -65, -67, 62, 123, 116, 0],[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2022,[a, b],red,{\"key1\": \"value1\"})",
-                        "+U(1,false,true,true,127,255,32767,65535,8388607,16777215,2147483647,2147483647,4294967295,9223372036854775807,18446744073709551615,123.102,123.102,404.4443,123.4567,346,34567892.1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,abc,Hello World,[101, 26, -17, -65, -67, 8, 57, 15, 72, -17, -65, -67, -17, -65, -67, -17, -65, -67, 54, -17, -65, -67, 62, 123, 116, 0],[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2022,[a, b],red,{\"key1\": \"value1\"})");
+                        "+I(1,false,true,true,127,255,32767,65535,8388607,16777215,2147483647,2147483647,4294967295,9223372036854775807,18446744073709551615,123.102,123.102,404.4443,123.4567,346,34567892.1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,abc,Hello World,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=,[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2022,[a, b],red,{\"key1\": \"value1\"})",
+                        "+U(1,false,true,true,127,255,32767,65535,8388607,16777215,2147483647,2147483647,4294967295,9223372036854775807,18446744073709551615,123.102,123.102,404.4443,123.4567,346,34567892.1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,abc,Hello World,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=,[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2022,[a, b],red,{\"key1\": \"value1\"})");
 
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         assertContainsInAnyOrder(expected, actual);
@@ -475,11 +540,9 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
     }
 
     public void testTimeDataTypes(String serverTimeZone) throws Exception {
-        try (Connection connection = getJdbcConnection("");
-                Statement statement = connection.createStatement()) {
-            statement.execute(String.format("SET GLOBAL time_zone = '%s';", serverTimeZone));
-        }
+        setGlobalTimeZone(serverTimeZone);
         tEnv.getConfig().setLocalTimeZone(ZoneId.of(serverTimeZone));
+
         initializeTable("column_type_test");
         String sourceDDL =
                 String.format(
@@ -489,36 +552,18 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
                                 + "    time_c TIME(0),\n"
                                 + "    datetime3_c TIMESTAMP(3),\n"
                                 + "    datetime6_c TIMESTAMP(6),\n"
-                                + "    timestamp_c TIMESTAMP_LTZ,\n"
+                                + "    timestamp_c TIMESTAMP,\n"
                                 + "    primary key (`id`) not enforced"
                                 + ") WITH ("
-                                + " 'connector' = 'oceanbase-cdc',"
-                                + " 'scan.startup.mode' = 'initial',"
-                                + " 'username' = '%s',"
-                                + " 'password' = '%s',"
-                                + " 'tenant-name' = '%s',"
+                                + initialOptionsString()
+                                + ","
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'server-time-zone' = '%s',"
-                                + " 'hostname' = '%s',"
-                                + " 'port' = '%s',"
-                                + " 'logproxy.host' = '%s',"
-                                + " 'logproxy.port' = '%s',"
-                                + " 'rootserver-list' = '%s',"
-                                + " 'working-mode' = 'memory',"
-                                + " 'jdbc.properties.useSSL' = 'false'"
+                                + " 'server-time-zone' = '%s'"
                                 + ")",
-                        getUsername(),
-                        getPassword(),
-                        getTenant(),
                         "column_type_test",
                         "full_types",
-                        serverTimeZone,
-                        OB_SERVER.getHost(),
-                        getObServerSqlPort(),
-                        LOG_PROXY.getHost(),
-                        getLogProxyPort(),
-                        getRsList());
+                        serverTimeZone);
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -546,10 +591,10 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
         waitForSinkSize("sink", 1);
         int snapshotSize = sinkSize("sink");
 
-        try (Connection connection = getJdbcConnection("column_type_test");
+        try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+                    "UPDATE column_type_test.full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
 
         waitForSinkSize("sink", snapshotSize + 1);
@@ -564,28 +609,57 @@ public class OceanBaseConnectorITCase extends OceanBaseTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
+    @Test
+    public void testSnapshotOnly() throws Exception {
+        initializeTable("inventory");
 
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
-    }
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE ob_source ("
+                                + " `id` INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(20, 10),"
+                                + " PRIMARY KEY (`id`) NOT ENFORCED"
+                                + ") WITH ("
+                                + snapshotOptionsString()
+                                + ", "
+                                + " 'table-list' = '%s'"
+                                + ")",
+                        "inventory.products");
 
-    public static void assertContainsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertTrue(
-                String.format("expected: %s, actual: %s", expected, actual),
-                actual.containsAll(expected));
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " `id` INT NOT NULL,"
+                        + " name STRING,"
+                        + " description STRING,"
+                        + " weight DECIMAL(20, 10),"
+                        + " PRIMARY KEY (`id`) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '30'"
+                        + ")";
+
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM ob_source");
+
+        waitForSinkSize("sink", 9);
+
+        List<String> expected =
+                Arrays.asList(
+                        "+I(101,scooter,Small 2-wheel scooter,3.1400000000)",
+                        "+I(102,car battery,12V car battery,8.1000000000)",
+                        "+I(103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
+                        "+I(104,hammer,12oz carpenter's hammer,0.7500000000)",
+                        "+I(105,hammer,14oz carpenter's hammer,0.8750000000)",
+                        "+I(106,hammer,16oz carpenter's hammer,1.0000000000)",
+                        "+I(107,rocks,box of assorted rocks,5.3000000000)",
+                        "+I(108,jacket,water resistent black wind breaker,0.1000000000)",
+                        "+I(109,spare tire,24 inch spare tire,22.2000000000)");
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        assertContainsInAnyOrder(expected, actual);
     }
 }
