@@ -56,6 +56,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -81,7 +82,7 @@ public class MysqlDebeziumTimeConverterITCase {
     private static final Logger LOG =
             LoggerFactory.getLogger(MysqlDebeziumTimeConverterITCase.class);
 
-    private static final String defaultZone = "GMT+8";
+    private static final String defaultZone = ZoneId.systemDefault().toString();
 
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
