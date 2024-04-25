@@ -14,13 +14,13 @@
 -- limitations under the License.
 
 -- ----------------------------------------------------------------------------------------------------------------
--- DATABASE:  inventory_meta
+-- DATABASE:  inventory
 -- ----------------------------------------------------------------------------------------------------------------
 
-CREATE DATABASE inventory_meta;
-USE inventory_meta;
+CREATE DATABASE IF NOT EXISTS inventory;
+USE inventory;
 
--- Create and populate our products using a single insert with many rows
+DROP TABLE IF EXISTS products;
 CREATE TABLE products
 (
     id          INTEGER      NOT NULL AUTO_INCREMENT PRIMARY KEY,
