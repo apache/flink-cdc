@@ -39,7 +39,7 @@ MongoDB CDC 连接器允许从 MongoDB 读取快照数据和增量数据。 本�
    <groupId>org.apache.flink</groupId>
    <artifactId>flink-connector-mongodb-cdc</artifactId>
    <!--  请使用已发布的版本依赖，snapshot 版本的依赖需要本地自行编译。 -->
-   <version>3.1-SNAPSHOT</version>
+   <version>3.2-SNAPSHOT</version>
 </dependency>
 ```
 
