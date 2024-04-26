@@ -1,11 +1,12 @@
 /*
- * Copyright 2022 Ververica Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,33 +30,33 @@ import static org.junit.Assert.assertTrue;
 
 /** Unit test for {@link TiDBSourceMetrics}. */
 public class TiDBSourceMetricsTest {
-  private static final String FETCH_EVENTTIME_LAG = "currentFetchEventTimeLag";
-  private static final String EMIT_EVENTTIME_LAG = "currentEmitEventTimeLag";
-  private MetricListener metricListener;
-  private TiDBSourceMetrics sourceMetrics;
+    private static final String FETCH_EVENTTIME_LAG = "currentFetchEventTimeLag";
+    private static final String EMIT_EVENTTIME_LAG = "currentEmitEventTimeLag";
+    private MetricListener metricListener;
+    private TiDBSourceMetrics sourceMetrics;
 
-  @Before
-  public void setUp() {
-    metricListener = new MetricListener();
-    sourceMetrics = new TiDBSourceMetrics(metricListener.getMetricGroup());
-    sourceMetrics.registerMetrics();
-  }
+    @Before
+    public void setUp() {
+        metricListener = new MetricListener();
+        sourceMetrics = new TiDBSourceMetrics(metricListener.getMetricGroup());
+        sourceMetrics.registerMetrics();
+    }
 
-  @Test
-  public void testFetchEventTimeLagTracking() {
-    sourceMetrics.recordFetchDelay(5L);
-    assertGauge(metricListener, FETCH_EVENTTIME_LAG, 5L);
-  }
+    @Test
+    public void testFetchEventTimeLagTracking() {
+        sourceMetrics.recordFetchDelay(5L);
+        assertGauge(metricListener, FETCH_EVENTTIME_LAG, 5L);
+    }
 
-  @Test
-  public void testEmitEventTimeLagTracking() {
-    sourceMetrics.recordEmitDelay(3L);
-    assertGauge(metricListener, EMIT_EVENTTIME_LAG, 3L);
-  }
+    @Test
+    public void testEmitEventTimeLagTracking() {
+        sourceMetrics.recordEmitDelay(3L);
+        assertGauge(metricListener, EMIT_EVENTTIME_LAG, 3L);
+    }
 
-  private void assertGauge(MetricListener metricListener, String identifier, long expected) {
-    Optional<Gauge<Object>> gauge = metricListener.getGauge(identifier);
-    assertTrue(gauge.isPresent());
-    assertEquals(expected, (long) gauge.get().getValue());
-  }
+    private void assertGauge(MetricListener metricListener, String identifier, long expected) {
+        Optional<Gauge<Object>> gauge = metricListener.getGauge(identifier);
+        assertTrue(gauge.isPresent());
+        assertEquals(expected, (long) gauge.get().getValue());
+    }
 }
