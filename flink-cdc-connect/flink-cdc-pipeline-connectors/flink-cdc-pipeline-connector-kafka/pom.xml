@@ -83,10 +83,20 @@ limitations under the License.
                         </goals>
                         <configuration>
                             <shadeTestJar>false</shadeTestJar>
+                            <artifactSet>
+                                <includes>
+                                    <include>org.apache.kafka:*</include>
+                                    <include>org.apache.flink:flink-connector-kafka</include>
+                                </includes>
+                            </artifactSet>
                             <relocations>
                                 <relocation>
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>org.apache.flink.cdc.connectors.kafka.shaded.org.apache.kafka</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.flink.connector.kafka</pattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.kafka.shaded.org.apache.flink.connector.kafka</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
