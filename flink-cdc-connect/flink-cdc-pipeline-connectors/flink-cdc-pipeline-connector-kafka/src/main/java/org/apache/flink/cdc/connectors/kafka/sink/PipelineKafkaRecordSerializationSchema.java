@@ -20,7 +20,6 @@ package org.apache.flink.cdc.connectors.kafka.sink;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
 import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner;
@@ -94,10 +93,7 @@ public class PipelineKafkaRecordSerializationSchema
             Event event, KafkaSinkContext context, Long timestamp) {
         ChangeEvent changeEvent = (ChangeEvent) event;
         final byte[] valueSerialized = valueSerialization.serialize(event);
-        if (event instanceof SchemaChangeEvent) {
-            // skip sending SchemaChangeEvent.
-            return null;
-        }
+
         String topic = unifiedTopic == null ? changeEvent.tableId().toString() : unifiedTopic;
         RecordHeaders recordHeaders = new RecordHeaders();
         if (addTableToHeaderEnabled) {

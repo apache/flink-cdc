@@ -63,6 +63,13 @@ public class DebeziumJsonSerializationSchemaTest {
                         .primaryKey("col1")
                         .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
+        createTableEvent.setDdlContent("create table demos {}");
+        JsonNode expected =
+                mapper.readTree(
+                        "{\"before\":null,\"after\":{\"col1\":\"1\",\"col2\":\"1\"},\"op\":\"c\"}");
+        JsonNode actual = mapper.readTree(serializationSchema.serialize(createTableEvent));
+        Assertions.assertEquals(expected, actual);
+
         Assertions.assertNull(serializationSchema.serialize(createTableEvent));
         BinaryRecordDataGenerator generator =
                 new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
@@ -75,10 +82,10 @@ public class DebeziumJsonSerializationSchemaTest {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
                                 }));
-        JsonNode expected =
+        expected =
                 mapper.readTree(
                         "{\"before\":null,\"after\":{\"col1\":\"1\",\"col2\":\"1\"},\"op\":\"c\"}");
-        JsonNode actual = mapper.readTree(serializationSchema.serialize(insertEvent1));
+        actual = mapper.readTree(serializationSchema.serialize(insertEvent1));
         Assertions.assertEquals(expected, actual);
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(

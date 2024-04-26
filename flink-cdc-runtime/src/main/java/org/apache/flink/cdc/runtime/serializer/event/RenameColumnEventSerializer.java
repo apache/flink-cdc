@@ -43,6 +43,7 @@ public class RenameColumnEventSerializer extends TypeSerializerSingleton<RenameC
     private final TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
     private final MapSerializer<String, String> nameMapSerializer =
             new MapSerializer<>(StringSerializer.INSTANCE, StringSerializer.INSTANCE);
+    private final StringSerializer ddlSerializer = StringSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {
@@ -56,7 +57,11 @@ public class RenameColumnEventSerializer extends TypeSerializerSingleton<RenameC
 
     @Override
     public RenameColumnEvent copy(RenameColumnEvent from) {
-        return new RenameColumnEvent(from.tableId(), nameMapSerializer.copy(from.getNameMapping()));
+        RenameColumnEvent event =
+                new RenameColumnEvent(
+                        from.tableId(), nameMapSerializer.copy(from.getNameMapping()));
+        event.setDdlContent(from.getDdlContent());
+        return event;
     }
 
     @Override
@@ -73,12 +78,17 @@ public class RenameColumnEventSerializer extends TypeSerializerSingleton<RenameC
     public void serialize(RenameColumnEvent record, DataOutputView target) throws IOException {
         tableIdSerializer.serialize(record.tableId(), target);
         nameMapSerializer.serialize(record.getNameMapping(), target);
+        ddlSerializer.serialize(record.getDdlContent(), target);
     }
 
     @Override
     public RenameColumnEvent deserialize(DataInputView source) throws IOException {
-        return new RenameColumnEvent(
-                tableIdSerializer.deserialize(source), nameMapSerializer.deserialize(source));
+        RenameColumnEvent event =
+                new RenameColumnEvent(
+                        tableIdSerializer.deserialize(source),
+                        nameMapSerializer.deserialize(source));
+        event.setDdlContent(ddlSerializer.deserialize(source));
+        return event;
     }
 
     @Override

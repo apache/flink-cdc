@@ -37,6 +37,7 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 
+import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
@@ -126,7 +127,13 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
             jsonSerializers.put(
                     schemaChangeEvent.tableId(),
                     new TableSchemaInfo(schema, jsonSerializer, zoneId));
-            return null;
+
+            StringBuilder builder = new StringBuilder();
+            TableId tableId = schemaChangeEvent.tableId();
+            builder.append("{\"databaseName\": \"").append(tableId.getSchemaName()).append("\", ");
+            builder.append("\"schemaName\": null,");
+            builder.append("\"ddl\": \"").append(schemaChangeEvent.getDdlContent()).append("\"}");
+            return builder.toString().getBytes(StandardCharsets.UTF_8);
         }
 
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;

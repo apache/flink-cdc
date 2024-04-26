@@ -23,6 +23,7 @@ import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.serializer.StringSerializer;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
 import org.apache.flink.cdc.runtime.serializer.TypeSerializerSingleton;
 import org.apache.flink.cdc.runtime.serializer.schema.SchemaSerializer;
@@ -41,6 +42,7 @@ public class CreateTableEventSerializer extends TypeSerializerSingleton<CreateTa
 
     private final TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
     private final SchemaSerializer schemaSerializer = SchemaSerializer.INSTANCE;
+    private final StringSerializer ddlSerializer = StringSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {
@@ -54,7 +56,10 @@ public class CreateTableEventSerializer extends TypeSerializerSingleton<CreateTa
 
     @Override
     public CreateTableEvent copy(CreateTableEvent from) {
-        return new CreateTableEvent(from.tableId(), schemaSerializer.copy(from.getSchema()));
+        CreateTableEvent event =
+                new CreateTableEvent(from.tableId(), schemaSerializer.copy(from.getSchema()));
+        event.setDdlContent(from.getDdlContent());
+        return event;
     }
 
     @Override
@@ -71,12 +76,17 @@ public class CreateTableEventSerializer extends TypeSerializerSingleton<CreateTa
     public void serialize(CreateTableEvent record, DataOutputView target) throws IOException {
         tableIdSerializer.serialize(record.tableId(), target);
         schemaSerializer.serialize(record.getSchema(), target);
+        ddlSerializer.serialize(record.getDdlContent(), target);
     }
 
     @Override
     public CreateTableEvent deserialize(DataInputView source) throws IOException {
-        return new CreateTableEvent(
-                tableIdSerializer.deserialize(source), schemaSerializer.deserialize(source));
+        CreateTableEvent event =
+                new CreateTableEvent(
+                        tableIdSerializer.deserialize(source),
+                        schemaSerializer.deserialize(source));
+        event.setDdlContent(ddlSerializer.deserialize(source));
+        return event;
     }
 
     @Override

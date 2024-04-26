@@ -46,6 +46,7 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
     private final TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
     private final MapSerializer<String, DataType> typeMapSerializer =
             new MapSerializer<>(StringSerializer.INSTANCE, new DataTypeSerializer());
+    private final StringSerializer ddlSerializer = StringSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {
@@ -59,8 +60,11 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
 
     @Override
     public AlterColumnTypeEvent copy(AlterColumnTypeEvent from) {
-        return new AlterColumnTypeEvent(
-                from.tableId(), typeMapSerializer.copy(from.getTypeMapping()));
+        AlterColumnTypeEvent event =
+                new AlterColumnTypeEvent(
+                        from.tableId(), typeMapSerializer.copy(from.getTypeMapping()));
+        event.setDdlContent(from.getDdlContent());
+        return event;
     }
 
     @Override
@@ -77,12 +81,17 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
     public void serialize(AlterColumnTypeEvent record, DataOutputView target) throws IOException {
         tableIdSerializer.serialize(record.tableId(), target);
         typeMapSerializer.serialize(record.getTypeMapping(), target);
+        ddlSerializer.serialize(record.getDdlContent(), target);
     }
 
     @Override
     public AlterColumnTypeEvent deserialize(DataInputView source) throws IOException {
-        return new AlterColumnTypeEvent(
-                tableIdSerializer.deserialize(source), typeMapSerializer.deserialize(source));
+        AlterColumnTypeEvent event =
+                new AlterColumnTypeEvent(
+                        tableIdSerializer.deserialize(source),
+                        typeMapSerializer.deserialize(source));
+        event.setDdlContent(ddlSerializer.deserialize(source));
+        return event;
     }
 
     @Override

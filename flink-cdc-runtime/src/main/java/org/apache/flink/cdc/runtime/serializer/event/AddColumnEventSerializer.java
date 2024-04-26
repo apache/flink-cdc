@@ -23,6 +23,7 @@ import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.runtime.serializer.ListSerializer;
+import org.apache.flink.cdc.runtime.serializer.StringSerializer;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
 import org.apache.flink.cdc.runtime.serializer.TypeSerializerSingleton;
 import org.apache.flink.cdc.runtime.serializer.schema.ColumnWithPositionSerializer;
@@ -43,6 +44,7 @@ public class AddColumnEventSerializer extends TypeSerializerSingleton<AddColumnE
     private final TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
     private final ListSerializer<AddColumnEvent.ColumnWithPosition> columnsSerializer =
             new ListSerializer<>(ColumnWithPositionSerializer.INSTANCE);
+    private final StringSerializer ddlSerializer = StringSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {
@@ -56,7 +58,10 @@ public class AddColumnEventSerializer extends TypeSerializerSingleton<AddColumnE
 
     @Override
     public AddColumnEvent copy(AddColumnEvent from) {
-        return new AddColumnEvent(from.tableId(), columnsSerializer.copy(from.getAddedColumns()));
+        AddColumnEvent event =
+                new AddColumnEvent(from.tableId(), columnsSerializer.copy(from.getAddedColumns()));
+        event.setDdlContent(from.getDdlContent());
+        return event;
     }
 
     @Override
@@ -73,12 +78,17 @@ public class AddColumnEventSerializer extends TypeSerializerSingleton<AddColumnE
     public void serialize(AddColumnEvent record, DataOutputView target) throws IOException {
         tableIdSerializer.serialize(record.tableId(), target);
         columnsSerializer.serialize(record.getAddedColumns(), target);
+        ddlSerializer.serialize(record.getDdlContent(), target);
     }
 
     @Override
     public AddColumnEvent deserialize(DataInputView source) throws IOException {
-        return new AddColumnEvent(
-                tableIdSerializer.deserialize(source), columnsSerializer.deserialize(source));
+        AddColumnEvent event =
+                new AddColumnEvent(
+                        tableIdSerializer.deserialize(source),
+                        columnsSerializer.deserialize(source));
+        event.setDdlContent(ddlSerializer.deserialize(source));
+        return event;
     }
 
     @Override

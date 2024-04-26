@@ -43,6 +43,7 @@ public class DropColumnEventSerializer extends TypeSerializerSingleton<DropColum
     private final TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
     private final ListSerializer<String> columnNamesSerializer =
             new ListSerializer<>(StringSerializer.INSTANCE);
+    private final StringSerializer ddlSerializer = StringSerializer.INSTANCE;
 
     @Override
     public boolean isImmutableType() {
@@ -56,8 +57,11 @@ public class DropColumnEventSerializer extends TypeSerializerSingleton<DropColum
 
     @Override
     public DropColumnEvent copy(DropColumnEvent from) {
-        return new DropColumnEvent(
-                from.tableId(), columnNamesSerializer.copy(from.getDroppedColumnNames()));
+        DropColumnEvent event =
+                new DropColumnEvent(
+                        from.tableId(), columnNamesSerializer.copy(from.getDroppedColumnNames()));
+        event.setDdlContent(from.getDdlContent());
+        return event;
     }
 
     @Override
@@ -74,12 +78,17 @@ public class DropColumnEventSerializer extends TypeSerializerSingleton<DropColum
     public void serialize(DropColumnEvent record, DataOutputView target) throws IOException {
         tableIdSerializer.serialize(record.tableId(), target);
         columnNamesSerializer.serialize(record.getDroppedColumnNames(), target);
+        ddlSerializer.serialize(record.getDdlContent(), target);
     }
 
     @Override
     public DropColumnEvent deserialize(DataInputView source) throws IOException {
-        return new DropColumnEvent(
-                tableIdSerializer.deserialize(source), columnNamesSerializer.deserialize(source));
+        DropColumnEvent event =
+                new DropColumnEvent(
+                        tableIdSerializer.deserialize(source),
+                        columnNamesSerializer.deserialize(source));
+        event.setDdlContent(ddlSerializer.deserialize(source));
+        return event;
     }
 
     @Override

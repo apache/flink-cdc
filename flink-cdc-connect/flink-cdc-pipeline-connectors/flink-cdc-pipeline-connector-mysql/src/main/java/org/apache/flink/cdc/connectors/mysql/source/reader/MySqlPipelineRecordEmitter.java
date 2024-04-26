@@ -86,12 +86,8 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
             try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
                 List<TableId> capturedTableIds = listTables(jdbc, sourceConfig.getTableFilters());
                 for (TableId tableId : capturedTableIds) {
-                    Schema schema = getSchema(jdbc, tableId);
-                    createTableEventCache.add(
-                            new CreateTableEvent(
-                                    org.apache.flink.cdc.common.event.TableId.tableId(
-                                            tableId.catalog(), tableId.table()),
-                                    schema));
+                    CreateTableEvent event = buildCreateTableEvent(jdbc, tableId);
+                    createTableEventCache.add(event);
                 }
             } catch (SQLException e) {
                 throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
@@ -122,26 +118,34 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
     private void sendCreateTableEvent(
             JdbcConnection jdbc, TableId tableId, SourceOutput<Event> output) {
-        Schema schema = getSchema(jdbc, tableId);
-        output.collect(
-                new CreateTableEvent(
-                        org.apache.flink.cdc.common.event.TableId.tableId(
-                                tableId.catalog(), tableId.table()),
-                        schema));
+        CreateTableEvent event = buildCreateTableEvent(jdbc, tableId);
+        output.collect(event);
     }
 
-    private Schema getSchema(JdbcConnection jdbc, TableId tableId) {
+    private CreateTableEvent buildCreateTableEvent(JdbcConnection jdbc, TableId tableId) {
         String ddlStatement = showCreateTable(jdbc, tableId);
+
+        Schema schema;
         try {
-            return parseDDL(ddlStatement, tableId);
+            schema = parseDDL(ddlStatement, tableId);
         } catch (ParsingException pe) {
             LOG.warn(
                     "Failed to parse DDL: \n{}\nWill try parsing by describing table.",
                     ddlStatement,
                     pe);
+
+            ddlStatement = describeTable(jdbc, tableId);
+            schema = parseDDL(ddlStatement, tableId);
         }
-        ddlStatement = describeTable(jdbc, tableId);
-        return parseDDL(ddlStatement, tableId);
+
+        CreateTableEvent event =
+                new CreateTableEvent(
+                        org.apache.flink.cdc.common.event.TableId.tableId(
+                                tableId.catalog(), tableId.table()),
+                        schema);
+        event.setDdlContent(ddlStatement);
+
+        return event;
     }
 
     private String showCreateTable(JdbcConnection jdbc, TableId tableId) {
