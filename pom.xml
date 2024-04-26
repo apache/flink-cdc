@@ -50,16 +50,11 @@ limitations under the License.
         </license>
     </licenses>
 
-    <distributionManagement>
-        <snapshotRepository>
-            <id>oss</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
-        </snapshotRepository>
-        <repository>
-            <id>oss</id>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
-    </distributionManagement>
+    <scm>
+        <url>https://github.com/apache/flink-cdc</url>
+        <connection>git@github.com:apache/flink-cdc.git</connection>
+        <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/flink-cdc.git</developerConnection>
+    </scm>
 
     <properties>
         <revision>3.1-SNAPSHOT</revision>
