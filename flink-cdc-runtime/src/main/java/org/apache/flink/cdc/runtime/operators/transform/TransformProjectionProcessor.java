@@ -96,7 +96,8 @@ public class TransformProjectionProcessor {
         List<Column> allColumnList = transformProjection.getAllColumnList();
         // add the column of projection into Schema
         Schema schema = createTableEvent.getSchema().copy(allColumnList);
-        return new CreateTableEvent(createTableEvent.tableId(), schema);
+        return new CreateTableEvent(
+                createTableEvent.tableId(), schema, createTableEvent.getDdlContent());
     }
 
     public void processSchemaChangeEvent(Schema schema) {
