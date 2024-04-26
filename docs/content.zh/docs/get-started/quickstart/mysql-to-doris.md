@@ -188,6 +188,7 @@ MacOS 由于内部实现容器的方式不同，在部署时宿主机直接修�
    **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译.**
     - [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
     - [Apache Doris pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-doris/3.0.0/flink-cdc-pipeline-connector-doris-3.0.0.jar)
+    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 
 3.编写任务配置 yaml 文件
 下面给出了一个整库同步的示例文件 `mysql-to-doris.yaml`：
@@ -226,7 +227,7 @@ sink 添加 `table.create.properties.replication_num` 参数是由于 Docker 镜
 
 4. 最后，通过命令行提交任务到 Flink Standalone cluster
    ```shell
-   bash bin/flink-cdc.sh mysql-to-doris.yaml
+   bash bin/flink-cdc.sh mysql-to-doris.yaml --jar lib/mysql-connector-java-8.0.27.jar
    ```
 提交成功后，返回信息如：
    ```shell
