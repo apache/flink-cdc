@@ -709,107 +709,35 @@ limitations under the License.
             </build>
         </profile>
         <profile>
-            <id>release</id>
+            <!--
+              We're reusing the apache-release build profile defined in the Apache Parent POM,
+              with one exclusion: do not run the source-release-assembly execution goal.
+              We have our own scripts to create the source release, which correctly excludes
+              binaries from distribution tarball.
+              The script can be found under tools/releasing/create_source_release.sh.
+            -->
+            <id>apache-release</id>
             <build>
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.6</version>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.apache.apache.resources</groupId>
+                                <artifactId>apache-source-release-assembly-descriptor</artifactId>
+                                <version>1.0.6</version>
+                            </dependency>
+                        </dependencies>
                         <executions>
                             <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-enforcer-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>enforce-java</id>
-                                <goals>
-                                    <goal>enforce</goal>
-                                </goals>
-                                <configuration>
-                                    <rules>
-                                        <requireJavaVersion>
-                                            <version>[1.8,)</version>
-                                        </requireJavaVersion>
-                                    </rules>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-source-plugin</artifactId>
-                        <version>2.2.1</version><!--$NO-MVN-MAN-VER$-->
-                        <executions>
-                            <execution>
-                                <id>attach-sources</id>
-                                <goals>
-                                    <goal>jar</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>net.ju-n.maven.plugins</groupId>
-                        <artifactId>checksum-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <goals>
-                                    <goal>artifacts</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <algorithms>
-                                <algorithm>SHA-256</algorithm>
-                            </algorithms>
-                            <failOnError>false</failOnError>
-                        </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-javadoc-plugin</artifactId>
-                        <version>2.9.1</version><!--$NO-MVN-MAN-VER$-->
-                        <configuration>
-                            <quiet>true</quiet>
-                            <detectOfflineLinks>false</detectOfflineLinks>
-                            <additionalJOptions combine.children="append">
-                                <additionalJOption>-Xdoclint:none</additionalJOption>
-                            </additionalJOptions>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>attach-javadocs</id>
-                                <goals>
-                                    <goal>jar</goal>
-                                </goals>
+                                <id>source-release-assembly</id>
+                                <!-- disable the execution -->
+                                <phase>none</phase>
                             </execution>
                         </executions>
                     </plugin>
                 </plugins>
-                <pluginManagement>
-                    <plugins>
-                        <plugin>
-                            <groupId>org.apache.maven.plugins</groupId>
-                            <artifactId>maven-release-plugin</artifactId>
-                            <version>2.1</version>
-                            <configuration>
-                                <mavenExecutorId>forked-path</mavenExecutorId>
-                                <useReleaseProfile>false</useReleaseProfile>
-                                <arguments>${arguments} -Psonatype-oss-release</arguments>
-                            </configuration>
-                        </plugin>
-                    </plugins>
-                </pluginManagement>
             </build>
         </profile>
     </profiles>
