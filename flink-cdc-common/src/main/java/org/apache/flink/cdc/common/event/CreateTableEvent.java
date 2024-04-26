@@ -43,6 +43,12 @@ public class CreateTableEvent implements SchemaChangeEvent {
         this.schema = schema;
     }
 
+    public CreateTableEvent(TableId tableId, Schema schema, String ddlContent) {
+        this.tableId = tableId;
+        this.schema = schema;
+        this.ddlContent = ddlContent;
+    }
+
     /** Returns the table schema. */
     public Schema getSchema() {
         return schema;

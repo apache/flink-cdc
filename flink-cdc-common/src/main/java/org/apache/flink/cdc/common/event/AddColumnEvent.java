@@ -46,6 +46,13 @@ public final class AddColumnEvent implements SchemaChangeEvent {
         this.addedColumns = addedColumns;
     }
 
+    public AddColumnEvent(
+            TableId tableId, List<ColumnWithPosition> addedColumns, String ddlContent) {
+        this.tableId = tableId;
+        this.addedColumns = addedColumns;
+        this.ddlContent = ddlContent;
+    }
+
     /** Returns the added columns. */
     public List<ColumnWithPosition> getAddedColumns() {
         return addedColumns;

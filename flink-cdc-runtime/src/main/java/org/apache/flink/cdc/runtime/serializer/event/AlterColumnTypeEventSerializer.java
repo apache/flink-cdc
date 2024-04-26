@@ -60,11 +60,10 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
 
     @Override
     public AlterColumnTypeEvent copy(AlterColumnTypeEvent from) {
-        AlterColumnTypeEvent event =
-                new AlterColumnTypeEvent(
-                        from.tableId(), typeMapSerializer.copy(from.getTypeMapping()));
-        event.setDdlContent(from.getDdlContent());
-        return event;
+        return new AlterColumnTypeEvent(
+                from.tableId(),
+                typeMapSerializer.copy(from.getTypeMapping()),
+                from.getDdlContent());
     }
 
     @Override
@@ -86,12 +85,10 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
 
     @Override
     public AlterColumnTypeEvent deserialize(DataInputView source) throws IOException {
-        AlterColumnTypeEvent event =
-                new AlterColumnTypeEvent(
-                        tableIdSerializer.deserialize(source),
-                        typeMapSerializer.deserialize(source));
-        event.setDdlContent(ddlSerializer.deserialize(source));
-        return event;
+        return new AlterColumnTypeEvent(
+                tableIdSerializer.deserialize(source),
+                typeMapSerializer.deserialize(source),
+                ddlSerializer.deserialize(source));
     }
 
     @Override

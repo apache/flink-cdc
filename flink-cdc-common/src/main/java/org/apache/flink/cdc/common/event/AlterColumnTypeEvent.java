@@ -42,6 +42,13 @@ public class AlterColumnTypeEvent implements SchemaChangeEvent {
         this.typeMapping = typeMapping;
     }
 
+    public AlterColumnTypeEvent(
+            TableId tableId, Map<String, DataType> typeMapping, String ddlContent) {
+        this.tableId = tableId;
+        this.typeMapping = typeMapping;
+        this.ddlContent = ddlContent;
+    }
+
     /** Returns the type mapping. */
     public Map<String, DataType> getTypeMapping() {
         return typeMapping;

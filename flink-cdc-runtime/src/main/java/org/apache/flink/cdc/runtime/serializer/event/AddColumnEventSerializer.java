@@ -58,10 +58,10 @@ public class AddColumnEventSerializer extends TypeSerializerSingleton<AddColumnE
 
     @Override
     public AddColumnEvent copy(AddColumnEvent from) {
-        AddColumnEvent event =
-                new AddColumnEvent(from.tableId(), columnsSerializer.copy(from.getAddedColumns()));
-        event.setDdlContent(from.getDdlContent());
-        return event;
+        return new AddColumnEvent(
+                from.tableId(),
+                columnsSerializer.copy(from.getAddedColumns()),
+                from.getDdlContent());
     }
 
     @Override
@@ -83,12 +83,10 @@ public class AddColumnEventSerializer extends TypeSerializerSingleton<AddColumnE
 
     @Override
     public AddColumnEvent deserialize(DataInputView source) throws IOException {
-        AddColumnEvent event =
-                new AddColumnEvent(
-                        tableIdSerializer.deserialize(source),
-                        columnsSerializer.deserialize(source));
-        event.setDdlContent(ddlSerializer.deserialize(source));
-        return event;
+        return new AddColumnEvent(
+                tableIdSerializer.deserialize(source),
+                columnsSerializer.deserialize(source),
+                ddlSerializer.deserialize(source));
     }
 
     @Override

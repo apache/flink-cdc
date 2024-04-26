@@ -57,11 +57,10 @@ public class RenameColumnEventSerializer extends TypeSerializerSingleton<RenameC
 
     @Override
     public RenameColumnEvent copy(RenameColumnEvent from) {
-        RenameColumnEvent event =
-                new RenameColumnEvent(
-                        from.tableId(), nameMapSerializer.copy(from.getNameMapping()));
-        event.setDdlContent(from.getDdlContent());
-        return event;
+        return new RenameColumnEvent(
+                from.tableId(),
+                nameMapSerializer.copy(from.getNameMapping()),
+                from.getDdlContent());
     }
 
     @Override
@@ -83,12 +82,10 @@ public class RenameColumnEventSerializer extends TypeSerializerSingleton<RenameC
 
     @Override
     public RenameColumnEvent deserialize(DataInputView source) throws IOException {
-        RenameColumnEvent event =
-                new RenameColumnEvent(
-                        tableIdSerializer.deserialize(source),
-                        nameMapSerializer.deserialize(source));
-        event.setDdlContent(ddlSerializer.deserialize(source));
-        return event;
+        return new RenameColumnEvent(
+                tableIdSerializer.deserialize(source),
+                nameMapSerializer.deserialize(source),
+                ddlSerializer.deserialize(source));
     }
 
     @Override

@@ -204,8 +204,8 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
                 createTableEvent =
                         new CreateTableEvent(
                                 tableId,
-                                transformSchemaMetaData(
-                                        createTableEvent.getSchema(), transform.f1));
+                                transformSchemaMetaData(createTableEvent.getSchema(), transform.f1),
+                                createTableEvent.getDdlContent());
             }
         }
 

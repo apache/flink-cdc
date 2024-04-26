@@ -40,6 +40,12 @@ public class RenameColumnEvent implements SchemaChangeEvent {
         this.nameMapping = nameMapping;
     }
 
+    public RenameColumnEvent(TableId tableId, Map<String, String> nameMapping, String ddlContent) {
+        this.tableId = tableId;
+        this.nameMapping = nameMapping;
+        this.ddlContent = ddlContent;
+    }
+
     /** Returns the name mapping. */
     public Map<String, String> getNameMapping() {
         return nameMapping;

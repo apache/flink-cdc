@@ -57,11 +57,10 @@ public class DropColumnEventSerializer extends TypeSerializerSingleton<DropColum
 
     @Override
     public DropColumnEvent copy(DropColumnEvent from) {
-        DropColumnEvent event =
-                new DropColumnEvent(
-                        from.tableId(), columnNamesSerializer.copy(from.getDroppedColumnNames()));
-        event.setDdlContent(from.getDdlContent());
-        return event;
+        return new DropColumnEvent(
+                from.tableId(),
+                columnNamesSerializer.copy(from.getDroppedColumnNames()),
+                from.getDdlContent());
     }
 
     @Override
@@ -83,12 +82,10 @@ public class DropColumnEventSerializer extends TypeSerializerSingleton<DropColum
 
     @Override
     public DropColumnEvent deserialize(DataInputView source) throws IOException {
-        DropColumnEvent event =
-                new DropColumnEvent(
-                        tableIdSerializer.deserialize(source),
-                        columnNamesSerializer.deserialize(source));
-        event.setDdlContent(ddlSerializer.deserialize(source));
-        return event;
+        return new DropColumnEvent(
+                tableIdSerializer.deserialize(source),
+                columnNamesSerializer.deserialize(source),
+                ddlSerializer.deserialize(source));
     }
 
     @Override

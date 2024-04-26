@@ -81,12 +81,10 @@ public class CreateTableEventSerializer extends TypeSerializerSingleton<CreateTa
 
     @Override
     public CreateTableEvent deserialize(DataInputView source) throws IOException {
-        CreateTableEvent event =
-                new CreateTableEvent(
-                        tableIdSerializer.deserialize(source),
-                        schemaSerializer.deserialize(source));
-        event.setDdlContent(ddlSerializer.deserialize(source));
-        return event;
+        return new CreateTableEvent(
+                tableIdSerializer.deserialize(source),
+                schemaSerializer.deserialize(source),
+                ddlSerializer.deserialize(source));
     }
 
     @Override

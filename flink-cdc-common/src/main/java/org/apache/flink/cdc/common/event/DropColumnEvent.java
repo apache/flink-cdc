@@ -42,6 +42,12 @@ public class DropColumnEvent implements SchemaChangeEvent {
         this.droppedColumnNames = droppedColumnNames;
     }
 
+    public DropColumnEvent(TableId tableId, List<String> droppedColumnNames, String ddlContent) {
+        this.tableId = tableId;
+        this.droppedColumnNames = droppedColumnNames;
+        this.ddlContent = ddlContent;
+    }
+
     public List<String> getDroppedColumnNames() {
         return droppedColumnNames;
     }
