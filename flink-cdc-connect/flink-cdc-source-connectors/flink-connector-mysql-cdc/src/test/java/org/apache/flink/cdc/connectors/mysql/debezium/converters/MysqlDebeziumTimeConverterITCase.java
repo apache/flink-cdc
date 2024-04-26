@@ -82,8 +82,6 @@ public class MysqlDebeziumTimeConverterITCase {
     private static final Logger LOG =
             LoggerFactory.getLogger(MysqlDebeziumTimeConverterITCase.class);
 
-    private static final String defaultZone = ZoneId.systemDefault().toString();
-
     @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
     @Before
