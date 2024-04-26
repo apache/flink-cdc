@@ -71,6 +71,7 @@ public class MysqlDebeziumTimeConverter
     protected DateTimeFormatter dateFormatter;
     protected DateTimeFormatter timeFormatter;
     protected DateTimeFormatter datetimeFormatter;
+    protected DateTimeFormatter timestampFormatter;
     protected String schemaNamePrefix;
     protected static DateTimeFormatter originalFormat =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -81,6 +82,7 @@ public class MysqlDebeziumTimeConverter
         String dateFormat = properties.getProperty("format.date", DATE_FORMAT);
         String timeFormat = properties.getProperty("format.time", TIME_FORMAT);
         String datetimeFormat = properties.getProperty("format.datetime", DATETIME_FORMAT);
+        String timestampFormat = properties.getProperty("format.timestamp", DATETIME_FORMAT);
         this.parseNullDefaultValue =
                 Boolean.parseBoolean(
                         properties.getProperty("format.default.value.convert", "true"));
@@ -89,6 +91,7 @@ public class MysqlDebeziumTimeConverter
         this.dateFormatter = DateTimeFormatter.ofPattern(dateFormat);
         this.timeFormatter = DateTimeFormatter.ofPattern(timeFormat);
         this.datetimeFormatter = DateTimeFormatter.ofPattern(datetimeFormat);
+        this.timestampFormatter = DateTimeFormatter.ofPattern(timestampFormat);
         this.zoneId =
                 ZoneId.of(
                         properties.getProperty(
@@ -169,19 +172,20 @@ public class MysqlDebeziumTimeConverter
         if (timestamp instanceof Timestamp) {
             Timestamp value = (Timestamp) timestamp;
             ZonedDateTime zonedDateTime = value.toInstant().atZone(zoneId);
-            return ConvertTimeBceUtil.resolveEra(value, zonedDateTime.format(timeFormatter));
+            return ConvertTimeBceUtil.resolveEra(value, zonedDateTime.format(timestampFormatter));
         } else if (timestamp instanceof OffsetDateTime) {
             OffsetDateTime value = (OffsetDateTime) timestamp;
-            return ConvertTimeBceUtil.resolveEra(value.toLocalDate(), value.format(timeFormatter));
+            return ConvertTimeBceUtil.resolveEra(
+                    value.toLocalDate(), value.format(timestampFormatter));
         } else if (timestamp instanceof ZonedDateTime) {
             ZonedDateTime zonedDateTime = (ZonedDateTime) timestamp;
             return ConvertTimeBceUtil.resolveEra(
-                    zonedDateTime.toLocalDate(), zonedDateTime.format(timeFormatter));
+                    zonedDateTime.toLocalDate(), zonedDateTime.format(timestampFormatter));
         } else if (timestamp instanceof Instant) {
             OffsetDateTime dateTime = OffsetDateTime.ofInstant((Instant) timestamp, zoneId);
             ZonedDateTime timestampZt = ZonedDateTime.from(dateTime);
             LocalDate localDate = timestampZt.toLocalDate();
-            return ConvertTimeBceUtil.resolveEra(localDate, timestampZt.format(timeFormatter));
+            return ConvertTimeBceUtil.resolveEra(localDate, timestampZt.format(timestampFormatter));
         } else {
             if (!loggedUnknownTimestampWithTimeZoneClass) {
                 printUnknownDateClassLogs(columnType, timestamp);
@@ -192,7 +196,7 @@ public class MysqlDebeziumTimeConverter
             OffsetDateTime dateTime = OffsetDateTime.ofInstant(instant, zoneId);
             ZonedDateTime timestampZt = ZonedDateTime.from(dateTime);
             LocalDate localDate = timestampZt.toLocalDate();
-            return ConvertTimeBceUtil.resolveEra(localDate, timestampZt.format(timeFormatter));
+            return ConvertTimeBceUtil.resolveEra(localDate, timestampZt.format(timestampFormatter));
         }
     }
 
@@ -304,8 +308,9 @@ public class MysqlDebeziumTimeConverter
                     case "DATETIME":
                         return dateTime.format(datetimeFormatter);
                     case "TIME":
-                    case "TIMESTAMP":
                         return dateTime.format(timeFormatter);
+                    case "TIMESTAMP":
+                        return dateTime.format(timestampFormatter);
                 }
             }
         }

@@ -100,6 +100,11 @@ public class MysqlDebeziumTimeConverterITCase {
     }
 
     @Test
+    public void testReadDateConvertDataStreamInJvmTime() throws Exception {
+        testReadDateConvertDataStreamSource(ZoneId.systemDefault().toString());
+    }
+
+    @Test
     public void testReadDateConvertDataStreamInAsia() throws Exception {
         testReadDateConvertDataStreamSource("Asia/Shanghai");
     }
@@ -188,9 +193,9 @@ public class MysqlDebeziumTimeConverterITCase {
                                 + " 'debezium.converters' = 'datetime',"
                                 + " 'debezium.datetime.type' = '%s',"
                                 + " 'debezium.database.connectionTimeZone' = '%s',"
-                                + " 'debezium.datetime.format.date' = 'yyyy-MM-dd',"
                                 + " 'debezium.datetime.format.time' = 'HH:mm:ss',"
                                 + " 'debezium.datetime.format.timezone' = '%s',"
+                                + " 'debezium.datetime.format.timestamp' = 'HH:mm:ss',"
                                 + " 'debezium.datetime.format.default.value.convert' = 'true'"
                                 + ")",
                         mySqlContainer.getHost(),
@@ -213,10 +218,7 @@ public class MysqlDebeziumTimeConverterITCase {
         // set properties
         debeziumProperties.setProperty("converters", "datetime");
         debeziumProperties.setProperty("datetime.type", MysqlDebeziumTimeConverter.class.getName());
-        debeziumProperties.setProperty("datetime.format.date", "yyyy-MM-dd");
-        debeziumProperties.setProperty("datetime.format.time", "HH:mm:ss");
-        debeziumProperties.setProperty("datetime.format.datetime", "yyyy-MM-dd HH:mm:ss");
-        debeziumProperties.setProperty("datetime.format.timestamp", "yyyy-MM-dd HH:mm:ss");
+        debeziumProperties.setProperty("datetime.format.timestamp", "HH:mm:ss");
         debeziumProperties.setProperty("datetime.format.default.value.convert", "false");
         // If not set time convert maybe error
         debeziumProperties.setProperty("database.connectionTimeZone", timezone);
