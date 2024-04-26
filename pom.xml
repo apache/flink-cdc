@@ -28,7 +28,7 @@ limitations under the License.
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.apache.flink</groupId>
-    <artifactId>flink-cdc</artifactId>
+    <artifactId>flink-cdc-parent</artifactId>
     <version>${revision}</version>
     <packaging>pom</packaging>
 
