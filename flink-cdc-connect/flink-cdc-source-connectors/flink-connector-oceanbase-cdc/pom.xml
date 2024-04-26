@@ -24,8 +24,7 @@ limitations under the License.
         <version>${revision}</version>
     </parent>
     <properties>
-        <!-- Because of oceanbase docker image can not expose port quickly, so we need to specify testcontainers version to 1.15.3 -->
-        <jdbc.version>1.15.3</jdbc.version>
+        <oblogclient.version>1.1.2</oblogclient.version>
     </properties>
     <modelVersion>4.0.0</modelVersion>
 
@@ -34,6 +33,13 @@ limitations under the License.
     <packaging>jar</packaging>
 
     <dependencies>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-base</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Debezium dependencies -->
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -47,12 +53,6 @@ limitations under the License.
             </exclusions>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-cdc-common</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- OceanBase Log Client -->
         <dependency>
             <groupId>com.oceanbase</groupId>
@@ -64,7 +64,13 @@ limitations under the License.
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
-            <version>5.1.47</version>
+            <version>8.0.27</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.protobuf</groupId>
+                    <artifactId>protobuf-java</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- test dependencies on Flink -->
@@ -151,7 +157,7 @@ limitations under the License.
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>jdbc</artifactId>
-            <version>${jdbc.version}</version>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
 

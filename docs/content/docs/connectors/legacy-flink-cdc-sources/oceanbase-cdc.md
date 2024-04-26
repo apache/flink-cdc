@@ -28,22 +28,81 @@ under the License.
 
 The OceanBase CDC connector allows for reading snapshot data and incremental data from OceanBase. This document describes how to set up the OceanBase CDC connector to run SQL queries against OceanBase.
 
+### OceanBase CDC Solutions
+
+Glossary:
+
+- *OceanBase CE*: OceanBase Community Edition. It's compatible with MySQL and has been open sourced at https://github.com/oceanbase/oceanbase.
+- *OceanBase EE*: OceanBase Enterprise Edition. It supports two compatibility modes: MySQL and Oracle. See https://en.oceanbase.com.
+- *OceanBase Cloud*: OceanBase Enterprise Edition on Cloud. See https://en.oceanbase.com/product/cloud.
+- *Log Proxy CE*: OceanBase Log Proxy Community Edition (CDC mode). It's a proxy service which can fetch the commit log data of OceanBase CE. It has been open sourced at https://github.com/oceanbase/oblogproxy.
+- *Log Proxy EE*: OceanBase Log Proxy Enterprise Edition (CDC mode). It's a proxy service which can fetch the commit log data of OceanBase EE. Limited support is available on OceanBase Cloud only, you can contact the provider support for more details.
+- *Binlog Service CE*: OceanBase Binlog Service Community Edition. It is a solution of OceanBase CE that is compatible with the MySQL replication protocol. See the docs of Log Proxy CE (Binlog mode) for details.
+- *Binlog Service EE*: OceanBase Binlog Service Enterprise Edition. It is a solution of OceanBase EE MySQL mode that is compatible with the MySQL replication protocol, and it's only available for users of Alibaba Cloud, see [User Guide](https://www.alibabacloud.com/help/en/apsaradb-for-oceanbase/latest/binlog-overview).
+- *MySQL Driver*: `mysql-connector-java` which can be used with OceanBase CE and OceanBase EE MySQL mode.
+- *OceanBase Driver*: The Jdbc driver for OceanBase, which supports both MySQL mode and Oracle mode of all OceanBase versions. It's open sourced at https://github.com/oceanbase/obconnector-j.
+
+CDC Source Solutions for OceanBase:
+
+<div class="wy-table-responsive">
+    <table class="colwidths-auto docutils">
+        <thead>
+            <tr>
+                <th class="text-left">Database</th>
+                <th class="text-left">Supported Driver</th>
+                <th class="text-left">CDC Source Connector</th>
+                <th class="text-left">Other Required Components</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td rowspan="2">OceanBase CE</td>
+                <td>
+                    MySQL Driver: 5.1.4x, 8.0.x <br>
+                    OceanBase Driver: 2.4.x
+                </td>
+                <td>OceanBase CDC Connector</td>
+                <td>Log Proxy CE</td>
+            </tr>
+            <tr>
+                <td>MySQL Driver: 8.0.x</td>
+                <td>MySQL CDC Connector</td>
+                <td>Binlog Service CE</td>
+            </tr>
+            <tr>
+                <td rowspan="2">OceanBase EE (MySQL Mode)</td>
+                <td>
+                    MySQL Driver: 5.1.4x, 8.0.x <br>
+                    OceanBase Driver: 2.4.x
+                </td>
+                <td>OceanBase CDC Connector</td>
+                <td>Log Proxy EE</td>
+            </tr>
+            <tr>
+                <td>MySQL Driver: 8.0.x</td>
+                <td>MySQL CDC Connector</td>
+                <td>Binlog Service EE</td>
+            </tr>
+            <tr>
+                <td>OceanBase EE (Oracle Mode)</td>
+                <td>OceanBase Driver: 2.4.x</td>
+                <td>OceanBase CDC Connector</td>
+                <td>Log Proxy EE (CDC Mode)</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+Note: For users of OceanBase CE or OceanBase EE MySQL Mode, we recommend that you follow the [MySQL CDC documentation](mysql-cdc.md) to use the MySQL CDC source connector with the Binlog service.
+
 Dependencies
 ------------
 
 In order to set up the OceanBase CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
+### Maven dependency
+
 {{< artifact flink-connector-oceanbase-cdc >}}
-
-If you want to use OceanBase JDBC driver to connect to the enterprise edition database, you should also include the following dependency in your class path.
-
-```xml
-<dependency>
-   <groupId>com.oceanbase</groupId>
-   <artifactId>oceanbase-client</artifactId>
-   <version>2.4.2</version>
-</dependency>
-```
 
 ### SQL Client JAR
 
@@ -53,7 +112,30 @@ Download [flink-sql-connector-oceanbase-cdc-3.0.1.jar](https://repo1.maven.org/m
 
 **Note:** Refer to [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oceanbase-cdc), more released versions will be available in the Maven central warehouse.
 
-Due to the license issue, we can not include the OceanBase JDBC driver in the cdc jar. If you need to use it, you can download it from [here](https://repo1.maven.org/maven2/com/oceanbase/oceanbase-client/2.4.2/oceanbase-client-2.4.2.jar) and put it under `<FLINK_HOME>/lib/`, you also need to set the start option `jdbc.driver` to `com.oceanbase.jdbc.Driver`.
+Since the licenses of MySQL Driver and OceanBase Driver are incompatible with Flink CDC project, we can't provide them in prebuilt connector jar packages. You may need to configure the following dependencies manually.
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">Dependency Item</th>
+        <th class="text-left">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="https://mvnrepository.com/artifact/mysql/mysql-connector-java/8.0.27">mysql:mysql-connector-java:8.0.27</a></td>
+        <td>Used for connecting to MySQL tenant of OceanBase.</td>
+      </tr>
+    </tbody>
+    <tbody>
+      <tr>
+        <td><a href="https://mvnrepository.com/artifact/com.oceanbase/oceanbase-client/2.4.9">com.oceanbase:oceanbase-client:2.4.9</a></td>
+        <td>Used for connecting to MySQL or Oracle tenant of OceanBase.</td>
+      </tr>
+    </tbody>
+</table>
+</div>
 
 Setup OceanBase and LogProxy Server
 ----------------------
@@ -84,7 +166,7 @@ Setup OceanBase and LogProxy Server
     mysql> show parameters like 'obconfig_url';
     ```
 
-5. Setup OceanBase LogProxy. For users of OceanBase Community Edition, you can follow the [quick start](https://github.com/oceanbase/oblogproxy#getting-started).
+5. Setup OceanBase LogProxy. For users of OceanBase Community Edition, you can follow the [docs (Chinese)](https://www.oceanbase.com/docs/community-oblogproxy-doc-1000000000531984).
 
 How to create a OceanBase CDC table
 ----------------
@@ -162,7 +244,7 @@ Connector Options
 The OceanBase CDC Connector contains some options for both sql and stream api as the following sheet. 
 
 *Note*: The connector supports two ways to specify the table list to listen to, and will get the union of the results when both way are used at the same time.
-1. Use `database-name` and `table-name` to match database and table names in regex. As the `obcdc` (former `liboblog`) only supports `fnmatch` now, we can't use regex directly to filter change events, so these two options can only be used in `initial` startup mode.
+1. Use `database-name` and `table-name` to match database and table names in regex.
 2. Use `table-list` to match the exact value of database and table names.
 
 <div class="highlight">
@@ -186,11 +268,11 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
             </tr>
             <tr>
                 <td>scan.startup.mode</td>
-                <td>required</td>
-                <td style="word-wrap: break-word;">(none)</td>
+                <td>optional</td>
+                <td style="word-wrap: break-word;">initial</td>
                 <td>String</td>
                 <td>Specify the startup mode for OceanBase CDC consumer, valid enumerations are
-                    <code>'initial'</code>,<code>'latest-offset'</code> or <code>'timestamp'</code>.
+                    <code>'initial'</code>,<code>'latest-offset'</code>,<code>'timestamp'</code> or <code>'snapshot'</code>.
                 </td>
             </tr>
             <tr>
@@ -216,24 +298,24 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
             </tr>
             <tr>
                 <td>tenant-name</td>
-                <td>required</td>
+                <td>optional</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Tenant name of OceanBase to monitor, should be exact value.</td>
+                <td>Tenant name of OceanBase to monitor, should be exact value. Required when 'scan.startup.mode' is not 'snapshot'.</td>
             </tr>
             <tr>
                 <td>database-name</td>
                 <td>optional</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Database name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.</td>
+                <td>Database name of OceanBase to monitor, should be regular expression.</td>
             </tr>
             <tr>
                 <td>table-name</td>
                 <td>optional</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Table name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.</td>
+                <td>Table name of OceanBase to monitor, should be regular expression.</td>
             </tr>
             <tr>
                 <td>table-list</td>
@@ -244,14 +326,14 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
             </tr>
             <tr>
                 <td>hostname</td>
-                <td>optional</td>
+                <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
                 <td>IP address or hostname of the OceanBase database server or OceanBase Proxy server.</td>
             </tr>
             <tr>
                 <td>port</td>
-                <td>optional</td>
+                <td>required</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>Integer</td>
                 <td>Integer port number to connect to OceanBase. It can be the SQL port of OceanBase server, which is 2881 by default, or the port of OceanBase proxy service, which is 2883 by default.</td>
@@ -272,17 +354,17 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
             </tr>
             <tr>
                 <td>logproxy.host</td>
-                <td>required</td>
+                <td>optional</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>String</td>
-                <td>Hostname or IP address of OceanBase log proxy service.</td>
+                <td>Hostname or IP address of OceanBase log proxy service. Required when 'scan.startup.mode' is not 'snapshot'.</td>
             </tr>
             <tr>
                 <td>logproxy.port</td>
-                <td>required</td>
+                <td>optional</td>
                 <td style="word-wrap: break-word;">(none)</td>
                 <td>Integer</td>
-                <td>Port number of OceanBase log proxy service.</td>
+                <td>Port number of OceanBase log proxy service. Required when 'scan.startup.mode' is not 'snapshot'.</td>
             </tr>
             <tr>
                 <td>logproxy.client.id</td>
@@ -322,7 +404,7 @@ The OceanBase CDC Connector contains some options for both sql and stream api as
             <tr>
                 <td>jdbc.driver</td>
                 <td>optional</td>
-                <td style="word-wrap: break-word;">com.mysql.jdbc.Driver</td>
+                <td style="word-wrap: break-word;">com.mysql.cj.jdbc.Driver</td>
                 <td>String</td>
                 <td>JDBC driver class for snapshot reading.</td>
             </tr>
@@ -360,13 +442,18 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
     <tbody>
         <tr>
             <td>tenant_name</td>
-            <td>STRING NOT NULL</td>
+            <td>STRING</td>
             <td>Name of the tenant that contains the row.</td>
         </tr>
         <tr>
             <td>database_name</td>
-            <td>STRING NOT NULL</td>
+            <td>STRING</td>
             <td>Name of the database that contains the row.</td>
+        </tr>
+        <tr>
+            <td>schema_name</td>
+            <td>STRING</td>
+            <td>Name of the schema that contains the row.</td>
         </tr>
         <tr>
             <td>table_name</td>
@@ -430,6 +517,7 @@ The config option `scan.startup.mode` specifies the startup mode for OceanBase C
 - `initial`: Performs an initial snapshot on the monitored table upon first startup, and continue to read the latest commit log.
 - `latest-offset`: Never to perform snapshot on the monitored table upon first startup and just read the latest commit log since the connector is started.
 - `timestamp`: Never to perform snapshot on the monitored table upon first startup and just read the commit log from the given `scan.startup.timestamp`.
+- `snapshot`: Only perform snapshot on the monitored table.
 
 ### Consume Commit Log
 
@@ -440,65 +528,31 @@ The OceanBase CDC Connector using [oblogclient](https://github.com/oceanbase/obl
 The OceanBase CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:
 
 ```java
-import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.cdc.connectors.oceanbase.OceanBaseSource;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.catalog.Column;
-import org.apache.flink.table.catalog.ResolvedSchema;
-import org.apache.flink.table.catalog.UniqueConstraint;
-import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
-import org.apache.flink.table.types.logical.RowType;
-
-import org.apache.flink.cdc.connectors.oceanbase.OceanBaseSource;
-import org.apache.flink.cdc.connectors.oceanbase.source.RowDataOceanBaseDeserializationSchema;
-import org.apache.flink.cdc.connectors.oceanbase.table.OceanBaseDeserializationSchema;
-import org.apache.flink.cdc.connectors.oceanbase.table.StartupMode;
-
-import java.time.ZoneId;
-import java.util.Arrays;
-import java.util.Collections;
 
 public class OceanBaseSourceExample {
    public static void main(String[] args) throws Exception {
-      ResolvedSchema resolvedSchema =
-              new ResolvedSchema(
-                      Arrays.asList(
-                              Column.physical("id", DataTypes.INT().notNull()),
-                              Column.physical("name", DataTypes.STRING().notNull())),
-                      Collections.emptyList(),
-                      UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
-
-      RowType physicalDataType =
-              (RowType) resolvedSchema.toPhysicalRowDataType().getLogicalType();
-      TypeInformation<RowData> resultTypeInfo = InternalTypeInfo.of(physicalDataType);
-      String serverTimeZone = "+00:00";
-
-      OceanBaseDeserializationSchema<RowData> deserializer =
-              RowDataOceanBaseDeserializationSchema.newBuilder()
-                      .setPhysicalRowType(physicalDataType)
-                      .setResultTypeInfo(resultTypeInfo)
-                      .setServerTimeZone(ZoneId.of(serverTimeZone))
-                      .build();
-
-      SourceFunction<RowData> oceanBaseSource =
-              OceanBaseSource.<RowData>builder()
-                      .rsList("127.0.0.1:2882:2881")
-                      .startupMode(StartupMode.INITIAL)
+      SourceFunction<String> oceanBaseSource =
+              OceanBaseSource.<String>builder()
+                      .startupOptions(StartupOptions.initial())
+                      .hostname("127.0.0.1")
+                      .port(2881)
                       .username("user@test_tenant")
                       .password("pswd")
+                      .compatibleMode("mysql")
+                      .jdbcDriver("com.mysql.cj.jdbc.Driver")
                       .tenantName("test_tenant")
                       .databaseName("^test_db$")
                       .tableName("^test_table$")
-                      .hostname("127.0.0.1")
-                      .port(2881)
-                      .compatibleMode("mysql")
-                      .jdbcDriver("com.mysql.jdbc.Driver")
                       .logProxyHost("127.0.0.1")
                       .logProxyPort(2983)
-                      .serverTimeZone(serverTimeZone)
-                      .deserializer(deserializer)
+                      .rsList("127.0.0.1:2882:2881")
+                      .serverTimeZone("+08:00")
+                      .deserializer(new JsonDebeziumDeserializationSchema())
                       .build();
 
       StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -511,6 +565,7 @@ public class OceanBaseSourceExample {
    }
 }
 ```
+
 Data Type Mapping
 ----------------
 
