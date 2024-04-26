@@ -190,6 +190,7 @@ This command automatically starts all the containers defined in the Docker Compo
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
     - [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
     - [Apache Doris pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-doris/3.0.0/flink-cdc-pipeline-connector-doris-3.0.0.jar)
+    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 
 3. Write task configuration yaml file 
   Here is an example file for synchronizing the entire database `mysql-to-doris.yaml`：
@@ -228,7 +229,7 @@ Notice that:
 
 4. Finally, submit job to Flink Standalone cluster using Cli.
    ```shell
-   bash bin/flink-cdc.sh mysql-to-doris.yaml
+   bash bin/flink-cdc.sh mysql-to-doris.yaml --jar lib/mysql-connector-java-8.0.27.jar
    ```
 After successful submission, the return information is as follows：
    ```shell
