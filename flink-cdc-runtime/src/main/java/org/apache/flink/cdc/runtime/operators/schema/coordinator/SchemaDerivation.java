@@ -123,7 +123,7 @@ public class SchemaDerivation {
         TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
         // Serialize derivation mapping in SchemaDerivation
         Map<TableId, Set<TableId>> derivationMapping = schemaDerivation.getDerivationMapping();
-        out.write(derivationMapping.size());
+        out.writeInt(derivationMapping.size());
         for (Map.Entry<TableId, Set<TableId>> entry : derivationMapping.entrySet()) {
             // Routed table ID
             TableId routedTableId = entry.getKey();
