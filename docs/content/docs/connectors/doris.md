@@ -162,7 +162,7 @@ pipeline:
        <td>String</td>
        <td> Parameters of StreamLoad.
          For example: <code> sink.properties.strict_mode: true</code>.
-         See more about <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-reference/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad Properties properties</a></td>
+         See more about <a href="https://doris.apache.org/docs/dev/sql-manual/sql-statements/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad Properties properties</a></td>
        </td>
      </tr>
      <tr>
@@ -172,7 +172,7 @@ pipeline:
        <td>String</td>
        <td>Create the Properties configuration of the table.
          For example: <code> table.create.properties.replication_num: 1</code>.
-         See more about <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-reference/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table Properties properties</a></td>
+         See more about <a href="https://doris.apache.org/docs/dev/sql-manual/sql-statements/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table Properties properties</a></td>
        </td>
      </tr>
      </tbody>
@@ -186,7 +186,7 @@ pipeline:
     <thead>
       <tr>
         <th class="text-left" style="width:10%;">Flink CDC Type</th>
-        <th class="text-left" style="width:30%;"><a href="https://doris.apache.org/docs/dev/sql-manual/sql-reference/Data-Types/BOOLEAN/">Doris Type</a></th>
+        <th class="text-left" style="width:30%;"><a href="https://doris.apache.org/docs/dev/sql-manual/sql-types/Data-Types/BOOLEAN/">Doris Type</a></th>
         <th class="text-left" style="width:60%;">Note</th>
       </tr>
     </thead>
