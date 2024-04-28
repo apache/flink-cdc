@@ -44,7 +44,7 @@ if synchronize the table `web_order` in the database `mydb` to a Doris table `od
 
 ```yaml
 route:
-    source-table: mydb.web_order
+  - source-table: mydb.web_order
     sink-table: mydb.ods_web_order
     description: sync table to one destination table with given prefix ods_
 ```
@@ -53,7 +53,7 @@ route:
 What's more, if you want to synchronize the sharding tables in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route：
 ```yaml
 route:
-    source-table: mydb\.*
+  - source-table: mydb\.*
     sink-table: mydb.ods_web_order
     description: sync sharding tables to one destination table
 ```
