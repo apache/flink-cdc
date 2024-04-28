@@ -57,15 +57,19 @@ import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions
 import org.apache.flink.cdc.connectors.maxcompute.utils.TypeConvertUtils;
 import org.apache.flink.cdc.connectors.maxcompute.writer.MaxComputeUpsertWriter;
 import org.apache.flink.cdc.connectors.maxcompute.writer.MaxComputeWriter;
+import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
 import com.aliyun.odps.tunnel.impl.UpsertRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 /** a {@link SinkWriter} for {@link Event} for MaxCompute. */
 public class MaxComputeEventWriter implements SinkWriter<Event> {
@@ -145,22 +149,35 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
     public void flush(boolean endOfInput) throws IOException, InterruptedException {
         SessionManageOperator operator = SessionManageOperator.instance;
         LOG.info("Sink writer {} start to flush.", context.getSubtaskId());
-        writerMap.forEach(
-                (sessionId, writer) -> {
-                    try {
-                        writer.flush();
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                });
+        List<Future<CoordinationResponse>> responces = new ArrayList<>(writerMap.size() + 1);
+        writerMap.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(
+                        entry -> {
+                            try {
+                                entry.getValue().flush();
+                                Future<CoordinationResponse> future =
+                                        operator.submitRequestToOperator(
+                                                new CommitSessionRequest(
+                                                        context.getSubtaskId(), entry.getKey()));
+                                responces.add(future);
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
         writerMap.clear();
+        Future<CoordinationResponse> future =
+                operator.submitRequestToOperator(
+                        new CommitSessionRequest(context.getSubtaskId(), Constant.END_OF_SESSION));
+        responces.add(future);
         try {
-            CommitSessionResponse response =
-                    (CommitSessionResponse)
-                            operator.sendRequestToOperator(
-                                    new CommitSessionRequest(context.getSubtaskId()));
-            if (!response.isSuccess()) {
-                throw new IOException("JobManager commit session failed. restart all TaskManager");
+            for (Future<CoordinationResponse> response : responces) {
+                CommitSessionResponse commitSessionResponse =
+                        (CommitSessionResponse) response.get();
+                if (!commitSessionResponse.isSuccess()) {
+                    throw new IOException(
+                            "JobManager commit session failed. restart all TaskManager");
+                }
             }
         } catch (ExecutionException e) {
             throw new IOException(e);

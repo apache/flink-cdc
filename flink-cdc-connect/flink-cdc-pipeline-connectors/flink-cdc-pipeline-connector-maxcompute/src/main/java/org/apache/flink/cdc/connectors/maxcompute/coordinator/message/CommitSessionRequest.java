@@ -30,17 +30,29 @@ public class CommitSessionRequest implements CoordinationRequest {
     private static final long serialVersionUID = 1L;
 
     private final int operatorIndex;
+    private final String sessionId;
 
-    public CommitSessionRequest(int operatorIndex) {
+    public CommitSessionRequest(int operatorIndex, String sessionId) {
         this.operatorIndex = operatorIndex;
+        this.sessionId = sessionId;
     }
 
     public int getOperatorIndex() {
         return operatorIndex;
     }
 
+    public String getSessionId() {
+        return sessionId;
+    }
+
     @Override
     public String toString() {
-        return "CommitSessionRequest{" + "operatorIndex=" + operatorIndex + '}';
+        return "CommitSessionRequest{"
+                + "operatorIndex="
+                + operatorIndex
+                + ", sessionId='"
+                + sessionId
+                + '\''
+                + '}';
     }
 }

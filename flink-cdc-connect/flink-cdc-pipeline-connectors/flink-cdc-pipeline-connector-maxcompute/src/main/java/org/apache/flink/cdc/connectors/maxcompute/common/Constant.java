@@ -26,4 +26,6 @@ public class Constant {
 
     public static final String PIPELINE_SESSION_MANAGE_OPERATOR_UID =
             "$$_session_manage_operator_$$";
+
+    public static final String END_OF_SESSION = "end_of_session";
 }
