@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 /**
  * Processes a {@link DataChangeEvent}, extracting data and encapsulating it into a {@link
@@ -193,5 +194,11 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
         return taskOperatorEventGateway
                 .sendRequestToCoordinator(getOperatorID(), new SerializedValue<>(request))
                 .get();
+    }
+
+    public Future<CoordinationResponse> submitRequestToOperator(CoordinationRequest request)
+            throws IOException {
+        return taskOperatorEventGateway.sendRequestToCoordinator(
+                getOperatorID(), new SerializedValue<>(request));
     }
 }
