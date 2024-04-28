@@ -17,6 +17,9 @@
 
 package org.apache.flink.cdc.runtime.functions;
 
+import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.utils.DateTimeUtils;
 
 import org.slf4j.Logger;
@@ -42,8 +45,8 @@ public class SystemFunctionUtils {
         return DateTimeUtils.timestampMillisToTime(epochTime);
     }
 
-    public static long localtimestamp(long epochTime, String timezone) {
-        return epochTime;
+    public static TimestampData localtimestamp(long epochTime, String timezone) {
+        return TimestampData.fromMillis(epochTime);
     }
 
     // synonym: localtime
@@ -55,18 +58,28 @@ public class SystemFunctionUtils {
         return DateTimeUtils.timestampMillisToDate(epochTime);
     }
 
-    public static long currentTimestamp(long epochTime, String timezone) {
-        return epochTime + TimeZone.getTimeZone(timezone).getOffset(epochTime);
+    public static TimestampData currentTimestamp(long epochTime, String timezone) {
+        return TimestampData.fromMillis(
+                epochTime + TimeZone.getTimeZone(timezone).getOffset(epochTime));
     }
 
-    // synonym: currentTimestamp
-    public static long now(long epochTime, String timezone) {
-        return currentTimestamp(epochTime, timezone);
+    public static LocalZonedTimestampData now(long epochTime, String timezone) {
+        return LocalZonedTimestampData.fromEpochMillis(epochTime);
     }
 
-    public static String dateFormat(long timestamp, String format) {
+    public static String dateFormat(LocalZonedTimestampData timestamp, String format) {
         SimpleDateFormat dateFormat = new SimpleDateFormat(format);
-        return dateFormat.format(new Date(timestamp));
+        return dateFormat.format(new Date(timestamp.getEpochMillisecond()));
+    }
+
+    public static String dateFormat(TimestampData timestamp, String format) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
+        return dateFormat.format(new Date(timestamp.getMillisecond()));
+    }
+
+    public static String dateFormat(ZonedTimestampData timestamp, String format) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
+        return dateFormat.format(new Date(timestamp.getMillisecond()));
     }
 
     public static int toDate(String str) {
@@ -77,18 +90,36 @@ public class SystemFunctionUtils {
         return DateTimeUtils.parseDate(str, format);
     }
 
-    public static long toTimestamp(String str) {
+    public static TimestampData toTimestamp(String str) {
         return toTimestamp(str, "yyyy-MM-dd HH:mm:ss");
     }
 
-    public static long toTimestamp(String str, String format) {
+    public static TimestampData toTimestamp(String str, String format) {
         SimpleDateFormat dateFormat = new SimpleDateFormat(format);
         try {
-            return dateFormat.parse(str).getTime();
+            return TimestampData.fromMillis(dateFormat.parse(str).getTime());
         } catch (ParseException e) {
             LOG.error("Unsupported date type convert: {}", str);
             throw new RuntimeException(e);
         }
+    }
+
+    public static int timestampDiff(
+            String symbol,
+            LocalZonedTimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp) {
+        return timestampDiff(
+                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getEpochMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, TimestampData fromTimestamp, TimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, ZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
     }
 
     public static int timestampDiff(String symbol, long fromDate, long toDate) {
