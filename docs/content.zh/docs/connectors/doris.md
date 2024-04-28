@@ -162,7 +162,7 @@ pipeline:
       <td>String</td>
       <td>StreamLoad的参数。
         For example: <code> sink.properties.strict_mode: true</code>.
-        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-reference/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad的Properties 属性</a></td> 
+        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad的Properties 属性</a></td> 
       </td>
     </tr>
     <tr>
@@ -172,7 +172,7 @@ pipeline:
       <td>String</td>
       <td>创建表的Properties配置。
         For example: <code> table.create.properties.replication_num: 1</code>.
-        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-reference/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table 的  Properties 属性</a></td> 
+        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table 的  Properties 属性</a></td> 
       </td>
     </tr>
     </tbody>
@@ -186,7 +186,7 @@ pipeline:
     <thead>
       <tr>
         <th class="text-left" style="width:10%;">CDC type</th>
-        <th class="text-left" style="width:30%;">Doris type<a href="https://doris.apache.org/docs/dev/sql-manual/sql-reference/Data-Types/BOOLEAN/"></a></th>
+        <th class="text-left" style="width:30%;">Doris type<a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-types/Data-Types/BOOLEAN/"></a></th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
