@@ -19,9 +19,9 @@
 package org.apache.flink.cdc.connectors.maxcompute.coordinator;
 
 import org.apache.flink.cdc.common.utils.StringUtils;
+import org.apache.flink.cdc.connectors.maxcompute.common.Constant;
 import org.apache.flink.cdc.connectors.maxcompute.common.SessionIdentifier;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CommitSessionRequest;
-import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CommitSessionResponse;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CreateSessionRequest;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CreateSessionResponse;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.WaitForFlushSuccessRequest;
@@ -30,6 +30,7 @@ import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.RetryUtils;
+import org.apache.flink.cdc.connectors.maxcompute.utils.SessionCommitCoordinator;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandler;
@@ -44,12 +45,9 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
@@ -70,8 +68,9 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
     private final MaxComputeExecutionOptions executionOptions;
     private final TableTunnel tunnel;
     private final int parallelism;
+    private SessionCommitCoordinator sessionCommitCoordinator;
     private Map<SessionIdentifier, TableTunnel.UpsertSession> sessionCache;
-    private CompletableFuture<CoordinationResponse>[] flushFutures;
+    private Map<String, SessionIdentifier> sessionIdMap;
     private CompletableFuture<CoordinationResponse>[] waitingFlushFutures;
     private ExecutorService executor;
 
@@ -94,11 +93,12 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
         LOG.info("Starting SessionManageCoordinator {}.", operatorName);
 
         this.sessionCache = new HashMap<>();
+        this.sessionIdMap = new HashMap<>();
         // start the executor
         this.executor = Executors.newFixedThreadPool(writeOptions.getNumCommitThread());
 
-        this.flushFutures = new CompletableFuture[parallelism];
         this.waitingFlushFutures = new CompletableFuture[parallelism];
+        this.sessionCommitCoordinator = new SessionCommitCoordinator(parallelism);
     }
 
     @Override
@@ -170,14 +170,26 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
         LOG.info("Received coordination request {}.", request);
         if (request instanceof CommitSessionRequest) {
             CommitSessionRequest commitSessionRequest = (CommitSessionRequest) request;
-            CompletableFuture<CoordinationResponse> flushFuture = new CompletableFuture<>();
-            flushFutures[commitSessionRequest.getOperatorIndex()] = flushFuture;
-            if (Arrays.stream(flushFutures).allMatch(Objects::nonNull)) {
-                boolean isSuccess = commitAllSessions();
-                completeAllFlushFutures(isSuccess);
-                resetFlushFutures();
+
+            CompletableFuture<CoordinationResponse> future =
+                    sessionCommitCoordinator.commit(
+                            commitSessionRequest.getOperatorIndex(),
+                            commitSessionRequest.getSessionId());
+            String toSubmitSessionId = sessionCommitCoordinator.getToCommitSessionId();
+            while (sessionCommitCoordinator.isCommitting() && toSubmitSessionId != null) {
+                commitSession(toSubmitSessionId);
+                toSubmitSessionId = sessionCommitCoordinator.getToCommitSessionId();
             }
-            return flushFuture;
+            if (!sessionCommitCoordinator.isCommitting()) {
+                completeAllFlushFutures();
+                sessionCommitCoordinator.commitSuccess(Constant.END_OF_SESSION, true);
+                sessionCommitCoordinator.clear();
+
+                if (!sessionCache.isEmpty()) {
+                    throw new RuntimeException("sessionCache not empty" + sessionCache.keySet());
+                }
+            }
+            return future;
         } else if (request instanceof WaitForFlushSuccessRequest) {
             CompletableFuture<CoordinationResponse> waitingFlushFuture = new CompletableFuture<>();
             waitingFlushFutures[((WaitForFlushSuccessRequest) request).getOperatorIndex()] =
@@ -188,6 +200,7 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
             if (!sessionCache.containsKey(sessionIdentifier)) {
                 TableTunnel.UpsertSession session = createSession(sessionIdentifier);
                 sessionCache.put(sessionIdentifier, session);
+                sessionIdMap.put(session.getId(), sessionIdentifier);
             }
             return CompletableFuture.completedFuture(
                     new CreateSessionResponse(sessionCache.get(sessionIdentifier).getId()));
@@ -196,33 +209,12 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
         }
     }
 
-    private void resetFlushFutures() {
-        Arrays.fill(flushFutures, null);
-        Arrays.fill(waitingFlushFutures, null);
-    }
-
-    private void completeAllFlushFutures(boolean isSuccess) {
-        for (CompletableFuture<CoordinationResponse> flushFuture : flushFutures) {
-            flushFuture.complete(new CommitSessionResponse(isSuccess));
-        }
-        for (CompletableFuture<CoordinationResponse> waitingFlushFuture : waitingFlushFutures) {
-            waitingFlushFuture.complete(null);
-        }
-    }
-
-    private synchronized boolean commitAllSessions() {
-        if (sessionCache.isEmpty()) {
-            return true;
-        }
-        ArrayList<TableTunnel.UpsertSession> commitSessions =
-                new ArrayList<>(sessionCache.values());
-        sessionCache.clear();
-
+    private void commitSession(String toSubmitSessionId) {
+        TableTunnel.UpsertSession session =
+                sessionCache.remove(sessionIdMap.remove(toSubmitSessionId));
         AtomicBoolean isSuccess = new AtomicBoolean(true);
-        List<Future<?>> futures = new ArrayList<>(commitSessions.size());
-
-        for (TableTunnel.UpsertSession session : commitSessions) {
-            LOG.info("start commit session {}.", session.getId());
+        LOG.info("start commit session {}.", toSubmitSessionId);
+        try {
             Future<?> future =
                     executor.submit(
                             () -> {
@@ -243,17 +235,18 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
                                     isSuccess.set(false);
                                 }
                             });
-            futures.add(future);
-        }
-        try {
-            for (Future<?> future : futures) {
-                future.get();
-            }
+            future.get();
         } catch (Exception e) {
-            LOG.warn("Failed to commit session.", e);
             isSuccess.set(false);
         }
-        return isSuccess.get();
+        sessionCommitCoordinator.commitSuccess(toSubmitSessionId, isSuccess.get());
+    }
+
+    private void completeAllFlushFutures() {
+        for (CompletableFuture<CoordinationResponse> waitingFlushFuture : waitingFlushFutures) {
+            waitingFlushFuture.complete(null);
+        }
+        Arrays.fill(waitingFlushFutures, null);
     }
 
     @Override
