@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
@@ -154,6 +155,12 @@ public class TransformParser {
                         .collect(
                                 Collectors.toMap(
                                         RelDataTypeField::getName, RelDataTypeField::getType));
+
+        Map<String, Boolean> isNotNullMap =
+                columns.stream()
+                        .collect(
+                                Collectors.toMap(
+                                        Column::getName, column -> !column.getType().isNullable()));
         List<ProjectionColumn> projectionColumns = new ArrayList<>();
         for (SqlNode sqlNode : sqlSelect.getSelectList()) {
             if (sqlNode instanceof SqlBasicCall) {
@@ -205,21 +212,27 @@ public class TransformParser {
             } else if (sqlNode instanceof SqlIdentifier) {
                 SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
                 String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+                DataType columnType =
+                        DataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                relDataTypeMap.get(columnName));
                 if (isMetadataColumn(columnName)) {
                     projectionColumns.add(
                             ProjectionColumn.of(
                                     columnName,
-                                    DataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                            relDataTypeMap.get(columnName)),
+                                    // Metadata columns should never be null
+                                    columnType.notNull(),
                                     columnName,
                                     columnName,
                                     Arrays.asList(columnName)));
                 } else {
+                    // Calcite translated column type doesn't keep nullability.
+                    // Appending it manually to circumvent this problem.
                     projectionColumns.add(
                             ProjectionColumn.of(
                                     columnName,
-                                    DataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                            relDataTypeMap.get(columnName))));
+                                    isNotNullMap.get(columnName)
+                                            ? columnType.notNull()
+                                            : columnType.nullable()));
                 }
             } else {
                 throw new ParseException("Unrecognized projection: " + sqlNode.toString());
