@@ -58,23 +58,32 @@ public class ChangeEventUtils {
             SchemaChangeEvent schemaChangeEvent, TableId tableId) {
         if (schemaChangeEvent instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
-            return new CreateTableEvent(tableId, createTableEvent.getSchema());
+            return new CreateTableEvent(
+                    tableId, createTableEvent.getSchema(), createTableEvent.getDdlContent());
         }
         if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
             AlterColumnTypeEvent alterColumnTypeEvent = (AlterColumnTypeEvent) schemaChangeEvent;
-            return new AlterColumnTypeEvent(tableId, alterColumnTypeEvent.getTypeMapping());
+            return new AlterColumnTypeEvent(
+                    tableId,
+                    alterColumnTypeEvent.getTypeMapping(),
+                    alterColumnTypeEvent.getDdlContent());
         }
         if (schemaChangeEvent instanceof RenameColumnEvent) {
             RenameColumnEvent renameColumnEvent = (RenameColumnEvent) schemaChangeEvent;
-            return new RenameColumnEvent(tableId, renameColumnEvent.getNameMapping());
+            return new RenameColumnEvent(
+                    tableId, renameColumnEvent.getNameMapping(), renameColumnEvent.getDdlContent());
         }
         if (schemaChangeEvent instanceof DropColumnEvent) {
             DropColumnEvent dropColumnEvent = (DropColumnEvent) schemaChangeEvent;
-            return new DropColumnEvent(tableId, dropColumnEvent.getDroppedColumnNames());
+            return new DropColumnEvent(
+                    tableId,
+                    dropColumnEvent.getDroppedColumnNames(),
+                    dropColumnEvent.getDdlContent());
         }
         if (schemaChangeEvent instanceof AddColumnEvent) {
             AddColumnEvent addColumnEvent = (AddColumnEvent) schemaChangeEvent;
-            return new AddColumnEvent(tableId, addColumnEvent.getAddedColumns());
+            return new AddColumnEvent(
+                    tableId, addColumnEvent.getAddedColumns(), addColumnEvent.getDdlContent());
         }
         throw new UnsupportedOperationException(
                 String.format(
