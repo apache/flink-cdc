@@ -110,28 +110,28 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
     }
 
     @Override
-    public Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)
+    public Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, Column column)
             throws SQLException {
-        return MySqlUtils.queryMinMax(jdbc, tableId, columnName);
+        return MySqlUtils.queryMinMax(jdbc, tableId, column.name());
     }
 
     @Override
     public Object queryMin(
-            JdbcConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
+            JdbcConnection jdbc, TableId tableId, Column column, Object excludedLowerBound)
             throws SQLException {
-        return MySqlUtils.queryMin(jdbc, tableId, columnName, excludedLowerBound);
+        return MySqlUtils.queryMin(jdbc, tableId, column.name(), excludedLowerBound);
     }
 
     @Override
     public Object queryNextChunkMax(
             JdbcConnection jdbc,
             TableId tableId,
-            String columnName,
+            Column column,
             int chunkSize,
             Object includedLowerBound)
             throws SQLException {
         return MySqlUtils.queryNextChunkMax(
-                jdbc, tableId, columnName, chunkSize, includedLowerBound);
+                jdbc, tableId, column.name(), chunkSize, includedLowerBound);
     }
 
     @Override
@@ -161,8 +161,7 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
      */
     private List<ChunkRange> splitTableIntoChunks(
             JdbcConnection jdbc, TableId tableId, Column splitColumn) throws SQLException {
-        final String splitColumnName = splitColumn.name();
-        final Object[] minMax = queryMinMax(jdbc, tableId, splitColumnName);
+        final Object[] minMax = queryMinMax(jdbc, tableId, splitColumn);
         final Object min = minMax[0];
         final Object max = minMax[1];
         if (min == null || max == null || min.equals(max)) {
@@ -189,11 +188,10 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
                 return splitEvenlySizedChunks(
                         tableId, min, max, approximateRowCnt, chunkSize, dynamicChunkSize);
             } else {
-                return splitUnevenlySizedChunks(
-                        jdbc, tableId, splitColumnName, min, max, chunkSize);
+                return splitUnevenlySizedChunks(jdbc, tableId, splitColumn, min, max, chunkSize);
             }
         } else {
-            return splitUnevenlySizedChunks(jdbc, tableId, splitColumnName, min, max, chunkSize);
+            return splitUnevenlySizedChunks(jdbc, tableId, splitColumn, min, max, chunkSize);
         }
     }
 
@@ -241,7 +239,7 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
     private List<ChunkRange> splitUnevenlySizedChunks(
             JdbcConnection jdbc,
             TableId tableId,
-            String splitColumnName,
+            Column splitColumn,
             Object min,
             Object max,
             int chunkSize)
@@ -250,7 +248,7 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
                 "Use unevenly-sized chunks for table {}, the chunk size is {}", tableId, chunkSize);
         final List<ChunkRange> splits = new ArrayList<>();
         Object chunkStart = null;
-        Object chunkEnd = nextChunkEnd(jdbc, min, tableId, splitColumnName, max, chunkSize);
+        Object chunkEnd = nextChunkEnd(jdbc, min, tableId, splitColumn, max, chunkSize);
         int count = 0;
         while (chunkEnd != null && ObjectUtils.compare(chunkEnd, max) <= 0) {
             // we start from [null, min + chunk_size) and avoid [null, min)
@@ -258,7 +256,7 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
             // may sleep a while to avoid DDOS on MySQL server
             maySleep(count++, tableId);
             chunkStart = chunkEnd;
-            chunkEnd = nextChunkEnd(jdbc, chunkEnd, tableId, splitColumnName, max, chunkSize);
+            chunkEnd = nextChunkEnd(jdbc, chunkEnd, tableId, splitColumn, max, chunkSize);
         }
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));
@@ -269,17 +267,17 @@ public class MySqlChunkSplitter implements JdbcSourceChunkSplitter {
             JdbcConnection jdbc,
             Object previousChunkEnd,
             TableId tableId,
-            String splitColumnName,
+            Column splitColumn,
             Object max,
             int chunkSize)
             throws SQLException {
         // chunk end might be null when max values are removed
         Object chunkEnd =
-                queryNextChunkMax(jdbc, tableId, splitColumnName, chunkSize, previousChunkEnd);
+                queryNextChunkMax(jdbc, tableId, splitColumn, chunkSize, previousChunkEnd);
         if (Objects.equals(previousChunkEnd, chunkEnd)) {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd
-            chunkEnd = queryMin(jdbc, tableId, splitColumnName, chunkEnd);
+            chunkEnd = queryMin(jdbc, tableId, splitColumn, chunkEnd);
         }
         if (ObjectUtils.compare(chunkEnd, max) >= 0) {
             return null;

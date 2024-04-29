@@ -53,7 +53,9 @@ import org.slf4j.LoggerFactory;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static io.debezium.connector.postgresql.PostgresObjectUtils.waitForReplicationSlotReady;
 import static io.debezium.connector.postgresql.Utils.refreshSchema;
@@ -280,12 +282,18 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                     snapshotSplit.splitId(),
                     table.id());
 
+            List<String> uuidFields =
+                    snapshotSplit.getSplitKeyType().getFieldNames().stream()
+                            .filter(field -> table.columnWithName(field).typeName().equals("uuid"))
+                            .collect(Collectors.toList());
+
             final String selectSql =
                     PostgresQueryUtils.buildSplitScanQuery(
                             snapshotSplit.getTableId(),
                             snapshotSplit.getSplitKeyType(),
                             snapshotSplit.getSplitStart() == null,
-                            snapshotSplit.getSplitEnd() == null);
+                            snapshotSplit.getSplitEnd() == null,
+                            uuidFields);
             LOG.debug(
                     "For split '{}' of table {} using select statement: '{}'",
                     snapshotSplit.splitId(),

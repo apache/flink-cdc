@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.postgres.source.utils;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.jdbc.JdbcConnection;
+import io.debezium.relational.Column;
 import io.debezium.relational.TableId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +28,9 @@ import org.slf4j.LoggerFactory;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -40,12 +43,12 @@ public class PostgresQueryUtils {
 
     private PostgresQueryUtils() {}
 
-    public static Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)
+    public static Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, Column column)
             throws SQLException {
         final String minMaxQuery =
                 String.format(
                         "SELECT MIN(%s), MAX(%s) FROM %s",
-                        quote(columnName), quote(columnName), quote(tableId));
+                        quoteForMinMax(column), quoteForMinMax(column), quote(tableId));
         return jdbc.queryAndMap(
                 minMaxQuery,
                 rs -> {
@@ -85,12 +88,15 @@ public class PostgresQueryUtils {
     }
 
     public static Object queryMin(
-            JdbcConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
+            JdbcConnection jdbc, TableId tableId, Column column, Object excludedLowerBound)
             throws SQLException {
         final String query =
                 String.format(
-                        "SELECT MIN(%s) FROM %s WHERE %s > ?",
-                        quote(columnName), quote(tableId), quote(columnName));
+                        "SELECT MIN(%s) FROM %s WHERE %s > %s",
+                        quoteForMinMax(column),
+                        quote(tableId),
+                        quote(column.name()),
+                        castParam(column));
         return jdbc.prepareQueryAndMap(
                 query,
                 ps -> ps.setObject(1, excludedLowerBound),
@@ -109,20 +115,21 @@ public class PostgresQueryUtils {
     public static Object queryNextChunkMax(
             JdbcConnection jdbc,
             TableId tableId,
-            String splitColumnName,
+            Column splitColumn,
             int chunkSize,
             Object includedLowerBound)
             throws SQLException {
-        String quotedColumn = quote(splitColumnName);
+        String quotedColumn = quote(splitColumn.name());
         String query =
                 String.format(
                         "SELECT MAX(%s) FROM ("
-                                + "SELECT %s FROM %s WHERE %s >= ? ORDER BY %s ASC LIMIT %s"
+                                + "SELECT %s FROM %s WHERE %s >= %s ORDER BY %s ASC LIMIT %s"
                                 + ") AS T",
-                        quotedColumn,
+                        quoteForMinMax(splitColumn),
                         quotedColumn,
                         quote(tableId),
                         quotedColumn,
+                        castParam(splitColumn),
                         quotedColumn,
                         chunkSize);
         return jdbc.prepareQueryAndMap(
@@ -141,7 +148,17 @@ public class PostgresQueryUtils {
 
     public static String buildSplitScanQuery(
             TableId tableId, RowType pkRowType, boolean isFirstSplit, boolean isLastSplit) {
-        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, true);
+        return buildSplitScanQuery(
+                tableId, pkRowType, isFirstSplit, isLastSplit, new ArrayList<>());
+    }
+
+    public static String buildSplitScanQuery(
+            TableId tableId,
+            RowType pkRowType,
+            boolean isFirstSplit,
+            boolean isLastSplit,
+            List<String> uuidFields) {
+        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, uuidFields, -1, true);
     }
 
     private static String buildSplitQuery(
@@ -149,6 +166,7 @@ public class PostgresQueryUtils {
             RowType pkRowType,
             boolean isFirstSplit,
             boolean isLastSplit,
+            List<String> uuidFields,
             int limitSize,
             boolean isScanningData) {
         final String condition;
@@ -157,27 +175,27 @@ public class PostgresQueryUtils {
             condition = null;
         } else if (isFirstSplit) {
             final StringBuilder sql = new StringBuilder();
-            addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ?");
+            addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ", uuidFields);
             if (isScanningData) {
                 sql.append(" AND NOT (");
-                addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ?");
+                addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ", uuidFields);
                 sql.append(")");
             }
             condition = sql.toString();
         } else if (isLastSplit) {
             final StringBuilder sql = new StringBuilder();
-            addPrimaryKeyColumnsToCondition(pkRowType, sql, " >= ?");
+            addPrimaryKeyColumnsToCondition(pkRowType, sql, " >= ", uuidFields);
             condition = sql.toString();
         } else {
             final StringBuilder sql = new StringBuilder();
-            addPrimaryKeyColumnsToCondition(pkRowType, sql, " >= ?");
+            addPrimaryKeyColumnsToCondition(pkRowType, sql, " >= ", uuidFields);
             if (isScanningData) {
                 sql.append(" AND NOT (");
-                addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ?");
+                addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ", uuidFields);
                 sql.append(")");
             }
             sql.append(" AND ");
-            addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ?");
+            addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ", uuidFields);
             condition = sql.toString();
         }
 
@@ -237,6 +255,31 @@ public class PostgresQueryUtils {
         return "\"" + dbOrTableName + "\"";
     }
 
+    private static String quoteForMinMax(Column column) {
+        String quoteColumn = quote(column.name());
+        return isUUID(column) ? castToText(quoteColumn) : quoteColumn;
+    }
+
+    private static String castParam(Column column) {
+        return castParam(isUUID(column));
+    }
+
+    private static String castParam(boolean isUUID) {
+        return isUUID ? castToUuid("?") : "?";
+    }
+
+    private static String castToUuid(String value) {
+        return String.format("(%s)::uuid", value);
+    }
+
+    private static String castToText(String value) {
+        return String.format("(%s)::text", value);
+    }
+
+    private static boolean isUUID(Column column) {
+        return column.typeName().equals("uuid");
+    }
+
     public static String quote(TableId tableId) {
         return tableId.toQuotedString('"');
     }
@@ -251,10 +294,12 @@ public class PostgresQueryUtils {
     }
 
     private static void addPrimaryKeyColumnsToCondition(
-            RowType pkRowType, StringBuilder sql, String predicate) {
+            RowType pkRowType, StringBuilder sql, String predicate, List<String> uuidFields) {
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append(fieldNamesIt.next()).append(predicate);
+            String fieldName = fieldNamesIt.next();
+            boolean isUUID = uuidFields.contains(fieldName);
+            sql.append(fieldName).append(predicate).append(castParam(isUUID));
             if (fieldNamesIt.hasNext()) {
                 sql.append(" AND ");
             }
