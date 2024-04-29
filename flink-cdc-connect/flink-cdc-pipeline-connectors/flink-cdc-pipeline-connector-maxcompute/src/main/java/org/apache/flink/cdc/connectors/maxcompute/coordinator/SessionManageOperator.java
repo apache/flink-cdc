@@ -35,15 +35,20 @@ import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CreateSess
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.WaitForFlushSuccessRequest;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.TypeConvertUtils;
+import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
+import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventHandler;
+import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.util.SerializedValue;
 
 import com.aliyun.odps.PartitionSpec;
@@ -55,6 +60,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -73,15 +79,18 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
     public static SessionManageOperator instance;
 
     private final MaxComputeOptions options;
+    private final OperatorID schemaOperatorUid;
 
     private transient TaskOperatorEventGateway taskOperatorEventGateway;
     private transient Map<SessionIdentifier, String> sessionCache;
     private transient Map<TableId, Schema> schemaMaps;
     private transient Map<TableId, List<RecordData.FieldGetter>> fieldGetterMaps;
+    private transient SchemaEvolutionClient schemaEvolutionClient;
 
-    public SessionManageOperator(MaxComputeOptions options) {
+    public SessionManageOperator(MaxComputeOptions options, OperatorID schemaOperatorUid) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.options = options;
+        this.schemaOperatorUid = schemaOperatorUid;
     }
 
     @Override
@@ -93,10 +102,27 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
     }
 
     @Override
+    public void setup(
+            StreamTask<?, ?> containingTask,
+            StreamConfig config,
+            Output<StreamRecord<Event>> output) {
+        super.setup(containingTask, config, output);
+        schemaEvolutionClient =
+                new SchemaEvolutionClient(
+                        containingTask.getEnvironment().getOperatorCoordinatorEventGateway(),
+                        schemaOperatorUid);
+    }
+
+    @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         if (element.getValue() instanceof DataChangeEvent) {
             DataChangeEvent dataChangeEvent = (DataChangeEvent) element.getValue();
             TableId tableId = dataChangeEvent.tableId();
+            // because of this operator is between SchemaOperator and DataSinkWriterOperator, no
+            // schema will fill when CreateTableEvent is loss.
+            if (!schemaMaps.containsKey(tableId)) {
+                emitLatestSchema(tableId);
+            }
             String partitionName =
                     extractPartition(
                             dataChangeEvent.op() == OperationType.DELETE
@@ -145,6 +171,19 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
         } else {
             output.collect(element);
             LOG.warn("unknown element", element.getValue());
+        }
+    }
+
+    private void emitLatestSchema(TableId tableId) throws Exception {
+        Optional<Schema> schema = schemaEvolutionClient.getLatestSchema(tableId);
+        if (schema.isPresent()) {
+            Schema latestSchema = schema.get();
+            schemaMaps.put(tableId, latestSchema);
+            fieldGetterMaps.put(tableId, TypeConvertUtils.createFieldGetters(latestSchema));
+            output.collect(new StreamRecord<>(new CreateTableEvent(tableId, latestSchema)));
+        } else {
+            throw new RuntimeException(
+                    "Could not find schema message from SchemaRegistry for " + tableId);
         }
     }
 

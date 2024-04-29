@@ -28,6 +28,7 @@ public class MaxComputeExecutionOptions implements Serializable {
     public static class Builder {
         private int maxRetries = 3;
         private long retryIntervalMillis = 3000;
+        private String schemaOperatorUid;
 
         public Builder withMaxRetries(int maxRetries) {
             this.maxRetries = maxRetries;
@@ -39,6 +40,11 @@ public class MaxComputeExecutionOptions implements Serializable {
             return this;
         }
 
+        public Builder withPipelineSchemaOperatorUid(String schemaOperatorUid) {
+            this.schemaOperatorUid = schemaOperatorUid;
+            return this;
+        }
+
         public MaxComputeExecutionOptions build() {
             return new MaxComputeExecutionOptions(this);
         }
@@ -46,10 +52,12 @@ public class MaxComputeExecutionOptions implements Serializable {
 
     private final int maxRetries;
     private final long retryIntervalMillis;
+    private final String schemaOperatorUid;
 
     private MaxComputeExecutionOptions(Builder builder) {
         this.maxRetries = builder.maxRetries;
         this.retryIntervalMillis = builder.retryIntervalMillis;
+        this.schemaOperatorUid = builder.schemaOperatorUid;
     }
 
     public int getMaxRetries() {
@@ -58,6 +66,10 @@ public class MaxComputeExecutionOptions implements Serializable {
 
     public long getRetryIntervalMillis() {
         return retryIntervalMillis;
+    }
+
+    public String getSchemaOperatorUid() {
+        return schemaOperatorUid;
     }
 
     public static Builder builder() {
