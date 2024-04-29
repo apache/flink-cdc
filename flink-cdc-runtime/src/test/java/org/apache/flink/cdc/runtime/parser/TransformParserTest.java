@@ -21,8 +21,6 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSchemaFactory;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
-import org.apache.flink.table.api.ApiExpression;
-import org.apache.flink.table.api.Expressions;
 
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.jdbc.CalciteSchema;
@@ -260,13 +258,12 @@ public class TransformParserTest {
         testFilterExpression("upper(lower(id))", "upper(lower(id))");
         testFilterExpression(
                 "abs(uniq_id) > 10 and id is not null", "abs(uniq_id) > 10 && null != id");
-    }
-
-    @Test
-    public void testSqlCall() {
-        ApiExpression apiExpression = Expressions.concat("1", "2");
-        ApiExpression substring = apiExpression.substring(1);
-        System.out.println(substring);
+        testFilterExpression(
+                "case id when 1 then 'a' when 2 then 'b' else 'c' end",
+                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+        testFilterExpression(
+                "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
+                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
     }
 
     private void testFilterExpression(String expression, String expressionExpect) {
