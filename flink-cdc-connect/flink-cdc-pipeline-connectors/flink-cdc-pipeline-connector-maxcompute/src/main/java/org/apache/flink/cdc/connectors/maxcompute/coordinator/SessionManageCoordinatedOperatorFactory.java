@@ -19,6 +19,7 @@
 package org.apache.flink.cdc.connectors.maxcompute.coordinator;
 
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
@@ -51,7 +52,10 @@ public class SessionManageCoordinatedOperatorFactory extends AbstractStreamOpera
     @Override
     public <T extends StreamOperator<Event>> T createStreamOperator(
             StreamOperatorParameters<Event> parameters) {
-        SessionManageOperator operator = new SessionManageOperator(options);
+        OperatorIDGenerator schemaOperatorIdGenerator =
+                new OperatorIDGenerator(executionOptions.getSchemaOperatorUid());
+        SessionManageOperator operator =
+                new SessionManageOperator(options, schemaOperatorIdGenerator.generate());
         TaskOperatorEventGateway taskOperatorEventGateway =
                 parameters
                         .getContainingTask()

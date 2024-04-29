@@ -21,6 +21,7 @@ package org.apache.flink.cdc.connectors.maxcompute;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
@@ -39,9 +40,10 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
     public DataSink createDataSink(Context context) {
         MaxComputeOptions options = extractMaxComputeOptions(context.getFactoryConfiguration());
         MaxComputeWriteOptions writeOptions =
-                extractMaxComputewriteOptions(context.getFactoryConfiguration());
+                extractMaxComputeWriteOptions(context.getFactoryConfiguration());
         MaxComputeExecutionOptions executionOptions =
-                extractMaxComputeExecutionOptions(context.getFactoryConfiguration());
+                extractMaxComputeExecutionOptions(
+                        context.getFactoryConfiguration(), context.getPipelineConfiguration());
         return new MaxComputeDataSink(options, writeOptions, executionOptions);
     }
 
@@ -62,7 +64,7 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
                 .build();
     }
 
-    private MaxComputeWriteOptions extractMaxComputewriteOptions(
+    private MaxComputeWriteOptions extractMaxComputeWriteOptions(
             Configuration factoryConfiguration) {
         int numCommitThread =
                 factoryConfiguration.get(MaxComputeDataSinkOptions.NUM_COMMIT_THREADS);
@@ -91,12 +93,15 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
     }
 
     private MaxComputeExecutionOptions extractMaxComputeExecutionOptions(
-            Configuration factoryConfiguration) {
+            Configuration factoryConfiguration, Configuration pipelineConfiguration) {
         int maxRetries = factoryConfiguration.get(MaxComputeDataSinkOptions.RETRY_TIMES);
         long retryIntervalMillis = factoryConfiguration.get(MaxComputeDataSinkOptions.SLEEP_MILLIS);
+        String schemaOperatorUid =
+                pipelineConfiguration.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
         return MaxComputeExecutionOptions.builder()
                 .withMaxRetries(maxRetries)
                 .withRetryIntervalMillis(retryIntervalMillis)
+                .withPipelineSchemaOperatorUid(schemaOperatorUid)
                 .build();
     }
 
