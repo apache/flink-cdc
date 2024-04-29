@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.runtime.parser;
 
+import org.apache.flink.cdc.common.data.TimestampData;
+
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
 import org.codehaus.janino.ExpressionEvaluator;
@@ -119,9 +121,9 @@ public class JaninoCompilerTest {
                         JaninoCompiler.loadSystemFunction(expression),
                         columnNames,
                         paramTypes,
-                        Long.class);
+                        TimestampData.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(localTime, evaluate);
+        Assert.assertEquals(TimestampData.fromMillis(localTime), evaluate);
     }
 
     @Test

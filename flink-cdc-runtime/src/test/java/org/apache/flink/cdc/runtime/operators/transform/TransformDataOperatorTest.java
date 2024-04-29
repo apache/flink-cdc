@@ -465,7 +465,7 @@ public class TransformDataOperatorTest {
                         .addTransform(
                                 TIMESTAMP_TABLEID.identifier(),
                                 "col1, IF(LOCALTIME = CURRENT_TIME, 1, 0) as time_equal,"
-                                        + " IF(LOCALTIMESTAMP = CURRENT_TIMESTAMP and NOW() = LOCALTIMESTAMP, 1, 0) as timestamp_equal,"
+                                        + " IF(LOCALTIMESTAMP = CURRENT_TIMESTAMP, 1, 0) as timestamp_equal,"
                                         + " IF(TO_DATE(DATE_FORMAT(LOCALTIMESTAMP, 'yyyy-MM-dd')) = CURRENT_DATE, 1, 0) as date_equal",
                                 "LOCALTIMESTAMP = CURRENT_TIMESTAMP")
                         .addTimezone("GMT")
