@@ -27,6 +27,7 @@ import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
@@ -82,17 +83,51 @@ public class JaninoCompiler {
     }
 
     public static String translateSqlNodeToJaninoExpression(SqlNode transform) {
-        if (transform instanceof SqlIdentifier) {
-            SqlIdentifier sqlIdentifier = (SqlIdentifier) transform;
-            return sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
-        } else if (transform instanceof SqlBasicCall) {
-            Java.Rvalue rvalue = translateJaninoAST((SqlBasicCall) transform);
+        Java.Rvalue rvalue = translateSqlNodeToJaninoRvalue(transform);
+        if (rvalue != null) {
             return rvalue.toString();
         }
         return "";
     }
 
-    private static Java.Rvalue translateJaninoAST(SqlBasicCall sqlBasicCall) {
+    public static Java.Rvalue translateSqlNodeToJaninoRvalue(SqlNode transform) {
+        if (transform instanceof SqlIdentifier) {
+            return translateSqlIdentifier((SqlIdentifier) transform);
+        } else if (transform instanceof SqlBasicCall) {
+            return translateSqlBasicCall((SqlBasicCall) transform);
+        } else if (transform instanceof SqlCase) {
+            return translateSqlCase((SqlCase) transform);
+        } else if (transform instanceof SqlLiteral) {
+            return translateSqlSqlLiteral((SqlLiteral) transform);
+        }
+        return null;
+    }
+
+    private static Java.Rvalue translateSqlIdentifier(SqlIdentifier sqlIdentifier) {
+        String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+        if (NO_OPERAND_TIMESTAMP_FUNCTIONS.contains(columnName)) {
+            return generateNoOperandTimestampFunctionOperation(columnName);
+        } else {
+            return new Java.AmbiguousName(Location.NOWHERE, new String[] {columnName});
+        }
+    }
+
+    private static Java.Rvalue translateSqlSqlLiteral(SqlLiteral sqlLiteral) {
+        if (sqlLiteral.getValue() == null) {
+            return new Java.NullLiteral(Location.NOWHERE);
+        }
+        String value = sqlLiteral.getValue().toString();
+        if (sqlLiteral instanceof SqlCharStringLiteral) {
+            // Double quotation marks represent strings in Janino.
+            value = "\"" + value.substring(1, value.length() - 1) + "\"";
+        }
+        if (SQL_TYPE_NAME_IGNORE.contains(sqlLiteral.getTypeName())) {
+            value = "\"" + value + "\"";
+        }
+        return new Java.AmbiguousName(Location.NOWHERE, new String[] {value});
+    }
+
+    private static Java.Rvalue translateSqlBasicCall(SqlBasicCall sqlBasicCall) {
         List<SqlNode> operandList = sqlBasicCall.getOperandList();
         List<Java.Rvalue> atoms = new ArrayList<>();
         for (SqlNode sqlNode : operandList) {
@@ -105,32 +140,44 @@ public class JaninoCompiler {
         return sqlBasicCallToJaninoRvalue(sqlBasicCall, atoms.toArray(new Java.Rvalue[0]));
     }
 
+    private static Java.Rvalue translateSqlCase(SqlCase sqlCase) {
+        SqlNodeList whenOperands = sqlCase.getWhenOperands();
+        SqlNodeList thenOperands = sqlCase.getThenOperands();
+        SqlNode elseOperand = sqlCase.getElseOperand();
+        List<Java.Rvalue> whenAtoms = new ArrayList<>();
+        for (SqlNode sqlNode : whenOperands) {
+            translateSqlNodeToAtoms(sqlNode, whenAtoms);
+        }
+        List<Java.Rvalue> thenAtoms = new ArrayList<>();
+        for (SqlNode sqlNode : thenOperands) {
+            translateSqlNodeToAtoms(sqlNode, thenAtoms);
+        }
+        Java.Rvalue elseAtoms = translateSqlNodeToJaninoRvalue(elseOperand);
+        Java.Rvalue sqlCaseRvalueTemp = elseAtoms;
+        for (int i = whenAtoms.size() - 1; i >= 0; i--) {
+            sqlCaseRvalueTemp =
+                    new Java.ConditionalExpression(
+                            Location.NOWHERE,
+                            whenAtoms.get(i),
+                            thenAtoms.get(i),
+                            sqlCaseRvalueTemp);
+        }
+        return new Java.ParenthesizedExpression(Location.NOWHERE, sqlCaseRvalueTemp);
+    }
+
     private static void translateSqlNodeToAtoms(SqlNode sqlNode, List<Java.Rvalue> atoms) {
         if (sqlNode instanceof SqlIdentifier) {
-            SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
-            String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
-            if (NO_OPERAND_TIMESTAMP_FUNCTIONS.contains(columnName)) {
-                atoms.add(generateNoOperandTimestampFunctionOperation(columnName));
-            } else {
-                atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {columnName}));
-            }
+            atoms.add(translateSqlIdentifier((SqlIdentifier) sqlNode));
         } else if (sqlNode instanceof SqlLiteral) {
-            SqlLiteral sqlLiteral = (SqlLiteral) sqlNode;
-            String value = sqlLiteral.getValue().toString();
-            if (sqlLiteral instanceof SqlCharStringLiteral) {
-                // Double quotation marks represent strings in Janino.
-                value = "\"" + value.substring(1, value.length() - 1) + "\"";
-            }
-            if (SQL_TYPE_NAME_IGNORE.contains(sqlLiteral.getTypeName())) {
-                value = "\"" + value + "\"";
-            }
-            atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {value}));
+            atoms.add(translateSqlSqlLiteral((SqlLiteral) sqlNode));
         } else if (sqlNode instanceof SqlBasicCall) {
-            atoms.add(translateJaninoAST((SqlBasicCall) sqlNode));
+            atoms.add(translateSqlBasicCall((SqlBasicCall) sqlNode));
         } else if (sqlNode instanceof SqlNodeList) {
             for (SqlNode node : (SqlNodeList) sqlNode) {
                 translateSqlNodeToAtoms(node, atoms);
             }
+        } else if (sqlNode instanceof SqlCase) {
+            atoms.add(translateSqlCase((SqlCase) sqlNode));
         }
     }
 

@@ -501,4 +501,13 @@ public class SystemFunctionUtils {
     public static boolean valueEquals(Object object1, Object object2) {
         return (object1 != null && object2 != null) && object1.equals(object2);
     }
+
+    public static Object coalesce(Object... objects) {
+        for (Object item : objects) {
+            if (item != null) {
+                return item;
+            }
+        }
+        return null;
+    }
 }
