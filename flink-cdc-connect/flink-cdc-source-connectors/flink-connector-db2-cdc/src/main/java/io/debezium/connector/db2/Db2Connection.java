@@ -323,7 +323,8 @@ public class Db2Connection extends JdbcConnection {
                          */
                         changeTables.add(
                                 new Db2ChangeTable(
-                                        new TableId("", rs.getString(1), rs.getString(2)),
+                                        new TableId(
+                                                realDatabaseName, rs.getString(1), rs.getString(2)),
                                         rs.getString(4),
                                         rs.getInt(9),
                                         Lsn.valueOf(rs.getBytes(5)),
