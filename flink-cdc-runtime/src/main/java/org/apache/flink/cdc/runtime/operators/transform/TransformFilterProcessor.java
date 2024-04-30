@@ -35,13 +35,13 @@ import java.util.List;
 /** The processor of the transform filter. It processes the data change event of matched table. */
 public class TransformFilterProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(TransformFilterProcessor.class);
-    private TableInfo tableInfo;
+    private PostTransformChangeInfo tableInfo;
     private TransformFilter transformFilter;
     private String timezone;
     private TransformExpressionKey transformExpressionKey;
 
     public TransformFilterProcessor(
-            TableInfo tableInfo, TransformFilter transformFilter, String timezone) {
+            PostTransformChangeInfo tableInfo, TransformFilter transformFilter, String timezone) {
         this.tableInfo = tableInfo;
         this.transformFilter = transformFilter;
         this.timezone = timezone;
@@ -49,7 +49,7 @@ public class TransformFilterProcessor {
     }
 
     public static TransformFilterProcessor of(
-            TableInfo tableInfo, TransformFilter transformFilter, String timezone) {
+            PostTransformChangeInfo tableInfo, TransformFilter transformFilter, String timezone) {
         return new TransformFilterProcessor(tableInfo, transformFilter, timezone);
     }
 
@@ -70,8 +70,8 @@ public class TransformFilterProcessor {
 
     private Object[] generateParams(BinaryRecordData after, long epochTime) {
         List<Object> params = new ArrayList<>();
-        List<Column> columns = tableInfo.getSchema().getColumns();
-        RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
+        List<Column> columns = tableInfo.getInputSchema().getColumns();
+        RecordData.FieldGetter[] fieldGetters = tableInfo.getPreTransformedFieldGetters();
         for (String columnName : transformFilter.getColumnNames()) {
             if (columnName.equals(TransformParser.DEFAULT_NAMESPACE_NAME)) {
                 params.add(tableInfo.getNamespace());
@@ -103,12 +103,11 @@ public class TransformFilterProcessor {
     private TransformExpressionKey generateTransformExpressionKey() {
         List<String> argumentNames = new ArrayList<>();
         List<Class<?>> paramTypes = new ArrayList<>();
-        List<Column> columns = tableInfo.getSchema().getColumns();
+        List<Column> columns = tableInfo.getInputSchema().getColumns();
         String scriptExpression = transformFilter.getScriptExpression();
         List<String> columnNames = transformFilter.getColumnNames();
         for (String columnName : columnNames) {
-            for (int i = 0; i < columns.size(); i++) {
-                Column column = columns.get(i);
+            for (Column column : columns) {
                 if (column.getName().equals(columnName)) {
                     argumentNames.add(columnName);
                     paramTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));

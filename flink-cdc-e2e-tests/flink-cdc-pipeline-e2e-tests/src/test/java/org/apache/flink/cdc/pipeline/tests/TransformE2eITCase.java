@@ -22,8 +22,10 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
-import org.apache.flink.cdc.runtime.operators.transform.TransformSchemaOperator;
+import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
+import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 
+import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -50,7 +52,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
-/** E2e tests for the {@link TransformSchemaOperator}. */
+/** E2e tests for the {@link PreTransformOperator} and {@link PostTransformOperator}. */
 @RunWith(Parameterized.class)
 public class TransformE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(TransformE2eITCase.class);
@@ -148,7 +150,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         List<String> expectedEvents =
                 Arrays.asList(
                         String.format(
-                                "CreateTableEvent{tableId=%s.terminus, schema=columns={`ID` INT NOT NULL,`VERSION` STRING}, primaryKeys=ID, options=()}",
+                                "CreateTableEvent{tableId=%s.terminus, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
                                 "DataChangeEvent{tableId=%s.terminus, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
@@ -182,7 +184,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stat = conn.createStatement()) {
             stat.execute("UPDATE TABLEALPHA SET VERSION='100' WHERE id=1009;");
-            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7', 79);");
+            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7', 79, 16, 'IINA');");
             stat.execute("DELETE FROM TABLEBETA WHERE id=2011;");
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
@@ -206,6 +208,401 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         String stdout = taskManagerConsumer.toUtf8String();
         System.out.println(stdout);
+    }
+
+    @Test
+    public void testMultipleTransformRule() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "route:\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.\\.*\n"
+                                + "    projection: ID, VERSION, 'Type-A' AS CATEGORY\n"
+                                + "    "
+                                + getString()
+                                + "ID > 1008\n"
+                                + "  - source-table: %s.\\.*\n"
+                                + "    projection: ID, VERSION, 'Type-B' AS CATEGORY\n"
+                                + "    filter: ID <= 1008\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: 1",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName());
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        List<String> expectedEvents =
+                Arrays.asList(
+                        String.format(
+                                "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CATEGORY` STRING}, primaryKeys=ID, options=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8, Type-B], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, Type-A], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, Type-A], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, Type-A], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CATEGORY` STRING}, primaryKeys=ID, options=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Type-A], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Type-A], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Type-A], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Type-A], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()));
+        validateResult(expectedEvents);
+        LOG.info("Begin incremental reading stage.");
+        // generate binlogs
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        transformRenameDatabase.getDatabaseName());
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("UPDATE TABLEALPHA SET VERSION='100' WHERE id=1009;");
+            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7', 79, 16, 'IINA');");
+            stat.execute("DELETE FROM TABLEBETA WHERE id=2011;");
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, 8.1, Type-A], after=[1009, 100, Type-A], op=UPDATE, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7, Type-A], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Type-A], after=[], op=DELETE, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        String stdout = taskManagerConsumer.toUtf8String();
+        System.out.println(stdout);
+    }
+
+    private static @NotNull String getString() {
+        return "filter: ";
+    }
+
+    @Test
+    public void testAssortedSchemaTransform() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "route:\n"
+                                + "  - source-table: %s.\\.*\n"
+                                + "    sink-table: %s.terminus\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.TABLEALPHA\n"
+                                + "    projection: ID, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEALPHA) AS NAME\n"
+                                + "    filter: AGEALPHA < 19\n"
+                                + "  - source-table: %s.TABLEBETA\n"
+                                + "    projection: ID, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEBETA) AS NAME\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: 1",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName());
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "CreateTableEvent{tableId=%s.terminus, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`NAME` STRING}, primaryKeys=ID, options=()}",
+                        transformRenameDatabase.getDatabaseName()));
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.terminus, before=[], after=[1008, v8, alice], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.terminus, before=[], after=[1009, v8.1, bob], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.terminus, before=[], after=[2011, v11, eva], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.terminus, before=[], after=[2012, v12, fred], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.terminus, before=[], after=[2013, v13, gus], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.terminus, before=[], after=[2014, v14, henry], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        LOG.info("Begin incremental reading stage.");
+        // generate binlogs
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        transformRenameDatabase.getDatabaseName());
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("UPDATE TABLEALPHA SET VERSION='100' WHERE id=1009;");
+            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7', 79, 16, 'IINA');");
+            stat.execute("DELETE FROM TABLEBETA WHERE id=2011;");
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.terminus, before=[1009, v8.1, bob], after=[1009, v100, bob], op=UPDATE, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.terminus, before=[], after=[3007, v7, iina], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.terminus, before=[2011, v11, eva], after=[], op=DELETE, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        String stdout = taskManagerConsumer.toUtf8String();
+        System.out.println(stdout);
+    }
+
+    @Test
+    public void testWildcardSchemaTransform() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.TABLEALPHA\n"
+                                + "    projection: \\*, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEALPHA) AS NAME\n"
+                                + "    filter: AGEALPHA < 19\n"
+                                + "  - source-table: %s.TABLEBETA\n"
+                                + "    projection: \\*, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEBETA) AS NAME\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: 1",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName());
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`NAME` STRING}, primaryKeys=ID, options=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, v8, 199, 17, Alice, alice], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, v8.1, 0, 18, Bob, bob], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`NAME` STRING}, primaryKeys=ID, options=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, v11, Big Sur, 21, Eva, eva], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, v12, Monterey, 22, Fred, fred], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, v13, Ventura, 23, Gus, gus], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, v14, Sonoma, 24, Henry, henry], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        LOG.info("Begin incremental reading stage.");
+        // generate binlogs
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        transformRenameDatabase.getDatabaseName());
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("UPDATE TABLEALPHA SET VERSION='100' WHERE id=1009;");
+            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7', 79, 16, 'IINA');");
+            stat.execute("DELETE FROM TABLEBETA WHERE id=2011;");
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, v8.1, 0, 18, Bob, bob], after=[1009, v100, 0, 18, Bob, bob], op=UPDATE, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, v7, 79, 16, IINA, iina], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, v11, Big Sur, 21, Eva, eva], after=[], op=DELETE, meta=()}",
+                        transformRenameDatabase.getDatabaseName()));
+
+        String stdout = taskManagerConsumer.toUtf8String();
+        System.out.println(stdout);
+    }
+
+    @Test
+    public void testWildcardWithMetadataColumnTransform() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.TABLEALPHA\n"
+                                + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.TABLEBETA\n"
+                                + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: 1",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName());
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        Thread.sleep(10000L);
+        System.out.println(taskManagerConsumer.toUtf8String());
     }
 
     @Test
@@ -249,34 +646,34 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         List<String> expectedEvents =
                 Arrays.asList(
                         String.format(
-                                "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`PRICEALPHA` INT,`UID` INT,`NEWVERSION` STRING}, primaryKeys=ID, options=()}",
+                                "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`UID` INT,`NEWVERSION` STRING}, primaryKeys=ID, options=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 99, 2010, 10], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8, 199, 17, Alice, 2008, 8], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 59, 2011, 11], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 0, 18, Bob, 2009, 8.1], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8, 199, 2008, 8], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 99, 19, Carol, 2010, 10], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 0, 2009, 8.1], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 59, 20, Dave, 2011, 11], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
-                                "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`CODENAMESBETA` STRING,`UID` INT,`NEWVERSION` STRING}, primaryKeys=ID, options=()}",
+                                "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`UID` INT,`NEWVERSION` STRING}, primaryKeys=ID, options=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Sonoma, 3014, 14], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Big Sur, 21, Eva, 3011, 11], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Monterey, 3012, 12], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Monterey, 22, Fred, 3012, 12], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Ventura, 3013, 13], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Ventura, 23, Gus, 3013, 13], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Big Sur, 3011, 11], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Sonoma, 24, Henry, 3014, 14], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()));
         validateResult(expectedEvents);
         LOG.info("Begin incremental reading stage.");
@@ -292,7 +689,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stat = conn.createStatement()) {
             stat.execute("UPDATE TABLEALPHA SET VERSION='100' WHERE id=1009;");
-            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7', 79);");
+            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7', 79, 25, 'IINA');");
             stat.execute("DELETE FROM TABLEBETA WHERE id=2011;");
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
@@ -301,17 +698,17 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, 8.1, 0, 2009, 8.1], after=[1009, 100, 0, 2009, 100], op=UPDATE, meta=()}",
+                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, 8.1, 0, 18, Bob, 2009, 8.1], after=[1009, 100, 0, 18, Bob, 2009, 100], op=UPDATE, meta=()}",
                         transformRenameDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
-                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7, 79, 4007, 7], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7, 79, 25, IINA, 4007, 7], op=INSERT, meta=()}",
                         transformRenameDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
-                        "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Big Sur, 3011, 11], after=[], op=DELETE, meta=()}",
+                        "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Big Sur, 21, Eva, 3011, 11], after=[], op=DELETE, meta=()}",
                         transformRenameDatabase.getDatabaseName()));
     }
 
