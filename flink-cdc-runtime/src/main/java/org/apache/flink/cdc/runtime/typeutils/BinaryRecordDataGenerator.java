@@ -58,9 +58,9 @@ public class BinaryRecordDataGenerator {
     public BinaryRecordDataGenerator(DataType[] dataTypes, TypeSerializer[] serializers) {
         checkArgument(
                 dataTypes.length == serializers.length,
-                String.format(
-                        "The types and serializers must have the same length. But types is %d and serializers is %d",
-                        dataTypes.length, serializers.length));
+                "The types and serializers must have the same length. But types is %s and serializers is %s",
+                dataTypes.length,
+                serializers.length);
 
         this.dataTypes = dataTypes;
         this.serializers = serializers;
@@ -77,9 +77,9 @@ public class BinaryRecordDataGenerator {
     public BinaryRecordData generate(Object[] rowFields) {
         checkArgument(
                 dataTypes.length == rowFields.length,
-                String.format(
-                        "The types and values must have the same length. But types is %d and values is %d",
-                        dataTypes.length, rowFields.length));
+                "The types and values must have the same length. But types is %s and values is %s",
+                dataTypes.length,
+                rowFields.length);
 
         reuseWriter.reset();
         for (int i = 0; i < dataTypes.length; i++) {
