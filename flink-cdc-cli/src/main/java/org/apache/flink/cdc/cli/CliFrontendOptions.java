@@ -83,6 +83,12 @@ public class CliFrontendOptions {
                                     + "You need to allow this if you removed an operator from your "
                                     + "program that was part of the program when the savepoint was triggered.")
                     .build();
+    public static final Option CDC_YAML =
+            Option.builder()
+                    .longOpt("cdc-yaml-content")
+                    .hasArg()
+                    .desc("Content of the CDC configuration file")
+                    .build();
 
     public static Options initializeOptions() {
         return new Options()
@@ -93,6 +99,7 @@ public class CliFrontendOptions {
                 .addOption(USE_MINI_CLUSTER)
                 .addOption(SAVEPOINT_PATH_OPTION)
                 .addOption(SAVEPOINT_CLAIM_MODE)
-                .addOption(SAVEPOINT_ALLOW_NON_RESTORED_OPTION);
+                .addOption(SAVEPOINT_ALLOW_NON_RESTORED_OPTION)
+                .addOption(CDC_YAML);
     }
 }

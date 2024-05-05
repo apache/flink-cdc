@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.cli;
 
+import org.apache.flink.cdc.cli.utils.Base64Util;
 import org.apache.flink.cdc.cli.utils.ConfigurationUtils;
 import org.apache.flink.cdc.cli.utils.FlinkEnvironmentUtils;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
@@ -30,11 +31,15 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -84,7 +89,17 @@ public class CliFrontend {
         }
 
         // Take the first unparsed argument as the pipeline definition file
-        Path pipelineDefPath = Paths.get(unparsedArgs.get(0));
+        String cdcYamlPath = unparsedArgs.get(0);
+        Path pipelineDefPath = Paths.get(cdcYamlPath);
+        System.out.println("Pipeline definition file: " + pipelineDefPath);
+        String cdcYamlContent = getCommandValue(commandLine, CliFrontendOptions.CDC_YAML);
+        if (!isEmpty(cdcYamlContent)) {
+            // throw new RuntimeException("The cdc yaml content is empty");
+            // 将 cdcYamlContent 写入文件
+            File cdcYamlFile = new File(cdcYamlPath);
+            FileUtils.writeStringToFile(
+                    cdcYamlFile, Base64Util.decode(cdcYamlContent), StandardCharsets.UTF_8.name());
+        }
         if (!Files.exists(pipelineDefPath)) {
             throw new FileNotFoundException(
                     String.format("Cannot find pipeline definition file \"%s\"", pipelineDefPath));
@@ -191,5 +206,14 @@ public class CliFrontend {
         System.out.println("Pipeline has been submitted to cluster.");
         System.out.printf("Job ID: %s\n", info.getId());
         System.out.printf("Job Description: %s\n", info.getDescription());
+    }
+
+    private static boolean isEmpty(String v) {
+        return v == null || v.isEmpty() || v.trim().length() == 0;
+    }
+
+    private static String getCommandValue(CommandLine commandLine, Option option) {
+        Optional<String[]> optional = Optional.ofNullable(commandLine.getOptionValues(option));
+        return optional.map(strings -> strings[0]).orElse(null);
     }
 }
