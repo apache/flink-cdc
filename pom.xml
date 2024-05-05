@@ -40,6 +40,8 @@ limitations under the License.
         <module>flink-cdc-connect</module>
         <module>flink-cdc-runtime</module>
         <module>flink-cdc-e2e-tests</module>
+        <module>flink-cdc-dist-dependencies</module>
+        <module>flink-cdc-cli-dist</module>
     </modules>
 
     <licenses>
