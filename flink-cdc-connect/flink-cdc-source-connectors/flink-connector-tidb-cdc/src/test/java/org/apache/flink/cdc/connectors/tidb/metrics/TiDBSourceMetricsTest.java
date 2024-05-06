@@ -25,13 +25,13 @@ import org.junit.Test;
 
 import java.util.Optional;
 
+import static org.apache.flink.runtime.metrics.MetricNames.CURRENT_EMIT_EVENT_TIME_LAG;
+import static org.apache.flink.runtime.metrics.MetricNames.CURRENT_FETCH_EVENT_TIME_LAG;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /** Unit test for {@link TiDBSourceMetrics}. */
 public class TiDBSourceMetricsTest {
-    private static final String FETCH_EVENTTIME_LAG = "currentFetchEventTimeLag";
-    private static final String EMIT_EVENTTIME_LAG = "currentEmitEventTimeLag";
     private MetricListener metricListener;
     private TiDBSourceMetrics sourceMetrics;
 
@@ -45,13 +45,13 @@ public class TiDBSourceMetricsTest {
     @Test
     public void testFetchEventTimeLagTracking() {
         sourceMetrics.recordFetchDelay(5L);
-        assertGauge(metricListener, FETCH_EVENTTIME_LAG, 5L);
+        assertGauge(metricListener, CURRENT_FETCH_EVENT_TIME_LAG, 5L);
     }
 
     @Test
     public void testEmitEventTimeLagTracking() {
         sourceMetrics.recordEmitDelay(3L);
-        assertGauge(metricListener, EMIT_EVENTTIME_LAG, 3L);
+        assertGauge(metricListener, CURRENT_EMIT_EVENT_TIME_LAG, 3L);
     }
 
     private void assertGauge(MetricListener metricListener, String identifier, long expected) {

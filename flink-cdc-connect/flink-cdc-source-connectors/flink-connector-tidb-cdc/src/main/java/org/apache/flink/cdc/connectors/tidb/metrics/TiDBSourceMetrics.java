@@ -17,6 +17,9 @@
 
 package org.apache.flink.cdc.connectors.tidb.metrics;
 
+import static org.apache.flink.runtime.metrics.MetricNames.CURRENT_EMIT_EVENT_TIME_LAG;
+import static org.apache.flink.runtime.metrics.MetricNames.CURRENT_FETCH_EVENT_TIME_LAG;
+import static org.apache.flink.runtime.metrics.MetricNames.SOURCE_IDLE_TIME;
 import org.apache.flink.cdc.connectors.tidb.TiKVRichParallelSourceFunction;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
@@ -50,9 +53,10 @@ public class TiDBSourceMetrics {
     }
 
     public void registerMetrics() {
-        metricGroup.gauge("currentFetchEventTimeLag", (Gauge<Long>) this::getFetchDelay);
-        metricGroup.gauge("currentEmitEventTimeLag", (Gauge<Long>) this::getEmitDelay);
-        metricGroup.gauge("sourceIdleTime", (Gauge<Long>) this::getIdleTime);
+
+        metricGroup.gauge(CURRENT_FETCH_EVENT_TIME_LAG, (Gauge<Long>) this::getFetchDelay);
+        metricGroup.gauge(CURRENT_EMIT_EVENT_TIME_LAG, (Gauge<Long>) this::getEmitDelay);
+        metricGroup.gauge(SOURCE_IDLE_TIME, (Gauge<Long>) this::getIdleTime);
     }
 
     public long getFetchDelay() {
