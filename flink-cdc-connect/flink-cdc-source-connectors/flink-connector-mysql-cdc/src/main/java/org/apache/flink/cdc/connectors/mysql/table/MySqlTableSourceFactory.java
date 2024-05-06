@@ -113,6 +113,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
             validateIntegerOption(MySqlSourceOptions.CONNECT_MAX_RETRIES, connectMaxRetries, 0);
             validateDistributionFactorUpper(distributionFactorUpper);
             validateDistributionFactorLower(distributionFactorLower);
+            validateDurationOption(
+                    MySqlSourceOptions.CONNECT_TIMEOUT, connectTimeout, Duration.ofMillis(250));
         }
 
         OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
@@ -313,6 +315,16 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 optionValue > exclusiveMin,
                 String.format(
                         "The value of option '%s' must larger than %d, but is %d",
+                        option.key(), exclusiveMin, optionValue));
+    }
+
+    /** Checks the value of given duration option is valid. */
+    private void validateDurationOption(
+            ConfigOption<Duration> option, Duration optionValue, Duration exclusiveMin) {
+        checkState(
+                optionValue.toMillis() > exclusiveMin.toMillis(),
+                String.format(
+                        "The value of option '%s' cannot be less than %s, but actual is %s",
                         option.key(), exclusiveMin, optionValue));
     }
 

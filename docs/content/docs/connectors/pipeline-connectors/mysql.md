@@ -218,7 +218,8 @@ pipeline:
           <td>optional</td>
           <td style="word-wrap: break-word;">30s</td>
           <td>Duration</td>
-          <td>The maximum time that the connector should wait after trying to connect to the MySQL database server before timing out.</td>
+          <td>The maximum time that the connector should wait after trying to connect to the MySQL database server before timing out. 
+              This value cannot be less than 250ms.</td>
     </tr>    
     <tr>
           <td>connect.max-retries</td>

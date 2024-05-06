@@ -324,7 +324,7 @@ Flink SQL> SELECT * FROM orders;
           <td>optional</td>
           <td style="word-wrap: break-word;">30s</td>
           <td>Duration</td>
-          <td>连接器在尝试连接到 MySQL 数据库服务器后超时前应等待的最长时间。</td>
+          <td>连接器在尝试连接到 MySQL 数据库服务器后超时前应等待的最长时间。该时长不能少于250毫秒。</td>
     </tr>    
     <tr>
           <td>connect.max-retries</td>
