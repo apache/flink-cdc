@@ -17,11 +17,11 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.utils;
 
-import com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils;
-import com.ververica.cdc.connectors.mysql.source.MySqlSourceTestBase;
-import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfig;
-import com.ververica.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
-import com.ververica.cdc.connectors.mysql.testutils.UniqueDatabase;
+import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
+import org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase;
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
+import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.TableId;
 import org.junit.AfterClass;
@@ -66,8 +66,6 @@ public class ObjectUtilsTest extends MySqlSourceTestBase {
             mySqlConnection.close();
         }
     }
-/** Tests for {@link org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils}. */
-public class ObjectUtilsTest {
 
     @Test
     public void testMinus() {
