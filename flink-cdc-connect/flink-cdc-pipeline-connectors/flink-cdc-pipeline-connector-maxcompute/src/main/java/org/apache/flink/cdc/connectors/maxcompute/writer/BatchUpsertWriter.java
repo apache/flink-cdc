@@ -25,9 +25,10 @@ import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.RetryUtils;
 
+import com.aliyun.odps.OdpsException;
+import com.aliyun.odps.data.ArrayRecord;
 import com.aliyun.odps.tunnel.TableTunnel;
 import com.aliyun.odps.tunnel.impl.ConfigurationImpl;
-import com.aliyun.odps.tunnel.impl.UpsertRecord;
 import com.aliyun.odps.tunnel.impl.UpsertSessionImpl;
 import com.aliyun.odps.tunnel.impl.UpsertSessionImpl.Builder;
 import com.aliyun.odps.tunnel.streams.UpsertStream;
@@ -43,9 +44,9 @@ import java.util.concurrent.ThreadLocalRandom;
  * MaxCompute upsert writer, use {@link UpsertSessionImpl} and {@link UpsertStream} to write data.
  * Each session corresponds to a stream.
  */
-public class MaxComputeUpsertWriter implements MaxComputeWriter {
+public class BatchUpsertWriter implements MaxComputeWriter {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MaxComputeUpsertWriter.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BatchUpsertWriter.class);
 
     private final MaxComputeOptions options;
     private final MaxComputeWriteOptions writeOptions;
@@ -55,7 +56,7 @@ public class MaxComputeUpsertWriter implements MaxComputeWriter {
     private UpsertSessionImpl upsertSession;
     private UpsertStream upsertStream;
 
-    public MaxComputeUpsertWriter(
+    public BatchUpsertWriter(
             MaxComputeOptions options,
             MaxComputeWriteOptions writeOptions,
             MaxComputeExecutionOptions executionOptions,
@@ -69,10 +70,10 @@ public class MaxComputeUpsertWriter implements MaxComputeWriter {
         this.sessionIdentifier = sessionIdentifier;
 
         LOG.info("sink writer reload session: {}", sessionIdentifier);
-        reloadSession(sessionIdentifier);
+        initOrReloadSession(sessionIdentifier);
     }
 
-    private void reloadSession(SessionIdentifier identifier) throws IOException {
+    private void initOrReloadSession(SessionIdentifier identifier) throws IOException {
         String partitionSpec = identifier.getPartitionName();
         String sessionId = identifier.getSessionId();
         Listener listener =
@@ -112,10 +113,7 @@ public class MaxComputeUpsertWriter implements MaxComputeWriter {
                                             tunnel.buildUpsertSession(
                                                     identifier.getProject(), identifier.getTable()))
                                     .setConfig((ConfigurationImpl) tunnel.getConfig())
-                                    .setSchemaName(
-                                            options.isSupportSchema()
-                                                    ? identifier.getSchema()
-                                                    : null)
+                                    .setSchemaName(identifier.getSchema())
                                     .setPartitionSpec(partitionSpec)
                                     .setUpsertId(sessionId)
                                     .setConcurrentNum(writeOptions.getFlushConcurrent())
@@ -142,25 +140,25 @@ public class MaxComputeUpsertWriter implements MaxComputeWriter {
     }
 
     @Override
-    public UpsertRecord newElement() {
-        return (UpsertRecord) upsertSession.newRecord();
+    public ArrayRecord newElement() {
+        return (ArrayRecord) upsertSession.newRecord();
     }
 
     @Override
-    public void write(UpsertRecord record) throws IOException {
+    public void write(ArrayRecord record) throws IOException {
         try {
             upsertStream.upsert(record);
-        } catch (Exception e) {
-            throw new IOException(e);
+        } catch (OdpsException e) {
+            throw new IOException(e.getMessage() + "RequestId: " + e.getRequestId(), e);
         }
     }
 
     @Override
-    public void delete(UpsertRecord record) throws IOException {
+    public void delete(ArrayRecord record) throws IOException {
         try {
             upsertStream.delete(record);
-        } catch (Exception e) {
-            throw new IOException(e);
+        } catch (OdpsException e) {
+            throw new IOException(e.getMessage() + "RequestId: " + e.getRequestId(), e);
         }
     }
 
@@ -168,13 +166,22 @@ public class MaxComputeUpsertWriter implements MaxComputeWriter {
     public void flush() throws IOException {
         try {
             upsertStream.flush();
-        } catch (Exception e) {
-            throw new IOException(e);
+        } catch (OdpsException e) {
+            throw new IOException(e.getMessage() + "RequestId: " + e.getRequestId(), e);
         }
     }
 
     @Override
     public String getId() {
         return upsertSession.getId();
+    }
+
+    @Override
+    public void commit() throws IOException {
+        try {
+            upsertSession.commit(false);
+        } catch (OdpsException e) {
+            throw new IOException(e.getMessage() + "RequestId: " + e.getRequestId(), e);
+        }
     }
 }

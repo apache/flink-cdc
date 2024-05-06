@@ -31,6 +31,7 @@ import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.RetryUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.SessionCommitCoordinator;
+import org.apache.flink.cdc.connectors.maxcompute.writer.MaxComputeWriter;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandler;
@@ -39,12 +40,13 @@ import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.util.ExceptionUtils;
 
-import com.aliyun.odps.tunnel.TableTunnel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -66,10 +68,9 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
     private final MaxComputeOptions options;
     private final MaxComputeWriteOptions writeOptions;
     private final MaxComputeExecutionOptions executionOptions;
-    private final TableTunnel tunnel;
     private final int parallelism;
     private SessionCommitCoordinator sessionCommitCoordinator;
-    private Map<SessionIdentifier, TableTunnel.UpsertSession> sessionCache;
+    private Map<SessionIdentifier, MaxComputeWriter> sessionCache;
     private Map<String, SessionIdentifier> sessionIdMap;
     private CompletableFuture<CoordinationResponse>[] waitingFlushFutures;
     private ExecutorService executor;
@@ -85,7 +86,6 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
         this.options = options;
         this.writeOptions = writeOptions;
         this.executionOptions = executionOptions;
-        this.tunnel = MaxComputeUtils.getTunnel(options);
     }
 
     @Override
@@ -113,7 +113,7 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
         // nothing to do
     }
 
-    private TableTunnel.UpsertSession createSession(SessionIdentifier identifier) {
+    private MaxComputeWriter createWriter(SessionIdentifier identifier) {
         String partitionName = identifier.getPartitionName();
         if (!StringUtils.isNullOrWhitespaceOnly(partitionName)) {
             RetryUtils.executeUnchecked(
@@ -128,21 +128,15 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
                     executionOptions.getMaxRetries(),
                     executionOptions.getRetryIntervalMillis());
         }
-
-        TableTunnel.UpsertSession.Builder builder =
-                tunnel.buildUpsertSession(identifier.getProject(), identifier.getTable())
-                        .setPartitionSpec(partitionName)
-                        .setConcurrentNum(writeOptions.getFlushConcurrent());
-        if (options.isSupportSchema()) {
-            builder.setSchemaName(identifier.getSchema());
+        try {
+            MaxComputeWriter writer =
+                    MaxComputeWriter.batchWriter(
+                            options, writeOptions, executionOptions, identifier);
+            LOG.info("Create session for table {}, sessionId {}.", identifier, writer.getId());
+            return writer;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-        TableTunnel.UpsertSession upsertSession =
-                RetryUtils.executeUnchecked(
-                        builder::build,
-                        executionOptions.getMaxRetries(),
-                        executionOptions.getRetryIntervalMillis());
-        LOG.info("Create session for table {}, sessionId {}.", identifier, upsertSession.getId());
-        return upsertSession;
     }
 
     @Override
@@ -198,9 +192,9 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
         } else if (request instanceof CreateSessionRequest) {
             SessionIdentifier sessionIdentifier = ((CreateSessionRequest) request).getIdentifier();
             if (!sessionCache.containsKey(sessionIdentifier)) {
-                TableTunnel.UpsertSession session = createSession(sessionIdentifier);
-                sessionCache.put(sessionIdentifier, session);
-                sessionIdMap.put(session.getId(), sessionIdentifier);
+                MaxComputeWriter writer = createWriter(sessionIdentifier);
+                sessionCache.put(sessionIdentifier, writer);
+                sessionIdMap.put(writer.getId(), sessionIdentifier);
             }
             return CompletableFuture.completedFuture(
                     new CreateSessionResponse(sessionCache.get(sessionIdentifier).getId()));
@@ -210,10 +204,9 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
     }
 
     private void commitSession(String toSubmitSessionId) {
-        TableTunnel.UpsertSession session =
-                sessionCache.remove(sessionIdMap.remove(toSubmitSessionId));
+        MaxComputeWriter writer = sessionCache.remove(sessionIdMap.remove(toSubmitSessionId));
         AtomicBoolean isSuccess = new AtomicBoolean(true);
-        LOG.info("start commit session {}.", toSubmitSessionId);
+        LOG.info("start commit writer {}.", toSubmitSessionId);
         try {
             Future<?> future =
                     executor.submit(
@@ -221,7 +214,7 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
                                 try {
                                     RetryUtils.execute(
                                             () -> {
-                                                session.commit(false);
+                                                writer.commit();
                                                 return null;
                                             },
                                             executionOptions.getMaxRetries(),
@@ -229,8 +222,8 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
                                 } catch (Throwable throwable) {
                                     ExceptionUtils.rethrowIfFatalErrorOrOOM(throwable);
                                     LOG.warn(
-                                            "Failed to commit session {}.",
-                                            session.getId(),
+                                            "Failed to commit writer {}.",
+                                            writer.getId(),
                                             throwable);
                                     isSuccess.set(false);
                                 }

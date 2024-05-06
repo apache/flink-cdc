@@ -21,6 +21,7 @@ package org.apache.flink.cdc.connectors.maxcompute.utils;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.maxcompute.common.Constant;
+import org.apache.flink.cdc.connectors.maxcompute.common.SessionIdentifier;
 import org.apache.flink.cdc.connectors.maxcompute.common.UncheckedOdpsException;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 
@@ -211,5 +212,28 @@ public class MaxComputeUtils {
                     .get(options.getProject(), table)
                     .createPartition(new PartitionSpec(partitionName), true);
         }
+    }
+
+    public static String getSchema(MaxComputeOptions options, TableId tableId) {
+        if (options.isSupportSchema()) {
+            if (tableId.getNamespace() == null) {
+                return "default";
+            } else {
+                return tableId.getNamespace();
+            }
+        } else {
+            return null;
+        }
+    }
+
+    public static boolean isTransactionalTable(
+            MaxComputeOptions options, SessionIdentifier sessionIdentifier) {
+        Odps odps = getOdps(options);
+        return odps.tables()
+                .get(
+                        sessionIdentifier.getProject(),
+                        sessionIdentifier.getSchema(),
+                        sessionIdentifier.getTable())
+                .isTransactional();
     }
 }

@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
+import org.apache.flink.util.CollectionUtil;
 
 import com.aliyun.odps.Instance;
 import com.aliyun.odps.Odps;
@@ -80,11 +81,12 @@ public class SchemaEvolutionUtils {
                 odps.tables()
                         .newTableCreator(
                                 odps.getDefaultProject(), tableId.getTableName(), tableSchema)
-                        .transactionTable()
-                        .withBucketNum(options.getBucketSize())
                         .withHints(unsupportSchemahints)
                         .ifNotExists()
                         .debug();
+        if (!CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
+            tableCreator.transactionTable().withBucketNum(options.getBucketSize());
+        }
         if (options.isSupportSchema()) {
             if (StringUtils.isNullOrWhitespaceOnly(tableId.getNamespace())) {
                 tableCreator.withSchemaName("default").withHints(supportSchemaHints);
