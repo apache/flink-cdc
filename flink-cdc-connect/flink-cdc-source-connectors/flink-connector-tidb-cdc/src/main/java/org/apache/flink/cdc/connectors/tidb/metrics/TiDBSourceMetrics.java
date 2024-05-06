@@ -17,12 +17,13 @@
 
 package org.apache.flink.cdc.connectors.tidb.metrics;
 
-import static org.apache.flink.runtime.metrics.MetricNames.CURRENT_EMIT_EVENT_TIME_LAG;
-import static org.apache.flink.runtime.metrics.MetricNames.CURRENT_FETCH_EVENT_TIME_LAG;
-import static org.apache.flink.runtime.metrics.MetricNames.SOURCE_IDLE_TIME;
 import org.apache.flink.cdc.connectors.tidb.TiKVRichParallelSourceFunction;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
+
+import static org.apache.flink.runtime.metrics.MetricNames.CURRENT_EMIT_EVENT_TIME_LAG;
+import static org.apache.flink.runtime.metrics.MetricNames.CURRENT_FETCH_EVENT_TIME_LAG;
+import static org.apache.flink.runtime.metrics.MetricNames.SOURCE_IDLE_TIME;
 
 /** A collection class for handling metrics in {@link TiKVRichParallelSourceFunction}. */
 public class TiDBSourceMetrics {
