@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.table;
+package org.apache.flink.cdc.connectors.tidb.table;
 
-import org.apache.flink.cdc.connectors.TiDBTestBase;
+import org.apache.flink.cdc.connectors.tidb.TiDBTestBase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
