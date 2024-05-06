@@ -36,11 +36,17 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.apache.flink.cdc.common.testutils.assertions.EventAssertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -361,5 +367,27 @@ class SchemaDerivationTest {
                                         new CreateTableEvent(TABLE_2, INCOMPATIBLE_SCHEMA)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Incompatible types: \"INT\" and \"STRING\"");
+    }
+
+    @Test
+    void testSerde() throws Exception {
+        Map<TableId, Set<TableId>> derivationMapping = new HashMap<>();
+        Set<TableId> originalTableIds = new HashSet<>();
+        originalTableIds.add(TABLE_1);
+        originalTableIds.add(TABLE_2);
+        derivationMapping.put(MERGED_TABLE, originalTableIds);
+        SchemaDerivation schemaDerivation =
+                new SchemaDerivation(new SchemaManager(), ROUTES, derivationMapping);
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                DataOutputStream out = new DataOutputStream(baos)) {
+            SchemaDerivation.serializeDerivationMapping(schemaDerivation, out);
+            byte[] serialized = baos.toByteArray();
+            try (ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
+                    DataInputStream in = new DataInputStream(bais)) {
+                Map<TableId, Set<TableId>> deserialized =
+                        SchemaDerivation.deserializerDerivationMapping(in);
+                assertThat(deserialized).isEqualTo(derivationMapping);
+            }
+        }
     }
 }

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors;
+package org.apache.flink.cdc.connectors.tidb;
 
 import org.apache.flink.test.util.AbstractTestBase;
 

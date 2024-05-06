@@ -15,10 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.table;
+package org.apache.flink.cdc.connectors.tidb.table;
 
-import org.apache.flink.cdc.connectors.tidb.table.StartupOptions;
-import org.apache.flink.cdc.connectors.tidb.table.TiDBTableSource;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;

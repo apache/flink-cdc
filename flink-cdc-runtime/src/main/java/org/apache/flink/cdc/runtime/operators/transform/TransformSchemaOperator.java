@@ -96,6 +96,7 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
     @Override
     public void open() throws Exception {
         super.open();
+        transforms = new ArrayList<>();
         for (Tuple5<String, String, String, String, String> transformRule : transformRules) {
             String tableInclusions = transformRule.f0;
             String projection = transformRule.f1;
@@ -104,7 +105,6 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
             String tableOptions = transformRule.f4;
             Selectors selectors =
                     new Selectors.SelectorsBuilder().includeTables(tableInclusions).build();
-            transforms = new ArrayList<>();
             transforms.add(new Tuple2<>(selectors, TransformProjection.of(projection)));
             schemaMetadataTransformers.add(
                     new Tuple2<>(
