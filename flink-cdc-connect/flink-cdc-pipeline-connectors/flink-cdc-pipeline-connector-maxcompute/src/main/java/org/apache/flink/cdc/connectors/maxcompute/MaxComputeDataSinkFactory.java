@@ -55,7 +55,7 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
         String tunnelEndpoint = factoryConfiguration.get(MaxComputeDataSinkOptions.TUNNEL_ENDPOINT);
         String quotaName = factoryConfiguration.get(MaxComputeDataSinkOptions.QUOTA_NAME);
         String stsToken = factoryConfiguration.get(MaxComputeDataSinkOptions.STS_TOKEN);
-        int bucketSize = factoryConfiguration.get(MaxComputeDataSinkOptions.BUCKET_SIZE);
+        int bucketSize = factoryConfiguration.get(MaxComputeDataSinkOptions.BUCKETS_NUM);
         return MaxComputeOptions.builder(accessId, accessKey, endpoint, project)
                 .withTunnelEndpoint(tunnelEndpoint)
                 .withQuotaName(quotaName)
@@ -127,7 +127,7 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(MaxComputeDataSinkOptions.TUNNEL_ENDPOINT);
         optionalOptions.add(MaxComputeDataSinkOptions.QUOTA_NAME);
         optionalOptions.add(MaxComputeDataSinkOptions.STS_TOKEN);
-        optionalOptions.add(MaxComputeDataSinkOptions.BUCKET_SIZE);
+        optionalOptions.add(MaxComputeDataSinkOptions.BUCKETS_NUM);
         // write options
         optionalOptions.add(MaxComputeDataSinkOptions.NUM_COMMIT_THREADS);
         optionalOptions.add(MaxComputeDataSinkOptions.COMPRESS_ALGORITHM);
