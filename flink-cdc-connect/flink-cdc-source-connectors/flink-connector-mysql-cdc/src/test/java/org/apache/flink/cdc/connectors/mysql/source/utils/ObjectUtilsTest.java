@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
+
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.relational.TableId;
 import org.junit.AfterClass;
