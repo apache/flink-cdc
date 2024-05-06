@@ -34,6 +34,7 @@ import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CreateSess
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CreateSessionResponse;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.WaitForFlushSuccessRequest;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
+import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.TypeConvertUtils;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -132,7 +133,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
             SessionIdentifier sessionIdentifier =
                     SessionIdentifier.of(
                             options.getProject(),
-                            tableId.getNamespace(),
+                            MaxComputeUtils.getSchema(options, tableId),
                             tableId.getTableName(),
                             partitionName);
             if (!sessionCache.containsKey(sessionIdentifier)) {
@@ -170,7 +171,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
             output.collect(element);
         } else {
             output.collect(element);
-            LOG.warn("unknown element", element.getValue());
+            LOG.warn("unknown element {}", element.getValue());
         }
     }
 
