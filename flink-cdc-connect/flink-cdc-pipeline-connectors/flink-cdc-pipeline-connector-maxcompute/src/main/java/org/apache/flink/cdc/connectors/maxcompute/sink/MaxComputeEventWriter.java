@@ -54,12 +54,12 @@ import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CommitSess
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
+import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.TypeConvertUtils;
-import org.apache.flink.cdc.connectors.maxcompute.writer.MaxComputeUpsertWriter;
 import org.apache.flink.cdc.connectors.maxcompute.writer.MaxComputeWriter;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
-import com.aliyun.odps.tunnel.impl.UpsertRecord;
+import com.aliyun.odps.data.ArrayRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,21 +104,20 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
             String sessionId = dataChangeEvent.meta().get(Constant.TUNNEL_SESSION_ID);
             String partitionName = dataChangeEvent.meta().get(Constant.MAXCOMPUTE_PARTITION_NAME);
             if (!writerMap.containsKey(sessionId)) {
+                SessionIdentifier sessionIdentifier =
+                        SessionIdentifier.of(
+                                options.getProject(),
+                                MaxComputeUtils.getSchema(options, dataChangeEvent.tableId()),
+                                dataChangeEvent.tableId().getTableName(),
+                                partitionName,
+                                sessionId);
                 writerMap.put(
                         sessionId,
-                        new MaxComputeUpsertWriter(
-                                options,
-                                writeOptions,
-                                executionOptions,
-                                SessionIdentifier.of(
-                                        options.getProject(),
-                                        dataChangeEvent.tableId().getNamespace(),
-                                        dataChangeEvent.tableId().getTableName(),
-                                        partitionName,
-                                        sessionId)));
+                        MaxComputeWriter.batchWriter(
+                                options, writeOptions, executionOptions, sessionIdentifier));
             }
             MaxComputeWriter writer = writerMap.get(sessionId);
-            UpsertRecord record = writer.newElement();
+            ArrayRecord record = writer.newElement();
 
             if (dataChangeEvent.op() != OperationType.DELETE) {
                 TypeConvertUtils.toMaxComputeRecord(

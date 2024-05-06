@@ -18,6 +18,7 @@
 
 package org.apache.flink.cdc.connectors.maxcompute.utils;
 
+import com.aliyun.odps.OdpsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +49,11 @@ public class RetryUtils {
             } catch (Exception e) {
                 attempt++;
                 if (attempt > maxRetries) {
+                    if (e instanceof OdpsException) {
+                        throw new IOException(
+                                e.getMessage() + "RequestId: " + ((OdpsException) e).getRequestId(),
+                                e);
+                    }
                     throw new IOException("Failed after retries", e);
                 }
                 try {
