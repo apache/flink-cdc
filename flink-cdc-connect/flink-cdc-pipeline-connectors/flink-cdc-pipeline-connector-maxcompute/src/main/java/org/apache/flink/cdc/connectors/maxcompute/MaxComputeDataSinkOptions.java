@@ -66,8 +66,8 @@ public class MaxComputeDataSinkOptions {
                     .noDefaultValue()
                     .withDescription("MaxCompute sts token.");
 
-    public static final ConfigOption<Integer> BUCKET_SIZE =
-            ConfigOptions.key("bucketSize")
+    public static final ConfigOption<Integer> BUCKETS_NUM =
+            ConfigOptions.key("bucketsNum")
                     .intType()
                     .defaultValue(16)
                     .withDescription(
@@ -103,7 +103,7 @@ public class MaxComputeDataSinkOptions {
     public static final ConfigOption<Integer> NUM_FLUSH_CONCURRENT =
             ConfigOptions.key("numFlushConcurrent")
                     .intType()
-                    .defaultValue(2)
+                    .defaultValue(4)
                     .withDescription("The number of concurrent with flush bucket data.");
 
     // extend options.
