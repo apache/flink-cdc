@@ -87,10 +87,13 @@ import static io.debezium.util.Strings.isNullOrEmpty;
  * Copied from Debezium project(1.9.8.Final) to fix
  * https://github.com/ververica/flink-cdc-connectors/issues/1944.
  *
- * <p>Line 1427-1433 : Adjust GTID merging logic to support recovering from job which previously
+ * <p>Line 263-265: Skip null events in event deserializer to compatible with {@link
+ * com.github.shyiko.mysql.binlog.BinaryLogFileReader} which reads local binlog files.
+ *
+ * <p>Line 1433-1439 : Adjust GTID merging logic to support recovering from job which previously
  * specifying starting offset on start.
  *
- * <p>Line 1485 : Add more error details for some exceptions.
+ * <p>Line 1491 : Add more error details for some exceptions.
  */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlPartition, MySqlOffsetContext> {
@@ -257,6 +260,9 @@ public class MySqlStreamingChangeEventSource
                         try {
                             // Delegate to the superclass ...
                             Event event = super.nextEvent(inputStream);
+                            if (event == null) {
+                                return null;
+                            }
 
                             // We have to record the most recent TableMapEventData for each table
                             // number for our custom deserializers ...
