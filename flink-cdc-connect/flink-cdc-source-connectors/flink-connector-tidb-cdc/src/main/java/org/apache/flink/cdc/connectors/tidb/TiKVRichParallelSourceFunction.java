@@ -23,9 +23,11 @@ import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.base.LongSerializer;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
+import org.apache.flink.cdc.connectors.tidb.metrics.TiDBSourceMetrics;
 import org.apache.flink.cdc.connectors.tidb.table.StartupMode;
 import org.apache.flink.cdc.connectors.tidb.table.utils.TableKeyRangeUtils;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
@@ -42,6 +44,7 @@ import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.key.RowKey;
 import org.tikv.common.meta.TiTableInfo;
+import org.tikv.common.meta.TiTimestamp;
 import org.tikv.kvproto.Cdcpb;
 import org.tikv.kvproto.Coprocessor;
 import org.tikv.kvproto.Kvrpcpb;
@@ -91,6 +94,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
 
     private transient boolean running = true;
     private transient ExecutorService executorService;
+    private transient TiDBSourceMetrics sourceMetrics;
 
     /** offset state. */
     private transient ListState<Long> offsetState;
@@ -146,6 +150,9 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                                         + getRuntimeContext().getIndexOfThisSubtask())
                         .build();
         executorService = Executors.newSingleThreadExecutor(threadFactory);
+        final MetricGroup metricGroup = getRuntimeContext().getMetricGroup();
+        sourceMetrics = new TiDBSourceMetrics(metricGroup);
+        sourceMetrics.registerMetrics();
     }
 
     @Override
@@ -210,6 +217,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                 for (final Kvrpcpb.KvPair pair : segment) {
                     if (TableKeyRangeUtils.isRecordKey(pair.getKey().toByteArray())) {
                         snapshotEventDeserializationSchema.deserialize(pair, outputCollector);
+                        reportMetrics(0L, startTs);
                     }
                 }
 
@@ -231,6 +239,8 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                             Cdcpb.Event.Row committedRow = committedEvents.take();
                             changeEventDeserializationSchema.deserialize(
                                     committedRow, outputCollector);
+                            // use startTs of row as messageTs, use commitTs of row as fetchTs
+                            reportMetrics(committedRow.getStartTs(), committedRow.getCommitTs());
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -388,6 +398,22 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
         @Override
         public void close() {
             // do nothing
+        }
+    }
+
+    private void reportMetrics(long messageTs, long fetchTs) {
+        long now = System.currentTimeMillis();
+        // record the latest process time
+        sourceMetrics.recordProcessTime(now);
+        long messageTimestamp = TiTimestamp.extractPhysical(messageTs);
+        long fetchTimestamp = TiTimestamp.extractPhysical(fetchTs);
+        if (messageTimestamp > 0L) {
+            // report fetch delay
+            if (fetchTimestamp >= messageTimestamp) {
+                sourceMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
+            }
+            // report emit delay
+            sourceMetrics.recordEmitDelay(now - messageTimestamp);
         }
     }
 }

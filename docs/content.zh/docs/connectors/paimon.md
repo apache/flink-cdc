@@ -52,8 +52,8 @@ source:
 sink:
   type: paimon
   name: Paimon Sink
-  metastore: filesystem
-  warehouse: /path/warehouse
+  catalog.properties.metastore: filesystem
+  catalog.properties.warehouse: /path/warehouse
 
 pipeline:
   name: MySQL to Paimon Pipeline
