@@ -21,6 +21,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
@@ -71,7 +72,9 @@ public class DataSinkTranslator {
         }
     }
 
-    private void sinkTo(
+    /** Only visible for test */
+    @VisibleForTesting
+    protected void sinkTo(
             DataStream<Event> input,
             Sink<Event> sink,
             String sinkName,
