@@ -206,13 +206,9 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         System.out.println(stdout);
     }
 
-    private void validateResult(List<String> expectedEvents) {
-        String stdout = taskManagerConsumer.toUtf8String();
+    private void validateResult(List<String> expectedEvents) throws Exception {
         for (String event : expectedEvents) {
-            if (!stdout.contains(event)) {
-                throw new RuntimeException(
-                        "failed to get specific event: " + event + " from stdout: " + stdout);
-            }
+            waitUtilSpecificEvent(event, 6000L);
         }
     }
 
