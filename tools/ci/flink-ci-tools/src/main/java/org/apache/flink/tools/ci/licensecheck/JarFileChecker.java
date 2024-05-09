@@ -18,6 +18,8 @@
 
 package org.apache.flink.tools.ci.licensecheck;
 
+import org.apache.flink.annotation.VisibleForTesting;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +61,7 @@ public class JarFileChecker {
                 .collect(Collectors.toList());
     }
 
+    @VisibleForTesting
     static int checkJar(Path file) throws Exception {
         final URI uri = file.toUri();
 
@@ -109,7 +112,8 @@ public class JarFileChecker {
         }
 
         final String noticeFileContents = readFile(noticeFile);
-        if (!noticeFileContents.contains("The Apache Software Foundation")) {
+        if (!noticeFileContents.toLowerCase().contains("flink")
+                || !noticeFileContents.contains("The Apache Software Foundation")) {
             LOG.error("The notice file in {} does not contain the expected entries.", jar);
             return false;
         }
@@ -200,15 +204,24 @@ public class JarFileChecker {
                     // false-positives due to optional components; startsWith covers .txt/.md files
                     .filter(path -> !getFileName(path).startsWith("notice"))
                     // dual-licensed under GPL 2 and CDDL 1.1
-                    // contained in hadoop/presto S3 FS and paimon-dist
+                    // contained in hadoop/presto S3 FS and flink-dist
+                    .filter(path -> !pathStartsWith(path, "/META-INF/versions/11/javax/xml/bind"))
+                    .filter(path -> !isJavaxManifest(jar, path))
                     .filter(
                             path ->
-                                    !path.toString()
-                                            .contains("/META-INF/versions/11/javax/xml/bind"))
-                    .filter(path -> !isJavaxManifest(jar, path))
+                                    !pathStartsWith(
+                                            path, "/org/apache/pulsar/shade/javax/xml/bind/"))
                     // dual-licensed under GPL 2 and EPL 2.0
                     // contained in sql-avro-confluent-registry
                     .filter(path -> !pathStartsWith(path, "/org/glassfish/jersey/internal"))
+                    // contained in sql-connector-pulsar
+                    // while the Pulsar connector is externalized, this is still needed for PyFlink
+                    .filter(
+                            path ->
+                                    !pathStartsWith(
+                                            path, "/org/apache/pulsar/shade/org/glassfish/jersey/"))
+                    .filter(path -> !pathStartsWith(path, "/org/glassfish/jersey"))
+                    .filter(path -> !pathStartsWith(path, "/javax"))
                     .map(
                             path -> {
                                 try {
@@ -272,7 +285,7 @@ public class JarFileChecker {
                                     path ->
                                             !getFileName(path)
                                                     .endsWith(".ftl")) // a false positive in
-                            // python
+                            // flink-python
                             .map(Path::toString)
                             .filter(
                                     path ->
@@ -284,7 +297,7 @@ public class JarFileChecker {
                                             !path.endsWith(
                                                     "web/3rdpartylicenses.txt")) // a false positive
                             // in
-                            // web
+                            // flink-runtime-web
                             .collect(Collectors.toList());
             for (String fileWithIssue : filesWithIssues) {
                 LOG.error(
