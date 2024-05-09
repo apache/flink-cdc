@@ -100,6 +100,10 @@ env:
 jobs:
   license_check:
     runs-on: ubuntu-latest
+    env:
+      MVN_COMMON_OPTIONS: -U -B --no-transfer-progress
+      MVN_BUILD_OUTPUT_FILE: "/tmp/mvn_build_output.out"
+      MVN_VALIDATION_DIR: "/tmp/flink-validation-deployment"
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -109,14 +113,23 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
-      - name: Compiling jar packages
-        run: mvn --no-snapshot-updates -B package -DskipTests
+      - name: Build
+        run: |
+          set -o pipefail
+          
+          mvn clean deploy ${{ env.MVN_COMMON_OPTIONS }} -DskipTests \
+           -DaltDeploymentRepository=validation_repository::default::file:${{ env.MVN_VALIDATION_DIR }} \
+          | tee ${{ env.MVN_BUILD_OUTPUT_FILE }}
+
       - name: Run license check
-        run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
+        run: |
+          gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
+
+          mvn ${{ env.MVN_COMMON_OPTIONS }} exec:java@check-license -N \
+            -Dexec.args="${{ env.MVN_BUILD_OUTPUT_FILE }} $(pwd) ${{ env.MVN_VALIDATION_DIR }}" \
+            -Dlog4j.configurationFile=file://$(pwd)/tools/ci/log4j.properties
 
   compile_and_test:
-    # Only run the CI pipeline for the flink-cdc-connectors repository
-#    if: github.repository == 'apache/flink-cdc-connectors'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -135,15 +148,6 @@ jobs:
                   "e2e"
         ]
     timeout-minutes: 120
-    env:
-      MVN_COMMON_OPTIONS: -Dmaven.wagon.http.pool=false \
-        -Dorg.slf4j.simpleLogger.showDateTime=true \
-        -Dorg.slf4j.simpleLogger.dateTimeFormat=HH:mm:ss.SSS \
-        -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn \
-        --no-snapshot-updates -B \
-        --settings /home/vsts/work/1/s/tools/ci/google-mirror-settings.xml \
-        -Dfast -Dlog.dir=/home/vsts/work/_temp/debug_files \
-        -Dlog4j.configurationFile=file:///home/vsts/work/1/s/tools/ci/log4j.properties
     steps:
       - run: echo "Running CI pipeline for JDK version ${{ matrix.jdk }}"
 
