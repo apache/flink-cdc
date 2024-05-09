@@ -45,6 +45,7 @@ public class DataSinkTranslatorTest {
         DataStreamSource<Event> inputStream = env.fromCollection(mockEvents);
         DataSinkTranslator translator = new DataSinkTranslator();
 
+        // Node hash must be a 32 character String that describes a hex code
         String uid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         MockPreWriteWithoutCommitSink mockPreWriteWithoutCommitSink =
                 new MockPreWriteWithoutCommitSink(uid);
@@ -53,6 +54,9 @@ public class DataSinkTranslatorTest {
                 mockPreWriteWithoutCommitSink,
                 "testPreWriteWithoutCommitSink",
                 new OperatorID());
+
+        // Check if the `addPreWriteTopology` is called, and the uid is set when the transformation
+        // added
         OneInputTransformation<Event, Event> oneInputTransformation =
                 (OneInputTransformation) env.getTransformations().get(0);
         Transformation<?> reblanceTransformation = oneInputTransformation.getInputs().get(0);

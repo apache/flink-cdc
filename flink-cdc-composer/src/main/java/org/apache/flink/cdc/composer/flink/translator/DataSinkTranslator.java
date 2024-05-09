@@ -72,9 +72,8 @@ public class DataSinkTranslator {
         }
     }
 
-    /** Only visible for test */
     @VisibleForTesting
-    protected void sinkTo(
+    void sinkTo(
             DataStream<Event> input,
             Sink<Event> sink,
             String sinkName,
