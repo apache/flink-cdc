@@ -22,17 +22,17 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.PipelineOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /** Utilities for {@link org.apache.flink.streaming.api.environment.StreamExecutionEnvironment}. */
 @Internal
@@ -44,26 +44,27 @@ public class FlinkEnvironmentUtils {
      * together with the job graph.
      */
     public static void addJar(StreamExecutionEnvironment env, URL jarUrl) {
-        addJar(env, Lists.newArrayList(jarUrl));
+        addJar(env, Collections.singletonList(jarUrl));
     }
 
     /**
      * Add the specified JARs to {@link StreamExecutionEnvironment} so that the JAR will be uploaded
      * together with the job graph.
      */
-    public static void addJar(StreamExecutionEnvironment env, List<URL> jarUrls) {
+    public static void addJar(StreamExecutionEnvironment env, Collection<URL> jarUrls) {
         try {
             Class<StreamExecutionEnvironment> envClass = StreamExecutionEnvironment.class;
             Field field = envClass.getDeclaredField("configuration");
             field.setAccessible(true);
             Configuration configuration = ((Configuration) field.get(env));
-            Set<String> jars =
-                    configuration.getOptional(PipelineOptions.JARS).orElse(new ArrayList<>())
-                            .stream()
-                            .collect(Collectors.toSet());
-            jars.addAll(jarUrls.stream().map(URL::toString).collect(Collectors.toList()));
-            LOG.info("add jar path is: " + String.join(",", jars));
-            configuration.set(PipelineOptions.JARS, jars.stream().collect(Collectors.toList()));
+            List<String> previousJars =
+                    configuration.getOptional(PipelineOptions.JARS).orElse(new ArrayList<>());
+            List<String> currentJars =
+                    Stream.concat(previousJars.stream(), jarUrls.stream().map(URL::toString))
+                            .distinct()
+                            .collect(Collectors.toList());
+            LOG.info("pipeline.jars is " + String.join(",", currentJars));
+            configuration.set(PipelineOptions.JARS, currentJars);
         } catch (Exception e) {
             throw new RuntimeException("Failed to add JAR to Flink execution environment", e);
         }
