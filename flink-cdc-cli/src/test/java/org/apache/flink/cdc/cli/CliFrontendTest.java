@@ -34,6 +34,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -75,22 +76,26 @@ class CliFrontendTest {
 
     @Test
     void testGlobalPipelineConfigParsing() throws Exception {
-        CliExecutor executor =
-                createExecutor(
+        List<CliExecutor> executors =
+                createExecutors(
                         pipelineDef(),
                         "--flink-home",
                         flinkHome(),
                         "--global-config",
                         globalPipelineConfig());
-        assertThat(executor.getGlobalPipelineConfig().toMap().get("parallelism")).isEqualTo("1");
-        assertThat(executor.getGlobalPipelineConfig().toMap().get("schema.change.behavior"))
-                .isEqualTo("ignore");
+
+        for (CliExecutor executor : executors) {
+            assertThat(executor.getGlobalPipelineConfig().toMap().get("parallelism"))
+                    .isEqualTo("1");
+            assertThat(executor.getGlobalPipelineConfig().toMap().get("schema.change.behavior"))
+                    .isEqualTo("ignore");
+        }
     }
 
     @Test
     void testSavePointConfiguration() throws Exception {
-        CliExecutor executor =
-                createExecutor(
+        List<CliExecutor> executors =
+                createExecutors(
                         pipelineDef(),
                         "--flink-home",
                         flinkHome(),
@@ -99,43 +104,52 @@ class CliFrontendTest {
                         "-cm",
                         "no_claim",
                         "-n");
-        assertThat(executor.getSavepointSettings().getRestorePath())
-                .isEqualTo(flinkHome() + "/savepoints/savepoint-1");
-        assertThat(executor.getSavepointSettings().getRestoreMode())
-                .isEqualTo(RestoreMode.NO_CLAIM);
-        assertThat(executor.getSavepointSettings().allowNonRestoredState()).isTrue();
+
+        for (CliExecutor executor : executors) {
+            assertThat(executor.getSavepointSettings().getRestorePath())
+                    .isEqualTo(flinkHome() + "/savepoints/savepoint-1");
+            assertThat(executor.getSavepointSettings().getRestoreMode())
+                    .isEqualTo(RestoreMode.NO_CLAIM);
+            assertThat(executor.getSavepointSettings().allowNonRestoredState()).isTrue();
+        }
     }
 
     @Test
     void testAdditionalJar() throws Exception {
         String aJar = "/foo/jar/a.jar";
         String bJar = "/foo/jar/b.jar";
-        CliExecutor executor =
-                createExecutor(
+        List<CliExecutor> executors =
+                createExecutors(
                         pipelineDef(), "--flink-home", flinkHome(), "--jar", aJar, "--jar", bJar);
-        assertThat(executor.getAdditionalJars()).contains(Paths.get(aJar), Paths.get(bJar));
+
+        for (CliExecutor executor : executors) {
+            assertThat(executor.getAdditionalJars()).contains(Paths.get(aJar), Paths.get(bJar));
+        }
     }
 
     @Test
     void testPipelineExecuting() throws Exception {
-        CliExecutor executor =
-                createExecutor(
+        List<CliExecutor> executors =
+                createExecutors(
                         pipelineDef(),
                         "--flink-home",
                         flinkHome(),
                         "--global-config",
                         globalPipelineConfig());
         NoOpComposer composer = new NoOpComposer();
-        executor.setComposer(composer);
-        PipelineExecution.ExecutionInfo executionInfo = executor.run();
-        assertThat(executionInfo.getId()).isEqualTo("fake-id");
-        assertThat(executionInfo.getDescription()).isEqualTo("fake-description");
+
+        for (CliExecutor executor : executors) {
+            executor.setComposer(composer);
+            PipelineExecution.ExecutionInfo executionInfo = executor.run();
+            assertThat(executionInfo.getId()).isEqualTo("fake-id");
+            assertThat(executionInfo.getDescription()).isEqualTo("fake-description");
+        }
     }
 
-    private CliExecutor createExecutor(String... args) throws Exception {
+    private List<CliExecutor> createExecutors(String... args) throws Exception {
         Options cliOptions = CliFrontendOptions.initializeOptions();
         CommandLineParser parser = new DefaultParser();
-        return CliFrontend.createExecutor(parser.parse(cliOptions, args));
+        return CliFrontend.createExecutors(parser.parse(cliOptions, args));
     }
 
     private String pipelineDef() throws Exception {
