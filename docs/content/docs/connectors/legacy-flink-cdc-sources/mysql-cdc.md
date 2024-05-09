@@ -353,6 +353,14 @@ During a snapshot operation, the connector will query each included table to pro
           <td>The interval of sending heartbeat event for tracing the latest available binlog offsets.</td>
     </tr>
     <tr>
+          <td>changelog-mode</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">all</td>
+          <td>String</td>
+          <td>The changelog mode used for encoding streaming changes. Supported values are <code>all</code> (which encodes changes as retract stream using all RowKinds) and <code>upsert</code> (which encodes changes as upsert stream that describes idempotent updates on a key).
+          <br/> Primary keys must be set to use <code>upsert</code> mode.</td>
+    </tr>
+    <tr>
       <td>debezium.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>

@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mysql.source.config;
 
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
+import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
@@ -190,6 +191,15 @@ public class MySqlSourceOptions {
                     .defaultValue(Duration.ofSeconds(30))
                     .withDescription(
                             "Optional interval of sending heartbeat event for tracing the latest available binlog offsets");
+
+    public static final ConfigOption<DebeziumChangelogMode> CHANGELOG_MODE =
+            ConfigOptions.key("changelog-mode")
+                    .enumType(DebeziumChangelogMode.class)
+                    .defaultValue(DebeziumChangelogMode.ALL)
+                    .withDescription(
+                            "The changelog mode used for encoding streaming changes.\n"
+                                    + "\"all\": Encodes changes as retract stream using all RowKinds. This is the default mode.\n"
+                                    + "\"upsert\": Encodes changes as upsert stream that describes idempotent updates on a key.");
 
     // ----------------------------------------------------------------------------
     // experimental options, won't add them to documentation
