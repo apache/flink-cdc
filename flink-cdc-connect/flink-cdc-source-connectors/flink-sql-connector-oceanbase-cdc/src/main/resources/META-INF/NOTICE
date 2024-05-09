@@ -6,4 +6,64 @@ The Apache Software Foundation (http://www.apache.org/).
 
 This project bundles the following dependencies under the Apache Software License 2.0. (http://www.apache.org/licenses/LICENSE-2.0.txt)
 
-- org.apache.kafka:kafka-clients:2.7.0
+- io.debezium:debezium-api:1.9.8.Final
+- io.debezium:debezium-embedded:1.9.8.Final
+- io.debezium:debezium-core:1.9.8.Final
+- com.fasterxml.jackson.core:jackson-core:2.13.2
+- com.fasterxml.jackson.core:jackson-databind:2.13.2.2
+- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2
+- org.apache.kafka:connect-api:3.2.0
+- org.apache.kafka:kafka-clients:3.2.0
+- org.apache.kafka:connect-runtime:3.2.0
+- org.apache.kafka:connect-transforms:3.2.0
+- org.apache.kafka:kafka-tools:3.2.0
+- com.fasterxml.jackson.core:jackson-annotations:2.12.6
+- com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider:2.12.6
+- com.fasterxml.jackson.jaxrs:jackson-jaxrs-base:2.12.6
+- com.fasterxml.jackson.module:jackson-module-jaxb-annotations:2.12.6
+- org.apache.kafka:connect-json:3.2.0
+- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.12.6
+- org.apache.kafka:connect-file:3.2.0
+- com.oceanbase:oblogclient-logproxy:1.1.2
+- com.oceanbase:oblogclient-common:1.1.2
+- commons-codec:commons-codec:1.15
+- io.netty:netty-all:4.1.77.Final
+- io.netty:netty-buffer:4.1.77.Final
+- io.netty:netty-codec:4.1.77.Final
+- io.netty:netty-codec-dns:4.1.77.Final
+- io.netty:netty-codec-haproxy:4.1.77.Final
+- io.netty:netty-codec-http:4.1.77.Final
+- io.netty:netty-codec-http2:4.1.77.Final
+- io.netty:netty-codec-memcache:4.1.77.Final
+- io.netty:netty-codec-mqtt:4.1.77.Final
+- io.netty:netty-codec-redis:4.1.77.Final
+- io.netty:netty-codec-smtp:4.1.77.Final
+- io.netty:netty-codec-socks:4.1.77.Final
+- io.netty:netty-codec-stomp:4.1.77.Final
+- io.netty:netty-codec-xml:4.1.77.Final
+- io.netty:netty-common:4.1.77.Final
+- io.netty:netty-handler:4.1.77.Final
+- io.netty:netty-handler-proxy:4.1.77.Final
+- io.netty:netty-resolver:4.1.77.Final
+- io.netty:netty-resolver-dns:4.1.77.Final
+- io.netty:netty-transport:4.1.77.Final
+- io.netty:netty-transport-rxtx:4.1.77.Final
+- io.netty:netty-transport-sctp:4.1.77.Final
+- io.netty:netty-transport-udt:4.1.77.Final
+- io.netty:netty-transport-classes-epoll:4.1.77.Final
+- io.netty:netty-transport-native-unix-common:4.1.77.Final
+- io.netty:netty-transport-classes-kqueue:4.1.77.Final
+- io.netty:netty-resolver-dns-classes-macos:4.1.77.Final
+- io.netty:netty-transport-native-epoll:linux-x86_64:4.1.77.Final
+- io.netty:netty-transport-native-epoll:linux-aarch_64:4.1.77.Final
+- io.netty:netty-transport-native-kqueue:osx-x86_64:4.1.77.Final
+- io.netty:netty-transport-native-kqueue:osx-aarch_64:4.1.77.Final
+- io.netty:netty-resolver-dns-native-macos:osx-x86_64:4.1.77.Final
+- io.netty:netty-resolver-dns-native-macos:osx-aarch_64:4.1.77.Final
+- org.apache.commons:commons-lang3:3.12.0
+- org.lz4:lz4-java:1.8.0
+
+This project bundles the following dependencies under the BSD 3-Clause license.
+See bundled license files for details.
+
+- com.google.protobuf:protobuf-java:3.19.6

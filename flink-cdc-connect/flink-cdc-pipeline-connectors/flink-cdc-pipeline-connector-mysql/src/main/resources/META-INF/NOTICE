@@ -1,19 +1,18 @@
-flink-sql-connector-mysql-cdc
+flink-cdc-pipeline-connector-mysql
+
 Copyright 2024 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
-This project bundles the following dependencies under the Apache Software License 2.0. (http://www.apache.org/licenses/LICENSE-2.0.txt)
+This project bundles the following dependencies under the Apache Software License 2.0 (http://www.apache.org/licenses/LICENSE-2.0.txt)
 
-- io.debezium:debezium-api:1.9.8.Final
 - io.debezium:debezium-embedded:1.9.8.Final
 - org.apache.kafka:connect-api:3.2.0
 - org.apache.kafka:kafka-clients:3.2.0
 - org.apache.kafka:connect-runtime:3.2.0
 - org.apache.kafka:connect-transforms:3.2.0
 - org.apache.kafka:kafka-tools:3.2.0
-- com.fasterxml.jackson.core:jackson-annotations:2.12.6
 - com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider:2.12.6
 - com.fasterxml.jackson.jaxrs:jackson-jaxrs-base:2.12.6
 - com.fasterxml.jackson.module:jackson-module-jaxb-annotations:2.12.6
@@ -22,16 +21,18 @@ This project bundles the following dependencies under the Apache Software Licens
 - org.apache.kafka:connect-file:3.2.0
 - io.debezium:debezium-connector-mysql:1.9.8.Final
 - io.debezium:debezium-core:1.9.8.Final
-- com.fasterxml.jackson.core:jackson-core:2.13.2
-- com.fasterxml.jackson.core:jackson-databind:2.13.2.2
-- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2
-- com.google.guava:guava:30.1.1-jre
-- com.google.guava:failureaccess:1.0.1
-- com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
 - io.debezium:debezium-ddl-parser:1.9.8.Final
 - com.zendesk:mysql-binlog-connector-java:0.27.2
 - com.esri.geometry:esri-geometry-api:2.2.0
 - com.zaxxer:HikariCP:4.0.3
+- io.debezium:debezium-api:1.9.8.Final
+- com.fasterxml.jackson.core:jackson-core:2.13.2
+- com.fasterxml.jackson.core:jackson-databind:2.13.2.2
+- com.fasterxml.jackson.core:jackson-annotations:2.13.2
+- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2
+- com.google.guava:guava:30.1.1-jre
+- com.google.guava:failureaccess:1.0.1
+- com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
 
 This project bundles the following dependencies under the BSD 3-clause license.
 See bundled license files for details.

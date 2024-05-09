@@ -80,7 +80,7 @@ limitations under the License.
                             </relocations>
                             <filters>
                                 <filter>
-                                    <artifact>org.apache.kafka:*</artifact>
+                                    <artifact>*:*</artifact>
                                     <excludes>
                                         <exclude>kafka/kafka-version.properties</exclude>
                                         <exclude>LICENSE</exclude>
@@ -89,6 +89,7 @@ limitations under the License.
                                             dependency graph, nor are any jersey files bundled. -->
                                         <exclude>NOTICE</exclude>
                                         <exclude>common/**</exclude>
+                                        <exclude>licenses/**</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
