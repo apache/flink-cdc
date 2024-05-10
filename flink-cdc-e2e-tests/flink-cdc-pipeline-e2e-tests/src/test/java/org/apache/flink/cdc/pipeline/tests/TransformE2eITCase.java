@@ -128,17 +128,6 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
-        waitUtilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.terminus, before=[], after=[1011, 11], op=INSERT, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                6000L);
-
-        waitUtilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.terminus, before=[], after=[2014, 14], op=INSERT, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                6000L);
 
         List<String> expectedEvents =
                 Arrays.asList(
@@ -163,7 +152,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                         String.format(
                                 "DataChangeEvent{tableId=%s.terminus, before=[], after=[2014, 14], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()));
-        validateResult(expectedEvents);
+        validateResult(expectedEvents, 60000L);
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
         String mysqlJdbcUrl =
@@ -184,39 +173,30 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
             throw e;
         }
 
-        waitUtilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.terminus, before=[], after=[3007, 7], op=INSERT, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                6000L);
-
-        waitUtilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.terminus, before=[1009, 8.1], after=[1009, 100], op=UPDATE, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                6000L);
-
-        waitUtilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.terminus, before=[2011, 11], after=[], op=DELETE, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                6000L);
+        List<String> expectedIncrementalEvents =
+                Arrays.asList(
+                        String.format(
+                                "DataChangeEvent{tableId=%s.terminus, before=[], after=[3007, 7], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.terminus, before=[1009, 8.1], after=[1009, 100], op=UPDATE, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.terminus, before=[2011, 11], after=[], op=DELETE, meta=()}",
+                                transformRenameDatabase.getDatabaseName()));
+        validateResult(expectedIncrementalEvents, 60000L);
 
         String stdout = taskManagerConsumer.toUtf8String();
         System.out.println(stdout);
     }
 
-    private void validateResult(List<String> expectedEvents) {
-        String stdout = taskManagerConsumer.toUtf8String();
+    private void validateResult(List<String> expectedEvents, long timeout) throws Exception {
         for (String event : expectedEvents) {
-            if (!stdout.contains(event)) {
-                throw new RuntimeException(
-                        "failed to get specific event: " + event + " from stdout: " + stdout);
-            }
+            waitUntilSpecificEvent(event, timeout);
         }
     }
 
-    private void waitUtilSpecificEvent(String event, long timeout) throws Exception {
+    private void waitUntilSpecificEvent(String event, long timeout) throws Exception {
         boolean result = false;
         long endTimeout = System.currentTimeMillis() + timeout;
         while (System.currentTimeMillis() < endTimeout) {

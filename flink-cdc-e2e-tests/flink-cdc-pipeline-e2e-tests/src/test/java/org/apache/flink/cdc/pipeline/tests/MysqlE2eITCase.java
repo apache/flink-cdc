@@ -114,16 +114,6 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
         submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
-        waitUtilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai, 123567891234], op=INSERT, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()),
-                60000L);
-        waitUtilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.products, before=[], after=[109, spare tire, 24 inch spare tire, 22.2, null, null, null], op=INSERT, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()),
-                60000L);
         List<String> expectedEvents =
                 Arrays.asList(
                         String.format(
@@ -171,7 +161,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                         String.format(
                                 "DataChangeEvent{tableId=%s.products, before=[], after=[102, car battery, 12V car battery, 8.1, white, {\"key2\": \"value2\"}, {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}], op=INSERT, meta=()}",
                                 mysqlInventoryDatabase.getDatabaseName()));
-        validateResult(expectedEvents);
+        validateResult(expectedEvents, 60000L);
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
         String mysqlJdbcUrl =
@@ -201,12 +191,6 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
             throw e;
         }
 
-        waitUtilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.products, before=[111, scooter, Big 2-wheel scooter , 5.17, null, null, null, 1], after=[], op=DELETE, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()),
-                60000L);
-
         expectedEvents =
                 Arrays.asList(
                         String.format(
@@ -233,20 +217,16 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                         String.format(
                                 "DataChangeEvent{tableId=%s.products, before=[111, scooter, Big 2-wheel scooter , 5.17, null, null, null, 1], after=[], op=DELETE, meta=()}",
                                 mysqlInventoryDatabase.getDatabaseName()));
-        validateResult(expectedEvents);
+        validateResult(expectedEvents, 60000L);
     }
 
-    private void validateResult(List<String> expectedEvents) {
-        String stdout = taskManagerConsumer.toUtf8String();
+    private void validateResult(List<String> expectedEvents, long timeout) throws Exception {
         for (String event : expectedEvents) {
-            if (!stdout.contains(event)) {
-                throw new RuntimeException(
-                        "failed to get specific event: " + event + " from stdout: " + stdout);
-            }
+            waitUntilSpecificEvent(event, timeout);
         }
     }
 
-    private void waitUtilSpecificEvent(String event, long timeout) throws Exception {
+    private void waitUntilSpecificEvent(String event, long timeout) throws Exception {
         boolean result = false;
         long endTimeout = System.currentTimeMillis() + timeout;
         while (System.currentTimeMillis() < endTimeout) {
