@@ -97,13 +97,16 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
     }
 
     @Override
-    public void write(Event element, Context context) throws IOException, InterruptedException {
+    public void write(Event element, Context context) throws IOException {
         if (element instanceof DataChangeEvent) {
             DataChangeEvent dataChangeEvent = (DataChangeEvent) element;
-            LOG.info("get dataChangeEvent {}", dataChangeEvent);
             String sessionId = dataChangeEvent.meta().get(Constant.TUNNEL_SESSION_ID);
             String partitionName = dataChangeEvent.meta().get(Constant.MAXCOMPUTE_PARTITION_NAME);
             if (!writerMap.containsKey(sessionId)) {
+                LOG.info(
+                        "Sink writer {} start to create session {}.",
+                        this.context.getSubtaskId(),
+                        sessionId);
                 SessionIdentifier sessionIdentifier =
                         SessionIdentifier.of(
                                 options.getProject(),
