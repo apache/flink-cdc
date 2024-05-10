@@ -109,10 +109,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-      - name: Set up Ruby environment
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.3'
       - name: Build
         run: |
           set -o pipefail
@@ -123,8 +119,6 @@ jobs:
 
       - name: Run license check
         run: |
-          gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
-
           mvn ${{ env.MVN_COMMON_OPTIONS }} exec:java@check-license -N \
             -Dexec.args="${{ env.MVN_BUILD_OUTPUT_FILE }} $(pwd) ${{ env.MVN_VALIDATION_DIR }}" \
             -Dlog4j.configurationFile=file://$(pwd)/tools/ci/log4j.properties
