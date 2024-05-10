@@ -69,7 +69,6 @@ public class BatchUpsertWriter implements MaxComputeWriter {
         this.tunnel = MaxComputeUtils.getTunnel(options);
         this.sessionIdentifier = sessionIdentifier;
 
-        LOG.info("sink writer reload session: {}", sessionIdentifier);
         initOrReloadSession(sessionIdentifier);
     }
 

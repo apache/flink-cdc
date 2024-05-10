@@ -26,11 +26,7 @@ import org.apache.flink.cdc.connectors.maxcompute.coordinator.SessionManageCoord
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
-import org.apache.flink.cdc.runtime.partitioning.EventPartitioner;
-import org.apache.flink.cdc.runtime.partitioning.PartitioningEventKeySelector;
-import org.apache.flink.cdc.runtime.partitioning.PostPartitionProcessor;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
-import org.apache.flink.cdc.runtime.typeutils.PartitioningEventTypeInfo;
 import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
@@ -62,15 +58,6 @@ public class MaxComputeEventSink implements Sink<Event>, WithPreWriteTopology<Ev
                         new SessionManageCoordinatedOperatorFactory(
                                 options, writeOptions, executionOptions));
         stream.uid(Constant.PIPELINE_SESSION_MANAGE_OPERATOR_UID);
-        stream =
-                stream.transform(
-                                "PartitionByBucket",
-                                new PartitioningEventTypeInfo(),
-                                new PartitionOperator(
-                                        stream.getParallelism(), options.getBucketSize()))
-                        .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
-                        .map(new PostPartitionProcessor(), new EventTypeInfo())
-                        .name("PartitionByBucket");
         return stream;
     }
 
