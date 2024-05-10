@@ -43,6 +43,7 @@ import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventHandler;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
@@ -88,6 +89,9 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
     private transient Map<TableId, List<RecordData.FieldGetter>> fieldGetterMaps;
     private transient SchemaEvolutionClient schemaEvolutionClient;
 
+    private transient Future<CoordinationResponse> snapshotFlushSuccess;
+    private transient int indexOfThisSubtask;
+
     public SessionManageOperator(MaxComputeOptions options, OperatorID schemaOperatorUid) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.options = options;
@@ -112,6 +116,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
                 new SchemaEvolutionClient(
                         containingTask.getEnvironment().getOperatorCoordinatorEventGateway(),
                         schemaOperatorUid);
+        indexOfThisSubtask = getRuntimeContext().getIndexOfThisSubtask();
     }
 
     @Override
@@ -148,13 +153,18 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
             dataChangeEvent.meta().put(Constant.MAXCOMPUTE_PARTITION_NAME, partitionName);
             output.collect(new StreamRecord<>(dataChangeEvent));
         } else if (element.getValue() instanceof FlushEvent) {
-            LOG.info("handle {} begin, wait for sink writers flush success", element.getValue());
+            LOG.info(
+                    "operator {} handle FlushEvent begin, wait for sink writers flush success",
+                    indexOfThisSubtask);
             sessionCache.clear();
+            Future<CoordinationResponse> waitForSuccess =
+                    submitRequestToOperator(new WaitForFlushSuccessRequest(indexOfThisSubtask));
             output.collect(element);
             // wait for sink writers flush success
-            sendRequestToOperator(
-                    new WaitForFlushSuccessRequest(getRuntimeContext().getIndexOfThisSubtask()));
-            LOG.info("handle {} end, all sink writers flush success", element.getValue());
+            waitForSuccess.get();
+            LOG.info(
+                    "operator {} handle FlushEvent end, all sink writers flush success",
+                    indexOfThisSubtask);
         } else if (element.getValue() instanceof CreateTableEvent) {
             TableId tableId = ((CreateTableEvent) element.getValue()).tableId();
             Schema schema = ((CreateTableEvent) element.getValue()).getSchema();
@@ -192,10 +202,19 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
     public void prepareSnapshotPreBarrier(long checkpointId) throws Exception {
         super.prepareSnapshotPreBarrier(checkpointId);
         LOG.info("prepare snapshot, wait for sink writers flush success");
+        // wait for sink writers flush success
+        snapshotFlushSuccess =
+                submitRequestToOperator(
+                        new WaitForFlushSuccessRequest(
+                                getRuntimeContext().getIndexOfThisSubtask()));
+    }
+
+    @Override
+    public void snapshotState(StateSnapshotContext context) throws Exception {
+        super.snapshotState(context);
         sessionCache.clear();
         // wait for sink writers flush success
-        sendRequestToOperator(
-                new WaitForFlushSuccessRequest(getRuntimeContext().getIndexOfThisSubtask()));
+        snapshotFlushSuccess.get();
         LOG.info("snapshot end, all sink writers flush success");
     }
 

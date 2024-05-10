@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.maxcompute.coordinator;
 
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.maxcompute.common.Constant;
+import org.apache.flink.cdc.connectors.maxcompute.common.FlinkOdpsException;
 import org.apache.flink.cdc.connectors.maxcompute.common.SessionIdentifier;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CommitSessionRequest;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CreateSessionRequest;
@@ -175,13 +176,14 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
                 toSubmitSessionId = sessionCommitCoordinator.getToCommitSessionId();
             }
             if (!sessionCommitCoordinator.isCommitting()) {
-                completeAllFlushFutures();
                 sessionCommitCoordinator.commitSuccess(Constant.END_OF_SESSION, true);
                 sessionCommitCoordinator.clear();
 
                 if (!sessionCache.isEmpty()) {
-                    throw new RuntimeException("sessionCache not empty" + sessionCache.keySet());
+                    throw new FlinkOdpsException(
+                            "sessionCache not empty: " + sessionCache.keySet());
                 }
+                completeAllFlushFutures();
             }
             return future;
         } else if (request instanceof WaitForFlushSuccessRequest) {

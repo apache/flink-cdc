@@ -103,6 +103,7 @@ public class SessionCommitCoordinator {
         for (Queue<String> toCommitSessionId : toCommitSessionIds) {
             toCommitSessionId.clear();
         }
+        toCommitFutures.clear();
         isCommitting = true;
     }
 
