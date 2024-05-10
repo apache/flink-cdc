@@ -40,6 +40,7 @@ limitations under the License.
         <module>flink-cdc-connect</module>
         <module>flink-cdc-runtime</module>
         <module>flink-cdc-e2e-tests</module>
+        <module>tools/ci/flink-cdc-ci-tools</module>
     </modules>
 
     <licenses>
@@ -674,6 +675,33 @@ limitations under the License.
                         <phase>clean</phase>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>check-license</id>
+                        <!-- manually called -->
+                        <phase>none</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>org.apache.flink.cdc.tools.ci.licensecheck.LicenseChecker</mainClass>
+                            <includePluginDependencies>true</includePluginDependencies>
+                            <includeProjectDependencies>false</includeProjectDependencies>
+                        </configuration>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.apache.flink</groupId>
+                        <artifactId>flink-cdc-ci-tools</artifactId>
+                        <version>${revision}</version>
+                    </dependency>
+                </dependencies>
             </plugin>
         </plugins>
         <pluginManagement>
