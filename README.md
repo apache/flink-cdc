@@ -63,7 +63,7 @@ full database synchronization, sharding table synchronization, schema evolution 
 5. View job execution status through Flink WebUI or downstream database.
 
 Try it out yourself with our more detailed [tutorial](docs/content/docs/get-started/quickstart/mysql-to-doris.md). 
-You can also see [connector overview](docs/content/docs/connectors/overview.md) to view a comprehensive catalog of the
+You can also see [connector overview](docs/content/docs/connectors/pipeline-connectors/overview.md) to view a comprehensive catalog of the
 connectors currently provided and understand more detailed configurations.
 
 
