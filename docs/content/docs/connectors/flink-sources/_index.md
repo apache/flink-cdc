@@ -1,7 +1,7 @@
 ---
 title: Flink Sources
 bookCollapseSection: true
-weight: 5
+weight: 2
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

@@ -1,6 +1,6 @@
 ---
 title: "MySQL"
-weight: 7
+weight: 2
 type: docs
 aliases:
 - /connectors/flink-sources/mysql-cdc

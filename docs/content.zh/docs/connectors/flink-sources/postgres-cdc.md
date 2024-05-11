@@ -1,6 +1,6 @@
 ---
 title: "Postgres"
-weight: 6
+weight: 5
 type: docs
 aliases:
 - /connectors/flink-sources/postgres-cdc

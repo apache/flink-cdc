@@ -1,7 +1,7 @@
 ---
-title: Flink 连接器
+title: Flink Source 连接器
 bookCollapseSection: true
-weight: 5
+weight: 2
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

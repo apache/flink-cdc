@@ -1,6 +1,6 @@
 ---
 title: "MongoDB"
-weight: 2
+weight: 6
 type: docs
 aliases:
 - /connectors/flink-sources/mongodb-cdc

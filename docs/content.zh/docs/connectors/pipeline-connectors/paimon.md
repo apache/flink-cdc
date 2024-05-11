@@ -1,6 +1,6 @@
 ---
 title: "Paimon"
-weight: 6
+weight: 3
 type: docs
 aliases:
 - /connectors/pipeline-connectors/paimon

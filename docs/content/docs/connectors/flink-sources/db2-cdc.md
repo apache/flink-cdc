@@ -1,6 +1,6 @@
 ---
 title: "Db2"
-weight: 9
+weight: 7
 type: docs
 aliases:
 - /connectors/flink-sources/db2-cdc

@@ -1,6 +1,6 @@
 ---
 title: "Oracle"
-weight: 5
+weight: 3
 type: docs
 aliases:
 - /connectors/flink-sources/oracle-cdc

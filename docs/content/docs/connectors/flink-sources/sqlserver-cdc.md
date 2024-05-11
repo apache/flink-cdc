@@ -1,6 +1,6 @@
 ---
 title: "SQL Server"
-weight: 7
+weight: 4
 type: docs
 aliases:
 - /connectors/flink-sources/sqlserver-cdc

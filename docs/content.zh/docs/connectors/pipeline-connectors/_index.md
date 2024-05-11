@@ -1,7 +1,7 @@
 ---
 title: Pipeline 连接器
 bookCollapseSection: true
-weight: 5
+weight: 1
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one

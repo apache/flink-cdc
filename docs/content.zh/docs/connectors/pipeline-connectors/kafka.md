@@ -1,6 +1,6 @@
 ---
 title: "Kafka"
-weight: 5
+weight: 4
 type: docs
 aliases:
 - /connectors/pipeline-connectors/kafka
