@@ -29,29 +29,29 @@ under the License.
 What's more, it also helps users filter some unnecessary data during the synchronization process.
 
 # Parameters
-To describe a transform, the follows are required:
+To describe a transform rule, the following parameters can be used:
 
 | Parameter    | Meaning                                            | Optional/Required |
 |--------------|----------------------------------------------------|-------------------|
 | source-table | Source table id, supports regular expressions      | required          |
-| projection   | Projection rule, supports syntax similar to the select clause in SQL        | optional          |
-| filter       | Filter rule, supports syntax similar to the where clause in SQL        | optional          |
-| primary-keys | Sink table primary keys, it is separated by English commas        | optional          |
-| partition-keys | Sink table partition keys, it is separated by English commas        | optional          |
-| table-options | Sink table options, when automatically creating a table, it is added to the configuration of the table creation statement  | optional          |
-| description  | Transform rule description(a default value provided) | optional          |
+| projection   | Projection rule, supports syntax similar to the select clause in SQL      | optional          |
+| filter       | Filter rule, supports syntax similar to the where clause in SQL      | optional          |
+| primary-keys | Sink table primary keys, separated by commas       | optional          |
+| partition-keys | Sink table partition keys, separated by commas       | optional          |
+| table-options | used to the configure table creation statement when automatically creating tables | optional          |
+| description  | Transform rule description | optional          |
 
-A transform module can contain a list of source-table rules.
+Multiple rules can be declared in one single pipeline YAML file.
 
 # Metadata Fields
 ## Fields definition
-There are three hidden columns used to describe metadata information. They only take effect when explicitly referenced in the transform rules.
+There are some hidden columns used to access metadata information. They will only take effect when explicitly referenced in the transform rules.
 
-| Field               | Data Type | Description                                                     |
-|--------------------|-----------|--------------------------------------------------------------|
-| __namespace_name__ | String    | Name of the namespace that contain the row.                  |
-| __schema_name__    | String    | Name of the schema that contain the row.                     |
-| __table_name__     | String    | Name of the table that contain the row.                      |
+| Field               | Data Type | Description                                  |
+|--------------------|-----------|----------------------------------------------|
+| __namespace_name__ | String    | Name of the namespace that contains the row. |
+| __schema_name__    | String    | Name of the schema that contains the row.    |
+| __table_name__     | String    | Name of the table that contains the row.     |
 
 ## Metadata relationship
 
@@ -67,7 +67,7 @@ There are three hidden columns used to describe metadata information. They only 
 | Doris                | Database  | -          | Table |
 
 # Functions
-Using Calcite to implement function parsing, and using Janino script to implement function calls.
+Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [Janino script](https://www.janino.net/) to evaluate expressions with function call.
 
 ## Comparison Functions
 
@@ -154,119 +154,119 @@ Using Calcite to implement function parsing, and using Janino script to implemen
 
 # Example
 ## Add computed columns
-If add two computed columns to the table `web_order` in the database `mydb`, we can use this yaml file to define this transform：
+Evaluation expressions can be used to generate new columns. For example, if we want to append two computed columns based on the table `web_order` in the database `mydb`, we may define a transform rule as follows:
 
 ```yaml
 transform:
   - source-table: mydb.web_order
     projection: id, order_id, UPPER(product_name) as product_name, localtimestamp as new_timestamp
-    description: project fields from source table
+    description: append calculated columns based on source table
 ```
 
 ## Reference metadata columns
-If add a metadata columns to the table `web_order` in the database `mydb`, we can use this yaml file to define this transform：
+We may reference metadata column in projection expressions. For example, given a table `web_order` in the database `mydb`, we may define a transform rule as follows:
 
 ```yaml
 transform:
   - source-table: mydb.web_order
     projection: id, order_id, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ identifier_name
-    description: project fields from source table
+    description: access metadata columns from source table
 ```
 
-## Use star instead of all fields
-If use star instead of all fields in the table `web_order` and  `app_order` in the database `mydb`, we can use this yaml file to define this transform：
+## Use wildcard character to project all fields
+A wildcard character (`*`) can be used to reference all fields in a table. For example, given two tables `web_order` and `app_order` in the database `mydb`, we may define a transform rule as follows:
 
 ```yaml
 transform:
   - source-table: mydb.web_order
     projection: \*, UPPER(product_name) as product_name
-    description: project fields from source table
+    description: project fields with wildcard character from source table
   - source-table: mydb.app_order
     projection: UPPER(product_name) as product_name, *
-    description: project fields from source table
+    description: project fields with wildcard character from source table
 ```
-Tips: When the star is at the beginning of the rule, a backslash needs to be added for escape.
+Notice: When `*` character presents at the beginning of expressions, an escaping backslash is required.
 
 ## Add filter rule
-Use reference columns when adding filtering rules to the table `web_order` in the database `mydb`, we can use this yaml file to define this transform：
+Use reference columns when adding filtering rules to the table `web_order` in the database `mydb`, we may define a transform rule as follows:
 
 ```yaml
 transform:
   - source-table: mydb.web_order
     filter: id > 10 AND order_id > 100
-    description: project fields from source table
+    description: filtering rows from source table
 ```
 
-Use computed columns when adding filtering rules to the table `web_order` in the database `mydb`, we can use this yaml file to define this transform：
+Computed columns can be used in filtering conditions, too. For example, given a table `web_order` in the database `mydb`, we may define a transform rule as follows:
 
 ```yaml
 transform:
   - source-table: mydb.web_order
     projection: id, order_id, UPPER(province) as new_province 
     filter: new_province = 'SHANGHAI'
-    description: project fields from source table
+    description: filtering rows based on computed columns
 ```
 
 ## Reassign primary key
-If reassign primary key to the table `web_order` in the database `mydb`, we can use this yaml file to define this transform：
+We can reassign the primary key in transform rules. For example, given a table `web_order` in the database `mydb`, we may define a transform rule as follows:
 
 ```yaml
 transform:
   - source-table: mydb.web_order
     projection: id, order_id
     primary-keys: order_id
-    description: project fields from source table
+    description: reassign primary key example
 ```
 
-If reassign composite primary key to the table `web_order` in the database `mydb`, we can use this yaml file to define this transform：
+Composite primary keys are also supported:
 
 ```yaml
 transform:
   - source-table: mydb.web_order
     projection: id, order_id, UPPER(product_name) as product_name
-    primary-keys: order_id,product_name
-    description: project fields from source table
+    primary-keys: order_id, product_name
+    description: reassign composite primary keys example
 ```
 
 ## Reassign partition key
-If reassign partition key to the table `web_order` in the database `mydb`, we can use this yaml file to define this transform：
+We can reassign the partition key in transform rules. For example, given a table web_order in the database mydb, we may define a transform rule as follows:
 
 ```yaml
 transform:
   - source-table: mydb.web_order
     projection: id, order_id, UPPER(product_name) as product_name
     partition-keys: product_name
-    description: project fields from source table
+    description: reassign partition key example
 ```
 
 ## Specify table creation configuration
-If specify the options to the table `web_order` in the database `mydb` when auto create table, we can use this yaml file to define this transform：
+Extra options can be defined in a transform rule, and will be applied when creating downstream tables. Given a table `web_order` in the database `mydb`, we may define a transform rule as follows:
 
 ```yaml
 transform:
   - source-table: mydb.web_order
     projection: id, order_id, UPPER(product_name) as product_name
     table-options: comment=web order
-    description: project fields from source table
+    description: auto creating table options example
 ```
 Tips: The format of table-options is `key1=value1,key2=value2`.
 
 ## Classification mapping
-
-Perform different processing on different classification data within a table, we can use this yaml file to define this transform：
+Multiple transform rules can be defined to classify input data rows and apply different processings. For example, we may define a transform rule as follows:
 
 ```yaml
 transform:
   - source-table: mydb.web_order
     projection: id, order_id
     filter: UPPER(province) = 'SHANGHAI'
-    description: project fields from source table
+    description: classification mapping example
   - source-table: mydb.web_order
     projection: order_id as id, id as order_id
     filter: UPPER(province) = 'BEIJING'
-    description: project fields from source table
+    description: classification mapping example
 ```
 
-# Problem
-· Transform cannot be used with route in the current version, future versions will support it.
-· The computed column does not support referencing the trimmed original column in the current version, future versions will support it.
+# Known limitations
+* Currently, transform doesn't work with route rules. It will be supported in future versions.
+* Computed columns cannot reference trimmed columns that do not present in final projection results. This will be fixed in future versions.
+* Regular matching of tables with different schemas is not supported. If necessary, multiple rules need to be written.
