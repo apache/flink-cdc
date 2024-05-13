@@ -21,6 +21,7 @@ import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfig
 import org.apache.flink.cdc.connectors.mongodb.source.connection.MongoClientPool;
 import org.apache.flink.cdc.connectors.mongodb.source.offset.ChangeStreamDescriptor;
 
+import com.mongodb.MongoCommandException;
 import com.mongodb.client.ChangeStreamIterable;
 import com.mongodb.client.MongoChangeStreamCursor;
 import com.mongodb.client.MongoClient;
@@ -45,8 +46,11 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import static com.mongodb.client.model.Aggregates.match;
@@ -56,6 +60,7 @@ import static com.mongodb.client.model.Filters.or;
 import static com.mongodb.client.model.Filters.regex;
 import static com.mongodb.client.model.Projections.include;
 import static com.mongodb.client.model.Sorts.ascending;
+import static java.util.Arrays.asList;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.DROPPED_FIELD;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.ID_FIELD;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.KEY_FIELD;
@@ -74,7 +79,25 @@ public class MongoUtils {
     public static final int FAILED_TO_PARSE_ERROR = 9;
     public static final int UNAUTHORIZED_ERROR = 13;
     public static final int ILLEGAL_OPERATION_ERROR = 20;
+    public static final int INVALIDATED_RESUME_TOKEN_ERROR = 260;
+    public static final int CHANGE_STREAM_FATAL_ERROR = 280;
+    public static final int CHANGE_STREAM_HISTORY_LOST = 286;
+    public static final int BSON_OBJECT_TOO_LARGE = 10334;
     public static final int UNKNOWN_FIELD_ERROR = 40415;
+
+    private static final Set<Integer> INVALID_CHANGE_STREAM_ERRORS =
+            new HashSet<>(
+                    asList(
+                            INVALIDATED_RESUME_TOKEN_ERROR,
+                            CHANGE_STREAM_FATAL_ERROR,
+                            CHANGE_STREAM_HISTORY_LOST,
+                            BSON_OBJECT_TOO_LARGE));
+
+    private static final String RESUME_TOKEN = "resume token";
+    private static final String NOT_FOUND = "not found";
+    private static final String DOES_NOT_EXIST = "does not exist";
+    private static final String INVALID_RESUME_TOKEN = "invalid resume token";
+    private static final String NO_LONGER_IN_THE_OPLOG = "no longer be in the oplog";
 
     private MongoUtils() {}
 
@@ -395,5 +418,26 @@ public class MongoUtils {
         }
 
         return sb.toString();
+    }
+
+    // Checks if given exception is caused by change stream cursor issues, including
+    // network connection failures, sharded cluster changes, or invalidate events.
+    // See: https://www.mongodb.com/docs/manual/changeStreams/ for more details.
+    public static boolean checkIfChangeStreamCursorExpires(final MongoCommandException e) {
+        return INVALID_CHANGE_STREAM_ERRORS.contains(e.getCode());
+    }
+
+    // This check is stricter than checkIfChangeStreamCursorExpires, which specifically
+    // checks if given exception is caused by an expired resume token.
+    public static boolean checkIfResumeTokenExpires(final MongoCommandException e) {
+        if (e.getCode() != CHANGE_STREAM_FATAL_ERROR) {
+            return false;
+        }
+        String errorMessage = e.getErrorMessage().toLowerCase(Locale.ROOT);
+        return (errorMessage.contains(RESUME_TOKEN))
+                && (errorMessage.contains(NOT_FOUND)
+                        || errorMessage.contains(DOES_NOT_EXIST)
+                        || errorMessage.contains(INVALID_RESUME_TOKEN)
+                        || errorMessage.contains(NO_LONGER_IN_THE_OPLOG));
     }
 }

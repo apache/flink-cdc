@@ -65,10 +65,9 @@ under the License.
    version: '2.1'
    services:
      StarRocks:
-       image: registry.starrocks.io/starrocks/allin1-ubuntu
+       image: starrocks/allin1-ubuntu:3.2.6
        ports:
-         - "8030:8030"
-         - "8040:8040"
+         - "8080:8080"
          - "9030:9030"
      MySQL:
        image: debezium/example-mysql:1.1
@@ -95,7 +94,7 @@ under the License.
 1. 进入 MySQL 容器
 
    ```shell
-   docker-compose exec mysql mysql -uroot -p123456
+   docker-compose exec MySQL mysql -uroot -p123456
    ```
 
 2. 创建数据库 `app_db` 和表 `orders`,`products`,`shipments`，并插入数据
@@ -150,6 +149,7 @@ under the License.
    **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译**
    - [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
    - [StarRocks pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-starrocks/3.0.0/flink-cdc-pipeline-connector-starrocks-3.0.0.jar)
+   - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 
 3. 编写任务配置 yaml 文件  
    下面给出了一个整库同步的示例文件 mysql-to-starrocks.yaml：
@@ -172,7 +172,7 @@ under the License.
      type: starrocks
      name: StarRocks Sink
      jdbc-url: jdbc:mysql://127.0.0.1:9030
-     load-url: 127.0.0.1:8030
+     load-url: 127.0.0.1:8080
      username: root
      password: ""
      table.create.properties.replication_num: 1
@@ -190,7 +190,7 @@ under the License.
 4. 最后，通过命令行提交任务到 Flink Standalone cluster
 
    ```shell
-   bash bin/flink-cdc.sh mysql-to-starrocks.yaml
+   bash bin/flink-cdc.sh mysql-to-starrocks.yaml --jar lib/mysql-connector-java-8.0.27.jar
    ```
 
 提交成功后，返回信息如：

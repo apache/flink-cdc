@@ -17,9 +17,9 @@
 
 package org.apache.flink.cdc.connectors.tests;
 
+import org.apache.flink.cdc.common.test.utils.JdbcProxy;
+import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
-import org.apache.flink.cdc.connectors.tests.utils.JdbcProxy;
-import org.apache.flink.cdc.connectors.tests.utils.TestUtils;
 
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -42,6 +42,8 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlE2eITCase.class);
 
     private static final Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-connector.jar");
+
+    private static final Path mySqlConnectorJar = TestUtils.getResource("mysql-driver.jar");
 
     @Test
     public void testMySqlCDC() throws Exception {
@@ -95,7 +97,7 @@ public class MySqlE2eITCase extends FlinkContainerTestEnvironment {
                         "INSERT INTO products_sink",
                         "SELECT * FROM products_source;");
 
-        submitSQLJob(sqlLines, mysqlCdcJar, jdbcJar);
+        submitSQLJob(sqlLines, mysqlCdcJar, jdbcJar, mySqlConnectorJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
         // generate binlogs

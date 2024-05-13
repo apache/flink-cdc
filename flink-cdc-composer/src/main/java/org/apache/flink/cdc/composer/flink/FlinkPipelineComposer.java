@@ -32,7 +32,6 @@ import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
 import org.apache.flink.cdc.composer.flink.translator.DataSourceTranslator;
 import org.apache.flink.cdc.composer.flink.translator.PartitioningTranslator;
-import org.apache.flink.cdc.composer.flink.translator.RouteTranslator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.composer.flink.translator.TransformTranslator;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
@@ -104,12 +103,17 @@ public class FlinkPipelineComposer implements PipelineComposer {
         // Build TransformSchemaOperator for processing Schema Event
         TransformTranslator transformTranslator = new TransformTranslator();
         stream = transformTranslator.translateSchema(stream, pipelineDef.getTransforms());
+
+        // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
                         pipelineDef
                                 .getConfig()
                                 .get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR),
-                        pipelineDef.getConfig().get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID));
+                        pipelineDef.getConfig().get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID),
+                        pipelineDef
+                                .getConfig()
+                                .get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT));
         OperatorIDGenerator schemaOperatorIDGenerator =
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
 
@@ -121,16 +125,12 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         schemaOperatorIDGenerator.generate(),
                         pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
 
-        // Build Router used to route Event
-        RouteTranslator routeTranslator = new RouteTranslator();
-        stream = routeTranslator.translate(stream, pipelineDef.getRoute());
-
         // Build DataSink in advance as schema operator requires MetadataApplier
         DataSink dataSink = createDataSink(pipelineDef.getSink(), pipelineDef.getConfig());
 
         stream =
                 schemaOperatorTranslator.translate(
-                        stream, parallelism, dataSink.getMetadataApplier());
+                        stream, parallelism, dataSink.getMetadataApplier(), pipelineDef.getRoute());
 
         // Build Partitioner used to shuffle Event
         PartitioningTranslator partitioningTranslator = new PartitioningTranslator();

@@ -451,6 +451,10 @@ public class DataTypeConverter {
             // TIMESTAMP_LTZ type is encoded in string type
             Instant instant = Instant.parse(str);
             return LocalZonedTimestampData.fromInstant(instant);
+        } else if (obj instanceof Long) {
+            return LocalZonedTimestampData.fromEpochMillis((Long) obj);
+        } else if (obj instanceof LocalZonedTimestampData) {
+            return obj;
         }
         throw new IllegalArgumentException(
                 "Unable to convert to TIMESTAMP_LTZ from unexpected value '"

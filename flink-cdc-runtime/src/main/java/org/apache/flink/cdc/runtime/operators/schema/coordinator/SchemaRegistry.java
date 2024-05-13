@@ -17,14 +17,18 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResultRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandler;
@@ -43,7 +47,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
@@ -82,22 +88,30 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     /** Metadata applier for applying schema changes to external system. */
     private final MetadataApplier metadataApplier;
 
+    private final List<Tuple2<Selectors, TableId>> routes;
+
     /** The request handler that handle all requests and events. */
     private SchemaRegistryRequestHandler requestHandler;
 
     /** Schema manager for tracking schemas of all tables. */
     private SchemaManager schemaManager = new SchemaManager();
 
+    private SchemaDerivation schemaDerivation;
+
     public SchemaRegistry(
             String operatorName,
             OperatorCoordinator.Context context,
-            MetadataApplier metadataApplier) {
+            MetadataApplier metadataApplier,
+            List<Tuple2<Selectors, TableId>> routes) {
         this.context = context;
         this.operatorName = operatorName;
         this.failedReasons = new HashMap<>();
         this.metadataApplier = metadataApplier;
+        this.routes = routes;
         schemaManager = new SchemaManager();
-        requestHandler = new SchemaRegistryRequestHandler(metadataApplier, schemaManager);
+        schemaDerivation = new SchemaDerivation(schemaManager, routes, new HashMap<>());
+        requestHandler =
+                new SchemaRegistryRequestHandler(metadataApplier, schemaManager, schemaDerivation);
     }
 
     @Override
@@ -110,6 +124,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     @Override
     public void close() throws Exception {
         LOG.info("SchemaRegistry for {} closed.", operatorName);
+        requestHandler.close();
     }
 
     @Override
@@ -141,6 +156,8 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             byte[] serializedSchemaManager = SchemaManager.SERIALIZER.serialize(schemaManager);
             out.writeInt(serializedSchemaManager.length);
             out.write(serializedSchemaManager);
+            // Serialize SchemaDerivation mapping
+            SchemaDerivation.serializeDerivationMapping(schemaDerivation, out);
             resultFuture.complete(baos.toByteArray());
         }
     }
@@ -161,6 +178,10 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
         } else if (request instanceof GetSchemaRequest) {
             return CompletableFuture.completedFuture(
                     wrap(handleGetSchemaRequest(((GetSchemaRequest) request))));
+        } else if (request instanceof SchemaChangeResultRequest) {
+            return requestHandler.getSchemaChangeResult();
+        } else if (request instanceof RefreshPendingListsRequest) {
+            return requestHandler.refreshPendingLists();
         } else {
             throw new IllegalArgumentException("Unrecognized CoordinationRequest type: " + request);
         }
@@ -181,7 +202,12 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             schemaManager =
                     SchemaManager.SERIALIZER.deserialize(
                             schemaManagerSerializerVersion, serializedSchemaManager);
-            requestHandler = new SchemaRegistryRequestHandler(metadataApplier, schemaManager);
+            Map<TableId, Set<TableId>> derivationMapping =
+                    SchemaDerivation.deserializerDerivationMapping(in);
+            schemaDerivation = new SchemaDerivation(schemaManager, routes, derivationMapping);
+            requestHandler =
+                    new SchemaRegistryRequestHandler(
+                            metadataApplier, schemaManager, schemaDerivation);
         }
     }
 

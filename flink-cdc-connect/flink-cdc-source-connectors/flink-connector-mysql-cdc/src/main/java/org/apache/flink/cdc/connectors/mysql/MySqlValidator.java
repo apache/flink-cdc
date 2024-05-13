@@ -50,6 +50,7 @@ public class MySqlValidator implements Validator {
 
     private static final String BINLOG_FORMAT_ROW = "ROW";
     private static final String BINLOG_FORMAT_IMAGE_FULL = "FULL";
+    private static final String DEFAULT_BINLOG_ROW_VALUE_OPTIONS = "";
 
     private final Properties dbzProperties;
     private final MySqlSourceConfig sourceConfig;
@@ -70,6 +71,7 @@ public class MySqlValidator implements Validator {
             checkVersion(connection);
             checkBinlogFormat(connection);
             checkBinlogRowImage(connection);
+            checkBinlogRowValueOptions(connection);
             checkTimeZone(connection);
         } catch (SQLException ex) {
             throw new TableException(
@@ -156,6 +158,30 @@ public class MySqlValidator implements Validator {
                                     + "required for this connector to work properly. Change the MySQL configuration to use a "
                                     + "binlog_row_image=FULL and restart the connector.",
                             rowImage, BINLOG_FORMAT_IMAGE_FULL));
+        }
+    }
+
+    /** Check whether the binlog row value options is empty. */
+    private void checkBinlogRowValueOptions(JdbcConnection connection) throws SQLException {
+        String rowValueOptions =
+                connection
+                        .queryAndMap(
+                                "SHOW GLOBAL VARIABLES LIKE 'binlog_row_value_options'",
+                                rs ->
+                                        rs.next()
+                                                ? rs.getString(2)
+                                                : DEFAULT_BINLOG_ROW_VALUE_OPTIONS)
+                        .trim()
+                        .toUpperCase();
+        // This setting was introduced in MySQL 8.0+ with default of empty string ''
+        // For older versions, assume empty string ''
+        if (!DEFAULT_BINLOG_ROW_VALUE_OPTIONS.equals(rowValueOptions)) {
+            throw new ValidationException(
+                    String.format(
+                            "The MySQL server is configured with binlog_row_value_options=%s, which is possible to cause losing some binlog events "
+                                    + "for the mysql cdc connector. Please remove the binlog_row_value_options setting in the MySQL server and rerun the job."
+                                    + "See more details at https://dev.mysql.com/doc/refman/8.0/en/replication-features-json.html.",
+                            rowValueOptions));
         }
     }
 

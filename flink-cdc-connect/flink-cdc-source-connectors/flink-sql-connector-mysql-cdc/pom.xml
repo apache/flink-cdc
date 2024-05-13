@@ -62,7 +62,6 @@ limitations under the License.
                                     <include>org.apache.flink:flink-connector-mysql-cdc</include>
                                     <include>org.antlr:antlr4-runtime</include>
                                     <include>org.apache.kafka:*</include>
-                                    <include>mysql:mysql-connector-java</include>
                                     <include>com.zendesk:mysql-binlog-connector-java</include>
                                     <include>com.fasterxml.*:*</include>
                                     <include>com.google.guava:*</include>

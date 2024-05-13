@@ -19,7 +19,7 @@ sh.shardCollection(db.getName() + ".shopping_cart", { "user_id": 1, "product_no"
 var shoppingCarts = [];
 for (var i = 1; i <= 20480; i++) {
     shoppingCarts.push({
-        "product_no": NumberLong(i),
+        "product_no": NumberLong(i.toString()),
         "product_kind": 'KIND_' + i,
         "user_id": 'user_' + i,
         "description": 'my shopping cart ' + i

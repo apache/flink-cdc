@@ -42,7 +42,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 
-import java.lang.reflect.Field;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -459,7 +458,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
             // step 4: make changelog data for all collections before this round(also includes this
             // round),
             // test whether only this round collection's data is captured.
-            for (int i = round; i >= 0; i--) {
+            for (int i = 0; i <= round; i++) {
                 String collection = captureAddressCollections[i];
                 makeOplogForAddressTableInRound(database, collection, round);
             }
@@ -948,20 +947,11 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
         // Close sink upsert materialize to show more clear test output.
         Configuration tableConfig = new Configuration();
         tableConfig.setString("table.exec.sink.upsert-materialize", "none");
+        if (finishedSavePointPath != null) {
+            tableConfig.setString(SavepointConfigOptions.SAVEPOINT_PATH, finishedSavePointPath);
+        }
         StreamExecutionEnvironment env =
                 StreamExecutionEnvironment.getExecutionEnvironment(tableConfig);
-        if (finishedSavePointPath != null) {
-            // restore from savepoint
-            // hack for test to visit protected TestStreamEnvironment#getConfiguration() method
-            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-            Class<?> clazz =
-                    classLoader.loadClass(
-                            "org.apache.flink.streaming.api.environment.StreamExecutionEnvironment");
-            Field field = clazz.getDeclaredField("configuration");
-            field.setAccessible(true);
-            Configuration configuration = (Configuration) field.get(env);
-            configuration.setString(SavepointConfigOptions.SAVEPOINT_PATH, finishedSavePointPath);
-        }
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 100L));
@@ -987,6 +977,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                         + " 'password' = '%s',"
                         + " 'database' = '%s',"
                         + " 'collection' = '%s',"
+                        + " 'chunk-meta.group.size' = '2',"
                         + " 'heartbeat.interval.ms' = '100',"
                         + " 'scan.full-changelog' = 'true',"
                         + " 'scan.newly-added-table.enabled' = 'true'"

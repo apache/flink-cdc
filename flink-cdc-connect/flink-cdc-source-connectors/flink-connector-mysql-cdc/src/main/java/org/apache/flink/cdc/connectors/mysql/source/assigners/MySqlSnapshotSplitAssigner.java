@@ -253,6 +253,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                             .entrySet()
                             .removeIf(schema -> tablesToRemove.contains(schema.getKey()));
                     remainingSplits.removeIf(split -> tablesToRemove.contains(split.getTableId()));
+                    LOG.info("Enumerator remove tables after restart: {}", tablesToRemove);
                     remainingTables.removeAll(tablesToRemove);
                     alreadyProcessedTables.removeIf(tableId -> tablesToRemove.contains(tableId));
                 }

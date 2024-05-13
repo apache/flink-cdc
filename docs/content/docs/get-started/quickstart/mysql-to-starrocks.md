@@ -68,10 +68,9 @@ Create a `docker-compose.yml` file using the content provided below:
    version: '2.1'
    services:
       StarRocks:
-         image: registry.starrocks.io/starrocks/allin1-ubuntu
+         image: starrocks/allin1-ubuntu:3.2.6
          ports:
-            - "8030:8030"
-            - "8040:8040"
+            - "8080:8080"
             - "9030:9030"
       MySQL:
          image: debezium/example-mysql:1.1
@@ -98,7 +97,7 @@ This command automatically starts all the containers defined in the Docker Compo
 1. Enter MySQL container
 
    ```shell
-   docker-compose exec mysql mysql -uroot -p123456
+   docker-compose exec MySQL mysql -uroot -p123456
    ```
 
 2. create `app_db` database and `orders`,`products`,`shipments` tables, then insert records
@@ -153,6 +152,7 @@ This command automatically starts all the containers defined in the Docker Compo
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
     - [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
     - [StarRocks pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-starrocks/3.0.0/flink-cdc-pipeline-connector-starrocks-3.0.0.jar)
+    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 
 3. Write task configuration yaml file.
    Here is an example file for synchronizing the entire database `mysql-to-starrocks.yaml`：
@@ -175,7 +175,7 @@ This command automatically starts all the containers defined in the Docker Compo
      type: starrocks
      name: StarRocks Sink
      jdbc-url: jdbc:mysql://127.0.0.1:9030
-     load-url: 127.0.0.1:8030
+     load-url: 127.0.0.1:8080
      username: root
      password: ""
      table.create.properties.replication_num: 1
@@ -193,7 +193,7 @@ Notice that:
 4. Finally, submit job to Flink Standalone cluster using Cli.
 
    ```shell
-   bash bin/flink-cdc.sh mysql-to-starrocks.yaml
+   bash bin/flink-cdc.sh mysql-to-starrocks.yaml --jar lib/mysql-connector-java-8.0.27.jar
    ```
    
 After successful submission, the return information is as follows：
@@ -215,9 +215,9 @@ Connect to jdbc through database connection tools such as Dbeaver using `mysql:/
 ### Synchronize Schema and Data changes
 Enter MySQL container
 
-    ```shell
-    docker-compose exec mysql mysql -uroot -p123456
-    ```
+ ```shell
+ docker-compose exec mysql mysql -uroot -p123456
+ ```
 
 Then, modify schema and record in MySQL, and the tables of StarRocks will change the same in real time：
 1. insert one record in `orders` from MySQL:

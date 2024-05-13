@@ -40,6 +40,14 @@ limitations under the License.
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-e2e-utils</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Drivers -->
         <dependency>
             <groupId>mysql</groupId>
@@ -368,6 +376,37 @@ limitations under the License.
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
                         </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.ibm.db2.jcc</groupId>
+                            <artifactId>db2jcc</artifactId>
+                            <version>db2jcc4</version>
+                            <destFileName>db2-jcc.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.oracle.ojdbc</groupId>
+                            <artifactId>ojdbc8</artifactId>
+                            <version>19.3.0.0</version>
+                            <destFileName>oracle-ojdbc.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.oracle.database.xml</groupId>
+                            <artifactId>xdb</artifactId>
+                            <version>19.3.0.0</version>
+                            <destFileName>oracle-xdb.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
                     </artifactItems>
                 </configuration>
             </plugin>

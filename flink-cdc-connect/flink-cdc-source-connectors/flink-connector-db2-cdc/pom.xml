@@ -30,6 +30,12 @@ limitations under the License.
     <packaging>jar</packaging>
 
     <dependencies>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-base</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Debezium dependencies -->
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -68,7 +74,6 @@ limitations under the License.
             <groupId>com.ibm.db2.jcc</groupId>
             <artifactId>db2jcc</artifactId>
             <version>db2jcc4</version>
-            <scope>test</scope>
         </dependency>
 
         <dependency>

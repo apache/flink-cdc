@@ -46,7 +46,7 @@ limitations under the License.
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.1.1</version>
+                <version>3.2.4</version>
                 <executions>
                     <execution>
                         <id>shade-flink</id>
@@ -63,6 +63,7 @@ limitations under the License.
                                 <excludes>
                                     <exclude>org.codehaus.janino:*</exclude>
                                     <exclude>org.apache.calcite:*</exclude>
+                                    <exclude>com.ibm.db2.jcc:*</exclude>
                                 </excludes>
                             </artifactSet>
                             <filters>

@@ -26,5 +26,6 @@ import java.util.Map;
 /** This handler helps to parse the source struct in SchemaChangeEvent and generate source info. */
 @Experimental
 public interface SchemaChangeEventHandler {
+
     Map<String, Object> parseSource(SchemaChangeEvent event);
 }

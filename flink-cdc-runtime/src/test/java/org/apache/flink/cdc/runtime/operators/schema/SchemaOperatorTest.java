@@ -18,31 +18,48 @@
 package org.apache.flink.cdc.runtime.operators.schema;
 
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
+import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit tests for the {@link SchemaOperator}. */
 public class SchemaOperatorTest {
+
+    private static final TableId CUSTOMERS =
+            TableId.tableId("my_company", "my_branch", "customers");
+    private static final Schema CUSTOMERS_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.INT())
+                    .physicalColumn("name", DataTypes.STRING())
+                    .physicalColumn("phone", DataTypes.BIGINT())
+                    .primaryKey("id")
+                    .build();
+
     @Test
     void testProcessElement() throws Exception {
         final int maxParallelism = 4;
@@ -93,11 +110,40 @@ public class SchemaOperatorTest {
         }
     }
 
+    @Test
+    void testProcessSchemaChangeEventWithTimeOut() throws Exception {
+        SchemaOperator schemaOperator =
+                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(1));
+        EventOperatorTestHarness<SchemaOperator, Event> harness =
+                new EventOperatorTestHarness<>(schemaOperator, 1, Duration.ofSeconds(3));
+        harness.open();
+        Assertions.assertThrowsExactly(
+                TimeoutException.class,
+                () ->
+                        schemaOperator.processElement(
+                                new StreamRecord<>(
+                                        new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))));
+    }
+
+    @Test
+    void testProcessSchemaChangeEventWithOutTimeOut() throws Exception {
+        SchemaOperator schemaOperator =
+                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30));
+        EventOperatorTestHarness<SchemaOperator, Event> harness =
+                new EventOperatorTestHarness<>(schemaOperator, 1, Duration.ofSeconds(3));
+        harness.open();
+        Assertions.assertDoesNotThrow(
+                () ->
+                        schemaOperator.processElement(
+                                new StreamRecord<>(
+                                        new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))));
+    }
+
     private OneInputStreamOperatorTestHarness<Event, Event> createTestHarness(
             int maxParallelism, int parallelism, int subtaskIndex, OperatorID opID)
             throws Exception {
         return new OneInputStreamOperatorTestHarness<>(
-                new SchemaOperator(),
+                new SchemaOperator(new ArrayList<>()),
                 maxParallelism,
                 parallelism,
                 subtaskIndex,

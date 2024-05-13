@@ -30,8 +30,17 @@ on:
       - 'docs/**'
       - 'README.md'
 
+# Concurrency strategy:
+#   github.workflow: distinguish this workflow from others
+#   github.event_name: distinguish `push` event from `pull_request` event
+#   github.event.number: set to the number of the pull request if `pull_request` event
+#   github.run_id: otherwise, it's a `push` or `schedule` event, only cancel if we rerun the workflow
+#
+# Reference:
+#   https://docs.github.com/en/actions/using-jobs/using-concurrency
+#   https://docs.github.com/en/actions/learn-github-actions/contexts#github-context
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.number || github.run_id }}
   cancel-in-progress: true
 
 env:
@@ -42,8 +51,12 @@ env:
   flink-cdc-runtime"
   
   MODULES_PIPELINE_CONNECTORS: "\
-  flink-cdc-connect/flink-cdc-pipeline-connectors"
-  
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-kafka"
+
   MODULES_MYSQL: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc"
@@ -85,6 +98,22 @@ env:
   flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 
 jobs:
+  license_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Set up Ruby environment
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Compiling jar packages
+        run: mvn --no-snapshot-updates -B package -DskipTests
+      - name: Run license check
+        run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
+
   compile_and_test:
     # Only run the CI pipeline for the flink-cdc-connectors repository
 #    if: github.repository == 'apache/flink-cdc-connectors'
@@ -131,7 +160,7 @@ jobs:
           cache: 'maven'
 
       - name: Set Maven 3.8.6
-        uses: stCarolas/setup-maven@v4.5
+        uses: stCarolas/setup-maven@v5
         with:
           maven-version: 3.8.6
 

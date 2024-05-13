@@ -17,16 +17,23 @@
 
 package org.apache.flink.cdc.composer.flink.translator;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperatorFactory;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
+
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Translator used to build {@link SchemaOperator} for schema event process. */
 @Internal
@@ -34,17 +41,25 @@ public class SchemaOperatorTranslator {
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final String schemaOperatorUid;
 
+    private final Duration rpcTimeOut;
+
     public SchemaOperatorTranslator(
-            SchemaChangeBehavior schemaChangeBehavior, String schemaOperatorUid) {
+            SchemaChangeBehavior schemaChangeBehavior,
+            String schemaOperatorUid,
+            Duration rpcTimeOut) {
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.schemaOperatorUid = schemaOperatorUid;
+        this.rpcTimeOut = rpcTimeOut;
     }
 
     public DataStream<Event> translate(
-            DataStream<Event> input, int parallelism, MetadataApplier metadataApplier) {
+            DataStream<Event> input,
+            int parallelism,
+            MetadataApplier metadataApplier,
+            List<RouteDef> routes) {
         switch (schemaChangeBehavior) {
             case EVOLVE:
-                return addSchemaOperator(input, parallelism, metadataApplier);
+                return addSchemaOperator(input, parallelism, metadataApplier, routes);
             case IGNORE:
                 return dropSchemaChangeEvent(input, parallelism);
             case EXCEPTION:
@@ -61,12 +76,20 @@ public class SchemaOperatorTranslator {
     }
 
     private DataStream<Event> addSchemaOperator(
-            DataStream<Event> input, int parallelism, MetadataApplier metadataApplier) {
+            DataStream<Event> input,
+            int parallelism,
+            MetadataApplier metadataApplier,
+            List<RouteDef> routes) {
+        List<Tuple2<String, TableId>> routingRules = new ArrayList<>();
+        for (RouteDef route : routes) {
+            routingRules.add(
+                    Tuple2.of(route.getSourceTable(), TableId.parse(route.getSinkTable())));
+        }
         SingleOutputStreamOperator<Event> stream =
                 input.transform(
                         "SchemaOperator",
                         new EventTypeInfo(),
-                        new SchemaOperatorFactory(metadataApplier));
+                        new SchemaOperatorFactory(metadataApplier, routingRules, rpcTimeOut));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
     }

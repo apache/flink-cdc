@@ -73,7 +73,13 @@ public class ValuesDataSourceHelper {
             // use default enum of SINGLE_SPLIT_SINGLE_TABLE
             sourceEvents = singleSplitSingleTable();
         }
-        return sourceEvents;
+        // put all events into one list to avoid CI failure and make sure that SchemaChangeEvent are
+        // sent in order.
+        List<Event> mergeEvents = new ArrayList<>();
+        for (List<Event> events : sourceEvents) {
+            mergeEvents.addAll(events);
+        }
+        return Collections.singletonList(mergeEvents);
     }
 
     /** set sourceEvents using custom events. */

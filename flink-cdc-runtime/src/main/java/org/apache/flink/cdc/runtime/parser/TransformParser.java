@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
@@ -43,7 +44,9 @@ import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
@@ -154,6 +157,12 @@ public class TransformParser {
                         .collect(
                                 Collectors.toMap(
                                         RelDataTypeField::getName, RelDataTypeField::getType));
+
+        Map<String, Boolean> isNotNullMap =
+                columns.stream()
+                        .collect(
+                                Collectors.toMap(
+                                        Column::getName, column -> !column.getType().isNullable()));
         List<ProjectionColumn> projectionColumns = new ArrayList<>();
         for (SqlNode sqlNode : sqlSelect.getSelectList()) {
             if (sqlNode instanceof SqlBasicCall) {
@@ -205,21 +214,27 @@ public class TransformParser {
             } else if (sqlNode instanceof SqlIdentifier) {
                 SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
                 String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+                DataType columnType =
+                        DataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                relDataTypeMap.get(columnName));
                 if (isMetadataColumn(columnName)) {
                     projectionColumns.add(
                             ProjectionColumn.of(
                                     columnName,
-                                    DataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                            relDataTypeMap.get(columnName)),
+                                    // Metadata columns should never be null
+                                    columnType.notNull(),
                                     columnName,
                                     columnName,
                                     Arrays.asList(columnName)));
                 } else {
+                    // Calcite translated column type doesn't keep nullability.
+                    // Appending it manually to circumvent this problem.
                     projectionColumns.add(
                             ProjectionColumn.of(
                                     columnName,
-                                    DataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                            relDataTypeMap.get(columnName))));
+                                    isNotNullMap.get(columnName)
+                                            ? columnType.notNull()
+                                            : columnType.nullable()));
                 }
             } else {
                 throw new ParseException("Unrecognized projection: " + sqlNode.toString());
@@ -237,10 +252,7 @@ public class TransformParser {
             return "";
         }
         SqlNode where = sqlSelect.getWhere();
-        if (!(where instanceof SqlBasicCall)) {
-            throw new ParseException("Unrecognized where: " + where.toString());
-        }
-        return JaninoCompiler.translateSqlNodeToJaninoExpression((SqlBasicCall) where);
+        return JaninoCompiler.translateSqlNodeToJaninoExpression(where);
     }
 
     public static List<String> parseComputedColumnNames(String projection) {
@@ -294,11 +306,7 @@ public class TransformParser {
             return new ArrayList<>();
         }
         SqlNode where = sqlSelect.getWhere();
-        if (!(where instanceof SqlBasicCall)) {
-            throw new ParseException("Unrecognized where: " + where.toString());
-        }
-        SqlBasicCall sqlBasicCall = (SqlBasicCall) where;
-        return parseColumnNameList(sqlBasicCall);
+        return parseColumnNameList(where);
     }
 
     private static List<String> parseColumnNameList(SqlNode sqlNode) {
@@ -310,6 +318,9 @@ public class TransformParser {
         } else if (sqlNode instanceof SqlBasicCall) {
             SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
             findSqlIdentifier(sqlBasicCall.getOperandList(), columnNameList);
+        } else if (sqlNode instanceof SqlCase) {
+            SqlCase sqlCase = (SqlCase) sqlNode;
+            findSqlIdentifier(sqlCase.getWhenOperands().getList(), columnNameList);
         }
         return columnNameList;
     }
@@ -323,6 +334,10 @@ public class TransformParser {
             } else if (sqlNode instanceof SqlBasicCall) {
                 SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
                 findSqlIdentifier(sqlBasicCall.getOperandList(), columnNameList);
+            } else if (sqlNode instanceof SqlCase) {
+                SqlCase sqlCase = (SqlCase) sqlNode;
+                SqlNodeList whenOperands = sqlCase.getWhenOperands();
+                findSqlIdentifier(whenOperands.getList(), columnNameList);
             }
         }
     }

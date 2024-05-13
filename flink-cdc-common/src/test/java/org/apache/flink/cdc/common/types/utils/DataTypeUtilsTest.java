@@ -45,6 +45,7 @@ import static org.apache.flink.table.api.DataTypes.ROW;
 import static org.apache.flink.table.api.DataTypes.SMALLINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.api.DataTypes.TIME;
+import static org.apache.flink.table.api.DataTypes.TIMESTAMP;
 import static org.apache.flink.table.api.DataTypes.TIMESTAMP_LTZ;
 import static org.apache.flink.table.api.DataTypes.TIMESTAMP_WITH_TIME_ZONE;
 import static org.apache.flink.table.api.DataTypes.TINYINT;
@@ -116,8 +117,8 @@ class DataTypeUtilsTest {
                         FIELD("f14", DATE()),
                         FIELD("f15", TIME()),
                         FIELD("f16", TIME(6)),
-                        FIELD("f17", TIMESTAMP_WITH_TIME_ZONE()),
-                        FIELD("f18", TIMESTAMP_WITH_TIME_ZONE(6)),
+                        FIELD("f17", TIMESTAMP()),
+                        FIELD("f18", TIMESTAMP(6)),
                         FIELD("f19", TIMESTAMP_LTZ()),
                         FIELD("f20", TIMESTAMP_LTZ(6)),
                         FIELD("f21", TIMESTAMP_WITH_TIME_ZONE()),

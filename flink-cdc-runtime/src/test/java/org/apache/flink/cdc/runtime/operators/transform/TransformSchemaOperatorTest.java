@@ -74,6 +74,26 @@ public class TransformSchemaOperatorTest {
                     .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
                     .build();
 
+    private static final Schema NULLABILITY_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.STRING().notNull())
+                    .physicalColumn("name", DataTypes.STRING())
+                    .primaryKey("id")
+                    .partitionKey("id")
+                    .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
+                    .build();
+
+    private static final Schema EXPECTED_NULLABILITY_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.STRING().notNull())
+                    .physicalColumn("uid", DataTypes.STRING())
+                    .physicalColumn("name", DataTypes.STRING())
+                    .physicalColumn("uname", DataTypes.STRING())
+                    .primaryKey("id")
+                    .partitionKey("id")
+                    .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
+                    .build();
+
     @Test
     void testEventTransform() throws Exception {
         TransformSchemaOperator transform =
@@ -175,5 +195,34 @@ public class TransformSchemaOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
+    }
+
+    @Test
+    public void testNullabilityColumn() throws Exception {
+        TransformSchemaOperator transform =
+                TransformSchemaOperator.newBuilder()
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "id, upper(id) uid, name, upper(name) uname",
+                                "id",
+                                "id",
+                                "key1=value1,key2=value2")
+                        .build();
+        EventOperatorTestHarness<TransformSchemaOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(CUSTOMERS_TABLEID, NULLABILITY_SCHEMA);
+        transform.processElement(new StreamRecord<>(createTableEvent));
+
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(
+                                        CUSTOMERS_TABLEID, EXPECTED_NULLABILITY_SCHEMA)));
     }
 }

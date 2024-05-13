@@ -231,4 +231,16 @@ public class MySqlDataSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "Whether send schema change events, by default is true. If set to false, the schema changes will not be sent.");
+
+    @Experimental
+    public static final ConfigOption<String> TABLES_EXCLUDE =
+            ConfigOptions.key("tables.exclude")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Table names of the MySQL tables to Exclude. Regular expressions are supported. "
+                                    + "It is important to note that the dot (.) is treated as a delimiter for database and table names. "
+                                    + "If there is a need to use a dot (.) in a regular expression to match any character, "
+                                    + "it is necessary to escape the dot with a backslash."
+                                    + "eg. db0.\\.*, db1.user_table_[0-9]+, db[1-2].[app|web]_order_\\.*");
 }

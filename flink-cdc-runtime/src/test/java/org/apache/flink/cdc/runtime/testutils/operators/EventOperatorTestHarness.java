@@ -19,10 +19,13 @@ package org.apache.flink.cdc.runtime.testutils.operators;
 
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
+import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.testutils.schema.CollectingMetadataApplier;
 import org.apache.flink.cdc.runtime.testutils.schema.TestingSchemaRegistryGateway;
@@ -40,7 +43,11 @@ import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 import org.apache.flink.streaming.util.MockStreamConfig;
 import org.apache.flink.util.OutputTag;
+import org.apache.flink.util.SerializedValue;
 
+import java.io.IOException;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.LinkedList;
 
 /**
@@ -58,6 +65,8 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
         implements AutoCloseable {
     public static final OperatorID SCHEMA_OPERATOR_ID = new OperatorID(15213L, 15513L);
 
+    public static final OperatorID SINK_OPERATOR_ID = new OperatorID(15214L, 15514L);
+
     private final OP operator;
     private final int numOutputs;
     private final SchemaRegistry schemaRegistry;
@@ -72,7 +81,21 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
                         "SchemaOperator",
                         new MockOperatorCoordinatorContext(
                                 SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
-                        new CollectingMetadataApplier());
+                        new CollectingMetadataApplier(null),
+                        new ArrayList<>());
+        schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
+    }
+
+    public EventOperatorTestHarness(OP operator, int numOutputs, Duration duration) {
+        this.operator = operator;
+        this.numOutputs = numOutputs;
+        schemaRegistry =
+                new SchemaRegistry(
+                        "SchemaOperator",
+                        new MockOperatorCoordinatorContext(
+                                SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
+                        new CollectingMetadataApplier(duration),
+                        new ArrayList<>());
         schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
     }
 
@@ -105,7 +128,9 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
         operator.setup(
                 new MockStreamTask(schemaRegistryGateway),
                 new MockStreamConfig(new Configuration(), numOutputs),
-                new EventCollectingOutput<>(outputRecords));
+                new EventCollectingOutput<>(outputRecords, schemaRegistryGateway));
+        schemaRegistryGateway.sendOperatorEventToCoordinator(
+                SINK_OPERATOR_ID, new SerializedValue<>(new SinkWriterRegisterEvent(0)));
     }
 
     // ---------------------------------------- Helper classes ---------------------------------
@@ -113,13 +138,29 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
     private static class EventCollectingOutput<E extends Event> implements Output<StreamRecord<E>> {
         private final LinkedList<StreamRecord<E>> outputRecords;
 
-        public EventCollectingOutput(LinkedList<StreamRecord<E>> outputRecords) {
+        private final TestingSchemaRegistryGateway schemaRegistryGateway;
+
+        public EventCollectingOutput(
+                LinkedList<StreamRecord<E>> outputRecords,
+                TestingSchemaRegistryGateway schemaRegistryGateway) {
             this.outputRecords = outputRecords;
+            this.schemaRegistryGateway = schemaRegistryGateway;
         }
 
         @Override
         public void collect(StreamRecord<E> record) {
             outputRecords.add(record);
+            Event event = record.getValue();
+            if (event instanceof FlushEvent) {
+                try {
+                    schemaRegistryGateway.sendOperatorEventToCoordinator(
+                            SINK_OPERATOR_ID,
+                            new SerializedValue<>(
+                                    new FlushSuccessEvent(0, ((FlushEvent) event).getTableId())));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
         }
 
         @Override

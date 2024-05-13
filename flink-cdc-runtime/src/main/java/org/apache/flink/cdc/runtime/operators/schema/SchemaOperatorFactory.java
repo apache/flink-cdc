@@ -17,8 +17,10 @@
 
 package org.apache.flink.cdc.runtime.operators.schema;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistryProvider;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -26,6 +28,9 @@ import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.streaming.api.operators.CoordinatedOperatorFactory;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
+
+import java.time.Duration;
+import java.util.List;
 
 /** Factory to create {@link SchemaOperator}. */
 @Internal
@@ -35,15 +40,20 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
     private static final long serialVersionUID = 1L;
 
     private final MetadataApplier metadataApplier;
+    private final List<Tuple2<String, TableId>> routingRules;
 
-    public SchemaOperatorFactory(MetadataApplier metadataApplier) {
-        super(new SchemaOperator());
+    public SchemaOperatorFactory(
+            MetadataApplier metadataApplier,
+            List<Tuple2<String, TableId>> routingRules,
+            Duration rpcTimeOut) {
+        super(new SchemaOperator(routingRules, rpcTimeOut));
         this.metadataApplier = metadataApplier;
+        this.routingRules = routingRules;
     }
 
     @Override
     public OperatorCoordinator.Provider getCoordinatorProvider(
             String operatorName, OperatorID operatorID) {
-        return new SchemaRegistryProvider(operatorID, operatorName, metadataApplier);
+        return new SchemaRegistryProvider(operatorID, operatorName, metadataApplier, routingRules);
     }
 }

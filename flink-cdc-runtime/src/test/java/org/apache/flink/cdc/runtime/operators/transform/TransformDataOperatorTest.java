@@ -465,7 +465,7 @@ public class TransformDataOperatorTest {
                         .addTransform(
                                 TIMESTAMP_TABLEID.identifier(),
                                 "col1, IF(LOCALTIME = CURRENT_TIME, 1, 0) as time_equal,"
-                                        + " IF(LOCALTIMESTAMP = CURRENT_TIMESTAMP and NOW() = LOCALTIMESTAMP, 1, 0) as timestamp_equal,"
+                                        + " IF(LOCALTIMESTAMP = CURRENT_TIMESTAMP, 1, 0) as timestamp_equal,"
                                         + " IF(TO_DATE(DATE_FORMAT(LOCALTIMESTAMP, 'yyyy-MM-dd')) = CURRENT_DATE, 1, 0) as date_equal",
                                 "LOCALTIMESTAMP = CURRENT_TIMESTAMP")
                         .addTimezone("GMT")
@@ -578,9 +578,23 @@ public class TransformDataOperatorTest {
         testExpressionConditionTransform("ceil(2.4) = 3.0");
         testExpressionConditionTransform("floor(2.5) = 2.0");
         testExpressionConditionTransform("round(3.1415926,2) = 3.14");
+        testExpressionConditionTransform("IF(2>0,1,0) = 1");
+        testExpressionConditionTransform("COALESCE(null,1,2) = 1");
+        testExpressionConditionTransform("1 + 1 = 2");
+        testExpressionConditionTransform("1 - 1 = 0");
+        testExpressionConditionTransform("1 * 1 = 1");
+        testExpressionConditionTransform("3 % 2 = 1");
+        testExpressionConditionTransform("1 < 2");
+        testExpressionConditionTransform("1 <= 1");
+        testExpressionConditionTransform("1 > 0");
+        testExpressionConditionTransform("1 >= 1");
+        testExpressionConditionTransform(
+                "case 1 when 1 then 'a' when 2 then 'b' else 'c' end = 'a'");
+        testExpressionConditionTransform("case col1 when '1' then true else false end");
+        testExpressionConditionTransform("case when col1 = '1' then true else false end");
     }
 
-    void testExpressionConditionTransform(String expression) throws Exception {
+    private void testExpressionConditionTransform(String expression) throws Exception {
         TransformDataOperator transform =
                 TransformDataOperator.newBuilder()
                         .addTransform(

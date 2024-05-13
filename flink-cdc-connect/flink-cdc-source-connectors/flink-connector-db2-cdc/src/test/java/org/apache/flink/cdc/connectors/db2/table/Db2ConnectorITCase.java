@@ -17,17 +17,24 @@
 
 package org.apache.flink.cdc.connectors.db2.table;
 
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.db2.Db2TestBase;
+import org.apache.flink.runtime.minicluster.RpcServiceSharing;
+import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
+import org.apache.flink.test.util.MiniClusterWithClientResource;
 
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,8 +53,22 @@ import static org.junit.Assert.assertThat;
 import static org.testcontainers.containers.Db2Container.DB2_PORT;
 
 /** Integration tests for DB2 CDC source. */
+@RunWith(Parameterized.class)
 public class Db2ConnectorITCase extends Db2TestBase {
+
     private static final Logger LOG = LoggerFactory.getLogger(Db2ConnectorITCase.class);
+
+    protected static final int DEFAULT_PARALLELISM = 2;
+
+    @Rule
+    public final MiniClusterWithClientResource miniClusterResource =
+            new MiniClusterWithClientResource(
+                    new MiniClusterResourceConfiguration.Builder()
+                            .setNumberTaskManagers(1)
+                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                            .withHaLeadershipControl()
+                            .build());
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -57,10 +78,27 @@ public class Db2ConnectorITCase extends Db2TestBase {
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
+    private final boolean incrementalSnapshot;
+
+    public Db2ConnectorITCase(boolean incrementalSnapshot) {
+        this.incrementalSnapshot = incrementalSnapshot;
+    }
+
+    @Parameterized.Parameters(name = "incrementalSnapshot: {0}")
+    public static Object[] parameters() {
+        return new Object[][] {new Object[] {true}, new Object[] {false}};
+    }
+
     @Before
     public void before() {
         TestValuesTableFactory.clearAllData();
-        env.setParallelism(1);
+        env.setRestartStrategy(RestartStrategies.noRestart());
+        if (incrementalSnapshot) {
+            env.setParallelism(DEFAULT_PARALLELISM);
+            env.enableCheckpointing(1000);
+        } else {
+            env.setParallelism(1);
+        }
     }
 
     private void cancelJobIfRunning(TableResult result)
@@ -75,6 +113,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
     @Test
     public void testConsumingAllEvents()
             throws SQLException, InterruptedException, ExecutionException {
+        initializeDb2Table("inventory", "PRODUCTS");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -89,16 +128,16 @@ public class Db2ConnectorITCase extends Db2TestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
-                                + " 'table-name' = '%s'"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s'"
                                 + ")",
                         DB2_CONTAINER.getHost(),
                         DB2_CONTAINER.getMappedPort(DB2_PORT),
                         DB2_CONTAINER.getUsername(),
                         DB2_CONTAINER.getPassword(),
                         DB2_CONTAINER.getDatabaseName(),
-                        "DB2INST1",
-                        "PRODUCTS");
+                        "DB2INST1.PRODUCTS",
+                        incrementalSnapshot);
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " name STRING,"
@@ -178,6 +217,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
 
     @Test
     public void testAllTypes() throws Exception {
+        initializeDb2Table("column_type_test", "FULL_TYPES");
         // NOTE: db2 is not case sensitive by default, the schema returned by debezium
         // is uppercase, thus we need use uppercase when defines a db2 table.
         String sourceDDL =
@@ -201,7 +241,8 @@ public class Db2ConnectorITCase extends Db2TestBase {
                                 + "    DATE_C DATE,\n"
                                 + "    TIME_C TIME(0),\n"
                                 + "    DEFAULT_NUMERIC_C DECIMAL,\n"
-                                + "    TIMESTAMP_PRECISION_C TIMESTAMP(9)\n"
+                                + "    TIMESTAMP_PRECISION_C TIMESTAMP(9),\n"
+                                + "    PRIMARY KEY (ID) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'db2-cdc',"
                                 + " 'hostname' = '%s',"
@@ -209,16 +250,16 @@ public class Db2ConnectorITCase extends Db2TestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
-                                + " 'table-name' = '%s'"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s'"
                                 + ")",
                         DB2_CONTAINER.getHost(),
                         DB2_CONTAINER.getMappedPort(DB2_PORT),
                         DB2_CONTAINER.getUsername(),
                         DB2_CONTAINER.getPassword(),
                         DB2_CONTAINER.getDatabaseName(),
-                        "DB2INST1",
-                        "FULL_TYPES");
+                        "DB2INST1.FULL_TYPES",
+                        incrementalSnapshot);
         String sinkDDL =
                 "CREATE TABLE sink (\n"
                         + "    id INTEGER NOT NULL,\n"
@@ -236,7 +277,8 @@ public class Db2ConnectorITCase extends Db2TestBase {
                         + "    date_c DATE,\n"
                         + "    time_c TIME(0),\n"
                         + "    default_numeric_c DECIMAL,\n"
-                        + "    timestamp_precision_c TIMESTAMP(9)\n"
+                        + "    timestamp_precision_c TIMESTAMP(9),\n"
+                        + "    PRIMARY KEY (id) NOT ENFORCED"
                         + ") WITH ("
                         + " 'connector' = 'values',"
                         + " 'sink-insert-only' = 'false'"
@@ -254,28 +296,30 @@ public class Db2ConnectorITCase extends Db2TestBase {
             statement.execute("UPDATE DB2INST1.FULL_TYPES SET SMALL_C=0 WHERE ID=1;");
         }
 
-        waitForSinkSize("sink", 3);
+        waitForSinkSize("sink", 2);
 
         List<String> expected =
                 Arrays.asList(
                         "+I(1,32767,65535,2147483647,5.5,6.6,123.12345,404.4,Hello World,a,abc,2020-07-17T18:00:22.123,2020-07-17,18:00:22,500,2020-07-17T18:00:22.123456789)",
-                        "-U(1,32767,65535,2147483647,5.5,6.6,123.12345,404.4,Hello World,a,abc,2020-07-17T18:00:22.123,2020-07-17,18:00:22,500,2020-07-17T18:00:22.123456789)",
                         "+U(1,0,65535,2147483647,5.5,6.6,123.12345,404.4,Hello World,a,abc,2020-07-17T18:00:22.123,2020-07-17,18:00:22,500,2020-07-17T18:00:22.123456789)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        Collections.sort(expected);
+        Collections.sort(actual);
         assertEquals(expected, actual);
-
         cancelJobIfRunning(result);
     }
 
     @Test
     public void testStartupFromLatestOffset() throws Exception {
+        initializeDb2Table("inventory", "PRODUCTS");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
                                 + " ID INT NOT NULL,"
                                 + " NAME STRING,"
                                 + " DESCRIPTION STRING,"
-                                + " WEIGHT DECIMAL(10,3)"
+                                + " WEIGHT DECIMAL(10,3),"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'db2-cdc',"
                                 + " 'hostname' = '%s',"
@@ -283,17 +327,17 @@ public class Db2ConnectorITCase extends Db2TestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s' ,"
-                                + " 'scan.startup.mode' = 'latest-offset'"
+                                + " 'scan.startup.mode' = 'latest-offset',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s'"
                                 + ")",
                         DB2_CONTAINER.getHost(),
                         DB2_CONTAINER.getMappedPort(DB2_PORT),
                         DB2_CONTAINER.getUsername(),
                         DB2_CONTAINER.getPassword(),
                         DB2_CONTAINER.getDatabaseName(),
-                        "DB2INST1",
-                        "PRODUCTS1");
+                        "DB2INST1.PRODUCTS",
+                        incrementalSnapshot);
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -315,16 +359,16 @@ public class Db2ConnectorITCase extends Db2TestBase {
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "INSERT INTO DB2INST1.PRODUCTS1 VALUES (default,'jacket','water resistent white wind breaker',0.2)");
+                    "INSERT INTO DB2INST1.PRODUCTS VALUES (default,'jacket','water resistent white wind breaker',0.2)");
             statement.execute(
-                    "INSERT INTO DB2INST1.PRODUCTS1 VALUES (default,'scooter','Big 2-wheel scooter ',5.18)");
+                    "INSERT INTO DB2INST1.PRODUCTS VALUES (default,'scooter','Big 2-wheel scooter ',5.18)");
             statement.execute(
-                    "UPDATE DB2INST1.PRODUCTS1 SET DESCRIPTION='new water resistent white wind breaker', WEIGHT='0.5' WHERE ID=110");
-            statement.execute("UPDATE DB2INST1.PRODUCTS1 SET WEIGHT='5.17' WHERE ID=111");
-            statement.execute("DELETE FROM DB2INST1.PRODUCTS1 WHERE ID=111");
+                    "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='new water resistent white wind breaker', WEIGHT='0.5' WHERE ID=110");
+            statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT='5.17' WHERE ID=111");
+            statement.execute("DELETE FROM DB2INST1.PRODUCTS WHERE ID=111");
         }
 
-        waitForSinkSize("sink", 7);
+        waitForSinkSize("sink", 5);
 
         String[] expected =
                 new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
@@ -337,6 +381,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
 
     @Test
     public void testMetadataColumns() throws Throwable {
+        initializeDb2Table("inventory", "PRODUCTS");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -355,16 +400,16 @@ public class Db2ConnectorITCase extends Db2TestBase {
                                 + " 'username' = '%s',"
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
-                                + " 'schema-name' = '%s',"
-                                + " 'table-name' = '%s'"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s'"
                                 + ")",
                         DB2_CONTAINER.getHost(),
                         DB2_CONTAINER.getMappedPort(DB2_PORT),
                         DB2_CONTAINER.getUsername(),
                         DB2_CONTAINER.getPassword(),
                         DB2_CONTAINER.getDatabaseName(),
-                        "DB2INST1",
-                        "PRODUCTS2");
+                        "DB2INST1.PRODUCTS",
+                        incrementalSnapshot);
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " database_name STRING,"
@@ -392,38 +437,38 @@ public class Db2ConnectorITCase extends Db2TestBase {
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
-                    "UPDATE DB2INST1.PRODUCTS2 SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106;");
-            statement.execute("UPDATE DB2INST1.PRODUCTS2 SET WEIGHT='5.1' WHERE ID=107;");
+                    "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106;");
+            statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT='5.1' WHERE ID=107;");
             statement.execute(
-                    "INSERT INTO DB2INST1.PRODUCTS2 VALUES (110,'jacket','water resistent white wind breaker',0.2);");
+                    "INSERT INTO DB2INST1.PRODUCTS VALUES (110,'jacket','water resistent white wind breaker',0.2);");
             statement.execute(
-                    "INSERT INTO DB2INST1.PRODUCTS2 VALUES (111,'scooter','Big 2-wheel scooter ',5.18);");
+                    "INSERT INTO DB2INST1.PRODUCTS VALUES (111,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE DB2INST1.PRODUCTS2 SET DESCRIPTION='new water resistent white wind breaker', WEIGHT='0.5' WHERE ID=110;");
-            statement.execute("UPDATE DB2INST1.PRODUCTS2 SET WEIGHT='5.17' WHERE ID=111;");
-            statement.execute("DELETE FROM DB2INST1.PRODUCTS2 WHERE ID=111;");
+                    "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='new water resistent white wind breaker', WEIGHT='0.5' WHERE ID=110;");
+            statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT='5.17' WHERE ID=111;");
+            statement.execute("DELETE FROM DB2INST1.PRODUCTS WHERE ID=111;");
         }
 
         waitForSinkSize("sink", 16);
 
         List<String> expected =
                 Arrays.asList(
-                        "+I(testdb,DB2INST1,PRODUCTS2,101,scooter,Small 2-wheel scooter,3.140)",
-                        "+I(testdb,DB2INST1,PRODUCTS2,102,car battery,12V car battery,8.100)",
-                        "+I(testdb,DB2INST1,PRODUCTS2,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.800)",
-                        "+I(testdb,DB2INST1,PRODUCTS2,104,hammer,12oz carpenter's hammer,0.750)",
-                        "+I(testdb,DB2INST1,PRODUCTS2,105,hammer,14oz carpenter's hammer,0.875)",
-                        "+I(testdb,DB2INST1,PRODUCTS2,106,hammer,16oz carpenter's hammer,1.000)",
-                        "+I(testdb,DB2INST1,PRODUCTS2,107,rocks,box of assorted rocks,5.300)",
-                        "+I(testdb,DB2INST1,PRODUCTS2,108,jacket,water resistent black wind breaker,0.100)",
-                        "+I(testdb,DB2INST1,PRODUCTS2,109,spare tire,24 inch spare tire,22.200)",
-                        "+U(testdb,DB2INST1,PRODUCTS2,106,hammer,18oz carpenter hammer,1.000)",
-                        "+U(testdb,DB2INST1,PRODUCTS2,107,rocks,box of assorted rocks,5.100)",
-                        "+I(testdb,DB2INST1,PRODUCTS2,110,jacket,water resistent white wind breaker,0.200)",
-                        "+I(testdb,DB2INST1,PRODUCTS2,111,scooter,Big 2-wheel scooter ,5.180)",
-                        "+U(testdb,DB2INST1,PRODUCTS2,110,jacket,new water resistent white wind breaker,0.500)",
-                        "+U(testdb,DB2INST1,PRODUCTS2,111,scooter,Big 2-wheel scooter ,5.170)",
-                        "-D(testdb,DB2INST1,PRODUCTS2,111,scooter,Big 2-wheel scooter ,5.170)");
+                        "+I(testdb,DB2INST1,PRODUCTS,101,scooter,Small 2-wheel scooter,3.140)",
+                        "+I(testdb,DB2INST1,PRODUCTS,102,car battery,12V car battery,8.100)",
+                        "+I(testdb,DB2INST1,PRODUCTS,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.800)",
+                        "+I(testdb,DB2INST1,PRODUCTS,104,hammer,12oz carpenter's hammer,0.750)",
+                        "+I(testdb,DB2INST1,PRODUCTS,105,hammer,14oz carpenter's hammer,0.875)",
+                        "+I(testdb,DB2INST1,PRODUCTS,106,hammer,16oz carpenter's hammer,1.000)",
+                        "+I(testdb,DB2INST1,PRODUCTS,107,rocks,box of assorted rocks,5.300)",
+                        "+I(testdb,DB2INST1,PRODUCTS,108,jacket,water resistent black wind breaker,0.100)",
+                        "+I(testdb,DB2INST1,PRODUCTS,109,spare tire,24 inch spare tire,22.200)",
+                        "+U(testdb,DB2INST1,PRODUCTS,106,hammer,18oz carpenter hammer,1.000)",
+                        "+U(testdb,DB2INST1,PRODUCTS,107,rocks,box of assorted rocks,5.100)",
+                        "+I(testdb,DB2INST1,PRODUCTS,110,jacket,water resistent white wind breaker,0.200)",
+                        "+I(testdb,DB2INST1,PRODUCTS,111,scooter,Big 2-wheel scooter ,5.180)",
+                        "+U(testdb,DB2INST1,PRODUCTS,110,jacket,new water resistent white wind breaker,0.500)",
+                        "+U(testdb,DB2INST1,PRODUCTS,111,scooter,Big 2-wheel scooter ,5.170)",
+                        "-D(testdb,DB2INST1,PRODUCTS,111,scooter,Big 2-wheel scooter ,5.170)");
 
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         Collections.sort(expected);

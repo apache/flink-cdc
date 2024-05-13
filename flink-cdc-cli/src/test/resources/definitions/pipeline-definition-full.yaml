@@ -56,3 +56,4 @@ pipeline:
   name: source-database-sync-pipe
   parallelism: 4
   enable-schema-evolution: false
+  schema-operator.rpc-timeout: 1 h

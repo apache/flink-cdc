@@ -39,10 +39,10 @@ import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -92,7 +92,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 currentParallelism,
                 new ArrayList<>(),
                 new ArrayList<>(),
-                new HashMap<>(),
+                new LinkedHashMap<>(),
                 new HashMap<>(),
                 new HashMap<>(),
                 INITIAL_ASSIGNING,
@@ -143,7 +143,17 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
-        this.assignedSplits = assignedSplits;
+        // When job restore from savepoint, sort the existing tables and newly added tables
+        // to let enumerator only send newly added tables' StreamSplitMetaEvent
+        this.assignedSplits =
+                assignedSplits.entrySet().stream()
+                        .sorted(Map.Entry.comparingByKey())
+                        .collect(
+                                Collectors.toMap(
+                                        Map.Entry::getKey,
+                                        Map.Entry::getValue,
+                                        (o, o2) -> o,
+                                        LinkedHashMap::new));
         this.tableSchemas = tableSchemas;
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerStatus = assignerStatus;
@@ -230,6 +240,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                     tableSchemas
                             .entrySet()
                             .removeIf(schema -> tablesToRemove.contains(schema.getKey()));
+                    LOG.info("Enumerator remove tables after restart: {}", tablesToRemove);
                     remainingSplits.removeIf(split -> tablesToRemove.contains(split.getTableId()));
                     remainingTables.removeAll(tablesToRemove);
                     alreadyProcessedTables.removeIf(tableId -> tablesToRemove.contains(tableId));
@@ -303,9 +314,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                     "The assigner is not ready to offer finished split information, this should not be called");
         }
         final List<SchemalessSnapshotSplit> assignedSnapshotSplit =
-                assignedSplits.values().stream()
-                        .sorted(Comparator.comparing(SourceSplitBase::splitId))
-                        .collect(Collectors.toList());
+                new ArrayList<>(assignedSplits.values());
         List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
         for (SchemalessSnapshotSplit split : assignedSnapshotSplit) {
             Offset finishedOffset = splitFinishedOffsets.get(split.splitId());
