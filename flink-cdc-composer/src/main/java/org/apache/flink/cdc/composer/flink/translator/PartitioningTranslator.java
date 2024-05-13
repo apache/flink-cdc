@@ -19,6 +19,7 @@ package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.sink.HashFunctionProvider;
 import org.apache.flink.cdc.runtime.partitioning.EventPartitioner;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEventKeySelector;
 import org.apache.flink.cdc.runtime.partitioning.PostPartitionProcessor;
@@ -39,11 +40,13 @@ public class PartitioningTranslator {
             DataStream<Event> input,
             int upstreamParallelism,
             int downstreamParallelism,
-            OperatorID schemaOperatorID) {
+            OperatorID schemaOperatorID,
+            HashFunctionProvider hashFunctionProvider) {
         return input.transform(
                         "PrePartition",
                         new PartitioningEventTypeInfo(),
-                        new PrePartitionOperator(schemaOperatorID, downstreamParallelism))
+                        new PrePartitionOperator(
+                                schemaOperatorID, downstreamParallelism, hashFunctionProvider))
                 .setParallelism(upstreamParallelism)
                 .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
                 .map(new PostPartitionProcessor(), new EventTypeInfo())
