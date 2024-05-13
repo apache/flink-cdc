@@ -17,26 +17,12 @@
 
 package org.apache.flink.cdc.common.sink;
 
-import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 
-/**
- * {@code DataSink} is used to write change data to external system and apply metadata changes to
- * external systems as well.
- */
-@PublicEvolving
-public interface DataSink {
+import java.util.function.Function;
 
-    /** Get the {@link EventSinkProvider} for writing changed data to external systems. */
-    EventSinkProvider getEventSinkProvider();
-
-    /** Get the {@link MetadataApplier} for applying metadata changes to external systems. */
-    MetadataApplier getMetadataApplier();
-
-    /**
-     * Get the {@link HashFunctionProvider} for calculating hash value when partition by primary
-     * ley.
-     */
-    default HashFunctionProvider getHashFunctionProvider() {
-        return new DefaultHashFunctionProvider();
-    }
+/** use for {@code PrePartitionOperator} when calculating hash code of primary key. */
+public interface HashFunction extends Function<DataChangeEvent, Integer> {
+    @Override
+    Integer apply(DataChangeEvent event);
 }

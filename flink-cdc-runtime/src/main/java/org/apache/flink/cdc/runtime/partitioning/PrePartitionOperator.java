@@ -18,15 +18,14 @@
 package org.apache.flink.cdc.runtime.partitioning;
 
 import org.apache.flink.cdc.common.annotation.Internal;
-import org.apache.flink.cdc.common.annotation.VisibleForTesting;
-import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
-import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.HashFunction;
+import org.apache.flink.cdc.common.sink.HashFunctionProvider;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -41,11 +40,7 @@ import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
 import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
 
 /** Operator for processing events from {@link SchemaOperator} before {@link EventPartitioner}. */
 @Internal
@@ -56,14 +51,19 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
 
     private final OperatorID schemaOperatorId;
     private final int downstreamParallelism;
+    private final HashFunctionProvider hashFunctionProvider;
 
     private transient SchemaEvolutionClient schemaEvolutionClient;
     private transient LoadingCache<TableId, HashFunction> cachedHashFunctions;
 
-    public PrePartitionOperator(OperatorID schemaOperatorId, int downstreamParallelism) {
+    public PrePartitionOperator(
+            OperatorID schemaOperatorId,
+            int downstreamParallelism,
+            HashFunctionProvider hashFunctionProvider) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.schemaOperatorId = schemaOperatorId;
         this.downstreamParallelism = downstreamParallelism;
+        this.hashFunctionProvider = hashFunctionProvider;
     }
 
     @Override
@@ -127,7 +127,7 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
     }
 
     private HashFunction recreateHashFunction(TableId tableId) {
-        return new HashFunction(loadLatestSchemaFromRegistry(tableId));
+        return hashFunctionProvider.getHashFunction(tableId, loadLatestSchemaFromRegistry(tableId));
     }
 
     private LoadingCache<TableId, HashFunction> createCache() {
@@ -140,63 +140,5 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
                                 return recreateHashFunction(key);
                             }
                         });
-    }
-
-    @VisibleForTesting
-    static class HashFunction implements Function<DataChangeEvent, Integer> {
-        private final List<RecordData.FieldGetter> primaryKeyGetters;
-
-        public HashFunction(Schema schema) {
-            primaryKeyGetters = createFieldGetters(schema);
-        }
-
-        @Override
-        public Integer apply(DataChangeEvent event) {
-            List<Object> objectsToHash = new ArrayList<>();
-            // Table ID
-            TableId tableId = event.tableId();
-            Optional.ofNullable(tableId.getNamespace()).ifPresent(objectsToHash::add);
-            Optional.ofNullable(tableId.getSchemaName()).ifPresent(objectsToHash::add);
-            objectsToHash.add(tableId.getTableName());
-
-            // Primary key
-            RecordData data =
-                    event.op().equals(OperationType.DELETE) ? event.before() : event.after();
-            for (RecordData.FieldGetter primaryKeyGetter : primaryKeyGetters) {
-                objectsToHash.add(primaryKeyGetter.getFieldOrNull(data));
-            }
-
-            // Calculate hash
-            return (Objects.hash(objectsToHash.toArray()) * 31) & 0x7FFFFFFF;
-        }
-
-        private List<RecordData.FieldGetter> createFieldGetters(Schema schema) {
-            List<RecordData.FieldGetter> fieldGetters =
-                    new ArrayList<>(schema.primaryKeys().size());
-            int[] primaryKeyPositions =
-                    schema.primaryKeys().stream()
-                            .mapToInt(
-                                    pk -> {
-                                        int i = 0;
-                                        while (!schema.getColumns().get(i).getName().equals(pk)) {
-                                            ++i;
-                                        }
-                                        if (i >= schema.getColumnCount()) {
-                                            throw new IllegalStateException(
-                                                    String.format(
-                                                            "Unable to find column \"%s\" which is defined as primary key",
-                                                            pk));
-                                        }
-                                        return i;
-                                    })
-                            .toArray();
-            for (int primaryKeyPosition : primaryKeyPositions) {
-                fieldGetters.add(
-                        RecordData.createFieldGetter(
-                                schema.getColumns().get(primaryKeyPosition).getType(),
-                                primaryKeyPosition));
-            }
-            return fieldGetters;
-        }
     }
 }
