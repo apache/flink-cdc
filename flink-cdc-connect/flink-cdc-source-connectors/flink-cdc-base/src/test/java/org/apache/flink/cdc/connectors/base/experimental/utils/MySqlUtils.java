@@ -45,7 +45,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.rowToArray;
 import static org.apache.flink.table.api.DataTypes.FIELD;
 import static org.apache.flink.table.api.DataTypes.ROW;
 
@@ -53,26 +52,6 @@ import static org.apache.flink.table.api.DataTypes.ROW;
 public class MySqlUtils {
 
     private MySqlUtils() {}
-
-    public static Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)
-            throws SQLException {
-        final String minMaxQuery =
-                String.format(
-                        "SELECT MIN(%s), MAX(%s) FROM %s",
-                        quote(columnName), quote(columnName), quote(tableId));
-        return jdbc.queryAndMap(
-                minMaxQuery,
-                rs -> {
-                    if (!rs.next()) {
-                        // this should never happen
-                        throw new SQLException(
-                                String.format(
-                                        "No result returned after running query [%s]",
-                                        minMaxQuery));
-                    }
-                    return rowToArray(rs, 2);
-                });
-    }
 
     public static long queryApproximateRowCnt(JdbcConnection jdbc, TableId tableId)
             throws SQLException {
@@ -94,27 +73,6 @@ public class MySqlUtils {
                 });
     }
 
-    public static Object queryMin(
-            JdbcConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
-            throws SQLException {
-        final String minQuery =
-                String.format(
-                        "SELECT MIN(%s) FROM %s WHERE %s > ?",
-                        quote(columnName), quote(tableId), quote(columnName));
-        return jdbc.prepareQueryAndMap(
-                minQuery,
-                ps -> ps.setObject(1, excludedLowerBound),
-                rs -> {
-                    if (!rs.next()) {
-                        // this should never happen
-                        throw new SQLException(
-                                String.format(
-                                        "No result returned after running query [%s]", minQuery));
-                    }
-                    return rs.getObject(1);
-                });
-    }
-
     public static Object queryNextChunkMax(
             JdbcConnection jdbc,
             TableId tableId,
@@ -122,7 +80,7 @@ public class MySqlUtils {
             int chunkSize,
             Object includedLowerBound)
             throws SQLException {
-        String quotedColumn = quote(splitColumnName);
+        String quotedColumn = jdbc.quotedColumnIdString(splitColumnName);
         String query =
                 String.format(
                         "SELECT MAX(%s) FROM ("
@@ -130,7 +88,7 @@ public class MySqlUtils {
                                 + ") AS T",
                         quotedColumn,
                         quotedColumn,
-                        quote(tableId),
+                        jdbc.quotedTableIdString(tableId),
                         quotedColumn,
                         quotedColumn,
                         chunkSize);
@@ -311,20 +269,6 @@ public class MySqlUtils {
         return (RowType)
                 ROW(FIELD(splitColumn.name(), MySqlTypeUtils.fromDbzColumn(splitColumn)))
                         .getLogicalType();
-    }
-
-    public static Column getSplitColumn(Table table) {
-        List<Column> primaryKeys = table.primaryKeyColumns();
-        if (primaryKeys.isEmpty()) {
-            throw new ValidationException(
-                    String.format(
-                            "Incremental snapshot for tables requires primary key,"
-                                    + " but table %s doesn't have primary key.",
-                            table.id()));
-        }
-
-        // use first field in primary key as the split key
-        return primaryKeys.get(0);
     }
 
     public static String quote(String dbOrTableName) {
