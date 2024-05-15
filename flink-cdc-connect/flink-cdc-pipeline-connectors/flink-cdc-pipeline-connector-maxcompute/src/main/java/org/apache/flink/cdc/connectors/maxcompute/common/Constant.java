@@ -28,4 +28,5 @@ public class Constant {
             "$$_session_manage_operator_$$";
 
     public static final String END_OF_SESSION = "end_of_session";
+    public static final String SESSION_LIMITING = "session_limiting";
 }
