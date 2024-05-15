@@ -52,6 +52,8 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
     private final String database;
     private final String tableName;
     private final String pdAddresses;
+
+    private final String hostMapping;
     private final StartupOptions startupOptions;
     private final Map<String, String> options;
 
@@ -70,12 +72,14 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
             String database,
             String tableName,
             String pdAddresses,
+            String hostMapping,
             StartupOptions startupOptions,
             Map<String, String> options) {
         this.physicalSchema = physicalSchema;
         this.database = checkNotNull(database);
         this.tableName = checkNotNull(tableName);
         this.pdAddresses = checkNotNull(pdAddresses);
+        this.hostMapping = hostMapping;
         this.startupOptions = startupOptions;
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.options = options;
@@ -93,7 +97,8 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-        final TiConfiguration tiConf = TDBSourceOptions.getTiConfiguration(pdAddresses, options);
+        final TiConfiguration tiConf =
+                TDBSourceOptions.getTiConfiguration(pdAddresses, hostMapping, options);
         RowType physicalDataType =
                 (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(producedDataType);
@@ -132,7 +137,13 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
     public DynamicTableSource copy() {
         TiDBTableSource source =
                 new TiDBTableSource(
-                        physicalSchema, database, tableName, pdAddresses, startupOptions, options);
+                        physicalSchema,
+                        database,
+                        tableName,
+                        pdAddresses,
+                        hostMapping,
+                        startupOptions,
+                        options);
         source.producedDataType = producedDataType;
         source.metadataKeys = metadataKeys;
         return source;
