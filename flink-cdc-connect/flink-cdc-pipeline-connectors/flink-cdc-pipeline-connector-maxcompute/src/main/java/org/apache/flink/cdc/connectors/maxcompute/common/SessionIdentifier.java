@@ -81,6 +81,10 @@ public class SessionIdentifier implements Serializable {
         return sessionId;
     }
 
+    public String getSimpleName() {
+        return project + "." + schema + "." + table + "." + partitionName;
+    }
+
     @Override
     public String toString() {
         return "SessionIdentifier{"
