@@ -34,11 +34,15 @@ import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.LogicalTypeConversion;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.SchemaChange;
+import org.apache.paimon.table.Table;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
+import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
 /**
  * A {@code MetadataApplier} that applies metadata changes to Paimon. Support primary key table
@@ -129,23 +133,111 @@ public class PaimonMetadataApplier implements MetadataApplier {
     private void applyAddColumn(AddColumnEvent event)
             throws Catalog.TableNotExistException, Catalog.ColumnAlreadyExistException,
                     Catalog.ColumnNotExistException {
-        List<SchemaChange> tableChangeList = new ArrayList<>();
-        event.getAddedColumns()
-                .forEach(
-                        (column) -> {
-                            SchemaChange tableChange =
-                                    SchemaChange.addColumn(
-                                            column.getAddColumn().getName(),
-                                            LogicalTypeConversion.toDataType(
-                                                    DataTypeUtils.toFlinkDataType(
-                                                                    column.getAddColumn().getType())
-                                                            .getLogicalType()));
-                            tableChangeList.add(tableChange);
-                        });
+        List<SchemaChange> tableChangeList = applyAddColumnEventWithPosition(event);
         catalog.alterTable(
                 new Identifier(event.tableId().getSchemaName(), event.tableId().getTableName()),
                 tableChangeList,
                 true);
+    }
+
+    private List<SchemaChange> applyAddColumnEventWithPosition(AddColumnEvent event)
+            throws Catalog.TableNotExistException {
+        List<SchemaChange> tableChangeList = new ArrayList<>();
+        for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
+            SchemaChange tableChange;
+            switch (columnWithPosition.getPosition()) {
+                case FIRST:
+                    tableChange =
+                            SchemaChange.addColumn(
+                                    columnWithPosition.getAddColumn().getName(),
+                                    LogicalTypeConversion.toDataType(
+                                            DataTypeUtils.toFlinkDataType(
+                                                            columnWithPosition
+                                                                    .getAddColumn()
+                                                                    .getType())
+                                                    .getLogicalType()),
+                                    columnWithPosition.getAddColumn().getComment(),
+                                    SchemaChange.Move.first(
+                                            columnWithPosition.getAddColumn().getName()));
+                    tableChangeList.add(tableChange);
+                    break;
+                case LAST:
+                    SchemaChange schemaChangeWithLastPosition =
+                            applyAddColumnWithLastPosition(columnWithPosition);
+                    tableChangeList.add(schemaChangeWithLastPosition);
+                    break;
+                case BEFORE:
+                    SchemaChange schemaChangeWithBeforePosition =
+                            applyAddColumnWithBeforePosition(
+                                    event.tableId().getSchemaName(),
+                                    event.tableId().getTableName(),
+                                    columnWithPosition);
+                    tableChangeList.add(schemaChangeWithBeforePosition);
+                    break;
+                case AFTER:
+                    checkNotNull(
+                            columnWithPosition.getExistedColumnName(),
+                            "Existing column name must be provided for AFTER position");
+                    tableChange =
+                            SchemaChange.addColumn(
+                                    columnWithPosition.getAddColumn().getName(),
+                                    LogicalTypeConversion.toDataType(
+                                            DataTypeUtils.toFlinkDataType(
+                                                            columnWithPosition
+                                                                    .getAddColumn()
+                                                                    .getType())
+                                                    .getLogicalType()),
+                                    columnWithPosition.getAddColumn().getComment(),
+                                    SchemaChange.Move.after(
+                                            columnWithPosition.getAddColumn().getName(),
+                                            columnWithPosition.getExistedColumnName()));
+                    tableChangeList.add(tableChange);
+                    break;
+                default:
+                    throw new IllegalArgumentException(
+                            "Unknown column position: " + columnWithPosition.getPosition());
+            }
+        }
+        return tableChangeList;
+    }
+
+    private SchemaChange applyAddColumnWithLastPosition(
+            AddColumnEvent.ColumnWithPosition columnWithPosition) {
+        return SchemaChange.addColumn(
+                columnWithPosition.getAddColumn().getName(),
+                LogicalTypeConversion.toDataType(
+                        DataTypeUtils.toFlinkDataType(columnWithPosition.getAddColumn().getType())
+                                .getLogicalType()),
+                columnWithPosition.getAddColumn().getComment());
+    }
+
+    private SchemaChange applyAddColumnWithBeforePosition(
+            String schemaName,
+            String tableName,
+            AddColumnEvent.ColumnWithPosition columnWithPosition)
+            throws Catalog.TableNotExistException {
+        String existedColumnName = columnWithPosition.getExistedColumnName();
+        Table table = catalog.getTable(new Identifier(schemaName, tableName));
+        List<String> columnNames = table.rowType().getFieldNames();
+        int index = checkColumnPosition(existedColumnName, columnNames);
+
+        return SchemaChange.addColumn(
+                columnWithPosition.getAddColumn().getName(),
+                LogicalTypeConversion.toDataType(
+                        DataTypeUtils.toFlinkDataType(columnWithPosition.getAddColumn().getType())
+                                .getLogicalType()),
+                columnWithPosition.getAddColumn().getComment(),
+                SchemaChange.Move.after(
+                        columnWithPosition.getAddColumn().getName(), columnNames.get(index - 1)));
+    }
+
+    private int checkColumnPosition(String existedColumnName, List<String> columnNames) {
+        if (existedColumnName == null) {
+            return 0;
+        }
+        int index = columnNames.indexOf(existedColumnName);
+        checkArgument(index == -1, "Column %s not found", existedColumnName);
+        return index;
     }
 
     private void applyDropColumn(DropColumnEvent event)
