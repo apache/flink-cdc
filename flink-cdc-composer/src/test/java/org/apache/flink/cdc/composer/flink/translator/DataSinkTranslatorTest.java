@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 
-/** A test for {@link DataSinkTranslator} */
+/** A test for {@link DataSinkTranslator}. */
 public class DataSinkTranslatorTest {
 
     @Test
