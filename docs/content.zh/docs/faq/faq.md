@@ -204,7 +204,8 @@ restart-strategy.fixed-delay.delay= 30s
 
 ### Q15: 在 DataStream API中构建MySQL CDC源时如何配置tableList选项？
 
-tableList选项要求表名使用数据库名，而不是DataStream API中的表名。对于MySQL CDC源代码，tableList选项值应该类似于‘my_db.my_table’。
+1. tableList选项要求表名使用数据库名，而不是DataStream API中的表名。对于MySQL CDC源代码，tableList选项值应该类似于‘my_db.my_table’。
+2. 如果要同步排除products和orders表之外的整个my_db库，tableList选项值应该类似于‘my_db.(?!products｜orders).*’。
 
 ## Postgres CDC FAQ
 
