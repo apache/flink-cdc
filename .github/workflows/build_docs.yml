@@ -30,24 +30,29 @@ on:
       - release-*
   schedule:
     - cron: '0 0 * * *' # Deploy every day
+  workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-
-  markdown-link-check:
+  check-documentation:
     if: github.repository == 'apache/flink-cdc'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
-      - uses: gaurav-nelson/github-action-markdown-link-check@1.0.15
+      - uses: actions/checkout@v3
+      - name: Check dead links
+        uses: gaurav-nelson/github-action-markdown-link-check@1.0.15
         with:
           config-file: '.dlc.json'
+      - name: Build documentation
+        run: |
+          docker run --rm --volume "$PWD:/root/flink-cdc" chesnay/flink-ci:java_8_11_17_21_maven_386 bash -c "cd /root/flink-cdc && chmod +x ./.github/workflows/docs.sh && ./.github/workflows/docs.sh"
 
   build-documentation:
     if: github.event_name != 'pull_request' && github.repository == 'apache/flink-cdc'
+    name: "Check and build documentation"
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 1
@@ -55,6 +60,7 @@ jobs:
         branch:
           - master
           - release-3.0
+          - release-3.1
 
     steps:
       - uses: actions/checkout@v3
@@ -69,9 +75,14 @@ jobs:
           
           if [ "${currentBranch}" = "master" ]; then
           echo "flink_alias=release-3.2" >> ${GITHUB_ENV}
-          elif [ "${currentBranch}" = "release-3.0" ]; then
+          elif [ "${currentBranch}" = "release-3.1" ]; then
           echo "flink_alias=stable" >> ${GITHUB_ENV}
           fi
+
+      - name: Check dead links
+        uses: gaurav-nelson/github-action-markdown-link-check@1.0.15
+        with:
+          config-file: '.dlc.json'
 
       - name: Build documentation
         run: |
