@@ -24,6 +24,7 @@ import com.alipay.oceanbase.rpc.protocol.payload.impl.direct_load.ObLoadDupActio
 
 import java.time.Duration;
 
+/** Options for {@link OceanBaseDataSink}. */
 public class OceanBaseDataSinkOptions {
     // ------------------------------------------------------------------------------------------
     // Options for sink connector

@@ -28,7 +28,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/** A {@link OceanBaseCatalog} for OceanBase connector that supports schema evolution under MySQL mode. */
+/**
+ * A {@link OceanBaseCatalog} for OceanBase connector that supports schema evolution under MySQL
+ * mode.
+ */
 public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
 
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseMySQLCatalog.class);
@@ -126,7 +129,8 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         }
     }
 
-    public void alterAddColumns(String databaseName, String tableName, List<OceanBaseColumn> addColumns) {
+    public void alterAddColumns(
+            String databaseName, String tableName, List<OceanBaseColumn> addColumns) {
         Preconditions.checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(databaseName),
                 "database name cannot be null or empty.");
@@ -135,15 +139,23 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                 "table name cannot be null or empty.");
         Preconditions.checkArgument(!addColumns.isEmpty(), "Added columns should not be empty.");
 
-        String alterSql =
-                buildAlterAddColumnsSql(databaseName, tableName, addColumns);
+        String alterSql = buildAlterAddColumnsSql(databaseName, tableName, addColumns);
         try {
             long startTimeMillis = System.currentTimeMillis();
             executeUpdateStatement(alterSql);
-            LOG.info("Success to add columns to {}.{}, duration: {}ms, sql: {}",
-                    databaseName, tableName, System.currentTimeMillis() - startTimeMillis, alterSql);
+            LOG.info(
+                    "Success to add columns to {}.{}, duration: {}ms, sql: {}",
+                    databaseName,
+                    tableName,
+                    System.currentTimeMillis() - startTimeMillis,
+                    alterSql);
         } catch (Exception e) {
-            LOG.error("Failed to add columns to {}.{}, sql: {}", databaseName, tableName, alterSql, e);
+            LOG.error(
+                    "Failed to add columns to {}.{}, sql: {}",
+                    databaseName,
+                    tableName,
+                    alterSql,
+                    e);
             throw new OceanBaseCatalogException(
                     String.format("Failed to add columns to %s.%s ", databaseName, tableName), e);
         }
@@ -287,9 +299,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
     }
 
     protected String buildAlterAddColumnsSql(
-            String databaseName,
-            String tableName,
-            List<OceanBaseColumn> addColumns) {
+            String databaseName, String tableName, List<OceanBaseColumn> addColumns) {
         StringBuilder builder = new StringBuilder();
         builder.append(String.format("ALTER TABLE `%s`.`%s` ", databaseName, tableName));
         String columnsStmt =

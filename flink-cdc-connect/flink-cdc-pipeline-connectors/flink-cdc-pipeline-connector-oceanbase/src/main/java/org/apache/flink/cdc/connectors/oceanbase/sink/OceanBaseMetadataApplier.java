@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.sink;
 
-import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
@@ -34,6 +33,8 @@ import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogFactory
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseColumn;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseMySQLCatalog;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseTable;
+
+import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +54,9 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
             OceanBaseConnectorOptions connectorOptions, Configuration config) throws Exception {
         this.connectorOptions = connectorOptions;
         this.config = config;
-        this.catalog = (OceanBaseMySQLCatalog)OceanBaseCatalogFactory.createOceanBaseCatalog(connectorOptions);
+        this.catalog =
+                (OceanBaseMySQLCatalog)
+                        OceanBaseCatalogFactory.createOceanBaseCatalog(connectorOptions);
     }
 
     @Override
@@ -96,7 +99,6 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
         }
     }
 
-
     private void applyAddColumnEvent(AddColumnEvent addColumnEvent) {
         List<OceanBaseColumn> addColumns = new ArrayList<>();
         for (AddColumnEvent.ColumnWithPosition columnWithPosition :
@@ -119,15 +121,7 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
         }
 
         TableId tableId = addColumnEvent.tableId();
-        OceanBaseCatalogException alterException = null;
-        try {
-            catalog.alterAddColumns(
-                    tableId.getSchemaName(),
-                    tableId.getTableName(),
-                    addColumns);
-        } catch (OceanBaseCatalogException e) {
-            alterException = e;
-        }
+        catalog.alterAddColumns(tableId.getSchemaName(), tableId.getTableName(), addColumns);
     }
 
     private void applyDropColumnEvent(DropColumnEvent dropColumnEvent) {

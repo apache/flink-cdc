@@ -29,35 +29,26 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
+import com.oceanbase.connector.flink.table.DataChangeRecord;
 import com.oceanbase.connector.flink.table.Record;
 import com.oceanbase.connector.flink.table.RecordSerializationSchema;
+import com.oceanbase.connector.flink.table.TableInfo;
 
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /** A serializer for Event to Record. */
-public class OceanBaseEventSerializer implements RecordSerializationSchema<Event> {
-
-    private ObjectMapper objectMapper = new ObjectMapper();
+public class OceanBaseEventSerializationSchema implements RecordSerializationSchema<Event> {
     private Map<TableId, Schema> schemaMaps = new HashMap<>();
-
-    /** Format DATE type data. */
-    public static final DateTimeFormatter DATE_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
-    /** Format timestamp-related type data. */
-    public static final DateTimeFormatter DATE_TIME_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /** ZoneId from pipeline config to support timestamp with local time zone. */
     public final ZoneId pipelineZoneId;
 
-    public OceanBaseEventSerializer(ZoneId zoneId) {
+    public OceanBaseEventSerializationSchema(ZoneId zoneId) {
         pipelineZoneId = zoneId;
     }
 
@@ -87,34 +78,61 @@ public class OceanBaseEventSerializer implements RecordSerializationSchema<Event
         TableId tableId = event.tableId();
         Schema schema = schemaMaps.get(tableId);
         Preconditions.checkNotNull(schema, event.tableId() + " is not existed");
-        Map<String, Object> valueMap;
+        Object[] values;
         OperationType op = event.op();
+        boolean isDelete = false;
         switch (op) {
             case INSERT:
             case UPDATE:
             case REPLACE:
-                valueMap = serializerRecord(event.after(), schema);
-                //                addDeleteSign(valueMap, false);
+                values = serializerRecord(event.after(), schema);
                 break;
             case DELETE:
-                valueMap = serializerRecord(event.before(), schema);
-                //                addDeleteSign(valueMap, true);
+                values = serializerRecord(event.before(), schema);
+                isDelete = true;
                 break;
             default:
                 throw new UnsupportedOperationException("Unsupport Operation " + op);
         }
 
-        return null;
+        return buildDataChangeRecord(tableId, schema, values, isDelete);
+    }
+
+    private DataChangeRecord buildDataChangeRecord(
+            TableId tableId, Schema schema, Object[] values, boolean isDelete) {
+        com.oceanbase.connector.flink.table.TableId oceanBaseTableId =
+                new com.oceanbase.connector.flink.table.TableId(
+                        tableId.getSchemaName(), tableId.getTableName());
+        TableInfo tableInfo =
+                new TableInfo(
+                        oceanBaseTableId,
+                        schema.partitionKeys(),
+                        schema.getColumnNames(),
+                        Lists.newArrayList(),
+                        null);
+
+        return new DataChangeRecord(
+                tableInfo,
+                isDelete ? DataChangeRecord.Type.DELETE : DataChangeRecord.Type.UPSERT,
+                values);
     }
 
     /** serializer RecordData to Doris Value. */
-    public Map<String, Object> serializerRecord(RecordData recordData, Schema schema) {
+    public Object[] serializerRecord(RecordData recordData, Schema schema) {
         List<Column> columns = schema.getColumns();
-        Map<String, Object> record = new HashMap<>();
         Preconditions.checkState(
                 columns.size() == recordData.getArity(),
                 "Column size does not match the data size");
+        Object[] values = new Object[columns.size()];
 
-        return record;
+        for (int i = 0; i < recordData.getArity(); i++) {
+            OceanBaseRowConvert.SerializationConverter converter =
+                    OceanBaseRowConvert.createNullableExternalConverter(
+                            columns.get(i).getType(), pipelineZoneId);
+            Object field = converter.serialize(i, recordData);
+            values[i] = field;
+        }
+
+        return values;
     }
 }

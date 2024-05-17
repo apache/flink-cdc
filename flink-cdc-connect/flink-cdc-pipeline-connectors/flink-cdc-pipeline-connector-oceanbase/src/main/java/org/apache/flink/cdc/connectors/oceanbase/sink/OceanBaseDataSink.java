@@ -33,6 +33,7 @@ import com.oceanbase.connector.flink.table.TableId;
 import java.io.Serializable;
 import java.time.ZoneId;
 
+/** A {@link DataSink} for "OceanBase" pipeline connector. */
 public class OceanBaseDataSink implements DataSink, Serializable {
 
     private final OceanBaseConnectorOptions connectorOptions;
@@ -63,7 +64,7 @@ public class OceanBaseDataSink implements DataSink, Serializable {
                 new OceanBaseSink<>(
                         connectorOptions,
                         null,
-                        new OceanBaseEventSerializer(zoneId),
+                        new OceanBaseEventSerializationSchema(zoneId),
                         DataChangeRecord.KeyExtractor.simple(),
                         recordFlusher));
     }

@@ -17,9 +17,10 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.catalog;
 
-import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
+
+import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +28,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/** A {@link OceanBaseCatalog} for OceanBase connector that supports schema evolution under Oracle mode. */
+/**
+ * A {@link OceanBaseCatalog} for OceanBase connector that supports schema evolution under Oracle
+ * mode.
+ */
 public class OceanBaseOracleCatalog extends OceanBaseCatalog {
 
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseOracleCatalog.class);

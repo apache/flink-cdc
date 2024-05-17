@@ -48,13 +48,6 @@ limitations under the License.
             <version>2.4.8</version>
             <scope>test</scope>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>org.testcontainers</groupId>-->
-<!--            <artifactId>testcontainers-bom</artifactId>-->
-<!--            <version>${testcontainers.version}</version>-->
-<!--            <type>pom</type>-->
-<!--            <scope>import</scope>-->
-<!--        </dependency>-->
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>jdbc</artifactId>

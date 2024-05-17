@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.oceanbase;
 
 import org.junit.ClassRule;
-import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -27,8 +26,8 @@ import org.testcontainers.utility.MountableFile;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.sql.Statement;
 
+/** Basic class for testing OceanBase. */
 public class OceanBaseTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseTestBase.class);
 
@@ -45,6 +44,7 @@ public class OceanBaseTestBase {
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     protected Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(OB_SERVER.getJdbcUrl(), OB_SERVER.getUsername(), OB_SERVER.getPassword());
+        return DriverManager.getConnection(
+                OB_SERVER.getJdbcUrl(), OB_SERVER.getUsername(), OB_SERVER.getPassword());
     }
 }

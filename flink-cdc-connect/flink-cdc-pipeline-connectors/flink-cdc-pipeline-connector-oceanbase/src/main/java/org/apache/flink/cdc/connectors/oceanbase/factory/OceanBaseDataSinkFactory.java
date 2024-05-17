@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.factory;
 
+import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
@@ -31,6 +32,8 @@ import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
+/** A {@link DataSinkFactory} to create {@link OceanBaseDataSink}. */
+@Internal
 public class OceanBaseDataSinkFactory implements DataSinkFactory {
 
     @Override

@@ -23,6 +23,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
 
+/** A {@link org.testcontainers.containers.Container} for "OceanBase". */
 public class OceanBaseContainer extends JdbcDatabaseContainer<OceanBaseContainer> {
 
     public static final String DOCKER_IMAGE_NAME = "oceanbase/oceanbase-ce";
