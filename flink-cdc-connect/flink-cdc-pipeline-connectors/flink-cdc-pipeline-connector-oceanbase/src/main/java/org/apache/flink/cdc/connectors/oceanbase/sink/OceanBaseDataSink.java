@@ -28,7 +28,6 @@ import com.oceanbase.connector.flink.connection.OceanBaseConnectionProvider;
 import com.oceanbase.connector.flink.sink.OceanBaseRecordFlusher;
 import com.oceanbase.connector.flink.sink.OceanBaseSink;
 import com.oceanbase.connector.flink.table.DataChangeRecord;
-import com.oceanbase.connector.flink.table.TableId;
 
 import java.io.Serializable;
 import java.time.ZoneId;
@@ -53,11 +52,6 @@ public class OceanBaseDataSink implements DataSink, Serializable {
     public EventSinkProvider getEventSinkProvider() {
         OceanBaseConnectionProvider connectionProvider =
                 new OceanBaseConnectionProvider(connectorOptions);
-        TableId tableId =
-                new TableId(
-                        connectionProvider.getDialect()::getFullTableName,
-                        connectorOptions.getSchemaName(),
-                        connectorOptions.getTableName());
         OceanBaseRecordFlusher recordFlusher =
                 new OceanBaseRecordFlusher(connectorOptions, connectionProvider);
         return FlinkSinkProvider.of(

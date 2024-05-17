@@ -21,7 +21,6 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
-import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.oceanbase.sink.OceanBaseDataSink;
 import org.apache.flink.cdc.connectors.oceanbase.sink.OceanBaseDataSinkOptions;
@@ -32,6 +31,8 @@ import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
+
 /** A {@link DataSinkFactory} to create {@link OceanBaseDataSink}. */
 @Internal
 public class OceanBaseDataSinkFactory implements DataSinkFactory {
@@ -40,13 +41,12 @@ public class OceanBaseDataSinkFactory implements DataSinkFactory {
     public DataSink createDataSink(Context context) {
         Configuration config = context.getFactoryConfiguration();
         OceanBaseConnectorOptions connectorOptions = new OceanBaseConnectorOptions(config.toMap());
-
-        return new OceanBaseDataSink(
-                connectorOptions,
-                config,
-                ZoneId.of(
-                        context.getPipelineConfiguration()
-                                .get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE)));
+        String zoneStr = context.getFactoryConfiguration().get(PIPELINE_LOCAL_TIME_ZONE);
+        ZoneId zoneId =
+                PIPELINE_LOCAL_TIME_ZONE.defaultValue().equals(zoneStr)
+                        ? ZoneId.systemDefault()
+                        : ZoneId.of(zoneStr);
+        return new OceanBaseDataSink(connectorOptions, config, zoneId);
     }
 
     @Override
