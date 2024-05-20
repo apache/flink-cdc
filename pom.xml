@@ -553,7 +553,7 @@ limitations under the License.
                     <!-- Prevent ORA-01882: timezone region not found errors due to the Oracle DB
                          does not understanding some time zone which used in Ubuntu OS -->
                     <argLine>-Xms256m -Xmx2048m -Dmvn.forkNumber=${surefire.forkNumber}
-                        -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -Doracle.jdbc.timezoneAsRegion=false
+                        -XX:+UseG1GC -Doracle.jdbc.timezoneAsRegion=false
                     </argLine>
                 </configuration>
             </plugin>
