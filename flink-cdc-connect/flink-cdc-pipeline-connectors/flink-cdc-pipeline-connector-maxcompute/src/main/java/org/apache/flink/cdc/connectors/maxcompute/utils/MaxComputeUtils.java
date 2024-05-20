@@ -106,8 +106,17 @@ public class MaxComputeUtils {
             case "zlib":
                 compressAlgorithm = CompressOption.CompressAlgorithm.ODPS_ZLIB;
                 break;
-            default:
+            case "lz4":
+                compressAlgorithm = CompressOption.CompressAlgorithm.ODPS_LZ4_FRAME;
+                break;
+            case "snappy":
                 compressAlgorithm = CompressOption.CompressAlgorithm.ODPS_SNAPPY;
+                break;
+            default:
+                throw new IllegalArgumentException(
+                        "unknown compress algo: "
+                                + compressAlgo
+                                + " , only support raw, zlib, lz4, snappy");
         }
         return new CompressOption(compressAlgorithm, 1, 0);
     }
@@ -159,7 +168,7 @@ public class MaxComputeUtils {
             return false;
         }
         for (int i = 0; i < currentColumns.size(); i++) {
-            if (!currentColumns.get(i).getName().equals(expectColumns.get(i).getName())) {
+            if (!currentColumns.get(i).getName().equalsIgnoreCase(expectColumns.get(i).getName())) {
                 LOG.error(
                         "current column {} name not equals to expect column name: {}",
                         currentColumns.get(i).getName(),
