@@ -141,7 +141,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
             handleDataChangeEvent(dataChangeEvent);
         } else if (element.getValue() instanceof FlushEvent) {
             handleFlushEvent(element);
-            if (options.getMaxSessionParallelism() <= 0) {
+            if (options.getMaxSessionParallelism() > 0) {
                 // when maxSessionParallelism is set, we indicate that some data have cached in
                 // file. so we need to un-cache data and flush again.
                 uncache(element);
@@ -240,6 +240,10 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
                 "operator {} prepare snapshot, wait for sink writers flush success",
                 indexOfThisSubtask);
         // wait for sink writers flush success
+        if (snapshotFlushSuccess != null) {
+            snapshotFlushSuccess.get();
+            snapshotFlushSuccess = null;
+        }
         snapshotFlushSuccess =
                 submitRequestToOperator(
                         new WaitForFlushSuccessRequest(
@@ -252,6 +256,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
         sessionCache.clear();
         // wait for sink writers flush success
         snapshotFlushSuccess.get();
+        snapshotFlushSuccess = null;
         LOG.info("operator {} snapshot end, all sink writers flush success", indexOfThisSubtask);
     }
 
@@ -261,6 +266,10 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
         LOG.info(
                 "operator {} end of input, wait for sink writers flush success",
                 indexOfThisSubtask);
+        if (snapshotFlushSuccess != null) {
+            snapshotFlushSuccess.get();
+            snapshotFlushSuccess = null;
+        }
         snapshotFlushSuccess =
                 submitRequestToOperator(
                         new WaitForFlushSuccessRequest(

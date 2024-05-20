@@ -196,7 +196,7 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
             if (!sessionCache.containsKey(sessionIdentifier)) {
                 // if sessionCache size exceed the max size, return SESSION_LIMITING to let
                 // TaskManager cache the data of new session
-                if (options.getMaxSessionParallelism() <= 0
+                if (options.getMaxSessionParallelism() > 0
                         && sessionCache.size() >= options.getMaxSessionParallelism()) {
                     return CompletableFuture.completedFuture(
                             new CreateSessionResponse(Constant.SESSION_LIMITING));

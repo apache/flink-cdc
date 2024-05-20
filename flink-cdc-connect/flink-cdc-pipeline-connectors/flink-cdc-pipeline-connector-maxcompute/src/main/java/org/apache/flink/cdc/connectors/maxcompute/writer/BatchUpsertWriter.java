@@ -179,6 +179,7 @@ public class BatchUpsertWriter implements MaxComputeWriter {
     public void commit() throws IOException {
         try {
             upsertSession.commit(false);
+            upsertSession.close();
         } catch (OdpsException e) {
             throw new IOException(e.getMessage() + "RequestId: " + e.getRequestId(), e);
         }
