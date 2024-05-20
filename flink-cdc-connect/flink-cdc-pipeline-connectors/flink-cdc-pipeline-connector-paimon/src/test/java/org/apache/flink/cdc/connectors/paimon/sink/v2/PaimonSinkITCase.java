@@ -137,6 +137,7 @@ public class PaimonSinkITCase {
                         .physicalColumn("col1", DataTypes.STRING())
                         .physicalColumn("col2", DataTypes.STRING())
                         .primaryKey("col1")
+                        .option("bucket", "1")
                         .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
         testEvents.add(createTableEvent);
