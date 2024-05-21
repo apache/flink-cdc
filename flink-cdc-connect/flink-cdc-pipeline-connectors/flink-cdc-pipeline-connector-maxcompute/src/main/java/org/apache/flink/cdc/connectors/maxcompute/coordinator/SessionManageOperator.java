@@ -240,10 +240,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
                 "operator {} prepare snapshot, wait for sink writers flush success",
                 indexOfThisSubtask);
         // wait for sink writers flush success
-        if (snapshotFlushSuccess != null) {
-            snapshotFlushSuccess.get();
-            snapshotFlushSuccess = null;
-        }
+        waitLastSnapshotFlushSuccess();
         snapshotFlushSuccess =
                 submitRequestToOperator(
                         new WaitForFlushSuccessRequest(
@@ -254,9 +251,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
         sessionCache.clear();
-        // wait for sink writers flush success
-        snapshotFlushSuccess.get();
-        snapshotFlushSuccess = null;
+        waitLastSnapshotFlushSuccess();
         LOG.info("operator {} snapshot end, all sink writers flush success", indexOfThisSubtask);
     }
 
@@ -266,14 +261,18 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
         LOG.info(
                 "operator {} end of input, wait for sink writers flush success",
                 indexOfThisSubtask);
-        if (snapshotFlushSuccess != null) {
-            snapshotFlushSuccess.get();
-            snapshotFlushSuccess = null;
-        }
+        waitLastSnapshotFlushSuccess();
         snapshotFlushSuccess =
                 submitRequestToOperator(
                         new WaitForFlushSuccessRequest(
                                 getRuntimeContext().getIndexOfThisSubtask()));
+    }
+
+    private void waitLastSnapshotFlushSuccess() throws Exception {
+        if (snapshotFlushSuccess != null) {
+            snapshotFlushSuccess.get();
+            snapshotFlushSuccess = null;
+        }
     }
 
     /** partition column is always after data column. */
