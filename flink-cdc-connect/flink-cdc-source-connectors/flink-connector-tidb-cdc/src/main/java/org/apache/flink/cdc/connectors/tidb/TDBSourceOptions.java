@@ -22,11 +22,11 @@ import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
 
-import org.apache.commons.lang3.StringUtils;
 import org.tikv.common.ConfigUtils;
 import org.tikv.common.TiConfiguration;
 
 import java.util.Map;
+import java.util.Optional;
 
 /** Configurations for {@link TiDBSource}. */
 public class TDBSourceOptions {
@@ -64,7 +64,7 @@ public class TDBSourceOptions {
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "This is route map used to configure public IP and intranet IP mapping. When the TiDB cluster is running on the intranet, you can map a set of intranet IPs to public IPs for an outside Flink cluster to access. The format is {Intranet IP1}:{Public IP1};{Intranet IP2}:{Public IP2}, e.g. 192.168.0.2:8.8.8.8;192.168.0.3:9.9.9.9.");
+                            "TiKV cluster's host-mapping used to configure public IP and intranet IP mapping. When the TiKV cluster is running on the intranet, you can map a set of intranet IPs to public IPs for an outside Flink cluster to access. The format is {Intranet IP1}:{Public IP1};{Intranet IP2}:{Public IP2}, e.g. 192.168.0.2:8.8.8.8;192.168.0.3:9.9.9.9.");
     public static final ConfigOption<Long> TIKV_GRPC_TIMEOUT =
             ConfigOptions.key(ConfigUtils.TIKV_GRPC_TIMEOUT)
                     .longType()
@@ -94,9 +94,7 @@ public class TDBSourceOptions {
         final Configuration configuration = Configuration.fromMap(options);
 
         final TiConfiguration tiConf = TiConfiguration.createDefault(pdAddrsStr);
-        if (StringUtils.isNotBlank(hostMapping)) {
-            tiConf.setHostMapping(new UriHostMapping(hostMapping));
-        }
+        Optional.of(new UriHostMapping(hostMapping)).ifPresent(tiConf::setHostMapping);
         configuration.getOptional(TIKV_GRPC_TIMEOUT).ifPresent(tiConf::setTimeout);
         configuration.getOptional(TIKV_GRPC_SCAN_TIMEOUT).ifPresent(tiConf::setScanTimeout);
         configuration
