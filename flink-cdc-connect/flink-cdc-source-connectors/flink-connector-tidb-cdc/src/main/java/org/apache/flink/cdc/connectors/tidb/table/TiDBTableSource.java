@@ -31,6 +31,7 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
+import com.sun.istack.internal.Nullable;
 import org.tikv.common.TiConfiguration;
 
 import java.util.Collections;
@@ -52,8 +53,7 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
     private final String database;
     private final String tableName;
     private final String pdAddresses;
-
-    private final String hostMapping;
+    @Nullable private final String hostMapping;
     private final StartupOptions startupOptions;
     private final Map<String, String> options;
 
