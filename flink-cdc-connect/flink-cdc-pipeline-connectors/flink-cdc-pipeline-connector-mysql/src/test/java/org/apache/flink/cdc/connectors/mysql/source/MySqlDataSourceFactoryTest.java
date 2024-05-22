@@ -124,7 +124,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                                 + tableExclude);
     }
 
-    class MockContext implements Factory.Context {
+    static class MockContext implements Factory.Context {
 
         Configuration factoryConfiguration;
 
