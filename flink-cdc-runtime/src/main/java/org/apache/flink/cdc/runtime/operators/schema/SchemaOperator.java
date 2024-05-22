@@ -140,16 +140,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                         return getLatestSchema(tableId);
                                     }
                                 });
-    }
 
-    @Override
-    public void initializeState(StateInitializationContext context) throws Exception {
-        if (context.isRestored()) {
-            // Multiple operators may appear during a restart process,
-            // only clear the pendingSchemaChanges when the first operator starts.
-            if (getRuntimeContext().getIndexOfThisSubtask() == 0) {
-                sendRequestToCoordinator(new RefreshPendingListsRequest());
-            }
+        // Multiple operators may appear during a restart process,
+        // only clear the pendingSchemaChanges when the first operator starts.
+        if (getRuntimeContext().getIndexOfThisSubtask() == 0) {
+            sendRequestToCoordinator(new RefreshPendingListsRequest());
         }
     }
 

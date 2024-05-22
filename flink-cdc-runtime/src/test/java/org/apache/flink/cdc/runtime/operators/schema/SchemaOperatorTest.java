@@ -126,6 +126,28 @@ public class SchemaOperatorTest {
     }
 
     @Test
+    void testProcessSchemaChangeEventWithRestart() throws Exception {
+        SchemaOperator schemaOperator =
+            new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(1));
+        EventOperatorTestHarness<SchemaOperator, Event> harness =
+            new EventOperatorTestHarness<>(schemaOperator, 1, Duration.ofSeconds(3));
+        harness.open();
+        Assertions.assertThrowsExactly(
+            TimeoutException.class,
+            () ->
+                schemaOperator.processElement(
+                    new StreamRecord<>(
+                        new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))));
+        harness.setOperator(new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(1)));
+        harness.open();
+        Assertions.assertDoesNotThrow(
+            () ->
+                schemaOperator.processElement(
+                    new StreamRecord<>(
+                        new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))));
+    }
+
+    @Test
     void testProcessSchemaChangeEventWithOutTimeOut() throws Exception {
         SchemaOperator schemaOperator =
                 new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30));
