@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.table;
 
-import org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestBase;
+import org.apache.flink.cdc.connectors.oceanbase.OceanBaseContainerUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -27,34 +27,32 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.lifecycle.Startables;
-import org.testcontainers.utility.MountableFile;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseContainerUtils.createLogProxy;
+import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseContainerUtils.createOceanBaseServer;
+
 /** Integration tests for OceanBase MySQL mode table source. */
 @RunWith(Parameterized.class)
-public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
+public class LegacyOceanBaseMySQLModeITCase extends LegacyOceanBaseTestBase {
 
-    private static final Logger LOG = LoggerFactory.getLogger(OceanBaseMySQLModeITCase.class);
+    private static final Logger LOG = LoggerFactory.getLogger(LegacyOceanBaseMySQLModeITCase.class);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -62,32 +60,8 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    private static final String NETWORK_MODE = "host";
-    private static final String OB_SYS_PASSWORD = "123456";
-
-    @ClassRule
-    public static final GenericContainer<?> OB_SERVER =
-            new GenericContainer<>("oceanbase/oceanbase-ce:4.2.0.0")
-                    .withNetworkMode(NETWORK_MODE)
-                    .withEnv("MODE", "slim")
-                    .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
-                    .withEnv("OB_DATAFILE_SIZE", "1G")
-                    .withEnv("OB_LOG_DISK_SIZE", "4G")
-                    .withCopyFileToContainer(
-                            MountableFile.forClasspathResource("ddl/mysql/docker_init.sql"),
-                            "/root/boot/init.d/init.sql")
-                    .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
-                    .withStartupTimeout(Duration.ofMinutes(4))
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
-
-    @ClassRule
-    public static final GenericContainer<?> LOG_PROXY =
-            new GenericContainer<>("whhe/oblogproxy:1.1.3_4x")
-                    .withNetworkMode(NETWORK_MODE)
-                    .withEnv("OB_SYS_PASSWORD", OB_SYS_PASSWORD)
-                    .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
-                    .withStartupTimeout(Duration.ofMinutes(1))
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+    public static final GenericContainer<?> OB_SERVER = createOceanBaseServer();
+    public static final GenericContainer<?> LOG_PROXY = createLogProxy();
 
     @BeforeClass
     public static void startContainers() {
@@ -112,7 +86,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
     private final String rsList;
 
-    public OceanBaseMySQLModeITCase(
+    public LegacyOceanBaseMySQLModeITCase(
             String username,
             String password,
             String hostname,
@@ -129,14 +103,14 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
     public static List<Object[]> parameters() {
         return Collections.singletonList(
                 new Object[] {
-                    "root@test",
-                    "123456",
-                    "127.0.0.1",
-                    2881,
-                    "127.0.0.1",
-                    2983,
-                    "test",
-                    "127.0.0.1:2882:2881"
+                    OceanBaseContainerUtils.USERNAME,
+                    OceanBaseContainerUtils.PASSWORD,
+                    OceanBaseContainerUtils.OB_SERVER_HOST,
+                    OceanBaseContainerUtils.OB_SERVER_PORT,
+                    OceanBaseContainerUtils.LOG_PROXY_HOST,
+                    OceanBaseContainerUtils.LOG_PROXY_PORT,
+                    OceanBaseContainerUtils.TENANT,
+                    OceanBaseContainerUtils.RS_LIST
                 });
     }
 

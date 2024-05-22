@@ -39,24 +39,30 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECTION_POOL_SIZE;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_MAX_RETRIES;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_TIMEOUT;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.DATABASE_NAME;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.HOSTNAME;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.PASSWORD;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.SERVER_TIME_ZONE;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.TABLE_NAME;
+import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_STARTUP_MODE;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 
 /** Factory for creating configured instance of {@link OceanBaseTableSource}. */
 public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
 
     private static final String IDENTIFIER = "oceanbase-cdc";
-
-    public static final ConfigOption<String> USERNAME =
-            ConfigOptions.key("username")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Username to be used when connecting to OceanBase.");
-
-    public static final ConfigOption<String> PASSWORD =
-            ConfigOptions.key("password")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("Password to be used when connecting to OceanBase.");
 
     public static final ConfigOption<String> TENANT_NAME =
             ConfigOptions.key("tenant-name")
@@ -64,46 +70,12 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
                     .noDefaultValue()
                     .withDescription("Tenant name of OceanBase to monitor.");
 
-    public static final ConfigOption<String> DATABASE_NAME =
-            ConfigOptions.key("database-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Database name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.");
-
-    public static final ConfigOption<String> TABLE_NAME =
-            ConfigOptions.key("table-name")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Table name of OceanBase to monitor, should be regular expression. Only can be used with 'initial' mode.");
-
     public static final ConfigOption<String> TABLE_LIST =
             ConfigOptions.key("table-list")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
                             "List of full names of tables, separated by commas, e.g. \"db1.table1, db2.table2\".");
-
-    public static final ConfigOption<String> SERVER_TIME_ZONE =
-            ConfigOptions.key("server-time-zone")
-                    .stringType()
-                    .defaultValue("+00:00")
-                    .withDescription("The session time zone in database server.");
-
-    public static final ConfigOption<Duration> CONNECT_TIMEOUT =
-            ConfigOptions.key("connect.timeout")
-                    .durationType()
-                    .defaultValue(Duration.ofSeconds(30))
-                    .withDescription(
-                            "The maximum time that the connector should wait after trying to connect to the database server or log proxy server before timing out.");
-
-    public static final ConfigOption<String> HOSTNAME =
-            ConfigOptions.key("hostname")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "IP address or hostname of the OceanBase database server or OceanBase proxy server.");
 
     public static final ConfigOption<Integer> PORT =
             ConfigOptions.key("port")
@@ -215,6 +187,53 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         String configUrl = config.get(CONFIG_URL);
         String workingMode = config.get(WORKING_MODE);
 
+        boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        int splitMetaGroupSize = config.get(CHUNK_META_GROUP_SIZE);
+        int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
+        int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
+        int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
+        double distributionFactorUpper = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        double distributionFactorLower = config.get(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        String chunkKeyColumn =
+                config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
+        boolean closeIdlerReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
+
+        if (enableParallelRead) {
+            return new OceanBaseTableSource(
+                    physicalSchema,
+                    startupOptions,
+                    username,
+                    password,
+                    tenantName,
+                    databaseName,
+                    tableName,
+                    serverTimeZone,
+                    connectTimeout,
+                    hostname,
+                    port,
+                    compatibleMode,
+                    jdbcDriver,
+                    logProxyHost,
+                    logProxyPort,
+                    rsList,
+                    configUrl,
+                    workingMode,
+                    getProperties(context.getCatalogTable().getOptions(), OBCDC_PROPERTIES_PREFIX),
+                    DebeziumOptions.getDebeziumProperties(context.getCatalogTable().getOptions()),
+                    splitSize,
+                    splitMetaGroupSize,
+                    fetchSize,
+                    connectMaxRetries,
+                    connectionPoolSize,
+                    distributionFactorUpper,
+                    distributionFactorLower,
+                    chunkKeyColumn,
+                    closeIdlerReaders,
+                    scanNewlyAddedTableEnabled);
+        }
+
         OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
 
         return new OceanBaseTableSource(
@@ -278,6 +297,18 @@ public class OceanBaseTableSourceFactory implements DynamicTableSourceFactory {
         options.add(RS_LIST);
         options.add(CONFIG_URL);
         options.add(WORKING_MODE);
+
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        options.add(CHUNK_META_GROUP_SIZE);
+        options.add(SCAN_SNAPSHOT_FETCH_SIZE);
+        options.add(CONNECT_MAX_RETRIES);
+        options.add(CONNECTION_POOL_SIZE);
+        options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        options.add(SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
+        options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         return options;
     }
 

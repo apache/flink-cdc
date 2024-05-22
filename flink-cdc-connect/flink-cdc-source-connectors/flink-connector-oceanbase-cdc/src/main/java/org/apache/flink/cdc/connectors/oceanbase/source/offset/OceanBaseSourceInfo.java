@@ -34,19 +34,19 @@ public class OceanBaseSourceInfo extends BaseSourceInfo {
     public static final String TENANT_KEY = "tenant";
     public static final String TRANSACTION_ID_KEY = "transaction_id";
 
-    private final String tenant;
+    private final OceanBaseConnectorConfig config;
 
     private Instant sourceTime;
     private Set<TableId> tableIds;
     private String transactionId;
 
-    public OceanBaseSourceInfo(OceanBaseConnectorConfig config, String tenant) {
+    public OceanBaseSourceInfo(OceanBaseConnectorConfig config) {
         super(config);
-        this.tenant = tenant;
+        this.config = config;
     }
 
     public String tenant() {
-        return tenant;
+        return config.getSourceConfig().getTenantName();
     }
 
     @Override
