@@ -31,8 +31,9 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 
-import com.sun.istack.internal.Nullable;
 import org.tikv.common.TiConfiguration;
+
+import javax.annotation.Nullable;
 
 import java.util.Collections;
 import java.util.List;
