@@ -21,6 +21,7 @@ import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
 import com.oceanbase.connector.flink.connection.OceanBaseConnectionProvider;
 import org.apache.commons.compress.utils.Lists;
 
+import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -28,10 +29,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /** A {@link OceanBaseCatalog} for OceanBase connector that supports schema evolution. */
-public abstract class OceanBaseCatalog {
-
+public abstract class OceanBaseCatalog implements Serializable {
+    private static final long serialVersionUID = 1L;
     private final OceanBaseConnectionProvider connectionProvider;
 
     public OceanBaseCatalog(OceanBaseConnectorOptions connectorOptions) {
@@ -59,4 +61,27 @@ public abstract class OceanBaseCatalog {
             statement.executeUpdate(sql);
         }
     }
+
+    public abstract boolean databaseExists(String databaseName) throws OceanBaseCatalogException;
+
+    public abstract void createDatabase(String databaseName, boolean ignoreIfExists)
+            throws OceanBaseCatalogException;
+
+    public abstract void createTable(OceanBaseTable table, boolean ignoreIfExists)
+            throws OceanBaseCatalogException;
+
+    public abstract void alterAddColumns(
+            String databaseName, String tableName, List<OceanBaseColumn> addColumns);
+
+    protected abstract String buildCreateDatabaseSql(String databaseName, boolean ignoreIfExists);
+
+    protected abstract String buildCreateTableSql(OceanBaseTable table, boolean ignoreIfExists);
+
+    protected abstract String buildColumnStmt(OceanBaseColumn column);
+
+    protected abstract String getFullColumnType(
+            String type, Optional<Integer> columnSize, Optional<Integer> decimalDigits);
+
+    protected abstract String buildAlterAddColumnsSql(
+            String databaseName, String tableName, List<OceanBaseColumn> addColumns);
 }

@@ -36,7 +36,6 @@ public class OceanBaseTestBase {
     @ClassRule
     public static final OceanBaseContainer OB_SERVER =
             new OceanBaseContainer(OceanBaseContainer.DOCKER_IMAGE_NAME + ":" + IMAGE_TAG)
-                    .withNetworkMode("host")
                     .withSysPassword("123456")
                     .withCopyFileToContainer(
                             MountableFile.forClasspathResource("sql/init.sql"),

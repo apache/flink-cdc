@@ -43,6 +43,7 @@ import java.util.Map;
 
 /** A serializer for Event to Record. */
 public class OceanBaseEventSerializationSchema implements RecordSerializationSchema<Event> {
+
     private Map<TableId, Schema> schemaMaps = new HashMap<>();
 
     /** ZoneId from pipeline config to support timestamp with local time zone. */
@@ -94,7 +95,6 @@ public class OceanBaseEventSerializationSchema implements RecordSerializationSch
             default:
                 throw new UnsupportedOperationException("Unsupport Operation " + op);
         }
-
         return buildDataChangeRecord(tableId, schema, values, isDelete);
     }
 
@@ -106,7 +106,7 @@ public class OceanBaseEventSerializationSchema implements RecordSerializationSch
         TableInfo tableInfo =
                 new TableInfo(
                         oceanBaseTableId,
-                        schema.partitionKeys(),
+                        schema.primaryKeys(),
                         schema.getColumnNames(),
                         Lists.newArrayList(),
                         null);
@@ -117,7 +117,7 @@ public class OceanBaseEventSerializationSchema implements RecordSerializationSch
                 values);
     }
 
-    /** serializer RecordData to Doris Value. */
+    /** serializer RecordData to oceanbase data change record. */
     public Object[] serializerRecord(RecordData recordData, Schema schema) {
         List<Column> columns = schema.getColumns();
         Preconditions.checkState(

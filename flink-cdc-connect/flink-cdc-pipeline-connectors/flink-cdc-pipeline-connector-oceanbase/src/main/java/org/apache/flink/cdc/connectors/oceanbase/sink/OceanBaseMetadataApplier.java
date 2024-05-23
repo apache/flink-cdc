@@ -125,14 +125,12 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
     }
 
     private void applyDropColumnEvent(DropColumnEvent dropColumnEvent) {
-        // TODO OceanBase plans to support column drop since 3.3 which has not been released.
-        // Support it later.
+        // TODO
         throw new UnsupportedOperationException("Rename column is not supported currently");
     }
 
     private void applyRenameColumnEvent(RenameColumnEvent renameColumnEvent) {
-        // TODO OceanBase plans to support column rename since 3.3 which has not been released.
-        // Support it later.
+        // TODO
         throw new UnsupportedOperationException("Rename column is not supported currently");
     }
 }

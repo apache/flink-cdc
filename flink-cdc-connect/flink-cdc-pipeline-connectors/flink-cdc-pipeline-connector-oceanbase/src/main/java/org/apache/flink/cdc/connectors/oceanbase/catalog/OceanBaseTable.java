@@ -28,22 +28,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * Describe a OceanBase table. See <a
- * href="https://docs.OceanBase.io/docs/table_design/OceanBase_table_design">OceanBase table
- * design</a> for how to define a OceanBase table.
- */
+/** Describe a OceanBase table. */
 public class OceanBaseTable {
 
-    /**
-     * Types of OceanBase table. See <a
-     * href="https://docs.OceanBase.io/docs/table_design/table_types">OceanBase Table Types</a>.
-     */
+    /** Types of OceanBase table. */
     public enum TableType {
         UNKNOWN,
         DUPLICATE_KEY,
-        AGGREGATE,
-        UNIQUE_KEY,
         PRIMARY_KEY
     }
 
@@ -59,19 +50,7 @@ public class OceanBaseTable {
     /** The columns sorted by the ordinal position. */
     private final List<OceanBaseColumn> columns;
 
-    /**
-     * The table keys sorted by the ordinal position. null if it's unknown. The table keys has
-     * different meaning for different types of tables. For duplicate key table, It's duplicate
-     * keys. For aggregate table, it's aggregate keys. For unique key table, it's unique keys. For
-     * primary key table, it's primary keys.
-     */
     @Nullable private final List<String> tableKeys;
-
-    /** The distribution keys. null if it's unknown. */
-    @Nullable private final List<String> distributionKeys;
-
-    /** The number of buckets. null if it's unknown or automatic. */
-    @Nullable private final Integer numBuckets;
 
     /** The table comment. null if there is no comment or it's unknown. */
     @Nullable private final String comment;
@@ -88,8 +67,6 @@ public class OceanBaseTable {
             TableType tableType,
             List<OceanBaseColumn> columns,
             @Nullable List<String> tableKeys,
-            @Nullable List<String> distributionKeys,
-            @Nullable Integer numBuckets,
             @Nullable String comment,
             Map<String, String> properties) {
         Preconditions.checkNotNull(databaseName);
@@ -101,8 +78,6 @@ public class OceanBaseTable {
         this.tableType = tableType;
         this.columns = columns;
         this.tableKeys = tableKeys;
-        this.distributionKeys = distributionKeys;
-        this.numBuckets = numBuckets;
         this.comment = comment;
         this.properties = Preconditions.checkNotNull(properties);
     }
@@ -125,14 +100,6 @@ public class OceanBaseTable {
 
     public Optional<List<String>> getTableKeys() {
         return Optional.ofNullable(tableKeys);
-    }
-
-    public Optional<List<String>> getDistributionKeys() {
-        return Optional.ofNullable(distributionKeys);
-    }
-
-    public Optional<Integer> getNumBuckets() {
-        return Optional.ofNullable(numBuckets);
     }
 
     public Optional<String> getComment() {
@@ -172,10 +139,6 @@ public class OceanBaseTable {
                 + columns
                 + ", tableKeys="
                 + tableKeys
-                + ", distributionKeys="
-                + distributionKeys
-                + ", numBuckets="
-                + numBuckets
                 + ", comment='"
                 + comment
                 + '\''
@@ -198,8 +161,6 @@ public class OceanBaseTable {
                 && tableType == that.tableType
                 && Objects.equals(columns, that.columns)
                 && Objects.equals(tableKeys, that.tableKeys)
-                && Objects.equals(distributionKeys, that.distributionKeys)
-                && Objects.equals(numBuckets, that.numBuckets)
                 && Objects.equals(comment, that.comment)
                 && Objects.equals(properties, that.properties);
     }
@@ -212,8 +173,6 @@ public class OceanBaseTable {
         private TableType tableType;
         private List<OceanBaseColumn> columns = new ArrayList<>();
         private List<String> tableKeys;
-        private List<String> distributionKeys;
-        private Integer numBuckets;
         private String comment;
         private Map<String, String> properties = new HashMap<>();
 
@@ -242,16 +201,6 @@ public class OceanBaseTable {
             return this;
         }
 
-        public Builder setDistributionKeys(List<String> distributionKeys) {
-            this.distributionKeys = distributionKeys;
-            return this;
-        }
-
-        public Builder setNumBuckets(Integer numBuckets) {
-            this.numBuckets = numBuckets;
-            return this;
-        }
-
         public Builder setComment(String comment) {
             this.comment = comment;
             return this;
@@ -264,15 +213,7 @@ public class OceanBaseTable {
 
         public OceanBaseTable build() {
             return new OceanBaseTable(
-                    databaseName,
-                    tableName,
-                    tableType,
-                    columns,
-                    tableKeys,
-                    distributionKeys,
-                    numBuckets,
-                    comment,
-                    properties);
+                    databaseName, tableName, tableType, columns, tableKeys, comment, properties);
         }
     }
 }

@@ -47,6 +47,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
      * @return true if the given database exists in the catalog false otherwise
      * @throws OceanBaseCatalogException in case of any runtime exception
      */
+    @Override
     public boolean databaseExists(String databaseName) throws OceanBaseCatalogException {
         Preconditions.checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(databaseName),
@@ -77,6 +78,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
      *     exists: if set to false, throw a StarRocksCatalogException, if set to true, do nothing.
      * @throws OceanBaseCatalogException in case of any runtime exception
      */
+    @Override
     public void createDatabase(String databaseName, boolean ignoreIfExists)
             throws OceanBaseCatalogException {
         Preconditions.checkArgument(
@@ -104,6 +106,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
      *     it throws a TableAlreadyExistException, if set to true, do nothing.
      * @throws OceanBaseCatalogException in case of any runtime exception
      */
+    @Override
     public void createTable(OceanBaseTable table, boolean ignoreIfExists)
             throws OceanBaseCatalogException {
         String createTableSql = buildCreateTableSql(table, ignoreIfExists);
@@ -129,6 +132,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         }
     }
 
+    @Override
     public void alterAddColumns(
             String databaseName, String tableName, List<OceanBaseColumn> addColumns) {
         Preconditions.checkArgument(
@@ -165,12 +169,14 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
     // OceanBase DDL SQL
     // ------------------------------------------------------------------------------------------
 
-    private String buildCreateDatabaseSql(String databaseName, boolean ignoreIfExists) {
+    @Override
+    protected String buildCreateDatabaseSql(String databaseName, boolean ignoreIfExists) {
         return String.format(
                 "CREATE DATABASE %s%s;", ignoreIfExists ? "IF NOT EXISTS " : "", databaseName);
     }
 
-    private String buildCreateTableSql(OceanBaseTable table, boolean ignoreIfExists) {
+    @Override
+    protected String buildCreateTableSql(OceanBaseTable table, boolean ignoreIfExists) {
         StringBuilder builder = new StringBuilder();
         builder.append(
                 String.format(
@@ -184,32 +190,15 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                         .map(this::buildColumnStmt)
                         .collect(Collectors.joining(",\n"));
         builder.append(columnsStmt);
-        builder.append("\n) ");
+        builder.append(",\n");
 
-        Preconditions.checkArgument(
-                table.getTableType() == OceanBaseTable.TableType.PRIMARY_KEY,
-                "Not support to build create table sql for table type " + table.getTableType());
-        Preconditions.checkArgument(
-                table.getTableKeys().isPresent(),
-                "Can't build create table sql because there is no table keys");
         String tableKeys =
                 table.getTableKeys().get().stream()
                         .map(key -> "`" + key + "`")
                         .collect(Collectors.joining(", "));
-        builder.append(String.format("PRIMARY KEY (%s)\n", tableKeys));
+        builder.append(String.format("PRIMARY KEY (%s)", tableKeys));
+        builder.append("\n) ");
 
-        Preconditions.checkArgument(
-                table.getDistributionKeys().isPresent(),
-                "Can't build create table sql because there is no distribution keys");
-        String distributionKeys =
-                table.getDistributionKeys().get().stream()
-                        .map(key -> "`" + key + "`")
-                        .collect(Collectors.joining(", "));
-        builder.append(String.format("DISTRIBUTED BY HASH (%s)", distributionKeys));
-        if (table.getNumBuckets().isPresent()) {
-            builder.append(" BUCKETS ");
-            builder.append(table.getNumBuckets().get());
-        }
         if (!table.getProperties().isEmpty()) {
             builder.append("\nPROPERTIES (\n");
             String properties =
@@ -258,7 +247,8 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         return builder.toString();
     }
 
-    private String buildColumnStmt(OceanBaseColumn column) {
+    @Override
+    protected String buildColumnStmt(OceanBaseColumn column) {
         StringBuilder builder = new StringBuilder();
         builder.append("`");
         builder.append(column.getColumnName());
@@ -278,7 +268,8 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         return builder.toString();
     }
 
-    private String getFullColumnType(
+    @Override
+    protected String getFullColumnType(
             String type, Optional<Integer> columnSize, Optional<Integer> decimalDigits) {
         String dataType = type.toUpperCase();
         switch (dataType) {
@@ -298,6 +289,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         }
     }
 
+    @Override
     protected String buildAlterAddColumnsSql(
             String databaseName, String tableName, List<OceanBaseColumn> addColumns) {
         StringBuilder builder = new StringBuilder();

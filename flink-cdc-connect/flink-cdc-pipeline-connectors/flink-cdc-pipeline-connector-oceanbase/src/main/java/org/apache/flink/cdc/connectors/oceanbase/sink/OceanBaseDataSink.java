@@ -68,7 +68,7 @@ public class OceanBaseDataSink implements DataSink, Serializable {
         try {
             return new OceanBaseMetadataApplier(connectorOptions, config);
         } catch (Exception e) {
-            throw new RuntimeException("Fail to create metadata applier");
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 }

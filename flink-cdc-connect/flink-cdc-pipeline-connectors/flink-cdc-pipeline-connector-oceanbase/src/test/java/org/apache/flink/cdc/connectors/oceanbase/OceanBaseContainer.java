@@ -85,6 +85,17 @@ public class OceanBaseContainer extends JdbcDatabaseContainer<OceanBaseContainer
                 + additionalUrlParams;
     }
 
+    public String getJdbcUrlInContainer(String databaseName, String networkAliases) {
+        String additionalUrlParams = constructUrlParameters("?", "&");
+        return "jdbc:mysql://"
+                + networkAliases
+                + ":"
+                + SQL_PORT
+                + "/"
+                + databaseName
+                + additionalUrlParams;
+    }
+
     public OceanBaseContainer withSysPassword(String sysPassword) {
         this.sysPassword = sysPassword;
         return this;

@@ -110,6 +110,13 @@ limitations under the License.
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-connector-oceanbase</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -224,6 +231,16 @@ limitations under the License.
                             <artifactId>flink-cdc-pipeline-connector-starrocks</artifactId>
                             <version>${project.version}</version>
                             <destFileName>starrocks-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-oceanbase</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>oceanbase-cdc-pipeline-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

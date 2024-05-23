@@ -31,7 +31,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogFactory}. */
-public class OceanBaseDataSinkFactoryTest /*extends OceanBaseTestBase*/ {
+public class OceanBaseDataSinkFactoryTest {
 
     @Test
     public void testCreateDataSink() {
