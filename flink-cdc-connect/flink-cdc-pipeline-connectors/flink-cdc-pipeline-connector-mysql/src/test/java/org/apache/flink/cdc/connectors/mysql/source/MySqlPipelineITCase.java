@@ -560,6 +560,14 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         inventoryDatabase.getDatabaseName()));
         expected.add(new DropColumnEvent(tableId, Collections.singletonList("DESC3")));
 
+        statement.execute(
+                String.format(
+                        "ALTER TABLE `%s`.`products` MODIFY COLUMN `DESC3` VARCHAR(255) NULL DEFAULT NULL;",
+                        inventoryDatabase.getDatabaseName()));
+        expected.add(
+                new AlterColumnTypeEvent(
+                        tableId, Collections.singletonMap("DESC3", DataTypes.VARCHAR(255))));
+
         // Should not catch SchemaChangeEvent of tables other than `products`
         statement.execute(
                 String.format(
