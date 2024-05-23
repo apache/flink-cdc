@@ -19,9 +19,11 @@ package org.apache.flink.cdc.common.pipeline;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 
+import java.io.Serializable;
+
 /** Behavior for handling schema changes. */
 @PublicEvolving
-public enum SchemaChangeBehavior {
+public enum SchemaChangeBehavior implements Serializable {
     EVOLVE,
     IGNORE,
     EXCEPTION
