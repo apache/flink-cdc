@@ -207,7 +207,8 @@ The reason for this problem is that the reading of the full volume phase of the 
 
 ### Q15: How to config `tableList` option when build MySQL CDC source in DataStream API?
 
-The `tableList` option requires table name with database name rather than table name in DataStream API. For MySQL CDC source, the `tableList` option value should like ‘my_db.my_table’.
+1. The `tableList` option requires table name with database name rather than table name in DataStream API. For MySQL CDC source, the `tableList` option value should like ‘my_db.my_table’.
+2. If you need to synchronize the whole mydb database excluding the products and orders tables, the `tableList` option value should like 'my_db.(?!products｜orders).*'.
 
 ## Postgres CDC FAQ
 

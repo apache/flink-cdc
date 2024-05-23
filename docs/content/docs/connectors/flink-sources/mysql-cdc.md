@@ -96,7 +96,7 @@ mysql> GRANT SELECT, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.
 mysql> FLUSH PRIVILEGES;
 ```
 
-See more about the [permission explanation](https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-creating-user).
+See more about the [permission explanation](https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-creating-user).
 
 
 Notes
@@ -304,7 +304,7 @@ Connector Options
       <td>String</td>
       <td>The session time zone in database server, e.g. "Asia/Shanghai". 
           It controls how the TIMESTAMP type in MYSQL converted to STRING.
-          See more <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types">here</a>.
+          See more <a href="https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-temporal-types">here</a>.
           If not set, then ZoneId.systemDefault() is used to determine the server time zone.
       </td>
     </tr>
@@ -359,7 +359,7 @@ During a snapshot operation, the connector will query each included table to pro
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from MySQL server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
