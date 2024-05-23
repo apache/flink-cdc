@@ -53,6 +53,7 @@ import org.apache.flink.util.ExceptionUtils;
 
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -82,16 +83,18 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_ID;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.fetchResults;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.getServerId;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests to cover various newly added tables during capture process in pipeline mode. */
-public class MysqlPipelineNewlyAddedTableTCase extends MySqlSourceTestBase {
+public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -146,84 +149,85 @@ public class MysqlPipelineNewlyAddedTableTCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testAddNewTableOneByOneSingleParallelism() throws Exception {
+        TestParam testParam =
+                TestParam.newBuilder(
+                                Collections.singletonList("address_hangzhou"),
+                                4,
+                                Arrays.asList("address_hangzhou", "address_beijing"),
+                                4)
+                        .setFirstRoundInitTables(
+                                Arrays.asList("address_hangzhou", "address_beijing"))
+                        .build();
+
+        testAddNewTable(testParam, 1);
+    }
+
+    @Test
     public void testAddNewTableOneByOne() throws Exception {
-        // step 1: create mysql tables with all tables included
-        initialAddressTables(getConnection(), "address_hangzhou", "address_beijing");
-        Path savepointDir = Files.createTempDirectory("add-new-table-test");
-        final String savepointDirectory = savepointDir.toAbsolutePath().toString();
-        String finishedSavePointPath = null;
-        StreamExecutionEnvironment env = getStreamExecutionEnvironment(finishedSavePointPath);
-        // step 2: only listen one table at first
-        FlinkSourceProvider sourceProvider =
-                getFlinkSourceProvider(customDatabase.getDatabaseName() + ".address_hangzhou");
-        DataStreamSource<Event> source =
-                env.fromSource(
-                        sourceProvider.getSource(),
-                        WatermarkStrategy.noWatermarks(),
-                        MySqlDataSourceFactory.IDENTIFIER,
-                        new EventTypeInfo());
+        TestParam testParam =
+                TestParam.newBuilder(
+                                Collections.singletonList("address_hangzhou"),
+                                4,
+                                Arrays.asList("address_hangzhou", "address_beijing"),
+                                4)
+                        .setFirstRoundInitTables(
+                                Arrays.asList("address_hangzhou", "address_beijing"))
+                        .build();
 
-        TypeSerializer<Event> serializer =
-                source.getTransformation().getOutputType().createSerializer(env.getConfig());
-        CheckpointedCollectResultBuffer<Event> resultBuffer =
-                new CheckpointedCollectResultBuffer<>(serializer);
-        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
-        CollectResultIterator<Event> iterator =
-                addCollector(env, source, resultBuffer, serializer, accumulatorName);
-        JobClient jobClient = env.executeAsync("beforeAddNewTable");
-        iterator.setJobClient(jobClient);
+        testAddNewTable(testParam, DEFAULT_PARALLELISM);
+    }
 
-        List<Event> actual = fetchResults(iterator, 4);
-        TableId tableId = TableId.tableId(customDatabase.getDatabaseName(), "address_hangzhou");
-        assertThat(actual.get(0)).isEqualTo(getCreateTableEvent(tableId));
-        List<Event> expectedSnapshot = getSnapshotExpected(tableId);
-        assertThat(actual.subList(1, 4))
-                .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
+    @Test
+    public void testAddNewTableByPatternSingleParallelism() throws Exception {
+        TestParam testParam =
+                TestParam.newBuilder(
+                                Collections.singletonList("address_\\.*"),
+                                8,
+                                Collections.singletonList("address_\\.*"),
+                                8)
+                        .setFirstRoundInitTables(
+                                Arrays.asList("address_hangzhou", "address_beijing"))
+                        .setSecondRoundInitTables(
+                                Arrays.asList("address_shanghai", "address_suzhou"))
+                        .build();
 
-        // step 3: trigger a savepoint and cancel the job
-        finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
-        jobClient.cancel().get();
-        iterator.close();
-
-        // step 4: add newly table when restore from savepoint
-        StreamExecutionEnvironment restoredEnv =
-                getStreamExecutionEnvironment(finishedSavePointPath);
-        FlinkSourceProvider restoredSourceProvider =
-                getFlinkSourceProvider(
-                        customDatabase.getDatabaseName() + ".address_hangzhou",
-                        customDatabase.getDatabaseName() + ".address_beijing");
-        DataStreamSource<Event> restoreSource =
-                restoredEnv.fromSource(
-                        restoredSourceProvider.getSource(),
-                        WatermarkStrategy.noWatermarks(),
-                        MySqlDataSourceFactory.IDENTIFIER,
-                        new EventTypeInfo());
-        CollectResultIterator<Event> restoredIterator =
-                addCollector(restoredEnv, restoreSource, resultBuffer, serializer, accumulatorName);
-        JobClient restoreClient = restoredEnv.executeAsync("AfterAddNewTable");
-
-        List<Event> newlyTableEvent = fetchResults(restoredIterator, 4);
-        tableId = TableId.tableId(customDatabase.getDatabaseName(), "address_beijing");
-        assertThat(newlyTableEvent.get(0)).isEqualTo(getCreateTableEvent(tableId));
-
-        expectedSnapshot = getSnapshotExpected(tableId);
-        assertThat(newlyTableEvent.subList(1, 4))
-                .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
-
-        restoreClient.cancel().get();
+        testAddNewTable(testParam, 1);
     }
 
     @Test
     public void testAddNewTableByPattern() throws Exception {
-        // step 1: create mysql tables with all tables included
-        initialAddressTables(getConnection(), "address_hangzhou", "address_beijing");
+        TestParam testParam =
+                TestParam.newBuilder(
+                                Collections.singletonList("address_\\.*"),
+                                8,
+                                Collections.singletonList("address_\\.*"),
+                                12)
+                        .setFirstRoundInitTables(
+                                Arrays.asList("address_hangzhou", "address_beijing"))
+                        .setSecondRoundInitTables(
+                                Arrays.asList(
+                                        "address_shanghai", "address_suzhou", "address_shenzhen"))
+                        .build();
+
+        testAddNewTable(testParam, DEFAULT_PARALLELISM);
+    }
+
+    private void testAddNewTable(TestParam testParam, int parallelism) throws Exception {
+        // step 1: create mysql tables
+        if (CollectionUtils.isNotEmpty(testParam.getFirstRoundInitTables())) {
+            initialAddressTables(getConnection(), testParam.getFirstRoundInitTables());
+        }
         Path savepointDir = Files.createTempDirectory("add-new-table-test");
         final String savepointDirectory = savepointDir.toAbsolutePath().toString();
         String finishedSavePointPath = null;
-        StreamExecutionEnvironment env = getStreamExecutionEnvironment(finishedSavePointPath);
-        // step 2: listen all table like address_* before creating new tables
+        StreamExecutionEnvironment env =
+                getStreamExecutionEnvironment(finishedSavePointPath, parallelism);
+        // step 2: listen tables first time
+        List<String> listenTablesFirstRound = testParam.getFirstRoundListenTables();
+
         FlinkSourceProvider sourceProvider =
-                getFlinkSourceProvider(customDatabase.getDatabaseName() + ".address_\\.*");
+                getFlinkSourceProvider(listenTablesFirstRound, parallelism);
         DataStreamSource<Event> source =
                 env.fromSource(
                         sourceProvider.getSource(),
@@ -241,34 +245,22 @@ public class MysqlPipelineNewlyAddedTableTCase extends MySqlSourceTestBase {
         JobClient jobClient = env.executeAsync("beforeAddNewTable");
         iterator.setJobClient(jobClient);
 
-        List<Event> actual = fetchResults(iterator, 8);
-        TableId tableId1 = TableId.tableId(customDatabase.getDatabaseName(), "address_hangzhou");
-        TableId tableId2 = TableId.tableId(customDatabase.getDatabaseName(), "address_beijing");
+        List<Event> actual = fetchResults(iterator, testParam.getFirstRoundFetchSize());
+        Optional<String> listenByPattern =
+                listenTablesFirstRound.stream()
+                        .filter(table -> StringUtils.contains(table, "\\.*"))
+                        .findAny();
+        multiAssert(
+                actual,
+                listenByPattern.isPresent()
+                        ? testParam.getFirstRoundInitTables()
+                        : listenTablesFirstRound);
 
-        List<Event> actualCreateTableEvents =
-                actual.stream()
-                        .filter(event -> event instanceof CreateTableEvent)
-                        .collect(Collectors.toList());
+        // step 3: create new tables if needed
+        if (CollectionUtils.isNotEmpty(testParam.getSecondRoundInitTables())) {
+            initialAddressTables(getConnection(), testParam.getSecondRoundInitTables());
+        }
 
-        assertThat(actualCreateTableEvents)
-                .containsExactlyInAnyOrder(
-                        Arrays.asList(getCreateTableEvent(tableId1), getCreateTableEvent(tableId2))
-                                .toArray(new Event[0]));
-
-        List<Event> allExpectedSnapshot = new ArrayList<>();
-        allExpectedSnapshot.addAll(getSnapshotExpected(tableId1));
-        allExpectedSnapshot.addAll(getSnapshotExpected(tableId2));
-
-        List<Event> allActualDataChangeEvents =
-                actual.stream()
-                        .filter(event -> event instanceof DataChangeEvent)
-                        .collect(Collectors.toList());
-
-        assertThat(allActualDataChangeEvents)
-                .containsExactlyInAnyOrder(allExpectedSnapshot.toArray(new Event[0]));
-
-        // step 3: create some new tables
-        initialAddressTables(getConnection(), "address_shanghai", "address_suzhou");
         // step 4: trigger a savepoint and cancel the job
         finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
         jobClient.cancel().get();
@@ -276,9 +268,10 @@ public class MysqlPipelineNewlyAddedTableTCase extends MySqlSourceTestBase {
 
         // step 5: restore from savepoint
         StreamExecutionEnvironment restoredEnv =
-                getStreamExecutionEnvironment(finishedSavePointPath);
+                getStreamExecutionEnvironment(finishedSavePointPath, parallelism);
+        List<String> listenTablesSecondRound = testParam.getSecondRoundListenTables();
         FlinkSourceProvider restoredSourceProvider =
-                getFlinkSourceProvider(customDatabase.getDatabaseName() + ".address_\\.*");
+                getFlinkSourceProvider(listenTablesSecondRound, parallelism);
         DataStreamSource<Event> restoreSource =
                 restoredEnv.fromSource(
                         restoredSourceProvider.getSource(),
@@ -289,32 +282,45 @@ public class MysqlPipelineNewlyAddedTableTCase extends MySqlSourceTestBase {
                 addCollector(restoredEnv, restoreSource, resultBuffer, serializer, accumulatorName);
         JobClient restoreClient = restoredEnv.executeAsync("AfterAddNewTable");
 
-        List<Event> newlyTableEvent = fetchResults(restoredIterator, 8);
-        tableId1 = TableId.tableId(customDatabase.getDatabaseName(), "address_shanghai");
-        tableId2 = TableId.tableId(customDatabase.getDatabaseName(), "address_suzhou");
+        List<String> newlyAddTables =
+                listenTablesSecondRound.stream()
+                        .filter(table -> !listenTablesFirstRound.contains(table))
+                        .collect(Collectors.toList());
+        // it means listen by pattern when newlyAddTables is empty
+        if (CollectionUtils.isEmpty(newlyAddTables)) {
+            newlyAddTables = testParam.getSecondRoundInitTables();
+        }
+        List<Event> newlyTableEvent =
+                fetchResults(restoredIterator, testParam.getSecondRoundFetchSize());
+        multiAssert(newlyTableEvent, newlyAddTables);
+        restoreClient.cancel().get();
+        restoredIterator.close();
+    }
 
-        actualCreateTableEvents =
-                newlyTableEvent.stream()
+    private void multiAssert(List<Event> actualEvents, List<String> listenTables) {
+        List<Event> expectedCreateTableEvents = new ArrayList<>();
+        List<Event> expectedDataChangeEvents = new ArrayList<>();
+        for (String table : listenTables) {
+            expectedCreateTableEvents.add(
+                    getCreateTableEvent(TableId.tableId(customDatabase.getDatabaseName(), table)));
+            expectedDataChangeEvents.addAll(
+                    getSnapshotExpected(TableId.tableId(customDatabase.getDatabaseName(), table)));
+        }
+        // compare create table events
+        List<Event> actualCreateTableEvents =
+                actualEvents.stream()
                         .filter(event -> event instanceof CreateTableEvent)
                         .collect(Collectors.toList());
-
         assertThat(actualCreateTableEvents)
-                .containsExactlyInAnyOrder(
-                        Arrays.asList(getCreateTableEvent(tableId1), getCreateTableEvent(tableId2))
-                                .toArray(new Event[0]));
+                .containsExactlyInAnyOrder(expectedCreateTableEvents.toArray(new Event[0]));
 
-        allExpectedSnapshot = new ArrayList<>();
-        allExpectedSnapshot.addAll(getSnapshotExpected(tableId1));
-        allExpectedSnapshot.addAll(getSnapshotExpected(tableId2));
-
-        allActualDataChangeEvents =
-                newlyTableEvent.stream()
+        // compare data change events
+        List<Event> actualDataChangeEvents =
+                actualEvents.stream()
                         .filter(event -> event instanceof DataChangeEvent)
                         .collect(Collectors.toList());
-
-        assertThat(allActualDataChangeEvents)
-                .containsExactlyInAnyOrder(allExpectedSnapshot.toArray(new Event[0]));
-        restoreClient.cancel().get();
+        assertThat(actualDataChangeEvents)
+                .containsExactlyInAnyOrder(expectedDataChangeEvents.toArray(new Event[0]));
     }
 
     private CreateTableEvent getCreateTableEvent(TableId tableId) {
@@ -393,7 +399,7 @@ public class MysqlPipelineNewlyAddedTableTCase extends MySqlSourceTestBase {
         return null;
     }
 
-    private void initialAddressTables(JdbcConnection connection, String... addressTables)
+    private void initialAddressTables(JdbcConnection connection, List<String> addressTables)
             throws SQLException {
         try {
             connection.setAutoCommit(false);
@@ -425,14 +431,19 @@ public class MysqlPipelineNewlyAddedTableTCase extends MySqlSourceTestBase {
         }
     }
 
-    private FlinkSourceProvider getFlinkSourceProvider(String... tables) {
+    private FlinkSourceProvider getFlinkSourceProvider(List<String> tables, int parallelism) {
+        List<String> fullTableNames =
+                tables.stream()
+                        .map(table -> customDatabase.getDatabaseName() + "." + table)
+                        .collect(Collectors.toList());
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
         options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
         options.put(USERNAME.key(), TEST_USER);
         options.put(PASSWORD.key(), TEST_PASSWORD);
         options.put(SERVER_TIME_ZONE.key(), "UTC");
-        options.put(TABLES.key(), StringUtils.join(tables, ","));
+        options.put(TABLES.key(), StringUtils.join(fullTableNames, ","));
+        options.put(SERVER_ID.key(), getServerId(parallelism));
         options.put(SCAN_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
         Factory.Context context =
                 new MySqlDataSourceFactoryTest.MockContext(
@@ -463,16 +474,106 @@ public class MysqlPipelineNewlyAddedTableTCase extends MySqlSourceTestBase {
         return iterator;
     }
 
-    private StreamExecutionEnvironment getStreamExecutionEnvironment(String finishedSavePointPath) {
+    private StreamExecutionEnvironment getStreamExecutionEnvironment(
+            String finishedSavePointPath, int parallelism) {
         Configuration configuration = new Configuration();
         if (finishedSavePointPath != null) {
             configuration.setString(SavepointConfigOptions.SAVEPOINT_PATH, finishedSavePointPath);
         }
         StreamExecutionEnvironment env =
                 StreamExecutionEnvironment.getExecutionEnvironment(configuration);
-        env.setParallelism(1);
+        env.setParallelism(parallelism);
         env.enableCheckpointing(500L);
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 1000L));
         return env;
+    }
+
+    static class TestParam {
+        private final List<String> firstRoundInitTables;
+        private final List<String> firstRoundListenTables;
+        private final Integer firstRoundFetchSize;
+        private final List<String> secondRoundInitTables;
+        private final List<String> secondRoundListenTables;
+        private final Integer secondRoundFetchSize;
+
+        private TestParam(Builder builder) {
+            this.firstRoundInitTables = builder.firstRoundInitTables;
+            this.firstRoundListenTables = builder.firstRoundListenTables;
+            this.firstRoundFetchSize = builder.firstRoundFetchSize;
+            this.secondRoundInitTables = builder.secondRoundInitTables;
+            this.secondRoundListenTables = builder.secondRoundListenTables;
+            this.secondRoundFetchSize = builder.secondRoundFetchSize;
+        }
+
+        public static Builder newBuilder(
+                List<String> firstRoundListenTables,
+                Integer firstRoundFetchSize,
+                List<String> secondRoundListenTables,
+                Integer secondRoundFetchSize) {
+            return new Builder(
+                    firstRoundListenTables,
+                    firstRoundFetchSize,
+                    secondRoundListenTables,
+                    secondRoundFetchSize);
+        }
+
+        public static class Builder {
+            private List<String> firstRoundInitTables;
+            private final List<String> firstRoundListenTables;
+            private final Integer firstRoundFetchSize;
+
+            private List<String> secondRoundInitTables;
+            private final List<String> secondRoundListenTables;
+            private final Integer secondRoundFetchSize;
+
+            public Builder(
+                    List<String> firstRoundListenTables,
+                    Integer firstRoundFetchSize,
+                    List<String> secondRoundListenTables,
+                    Integer secondRoundFetchSize) {
+                this.firstRoundListenTables = firstRoundListenTables;
+                this.firstRoundFetchSize = firstRoundFetchSize;
+                this.secondRoundListenTables = secondRoundListenTables;
+                this.secondRoundFetchSize = secondRoundFetchSize;
+            }
+
+            public TestParam build() {
+                return new TestParam(this);
+            }
+
+            public Builder setFirstRoundInitTables(List<String> firstRoundInitTables) {
+                this.firstRoundInitTables = firstRoundInitTables;
+                return this;
+            }
+
+            public Builder setSecondRoundInitTables(List<String> secondRoundInitTables) {
+                this.secondRoundInitTables = secondRoundInitTables;
+                return this;
+            }
+        }
+
+        public List<String> getFirstRoundInitTables() {
+            return firstRoundInitTables;
+        }
+
+        public List<String> getFirstRoundListenTables() {
+            return firstRoundListenTables;
+        }
+
+        public Integer getFirstRoundFetchSize() {
+            return firstRoundFetchSize;
+        }
+
+        public List<String> getSecondRoundInitTables() {
+            return secondRoundInitTables;
+        }
+
+        public List<String> getSecondRoundListenTables() {
+            return secondRoundListenTables;
+        }
+
+        public Integer getSecondRoundFetchSize() {
+            return secondRoundFetchSize;
+        }
     }
 }
