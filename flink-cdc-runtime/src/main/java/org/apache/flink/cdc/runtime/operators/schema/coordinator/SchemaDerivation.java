@@ -83,12 +83,12 @@ public class SchemaDerivation {
                 // 1-to-1 mapping. Replace the table ID directly
                 SchemaChangeEvent derivedSchemaChangeEvent =
                         ChangeEventUtils.recreateSchemaChangeEvent(schemaChangeEvent, derivedTable);
-                schemaManager.applySchemaChange(derivedSchemaChangeEvent);
+                schemaManager.applyUpstreamSchemaChange(derivedSchemaChangeEvent);
                 return Collections.singletonList(derivedSchemaChangeEvent);
             }
 
             // Many-to-1 mapping (merging tables)
-            Schema derivedTableSchema = schemaManager.getLatestSchema(derivedTable).get();
+            Schema derivedTableSchema = schemaManager.getLatestUpstreamSchema(derivedTable).get();
             if (schemaChangeEvent instanceof CreateTableEvent) {
                 return handleCreateTableEvent(
                         (CreateTableEvent) schemaChangeEvent, derivedTableSchema, derivedTable);
@@ -182,7 +182,7 @@ public class SchemaDerivation {
             AddColumnEvent derivedSchemaChangeEvent = new AddColumnEvent(derivedTable, newColumns);
             schemaChangeEvents.add(derivedSchemaChangeEvent);
         }
-        schemaChangeEvents.forEach(schemaManager::applySchemaChange);
+        schemaChangeEvents.forEach(schemaManager::applyUpstreamSchemaChange);
         return schemaChangeEvents;
     }
 
@@ -214,7 +214,7 @@ public class SchemaDerivation {
                     new AlterColumnTypeEvent(derivedTable, typeDifference);
             schemaChangeEvents.add(derivedSchemaChangeEvent);
         }
-        schemaChangeEvents.forEach(schemaManager::applySchemaChange);
+        schemaChangeEvents.forEach(schemaManager::applyUpstreamSchemaChange);
         return schemaChangeEvents;
     }
 
@@ -253,7 +253,7 @@ public class SchemaDerivation {
         if (!newTypeMapping.isEmpty()) {
             schemaChangeEvents.add(new AlterColumnTypeEvent(derivedTable, newTypeMapping));
         }
-        schemaChangeEvents.forEach(schemaManager::applySchemaChange);
+        schemaChangeEvents.forEach(schemaManager::applyUpstreamSchemaChange);
         return schemaChangeEvents;
     }
 
@@ -289,7 +289,7 @@ public class SchemaDerivation {
         if (!newTypeMapping.isEmpty()) {
             schemaChangeEvents.add(new AlterColumnTypeEvent(derivedTable, newTypeMapping));
         }
-        schemaChangeEvents.forEach(schemaManager::applySchemaChange);
+        schemaChangeEvents.forEach(schemaManager::applyUpstreamSchemaChange);
         return schemaChangeEvents;
     }
 

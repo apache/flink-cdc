@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.starrocks.sink;
 
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
@@ -30,6 +31,7 @@ import com.starrocks.connector.flink.table.sink.v2.StarRocksSink;
 
 import java.io.Serializable;
 import java.time.ZoneId;
+import java.util.Set;
 
 /** A {@link DataSink} for StarRocks connector that supports schema evolution. */
 public class StarRocksDataSink implements DataSink, Serializable {
@@ -70,12 +72,13 @@ public class StarRocksDataSink implements DataSink, Serializable {
     }
 
     @Override
-    public MetadataApplier getMetadataApplier() {
+    public MetadataApplier getMetadataApplier(Set<SchemaChangeEventType> enabledEventTypes) {
         StarRocksCatalog catalog =
                 new StarRocksCatalog(
                         sinkOptions.getJdbcUrl(),
                         sinkOptions.getUsername(),
                         sinkOptions.getPassword());
-        return new StarRocksMetadataApplier(catalog, tableCreateConfig, schemaChangeConfig);
+        return new StarRocksMetadataApplier(
+                catalog, tableCreateConfig, schemaChangeConfig, enabledEventTypes);
     }
 }

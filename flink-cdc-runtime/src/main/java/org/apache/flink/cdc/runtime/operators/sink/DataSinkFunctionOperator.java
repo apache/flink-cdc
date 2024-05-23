@@ -117,7 +117,7 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
     }
 
     private void emitLatestSchema(TableId tableId) throws Exception {
-        Optional<Schema> schema = schemaEvolutionClient.getLatestSchema(tableId);
+        Optional<Schema> schema = schemaEvolutionClient.getLatestEvolvedSchema(tableId);
         if (schema.isPresent()) {
             // request and process CreateTableEvent because SinkFunction need to retrieve
             // Schema to deserialize RecordData after resuming job.

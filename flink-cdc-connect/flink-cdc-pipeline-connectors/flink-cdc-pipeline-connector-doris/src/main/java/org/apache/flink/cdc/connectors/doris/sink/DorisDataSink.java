@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.doris.sink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
@@ -31,6 +32,7 @@ import org.apache.doris.flink.sink.batch.DorisBatchSink;
 
 import java.io.Serializable;
 import java.time.ZoneId;
+import java.util.Set;
 
 /** A {@link DataSink} for "Doris" connector. */
 public class DorisDataSink implements DataSink, Serializable {
@@ -74,7 +76,7 @@ public class DorisDataSink implements DataSink, Serializable {
     }
 
     @Override
-    public MetadataApplier getMetadataApplier() {
-        return new DorisMetadataApplier(dorisOptions, configuration);
+    public MetadataApplier getMetadataApplier(Set<SchemaChangeEventType> enabledEventTypes) {
+        return new DorisMetadataApplier(dorisOptions, configuration, enabledEventTypes);
     }
 }

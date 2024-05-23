@@ -19,13 +19,16 @@ package org.apache.flink.cdc.runtime.operators.schema;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
@@ -34,9 +37,12 @@ import org.apache.flink.cdc.common.types.DataTypeFamily;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
+import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.ApplyUpstreamSchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeProcessingResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResponse;
@@ -93,20 +99,37 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private transient List<Tuple2<Selectors, TableId>> routes;
     private transient TaskOperatorEventGateway toCoordinator;
     private transient SchemaEvolutionClient schemaEvolutionClient;
-    private transient LoadingCache<TableId, Schema> cachedSchemas;
+    private transient LoadingCache<TableId, Schema> upstreamSchema;
+    private transient LoadingCache<TableId, Schema> evolvedSchema;
+    private transient LoadingCache<TableId, Boolean> schemaDivergesMap;
 
     private final long rpcTimeOutInMillis;
+    private final SchemaChangeBehavior schemaChangeBehavior;
 
+    @VisibleForTesting
     public SchemaOperator(List<Tuple2<String, TableId>> routingRules) {
         this.routingRules = routingRules;
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT.toMillis();
+        this.schemaChangeBehavior = SchemaChangeBehavior.EVOLVE;
     }
 
+    @VisibleForTesting
     public SchemaOperator(List<Tuple2<String, TableId>> routingRules, Duration rpcTimeOut) {
         this.routingRules = routingRules;
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = rpcTimeOut.toMillis();
+        this.schemaChangeBehavior = SchemaChangeBehavior.EVOLVE;
+    }
+
+    public SchemaOperator(
+            List<Tuple2<String, TableId>> routingRules,
+            Duration rpcTimeOut,
+            SchemaChangeBehavior schemaChangeBehavior) {
+        this.routingRules = routingRules;
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
+        this.rpcTimeOutInMillis = rpcTimeOut.toMillis();
+        this.schemaChangeBehavior = schemaChangeBehavior;
     }
 
     @Override
@@ -130,14 +153,34 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                 })
                         .collect(Collectors.toList());
         schemaEvolutionClient = new SchemaEvolutionClient(toCoordinator, getOperatorID());
-        cachedSchemas =
+        evolvedSchema =
                 CacheBuilder.newBuilder()
                         .expireAfterAccess(CACHE_EXPIRE_DURATION)
                         .build(
                                 new CacheLoader<TableId, Schema>() {
                                     @Override
                                     public Schema load(TableId tableId) {
-                                        return getLatestSchema(tableId);
+                                        return getLatestEvolvedSchema(tableId);
+                                    }
+                                });
+        upstreamSchema =
+                CacheBuilder.newBuilder()
+                        .expireAfterAccess(CACHE_EXPIRE_DURATION)
+                        .build(
+                                new CacheLoader<TableId, Schema>() {
+                                    @Override
+                                    public Schema load(TableId tableId) throws Exception {
+                                        return getLatestUpstreamSchema(tableId);
+                                    }
+                                });
+        schemaDivergesMap =
+                CacheBuilder.newBuilder()
+                        .expireAfterAccess(CACHE_EXPIRE_DURATION)
+                        .build(
+                                new CacheLoader<TableId, Boolean>() {
+                                    @Override
+                                    public Boolean load(TableId tableId) throws Exception {
+                                        return checkSchemaDiverges(tableId);
                                     }
                                 });
     }
@@ -160,75 +203,105 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     public void processElement(StreamRecord<Event> streamRecord)
             throws InterruptedException, TimeoutException {
         Event event = streamRecord.getValue();
-        // Schema changes
         if (event instanceof SchemaChangeEvent) {
-            TableId tableId = ((SchemaChangeEvent) event).tableId();
-            LOG.info(
-                    "Table {} received SchemaChangeEvent and start to be blocked.",
-                    tableId.toString());
-            handleSchemaChangeEvent(tableId, (SchemaChangeEvent) event);
-            // Update caches
-            cachedSchemas.put(tableId, getLatestSchema(tableId));
-            getRoutedTable(tableId)
-                    .ifPresent(routed -> cachedSchemas.put(routed, getLatestSchema(routed)));
-            return;
+            processSchemaChangeEvents((SchemaChangeEvent) event);
+        } else if (event instanceof DataChangeEvent) {
+            processDataChangeEvents(streamRecord, (DataChangeEvent) event);
+        } else {
+            throw new RuntimeException("Unknown event type in Stream record: " + event);
         }
+    }
 
-        // Data changes
-        DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
-        TableId tableId = dataChangeEvent.tableId();
+    private void processSchemaChangeEvents(SchemaChangeEvent event)
+            throws InterruptedException, TimeoutException {
+        TableId tableId = event.tableId();
+        LOG.info("Table {} received SchemaChangeEvent and start to be blocked.", tableId);
+        handleSchemaChangeEvent(tableId, event);
+        // Update caches
+        upstreamSchema.put(tableId, getLatestUpstreamSchema(tableId));
+        schemaDivergesMap.put(tableId, checkSchemaDiverges(tableId));
+
+        Optional<TableId> optionalRoutedTable = getRoutedTable(tableId);
+        if (optionalRoutedTable.isPresent()) {
+            TableId routedTableId = optionalRoutedTable.get();
+            evolvedSchema.put(routedTableId, getLatestEvolvedSchema(routedTableId));
+        } else {
+            evolvedSchema.put(tableId, getLatestEvolvedSchema(tableId));
+        }
+    }
+
+    private void processDataChangeEvents(StreamRecord<Event> streamRecord, DataChangeEvent event) {
+        TableId tableId = event.tableId();
         Optional<TableId> optionalRoutedTable = getRoutedTable(tableId);
         if (optionalRoutedTable.isPresent()) {
             output.collect(
                     new StreamRecord<>(
-                            maybeFillInNullForEmptyColumns(
-                                    dataChangeEvent, optionalRoutedTable.get())));
+                            normalizeSchemaChangeEvents(event, optionalRoutedTable.get(), false)));
+        } else if (Boolean.FALSE.equals(schemaDivergesMap.getIfPresent(tableId))) {
+            output.collect(new StreamRecord<>(normalizeSchemaChangeEvents(event, true)));
         } else {
             output.collect(streamRecord);
         }
     }
 
-    // ----------------------------------------------------------------------------------
+    private DataChangeEvent normalizeSchemaChangeEvents(
+            DataChangeEvent event, boolean tolerantMode) {
+        return normalizeSchemaChangeEvents(event, event.tableId(), tolerantMode);
+    }
 
-    private DataChangeEvent maybeFillInNullForEmptyColumns(
-            DataChangeEvent originalEvent, TableId routedTableId) {
+    private DataChangeEvent normalizeSchemaChangeEvents(
+            DataChangeEvent event, TableId renamedTableId, boolean tolerantMode) {
         try {
-            Schema originalSchema = cachedSchemas.get(originalEvent.tableId());
-            Schema routedTableSchema = cachedSchemas.get(routedTableId);
-            if (originalSchema.equals(routedTableSchema)) {
-                return ChangeEventUtils.recreateDataChangeEvent(originalEvent, routedTableId);
+            Schema originalSchema = upstreamSchema.get(event.tableId());
+            Schema evolvedTableSchema = evolvedSchema.get(renamedTableId);
+            if (originalSchema.equals(evolvedTableSchema)) {
+                return ChangeEventUtils.recreateDataChangeEvent(event, renamedTableId);
             }
-            switch (originalEvent.op()) {
+            switch (event.op()) {
                 case INSERT:
                     return DataChangeEvent.insertEvent(
-                            routedTableId,
+                            renamedTableId,
                             regenerateRecordData(
-                                    originalEvent.after(), originalSchema, routedTableSchema),
-                            originalEvent.meta());
+                                    event.after(),
+                                    originalSchema,
+                                    evolvedTableSchema,
+                                    tolerantMode),
+                            event.meta());
                 case UPDATE:
                     return DataChangeEvent.updateEvent(
-                            routedTableId,
+                            renamedTableId,
                             regenerateRecordData(
-                                    originalEvent.before(), originalSchema, routedTableSchema),
+                                    event.before(),
+                                    originalSchema,
+                                    evolvedTableSchema,
+                                    tolerantMode),
                             regenerateRecordData(
-                                    originalEvent.after(), originalSchema, routedTableSchema),
-                            originalEvent.meta());
+                                    event.after(),
+                                    originalSchema,
+                                    evolvedTableSchema,
+                                    tolerantMode),
+                            event.meta());
                 case DELETE:
                     return DataChangeEvent.deleteEvent(
-                            routedTableId,
+                            renamedTableId,
                             regenerateRecordData(
-                                    originalEvent.before(), originalSchema, routedTableSchema),
-                            originalEvent.meta());
+                                    event.before(),
+                                    originalSchema,
+                                    evolvedTableSchema,
+                                    tolerantMode),
+                            event.meta());
                 case REPLACE:
                     return DataChangeEvent.replaceEvent(
-                            routedTableId,
+                            renamedTableId,
                             regenerateRecordData(
-                                    originalEvent.after(), originalSchema, routedTableSchema),
-                            originalEvent.meta());
+                                    event.after(),
+                                    originalSchema,
+                                    evolvedTableSchema,
+                                    tolerantMode),
+                            event.meta());
                 default:
                     throw new IllegalArgumentException(
-                            String.format(
-                                    "Unrecognized operation type \"%s\"", originalEvent.op()));
+                            String.format("Unrecognized operation type \"%s\"", event.op()));
             }
         } catch (Exception e) {
             throw new IllegalStateException("Unable to fill null for empty columns", e);
@@ -236,7 +309,10 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     }
 
     private RecordData regenerateRecordData(
-            RecordData recordData, Schema originalSchema, Schema routedTableSchema) {
+            RecordData recordData,
+            Schema originalSchema,
+            Schema routedTableSchema,
+            boolean tolerantMode) {
         // Regenerate record data
         List<RecordData.FieldGetter> fieldGetters = new ArrayList<>();
         for (Column column : routedTableSchema.getColumns()) {
@@ -252,7 +328,9 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 if (originalSchema.getColumn(columnName).get().getType().equals(column.getType())) {
                     fieldGetters.add(fieldGetter);
                 } else {
-                    fieldGetters.add(new TypeCoercionFieldGetter(column.getType(), fieldGetter));
+                    fieldGetters.add(
+                            new TypeCoercionFieldGetter(
+                                    column.getType(), fieldGetter, tolerantMode));
                 }
             }
         }
@@ -276,17 +354,73 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     private void handleSchemaChangeEvent(TableId tableId, SchemaChangeEvent schemaChangeEvent)
             throws InterruptedException, TimeoutException {
+
+        if (schemaChangeBehavior == SchemaChangeBehavior.EXCEPTION
+                && schemaChangeEvent.getType() != SchemaChangeEventType.CREATE_TABLE) {
+            // CreateTableEvent should be applied even in EXCEPTION mode
+            throw new RuntimeException(
+                    String.format(
+                            "Refused to apply schema change event %s in EXCEPTION mode.",
+                            schemaChangeEvent));
+        }
+
         // The request will need to send a FlushEvent or block until flushing finished
         SchemaChangeResponse response = requestSchemaChange(tableId, schemaChangeEvent);
+
         if (!response.getSchemaChangeEvents().isEmpty()) {
             LOG.info(
                     "Sending the FlushEvent for table {} in subtask {}.",
                     tableId,
                     getRuntimeContext().getIndexOfThisSubtask());
+
             output.collect(new StreamRecord<>(new FlushEvent(tableId)));
-            response.getSchemaChangeEvents().forEach(e -> output.collect(new StreamRecord<>(e)));
+            List<SchemaChangeEvent> expectedSchemaChangeEvents = response.getSchemaChangeEvents();
             // The request will block until flushing finished in each sink writer
-            requestReleaseUpstream();
+            ReleaseUpstreamResponse schemaEvolveResponse = requestReleaseUpstream();
+            List<SchemaChangeEvent> finishedSchemaChangeEvents =
+                    schemaEvolveResponse.getFinishedSchemaChangeEvents();
+            List<Tuple2<SchemaChangeEvent, Throwable>> failedSchemaChangeEvents =
+                    schemaEvolveResponse.getFailedSchemaChangeEvents();
+            List<SchemaChangeEvent> ignoredSchemaChangeEvents =
+                    schemaEvolveResponse.getIgnoredSchemaChangeEvents();
+
+            if (schemaChangeBehavior == SchemaChangeBehavior.EVOLVE
+                    || schemaChangeBehavior == SchemaChangeBehavior.EXCEPTION) {
+                if (schemaEvolveResponse.hasException()) {
+                    throw new RuntimeException(
+                            String.format(
+                                    "Failed to apply schema change event %s.\nExceptions: %s",
+                                    schemaChangeEvent,
+                                    schemaEvolveResponse.getPrintableFailedSchemaChangeEvents()));
+                }
+            } else if (schemaChangeBehavior == SchemaChangeBehavior.TRY_EVOLVE
+                    || schemaChangeBehavior == SchemaChangeBehavior.IGNORE) {
+                if (schemaEvolveResponse.hasException()) {
+                    schemaEvolveResponse
+                            .getFailedSchemaChangeEvents()
+                            .forEach(
+                                    e ->
+                                            LOG.warn(
+                                                    "Failed to apply event {}, but keeps running in TRY_EVOLVE mode. Caused by: {}",
+                                                    e.f0,
+                                                    e.f1));
+                }
+            } else {
+                throw new IllegalStateException(
+                        "Unexpected schema change behavior: " + schemaChangeBehavior);
+            }
+
+            // Update evolved schema changes based on apply results
+            requestApplyEvolvedSchemaChanges(tableId, finishedSchemaChangeEvents);
+            finishedSchemaChangeEvents.forEach(e -> output.collect(new StreamRecord<>(e)));
+
+            LOG.info(
+                    "Applied schema change event {} to downstream. Among {} total evolved events, {} succeeded, {} failed, and {} ignored.",
+                    schemaChangeEvent,
+                    expectedSchemaChangeEvents.size(),
+                    finishedSchemaChangeEvents.size(),
+                    failedSchemaChangeEvents.size(),
+                    ignoredSchemaChangeEvents.size());
         }
     }
 
@@ -295,7 +429,18 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         return sendRequestToCoordinator(new SchemaChangeRequest(tableId, schemaChangeEvent));
     }
 
-    private void requestReleaseUpstream() throws InterruptedException, TimeoutException {
+    private void requestApplyUpstreamSchemaChanges(
+            TableId tableId, SchemaChangeEvent schemaChangeEvent) {
+        sendRequestToCoordinator(new ApplyUpstreamSchemaChangeRequest(tableId, schemaChangeEvent));
+    }
+
+    private void requestApplyEvolvedSchemaChanges(
+            TableId tableId, List<SchemaChangeEvent> schemaChangeEvents) {
+        sendRequestToCoordinator(new ApplyEvolvedSchemaChangeRequest(tableId, schemaChangeEvents));
+    }
+
+    private ReleaseUpstreamResponse requestReleaseUpstream()
+            throws InterruptedException, TimeoutException {
         CoordinationResponse coordinationResponse =
                 sendRequestToCoordinator(new ReleaseUpstreamRequest());
         long nextRpcTimeOutMillis = System.currentTimeMillis() + rpcTimeOutInMillis;
@@ -307,6 +452,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 throw new TimeoutException("TimeOut when requesting release upstream");
             }
         }
+        return ((ReleaseUpstreamResponse) coordinationResponse);
     }
 
     private <REQUEST extends CoordinationRequest, RESPONSE extends CoordinationResponse>
@@ -322,9 +468,9 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         }
     }
 
-    private Schema getLatestSchema(TableId tableId) {
+    private Schema getLatestEvolvedSchema(TableId tableId) {
         try {
-            Optional<Schema> optionalSchema = schemaEvolutionClient.getLatestSchema(tableId);
+            Optional<Schema> optionalSchema = schemaEvolutionClient.getLatestEvolvedSchema(tableId);
             if (!optionalSchema.isPresent()) {
                 throw new IllegalStateException(
                         String.format("Schema doesn't exist for table \"%s\"", tableId));
@@ -333,6 +479,30 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         } catch (Exception e) {
             throw new IllegalStateException(
                     String.format("Unable to get latest schema for table \"%s\"", tableId));
+        }
+    }
+
+    private Schema getLatestUpstreamSchema(TableId tableId) {
+        try {
+            Optional<Schema> optionalSchema =
+                    schemaEvolutionClient.getLatestUpstreamSchema(tableId);
+            if (!optionalSchema.isPresent()) {
+                throw new IllegalStateException(
+                        String.format("Schema doesn't exist for table \"%s\"", tableId));
+            }
+            return optionalSchema.get();
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    String.format("Unable to get latest schema for table \"%s\"", tableId));
+        }
+    }
+
+    private Boolean checkSchemaDiverges(TableId tableId) {
+        try {
+            return getLatestEvolvedSchema(tableId).equals(getLatestUpstreamSchema(tableId));
+        } catch (IllegalStateException e) {
+            // schema fetch failed, regard it as diverged
+            return true;
         }
     }
 
@@ -347,11 +517,22 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private static class TypeCoercionFieldGetter implements RecordData.FieldGetter {
         private final DataType destinationType;
         private final RecordData.FieldGetter originalFieldGetter;
+        private final boolean tolerantMode;
 
         public TypeCoercionFieldGetter(
-                DataType destinationType, RecordData.FieldGetter originalFieldGetter) {
+                DataType destinationType,
+                RecordData.FieldGetter originalFieldGetter,
+                boolean tolerantMode) {
             this.destinationType = destinationType;
             this.originalFieldGetter = originalFieldGetter;
+            this.tolerantMode = tolerantMode;
+        }
+
+        private Object fail(IllegalArgumentException e) throws IllegalArgumentException {
+            if (tolerantMode) {
+                return null;
+            }
+            throw e;
         }
 
         @Nullable
@@ -372,38 +553,42 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                     // INT
                     return ((Integer) originalField).longValue();
                 } else {
-                    throw new IllegalArgumentException(
-                            String.format(
-                                    "Cannot fit type \"%s\" into a BIGINT column. "
-                                            + "Currently only TINYINT / SMALLINT / INT can be accepted by a BIGINT column",
-                                    originalField.getClass()));
+                    return fail(
+                            new IllegalArgumentException(
+                                    String.format(
+                                            "Cannot fit type \"%s\" into a BIGINT column. "
+                                                    + "Currently only TINYINT / SMALLINT / INT can be accepted by a BIGINT column",
+                                            originalField.getClass())));
                 }
             } else if (destinationType.is(DataTypeFamily.APPROXIMATE_NUMERIC)) {
                 if (originalField instanceof Float) {
                     // FLOAT
                     return ((Float) originalField).doubleValue();
                 } else {
-                    throw new IllegalArgumentException(
-                            String.format(
-                                    "Cannot fit type \"%s\" into a DOUBLE column. "
-                                            + "Currently only FLOAT can be accepted by a DOUBLE column",
-                                    originalField.getClass()));
+                    return fail(
+                            new IllegalArgumentException(
+                                    String.format(
+                                            "Cannot fit type \"%s\" into a DOUBLE column. "
+                                                    + "Currently only FLOAT can be accepted by a DOUBLE column",
+                                            originalField.getClass())));
                 }
             } else if (destinationType.is(DataTypeRoot.VARCHAR)) {
                 if (originalField instanceof StringData) {
                     return originalField;
                 } else {
-                    throw new IllegalArgumentException(
-                            String.format(
-                                    "Cannot fit type \"%s\" into a STRING column. "
-                                            + "Currently only CHAR / VARCHAR can be accepted by a STRING column",
-                                    originalField.getClass()));
+                    return fail(
+                            new IllegalArgumentException(
+                                    String.format(
+                                            "Cannot fit type \"%s\" into a STRING column. "
+                                                    + "Currently only CHAR / VARCHAR can be accepted by a STRING column",
+                                            originalField.getClass())));
                 }
             } else {
-                throw new IllegalArgumentException(
-                        String.format(
-                                "Column type \"%s\" doesn't support type coercion",
-                                destinationType));
+                return fail(
+                        new IllegalArgumentException(
+                                String.format(
+                                        "Column type \"%s\" doesn't support type coercion",
+                                        destinationType)));
             }
         }
     }

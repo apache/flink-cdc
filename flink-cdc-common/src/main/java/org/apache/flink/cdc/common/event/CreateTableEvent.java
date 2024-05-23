@@ -72,4 +72,9 @@ public class CreateTableEvent implements SchemaChangeEvent {
     public TableId tableId() {
         return tableId;
     }
+
+    @Override
+    public SchemaChangeEventType getType() {
+        return SchemaChangeEventType.CREATE_TABLE;
+    }
 }

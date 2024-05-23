@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.composer.utils.factory;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
@@ -37,7 +38,8 @@ public class DataSinkFactory2 implements DataSinkFactory {
             }
 
             @Override
-            public MetadataApplier getMetadataApplier() {
+            public MetadataApplier getMetadataApplier(
+                    Set<SchemaChangeEventType> enabledEventTypes) {
                 return null;
             }
         };

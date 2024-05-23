@@ -23,9 +23,12 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+
+import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import com.starrocks.connector.flink.catalog.StarRocksCatalog;
 import com.starrocks.connector.flink.catalog.StarRocksCatalogException;
@@ -36,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /** A {@code MetadataApplier} that applies metadata changes to StarRocks. */
 public class StarRocksMetadataApplier implements MetadataApplier {
@@ -48,6 +52,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
     private final TableCreateConfig tableCreateConfig;
     private final SchemaChangeConfig schemaChangeConfig;
     private boolean isOpened;
+    private final Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
     public StarRocksMetadataApplier(
             StarRocksCatalog catalog,
@@ -57,10 +62,40 @@ public class StarRocksMetadataApplier implements MetadataApplier {
         this.tableCreateConfig = tableCreateConfig;
         this.schemaChangeConfig = schemaChangeConfig;
         this.isOpened = false;
+        this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
+    }
+
+    public StarRocksMetadataApplier(
+            StarRocksCatalog catalog,
+            TableCreateConfig tableCreateConfig,
+            SchemaChangeConfig schemaChangeConfig,
+            Set<SchemaChangeEventType> enabledSchemaEvolutionTypes) {
+        this.catalog = catalog;
+        this.tableCreateConfig = tableCreateConfig;
+        this.schemaChangeConfig = schemaChangeConfig;
+        this.isOpened = false;
+        this.enabledSchemaEvolutionTypes = enabledSchemaEvolutionTypes;
+    }
+
+    @Override
+    public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+        return enabledSchemaEvolutionTypes.contains(schemaChangeEventType);
+    }
+
+    @Override
+    public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+        return Sets.newHashSet(
+                SchemaChangeEventType.CREATE_TABLE,
+                SchemaChangeEventType.ADD_COLUMN,
+                SchemaChangeEventType.DROP_COLUMN);
     }
 
     @Override
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+        if (!enabledSchemaEvolutionTypes.contains(schemaChangeEvent.getType())) {
+            LOG.info("Sink ignores schema change event {}", schemaChangeEvent);
+            return;
+        }
         if (!isOpened) {
             isOpened = true;
             catalog.open();

@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -35,12 +36,15 @@ import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSource;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -69,9 +73,84 @@ public class ValuesDatabase {
      */
     public static class ValuesMetadataApplier implements MetadataApplier {
 
+        private final Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
+
+        public ValuesMetadataApplier() {
+            this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
+        }
+
+        public ValuesMetadataApplier(Set<SchemaChangeEventType> types) {
+            this.enabledSchemaEvolutionTypes = types;
+        }
+
+        @Override
+        public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+            return enabledSchemaEvolutionTypes.contains(schemaChangeEventType);
+        }
+
+        @Override
+        public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+            return Sets.newHashSet(
+                    SchemaChangeEventType.ADD_COLUMN,
+                    SchemaChangeEventType.ALTER_COLUMN_TYPE,
+                    SchemaChangeEventType.CREATE_TABLE,
+                    SchemaChangeEventType.DROP_COLUMN,
+                    SchemaChangeEventType.RENAME_COLUMN);
+        }
+
         @Override
         public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
-            applySchemaChangeEvent(schemaChangeEvent);
+            if (enabledSchemaEvolutionTypes.contains(schemaChangeEvent.getType())) {
+                applySchemaChangeEvent(schemaChangeEvent);
+            } else {
+                LOG.info("Sink ignores schema change event {}", schemaChangeEvent);
+            }
+        }
+    }
+
+    /**
+     * apply SchemaChangeEvent to ValuesDatabase and print it out, throw exception if illegal
+     * changes occur.
+     */
+    public static class ErrorOnChangeMetadataApplier implements MetadataApplier {
+        private final Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
+
+        public ErrorOnChangeMetadataApplier() {
+            enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
+        }
+
+        public ErrorOnChangeMetadataApplier(Set<SchemaChangeEventType> types) {
+            enabledSchemaEvolutionTypes = types;
+        }
+
+        @Override
+        public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+            return enabledSchemaEvolutionTypes.contains(schemaChangeEventType);
+        }
+
+        @Override
+        public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+            return Collections.singleton(SchemaChangeEventType.CREATE_TABLE);
+        }
+
+        @Override
+        public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+            if (schemaChangeEvent instanceof CreateTableEvent) {
+                TableId tableId = schemaChangeEvent.tableId();
+                if (!globalTables.containsKey(tableId)) {
+                    globalTables.put(
+                            tableId,
+                            new ValuesTable(
+                                    tableId, ((CreateTableEvent) schemaChangeEvent).getSchema()));
+                }
+            } else if (enabledSchemaEvolutionTypes.contains(schemaChangeEvent.getType())) {
+                throw new RuntimeException(
+                        String.format(
+                                "Rejected schema change event %s since error.on.schema.change is enabled.",
+                                schemaChangeEvent));
+            } else {
+                LOG.info("Sink ignores schema change event {}", schemaChangeEvent);
+            }
         }
     }
 

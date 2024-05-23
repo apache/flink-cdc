@@ -15,15 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.pipeline;
+package org.apache.flink.cdc.runtime.operators.schema.event;
 
-import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
+import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
+import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
-/** Behavior for handling schema changes. */
-@PublicEvolving
-public enum SchemaChangeBehavior {
-    IGNORE,
-    TRY_EVOLVE,
-    EVOLVE,
-    EXCEPTION
+/**
+ * The response from {@link SchemaOperator} to {@link SchemaRegistry} to request apply evolved
+ * schema changes.
+ */
+public class ApplyEvolvedSchemaChangeResponse implements CoordinationResponse {
+
+    private static final long serialVersionUID = 1L;
 }

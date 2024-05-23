@@ -15,27 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.event;
+package org.apache.flink.cdc.runtime.operators.schema;
 
-import org.apache.flink.cdc.common.annotation.Internal;
-import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
-import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 
-import javax.annotation.Nullable;
-
-import java.util.Optional;
-
-/** Coordination response from {@link SchemaRegistry} for {@link GetSchemaRequest}. */
-@Internal
-public class GetSchemaResponse implements CoordinationResponse {
-    @Nullable private final Schema schema;
-
-    public GetSchemaResponse(@Nullable Schema schema) {
-        this.schema = schema;
-    }
-
-    public Optional<Schema> getSchema() {
-        return Optional.ofNullable(schema);
-    }
-}
+/** Unit tests for different kind of {@link SchemaChangeBehavior}. */
+public class SchemaEvolveBehaviorTest {}

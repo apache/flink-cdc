@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.paimon.sink;
 
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
@@ -31,6 +32,7 @@ import org.apache.paimon.options.Options;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** A {@link DataSink} for Paimon connector that supports schema evolution. */
 public class PaimonDataSink implements DataSink, Serializable {
@@ -66,7 +68,7 @@ public class PaimonDataSink implements DataSink, Serializable {
     }
 
     @Override
-    public MetadataApplier getMetadataApplier() {
-        return new PaimonMetadataApplier(options, tableOptions, partitionMaps);
+    public MetadataApplier getMetadataApplier(Set<SchemaChangeEventType> enabledEventTypes) {
+        return new PaimonMetadataApplier(options, tableOptions, partitionMaps, enabledEventTypes);
     }
 }

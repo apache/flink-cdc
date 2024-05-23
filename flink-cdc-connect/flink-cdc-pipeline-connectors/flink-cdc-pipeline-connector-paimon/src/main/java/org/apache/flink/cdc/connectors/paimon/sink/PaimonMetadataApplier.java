@@ -23,10 +23,13 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
+
+import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
@@ -34,12 +37,15 @@ import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.LogicalTypeConversion;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.SchemaChange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.apache.paimon.table.Table;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
@@ -49,6 +55,8 @@ import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
  * only.
  */
 public class PaimonMetadataApplier implements MetadataApplier {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PaimonMetadataApplier.class);
 
     // Catalog is unSerializable.
     private transient Catalog catalog;
@@ -60,10 +68,13 @@ public class PaimonMetadataApplier implements MetadataApplier {
 
     private final Map<TableId, List<String>> partitionMaps;
 
+    private final Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
+
     public PaimonMetadataApplier(Options catalogOptions) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = new HashMap<>();
         this.partitionMaps = new HashMap<>();
+        this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }
 
     public PaimonMetadataApplier(
@@ -73,6 +84,33 @@ public class PaimonMetadataApplier implements MetadataApplier {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.partitionMaps = partitionMaps;
+        this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
+    }
+
+    public PaimonMetadataApplier(
+            Options catalogOptions,
+            Map<String, String> tableOptions,
+            Map<TableId, List<String>> partitionMaps,
+            Set<SchemaChangeEventType> enabledSchemaEvolutionTypes) {
+        this.catalogOptions = catalogOptions;
+        this.tableOptions = tableOptions;
+        this.partitionMaps = partitionMaps;
+        this.enabledSchemaEvolutionTypes = enabledSchemaEvolutionTypes;
+    }
+
+    @Override
+    public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+        return enabledSchemaEvolutionTypes.contains(schemaChangeEventType);
+    }
+
+    @Override
+    public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+        return Sets.newHashSet(
+                SchemaChangeEventType.CREATE_TABLE,
+                SchemaChangeEventType.ADD_COLUMN,
+                SchemaChangeEventType.DROP_COLUMN,
+                SchemaChangeEventType.RENAME_COLUMN,
+                SchemaChangeEventType.ALTER_COLUMN_TYPE);
     }
 
     @Override

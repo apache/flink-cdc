@@ -267,6 +267,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         return String.join(
                 "\n",
                 Arrays.asList(
+                        "restart-strategy.type: off",
                         "jobmanager.rpc.address: jobmanager",
                         "taskmanager.numberOfTaskSlots: 10",
                         "parallelism.default: 4",

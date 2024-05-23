@@ -310,9 +310,6 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                         "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Big Sur, 3011, 11], after=[], op=DELETE, meta=()}",
                         transformRenameDatabase.getDatabaseName()),
                 6000L);
-
-        String stdout = taskManagerConsumer.toUtf8String();
-        System.out.println(stdout);
     }
 
     private void validateResult(List<String> expectedEvents) throws Exception {

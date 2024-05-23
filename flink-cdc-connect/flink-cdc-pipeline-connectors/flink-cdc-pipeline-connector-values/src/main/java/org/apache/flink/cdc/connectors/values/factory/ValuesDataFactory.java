@@ -54,7 +54,9 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
         return new ValuesDataSink(
                 context.getFactoryConfiguration().get(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY),
                 context.getFactoryConfiguration().get(ValuesDataSinkOptions.PRINT_ENABLED),
-                context.getFactoryConfiguration().get(ValuesDataSinkOptions.SINK_API));
+                context.getFactoryConfiguration().get(ValuesDataSinkOptions.SINK_API),
+                context.getFactoryConfiguration()
+                        .get(ValuesDataSinkOptions.ERROR_ON_SCHEMA_CHANGE));
     }
 
     @Override

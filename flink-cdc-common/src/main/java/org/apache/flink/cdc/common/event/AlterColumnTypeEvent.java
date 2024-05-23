@@ -77,4 +77,9 @@ public class AlterColumnTypeEvent implements SchemaChangeEvent {
     public TableId tableId() {
         return tableId;
     }
+
+    @Override
+    public SchemaChangeEventType getType() {
+        return SchemaChangeEventType.ALTER_COLUMN_TYPE;
+    }
 }

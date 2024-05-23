@@ -18,6 +18,9 @@
 package org.apache.flink.cdc.common.sink;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+
+import java.util.Set;
 
 /**
  * {@code DataSink} is used to write change data to external system and apply metadata changes to
@@ -30,5 +33,5 @@ public interface DataSink {
     EventSinkProvider getEventSinkProvider();
 
     /** Get the {@link MetadataApplier} for applying metadata changes to external systems. */
-    MetadataApplier getMetadataApplier();
+    MetadataApplier getMetadataApplier(Set<SchemaChangeEventType> enabledEventTypes);
 }

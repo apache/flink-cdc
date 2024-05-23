@@ -333,7 +333,7 @@ class SchemaDerivationTest {
                         new AddColumnEvent.ColumnWithPosition(
                                 new PhysicalColumn("first_name", DataTypes.STRING(), null)));
 
-        assertThat(schemaManager.getLatestSchema(MERGED_TABLE))
+        assertThat(schemaManager.getLatestUpstreamSchema(MERGED_TABLE))
                 .contains(
                         Schema.newBuilder()
                                 .column(Column.physicalColumn("id", DataTypes.BIGINT()))

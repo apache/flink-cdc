@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
@@ -40,6 +41,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** A {@link DataSink} for "values" connector that supports schema evolution. */
 @Internal
@@ -52,10 +54,17 @@ public class ValuesDataSink implements DataSink, Serializable {
 
     private final SinkApi sinkApi;
 
-    public ValuesDataSink(boolean materializedInMemory, boolean print, SinkApi sinkApi) {
+    private final boolean errorOnSchemaChange;
+
+    public ValuesDataSink(
+            boolean materializedInMemory,
+            boolean print,
+            SinkApi sinkApi,
+            boolean errorOnSchemaChange) {
         this.materializedInMemory = materializedInMemory;
         this.print = print;
         this.sinkApi = sinkApi;
+        this.errorOnSchemaChange = errorOnSchemaChange;
     }
 
     @Override
@@ -69,8 +78,12 @@ public class ValuesDataSink implements DataSink, Serializable {
     }
 
     @Override
-    public MetadataApplier getMetadataApplier() {
-        return new ValuesDatabase.ValuesMetadataApplier();
+    public MetadataApplier getMetadataApplier(Set<SchemaChangeEventType> enabledEventTypes) {
+        if (errorOnSchemaChange) {
+            return new ValuesDatabase.ErrorOnChangeMetadataApplier(enabledEventTypes);
+        } else {
+            return new ValuesDatabase.ValuesMetadataApplier(enabledEventTypes);
+        }
     }
 
     /** an e2e {@link Sink} implementation that print all {@link DataChangeEvent} out. */
