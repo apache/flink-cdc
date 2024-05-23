@@ -592,6 +592,16 @@ public class TransformDataOperatorTest {
                 "case 1 when 1 then 'a' when 2 then 'b' else 'c' end = 'a'");
         testExpressionConditionTransform("case col1 when '1' then true else false end");
         testExpressionConditionTransform("case when col1 = '1' then true else false end");
+        testExpressionConditionTransform("cast(col1 as int) = 1");
+        testExpressionConditionTransform("cast('true' as boolean)");
+        testExpressionConditionTransform("cast(col1 as tinyint) = cast(1 as tinyint)");
+        testExpressionConditionTransform("cast(col1 as smallint) = cast(1 as smallint)");
+        testExpressionConditionTransform("cast(col1 as bigint) = cast(1 as bigint)");
+        testExpressionConditionTransform("cast(col1 as float) = cast(1 as float)");
+        testExpressionConditionTransform("cast(col1 as double) = cast(1 as double)");
+        testExpressionConditionTransform("cast('1' as char) = '1'");
+        testExpressionConditionTransform("cast(col1 as varchar) = '1'");
+        testExpressionConditionTransform("cast(col1 as DECIMAL(4,2)) = cast(1.0 as DECIMAL(4,2))");
     }
 
     private void testExpressionConditionTransform(String expression) throws Exception {

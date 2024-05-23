@@ -264,6 +264,23 @@ public class TransformParserTest {
         testFilterExpression(
                 "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
                 "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+        testFilterExpression(
+                "case id when 1 then 'a' when 2 then 'b' else 'c' end",
+                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+        testFilterExpression(
+                "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
+                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+        testFilterExpression("cast(id||'0' as int)", "convertInteger(concat(id, \"0\"))");
+        testFilterExpression("cast(1 as string)", "convertString(1)");
+        testFilterExpression("cast(1 as boolean)", "convertBoolean(1)");
+        testFilterExpression("cast(1 as tinyint)", "convertByte(1)");
+        testFilterExpression("cast(1 as smallint)", "convertShort(1)");
+        testFilterExpression("cast(1 as bigint)", "convertLong(1)");
+        testFilterExpression("cast(1 as float)", "convertFloat(1)");
+        testFilterExpression("cast(1 as double)", "convertDouble(1)");
+        testFilterExpression("cast(1 as decimal)", "convertBigDecimal(1)");
+        testFilterExpression("cast(1 as char)", "convertString(1)");
+        testFilterExpression("cast(1 as varchar)", "convertString(1)");
     }
 
     private void testFilterExpression(String expression, String expressionExpect) {

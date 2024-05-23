@@ -510,4 +510,40 @@ public class SystemFunctionUtils {
         }
         return null;
     }
+
+    public static String convertString(Object object) {
+        return object.toString();
+    }
+
+    public static Byte convertByte(Object object) {
+        return Byte.valueOf(convertString(object));
+    }
+
+    public static Boolean convertBoolean(Object object) {
+        return Boolean.valueOf(convertString(object));
+    }
+
+    public static Short convertShort(Object object) {
+        return Short.valueOf(convertString(object));
+    }
+
+    public static Integer convertInteger(Object object) {
+        return Integer.valueOf(convertString(object));
+    }
+
+    public static Long convertLong(Object object) {
+        return Long.valueOf(convertString(object));
+    }
+
+    public static Float convertFloat(Object object) {
+        return Float.valueOf(convertString(object));
+    }
+
+    public static Double convertDouble(Object object) {
+        return Double.valueOf(convertString(object));
+    }
+
+    public static BigDecimal convertBigDecimal(Object object) {
+        return BigDecimal.valueOf(convertDouble(object));
+    }
 }

@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.utils.StringUtils;
 
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCharStringLiteral;
+import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
@@ -228,6 +229,8 @@ public class JaninoCompiler {
             case LESS_THAN_OR_EQUAL:
             case GREATER_THAN_OR_EQUAL:
                 return generateBinaryOperation(sqlBasicCall, atoms, sqlBasicCall.getKind().sql);
+            case CAST:
+                return generateCastOperation(sqlBasicCall, atoms);
             case OTHER:
                 return generateOtherOperation(sqlBasicCall, atoms);
             default:
@@ -254,6 +257,17 @@ public class JaninoCompiler {
         }
         return new Java.MethodInvocation(
                 Location.NOWHERE, null, StringUtils.convertToCamelCase("VALUE_EQUALS"), atoms);
+    }
+
+    private static Java.Rvalue generateCastOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (atoms.length != 1) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        List<SqlNode> operandList = sqlBasicCall.getOperandList();
+        SqlDataTypeSpec sqlDataTypeSpec = (SqlDataTypeSpec) operandList.get(1);
+        return new Java.MethodInvocation(
+                Location.NOWHERE, null, getTypeConvertMethod(sqlDataTypeSpec), atoms);
     }
 
     private static Java.Rvalue generateOtherOperation(
@@ -297,5 +311,34 @@ public class JaninoCompiler {
                 null,
                 StringUtils.convertToCamelCase(operationName),
                 timestampFunctionParam.toArray(new Java.Rvalue[0]));
+    }
+
+    private static String getTypeConvertMethod(SqlDataTypeSpec sqlDataTypeSpec) {
+        switch (sqlDataTypeSpec.getTypeName().getSimple().toUpperCase()) {
+            case "BOOLEAN":
+                return "convertBoolean";
+            case "TINYINT":
+                return "convertByte";
+            case "SMALLINT":
+                return "convertShort";
+            case "INTEGER":
+                return "convertInteger";
+            case "BIGINT":
+                return "convertLong";
+            case "FLOAT":
+                return "convertFloat";
+            case "DOUBLE":
+                return "convertDouble";
+            case "DECIMAL":
+                return "convertBigDecimal";
+            case "CHAR":
+            case "VARCHAR":
+            case "STRING":
+            case "`STRING`":
+                return "convertString";
+            default:
+                throw new ParseException(
+                        "Unsupported data type convert: " + sqlDataTypeSpec.toString());
+        }
     }
 }
