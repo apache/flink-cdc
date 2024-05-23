@@ -255,7 +255,7 @@ pipeline:
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from MySQL server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
