@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.maxcompute.utils;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.maxcompute.common.Constant;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CommitSessionResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
 import org.slf4j.Logger;
@@ -146,7 +147,9 @@ public class SessionCommitCoordinator {
     }
 
     public void commitSuccess(String sessionId, boolean success) {
-        toCommitFutures.get(sessionId).complete(new CommitSessionResponse(success));
+        toCommitFutures
+                .get(sessionId)
+                .complete(CoordinationResponseUtils.wrap(new CommitSessionResponse(success)));
     }
 
     public boolean isCommitting() {

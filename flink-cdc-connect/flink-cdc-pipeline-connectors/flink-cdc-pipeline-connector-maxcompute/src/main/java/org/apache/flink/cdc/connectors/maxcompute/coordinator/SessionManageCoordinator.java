@@ -33,6 +33,7 @@ import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.RetryUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.SessionCommitCoordinator;
 import org.apache.flink.cdc.connectors.maxcompute.writer.MaxComputeWriter;
+import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandler;
@@ -206,7 +207,9 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
                 sessionIdMap.put(writer.getId(), sessionIdentifier);
             }
             return CompletableFuture.completedFuture(
-                    new CreateSessionResponse(sessionCache.get(sessionIdentifier).getId()));
+                    CoordinationResponseUtils.wrap(
+                            new CreateSessionResponse(
+                                    sessionCache.get(sessionIdentifier).getId())));
         } else {
             return CompletableFuture.completedFuture(null);
         }
