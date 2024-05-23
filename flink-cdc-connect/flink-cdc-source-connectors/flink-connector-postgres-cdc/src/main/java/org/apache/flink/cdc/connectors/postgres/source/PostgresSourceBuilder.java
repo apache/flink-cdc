@@ -280,6 +280,12 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    /** Set the {@code LSN} checkpoints delay number for Postgres to commit the offsets. */
+    public PostgresSourceBuilder<T> lsnCommitCheckpointsDelay(int lsnCommitDelay) {
+        this.configFactory.setLsnCommitCheckpointsDelay(lsnCommitDelay);
+        return this;
+    }
+
     /**
      * Build the {@link PostgresIncrementalSource}.
      *
