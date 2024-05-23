@@ -102,7 +102,7 @@ mysql> GRANT SELECT, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.
 mysql> FLUSH PRIVILEGES;
 ```
 
-查看更多用户权限问题请参考 [权限说明](https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-creating-user).
+查看更多用户权限问题请参考 [权限说明](https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-creating-user).
 
 
 注意事项
@@ -306,7 +306,7 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td>数据库服务器中的会话时区， 例如： "Asia/Shanghai". 
           它控制 MYSQL 中的时间戳类型如何转换为字符串。
-          更多请参考 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types"> 这里</a>.
+          更多请参考 <a href="https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-temporal-types"> 这里</a>.
           如果没有设置，则使用ZoneId.systemDefault()来确定服务器时区。
       </td>
     </tr>
@@ -361,7 +361,7 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
+          查看更多关于 <a href="https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
