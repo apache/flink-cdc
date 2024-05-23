@@ -38,6 +38,7 @@ import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.TypeConvertUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.cache.UnifiedFileWriter;
+import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
@@ -67,6 +68,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -373,9 +375,10 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
 
     public CoordinationResponse sendRequestToOperator(CoordinationRequest request)
             throws IOException, ExecutionException, InterruptedException {
-        return taskOperatorEventGateway
-                .sendRequestToCoordinator(getOperatorID(), new SerializedValue<>(request))
-                .get();
+        CompletableFuture<CoordinationResponse> responseFuture =
+                taskOperatorEventGateway.sendRequestToCoordinator(
+                        getOperatorID(), new SerializedValue<>(request));
+        return CoordinationResponseUtils.unwrap(responseFuture.get());
     }
 
     public Future<CoordinationResponse> submitRequestToOperator(CoordinationRequest request)
