@@ -22,19 +22,19 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 
-/** Request to {@link SchemaRegistry} for getting schema of a table. */
+/** Request to {@link SchemaRegistry} for getting upstream schema of a table. */
 @Internal
-public class GetSchemaRequest implements CoordinationRequest {
+public class GetUpstreamSchemaRequest implements CoordinationRequest {
     public static final int LATEST_SCHEMA_VERSION = -1;
 
     private final TableId tableId;
     private final int schemaVersion;
 
-    public static GetSchemaRequest ofLatestSchema(TableId tableId) {
-        return new GetSchemaRequest(tableId, LATEST_SCHEMA_VERSION);
+    public static GetUpstreamSchemaRequest ofLatestSchema(TableId tableId) {
+        return new GetUpstreamSchemaRequest(tableId, LATEST_SCHEMA_VERSION);
     }
 
-    public GetSchemaRequest(TableId tableId, int schemaVersion) {
+    public GetUpstreamSchemaRequest(TableId tableId, int schemaVersion) {
         this.tableId = tableId;
         this.schemaVersion = schemaVersion;
     }
@@ -49,7 +49,7 @@ public class GetSchemaRequest implements CoordinationRequest {
 
     @Override
     public String toString() {
-        return "GetSchemaRequest{"
+        return "GetUpstreamSchemaRequest{"
                 + "tableId="
                 + tableId
                 + ", schemaVersion="

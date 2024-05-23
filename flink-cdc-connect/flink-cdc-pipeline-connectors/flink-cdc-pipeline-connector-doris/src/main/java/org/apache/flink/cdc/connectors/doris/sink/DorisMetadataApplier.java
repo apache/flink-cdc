@@ -24,7 +24,10 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -35,6 +38,8 @@ import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 import org.apache.flink.util.CollectionUtil;
+
+import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import org.apache.doris.flink.catalog.DorisTypeMapper;
 import org.apache.doris.flink.catalog.doris.DataModel;
@@ -52,7 +57,11 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_PROPERTIES_PREFIX;
 
 /** Supports {@link DorisDataSink} to schema evolution. */
@@ -61,15 +70,34 @@ public class DorisMetadataApplier implements MetadataApplier {
     private DorisOptions dorisOptions;
     private SchemaChangeManager schemaChangeManager;
     private Configuration config;
+    private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
     public DorisMetadataApplier(DorisOptions dorisOptions, Configuration config) {
         this.dorisOptions = dorisOptions;
         this.schemaChangeManager = new SchemaChangeManager(dorisOptions);
         this.config = config;
+        this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }
 
     @Override
-    public void applySchemaChange(SchemaChangeEvent event) {
+    public MetadataApplier setAcceptedSchemaEvolutionTypes(
+            Set<SchemaChangeEventType> schemaEvolutionTypes) {
+        this.enabledSchemaEvolutionTypes = schemaEvolutionTypes;
+        return this;
+    }
+
+    @Override
+    public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+        return enabledSchemaEvolutionTypes.contains(schemaChangeEventType);
+    }
+
+    @Override
+    public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+        return Sets.newHashSet(ADD_COLUMN, DROP_COLUMN, RENAME_COLUMN);
+    }
+
+    @Override
+    public void applySchemaChange(SchemaChangeEvent event) throws SchemaEvolveException {
         try {
             // send schema change op to doris
             if (event instanceof CreateTableEvent) {
@@ -82,12 +110,11 @@ public class DorisMetadataApplier implements MetadataApplier {
                 applyRenameColumnEvent((RenameColumnEvent) event);
             } else if (event instanceof AlterColumnTypeEvent) {
                 applyAlterColumnTypeEvent((AlterColumnTypeEvent) event);
-            } else if (event instanceof AlterColumnTypeEvent) {
-                throw new RuntimeException("Unsupported schema change event, " + event);
+            } else {
+                throw new UnsupportedSchemaChangeEventException(event);
             }
         } catch (Exception ex) {
-            throw new RuntimeException(
-                    "Failed to schema change, " + event + ", reason: " + ex.getMessage());
+            throw new SchemaEvolveException(event, ex.getMessage(), null);
         }
     }
 

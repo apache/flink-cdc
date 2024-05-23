@@ -15,27 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.event;
+package org.apache.flink.cdc.common.exceptions;
 
-import org.apache.flink.cdc.common.annotation.Internal;
-import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
-import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 
-import javax.annotation.Nullable;
+/** A special kind of {@link SchemaEvolveException} that sink doesn't support such event type. */
+public class UnsupportedSchemaChangeEventException extends SchemaEvolveException {
 
-import java.util.Optional;
-
-/** Coordination response from {@link SchemaRegistry} for {@link GetSchemaRequest}. */
-@Internal
-public class GetSchemaResponse implements CoordinationResponse {
-    @Nullable private final Schema schema;
-
-    public GetSchemaResponse(@Nullable Schema schema) {
-        this.schema = schema;
-    }
-
-    public Optional<Schema> getSchema() {
-        return Optional.ofNullable(schema);
+    public UnsupportedSchemaChangeEventException(SchemaChangeEvent applyingEvent) {
+        super(applyingEvent, "Sink doesn't support such schema change event.", null);
     }
 }
