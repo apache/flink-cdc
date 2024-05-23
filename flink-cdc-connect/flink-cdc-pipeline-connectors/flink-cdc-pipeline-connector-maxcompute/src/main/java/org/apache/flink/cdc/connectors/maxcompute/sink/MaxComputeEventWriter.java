@@ -57,6 +57,7 @@ import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.TypeConvertUtils;
 import org.apache.flink.cdc.connectors.maxcompute.writer.MaxComputeWriter;
+import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
 import com.aliyun.odps.data.ArrayRecord;
@@ -175,7 +176,7 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
         try {
             for (Future<CoordinationResponse> response : responces) {
                 CommitSessionResponse commitSessionResponse =
-                        (CommitSessionResponse) response.get();
+                        CoordinationResponseUtils.unwrap(response.get());
                 if (!commitSessionResponse.isSuccess()) {
                     throw new IOException(
                             "JobManager commit session failed. restart all TaskManager");
