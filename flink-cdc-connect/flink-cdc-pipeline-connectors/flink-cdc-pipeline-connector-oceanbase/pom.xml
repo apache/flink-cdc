@@ -29,7 +29,7 @@ limitations under the License.
     <name>flink-cdc-pipeline-connector-oceanbase</name>
 
     <properties>
-        <flink.connector.oceanbase>1.2-SNAPSHOT</flink.connector.oceanbase>
+        <flink.connector.oceanbase>1.2</flink.connector.oceanbase>
     </properties>
 
     <dependencies>
