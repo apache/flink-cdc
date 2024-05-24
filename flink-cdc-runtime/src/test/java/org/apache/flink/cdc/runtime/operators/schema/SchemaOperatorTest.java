@@ -68,12 +68,14 @@ public class SchemaOperatorTest {
         final TableId tableId = TableId.tableId("testProcessElement");
         final RowType rowType = DataTypes.ROW(DataTypes.BIGINT(), DataTypes.STRING());
 
-        List<OneInputStreamOperatorTestHarness<Event, Event>> testHarnesses = new ArrayList<>();
+        List<EventOperatorTestHarness<SchemaOperator, Event>> testHarnesses = new ArrayList<>();
         for (int subtaskIndex = 0; subtaskIndex < parallelism; subtaskIndex++) {
-            OneInputStreamOperatorTestHarness<Event, Event> testHarness =
-                    createTestHarness(maxParallelism, parallelism, subtaskIndex, opID);
+            SchemaOperator schemaOperator =
+                    new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(1));
+            EventOperatorTestHarness<SchemaOperator, Event> testHarness =
+                    new EventOperatorTestHarness<>(schemaOperator, 1, Duration.ofSeconds(3));
+            createTestHarness(maxParallelism, parallelism, subtaskIndex, opID);
             testHarnesses.add(testHarness);
-            testHarness.setup(EventSerializer.INSTANCE);
             testHarness.open();
 
             Map<String, String> meta = new HashMap<>();
@@ -97,10 +99,10 @@ public class SchemaOperatorTest {
                                             new Object[] {4L, BinaryStringData.fromString("4")}),
                                     meta));
             for (Event event : testData) {
-                testHarness.processElement(event, 0);
+                schemaOperator.processElement(new StreamRecord<>(event));
             }
 
-            Collection<StreamRecord<Event>> result = testHarness.getRecordOutput();
+            Collection<StreamRecord<Event>> result = testHarness.getOutputRecords();
             assertThat(result.stream().map(StreamRecord::getValue).collect(Collectors.toList()))
                     .isEqualTo(testData);
         }
