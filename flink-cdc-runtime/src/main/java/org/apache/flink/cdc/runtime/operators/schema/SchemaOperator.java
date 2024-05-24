@@ -47,6 +47,7 @@ import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeProcessin
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResultRequest;
+import org.apache.flink.cdc.runtime.operators.schema.metrics.SchemaOperatorMetrics;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
@@ -106,6 +107,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private final long rpcTimeOutInMillis;
     private final SchemaChangeBehavior schemaChangeBehavior;
 
+    private transient SchemaOperatorMetrics schemaOperatorMetrics;
+
     @VisibleForTesting
     public SchemaOperator(List<Tuple2<String, TableId>> routingRules) {
         this.routingRules = routingRules;
@@ -130,6 +133,14 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = rpcTimeOut.toMillis();
         this.schemaChangeBehavior = schemaChangeBehavior;
+    }
+
+    @Override
+    public void open() throws Exception {
+        super.open();
+        schemaOperatorMetrics =
+                new SchemaOperatorMetrics(
+                        getRuntimeContext().getMetricGroup(), schemaChangeBehavior);
     }
 
     @Override
@@ -375,6 +386,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
             output.collect(new StreamRecord<>(new FlushEvent(tableId)));
             List<SchemaChangeEvent> expectedSchemaChangeEvents = response.getSchemaChangeEvents();
+            schemaOperatorMetrics.increaseSchemaChangeEvents(expectedSchemaChangeEvents.size());
+
             // The request will block until flushing finished in each sink writer
             ReleaseUpstreamResponse schemaEvolveResponse = requestReleaseUpstream();
             List<SchemaChangeEvent> finishedSchemaChangeEvents =
@@ -420,6 +433,12 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                     expectedSchemaChangeEvents.size(),
                     finishedSchemaChangeEvents.size(),
                     failedSchemaChangeEvents.size(),
+                    ignoredSchemaChangeEvents.size());
+
+            schemaOperatorMetrics.increaseFinishedSchemaChangeEvents(
+                    finishedSchemaChangeEvents.size());
+            schemaOperatorMetrics.increaseFailedSchemaChangeEvents(failedSchemaChangeEvents.size());
+            schemaOperatorMetrics.increaseIgnoredSchemaChangeEvents(
                     ignoredSchemaChangeEvents.size());
         }
     }
