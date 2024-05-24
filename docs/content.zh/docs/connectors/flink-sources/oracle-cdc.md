@@ -234,7 +234,7 @@ Overall, the steps for configuring CDB database is quite similar to non-CDB data
      exit
    ```
    
-See more about the [Setting up Oracle](https://debezium.io/documentation/reference/1.9/connectors/oracle.html#setting-up-oracle)
+See more about the [Setting up Oracle](https://debezium.io/documentation/reference/2.0/connectors/oracle.html#setting-up-oracle)
 
 How to create an Oracle CDC table
 ----------------
@@ -401,7 +401,7 @@ Connector Options
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from Oracle server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/oracle.html#oracle-connector-properties">Debezium's Oracle Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/2.0/connectors/oracle.html#oracle-connector-properties">Debezium's Oracle Connector properties</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -509,7 +509,7 @@ Features
 
 ### Exactly-Once Processing
 
-The Oracle CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/oracle.html#how-the-oracle-connector-works).
+The Oracle CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/2.0/connectors/oracle.html#how-the-oracle-connector-works).
 
 ### Startup Reading Position
 
