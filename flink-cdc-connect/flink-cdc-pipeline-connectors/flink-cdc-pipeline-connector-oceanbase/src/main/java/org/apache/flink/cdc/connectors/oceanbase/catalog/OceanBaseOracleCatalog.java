@@ -22,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * A {@link OceanBaseCatalog} for OceanBase connector that supports schema evolution under Oracle
@@ -39,59 +38,34 @@ public class OceanBaseOracleCatalog extends OceanBaseCatalog {
     @Override
     public boolean databaseExists(String databaseName) throws OceanBaseCatalogException {
         throw new OceanBaseCatalogException(
-                "This operator under oracle tenant is not supported currently.");
+                "This operation under oracle tenant is not supported currently.");
     }
 
     @Override
     public void createDatabase(String databaseName, boolean ignoreIfExists)
             throws OceanBaseCatalogException {
         throw new OceanBaseCatalogException(
-                "This operator under oracle tenant is not supported currently.");
+                "This operation under oracle tenant is not supported currently.");
     }
 
     @Override
     public void createTable(OceanBaseTable table, boolean ignoreIfExists)
             throws OceanBaseCatalogException {
         throw new OceanBaseCatalogException(
-                "This operator under oracle tenant is not supported currently.");
+                "This operation under oracle tenant is not supported currently.");
     }
 
     @Override
     public void alterAddColumns(
             String databaseName, String tableName, List<OceanBaseColumn> addColumns) {
         throw new OceanBaseCatalogException(
-                "This operator under oracle tenant is not supported currently.");
+                "This operation under oracle tenant is not supported currently.");
     }
 
     @Override
-    protected String buildCreateDatabaseSql(String databaseName, boolean ignoreIfExists) {
+    public void renameColumn(
+            String schemaName, String tableName, String oldColumnName, String newColumnName) {
         throw new OceanBaseCatalogException(
-                "This operator under oracle tenant is not supported currently.");
-    }
-
-    @Override
-    protected String buildCreateTableSql(OceanBaseTable table, boolean ignoreIfExists) {
-        throw new OceanBaseCatalogException(
-                "This operator under oracle tenant is not supported currently.");
-    }
-
-    @Override
-    protected String buildColumnStmt(OceanBaseColumn column) {
-        throw new OceanBaseCatalogException(
-                "This operator under oracle tenant is not supported currently.");
-    }
-
-    @Override
-    protected String getFullColumnType(
-            String type, Optional<Integer> columnSize, Optional<Integer> decimalDigits) {
-        throw new OceanBaseCatalogException(
-                "This operator under oracle tenant is not supported currently.");
-    }
-
-    @Override
-    protected String buildAlterAddColumnsSql(
-            String databaseName, String tableName, List<OceanBaseColumn> addColumns) {
-        throw new OceanBaseCatalogException(
-                "This operator under oracle tenant is not supported currently.");
+                "This operation under oracle tenant is not supported currently.");
     }
 }

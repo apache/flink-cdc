@@ -34,6 +34,8 @@ import java.util.stream.Collectors;
  */
 public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
 
+    private static final String RENAME_DDL = "ALTER TABLE `%s`.`%s` RENAME COLUMN `%s` TO `%s`";
+
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseMySQLCatalog.class);
 
     public OceanBaseMySQLCatalog(OceanBaseConnectorOptions connectorOptions) {
@@ -165,17 +167,46 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         }
     }
 
+    @Override
+    public void renameColumn(
+            String schemaName, String tableName, String oldColumnName, String newColumnName) {
+        String renameColumnSql =
+                buildRenameColumnSql(schemaName, tableName, oldColumnName, newColumnName);
+        try {
+            long startTimeMillis = System.currentTimeMillis();
+            executeUpdateStatement(renameColumnSql);
+            LOG.info(
+                    "Success to rename {} column from {} to {}, duration: {}ms, sql: {}",
+                    String.format("%s.%s", schemaName, tableName),
+                    oldColumnName,
+                    newColumnName,
+                    System.currentTimeMillis() - startTimeMillis,
+                    renameColumnSql);
+        } catch (Exception e) {
+            LOG.error(
+                    "Fail to rename {} column from {} to {}, duration: {}ms, sql: {}",
+                    String.format("%s.%s", schemaName, tableName),
+                    oldColumnName,
+                    newColumnName,
+                    renameColumnSql,
+                    e);
+            throw new OceanBaseCatalogException(
+                    String.format(
+                            "Failed to rename %s column from %s to %s ",
+                            String.format("%s.%s", schemaName, tableName), schemaName, tableName),
+                    e);
+        }
+    }
+
     // ------------------------------------------------------------------------------------------
     // OceanBase DDL SQL
     // ------------------------------------------------------------------------------------------
 
-    @Override
     protected String buildCreateDatabaseSql(String databaseName, boolean ignoreIfExists) {
         return String.format(
                 "CREATE DATABASE %s%s;", ignoreIfExists ? "IF NOT EXISTS " : "", databaseName);
     }
 
-    @Override
     protected String buildCreateTableSql(OceanBaseTable table, boolean ignoreIfExists) {
         StringBuilder builder = new StringBuilder();
         builder.append(
@@ -216,38 +247,6 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         return builder.toString();
     }
 
-    private String buildAlterAddColumnsSql(
-            String databaseName,
-            String tableName,
-            List<OceanBaseColumn> addColumns,
-            long timeoutSecond) {
-        StringBuilder builder = new StringBuilder();
-        builder.append(String.format("ALTER TABLE `%s`.`%s` ", databaseName, tableName));
-        String columnsStmt =
-                addColumns.stream()
-                        .map(col -> "ADD COLUMN " + buildColumnStmt(col))
-                        .collect(Collectors.joining(", "));
-        builder.append(columnsStmt);
-        builder.append(String.format(" PROPERTIES (\"timeout\" = \"%s\")", timeoutSecond));
-        builder.append(";");
-        return builder.toString();
-    }
-
-    private String buildAlterDropColumnsSql(
-            String databaseName, String tableName, List<String> dropColumns, long timeoutSecond) {
-        StringBuilder builder = new StringBuilder();
-        builder.append(String.format("ALTER TABLE `%s`.`%s` ", databaseName, tableName));
-        String columnsStmt =
-                dropColumns.stream()
-                        .map(col -> String.format("DROP COLUMN `%s`", col))
-                        .collect(Collectors.joining(", "));
-        builder.append(columnsStmt);
-        builder.append(String.format(" PROPERTIES (\"timeout\" = \"%s\")", timeoutSecond));
-        builder.append(";");
-        return builder.toString();
-    }
-
-    @Override
     protected String buildColumnStmt(OceanBaseColumn column) {
         StringBuilder builder = new StringBuilder();
         builder.append("`");
@@ -268,7 +267,6 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         return builder.toString();
     }
 
-    @Override
     protected String getFullColumnType(
             String type, Optional<Integer> columnSize, Optional<Integer> decimalDigits) {
         String dataType = type.toUpperCase();
@@ -289,7 +287,6 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         }
     }
 
-    @Override
     protected String buildAlterAddColumnsSql(
             String databaseName, String tableName, List<OceanBaseColumn> addColumns) {
         StringBuilder builder = new StringBuilder();
@@ -301,5 +298,10 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         builder.append(columnsStmt);
         builder.append(";");
         return builder.toString();
+    }
+
+    private static String buildRenameColumnSql(
+            String schemaName, String tableName, String oldColumnName, String newColumnName) {
+        return String.format(RENAME_DDL, schemaName, tableName, oldColumnName, newColumnName);
     }
 }

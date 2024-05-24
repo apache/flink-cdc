@@ -49,26 +49,17 @@ public class OceanBaseUtils {
     /** Convert a source table to {@link OceanBaseTable}. */
     public static OceanBaseTable toOceanBaseTable(TableId tableId, Schema schema) {
 
-        List<Column> orderedColumns = new ArrayList<>();
-        for (String primaryKey : schema.primaryKeys()) {
-            orderedColumns.add(schema.getColumn(primaryKey).get());
-        }
-        for (Column column : schema.getColumns()) {
-            if (!schema.primaryKeys().contains(column.getName())) {
-                orderedColumns.add(column);
-            }
-        }
-
-        int primaryKeyCount = schema.primaryKeys().size();
+        List<Column> columns = schema.getColumns();
+        List<String> primaryKeys = schema.primaryKeys();
         List<OceanBaseColumn> oceanBaseColumns = new ArrayList<>();
-        for (int i = 0; i < orderedColumns.size(); i++) {
-            Column column = orderedColumns.get(i);
+        for (int i = 0; i < columns.size(); i++) {
+            Column column = columns.get(i);
             OceanBaseColumn.Builder builder =
                     new OceanBaseColumn.Builder()
                             .setColumnName(column.getName())
                             .setOrdinalPosition(i)
                             .setColumnComment(column.getComment());
-            toOceanBaseDataType(column, i < primaryKeyCount, builder);
+            toOceanBaseDataType(column, primaryKeys.contains(column.getName()), builder);
             oceanBaseColumns.add(builder.build());
         }
 
@@ -103,7 +94,6 @@ public class OceanBaseUtils {
     public static final String SMALLINT = "SMALLINT";
     public static final String INT = "INT";
     public static final String BIGINT = "BIGINT";
-    public static final String LARGEINT = "BIGINT UNSIGNED";
     public static final String FLOAT = "FLOAT";
     public static final String DOUBLE = "DOUBLE";
     public static final String DECIMAL = "DECIMAL";
@@ -185,24 +175,9 @@ public class OceanBaseUtils {
 
         @Override
         public OceanBaseColumn.Builder visit(DecimalType decimalType) {
-            // OceanBase does not support Decimal as primary key, so decimal should be cast to
-            // VARCHAR.
-            if (!isPrimaryKeys) {
-                builder.setDataType(DECIMAL);
-                builder.setColumnSize(decimalType.getPrecision());
-                builder.setDecimalDigits(decimalType.getScale());
-            } else {
-                builder.setDataType(VARCHAR);
-                // For a DecimalType with precision N, we may need N + 1 or N + 2 characters to
-                // store it as a
-                // string (one for negative sign, and one for decimal point)
-                builder.setColumnSize(
-                        Math.min(
-                                decimalType.getScale() != 0
-                                        ? decimalType.getPrecision() + 2
-                                        : decimalType.getPrecision() + 1,
-                                MAX_VARCHAR_SIZE));
-            }
+            builder.setDataType(DECIMAL);
+            builder.setColumnSize(decimalType.getPrecision());
+            builder.setDecimalDigits(decimalType.getScale());
             builder.setNullable(decimalType.isNullable());
             return builder;
         }

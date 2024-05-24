@@ -28,10 +28,10 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalog;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogException;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogFactory;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseColumn;
-import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseMySQLCatalog;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseTable;
 
 import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
@@ -40,23 +40,18 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /** Supports {@link OceanBaseDataSink} to schema evolution. */
 public class OceanBaseMetadataApplier implements MetadataApplier {
 
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseMetadataApplier.class);
 
-    private final OceanBaseConnectorOptions connectorOptions;
-    private final Configuration config;
-    private final OceanBaseMySQLCatalog catalog;
+    private final OceanBaseCatalog catalog;
 
     public OceanBaseMetadataApplier(
             OceanBaseConnectorOptions connectorOptions, Configuration config) throws Exception {
-        this.connectorOptions = connectorOptions;
-        this.config = config;
-        this.catalog =
-                (OceanBaseMySQLCatalog)
-                        OceanBaseCatalogFactory.createOceanBaseCatalog(connectorOptions);
+        this.catalog = OceanBaseCatalogFactory.createOceanBaseCatalog(connectorOptions);
     }
 
     @Override
@@ -125,12 +120,20 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
     }
 
     private void applyDropColumnEvent(DropColumnEvent dropColumnEvent) {
-        // TODO
-        throw new UnsupportedOperationException("Rename column is not supported currently");
+        // TODO The `DropColumnEvent` in OceanBase is classified as an OFFLINE DDL operation,
+        //  and currently, this pipeline connector does not support offline DDL actions.
+        throw new UnsupportedOperationException("Drop column is not supported currently");
     }
 
     private void applyRenameColumnEvent(RenameColumnEvent renameColumnEvent) {
-        // TODO
-        throw new UnsupportedOperationException("Rename column is not supported currently");
+        TableId tableId = renameColumnEvent.tableId();
+        Map<String, String> nameMapping = renameColumnEvent.getNameMapping();
+        for (Map.Entry<String, String> entry : nameMapping.entrySet()) {
+            catalog.renameColumn(
+                    tableId.getSchemaName(),
+                    tableId.getTableName(),
+                    entry.getKey(),
+                    entry.getValue());
+        }
     }
 }

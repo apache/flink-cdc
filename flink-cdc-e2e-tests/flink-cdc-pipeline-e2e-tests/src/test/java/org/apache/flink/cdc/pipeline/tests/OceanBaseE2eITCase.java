@@ -29,6 +29,7 @@ import org.apache.commons.text.StringEscapeUtils;
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Rule;
@@ -143,10 +144,8 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
         submitPipelineJob(pipelineJob, mysqlCdcJar, oceanbaseCdcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
-        // waiting for databases were created in oceanbase
-        Thread.sleep(30_000);
 
-        waitForTableCount(MYSQL_TEST_TABLE_NAME, false, 9);
+        waitingAndAssertTableCount(MYSQL_TEST_TABLE_NAME, false, 9);
         List<String> originList = queryTable(MYSQL_TEST_TABLE_NAME, false);
         MatcherAssert.assertThat(
                 originList,
@@ -190,7 +189,7 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
             throw e;
         }
 
-        waitForTableCount(MYSQL_TEST_TABLE_NAME, false, 10);
+        waitingAndAssertTableCount(MYSQL_TEST_TABLE_NAME, false, 10);
         List<String> updateList = queryTable(MYSQL_TEST_TABLE_NAME, false);
         MatcherAssert.assertThat(
                 updateList,
@@ -210,13 +209,20 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                                 .toArray()));
     }
 
-    private void waitForTableCount(String tableName, boolean isMySQL, int expectedCount)
+    private void waitingAndAssertTableCount(String tableName, boolean isMySQL, int expectedCount)
             throws InterruptedException {
-        while (OceanBaseJdbcUtils.getTableRowsCount(
-                        () -> getConnection(uniqueDatabaseName, isMySQL), tableName)
-                < expectedCount) {
-            Thread.sleep(100);
+        // waiting for databases were created in oceanbase to avoid get connection fail.
+        Thread.sleep(10_000);
+
+        int tableRowsCount = 0;
+        for (int i = 0; i < 10; ++i) {
+            tableRowsCount =
+                    OceanBaseJdbcUtils.getTableRowsCount(() -> getConnection(isMySQL), tableName);
+            if (tableRowsCount < expectedCount) {
+                Thread.sleep(100);
+            }
         }
+        Assert.assertEquals(tableRowsCount, expectedCount);
     }
 
     private List<String> queryTable(String tableName, boolean isMySQL) throws SQLException {
@@ -226,7 +232,7 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
     private List<String> queryTable(String tableName, boolean isMySQL, List<String> fields)
             throws SQLException {
         List<String> result = new ArrayList<>();
-        try (Connection connection = getConnection(tableName, isMySQL);
+        try (Connection connection = getConnection(isMySQL);
                 Statement statement = connection.createStatement()) {
             ResultSet rs =
                     statement.executeQuery(
@@ -247,7 +253,7 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
         return result;
     }
 
-    private Connection getConnection(String database, boolean isMySQL) throws SQLException {
+    private Connection getConnection(boolean isMySQL) throws SQLException {
         if (isMySQL) {
             String mysqlJdbcUrl =
                     String.format(

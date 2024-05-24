@@ -29,7 +29,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 
 /** A {@link OceanBaseCatalog} for OceanBase connector that supports schema evolution. */
 public abstract class OceanBaseCatalog implements Serializable {
@@ -73,15 +72,6 @@ public abstract class OceanBaseCatalog implements Serializable {
     public abstract void alterAddColumns(
             String databaseName, String tableName, List<OceanBaseColumn> addColumns);
 
-    protected abstract String buildCreateDatabaseSql(String databaseName, boolean ignoreIfExists);
-
-    protected abstract String buildCreateTableSql(OceanBaseTable table, boolean ignoreIfExists);
-
-    protected abstract String buildColumnStmt(OceanBaseColumn column);
-
-    protected abstract String getFullColumnType(
-            String type, Optional<Integer> columnSize, Optional<Integer> decimalDigits);
-
-    protected abstract String buildAlterAddColumnsSql(
-            String databaseName, String tableName, List<OceanBaseColumn> addColumns);
+    public abstract void renameColumn(
+            String schemaName, String tableName, String oldColumnName, String newColumnName);
 }

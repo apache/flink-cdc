@@ -25,27 +25,24 @@ import java.util.Optional;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
-/** Describe a column of OceanBase table. These metas are from information_schema.COLUMNS. */
+/** Describe a column of OceanBase table. */
 public class OceanBaseColumn implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /** The name of the column. COLUMN_NAME in information_schema.COLUMNS. */
+    /** The name of the column. */
     private final String columnName;
 
-    /**
-     * The position of the column within the table (starting at 0). ORDINAL_POSITION in
-     * information_schema.COLUMNS.
-     */
+    /** The position of the column within the table (starting at 0). */
     private final int ordinalPosition;
 
-    /** The column data type. DATA_TYPE in information_schema.COLUMNS. */
+    /** The column data type. */
     private final String dataType;
 
-    /** The column nullability.IS_NULLABLE in information_schema.COLUMNS. */
+    /** The column nullability. */
     private final boolean isNullable;
 
-    /** The default value for the column. COLUMN_DEFAULT in information_schema.COLUMNS. */
+    /** The default value for the column. */
     @Nullable private final String defaultValue;
 
     /**

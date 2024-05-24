@@ -44,7 +44,7 @@ import java.util.Map;
 /** A serializer for Event to Record. */
 public class OceanBaseEventSerializationSchema implements RecordSerializationSchema<Event> {
 
-    private Map<TableId, Schema> schemaMaps = new HashMap<>();
+    private final Map<TableId, Schema> schemaMaps = new HashMap<>();
 
     /** ZoneId from pipeline config to support timestamp with local time zone. */
     public final ZoneId pipelineZoneId;
