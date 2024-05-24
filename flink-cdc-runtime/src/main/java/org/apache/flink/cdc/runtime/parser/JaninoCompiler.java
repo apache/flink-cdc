@@ -334,11 +334,10 @@ public class JaninoCompiler {
             case "CHAR":
             case "VARCHAR":
             case "STRING":
-            case "`STRING`":
                 return "convertString";
             default:
                 throw new ParseException(
-                        "Unsupported data type convert: " + sqlDataTypeSpec.toString());
+                        "Unsupported data type cast: " + sqlDataTypeSpec.toString());
         }
     }
 }
