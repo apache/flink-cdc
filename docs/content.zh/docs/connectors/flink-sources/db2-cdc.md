@@ -32,9 +32,9 @@ describes how to setup the db2 CDC connector to run SQL queries against Db2 data
 
 ## Supported Databases
 
-| Connector             | Database                                           | Driver               |
-|-----------------------|----------------------------------------------------|----------------------|
-| [Db2-cdc](../db2-cdc) | <li> [Db2](https://www.ibm.com/products/db2): 11.5 | Db2 Driver: 11.5.0.0 |
+| Connector | Database                                           | Driver               |
+|-----------|----------------------------------------------------|----------------------|
+| Db2-cdc   | <li> [Db2](https://www.ibm.com/products/db2): 11.5 | Db2 Driver: 11.5.0.0 |
 
 Dependencies
 ------------
@@ -56,7 +56,7 @@ put it under `<FLINK_HOME>/lib/`.
 Setup Db2 server
 ----------------
 
-Follow the steps in the [Debezium Db2 Connector](https://debezium.io/documentation/reference/1.9/connectors/db2.html#setting-up-db2).
+Follow the steps in the [Debezium Db2 Connector](https://debezium.io/documentation/reference/2.0/connectors/db2.html#setting-up-db2).
 
 
 Notes
@@ -184,7 +184,7 @@ for more detailed information.</td>
       <td>String</td>
       <td>The session time zone in database server, e.g. "Asia/Shanghai". 
           It controls how the TIMESTAMP type in Db2 converted to STRING.
-          See more <a href="https://debezium.io/documentation/reference/1.9/connectors/db2.html#db2-temporal-types">here</a>.
+          See more <a href="https://debezium.io/documentation/reference/2.0/connectors/db2.html#db2-temporal-types">here</a>.
           If not set, then ZoneId.systemDefault() is used to determine the server time zone.
       </td>
     </tr>
@@ -196,7 +196,7 @@ for more detailed information.</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from 
 Db2 server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/db2.html#db2-connector-properties">Debezium's Db2 Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/2.0/connectors/db2.html#db2-connector-properties">Debezium's Db2 Connector properties</a></td> 
     </tr>
     </tbody>
 </table>

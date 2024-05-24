@@ -226,7 +226,7 @@ pipeline:
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from MySQL server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -262,7 +262,7 @@ The config option `scan.startup.mode` specifies the startup mode for MySQL CDC c
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left" style="width:30%;"><a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html">MySQL type</a></th>
+        <th class="text-left" style="width:30%;"><a href="https://dev.mysql.com/doc/refman/8.0/en/data-types.html">MySQL type</a></th>
         <th class="text-left" style="width:10%;">Flink CDC type</th>
         <th class="text-left" style="width:60%;">Note</th>
       </tr>

@@ -223,7 +223,7 @@ pipeline:
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
           例如: <code>'debezium.snapshot.mode' = 'never'</code>.
-          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
+          查看更多关于 <a href="https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -253,7 +253,7 @@ pipeline:
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left" style="width:30%;">MySQL type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html"></a></th>
+        <th class="text-left" style="width:30%;">MySQL type<a href="https://dev.mysql.com/doc/refman/8.0/en/data-types.html"></a></th>
         <th class="text-left" style="width:10%;">CDC type</th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>

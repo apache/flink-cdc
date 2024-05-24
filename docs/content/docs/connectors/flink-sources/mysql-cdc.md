@@ -31,9 +31,9 @@ The MySQL CDC connector allows for reading snapshot data and incremental data fr
 
 ## Supported Databases
 
-| Connector                 | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver                  |
-|---------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
-| [mysql-cdc](../mysql-cdc) | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.27     |
+| Connector | Database                                                                                                                                                                                                                                                                                                                                                                                               | Driver              |
+|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
+| mysql-cdc | <li> [MySQL](https://dev.mysql.com/doc): 5.6, 5.7, 8.0.x <li> [RDS MySQL](https://www.aliyun.com/product/rds/mysql): 5.6, 5.7, 8.0.x <li> [PolarDB MySQL](https://www.aliyun.com/product/polardb): 5.6, 5.7, 8.0.x <li> [Aurora MySQL](https://aws.amazon.com/cn/rds/aurora): 5.6, 5.7, 8.0.x <li> [MariaDB](https://mariadb.org): 10.x <li> [PolarDB X](https://github.com/ApsaraDB/galaxysql): 2.0.1 | JDBC Driver: 8.0.27 |
 
 Dependencies
 ------------
@@ -74,7 +74,7 @@ mysql> GRANT SELECT, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.
 mysql> FLUSH PRIVILEGES;
 ```
 
-See more about the [permission explanation](https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-creating-user).
+See more about the [permission explanation](https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-creating-user).
 
 
 Notes
@@ -282,7 +282,7 @@ Connector Options
       <td>String</td>
       <td>The session time zone in database server, e.g. "Asia/Shanghai". 
           It controls how the TIMESTAMP type in MYSQL converted to STRING.
-          See more <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types">here</a>.
+          See more <a href="https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-temporal-types">here</a>.
           If not set, then ZoneId.systemDefault() is used to determine the server time zone.
       </td>
     </tr>
@@ -337,7 +337,7 @@ During a snapshot operation, the connector will query each included table to pro
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from MySQL server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -800,7 +800,7 @@ Data Type Mapping
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left" style="width:30%;">MySQL type<a href="https://dev.mysql.com/doc/man/8.0/en/data-types.html"></a></th>
+        <th class="text-left" style="width:30%;">MySQL type<a href="https://dev.mysql.com/doc/refman/8.0/en/data-types.html"></a></th>
         <th class="text-left" style="width:10%;">Flink SQL type<a href="{% link dev/table/types.md %}"></a></th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
