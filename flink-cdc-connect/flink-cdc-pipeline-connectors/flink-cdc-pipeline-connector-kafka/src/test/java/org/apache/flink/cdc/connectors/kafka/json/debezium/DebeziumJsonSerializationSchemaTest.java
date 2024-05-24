@@ -40,6 +40,8 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.time.ZoneId;
+
 /** Tests for {@link DebeziumJsonSerializationSchema}. */
 public class DebeziumJsonSerializationSchemaTest {
 
@@ -53,7 +55,9 @@ public class DebeziumJsonSerializationSchemaTest {
                         .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
         SerializationSchema<Event> serializationSchema =
                 ChangeLogJsonFormatFactory.createSerializationSchema(
-                        new Configuration(), JsonSerializationType.DEBEZIUM_JSON);
+                        new Configuration(),
+                        JsonSerializationType.DEBEZIUM_JSON,
+                        ZoneId.systemDefault());
         serializationSchema.open(new MockInitializationContext());
         // create table
         Schema schema =
