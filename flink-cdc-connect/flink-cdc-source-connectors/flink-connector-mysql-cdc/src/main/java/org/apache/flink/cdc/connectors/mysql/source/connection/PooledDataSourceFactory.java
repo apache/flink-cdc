@@ -23,6 +23,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 
+import java.sql.DriverManager;
 import java.util.Properties;
 
 /** A connection pool factory to create pooled DataSource {@link HikariDataSource}. */
@@ -52,6 +53,7 @@ public class PooledDataSourceFactory {
         config.setMaximumPoolSize(sourceConfig.getConnectionPoolSize());
         config.setConnectionTimeout(sourceConfig.getConnectTimeout().toMillis());
         config.addDataSourceProperty(SERVER_TIMEZONE_KEY, sourceConfig.getServerTimeZone());
+        DriverManager.getDrivers();
         config.setDriverClassName(
                 sourceConfig.getDbzConfiguration().getString(MySqlConnectorConfig.JDBC_DRIVER));
 
