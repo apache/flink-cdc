@@ -14,19 +14,19 @@ import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-public class EmbeddedExecutor {
+public class PipelineEmbeddedExecutor {
 
-    private static final Logger LOG = LoggerFactory.getLogger(EmbeddedExecutor.class);
+    private static final Logger LOG = LoggerFactory.getLogger(PipelineEmbeddedExecutor.class);
 
     private final Path pipelineDefPath;
 
-    public EmbeddedExecutor(Path pipelineDefPath) {
+    public PipelineEmbeddedExecutor(Path pipelineDefPath) {
         this.pipelineDefPath = pipelineDefPath;
     }
 
     public static void main(String[] args) throws Exception {
         final ParameterTool params = ParameterTool.fromArgs(args);
-        EmbeddedExecutor executor = new EmbeddedExecutor(Paths.get(params.get("pipeline-file")));
+        PipelineEmbeddedExecutor executor = new PipelineEmbeddedExecutor(Paths.get(params.get("pipeline-file")));
         PipelineExecution.ExecutionInfo executionInfo = executor.run();
         logExecutionInfo(executionInfo);
     }
