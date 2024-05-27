@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalog;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogException;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogFactory;
@@ -98,13 +99,13 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
         List<OceanBaseColumn> addColumns = new ArrayList<>();
         for (AddColumnEvent.ColumnWithPosition columnWithPosition :
                 addColumnEvent.getAddedColumns()) {
+            Preconditions.checkState(
+                    columnWithPosition.getPosition() == AddColumnEvent.ColumnPosition.LAST,
+                    "The oceanbase pipeline connector currently only supports add the column to the last.");
+
             // we will ignore position information, and always add the column to the last.
-            // The reason is that the order of columns between source table and OceanBase
-            // table may be not consistent because of limitations of OceanBase table, so the
-            // position may be meaningless. For example, primary keys of OceanBase table
-            // must be at the front, but mysql doest not have this limitation, so the order
-            // may be different, and also FIRST position is not allowed for OceanBase primary
-            // key table.
+            // The reason is that in OceanBase, only adding columns to the last as an online DDL,
+            // and this pipeline connector currently only supports online DDL.
             Column column = columnWithPosition.getAddColumn();
             OceanBaseColumn.Builder builder =
                     new OceanBaseColumn.Builder()

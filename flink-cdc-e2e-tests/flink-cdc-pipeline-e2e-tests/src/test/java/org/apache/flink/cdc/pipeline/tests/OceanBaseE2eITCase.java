@@ -222,7 +222,7 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                 Thread.sleep(100);
             }
         }
-        Assert.assertEquals(tableRowsCount, expectedCount);
+        Assert.assertEquals(expectedCount, tableRowsCount);
     }
 
     private List<String> queryTable(String tableName, boolean isMySQL) throws SQLException {
