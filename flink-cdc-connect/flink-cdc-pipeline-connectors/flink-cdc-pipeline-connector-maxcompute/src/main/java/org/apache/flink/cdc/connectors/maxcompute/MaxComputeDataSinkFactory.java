@@ -23,7 +23,6 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
-import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeDataSinkOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
@@ -57,14 +56,11 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
         String quotaName = factoryConfiguration.get(MaxComputeDataSinkOptions.QUOTA_NAME);
         String stsToken = factoryConfiguration.get(MaxComputeDataSinkOptions.STS_TOKEN);
         int bucketSize = factoryConfiguration.get(MaxComputeDataSinkOptions.BUCKETS_NUM);
-        int maxSessionParallelism =
-                factoryConfiguration.get(MaxComputeDataSinkOptions.MAX_SESSION_PARALLELISM);
         return MaxComputeOptions.builder(accessId, accessKey, endpoint, project)
                 .withTunnelEndpoint(tunnelEndpoint)
                 .withQuotaName(quotaName)
                 .withStsToken(stsToken)
                 .withBucketSize(bucketSize)
-                .withMaxSessionParallelism(maxSessionParallelism)
                 .build();
     }
 
@@ -132,7 +128,6 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(MaxComputeDataSinkOptions.QUOTA_NAME);
         optionalOptions.add(MaxComputeDataSinkOptions.STS_TOKEN);
         optionalOptions.add(MaxComputeDataSinkOptions.BUCKETS_NUM);
-        optionalOptions.add(MaxComputeDataSinkOptions.MAX_SESSION_PARALLELISM);
         // write options
         optionalOptions.add(MaxComputeDataSinkOptions.NUM_COMMIT_THREADS);
         optionalOptions.add(MaxComputeDataSinkOptions.COMPRESS_ALGORITHM);

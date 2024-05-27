@@ -29,7 +29,6 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.maxcompute.common.Constant;
-import org.apache.flink.cdc.connectors.maxcompute.common.FlinkOdpsException;
 import org.apache.flink.cdc.connectors.maxcompute.common.SessionIdentifier;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CreateSessionRequest;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CreateSessionResponse;
@@ -63,7 +62,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +95,6 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
     private transient SchemaEvolutionClient schemaEvolutionClient;
 
     private transient Future<CoordinationResponse> snapshotFlushSuccess;
-    private transient Map<SessionIdentifier, UnifiedFileWriter<DataChangeEvent>> fileCacheWriters;
     private transient int indexOfThisSubtask;
     /**
      * trigger endOfInput is ahead of prepareSnapshotPreBarrier, so we need this flag to handle when
@@ -113,15 +110,10 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
 
     @Override
     public void open() throws Exception {
-        this.endOfInput = false;
         this.sessionCache = new HashMap<>();
         this.schemaMaps = new HashMap<>();
         this.fieldGetterMaps = new HashMap<>();
         SessionManageOperator.instance = this;
-
-        if (options.getMaxSessionParallelism() > 0) {
-            this.fileCacheWriters = new HashMap<>();
-        }
     }
 
     @Override
@@ -141,15 +133,48 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
     public void processElement(StreamRecord<Event> element) throws Exception {
         if (element.getValue() instanceof DataChangeEvent) {
             DataChangeEvent dataChangeEvent = (DataChangeEvent) element.getValue();
-            handleDataChangeEvent(dataChangeEvent);
-        } else if (element.getValue() instanceof FlushEvent) {
-            handleFlushEvent(element);
-            if (options.getMaxSessionParallelism() > 0) {
-                // when maxSessionParallelism is set, we indicate that some data have cached in
-                // file. so we need to un-cache data and flush again.
-                uncache(element);
-                handleFlushEvent(element);
+            TableId tableId = dataChangeEvent.tableId();
+            // because of this operator is between SchemaOperator and DataSinkWriterOperator, no
+            // schema will fill when CreateTableEvent is loss.
+            if (!schemaMaps.containsKey(tableId)) {
+                emitLatestSchema(tableId);
             }
+            String partitionName =
+                    extractPartition(
+                            dataChangeEvent.op() == OperationType.DELETE
+                                    ? dataChangeEvent.before()
+                                    : dataChangeEvent.after(),
+                            tableId);
+            SessionIdentifier sessionIdentifier =
+                    SessionIdentifier.of(
+                            options.getProject(),
+                            MaxComputeUtils.getSchema(options, tableId),
+                            tableId.getTableName(),
+                            partitionName);
+            if (!sessionCache.containsKey(sessionIdentifier)) {
+                CreateSessionResponse response =
+                        (CreateSessionResponse)
+                                sendRequestToOperator(new CreateSessionRequest(sessionIdentifier));
+                sessionCache.put(sessionIdentifier, response.getSessionId());
+            }
+            dataChangeEvent
+                    .meta()
+                    .put(Constant.TUNNEL_SESSION_ID, sessionCache.get(sessionIdentifier));
+            dataChangeEvent.meta().put(Constant.MAXCOMPUTE_PARTITION_NAME, partitionName);
+            output.collect(new StreamRecord<>(dataChangeEvent));
+        } else if (element.getValue() instanceof FlushEvent) {
+            LOG.info(
+                    "operator {} handle FlushEvent begin, wait for sink writers flush success",
+                    indexOfThisSubtask);
+            sessionCache.clear();
+            Future<CoordinationResponse> waitForSuccess =
+                    submitRequestToOperator(new WaitForFlushSuccessRequest(indexOfThisSubtask));
+            output.collect(element);
+            // wait for sink writers flush success
+            waitForSuccess.get();
+            LOG.info(
+                    "operator {} handle FlushEvent end, all sink writers flush success",
+                    indexOfThisSubtask);
         } else if (element.getValue() instanceof CreateTableEvent) {
             TableId tableId = ((CreateTableEvent) element.getValue()).tableId();
             Schema schema = ((CreateTableEvent) element.getValue()).getSchema();
@@ -168,56 +193,6 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
             output.collect(element);
             LOG.warn("unknown element {}", element.getValue());
         }
-    }
-
-    private void handleDataChangeEvent(DataChangeEvent dataChangeEvent) throws Exception {
-        TableId tableId = dataChangeEvent.tableId();
-        // because of this operator is between SchemaOperator and DataSinkWriterOperator, no
-        // schema will fill when CreateTableEvent is loss.
-        if (!schemaMaps.containsKey(tableId)) {
-            emitLatestSchema(tableId);
-        }
-        String partitionName =
-                extractPartition(
-                        dataChangeEvent.op() == OperationType.DELETE
-                                ? dataChangeEvent.before()
-                                : dataChangeEvent.after(),
-                        tableId);
-        SessionIdentifier sessionIdentifier =
-                SessionIdentifier.of(
-                        options.getProject(),
-                        MaxComputeUtils.getSchema(options, tableId),
-                        tableId.getTableName(),
-                        partitionName);
-        if (!sessionCache.containsKey(sessionIdentifier)) {
-            CreateSessionResponse response =
-                    (CreateSessionResponse)
-                            sendRequestToOperator(new CreateSessionRequest(sessionIdentifier));
-            if (response.getSessionId().equals(Constant.SESSION_LIMITING)) {
-                cache(sessionIdentifier, dataChangeEvent);
-                return;
-            }
-            sessionCache.put(sessionIdentifier, response.getSessionId());
-        }
-        dataChangeEvent.meta().put(Constant.TUNNEL_SESSION_ID, sessionCache.get(sessionIdentifier));
-        dataChangeEvent.meta().put(Constant.MAXCOMPUTE_PARTITION_NAME, partitionName);
-        output.collect(new StreamRecord<>(dataChangeEvent));
-    }
-
-    private void handleFlushEvent(StreamRecord<Event> element)
-            throws IOException, ExecutionException, InterruptedException {
-        LOG.info(
-                "operator {} handle FlushEvent begin, wait for sink writers flush success",
-                indexOfThisSubtask);
-        sessionCache.clear();
-        Future<CoordinationResponse> waitForSuccess =
-                submitRequestToOperator(new WaitForFlushSuccessRequest(indexOfThisSubtask));
-        output.collect(element);
-        // wait for sink writers flush success
-        waitForSuccess.get();
-        LOG.info(
-                "operator {} handle FlushEvent end, all sink writers flush success",
-                indexOfThisSubtask);
     }
 
     private void emitLatestSchema(TableId tableId) throws Exception {
@@ -296,75 +271,6 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
             partitionSpec.set(schema.partitionKeys().get(i), Objects.toString(value));
         }
         return partitionSpec.toString(true, true);
-    }
-
-    private void cache(SessionIdentifier sessionIdentifier, DataChangeEvent dataChangeEvent)
-            throws IOException {
-        fileCacheWriters.putIfAbsent(
-                sessionIdentifier,
-                new UnifiedFileWriter<>(
-                        "/tmp/maxcompute_sink_cache", DataChangeEventSerializer.INSTANCE));
-        fileCacheWriters.get(sessionIdentifier).write(dataChangeEvent);
-    }
-
-    private void uncache(StreamRecord<Event> flushElement) {
-        fileCacheWriters.entrySet().stream()
-                // sort by table name
-                .sorted(
-                        Comparator.comparing(
-                                e -> e.getKey().getSimpleName(), Comparator.naturalOrder()))
-                .forEach(
-                        entry -> {
-                            try {
-                                SessionIdentifier sessionIdentifier = entry.getKey();
-                                LOG.info(
-                                        "operator {} un-cache data of {}",
-                                        indexOfThisSubtask,
-                                        sessionIdentifier);
-                                if (!sessionCache.containsKey(sessionIdentifier)) {
-                                    CreateSessionResponse response =
-                                            (CreateSessionResponse)
-                                                    sendRequestToOperator(
-                                                            new CreateSessionRequest(
-                                                                    sessionIdentifier));
-                                    // when encounter session limiting again, we need to flush again
-                                    // and then continue
-                                    if (response.getSessionId().equals(Constant.SESSION_LIMITING)) {
-                                        handleFlushEvent(flushElement);
-                                    }
-                                    sessionCache.put(sessionIdentifier, response.getSessionId());
-                                }
-                                entry.getValue().close();
-                                entry.getValue()
-                                        .read(
-                                                dataChangeEvent -> {
-                                                    try {
-                                                        dataChangeEvent
-                                                                .meta()
-                                                                .put(
-                                                                        Constant.TUNNEL_SESSION_ID,
-                                                                        sessionCache.get(
-                                                                                sessionIdentifier));
-                                                        dataChangeEvent
-                                                                .meta()
-                                                                .put(
-                                                                        Constant
-                                                                                .MAXCOMPUTE_PARTITION_NAME,
-                                                                        sessionIdentifier
-                                                                                .getPartitionName());
-                                                        output.collect(
-                                                                new StreamRecord<>(
-                                                                        dataChangeEvent));
-                                                    } catch (Exception ex) {
-                                                        throw new FlinkOdpsException(ex);
-                                                    }
-                                                    return null;
-                                                });
-                            } catch (Exception e) {
-                                throw new FlinkOdpsException(e);
-                            }
-                        });
-        fileCacheWriters.clear();
     }
 
     @Override
