@@ -17,13 +17,13 @@
 
 package org.apache.flink.cdc.cli;
 
-import org.apache.flink.cdc.cli.parser.PipelineDefinitionParser;
-import org.apache.flink.cdc.cli.parser.YamlPipelineDefinitionParser;
 import org.apache.flink.cdc.cli.utils.FlinkEnvironmentUtils;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
+import org.apache.flink.cdc.composer.parser.PipelineDefinitionParser;
+import org.apache.flink.cdc.composer.parser.YamlPipelineDefinitionParser;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
 
