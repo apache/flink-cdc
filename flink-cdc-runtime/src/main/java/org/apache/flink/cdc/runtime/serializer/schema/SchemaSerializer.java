@@ -89,15 +89,33 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
         stringSerializer.serialize(record.comment(), target);
     }
 
+    private static final int CURRENT_VERSION = 1;
+
     @Override
     public Schema deserialize(DataInputView source) throws IOException {
-        return Schema.newBuilder()
-                .setColumns(columnsSerializer.deserialize(source))
-                .primaryKey(primaryKeysSerializer.deserialize(source))
-                .partitionKey(partitionKeysSerializer.deserialize(source))
-                .options(optionsSerializer.deserialize(source))
-                .comment(stringSerializer.deserialize(source))
-                .build();
+        return deserialize(CURRENT_VERSION, source);
+    }
+
+    public Schema deserialize(int version, DataInputView source) throws IOException {
+        switch (version) {
+            case 0:
+                return Schema.newBuilder()
+                        .setColumns(columnsSerializer.deserialize(source))
+                        .primaryKey(primaryKeysSerializer.deserialize(source))
+                        .options(optionsSerializer.deserialize(source))
+                        .comment(stringSerializer.deserialize(source))
+                        .build();
+            case 1:
+                return Schema.newBuilder()
+                        .setColumns(columnsSerializer.deserialize(source))
+                        .primaryKey(primaryKeysSerializer.deserialize(source))
+                        .partitionKey(partitionKeysSerializer.deserialize(source))
+                        .options(optionsSerializer.deserialize(source))
+                        .comment(stringSerializer.deserialize(source))
+                        .build();
+            default:
+                throw new IOException("Unrecognized serialization version " + version);
+        }
     }
 
     @Override
