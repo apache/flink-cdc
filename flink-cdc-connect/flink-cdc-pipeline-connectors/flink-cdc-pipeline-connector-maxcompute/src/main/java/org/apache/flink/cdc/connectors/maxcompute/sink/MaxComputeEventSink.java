@@ -22,16 +22,11 @@ import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.connectors.maxcompute.common.Constant;
-import org.apache.flink.cdc.connectors.maxcompute.coordinator.PartitionOperator;
-import org.apache.flink.cdc.connectors.maxcompute.coordinator.PostPartitionOperator;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.SessionManageCoordinatedOperatorFactory;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
-import org.apache.flink.cdc.runtime.partitioning.EventPartitioner;
-import org.apache.flink.cdc.runtime.partitioning.PartitioningEventKeySelector;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
-import org.apache.flink.cdc.runtime.typeutils.PartitioningEventTypeInfo;
 import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
@@ -64,18 +59,19 @@ public class MaxComputeEventSink implements Sink<Event>, WithPreWriteTopology<Ev
                                 options, writeOptions, executionOptions));
         stream.uid(Constant.PIPELINE_SESSION_MANAGE_OPERATOR_UID);
 
-        stream =
-                stream.transform(
-                                "PartitionByBucket",
-                                new PartitioningEventTypeInfo(),
-                                new PartitionOperator(
-                                        stream.getParallelism(), options.getBucketSize()))
-                        .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
-                        .transform(
-                                "PostPartition",
-                                new EventTypeInfo(),
-                                new PostPartitionOperator(stream.getParallelism()))
-                        .name("PartitionByBucket");
+        //        stream =
+        //                stream.transform(
+        //                                "PartitionByBucket",
+        //                                new PartitioningEventTypeInfo(),
+        //                                new PartitionOperator(
+        //                                        stream.getParallelism(), options.getBucketSize()))
+        //                        .partitionCustom(new EventPartitioner(), new
+        // PartitioningEventKeySelector())
+        //                        .transform(
+        //                                "PostPartition",
+        //                                new EventTypeInfo(),
+        //                                new PostPartitionOperator(stream.getParallelism()))
+        //                        .name("PartitionByBucket");
         return stream;
     }
 

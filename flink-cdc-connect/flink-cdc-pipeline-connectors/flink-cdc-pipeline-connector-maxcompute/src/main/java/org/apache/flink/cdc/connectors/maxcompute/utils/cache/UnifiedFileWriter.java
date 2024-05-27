@@ -17,58 +17,54 @@
 
 package org.apache.flink.cdc.connectors.maxcompute.utils.cache;
 
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.utils.Preconditions;
-import org.apache.flink.core.io.SimpleVersionedSerializer;
+import org.apache.flink.core.memory.DataInputView;
+import org.apache.flink.core.memory.DataInputViewStreamWrapper;
+import org.apache.flink.core.memory.DataOutputView;
+import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Function;
 
 /** UnifiedFileWriter. */
 public class UnifiedFileWriter<T> {
-    private static final long MAX_FILE_SIZE = 1024 * 1024 * 100;
+    private static final long MAX_FILE_ROW_COUNT = 40960;
     private final String basePath;
-    private long currentFileSize = 0;
     private int fileIndex = 0;
     private BufferedOutputStream currentOutputStream;
-    private SimpleVersionedSerializer<T> serializer;
+    private TypeSerializer<T> serializer;
+    private Map<Integer, Long> fileRecordCountMap;
 
-    public UnifiedFileWriter(String basePath) throws IOException {
+    public UnifiedFileWriter(String basePath, TypeSerializer<T> serializer) throws IOException {
         this.basePath = basePath;
+        this.serializer = serializer;
         // make sure the directory exists
         Paths.get(basePath).toFile().mkdirs();
         currentOutputStream = createNewOutputStream();
+        fileRecordCountMap = new HashMap<>();
     }
 
     public synchronized void write(T data) throws IOException {
-        byte[] serializedData = serializer.serialize(data);
+        DataOutputView dov = new DataOutputViewStreamWrapper(currentOutputStream);
+        serializer.serialize(data, dov);
+        fileRecordCountMap.put(fileIndex, fileRecordCountMap.getOrDefault(fileIndex, 0L) + 1);
 
-        // write the data block length first
-        byte[] sizePrefix = ByteBuffer.allocate(4).putInt(serializedData.length).array();
-
-        if (currentFileSize + sizePrefix.length + serializedData.length > MAX_FILE_SIZE) {
+        if (fileRecordCountMap.get(fileIndex) > MAX_FILE_ROW_COUNT) {
             currentOutputStream.close();
             fileIndex++;
             currentOutputStream = createNewOutputStream();
-            currentFileSize = 0;
         }
-
-        // then write the data
-        currentOutputStream.write(sizePrefix);
-        currentOutputStream.write(serializedData);
-
-        // update the current file size
-        currentFileSize += sizePrefix.length + serializedData.length;
     }
 
     private BufferedOutputStream createNewOutputStream() throws IOException {
@@ -89,23 +85,12 @@ public class UnifiedFileWriter<T> {
         Arrays.sort(files, Comparator.comparing(File::getName));
 
         // deal with each file in order
-        for (File file : files) {
-            try (InputStream input = new BufferedInputStream(Files.newInputStream(file.toPath()))) {
-                // read until EOF
-                while (true) {
-                    // read the size prefix
-                    byte[] sizePrefix = new byte[4];
-                    if (input.read(sizePrefix) != sizePrefix.length) {
-                        break;
-                    }
-                    int size = ByteBuffer.wrap(sizePrefix).getInt();
-                    // read the data
-                    byte[] data = new byte[size];
-                    if (input.read(data) != size) {
-                        throw new EOFException("Unexpected end of file while reading data block.");
-                    }
-                    T record = serializer.deserialize(serializer.getVersion(), data);
-                    // process the record
+        for (int index = 0; index <= fileIndex; index++) {
+            File file = files[index];
+            try (InputStream fileInputStream = Files.newInputStream(file.toPath())) {
+                DataInputView dataInputView = new DataInputViewStreamWrapper(fileInputStream);
+                for (int i = 0; i < fileRecordCountMap.get(index); i++) {
+                    T record = serializer.deserialize(dataInputView);
                     eventProcessor.apply(record);
                 }
             }

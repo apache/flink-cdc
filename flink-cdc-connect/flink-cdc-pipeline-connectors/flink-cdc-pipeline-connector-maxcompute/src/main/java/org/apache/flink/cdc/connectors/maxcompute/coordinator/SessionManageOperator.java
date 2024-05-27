@@ -40,6 +40,7 @@ import org.apache.flink.cdc.connectors.maxcompute.utils.TypeConvertUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.cache.UnifiedFileWriter;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
+import org.apache.flink.cdc.runtime.serializer.event.DataChangeEventSerializer;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
@@ -118,7 +119,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
         this.fieldGetterMaps = new HashMap<>();
         SessionManageOperator.instance = this;
 
-        if (options.getMaxSessionParallelism() <= 0) {
+        if (options.getMaxSessionParallelism() > 0) {
             this.fileCacheWriters = new HashMap<>();
         }
     }
@@ -299,7 +300,10 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
 
     private void cache(SessionIdentifier sessionIdentifier, DataChangeEvent dataChangeEvent)
             throws IOException {
-        fileCacheWriters.putIfAbsent(sessionIdentifier, new UnifiedFileWriter<>("/tmp/"));
+        fileCacheWriters.putIfAbsent(
+                sessionIdentifier,
+                new UnifiedFileWriter<>(
+                        "/tmp/maxcompute_sink_cache", DataChangeEventSerializer.INSTANCE));
         fileCacheWriters.get(sessionIdentifier).write(dataChangeEvent);
     }
 
