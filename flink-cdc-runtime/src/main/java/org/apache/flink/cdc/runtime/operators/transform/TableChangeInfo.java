@@ -109,7 +109,7 @@ public class TableChangeInfo {
     /** Serializer for {@link TableChangeInfo}. */
     public static class Serializer implements SimpleVersionedSerializer<TableChangeInfo> {
 
-        public static final int CURRENT_VERSION = 0;
+        public static final int CURRENT_VERSION = 1;
 
         @Override
         public int getVersion() {
@@ -140,9 +140,9 @@ public class TableChangeInfo {
                     DataInputStream in = new DataInputStream(bais)) {
                 TableId tableId = tableIdSerializer.deserialize(new DataInputViewStreamWrapper(in));
                 Schema originalSchema =
-                        schemaSerializer.deserialize(new DataInputViewStreamWrapper(in));
+                        schemaSerializer.deserialize(version, new DataInputViewStreamWrapper(in));
                 Schema transformedSchema =
-                        schemaSerializer.deserialize(new DataInputViewStreamWrapper(in));
+                        schemaSerializer.deserialize(version, new DataInputViewStreamWrapper(in));
                 return TableChangeInfo.of(tableId, originalSchema, transformedSchema);
             }
         }
