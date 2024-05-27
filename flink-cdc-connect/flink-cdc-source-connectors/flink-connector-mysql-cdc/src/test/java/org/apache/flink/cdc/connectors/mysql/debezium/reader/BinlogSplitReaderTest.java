@@ -45,6 +45,10 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.util.ExceptionUtils;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.github.shyiko.mysql.binlog.event.Event;
+import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
+import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlOffsetContext;
@@ -82,6 +86,7 @@ import static org.apache.flink.cdc.connectors.mysql.MySqlTestUtils.assertContain
 import static org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.initializeEffectiveOffset;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getSnapshotSplitInfo;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
@@ -839,6 +844,50 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         } finally {
             reader.close();
         }
+    }
+
+    @Test
+    public void testRestoreFromCheckpointWithTimestampStartingOffset() throws Exception {
+        // Preparations
+        inventoryDatabase8.createAndInitialize();
+        MySqlSourceConfig connectionConfig =
+                getConfig(MYSQL8_CONTAINER, inventoryDatabase8, new String[] {"products"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
+
+        // Capture the current binlog offset, and use it to mock restoring from checkpoint
+        BinlogOffset checkpointOffset = DebeziumUtils.currentBinlogOffset(mySqlConnection);
+
+        // Create a config to start reading from timestamp
+        long startTimestampMs = 15213L;
+        MySqlSourceConfig sourceConfig =
+                getConfig(
+                        MYSQL8_CONTAINER,
+                        inventoryDatabase8,
+                        StartupOptions.timestamp(startTimestampMs),
+                        new String[] {"products"});
+
+        BinlogSplitReader binlogReader = createBinlogReader(sourceConfig);
+        MySqlBinlogSplit checkpointSplit =
+                createBinlogSplit(
+                        getConfig(
+                                MYSQL8_CONTAINER,
+                                inventoryDatabase8,
+                                StartupOptions.specificOffset(checkpointOffset),
+                                new String[] {"products"}));
+
+        // Restore binlog reader from checkpoint
+        binlogReader.submitSplit(checkpointSplit);
+
+        // We mock a WRITE_ROWS event with timestamp = 1, which should be dropped by filter
+        EventHeaderV4 header = new EventHeaderV4();
+        header.setEventType(EventType.WRITE_ROWS);
+        header.setTimestamp(1L);
+        Event event = new Event(header, new WriteRowsEventData());
+
+        // Check if the filter works
+        Predicate<Event> eventFilter = binlogReader.getBinlogSplitReadTask().getEventFilter();
+        assertThat(eventFilter.test(event)).isFalse();
     }
 
     private BinlogSplitReader createBinlogReader(MySqlSourceConfig sourceConfig) {

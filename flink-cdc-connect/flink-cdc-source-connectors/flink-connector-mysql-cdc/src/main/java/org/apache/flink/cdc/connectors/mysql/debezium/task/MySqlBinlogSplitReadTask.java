@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.debezium.task;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
 import org.apache.flink.cdc.connectors.mysql.debezium.reader.StoppableChangeEventSourceContext;
@@ -118,5 +119,10 @@ public class MySqlBinlogSplitReadTask extends MySqlStreamingChangeEventSource {
 
     private boolean isBoundedRead() {
         return !isNonStoppingOffset(binlogSplit.getEndingOffset());
+    }
+
+    @VisibleForTesting
+    public Predicate<Event> getEventFilter() {
+        return eventFilter;
     }
 }
