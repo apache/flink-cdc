@@ -28,6 +28,8 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.junit.Test;
 
+import java.util.Optional;
+
 import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogFactory}. */
@@ -42,9 +44,13 @@ public class OceanBaseDataSinkFactoryTest {
         Configuration conf =
                 Configuration.fromMap(
                         ImmutableMap.<String, String>builder()
-                                .put("url", System.getenv("url"))
-                                .put("username", System.getenv("username"))
-                                .put("password", System.getenv("password"))
+                                .put("url", Optional.ofNullable(System.getenv("url")).orElse(""))
+                                .put(
+                                        "username",
+                                        Optional.ofNullable(System.getenv("username")).orElse(""))
+                                .put(
+                                        "password",
+                                        Optional.ofNullable(System.getenv("password")).orElse(""))
                                 .build());
         DataSink dataSink =
                 sinkFactory.createDataSink(
