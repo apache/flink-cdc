@@ -195,13 +195,6 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
         } else if (request instanceof CreateSessionRequest) {
             SessionIdentifier sessionIdentifier = ((CreateSessionRequest) request).getIdentifier();
             if (!sessionCache.containsKey(sessionIdentifier)) {
-                // if sessionCache size exceed the max size, return SESSION_LIMITING to let
-                // TaskManager cache the data of new session
-                if (options.getMaxSessionParallelism() > 0
-                        && sessionCache.size() >= options.getMaxSessionParallelism()) {
-                    return CompletableFuture.completedFuture(
-                            new CreateSessionResponse(Constant.SESSION_LIMITING));
-                }
                 MaxComputeWriter writer = createWriter(sessionIdentifier);
                 sessionCache.put(sessionIdentifier, writer);
                 sessionIdMap.put(writer.getId(), sessionIdentifier);

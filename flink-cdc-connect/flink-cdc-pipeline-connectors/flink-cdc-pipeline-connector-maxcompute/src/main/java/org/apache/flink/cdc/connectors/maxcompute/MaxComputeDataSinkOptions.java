@@ -1,12 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.maxcompute.options;
+package org.apache.flink.cdc.connectors.maxcompute;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
@@ -71,13 +72,6 @@ public class MaxComputeDataSinkOptions {
                     .defaultValue(16)
                     .withDescription(
                             "The batch size of MaxCompute table when automatically create table.");
-
-    public static final ConfigOption<Integer> MAX_SESSION_PARALLELISM =
-            ConfigOptions.key("maxSessionParallelism")
-                    .intType()
-                    .defaultValue(-1)
-                    .withDescription(
-                            "The max session when writing to maxcompute, the session overflow will trigger cache logic.");
 
     // write options.
     public static final ConfigOption<String> COMPRESS_ALGORITHM =

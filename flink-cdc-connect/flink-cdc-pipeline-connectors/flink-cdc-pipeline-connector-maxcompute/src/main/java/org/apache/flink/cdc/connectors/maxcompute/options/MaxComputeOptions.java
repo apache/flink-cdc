@@ -35,7 +35,6 @@ public class MaxComputeOptions implements Serializable {
     private final String quotaName;
     private final String stsToken;
     private final int bucketSize;
-    private final int maxSessionParallelism;
 
     /** builder for maxcompute options. */
     public static class Builder {
@@ -48,7 +47,6 @@ public class MaxComputeOptions implements Serializable {
         private String quotaName;
         private String stsToken;
         private int bucketSize = 16;
-        private int maxSessionParallelism = -1;
 
         public Builder(String accessId, String accessKey, String endpoint, String project) {
             this.accessId = accessId;
@@ -77,11 +75,6 @@ public class MaxComputeOptions implements Serializable {
             return this;
         }
 
-        public Builder withMaxSessionParallelism(int maxSessionParallelism) {
-            this.maxSessionParallelism = maxSessionParallelism;
-            return this;
-        }
-
         public MaxComputeOptions build() {
             return new MaxComputeOptions(this);
         }
@@ -96,7 +89,6 @@ public class MaxComputeOptions implements Serializable {
         this.quotaName = builder.quotaName;
         this.stsToken = builder.stsToken;
         this.bucketSize = builder.bucketSize;
-        this.maxSessionParallelism = builder.maxSessionParallelism;
         this.supportSchema = MaxComputeUtils.supportSchema(this);
     }
 
@@ -134,10 +126,6 @@ public class MaxComputeOptions implements Serializable {
 
     public int getBucketSize() {
         return bucketSize;
-    }
-
-    public int getMaxSessionParallelism() {
-        return maxSessionParallelism;
     }
 
     public static Builder builder(
