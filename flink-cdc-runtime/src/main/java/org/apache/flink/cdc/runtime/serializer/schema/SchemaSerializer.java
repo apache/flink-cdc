@@ -89,7 +89,7 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
         stringSerializer.serialize(record.comment(), target);
     }
 
-    private static final int CURRENT_VERSION = 1;
+    private static final int CURRENT_VERSION = 2;
 
     @Override
     public Schema deserialize(DataInputView source) throws IOException {
@@ -106,6 +106,7 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
                         .comment(stringSerializer.deserialize(source))
                         .build();
             case 1:
+            case 2:
                 return Schema.newBuilder()
                         .setColumns(columnsSerializer.deserialize(source))
                         .primaryKey(primaryKeysSerializer.deserialize(source))

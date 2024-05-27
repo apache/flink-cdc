@@ -98,10 +98,6 @@ public class DorisMetadataApplier implements MetadataApplier {
 
     @Override
     public void applySchemaChange(SchemaChangeEvent event) {
-        if (!enabledSchemaEvolutionTypes.contains(event.getType())) {
-            LOG.info("Sink ignores schema change event {}", event);
-            return;
-        }
         try {
             // send schema change op to doris
             if (event instanceof CreateTableEvent) {

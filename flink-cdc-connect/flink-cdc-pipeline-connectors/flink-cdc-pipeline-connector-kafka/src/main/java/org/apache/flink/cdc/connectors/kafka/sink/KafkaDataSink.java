@@ -103,7 +103,7 @@ public class KafkaDataSink implements DataSink {
         return new MetadataApplier() {
             @Override
             public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
-                return true;
+                return enabledEventTypes.contains(schemaChangeEventType);
             }
 
             @Override

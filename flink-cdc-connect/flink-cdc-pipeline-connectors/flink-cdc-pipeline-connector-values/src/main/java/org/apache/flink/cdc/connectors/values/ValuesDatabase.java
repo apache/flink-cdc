@@ -100,11 +100,7 @@ public class ValuesDatabase {
 
         @Override
         public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
-            if (enabledSchemaEvolutionTypes.contains(schemaChangeEvent.getType())) {
-                applySchemaChangeEvent(schemaChangeEvent);
-            } else {
-                LOG.info("Sink ignores schema change event {}", schemaChangeEvent);
-            }
+            applySchemaChangeEvent(schemaChangeEvent);
         }
     }
 
@@ -143,13 +139,11 @@ public class ValuesDatabase {
                             new ValuesTable(
                                     tableId, ((CreateTableEvent) schemaChangeEvent).getSchema()));
                 }
-            } else if (enabledSchemaEvolutionTypes.contains(schemaChangeEvent.getType())) {
+            } else {
                 throw new RuntimeException(
                         String.format(
                                 "Rejected schema change event %s since error.on.schema.change is enabled.",
                                 schemaChangeEvent));
-            } else {
-                LOG.info("Sink ignores schema change event {}", schemaChangeEvent);
             }
         }
     }

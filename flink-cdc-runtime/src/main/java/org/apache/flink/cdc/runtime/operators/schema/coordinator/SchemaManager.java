@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
@@ -56,6 +57,7 @@ public class SchemaManager {
     private static final Logger LOG = LoggerFactory.getLogger(SchemaManager.class);
     private static final int INITIAL_SCHEMA_VERSION = 0;
     private static final int VERSIONS_TO_KEEP = 3;
+    private final SchemaChangeBehavior behavior;
 
     // Serializer for checkpointing
     public static final Serializer SERIALIZER = new Serializer();
@@ -69,13 +71,26 @@ public class SchemaManager {
     public SchemaManager() {
         evolvedSchemas = new HashMap<>();
         upstreamSchemas = new HashMap<>();
+        behavior = SchemaChangeBehavior.EVOLVE;
+    }
+
+    public SchemaManager(SchemaChangeBehavior behavior) {
+        evolvedSchemas = new HashMap<>();
+        upstreamSchemas = new HashMap<>();
+        this.behavior = behavior;
     }
 
     public SchemaManager(
             Map<TableId, SortedMap<Integer, Schema>> upstreamSchemas,
-            Map<TableId, SortedMap<Integer, Schema>> evolvedSchemas) {
+            Map<TableId, SortedMap<Integer, Schema>> evolvedSchemas,
+            SchemaChangeBehavior behavior) {
         this.evolvedSchemas = evolvedSchemas;
         this.upstreamSchemas = upstreamSchemas;
+        this.behavior = behavior;
+    }
+
+    public SchemaChangeBehavior getBehavior() {
+        return behavior;
     }
 
     public final boolean schemaExists(
@@ -234,7 +249,7 @@ public class SchemaManager {
     /** Serializer for {@link SchemaManager}. */
     public static class Serializer implements SimpleVersionedSerializer<SchemaManager> {
 
-        public static final int CURRENT_VERSION = 0;
+        public static final int CURRENT_VERSION = 2;
 
         @Override
         public int getVersion() {
@@ -247,6 +262,7 @@ public class SchemaManager {
                     DataOutputStream out = new DataOutputStream(baos)) {
                 serializeSchemaMap(schemaManager.evolvedSchemas, out);
                 serializeSchemaMap(schemaManager.upstreamSchemas, out);
+                out.writeUTF(schemaManager.getBehavior().name());
                 return baos.toByteArray();
             }
         }
@@ -255,9 +271,28 @@ public class SchemaManager {
         public SchemaManager deserialize(int version, byte[] serialized) throws IOException {
             try (ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
                     DataInputStream in = new DataInputStream(bais)) {
-                Map<TableId, SortedMap<Integer, Schema>> evolvedSchemas = deserializeSchemaMap(in);
-                Map<TableId, SortedMap<Integer, Schema>> upstreamSchemas = deserializeSchemaMap(in);
-                return new SchemaManager(upstreamSchemas, evolvedSchemas);
+                switch (version) {
+                    case 0:
+                    case 1:
+                        {
+                            Map<TableId, SortedMap<Integer, Schema>> schemas =
+                                    deserializeSchemaMap(in);
+                            // In legacy mode, upstream schema and evolved schema never differs
+                            return new SchemaManager(schemas, schemas, SchemaChangeBehavior.EVOLVE);
+                        }
+                    case 2:
+                        {
+                            Map<TableId, SortedMap<Integer, Schema>> evolvedSchemas =
+                                    deserializeSchemaMap(in);
+                            Map<TableId, SortedMap<Integer, Schema>> upstreamSchemas =
+                                    deserializeSchemaMap(in);
+                            SchemaChangeBehavior behavior =
+                                    SchemaChangeBehavior.valueOf(in.readUTF());
+                            return new SchemaManager(upstreamSchemas, evolvedSchemas, behavior);
+                        }
+                    default:
+                        throw new RuntimeException("Unknown serialize version: " + version);
+                }
             }
         }
     }

@@ -132,7 +132,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
             } else {
                 try {
                     metadataApplier.applySchemaChange(changeEvent);
-                    LOG.debug("Apply schema change {} to table {}.", changeEvent, tableId);
+                    LOG.debug("Applied schema change {} to table {}.", changeEvent, tableId);
                     finishedSchemaChanges.add(changeEvent);
                 } catch (Throwable t) {
                     LOG.error(

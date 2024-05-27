@@ -92,10 +92,6 @@ public class StarRocksMetadataApplier implements MetadataApplier {
 
     @Override
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
-        if (!enabledSchemaEvolutionTypes.contains(schemaChangeEvent.getType())) {
-            LOG.info("Sink ignores schema change event {}", schemaChangeEvent);
-            return;
-        }
         if (!isOpened) {
             isOpened = true;
             catalog.open();

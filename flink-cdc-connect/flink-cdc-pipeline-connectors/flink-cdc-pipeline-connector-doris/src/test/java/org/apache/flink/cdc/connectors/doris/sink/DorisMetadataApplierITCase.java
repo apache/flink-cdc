@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
@@ -55,6 +56,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.BENODES;
@@ -426,7 +428,9 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 schemaOperatorTranslator.translate(
                         stream,
                         DEFAULT_PARALLELISM,
-                        dorisSink.getMetadataApplier(),
+                        dorisSink.getMetadataApplier(
+                                Arrays.stream(SchemaChangeEventTypeFamily.ALL)
+                                        .collect(Collectors.toSet())),
                         new ArrayList<>());
 
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
