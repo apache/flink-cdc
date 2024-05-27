@@ -18,9 +18,11 @@
 package org.apache.flink.cdc.connectors.mysql.source.connection;
 
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.pool.HikariPool;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 
 import java.util.Properties;
@@ -60,7 +62,15 @@ public class PooledDataSourceFactory {
         config.addDataSourceProperty("prepStmtCacheSize", "250");
         config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
 
-        return new HikariDataSource(config);
+        try {
+            return new HikariDataSource(config);
+        } catch (HikariPool.PoolInitializationException e) {
+            throw new FlinkRuntimeException(
+                    "Initialize jdbc connection pool failed, this may caused by"
+                            + " wrong jdbc configurations or unstable network."
+                            + " Please check your jdbc configurations and network.",
+                    e);
+        }
     }
 
     private static String formatJdbcUrl(String hostName, int port, Properties jdbcProperties) {
