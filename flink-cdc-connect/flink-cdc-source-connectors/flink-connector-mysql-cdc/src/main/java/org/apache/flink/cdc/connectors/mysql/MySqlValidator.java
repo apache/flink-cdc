@@ -51,6 +51,7 @@ public class MySqlValidator implements Validator {
     private static final String BINLOG_FORMAT_ROW = "ROW";
     private static final String BINLOG_FORMAT_IMAGE_FULL = "FULL";
     private static final String DEFAULT_BINLOG_ROW_VALUE_OPTIONS = "";
+    private static final int TIME_ZONE_TOLERANCE_SECONDS = 30 * 60;
 
     private final Properties dbzProperties;
     private final MySqlSourceConfig sourceConfig;
@@ -206,7 +207,10 @@ public class MySqlValidator implements Validator {
                 zoneId.getRules().getOffset(LocalDateTime.now()).getTotalSeconds();
 
         if (!timeDiffMatchesZoneOffset(
-                timeDiffInSeconds, timeZoneOffsetInSeconds, inDayLightTime)) {
+                timeDiffInSeconds,
+                timeZoneOffsetInSeconds,
+                inDayLightTime,
+                TIME_ZONE_TOLERANCE_SECONDS)) {
             throw new ValidationException(
                     String.format(
                             "The MySQL server has a timezone offset (%d seconds %s UTC) which does not match "
@@ -220,10 +224,14 @@ public class MySqlValidator implements Validator {
     }
 
     private boolean timeDiffMatchesZoneOffset(
-            int timeDiffInSeconds, int timeZoneOffsetInSeconds, boolean inDayLightTime) {
+            int timeDiffInSeconds,
+            int timeZoneOffsetInSeconds,
+            boolean inDayLightTime,
+            int toleranceInSeconds) {
         // Trivial case for non-DST timezone
         if (!inDayLightTime) {
-            return timeDiffInSeconds == timeZoneOffsetInSeconds;
+            return equalsWithTolerance(
+                    timeDiffInSeconds, timeZoneOffsetInSeconds, toleranceInSeconds);
         }
 
         // There are two cases when Daylight Saving Time is in effect,
@@ -232,7 +240,14 @@ public class MySqlValidator implements Validator {
         // 2) MySQL timezone has been fixed to non-DST, like using 'Pacific Standard Time' all year
         // long.
         // thus we need to accept both.
-        return timeDiffInSeconds == timeZoneOffsetInSeconds
-                || timeDiffInSeconds == timeZoneOffsetInSeconds - TimeUnit.HOURS.toSeconds(1);
+        return equalsWithTolerance(timeDiffInSeconds, timeZoneOffsetInSeconds, toleranceInSeconds)
+                || equalsWithTolerance(
+                        timeDiffInSeconds,
+                        timeZoneOffsetInSeconds - TimeUnit.HOURS.toSeconds(1),
+                        toleranceInSeconds);
+    }
+
+    private boolean equalsWithTolerance(long val1, long val2, long tolerance) {
+        return Math.abs(val1 - val2) <= tolerance;
     }
 }
