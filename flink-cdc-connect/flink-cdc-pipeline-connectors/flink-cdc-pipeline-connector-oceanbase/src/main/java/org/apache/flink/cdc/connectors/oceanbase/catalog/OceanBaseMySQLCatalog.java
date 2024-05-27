@@ -77,7 +77,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
      *
      * @param databaseName Name of the database
      * @param ignoreIfExists Flag to specify behavior when a database with the given name already
-     *     exists: if set to false, throw a StarRocksCatalogException, if set to true, do nothing.
+     *     exists.
      * @throws OceanBaseCatalogException in case of any runtime exception
      */
     @Override
@@ -104,8 +104,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
      * Creates a table.
      *
      * @param table the table definition
-     * @param ignoreIfExists flag to specify behavior when a table already exists. if set to false,
-     *     it throws a TableAlreadyExistException, if set to true, do nothing.
+     * @param ignoreIfExists flag to specify behavior when a table already exists.
      * @throws OceanBaseCatalogException in case of any runtime exception
      */
     @Override

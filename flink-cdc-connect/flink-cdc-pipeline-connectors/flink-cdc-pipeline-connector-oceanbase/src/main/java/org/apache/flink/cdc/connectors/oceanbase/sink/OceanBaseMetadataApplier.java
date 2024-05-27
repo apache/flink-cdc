@@ -58,7 +58,6 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
     @Override
     public void applySchemaChange(SchemaChangeEvent event) {
         try {
-            // send schema change op to doris
             if (event instanceof CreateTableEvent) {
                 applyCreateTableEvent((CreateTableEvent) event);
             } else if (event instanceof AddColumnEvent) {
@@ -121,7 +120,7 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
     }
 
     private void applyDropColumnEvent(DropColumnEvent dropColumnEvent) {
-        // TODO The `DropColumnEvent` in OceanBase is classified as an OFFLINE DDL operation,
+        // TODO The `DropColumnEvent` in OceanBase is classified as an offline DDL operation,
         //  and currently, this pipeline connector does not support offline DDL actions.
         throw new UnsupportedOperationException("Drop column is not supported currently");
     }
