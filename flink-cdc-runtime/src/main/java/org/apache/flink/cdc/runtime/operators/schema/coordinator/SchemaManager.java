@@ -146,10 +146,6 @@ public class SchemaManager {
     }
 
     private void handleCreateTableEvent(CreateTableEvent event) {
-        checkArgument(
-                !schemaExists(event.tableId()),
-                "Unable to apply CreateTableEvent to an existing schema for table \"%s\"",
-                event.tableId());
         LOG.info("Handling schema change event: {}", event);
         registerNewSchema(event.tableId(), event.getSchema());
     }
