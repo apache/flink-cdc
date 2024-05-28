@@ -511,39 +511,66 @@ public class SystemFunctionUtils {
         return null;
     }
 
-    public static String convertString(Object object) {
+    public static String castToString(Object object) {
+        if (object == null) {
+            return null;
+        }
         return object.toString();
     }
 
-    public static Byte convertByte(Object object) {
-        return Byte.valueOf(convertString(object));
+    public static Byte castToByte(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Byte.valueOf(castToString(object));
     }
 
-    public static Boolean convertBoolean(Object object) {
-        return Boolean.valueOf(convertString(object));
+    public static Boolean castToBoolean(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Boolean.valueOf(castToString(object));
     }
 
-    public static Short convertShort(Object object) {
-        return Short.valueOf(convertString(object));
+    public static Short castToShort(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Short.valueOf(castToString(object));
     }
 
-    public static Integer convertInteger(Object object) {
-        return Integer.valueOf(convertString(object));
+    public static Integer castToInteger(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Integer.valueOf(castToString(object));
     }
 
-    public static Long convertLong(Object object) {
-        return Long.valueOf(convertString(object));
+    public static Long castToLong(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Long.valueOf(castToString(object));
     }
 
-    public static Float convertFloat(Object object) {
-        return Float.valueOf(convertString(object));
+    public static Float castToFloat(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Float.valueOf(castToString(object));
     }
 
-    public static Double convertDouble(Object object) {
-        return Double.valueOf(convertString(object));
+    public static Double castToDouble(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Double.valueOf(castToString(object));
     }
 
-    public static BigDecimal convertBigDecimal(Object object) {
-        return BigDecimal.valueOf(convertDouble(object));
+    public static BigDecimal castToBigDecimal(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return BigDecimal.valueOf(castToDouble(object));
     }
 }

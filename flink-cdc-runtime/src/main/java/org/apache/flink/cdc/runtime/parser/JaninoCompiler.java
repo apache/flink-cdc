@@ -316,25 +316,25 @@ public class JaninoCompiler {
     private static String getTypeConvertMethod(SqlDataTypeSpec sqlDataTypeSpec) {
         switch (sqlDataTypeSpec.getTypeName().getSimple().toUpperCase()) {
             case "BOOLEAN":
-                return "convertBoolean";
+                return "castToBoolean";
             case "TINYINT":
-                return "convertByte";
+                return "castToByte";
             case "SMALLINT":
-                return "convertShort";
+                return "castToShort";
             case "INTEGER":
-                return "convertInteger";
+                return "castToInteger";
             case "BIGINT":
-                return "convertLong";
+                return "castToLong";
             case "FLOAT":
-                return "convertFloat";
+                return "castToFloat";
             case "DOUBLE":
-                return "convertDouble";
+                return "castToDouble";
             case "DECIMAL":
-                return "convertBigDecimal";
+                return "castToBigDecimal";
             case "CHAR":
             case "VARCHAR":
             case "STRING":
-                return "convertString";
+                return "castToString";
             default:
                 throw new ParseException(
                         "Unsupported data type cast: " + sqlDataTypeSpec.toString());
