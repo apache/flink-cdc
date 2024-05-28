@@ -37,6 +37,8 @@ runtime:
   - flink-cdc-runtime/**/*
 e2e-tests:
   - flink-cdc-e2e-tests/**/*
+migration-tests:
+  - flink-cdc-migration-tests/**/*
 base:
   - flink-cdc-connect/flink-cdc-source-connectors/flink-cdc-base/**/*
 debezium:
