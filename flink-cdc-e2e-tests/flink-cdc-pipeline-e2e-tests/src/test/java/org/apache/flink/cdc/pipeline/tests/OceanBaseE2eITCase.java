@@ -23,8 +23,9 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.connectors.oceanbase.OceanBaseContainer;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
+import org.apache.flink.util.function.FunctionWithException;
+import org.apache.flink.util.function.SupplierWithException;
 
-import com.oceanbase.connector.flink.utils.OceanBaseJdbcUtils;
 import org.apache.commons.text.StringEscapeUtils;
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
@@ -217,8 +218,7 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
 
         int tableRowsCount = 0;
         for (int i = 0; i < 10; ++i) {
-            tableRowsCount =
-                    OceanBaseJdbcUtils.getTableRowsCount(() -> getConnection(isMySQL), tableName);
+            tableRowsCount = getTableRowsCount(() -> getConnection(isMySQL), tableName);
             if (tableRowsCount < expectedCount) {
                 Thread.sleep(100);
             }
@@ -267,5 +267,27 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                 obServer.getJdbcUrl(uniqueDatabaseName),
                 obServer.getUsername(),
                 obServer.getPassword());
+    }
+
+    private int getTableRowsCount(
+            SupplierWithException<Connection, SQLException> connectionSupplier, String tableName) {
+        return (int)
+                query(
+                        connectionSupplier,
+                        "SELECT COUNT(1) FROM " + tableName,
+                        rs -> rs.next() ? rs.getInt(1) : 0);
+    }
+
+    private Object query(
+            SupplierWithException<Connection, SQLException> connectionSupplier,
+            String sql,
+            FunctionWithException<ResultSet, Object, SQLException> resultSetConsumer) {
+        try (Connection connection = connectionSupplier.get();
+                Statement statement = connection.createStatement()) {
+            ResultSet rs = statement.executeQuery(sql);
+            return resultSetConsumer.apply(rs);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to execute sql: " + sql, e);
+        }
     }
 }
