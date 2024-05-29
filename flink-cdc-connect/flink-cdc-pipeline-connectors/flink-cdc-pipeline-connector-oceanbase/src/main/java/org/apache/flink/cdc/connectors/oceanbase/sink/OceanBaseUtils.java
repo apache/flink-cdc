@@ -73,6 +73,7 @@ public class OceanBaseUtils {
                                         : OceanBaseTable.TableType.DUPLICATE_KEY)
                         .setColumns(oceanBaseColumns)
                         .setTableKeys(schema.primaryKeys())
+                        .setPartitionKeys(schema.partitionKeys())
                         .setComment(schema.comment());
         return tableBuilder.build();
     }
@@ -102,6 +103,7 @@ public class OceanBaseUtils {
     public static final String STRING = "STRING";
     public static final String DATE = "DATE";
     public static final String DATETIME = "DATETIME";
+    public static final String TIMESTAMP = "TIMESTAMP";
     public static final String JSON = "JSON";
     public static final String TEXT = "TEXT";
     public static final String BLOB = "BLOB";
@@ -220,7 +222,7 @@ public class OceanBaseUtils {
 
         @Override
         public OceanBaseColumn.Builder visit(TimestampType timestampType) {
-            builder.setDataType(DATETIME);
+            builder.setDataType(TIMESTAMP);
             builder.setNullable(timestampType.isNullable());
             return builder;
         }

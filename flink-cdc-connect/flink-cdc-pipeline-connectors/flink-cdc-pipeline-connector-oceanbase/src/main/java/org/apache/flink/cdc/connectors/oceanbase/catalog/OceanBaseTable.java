@@ -52,6 +52,8 @@ public class OceanBaseTable {
 
     @Nullable private final List<String> tableKeys;
 
+    private final List<String> partitionKeys;
+
     /** The table comment. null if there is no comment or it's unknown. */
     @Nullable private final String comment;
 
@@ -67,6 +69,7 @@ public class OceanBaseTable {
             TableType tableType,
             List<OceanBaseColumn> columns,
             @Nullable List<String> tableKeys,
+            @Nullable List<String> partitionKeys,
             @Nullable String comment,
             Map<String, String> properties) {
         Preconditions.checkNotNull(databaseName);
@@ -78,6 +81,7 @@ public class OceanBaseTable {
         this.tableType = tableType;
         this.columns = columns;
         this.tableKeys = tableKeys;
+        this.partitionKeys = partitionKeys;
         this.comment = comment;
         this.properties = Preconditions.checkNotNull(properties);
     }
@@ -100,6 +104,10 @@ public class OceanBaseTable {
 
     public Optional<List<String>> getTableKeys() {
         return Optional.ofNullable(tableKeys);
+    }
+
+    public Optional<List<String>> getPartitionKeys() {
+        return Optional.ofNullable(partitionKeys);
     }
 
     public Optional<String> getComment() {
@@ -139,6 +147,8 @@ public class OceanBaseTable {
                 + columns
                 + ", tableKeys="
                 + tableKeys
+                + ", partitionKeys="
+                + partitionKeys
                 + ", comment='"
                 + comment
                 + '\''
@@ -161,6 +171,7 @@ public class OceanBaseTable {
                 && tableType == that.tableType
                 && Objects.equals(columns, that.columns)
                 && Objects.equals(tableKeys, that.tableKeys)
+                && Objects.equals(partitionKeys, that.partitionKeys)
                 && Objects.equals(comment, that.comment)
                 && Objects.equals(properties, that.properties);
     }
@@ -173,6 +184,7 @@ public class OceanBaseTable {
         private TableType tableType;
         private List<OceanBaseColumn> columns = new ArrayList<>();
         private List<String> tableKeys;
+        private List<String> partitionKeys;
         private String comment;
         private Map<String, String> properties = new HashMap<>();
 
@@ -201,6 +213,11 @@ public class OceanBaseTable {
             return this;
         }
 
+        public Builder setPartitionKeys(List<String> partitionKeys) {
+            this.partitionKeys = partitionKeys;
+            return this;
+        }
+
         public Builder setComment(String comment) {
             this.comment = comment;
             return this;
@@ -213,7 +230,14 @@ public class OceanBaseTable {
 
         public OceanBaseTable build() {
             return new OceanBaseTable(
-                    databaseName, tableName, tableType, columns, tableKeys, comment, properties);
+                    databaseName,
+                    tableName,
+                    tableType,
+                    columns,
+                    tableKeys,
+                    partitionKeys,
+                    comment,
+                    properties);
         }
     }
 }
