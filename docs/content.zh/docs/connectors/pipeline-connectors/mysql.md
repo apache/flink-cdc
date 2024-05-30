@@ -275,6 +275,21 @@ pipeline:
 - `specific-offset`：跳过快照阶段，从指定的 binlog 位点开始读取。位点可通过 binlog 文件名和位置指定，或者在 GTID 在集群上启用时通过 GTID 集合指定。
 - `timestamp`：跳过快照阶段，从指定的时间戳开始读取 binlog 事件。
 
+例如，可以在 YAML 配置文件中这样指定启动模式：
+
+```yaml
+source:
+  type: mysql
+  scan.startup.mode: earliest-offset                    # Start from earliest offset
+  scan.startup.mode: latest-offset                      # Start from latest offset
+  scan.startup.mode: specific-offset                    # Start from specific offset
+  scan.startup.mode: timestamp                          # Start from timestamp
+  scan.startup.specific-offset.file: 'mysql-bin.000003' # Binlog filename under specific offset startup mode
+  scan.startup.specific-offset.pos: 4                   # Binlog position under specific offset mode
+  scan.startup.specific-offset.gtid-set: 24DA167-...    # GTID set under specific offset startup mode
+  scan.startup.timestamp-millis: 1667232000000          # Timestamp under timestamp startup mode
+  # ...
+```
 
 ## 数据类型映射
 

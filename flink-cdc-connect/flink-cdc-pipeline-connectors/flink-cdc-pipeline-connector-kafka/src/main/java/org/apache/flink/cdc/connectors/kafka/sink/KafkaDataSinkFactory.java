@@ -38,6 +38,10 @@ import java.util.Properties;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.PROPERTIES_PREFIX;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_ADD_TABLEID_TO_HEADER_ENABLED;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_CUSTOM_HEADER;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.TOPIC;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.VALUE_FORMAT;
 
 /** A dummy {@link DataSinkFactory} to create {@link KafkaDataSink}. */
 public class KafkaDataSinkFactory implements DataSinkFactory {
@@ -100,15 +104,17 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
 
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
-        return null;
+        return new HashSet<>();
     }
 
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(VALUE_FORMAT);
+        options.add(TOPIC);
+        options.add(SINK_ADD_TABLEID_TO_HEADER_ENABLED);
+        options.add(SINK_CUSTOM_HEADER);
         options.add(KafkaDataSinkOptions.DELIVERY_GUARANTEE);
-        options.add(KafkaDataSinkOptions.TOPIC);
-        options.add(KafkaDataSinkOptions.SINK_ADD_TABLEID_TO_HEADER_ENABLED);
         return options;
     }
 }

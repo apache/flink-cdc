@@ -76,6 +76,8 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
         options.add(ValuesDataSourceOptions.EVENT_SET_ID);
         options.add(ValuesDataSourceOptions.FAILURE_INJECTION_INDEX);
         options.add(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY);
+        options.add(ValuesDataSinkOptions.PRINT_ENABLED);
+        options.add(ValuesDataSinkOptions.SINK_API);
         return options;
     }
 }

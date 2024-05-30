@@ -122,9 +122,10 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(PaimonDataSinkOptions.URI);
         options.add(PaimonDataSinkOptions.WAREHOUSE);
+        options.add(PaimonDataSinkOptions.URI);
         options.add(PaimonDataSinkOptions.COMMIT_USER);
+        options.add(PaimonDataSinkOptions.PARTITION_KEY);
         return options;
     }
 }

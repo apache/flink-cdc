@@ -66,7 +66,7 @@ public class DorisDataSinkFactory implements DataSinkFactory {
     @Override
     public DataSink createDataSink(Context context) {
         FactoryHelper.createFactoryHelper(this, context)
-                .validateExcept(TABLE_CREATE_PROPERTIES_PREFIX);
+                .validateExcept(TABLE_CREATE_PROPERTIES_PREFIX, STREAM_LOAD_PROP_PREFIX);
 
         Configuration config = context.getFactoryConfiguration();
 
@@ -140,11 +140,9 @@ public class DorisDataSinkFactory implements DataSinkFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(FENODES);
         options.add(BENODES);
-        options.add(USERNAME);
-        options.add(PASSWORD);
         options.add(JDBC_URL);
+        options.add(PASSWORD);
         options.add(AUTO_REDIRECT);
 
         options.add(SINK_CHECK_INTERVAL);

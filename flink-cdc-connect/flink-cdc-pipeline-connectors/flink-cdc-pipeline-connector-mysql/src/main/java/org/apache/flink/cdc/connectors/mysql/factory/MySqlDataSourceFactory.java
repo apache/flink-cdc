@@ -198,26 +198,28 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PORT);
-        options.add(SERVER_TIME_ZONE);
+        options.add(TABLES_EXCLUDE);
+        options.add(SCHEMA_CHANGE_ENABLED);
         options.add(SERVER_ID);
+        options.add(SERVER_TIME_ZONE);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(SCAN_STARTUP_MODE);
+        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS);
-        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
-        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
-        options.add(CHUNK_META_GROUP_SIZE);
-        options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(CONNECT_TIMEOUT);
+        options.add(CONNECT_MAX_RETRIES);
         options.add(CONNECTION_POOL_SIZE);
+        options.add(HEARTBEAT_INTERVAL);
+        options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+
+        options.add(CHUNK_META_GROUP_SIZE);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
-        options.add(CONNECT_MAX_RETRIES);
-        options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
-        options.add(HEARTBEAT_INTERVAL);
-        options.add(SCHEMA_CHANGE_ENABLED);
         return options;
     }
 

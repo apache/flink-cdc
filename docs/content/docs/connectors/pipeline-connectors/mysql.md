@@ -284,6 +284,21 @@ The config option `scan.startup.mode` specifies the startup mode for MySQL CDC c
   specified with binlog filename and position, or a GTID set if GTID is enabled on server.
 - `timestamp`: Skip snapshot phase and start reading binlog events from a specific timestamp.
 
+For example in YAML definition:
+
+```yaml
+source:
+  type: mysql
+  scan.startup.mode: earliest-offset                    # Start from earliest offset
+  scan.startup.mode: latest-offset                      # Start from latest offset
+  scan.startup.mode: specific-offset                    # Start from specific offset
+  scan.startup.mode: timestamp                          # Start from timestamp
+  scan.startup.specific-offset.file: 'mysql-bin.000003' # Binlog filename under specific offset startup mode
+  scan.startup.specific-offset.pos: 4                   # Binlog position under specific offset mode
+  scan.startup.specific-offset.gtid-set: 24DA167-...    # GTID set under specific offset startup mode
+  scan.startup.timestamp-millis: 1667232000000          # Timestamp under timestamp startup mode
+  # ...
+```
 
 ## Data Type Mapping
 
