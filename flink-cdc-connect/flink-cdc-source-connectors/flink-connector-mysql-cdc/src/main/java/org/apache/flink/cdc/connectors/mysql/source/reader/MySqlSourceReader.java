@@ -235,18 +235,27 @@ public class MySqlSourceReader<T>
             LOG.info("Source reader {} adds split {}", subtaskId, split);
             if (split.isSnapshotSplit()) {
                 MySqlSnapshotSplit snapshotSplit = split.asSnapshotSplit();
-                if (snapshotSplit.isSnapshotReadFinished()) {
-                    finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
-                } else if (sourceConfig
+                if (sourceConfig
                         .getTableFilters()
                         .dataCollectionFilter()
                         .isIncluded(split.asSnapshotSplit().getTableId())) {
-                    unfinishedSplits.add(split);
+                    if (snapshotSplit.isSnapshotReadFinished()) {
+                        finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
+                    } else {
+                        unfinishedSplits.add(split);
+                    }
                 } else {
-                    LOG.debug(
-                            "The subtask {} is skipping split {} because it does not match new table filter.",
-                            subtaskId,
-                            split.splitId());
+                    if (sourceConfig.isScanNewlyAddedTableEnabled()) {
+                        LOG.info(
+                                "The subtask {} is skipping split {} because it does not match new table filter.",
+                                subtaskId,
+                                split.splitId());
+                    } else {
+                        LOG.warn(
+                                "The subtask {} is skipping split {} because it does not match new table filter, but ScanNewlyAddedTable is not enabled.",
+                                subtaskId,
+                                split.splitId());
+                    }
                 }
             } else {
                 MySqlBinlogSplit binlogSplit = split.asBinlogSplit();
@@ -295,7 +304,10 @@ public class MySqlSourceReader<T>
         if (!unfinishedSplits.isEmpty()) {
             super.addSplits(unfinishedSplits);
         } else if (suspendedBinlogSplit
-                != null) { // only request new snapshot split if the binlog split is suspended
+                        != null // request new snapshot split if the binlog split is suspended
+                || getNumberOfCurrentlyAssignedSplits()
+                        <= 1 // request when all splits are in removed tables
+        ) {
             context.sendSplitRequest();
         }
     }
