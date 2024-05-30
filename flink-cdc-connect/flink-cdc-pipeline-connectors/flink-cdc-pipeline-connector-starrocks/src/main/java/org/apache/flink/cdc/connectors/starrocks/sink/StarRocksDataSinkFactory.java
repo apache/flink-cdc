@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.starrocks.sink;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
 
 import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
@@ -31,6 +32,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
+import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.SINK_PROPERTIES_PREFIX;
+import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.TABLE_CREATE_PROPERTIES_PREFIX;
 
 /** A {@link DataSinkFactory} to create {@link StarRocksDataSink}. */
 public class StarRocksDataSinkFactory implements DataSinkFactory {
@@ -39,6 +42,9 @@ public class StarRocksDataSinkFactory implements DataSinkFactory {
 
     @Override
     public DataSink createDataSink(Context context) {
+        FactoryHelper.createFactoryHelper(this, context)
+                .validateExcept(TABLE_CREATE_PROPERTIES_PREFIX, SINK_PROPERTIES_PREFIX);
+
         StarRocksSinkOptions sinkOptions =
                 buildSinkConnectorOptions(context.getFactoryConfiguration());
         TableCreateConfig tableCreateConfig =
@@ -124,8 +130,7 @@ public class StarRocksDataSinkFactory implements DataSinkFactory {
         sinkConfig.set(StarRocksSinkOptions.SINK_SEMANTIC, "at-least-once");
 
         Map<String, String> streamProperties =
-                getPrefixConfigs(
-                        cdcConfig.toMap(), StarRocksDataSinkOptions.SINK_PROPERTIES_PREFIX);
+                getPrefixConfigs(cdcConfig.toMap(), SINK_PROPERTIES_PREFIX);
         // force to use json format for stream load to simplify the configuration,
         // such as there is no need to reconfigure the "columns" property after
         // schema change. csv format can be supported in the future if needed

@@ -21,6 +21,7 @@ import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.kafka.json.ChangeLogJsonFormatFactory;
@@ -45,6 +46,8 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
 
     @Override
     public DataSink createDataSink(Context context) {
+        FactoryHelper.createFactoryHelper(this, context).validateExcept(PROPERTIES_PREFIX);
+
         Configuration configuration =
                 Configuration.fromMap(context.getFactoryConfiguration().toMap());
         DeliveryGuarantee deliveryGuarantee =

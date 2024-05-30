@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.doris.sink.DorisDataSink;
@@ -56,6 +57,7 @@ import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SI
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_MAX_RETRIES;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_USE_CACHE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.STREAM_LOAD_PROP_PREFIX;
+import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_PROPERTIES_PREFIX;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.USERNAME;
 
 /** A dummy {@link DataSinkFactory} to create {@link DorisDataSink}. */
@@ -63,7 +65,11 @@ import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.US
 public class DorisDataSinkFactory implements DataSinkFactory {
     @Override
     public DataSink createDataSink(Context context) {
+        FactoryHelper.createFactoryHelper(this, context)
+                .validateExcept(TABLE_CREATE_PROPERTIES_PREFIX);
+
         Configuration config = context.getFactoryConfiguration();
+
         DorisOptions.Builder optionsBuilder = DorisOptions.builder();
         DorisExecutionOptions.Builder executionBuilder = DorisExecutionOptions.builder();
         config.getOptional(FENODES).ifPresent(optionsBuilder::setFenodes);

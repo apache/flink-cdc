@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiFunction;
 
 import static org.apache.flink.cdc.common.configuration.ConfigurationUtils.canBePrefixMap;
@@ -245,6 +246,10 @@ public class Configuration implements java.io.Serializable, Cloneable {
             }
         }
         return Optional.empty();
+    }
+
+    public Set<String> getKeys() {
+        return confData.keySet();
     }
 
     @Override
