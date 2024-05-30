@@ -281,6 +281,10 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                 Preconditions.checkArgument(
                         columnSize.isPresent(), type + " type must have column size");
                 return String.format("%s(%d)", dataType, columnSize.get());
+            case "TIMESTAMP":
+                return columnSize
+                        .map(size -> String.format("%s(%d)", dataType, size))
+                        .orElse(dataType);
             default:
                 return dataType;
         }

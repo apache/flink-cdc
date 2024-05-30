@@ -33,7 +33,6 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -90,8 +89,8 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
 
     private final String uniqueDatabaseName = mysqlInventoryDatabase.getDatabaseName();
 
-    @Rule
-    public final OceanBaseContainer obServer =
+    @ClassRule
+    public static final OceanBaseContainer OB_SERVER =
             new OceanBaseContainer(OceanBaseContainer.DOCKER_IMAGE_NAME + ":" + IMAGE_TAG)
                     .withNetwork(NETWORK)
                     .withNetworkAliases("oceanbase")
@@ -136,9 +135,9 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         uniqueDatabaseName,
-                        obServer.getJdbcUrlInContainer("test", "oceanbase"),
-                        obServer.getUsername(),
-                        obServer.getPassword());
+                        OB_SERVER.getJdbcUrlInContainer("test", "oceanbase"),
+                        OB_SERVER.getUsername(),
+                        OB_SERVER.getPassword());
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path oceanbaseCdcJar = TestUtils.getResource("oceanbase-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -162,6 +161,17 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                                         "108,jacket,water resistent black wind breaker,0.1,null,null,null",
                                         "109,spare tire,24 inch spare tire,22.2,null,null,null")
                                 .map(StringEscapeUtils::unescapeJava)
+                                .toArray()));
+        // validate table of customers
+        List<String> customerList = queryTable("customers", false);
+        MatcherAssert.assertThat(
+                customerList,
+                Matchers.containsInAnyOrder(
+                        Stream.of(
+                                        "101,user_1,Shanghai,123567891234,2023-12-12 11:00:11.0",
+                                        "102,user_2,Shanghai,123567891234,2023-12-12 11:00:11.0",
+                                        "103,user_3,Shanghai,123567891234,2023-12-12 11:00:11.0",
+                                        "104,user_4,Shanghai,123567891234,2023-12-12 11:00:11.0")
                                 .toArray()));
 
         // generate binlogs
@@ -209,6 +219,8 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                                         "110,jacket,new water resistent white wind breaker,0.5,null,null,null,1")
                                 .map(StringEscapeUtils::unescapeJava)
                                 .toArray()));
+
+        dropDatabase(getConnection(false), uniqueDatabaseName);
     }
 
     private void waitingAndAssertTableCount(String tableName, boolean isMySQL, int expectedCount)
@@ -260,13 +272,12 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                     String.format(
                             "jdbc:mysql://%s:%s/%s",
                             MYSQL.getHost(), MYSQL.getDatabasePort(), uniqueDatabaseName);
-            System.out.println(mysqlJdbcUrl);
             return DriverManager.getConnection(mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
         }
         return DriverManager.getConnection(
-                obServer.getJdbcUrl(uniqueDatabaseName),
-                obServer.getUsername(),
-                obServer.getPassword());
+                OB_SERVER.getJdbcUrl(uniqueDatabaseName),
+                OB_SERVER.getUsername(),
+                OB_SERVER.getPassword());
     }
 
     private int getTableRowsCount(
@@ -288,6 +299,15 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
             return resultSetConsumer.apply(rs);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to execute sql: " + sql, e);
+        }
+    }
+
+    private void dropDatabase(Connection connection, String database) {
+        try (Connection conn = connection;
+                Statement statement = conn.createStatement()) {
+            statement.execute(String.format("DROP DATABASE %s", database));
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to drop database", e);
         }
     }
 }

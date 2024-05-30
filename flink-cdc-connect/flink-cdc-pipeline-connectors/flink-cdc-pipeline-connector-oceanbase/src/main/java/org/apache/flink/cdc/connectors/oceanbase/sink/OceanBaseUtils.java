@@ -224,6 +224,8 @@ public class OceanBaseUtils {
         public OceanBaseColumn.Builder visit(TimestampType timestampType) {
             builder.setDataType(TIMESTAMP);
             builder.setNullable(timestampType.isNullable());
+            builder.setColumnSize(
+                    Math.min(timestampType.getPrecision(), TimestampType.DEFAULT_PRECISION));
             return builder;
         }
 

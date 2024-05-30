@@ -1,6 +1,6 @@
 ---
 title: "OceanBase"
-weight: 6
+weight: 7
 type: docs
 aliases:
 - /connectors/pipeline-connectors/oceanbase

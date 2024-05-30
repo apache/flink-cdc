@@ -34,3 +34,18 @@ VALUES (default,"scooter","Small 2-wheel scooter",3.14, 'red', '{"key1": "value1
        (default,"rocks","box of assorted rocks",5.3, null, null, null),
        (default,"jacket","water resistent black wind breaker",0.1, null, null, null),
        (default,"spare tire","24 inch spare tire",22.2, null, null, null);
+
+
+CREATE TABLE customers (
+                                id INTEGER NOT NULL PRIMARY KEY,
+                                name VARCHAR(255) NOT NULL DEFAULT 'flink',
+                                address VARCHAR(1024),
+                                phone_number VARCHAR(512),
+                                create_date DATETIME
+);
+
+INSERT INTO customers
+VALUES (101,"user_1","Shanghai","123567891234", "2023-12-12 11:00:11"),
+       (102,"user_2","Shanghai","123567891234", "2023-12-12 11:00:11"),
+       (103,"user_3","Shanghai","123567891234", "2023-12-12 11:00:11"),
+       (104,"user_4","Shanghai","123567891234", "2023-12-12 11:00:11");
