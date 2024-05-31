@@ -99,8 +99,6 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
 
     @Override
     public void write(Event element, Context context) throws IOException {
-        LOG.info("Sink writer {} write {}.", this.context.getSubtaskId(), element);
-
         if (element instanceof DataChangeEvent) {
             DataChangeEvent dataChangeEvent = (DataChangeEvent) element;
             String sessionId = dataChangeEvent.meta().get(Constant.TUNNEL_SESSION_ID);

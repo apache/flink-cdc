@@ -27,18 +27,18 @@ under the License.
 
 # MaxCompute Connector
 
-MaxCompute Pipeline 连接器可以用作 Pipeline 的 *Data Sink*，将数据写入[MaxCompute](https://www.aliyun.com/product/odps)。
-本文档介绍如何设置 MaxCompute Pipeline 连接器。
+MaxCompute connector can be used as the *Data Sink* of the pipeline, and write data
+to [MaxCompute](https://www.aliyun.com/product/odps). This document describes how to set up the MaxCompute connector.
 
-## 连接器的功能
+## What can the connector do?
 
-* 自动建表
-* 表结构变更同步
-* 数据实时同步
+* Create table automatically if not exist
+* Schema change synchronization
+* Data synchronization
 
-## 示例
+## Example
 
-从 MySQL 读取数据同步到 MaxCompute 的 Pipeline 可以定义如下：
+The pipeline for reading data from MySQL and sink to MaxCompute can be defined as follows:
 
 ```yaml
 source:
@@ -65,7 +65,7 @@ pipeline:
   parallelism: 2
 ```
 
-## 连接器配置项
+## Connector Options
 
 <div class="highlight">
 <table class="colwidths-auto docutils">
@@ -84,163 +84,156 @@ pipeline:
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>指定要使用的连接器, 这里需要设置成 <code>'maxcompute'</code>.</td>
+      <td>Specify what connector to use, here should be <code>'maxcompute'</code>.</td>
     </tr>
     <tr>
       <td>name</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Sink 的名称.</td>
+      <td>The name of the sink.</td>
     </tr>
     <tr>
       <td>accessId</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>阿里云账号或RAM用户的AccessKey ID。您可以进入<a href="https://ram.console.aliyun.com/manage/ak">
-            AccessKey管理页面</a> 获取AccessKey ID。</td>
+      <td>AccessKey ID of Alibaba Cloud account or RAM user. You can enter <a href="https://ram.console.aliyun.com/manage/ak">
+            AccessKey management page</a> Obtain AccessKey ID.</td>
     </tr>
     <tr>
       <td>accessKey</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>AccessKey ID对应的AccessKey Secret。您可以进入<a href="https://ram.console.aliyun.com/manage/ak">
-            AccessKey管理页面</a> 获取AccessKey Secret。</td>
+      <td>AccessKey Secret corresponding to AccessKey ID. You can enter <a href="https://ram.console.aliyun.com/manage/ak">
+            AccessKey management page</a> Obtain AccessKey Secret.</td>
     </tr>
     <tr>
       <td>endpoint</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>MaxCompute服务的连接地址。您需要根据创建MaxCompute项目时选择的地域以及网络连接方式配置Endpoint。各地域及网络对应的Endpoint值，请参见<a href="https://help.aliyun.com/zh/maxcompute/user-guide/endpoints">
-           Endpoint</a>。</td>
+      <td>The connection address for the MaxCompute service. You need to configure the Endpoint based on the region selected when creating the MaxCompute project and the network connection method. For values corresponding to each region and network, please refer to <a href="https://help.aliyun.com/zh/maxcompute/user-guide/endpoints">Endpoint</a>.</td>
     </tr>
     <tr>
       <td>project</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>MaxCompute项目名称。您可以登录<a href="https://maxcompute.console.aliyun.com/">
-           MaxCompute控制台</a>，在 工作区 > 项目管理 页面获取MaxCompute项目名称。</td>
+      <td>The name of the MaxCompute project. You can log in to the <a href="https://maxcompute.console.aliyun.com/">MaxCompute console</a> and obtain the MaxCompute project name on the Workspace > Project Management page.</td>
     </tr>
     <tr>
       <td>tunnelEndpoint</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>MaxCompute Tunnel服务的连接地址，通常这项配置可以根据指定的project所在的region进行自动路由。仅在使用代理等特殊网络环境下使用该配置。</td>
+      <td>The connection address for the MaxCompute Tunnel service. Typically, this configuration can be auto-routed based on the region where the specified project is located. It is used only in special network environments such as when using a proxy.</td>
     </tr>
     <tr>
       <td>quotaName</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>MaxCompute 数据传输使用的独享资源组名称，如不指定该配置，则使用共享资源组。详情可以参考<a href="https://help.aliyun.com/zh/maxcompute/user-guide/purchase-and-use-exclusive-resource-groups-for-dts">
-           使用 Maxcompute 独享资源组</a></td>
+      <td>The name of the exclusive resource group for MaxCompute data transfer. If not specified, the shared resource group is used. For details, refer to <a href="https://help.aliyun.com/zh/maxcompute/user-guide/purchase-and-use-exclusive-resource-groups-for-dts">Using exclusive resource groups for Maxcompute</a></td>
     </tr>
     <tr>
       <td>stsToken</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>当使用RAM角色颁发的短时有效的访问令牌（STS Token）进行鉴权时，需要指定该参数。</td>
+      <td>When using a temporary access token (STS Token) issued by a RAM role for authentication, this parameter must be specified.</td>
     </tr>
     <tr>
       <td>bucketsNum</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">16</td>
       <td>Integer</td>
-      <td>自动创建 MaxCompute Transaction 表时使用的桶数。使用方式可以参考 <a href="ttps://help.aliyun.com/zh/maxcompute/user-guide/table-data-format">
-           Transaction Table 2.0</a></td>
+      <td>The number of buckets used when auto-creating MaxCompute Delta tables. For usage, refer to <a href="https://help.aliyun.com/zh/maxcompute/user-guide/transaction-table2-0-overview">Delta Table Overview</a></td>
     </tr>
     <tr>
       <td>compressAlgorithm</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">zlib</td>
       <td>String</td>
-      <td>写入MaxCompute时使用的数据压缩算法，当前支持<code>raw</code>（不进行压缩），<code>zlib</code>和<code>snappy</code>。</td>
+      <td>The data compression algorithm used when writing to MaxCompute. Currently supports <code>raw</code> (no compression), <code>zlib</code>, and <code>snappy</code>.</td>
     </tr>
     <tr>
       <td>totalBatchSize</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">64MB</td>
       <td>String</td>
-      <td>内存中缓冲的数据量大小，单位为分区级（非分区表单位为表级），不同分区（表）的缓冲区相互独立，达到阈值后数据写入到MaxCompute。</td>
+      <td>The size of the data buffer in memory, by partition level (for non-partitioned tables, by table level). Buffers for different partitions (tables) are independent, and data is written to MaxCompute when the threshold is reached.</td>
     </tr>
     <tr>
       <td>bucketBatchSize</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">4MB</td>
       <td>String</td>
-      <td>内存中缓冲的数据量大小，单位为桶级，仅写入 Transaction 表时生效。不同数据桶的缓冲区相互独立，达到阈值后将该桶数据写入到MaxCompute。</td>
+      <td>The size of the data buffer in memory, by bucket level. This is effective only when writing to Delta tables. Buffers for different data buckets are independent, and the bucket data is written to MaxCompute when the threshold is reached.</td>
     </tr>
     <tr>
       <td>numCommitThreads</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">16</td>
       <td>Integer</td>
-      <td>checkpoint阶段，能够同时处理的分区（表）数量。</td>
+      <td>The number of partitions (tables) that can be processed simultaneously during the checkpoint stage.</td>
     </tr>
     <tr>
       <td>numFlushConcurrent</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">4</td>
       <td>Integer</td>
-      <td>写入数据到MaxCompute时，能够同时写入的桶数量。仅写入 Transaction 表时生效。</td>
+      <td>The number of buckets that can be written to MaxCompute simultaneously. This is effective only when writing to Delta tables.</td>
     </tr>
     <tr>
       <td>retryTimes</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">3</td>
       <td>Integer</td>
-      <td>当网络链接发生错误时，进行重试的次数。</td>
+      <td>The number of retries in case of a network connection error.</td>
     </tr>
     <tr>
       <td>sleepMillis</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Long</td>
-      <td>当网络链接发生错误时，每次重试等待的时间，单位毫秒。</td>
+      <td>The waiting time for each retry in case of a network connection error, in milliseconds. </td>
     </tr>
     </tbody>
 </table>    
 </div>
 
-## 使用说明
+## Usage Instructions
 
-* 链接器 支持自动建表，将MaxCompute表与源表的位置关系、数据类型进行自动映射（参见下文映射表），当源表有主键时，自动创建
-  MaxCompute Transaction 表，否则创建普通 MaxCompute 表（Append表）
-* 当写入普通 MaxCompute 表（Append表）时，会忽略`delete`操作，`update`操作会被视为`insert`操作
-* 目前仅支持 at-least-once，Transaction 表由于主键特性能够实现幂等写
-* 对于表结构变更同步
-    * 新增列只能添加到最后一列
-    * 修改列类型，只能修改为兼容的类型。兼容表可以参考[ALTER TABLE](https://help.aliyun.com/zh/maxcompute/user-guide/alter-table)
+* The connector supports automatic table creation, automatically mapping the location relationship and data types between MaxCompute tables and source tables (see the mapping table below). When the source table has a primary key, a MaxCompute Delta table is automatically created; otherwise, a regular MaxCompute table (Append table) is created.
+* When writing to a regular MaxCompute table (Append table), the delete operation will be ignored, and the update operation will be treated as an insert operation.
+* Currently, only at-least-once is supported. Delta tables can achieve idempotent writes due to their primary key characteristics.
+* For synchronization of table structure changes:
+    * A new column can only be added as the last column.
+    * Modifying a column type can only be changed to a compatible type. For compatible types, refer to[ALTER TABLE](https://help.aliyun.com/zh/maxcompute/user-guide/alter-table)
 
-## 表位置映射
-
-链接器自动建表时，使用如下映射关系，将源表的位置信息映射到MaxCompute表的位置。注意，当MaxCompute项目不支持Schema模型时，每个同步任务仅能同步一个Mysql
-Database。（其他Datasource同理，链接器会忽略TableId.namespace信息）
+## Table Location Mapping
+When the connector automatically creates tables, it uses the following mapping relationship to map the location information of the source tables to the location of the MaxCompute tables. Note that when the MaxCompute project does not support the Schema model, each synchronization task can only synchronize one MySQL Database. (The same applies to other DataSources, the connector will ignore the TableId.namespace information)
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
-        <th class="text-left">Flink CDC 中抽象</th>
-        <th class="text-left">MaxCompute 位置</th>
-        <th class="text-left" style="width:60%;">Mysql 位置</th>
+        <th class="text-left">Abstract in Flink CDC	</th>
+        <th class="text-left">MaxCompute Location</th>
+        <th class="text-left" style="width:60%;">MySQL Location</th>
       </tr>
     </thead>
     <tbody>
     <tr>
-      <td>配置文件中project</td>
+      <td>project in the configuration file</td>
       <td>project</td>
       <td>(none)</td>
     </tr>
     <tr>
       <td>TableId.namespace</td>
-      <td>schema（仅当MaxCompute项目支持Schema模型时，如不支持，将忽略该配置）</td>
+      <td>schema (Only when the MaxCompute project supports the Schema model. If not supported, this configuration will be ignored)</td>
       <td>database</td>
     </tr>
     <tr>
@@ -252,7 +245,7 @@ Database。（其他Datasource同理，链接器会忽略TableId.namespace信息
 </table>
 </div>
 
-## 数据类型映射
+## Data Type Mapping
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
@@ -323,6 +316,7 @@ Database。（其他Datasource同理，链接器会忽略TableId.namespace信息
       <td>TIMESTAMP_WITH_TIME_ZONE</td>
       <td>TIMESTAMP</td>
     </tr>
+    <tr>
     <tr>
       <td>ARRAY</td>
       <td>ARRAY</td>

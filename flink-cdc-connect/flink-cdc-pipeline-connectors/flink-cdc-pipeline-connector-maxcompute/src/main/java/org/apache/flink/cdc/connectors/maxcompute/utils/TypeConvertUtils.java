@@ -85,9 +85,6 @@ import static org.apache.flink.cdc.common.types.DataTypeChecks.getScale;
  * | MAP                               | MAP            | MapData             | HashMap              |
  * | ROW                               | STRUCT         | RowData             | odps.data.SimpleStruct|
  * </pre>
- *
- * <p>When converting, put the Flink Type Name into the Column comment to facilitate conversion
- * back.
  */
 public class TypeConvertUtils {
 
@@ -115,8 +112,10 @@ public class TypeConvertUtils {
         Preconditions.checkNotNull(flinkColumn, "flink Schema Column");
         DataType type = flinkColumn.getType();
         Column.ColumnBuilder columnBuilder =
-                Column.newBuilder(flinkColumn.getName(), toMaxCompute(type))
-                        .withComment(type.asSummaryString());
+                Column.newBuilder(flinkColumn.getName(), toMaxCompute(type));
+        if (!type.isNullable()) {
+            columnBuilder.notNull();
+        }
         if (isPrimaryKey) {
             columnBuilder.primaryKey();
         }
