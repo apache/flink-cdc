@@ -22,7 +22,6 @@ import org.apache.flink.api.common.time.Deadline;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
-import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.client.program.rest.RestClusterClient;
 import org.apache.flink.runtime.client.JobStatusMessage;
@@ -73,10 +72,8 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
                     .build();
 
     @Test
-    public void testNormal() throws Exception {
-        ValuesDataSourceHelper.setSourceEvents(ValuesDataSourceHelper.multiSplitsSingleTable());
-        startTest();
-
+    public void testSingleSplitSingleTable() throws Exception {
+        startTest("SINGLE_SPLIT_SINGLE_TABLE");
         Instance instance =
                 SQLTask.run(
                         MaxComputeUtils.getOdps(testOptions),
@@ -93,7 +90,7 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
         Assert.assertEquals("NULL", result.get(1).get(1));
     }
 
-    private void startTest() throws Exception {
+    private void startTest(String testSet) throws Exception {
         sendPOST(getEndpoint() + "/init", getEndpoint());
 
         Odps odps = MaxComputeUtils.getOdps(testOptions);
@@ -104,7 +101,9 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
                 "source:\n"
                         + "   type: values\n"
                         + "   name: ValuesSource\n"
-                        + "   event-set.id: CUSTOM_SOURCE_EVENTS\n"
+                        + "   event-set.id: "
+                        + testSet
+                        + "\n"
                         + "\n"
                         + "sink:\n"
                         + "   type: maxcompute\n"
