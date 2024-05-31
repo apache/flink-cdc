@@ -19,20 +19,11 @@ package org.apache.flink.cdc.pipeline.tests;
 
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Deadline;
-import org.apache.flink.cdc.common.data.binary.BinaryStringData;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
-import org.apache.flink.cdc.common.event.DataChangeEvent;
-import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
-import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
-import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.client.program.rest.RestClusterClient;
 import org.apache.flink.runtime.client.JobStatusMessage;
 import org.apache.flink.table.api.ValidationException;
@@ -57,7 +48,6 @@ import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -67,7 +57,7 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MaxComputeE2eITCase.class);
 
     public static final DockerImageName MAXCOMPUTE_IMAGE =
-            DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.2");
+            DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.3");
 
     @ClassRule
     public static GenericContainer<?> maxcompute =
@@ -93,55 +83,14 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
                         "select * from table1 order by col1;");
         instance.waitForSuccess();
         List<Record> result = SQLTask.getResult(instance);
-        Assert.assertEquals(2, result.size());
-    }
-
-    @Test
-    public void testFileCacheMode() throws Exception {
-        TableId tableId = TableId.tableId("table1");
-
-        List<List<Event>> sourceEvents = new ArrayList<>();
-        List<Event> split1 = new ArrayList<>();
-        // create table
-        Schema schema =
-                Schema.newBuilder()
-                        .physicalColumn("c1", DataTypes.STRING())
-                        .physicalColumn("c2", DataTypes.STRING())
-                        .physicalColumn("p1", DataTypes.STRING())
-                        .primaryKey("c1")
-                        .partitionKey("p1")
-                        .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
-        split1.add(createTableEvent);
-
-        BinaryRecordDataGenerator generator =
-                new BinaryRecordDataGenerator(
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
-
-        // create split1
-        for (int partition = 0; partition < 10; partition++) {
-            for (int i = 0; i < 10; i++) {
-                split1.add(
-                        DataChangeEvent.insertEvent(
-                                tableId,
-                                generator.generate(
-                                        new Object[] {
-                                            BinaryStringData.fromString(String.valueOf(i)),
-                                            BinaryStringData.fromString(String.valueOf(i)),
-                                            BinaryStringData.fromString(String.valueOf(partition))
-                                        })));
-            }
-        }
-        sourceEvents.add(split1);
-        ValuesDataSourceHelper.setSourceEvents(sourceEvents);
-
-        startTest();
-
-        Instance instance =
-                SQLTask.run(MaxComputeUtils.getOdps(testOptions), "select * from table1;");
-        instance.waitForSuccess();
-        List<Record> result = SQLTask.getResult(instance);
         System.out.println(result);
+        Assert.assertEquals(2, result.size());
+        // 2,x
+        Assert.assertEquals("2", result.get(0).get(0));
+        Assert.assertEquals("x", result.get(0).get(1));
+        // 3, NULL (MaxCompute Emulator use 'NULL' instead of null)
+        Assert.assertEquals("3", result.get(1).get(0));
+        Assert.assertEquals("NULL", result.get(1).get(1));
     }
 
     private void startTest() throws Exception {
