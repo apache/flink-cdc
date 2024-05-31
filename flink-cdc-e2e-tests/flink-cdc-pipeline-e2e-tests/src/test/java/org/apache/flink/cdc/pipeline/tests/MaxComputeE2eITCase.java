@@ -56,7 +56,7 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MaxComputeE2eITCase.class);
 
     public static final DockerImageName MAXCOMPUTE_IMAGE =
-            DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.3");
+            DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.4");
 
     @ClassRule
     public static GenericContainer<?> maxcompute =

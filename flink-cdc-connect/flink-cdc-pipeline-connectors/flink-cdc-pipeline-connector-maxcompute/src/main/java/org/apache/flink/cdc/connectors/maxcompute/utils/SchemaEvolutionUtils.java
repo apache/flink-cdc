@@ -166,12 +166,6 @@ public class SchemaEvolutionUtils {
                             + " "
                             + string(entry.getValue())
                             + ";";
-            String alterCommentSql =
-                    prefix
-                            + entry.getKey()
-                            + " comment '"
-                            + entry.getValue().asSummaryString()
-                            + "';";
             Instance instance =
                     SQLTask.run(
                             odps,
@@ -179,21 +173,11 @@ public class SchemaEvolutionUtils {
                             alterColumnSql,
                             options.isSupportSchema() ? supportSchemaHints : unsupportSchemahints,
                             null);
-            Instance instance2 =
-                    SQLTask.run(
-                            odps,
-                            odps.getDefaultProject(),
-                            alterCommentSql,
-                            options.isSupportSchema() ? supportSchemaHints : unsupportSchemahints,
-                            null);
             LOG.info(
-                    "execute alter column task: `{}` and `{}`, instanceId: {} and {}",
+                    "execute alter column task: `{}`, instanceId: {}",
                     alterColumnSql,
-                    alterCommentSql,
-                    instance.getId(),
-                    instance2.getId());
+                    instance.getId());
             instance.waitForSuccess();
-            instance2.waitForSuccess();
         }
     }
 

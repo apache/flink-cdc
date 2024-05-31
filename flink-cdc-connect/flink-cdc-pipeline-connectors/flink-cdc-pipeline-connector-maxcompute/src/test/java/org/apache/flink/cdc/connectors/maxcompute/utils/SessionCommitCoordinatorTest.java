@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.maxcompute.utils;
 
 import org.apache.flink.cdc.connectors.maxcompute.common.Constant;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.concurrent.ExecutionException;
@@ -38,12 +39,15 @@ public class SessionCommitCoordinatorTest {
         Future<?> future =
                 executorService.submit(
                         () -> {
+                            int expect = 1;
                             while (sessionCommitCoordinator.isCommitting()) {
                                 try {
                                     String toCommitSessionId =
                                             sessionCommitCoordinator.getToCommitSessionId();
                                     if (toCommitSessionId != null) {
-                                        System.out.println(toCommitSessionId);
+                                        Assert.assertEquals(
+                                                expect, Integer.parseInt(toCommitSessionId));
+                                        expect++;
                                     }
                                     Thread.sleep(1000);
                                 } catch (InterruptedException e) {
