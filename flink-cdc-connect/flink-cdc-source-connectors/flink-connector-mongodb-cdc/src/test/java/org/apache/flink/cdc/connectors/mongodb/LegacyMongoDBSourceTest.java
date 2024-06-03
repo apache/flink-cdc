@@ -354,17 +354,17 @@ class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
         assertThat(case0).isEqualTo(String.format("mongodb://%s", hosts));
 
         String case1 = buildConnectionString("", null, "mongodb", hosts, null);
-        assertEquals(String.format("mongodb://%s", hosts), case1);
+        assertThat(case1).isEqualTo(String.format("mongodb://%s", hosts));
 
         String case2 = buildConnectionString(null, "", "mongodb+srv", "localhost", null);
-        assertEquals("mongodb+srv://localhost", case2);
+        assertThat(case2).isEqualTo("mongodb+srv://localhost");
 
         ConnectionString case3 =
                 new ConnectionString(
                         buildConnectionString(
                                 FLINK_USER, FLINK_USER_PASSWORD, "mongodb", hosts, null));
-        assertEquals(FLINK_USER, case3.getUsername());
-        assertEquals(FLINK_USER_PASSWORD, new String(case3.getPassword()));
+        assertThat(case3.getUsername()).isEqualTo(FLINK_USER);
+        assertThat(new String(case3.getPassword())).isEqualTo(FLINK_USER_PASSWORD);
     }
 
     // ------------------------------------------------------------------------------------------
