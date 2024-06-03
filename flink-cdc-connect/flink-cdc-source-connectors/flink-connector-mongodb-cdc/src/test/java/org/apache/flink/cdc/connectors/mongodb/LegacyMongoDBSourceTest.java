@@ -44,7 +44,7 @@ import com.mongodb.client.model.Updates;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.bson.Document;
 import org.bson.types.ObjectId;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -66,15 +66,14 @@ import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBAssertUtils.a
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertObjectIdEquals;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertReplace;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertUpdate;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.as;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link MongoDBSource} which also heavily tests {@link DebeziumSourceFunction}. */
-public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
+class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
 
     @Test
-    public void testConsumingAllEvents() throws Exception {
+    void testConsumingAllEvents() throws Exception {
         String database = MONGODB_CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         DebeziumSourceFunction<SourceRecord> source = createMongoDBSource(database);
@@ -95,10 +94,10 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
         runThread.start();
 
         List<SourceRecord> records = drain(sourceContext, 9);
-        assertEquals(9, records.size());
+        assertThat(records).hasSize(9);
 
-        assertTrue(
-                waitForCheckpointLock(sourceContext.getCheckpointLock(), Duration.ofSeconds(15)));
+        assertThat(
+                waitForCheckpointLock(sourceContext.getCheckpointLock(), Duration.ofSeconds(15))).isTrue();
 
         // ---------------------------------------------------------------------------------------------------------------
         // Simple INSERT
@@ -144,7 +143,7 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
     }
 
     @Test
-    public void testCheckpointAndRestore() throws Exception {
+    void testCheckpointAndRestore() throws Exception {
         String database = MONGODB_CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         final TestingListState<byte[]> offsetState = new TestingListState<>();
@@ -172,22 +171,22 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
             // wait until consumer is started
             List<SourceRecord> records = drain(sourceContext, 2);
             int received = records.size();
-            assertEquals(2, received);
+            assertThat(received).isEqualTo(2);
 
             // we can't perform checkpoint during DB snapshot
-            assertFalse(
+            assertThat(
                     waitForCheckpointLock(
-                            sourceContext.getCheckpointLock(), Duration.ofSeconds(3)));
+                            sourceContext.getCheckpointLock(), Duration.ofSeconds(3))).isFalse();
 
             // unblock the source context to continue the processing
             sourceContext.blocker.release();
             // wait until the source finishes the database snapshot
             records = drain(sourceContext, 9 - received);
-            assertEquals(9, records.size() + received);
+            assertThat(records.size() + received).isEqualTo(9);
 
             // state is still empty
-            assertEquals(0, offsetState.list.size());
-            assertEquals(0, historyState.list.size());
+            assertThat(offsetState.list).isEmpty();
+            assertThat(historyState.list).isEmpty();
 
             // ---------------------------------------------------------------------------
             // Step-2: trigger checkpoint-1 after snapshot finished
@@ -197,11 +196,11 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
                 source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
             }
 
-            assertEquals(1, offsetState.list.size());
+            assertThat(offsetState.list).hasSize(1);
 
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            assertTrue(state.contains("sourcePartition"));
-            assertTrue(state.contains("sourceOffset"));
+            assertThat(state).contains("sourcePartition");
+            assertThat(state).contains("sourceOffset");
 
             // ---------------------------------------------------------------------------
             // Step-3: trigger checkpoint-2 after snapshot finished and streaming data received
@@ -220,13 +219,13 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
                 source.snapshotState(new StateSnapshotContextSynchronousImpl(102, 102));
             }
 
-            assertEquals(1, offsetState.list.size());
+            assertThat(offsetState.list).hasSize(1);
 
             state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            assertTrue(state.contains("sourcePartition"));
-            assertTrue(state.contains("sourceOffset"));
+            assertThat(state).contains("sourcePartition");
+            assertThat(state).contains("sourceOffset");
             String resumeToken = JsonPath.read(state, "$.sourceOffset._id");
-            assertTrue(resumeToken.contains("_data"));
+            assertThat(resumeToken).contains("_data");
 
             source.close();
             runThread.sync();
@@ -249,7 +248,7 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
             runThread2.start();
 
             // make sure there is no more events
-            assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
+            assertThat(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2)).isFalse();
 
             MongoCollection<Document> products =
                     getMongoDatabase(database).getCollection("products");
@@ -258,7 +257,7 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
                     productDocOf("000000000000000000001002", "robot", "Toy robot", 1.304));
 
             List<SourceRecord> records = drain(sourceContext2, 1);
-            assertEquals(1, records.size());
+            assertThat(records).hasSize(1);
             assertInsert(records.get(0), true);
             assertObjectIdEquals("000000000000000000001002", records.get(0));
 
@@ -270,12 +269,12 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
                 source2.snapshotState(new StateSnapshotContextSynchronousImpl(138, 138));
             }
 
-            assertEquals(1, offsetState.list.size());
+            assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            assertTrue(state.contains("sourcePartition"));
-            assertTrue(state.contains("sourceOffset"));
+            assertThat(state).contains("sourcePartition");
+            assertThat(state).contains("sourceOffset");
             String resumeToken = JsonPath.read(state, "$.sourceOffset._id");
-            assertTrue(resumeToken.contains("_data"));
+            assertThat(resumeToken).contains("_data");
 
             // execute 2 more DMLs to have more change log
             products.insertOne(
@@ -314,7 +313,7 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
             assertUpdate(records.get(1), "000000000000000000001002");
 
             // make sure there is no more events
-            assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3));
+            assertThat(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3)).isFalse();
 
             MongoCollection<Document> products =
                     getMongoDatabase(database).getCollection("products");
@@ -335,12 +334,12 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
                 source3.snapshotState(new StateSnapshotContextSynchronousImpl(233, 233));
             }
 
-            assertEquals(1, offsetState.list.size());
+            assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            assertTrue(state.contains("sourcePartition"));
-            assertTrue(state.contains("sourceOffset"));
+            assertThat(state).contains("sourcePartition"));
+            assertThat(state).contains("sourceOffset"));
             String resumeToken = JsonPath.read(state, "$.sourceOffset._id");
-            assertTrue(resumeToken.contains("_data"));
+            assertThat(resumeToken).contains("_data"));
 
             source3.close();
             runThread3.sync();
@@ -348,11 +347,11 @@ public class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
     }
 
     @Test
-    public void testConnectionUri() {
+    void testConnectionUri() {
         String hosts = MONGODB_CONTAINER.getHostAndPort();
 
         String case0 = buildConnectionString(null, null, "mongodb", hosts, null);
-        assertEquals(String.format("mongodb://%s", hosts), case0);
+        assertThat(case0).isEqualTo(String.format("mongodb://%s", hosts));
 
         String case1 = buildConnectionString("", null, "mongodb", hosts, null);
         assertEquals(String.format("mongodb://%s", hosts), case1);

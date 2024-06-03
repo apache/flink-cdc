@@ -21,8 +21,8 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.awaitility.Awaitility;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Db2Container;
@@ -90,7 +90,7 @@ public class Db2TestBase {
                                 }
                             });
 
-    @BeforeClass
+    @BeforeAll
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(DB2_CONTAINER)).join();
@@ -107,7 +107,7 @@ public class Db2TestBase {
         LOG.info("Db2 asn agent are started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void stopContainers() {
         LOG.info("Stopping containers...");
         if (DB2_CONTAINER != null) {

@@ -25,7 +25,8 @@ import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.relational.TableId;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -33,23 +34,31 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link SourceSplitSerializer}. */
-public class SourceSplitSerializerTest {
+class SourceSplitSerializerTest {
+    private SourceSplitSerializer sourceSplitSerializer;
+
+    @BeforeEach
+    void beforeEach() {
+        sourceSplitSerializer = constructSourceSplitSerializer();
+    }
 
     @Test
-    public void testSourceSplitSerializeAndDeserialize() throws IOException {
+    void testSourceSplitSerializeAndDeserializeSnapshot() throws IOException {
         SnapshotSplit snapshotSplitBefore = constuctSnapshotSplit();
-        SourceSplitSerializer sourceSplitSerializer = constructSourceSplitSerializer();
         SnapshotSplit snapshotSplitAfter =
                 (SnapshotSplit)
                         sourceSplitSerializer.deserialize(
                                 sourceSplitSerializer.getVersion(),
                                 sourceSplitSerializer.serialize(snapshotSplitBefore));
 
-        assertEquals(snapshotSplitBefore, snapshotSplitAfter);
+        assertThat(snapshotSplitBefore).isEqualTo(snapshotSplitAfter);
+    }
 
+    @Test
+    void testSourceSplitSerializeAndDeserializeStream() throws IOException {
         StreamSplit streamSplitBefore = constuctStreamSplit(true);
         StreamSplit streamSplitAfter =
                 (StreamSplit)
@@ -57,13 +66,12 @@ public class SourceSplitSerializerTest {
                                 sourceSplitSerializer.getVersion(),
                                 sourceSplitSerializer.serialize(streamSplitBefore));
 
-        assertEquals(streamSplitBefore, streamSplitAfter);
+        assertThat(streamSplitBefore).isEqualTo(streamSplitAfter);
     }
 
     @Test
-    public void testStreamSplitBackwardCompatibility() throws IOException {
+    void testStreamSplitBackwardCompatibilitySnapshot() throws IOException {
         SnapshotSplit snapshotSplitBefore = constuctSnapshotSplit();
-        SourceSplitSerializer sourceSplitSerializer = constructSourceSplitSerializer();
         SnapshotSplit snapshotSplitAfter =
                 (SnapshotSplit)
                         sourceSplitSerializer.deserialize(
@@ -71,8 +79,11 @@ public class SourceSplitSerializerTest {
                                 LegacySourceSplitSerializierVersion4.serialize(
                                         snapshotSplitBefore));
 
-        assertEquals(snapshotSplitBefore, snapshotSplitAfter);
+        assertThat(snapshotSplitBefore).isEqualTo(snapshotSplitAfter);
+    }
 
+    @Test
+    void testStreamSplitBackwardCompatibilityStream() throws IOException {
         StreamSplitVersion4 streamSplitVersion4Before = constuctStreamSplitVersion4();
         StreamSplit expectedStreamSplit = constuctStreamSplit(false);
         StreamSplit streamSplitAfter =
@@ -82,7 +93,7 @@ public class SourceSplitSerializerTest {
                                 LegacySourceSplitSerializierVersion4.serialize(
                                         streamSplitVersion4Before));
 
-        assertEquals(expectedStreamSplit, streamSplitAfter);
+        assertThat(expectedStreamSplit).isEqualTo(streamSplitAfter);
     }
 
     private SnapshotSplit constuctSnapshotSplit() {

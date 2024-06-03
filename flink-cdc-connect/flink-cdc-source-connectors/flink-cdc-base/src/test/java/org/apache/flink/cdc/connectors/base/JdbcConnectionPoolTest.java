@@ -26,59 +26,63 @@ import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnection
 import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionPools;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Properties;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
+
 /** Tests for {@link JdbcConnectionPools}. */
-public class JdbcConnectionPoolTest {
-    public static final String HOSTNAME = "localhost";
-    public static final int PORT = 3306;
+class JdbcConnectionPoolTest {
+    private static final String HOSTNAME = "localhost";
+    private static final int PORT = 3306;
 
-    public static final String USER_NAME = "user";
-    public static final String PASSWORD = "password";
+    private static final String USER_NAME = "user";
+    private static final String PASSWORD = "password";
 
-    public static final String DATABASE = "test_database";
+    private static final String DATABASE = "test_database";
+    private static final String TABLE = "test_table";
 
-    public static final String TABLE = "test_table";
+    private MysqlPooledDataSourceFactory mysqlPooledDataSourceFactory;
+    private JdbcConnectionPools mysqlInstance;
+    private MySqlSourceConfig mySqlSourceConfig;
 
-    @Test
-    public void testMultiConnectionPoolFactory() {
-        MockConnectionPoolFactory mockConnectionPoolFactory = new MockConnectionPoolFactory();
-        MysqlPooledDataSourceFactory mysqlPooledDataSourceFactory =
-                new MysqlPooledDataSourceFactory();
-        JdbcConnectionPools mockInstance =
-                JdbcConnectionPools.getInstance(mockConnectionPoolFactory);
-        JdbcConnectionPools mysqlInstance =
-                JdbcConnectionPools.getInstance(mysqlPooledDataSourceFactory);
-        MySqlSourceConfig mySqlSourceConfig =
+    @BeforeEach
+    void beforeEach() {
+        mysqlPooledDataSourceFactory = new MysqlPooledDataSourceFactory();
+        mysqlInstance = JdbcConnectionPools.getInstance(mysqlPooledDataSourceFactory);
+        mySqlSourceConfig =
                 getMockMySqlSourceConfig(HOSTNAME, PORT, USER_NAME, PASSWORD, DATABASE, TABLE);
-
-        Assert.assertEquals(
-                mockInstance.getJdbcUrl(
-                        mySqlSourceConfig, mockConnectionPoolFactory.getClass().getName()),
-                mockConnectionPoolFactory.getJdbcUrl(mySqlSourceConfig));
-        Assert.assertEquals(
-                mysqlInstance.getJdbcUrl(
-                        mySqlSourceConfig, mysqlPooledDataSourceFactory.getClass().getName()),
-                mysqlPooledDataSourceFactory.getJdbcUrl(mySqlSourceConfig));
-        Assert.assertNotEquals(
-                mysqlInstance.getJdbcUrl(
-                        mySqlSourceConfig, mysqlPooledDataSourceFactory.getClass().getName()),
-                mockConnectionPoolFactory.getJdbcUrl(mySqlSourceConfig));
     }
 
     @Test
-    public void testNoDataSourcePoolFactoryIdentifier() {
-        MysqlPooledDataSourceFactory mysqlPooledDataSourceFactory =
-                new MysqlPooledDataSourceFactory();
-        JdbcConnectionPools mysqlInstance =
-                JdbcConnectionPools.getInstance(mysqlPooledDataSourceFactory);
-        MySqlSourceConfig mySqlSourceConfig =
-                getMockMySqlSourceConfig(HOSTNAME, PORT, USER_NAME, PASSWORD, DATABASE, TABLE);
+    void testMultiConnectionPoolFactory() {
+        MockConnectionPoolFactory mockConnectionPoolFactory = new MockConnectionPoolFactory();
+        JdbcConnectionPools mockInstance =
+                JdbcConnectionPools.getInstance(mockConnectionPoolFactory);
+
+        assertThat(
+                        mockInstance.getJdbcUrl(
+                                mySqlSourceConfig, mockConnectionPoolFactory.getClass().getName()))
+                .isEqualTo(mockConnectionPoolFactory.getJdbcUrl(mySqlSourceConfig));
+        assertThat(
+                        mysqlInstance.getJdbcUrl(
+                                mySqlSourceConfig,
+                                mysqlPooledDataSourceFactory.getClass().getName()))
+                .isEqualTo(mysqlPooledDataSourceFactory.getJdbcUrl(mySqlSourceConfig));
+        assertThat(
+                        mysqlInstance.getJdbcUrl(
+                                mySqlSourceConfig,
+                                mysqlPooledDataSourceFactory.getClass().getName()))
+                .isNotEqualTo(mockConnectionPoolFactory.getJdbcUrl(mySqlSourceConfig));
+    }
+
+    @Test
+    void testNoDataSourcePoolFactoryIdentifier() {
         ConnectionPoolId poolId =
                 new ConnectionPoolId(
                         HOSTNAME,
@@ -86,12 +90,12 @@ public class JdbcConnectionPoolTest {
                         USER_NAME,
                         DATABASE,
                         MockConnectionPoolFactory.class.getName());
-        Assert.assertThrows(
+        assertThrowsExactly(
+                FlinkRuntimeException.class,
+                () -> mysqlInstance.getOrCreateConnectionPool(poolId, mySqlSourceConfig),
                 String.format(
                         "DataSourcePoolFactoryIdentifier named %s doesn't exists",
-                        poolId.getDataSourcePoolFactoryIdentifier()),
-                FlinkRuntimeException.class,
-                () -> mysqlInstance.getOrCreateConnectionPool(poolId, mySqlSourceConfig));
+                        poolId.getDataSourcePoolFactoryIdentifier()));
     }
 
     private static MySqlSourceConfig getMockMySqlSourceConfig(
@@ -127,7 +131,6 @@ public class JdbcConnectionPoolTest {
     }
 
     private static class MockConnectionPoolFactory extends JdbcConnectionPoolFactory {
-
         @Override
         public String getJdbcUrl(JdbcSourceConfig sourceConfig) {
             return "mock-url";

@@ -33,8 +33,8 @@ import io.debezium.relational.Table;
 import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -42,21 +42,28 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /** Tests for {@link PendingSplitsStateSerializer}. */
-public class PendingSplitsStateSerializerTest {
+class PendingSplitsStateSerializerTest {
 
     private TableId tableId = TableId.parse("catalog.schema.table1");
+    private PendingSplitsStateSerializer pendingSplitsStateSerializer;
+
+    @BeforeEach
+    void beforeEach() {
+        pendingSplitsStateSerializer =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer());
+    }
 
     @Test
-    public void testPendingSplitsStateSerializerAndDeserialize() throws IOException {
+    void testPendingSplitsStateSerializerAndDeserialize() throws IOException {
         StreamPendingSplitsState streamPendingSplitsStateBefore =
                 new StreamPendingSplitsState(true);
-        PendingSplitsStateSerializer pendingSplitsStateSerializer =
-                new PendingSplitsStateSerializer(constructSourceSplitSerializer());
         PendingSplitsState streamSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
                         6, pendingSplitsStateSerializer.serialize(streamPendingSplitsStateBefore));
-        Assert.assertEquals(streamPendingSplitsStateBefore, streamSplitsStateAfter);
+        assertThat(streamPendingSplitsStateBefore).isEqualTo(streamSplitsStateAfter);
 
         SnapshotPendingSplitsState snapshotPendingSplitsStateBefore =
                 constructSnapshotPendingSplitsState(AssignerStatus.NEWLY_ADDED_ASSIGNING);
@@ -64,28 +71,26 @@ public class PendingSplitsStateSerializerTest {
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
                         6,
                         pendingSplitsStateSerializer.serialize(snapshotPendingSplitsStateBefore));
-        Assert.assertEquals(snapshotPendingSplitsStateBefore, snapshotPendingSplitsStateAfter);
+        assertThat(snapshotPendingSplitsStateBefore).isEqualTo(snapshotPendingSplitsStateAfter);
 
         HybridPendingSplitsState hybridPendingSplitsStateBefore =
                 new HybridPendingSplitsState(snapshotPendingSplitsStateBefore, false);
         PendingSplitsState hybridPendingSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
                         6, pendingSplitsStateSerializer.serialize(hybridPendingSplitsStateBefore));
-        Assert.assertEquals(hybridPendingSplitsStateBefore, hybridPendingSplitsStateAfter);
+        assertThat(hybridPendingSplitsStateBefore).isEqualTo(hybridPendingSplitsStateAfter);
     }
 
     @Test
-    public void testPendingSplitsStateSerializerCompatibility() throws IOException {
+    void testPendingSplitsStateSerializerCompatibility() throws IOException {
         StreamPendingSplitsState streamPendingSplitsStateBefore =
                 new StreamPendingSplitsState(true);
-        PendingSplitsStateSerializer pendingSplitsStateSerializer =
-                new PendingSplitsStateSerializer(constructSourceSplitSerializer());
         PendingSplitsState streamSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
                         5,
                         PendingSplitsStateSerializerVersion5.serialize(
                                 streamPendingSplitsStateBefore));
-        Assert.assertEquals(streamPendingSplitsStateBefore, streamSplitsStateAfter);
+        assertThat(streamPendingSplitsStateBefore).isEqualTo(streamSplitsStateAfter);
 
         SnapshotPendingSplitsState expectedSnapshotSplitsState =
                 constructSnapshotPendingSplitsState(AssignerStatus.INITIAL_ASSIGNING);
@@ -94,7 +99,7 @@ public class PendingSplitsStateSerializerTest {
                         5,
                         PendingSplitsStateSerializerVersion5.serialize(
                                 constructSnapshotPendingSplitsStateVersion4(false)));
-        Assert.assertEquals(expectedSnapshotSplitsState, snapshotPendingSplitsStateAfter);
+        assertThat(expectedSnapshotSplitsState).isEqualTo(snapshotPendingSplitsStateAfter);
 
         HybridPendingSplitsState expectedHybridPendingSplitsState =
                 new HybridPendingSplitsState(
@@ -107,7 +112,7 @@ public class PendingSplitsStateSerializerTest {
                         PendingSplitsStateSerializerVersion5.serialize(
                                 new HybridPendingSplitsStateVersion5(
                                         constructSnapshotPendingSplitsStateVersion4(true), false)));
-        Assert.assertEquals(expectedHybridPendingSplitsState, hybridPendingSplitsStateAfter);
+        assertThat(expectedHybridPendingSplitsState).isEqualTo(hybridPendingSplitsStateAfter);
     }
 
     private SourceSplitSerializer constructSourceSplitSerializer() {
