@@ -33,6 +33,7 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.ExceptionUtils;
+
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
@@ -45,9 +46,8 @@ import java.util.Properties;
 
 import static org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
-import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.assertThat;
-
+import static org.assertj.core.api.Assertions.fail;
 
 /** Test for {@link Db2TableSource} created by {@link Db2TableSourceFactory}. */
 class Db2TableSourceFactoryTest {
@@ -171,9 +171,10 @@ class Db2TableSourceFactoryTest {
             fail("exception expected");
         } catch (Throwable t) {
             assertThat(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "Could not parse value '123b' for key 'port'.")
-                            .isPresent()).isTrue();
+                            ExceptionUtils.findThrowableWithMessage(
+                                            t, "Could not parse value '123b' for key 'port'.")
+                                    .isPresent())
+                    .isTrue();
         }
 
         // validate missing required
@@ -187,10 +188,12 @@ class Db2TableSourceFactoryTest {
                 fail("exception expected");
             } catch (Throwable t) {
                 assertThat(
-                        ExceptionUtils.findThrowableWithMessage(
-                                        t,
-                                        "Missing required options are:\n\n" + requiredOption.key())
-                                .isPresent()).isTrue();
+                                ExceptionUtils.findThrowableWithMessage(
+                                                t,
+                                                "Missing required options are:\n\n"
+                                                        + requiredOption.key())
+                                        .isPresent())
+                        .isTrue();
             }
         }
 
@@ -203,8 +206,10 @@ class Db2TableSourceFactoryTest {
             fail("exception expected");
         } catch (Throwable t) {
             assertThat(
-                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
-                            .isPresent()).isTrue();
+                            ExceptionUtils.findThrowableWithMessage(
+                                            t, "Unsupported options:\n\nunknown")
+                                    .isPresent())
+                    .isTrue();
         }
     }
 

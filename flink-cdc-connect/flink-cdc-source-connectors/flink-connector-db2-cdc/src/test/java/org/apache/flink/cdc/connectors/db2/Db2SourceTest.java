@@ -60,9 +60,8 @@ import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertDelete;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertInsert;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertRead;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertUpdate;
-import static org.testcontainers.containers.Db2Container.DB2_PORT;
-
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.testcontainers.containers.Db2Container.DB2_PORT;
 
 /** Test for {@link Db2Source} which also heavily tests {@link DebeziumSourceFunction}. */
 class Db2SourceTest extends Db2TestBase {
@@ -170,8 +169,9 @@ class Db2SourceTest extends Db2TestBase {
 
             // we can't perform checkpoint during DB snapshot
             assertThat(
-                    waitForCheckpointLock(
-                            sourceContext.getCheckpointLock(), Duration.ofSeconds(3))).isFalse();
+                            waitForCheckpointLock(
+                                    sourceContext.getCheckpointLock(), Duration.ofSeconds(3)))
+                    .isFalse();
 
             // unblock the source context to continue the processing
             sourceContext.blocker.release();
@@ -195,7 +195,6 @@ class Db2SourceTest extends Db2TestBase {
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
             String result = JsonPath.read(state, "$.sourcePartition.server");
             assertThat(result).isEqualTo("db2_cdc_source");
-
 
             String lsn = JsonPath.read(state, "$.sourceOffset.commit_lsn");
             assertThat(lsn.compareTo(prevLsn)).isGreaterThan(0);

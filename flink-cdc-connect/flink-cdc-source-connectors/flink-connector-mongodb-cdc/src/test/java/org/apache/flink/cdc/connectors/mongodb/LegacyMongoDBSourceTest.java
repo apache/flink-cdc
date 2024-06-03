@@ -66,7 +66,6 @@ import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBAssertUtils.a
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertObjectIdEquals;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertReplace;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertUpdate;
-import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link MongoDBSource} which also heavily tests {@link DebeziumSourceFunction}. */
@@ -96,8 +95,8 @@ class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
         List<SourceRecord> records = drain(sourceContext, 9);
         assertThat(records).hasSize(9);
 
-        assertThat(
-                waitForCheckpointLock(sourceContext.getCheckpointLock(), Duration.ofSeconds(15))).isTrue();
+        assertThat(waitForCheckpointLock(sourceContext.getCheckpointLock(), Duration.ofSeconds(15)))
+                .isTrue();
 
         // ---------------------------------------------------------------------------------------------------------------
         // Simple INSERT
@@ -175,8 +174,9 @@ class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
 
             // we can't perform checkpoint during DB snapshot
             assertThat(
-                    waitForCheckpointLock(
-                            sourceContext.getCheckpointLock(), Duration.ofSeconds(3))).isFalse();
+                            waitForCheckpointLock(
+                                    sourceContext.getCheckpointLock(), Duration.ofSeconds(3)))
+                    .isFalse();
 
             // unblock the source context to continue the processing
             sourceContext.blocker.release();
@@ -336,10 +336,10 @@ class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
 
             assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            assertThat(state).contains("sourcePartition"));
-            assertThat(state).contains("sourceOffset"));
+            assertThat(state).contains("sourcePartition");
+            assertThat(state).contains("sourceOffset");
             String resumeToken = JsonPath.read(state, "$.sourceOffset._id");
-            assertThat(resumeToken).contains("_data"));
+            assertThat(resumeToken).contains("_data");
 
             source3.close();
             runThread3.sync();
