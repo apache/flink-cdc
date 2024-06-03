@@ -26,6 +26,7 @@ import io.debezium.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -622,6 +623,7 @@ public class MySqlConnection extends JdbcConnection {
             this.jdbcConfig = JdbcConfiguration.adapt(jdbcConfigBuilder.build());
             String driverClassName = this.jdbcConfig.getString(MySqlConnectorConfig.JDBC_DRIVER);
             this.urlPattern = formatJdbcUrl(jdbcProperties);
+            DriverManager.getDrivers();
             factory =
                     JdbcConnection.patternBasedFactory(
                             urlPattern, driverClassName, getClass().getClassLoader());
