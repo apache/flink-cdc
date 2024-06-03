@@ -97,13 +97,6 @@ env:
   flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests,\
   flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 
-  MODULES_MIGRATE: "\
-  flink-cdc-migration-tests/flink-cdc-migration-testcases,\
-  flink-cdc-migration-tests/flink-cdc-release-3.0.0,\
-  flink-cdc-migration-tests/flink-cdc-release-3.0.1,\
-  flink-cdc-migration-tests/flink-cdc-release-3.1.0,\
-  flink-cdc-migration-tests/flink-cdc-release-snapshot"
-
 jobs:
   license_check:
     runs-on: ubuntu-latest
@@ -120,6 +113,18 @@ jobs:
         run: mvn --no-snapshot-updates -B package -DskipTests
       - name: Run license check
         run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
+
+  migration_test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Compile snapshot CDC version
+        run: mvn --no-snapshot-updates -B install -DskipTests
+      - name: Run migration tests
+        run: cd flink-cdc-migration-tests && mvn clean verify
 
   compile_and_test:
     # Only run the CI pipeline for the flink-cdc-connectors repository
@@ -139,8 +144,7 @@ jobs:
                   "oceanbase",
                   "db2",
                   "vitess",
-                  "e2e",
-                  "migration"
+                  "e2e"
         ]
     timeout-minutes: 120
     env:
@@ -215,13 +219,9 @@ jobs:
                compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_E2E }}"
                modules=${{ env.MODULES_E2E }}
               ;;
-              ("migration")
-               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_MIGRATE }}"
-               modules=${{ env.MODULES_MIGRATE }}
-              ;;
           esac
 
-          if [ ${{ matrix.module }} != "e2e" ] && [ ${{ matrix.module }} != "migration" ]; then
+          if [ ${{ matrix.module }} != "e2e" ]; then
             compile_modules=$modules
           fi
 
