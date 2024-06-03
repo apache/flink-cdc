@@ -62,7 +62,7 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
                 context.getFactoryConfiguration().get(KafkaDataSinkOptions.VALUE_FORMAT);
         SerializationSchema<Event> valueSerialization =
                 ChangeLogJsonFormatFactory.createSerializationSchema(
-                        configuration, jsonSerializationType);
+                        configuration, jsonSerializationType, zoneId);
         final Properties kafkaProperties = new Properties();
         Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
         allOptions.keySet().stream()
