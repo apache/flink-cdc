@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
@@ -70,9 +71,10 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
     /** keep the relationship of TableId and table information. */
     private final Map<TableId, TableInfo> tableInfoMap;
 
-    private transient Map<TransformProjection, TransformProjectionProcessor>
+    private transient Map<Tuple2<TableId, TransformProjection>, TransformProjectionProcessor>
             transformProjectionProcessorMap;
-    private transient Map<TransformFilter, TransformFilterProcessor> transformFilterProcessorMap;
+    private transient Map<Tuple2<TableId, TransformFilter>, TransformFilterProcessor>
+            transformFilterProcessorMap;
 
     public static TransformDataOperator.Builder newBuilder() {
         return new TransformDataOperator.Builder();
@@ -228,13 +230,15 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
             if (selectors.isMatch(tableId) && transform.f1.isPresent()) {
                 TransformProjection transformProjection = transform.f1.get();
                 if (transformProjection.isValid()) {
-                    if (!transformProjectionProcessorMap.containsKey(transformProjection)) {
+                    if (!transformProjectionProcessorMap.containsKey(
+                            Tuple2.of(tableId, transformProjection))) {
                         transformProjectionProcessorMap.put(
-                                transformProjection,
+                                Tuple2.of(tableId, transformProjection),
                                 TransformProjectionProcessor.of(transformProjection));
                     }
                     TransformProjectionProcessor transformProjectionProcessor =
-                            transformProjectionProcessorMap.get(transformProjection);
+                            transformProjectionProcessorMap.get(
+                                    Tuple2.of(tableId, transformProjection));
                     // update the columns of projection and add the column of projection into Schema
                     transformProjectionProcessor.processSchemaChangeEvent(schema);
                 }
@@ -258,19 +262,21 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                         && transformProjectionOptional.isPresent()
                         && transformProjectionOptional.get().isValid()) {
                     TransformProjection transformProjection = transformProjectionOptional.get();
-                    if (!transformProjectionProcessorMap.containsKey(transformProjection)
+                    if (!transformProjectionProcessorMap.containsKey(
+                                    Tuple2.of(tableId, transformProjection))
                             || !transformProjectionProcessorMap
-                                    .get(transformProjection)
+                                    .get(Tuple2.of(tableId, transformProjection))
                                     .hasTableInfo()) {
                         transformProjectionProcessorMap.put(
-                                transformProjection,
+                                Tuple2.of(tableId, transformProjection),
                                 TransformProjectionProcessor.of(
                                         getTableInfoFromSchemaEvolutionClient(tableId),
                                         transformProjection,
                                         timezone));
                     }
                     TransformProjectionProcessor transformProjectionProcessor =
-                            transformProjectionProcessorMap.get(transformProjection);
+                            transformProjectionProcessorMap.get(
+                                    Tuple2.of(tableId, transformProjection));
                     dataChangeEventOptional =
                             processProjection(
                                     transformProjectionProcessor,
@@ -281,16 +287,17 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                 if (transformFilterOptional.isPresent()
                         && transformFilterOptional.get().isVaild()) {
                     TransformFilter transformFilter = transformFilterOptional.get();
-                    if (!transformFilterProcessorMap.containsKey(transformFilter)) {
+                    if (!transformFilterProcessorMap.containsKey(
+                            Tuple2.of(tableId, transformFilter))) {
                         transformFilterProcessorMap.put(
-                                transformFilter,
+                                Tuple2.of(tableId, transformFilter),
                                 TransformFilterProcessor.of(
                                         getTableInfoFromSchemaEvolutionClient(tableId),
                                         transformFilter,
                                         timezone));
                     }
                     TransformFilterProcessor transformFilterProcessor =
-                            transformFilterProcessorMap.get(transformFilter);
+                            transformFilterProcessorMap.get(Tuple2.of(tableId, transformFilter));
                     dataChangeEventOptional =
                             processFilter(
                                     transformFilterProcessor,
@@ -302,19 +309,21 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                         && transformProjectionOptional.isPresent()
                         && transformProjectionOptional.get().isValid()) {
                     TransformProjection transformProjection = transformProjectionOptional.get();
-                    if (!transformProjectionProcessorMap.containsKey(transformProjection)
+                    if (!transformProjectionProcessorMap.containsKey(
+                                    Tuple2.of(tableId, transformProjection))
                             || !transformProjectionProcessorMap
-                                    .get(transformProjection)
+                                    .get(Tuple2.of(tableId, transformProjection))
                                     .hasTableInfo()) {
                         transformProjectionProcessorMap.put(
-                                transformProjection,
+                                Tuple2.of(tableId, transformProjection),
                                 TransformProjectionProcessor.of(
                                         getTableInfoFromSchemaEvolutionClient(tableId),
                                         transformProjection,
                                         timezone));
                     }
                     TransformProjectionProcessor transformProjectionProcessor =
-                            transformProjectionProcessorMap.get(transformProjection);
+                            transformProjectionProcessorMap.get(
+                                    Tuple2.of(tableId, transformProjection));
                     dataChangeEventOptional =
                             processProjection(
                                     transformProjectionProcessor,
