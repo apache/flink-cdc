@@ -21,13 +21,14 @@ import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
-import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetKind;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.ChunkUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
+import org.apache.flink.cdc.connectors.mysql.table.StartupMode;
+import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -114,7 +115,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                         (MySqlStreamingChangeEventSourceMetrics)
                                 statefulTaskContext.getStreamingChangeEventSourceMetrics(),
                         currentBinlogSplit,
-                        createEventFilter(currentBinlogSplit.getStartingOffset()));
+                        createEventFilter());
 
         executorService.submit(
                 () -> {
@@ -306,17 +307,35 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         this.pureBinlogPhaseTables.clear();
     }
 
-    private Predicate<Event> createEventFilter(BinlogOffset startingOffset) {
+    private Predicate<Event> createEventFilter() {
         // If the startup mode is set as TIMESTAMP, we need to apply a filter on event to drop
         // events earlier than the specified timestamp.
-        if (BinlogOffsetKind.TIMESTAMP.equals(startingOffset.getOffsetKind())) {
-            long startTimestampSec = startingOffset.getTimestampSec();
-            // Notes:
-            // 1. Heartbeat event doesn't contain timestamp, so we just keep it
-            // 2. Timestamp of event is in epoch millisecond
-            return event ->
-                    EventType.HEARTBEAT.equals(event.getHeader().getEventType())
-                            || event.getHeader().getTimestamp() >= startTimestampSec * 1000;
+
+        // NOTE: Here we take user's configuration (statefulTaskContext.getSourceConfig())
+        // as the ground truth. This might be fragile if user changes the config and recover
+        // the job from savepoint / checkpoint, as there might be conflict between user's config
+        // and the state in savepoint / checkpoint. But as we don't promise compatibility of
+        // checkpoint after changing the config, this is acceptable for now.
+        StartupOptions startupOptions = statefulTaskContext.getSourceConfig().getStartupOptions();
+        if (startupOptions.startupMode.equals(StartupMode.TIMESTAMP)) {
+            if (startupOptions.binlogOffset == null) {
+                throw new NullPointerException(
+                        "The startup option was set to TIMESTAMP "
+                                + "but unable to find starting binlog offset. Please check if the timestamp is specified in "
+                                + "configuration. ");
+            }
+            long startTimestampSec = startupOptions.binlogOffset.getTimestampSec();
+            // We only skip data change event, as other kinds of events are necessary for updating
+            // some internal state inside MySqlStreamingChangeEventSource
+            LOG.info(
+                    "Creating event filter that dropping row mutation events before timestamp in second {}",
+                    startTimestampSec);
+            return event -> {
+                if (!EventType.isRowMutation(getEventType(event))) {
+                    return true;
+                }
+                return event.getHeader().getTimestamp() >= startTimestampSec * 1000;
+            };
         }
         return event -> true;
     }
@@ -327,8 +346,17 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         changeEventSourceContext.stopChangeEventSource();
     }
 
+    private EventType getEventType(Event event) {
+        return event.getHeader().getEventType();
+    }
+
     @VisibleForTesting
     public ExecutorService getExecutorService() {
         return executorService;
+    }
+
+    @VisibleForTesting
+    MySqlBinlogSplitReadTask getBinlogSplitReadTask() {
+        return binlogSplitReadTask;
     }
 }

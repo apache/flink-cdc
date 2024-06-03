@@ -20,9 +20,11 @@ package org.apache.flink.cdc.connectors.mysql.source;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
+import org.apache.flink.runtime.testutils.InMemoryReporter;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
@@ -52,6 +54,7 @@ public abstract class MySqlSourceTestBase extends TestLogger {
 
     protected static final int DEFAULT_PARALLELISM = 4;
     protected static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
+    protected InMemoryReporter metricReporter = InMemoryReporter.createWithRetainedMetrics();
 
     @Rule
     public final MiniClusterWithClientResource miniClusterResource =
@@ -61,6 +64,8 @@ public abstract class MySqlSourceTestBase extends TestLogger {
                             .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
                             .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
                             .withHaLeadershipControl()
+                            .setConfiguration(
+                                    metricReporter.addToConfiguration(new Configuration()))
                             .build());
 
     @BeforeClass
