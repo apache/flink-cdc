@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
@@ -90,6 +91,8 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
 
     private final List<Tuple2<Selectors, TableId>> routes;
 
+    private final SchemaChangeBehavior schemaChangeBehavior;
+
     /** The request handler that handle all requests and events. */
     private SchemaRegistryRequestHandler requestHandler;
 
@@ -103,15 +106,26 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             OperatorCoordinator.Context context,
             MetadataApplier metadataApplier,
             List<Tuple2<Selectors, TableId>> routes) {
+        this(operatorName, context, metadataApplier, routes, SchemaChangeBehavior.EVOLVE);
+    }
+
+    public SchemaRegistry(
+            String operatorName,
+            OperatorCoordinator.Context context,
+            MetadataApplier metadataApplier,
+            List<Tuple2<Selectors, TableId>> routes,
+            SchemaChangeBehavior schemaChangeBehavior) {
         this.context = context;
         this.operatorName = operatorName;
         this.failedReasons = new HashMap<>();
         this.metadataApplier = metadataApplier;
         this.routes = routes;
+        this.schemaChangeBehavior = schemaChangeBehavior;
         schemaManager = new SchemaManager();
         schemaDerivation = new SchemaDerivation(schemaManager, routes, new HashMap<>());
         requestHandler =
-                new SchemaRegistryRequestHandler(metadataApplier, schemaManager, schemaDerivation);
+                new SchemaRegistryRequestHandler(
+                        metadataApplier, schemaManager, schemaDerivation, schemaChangeBehavior);
     }
 
     @Override
@@ -207,7 +221,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             schemaDerivation = new SchemaDerivation(schemaManager, routes, derivationMapping);
             requestHandler =
                     new SchemaRegistryRequestHandler(
-                            metadataApplier, schemaManager, schemaDerivation);
+                            metadataApplier, schemaManager, schemaDerivation, schemaChangeBehavior);
         }
     }
 

@@ -18,9 +18,11 @@
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
@@ -30,6 +32,7 @@ import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResponse;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +67,8 @@ public class SchemaRegistryRequestHandler implements Closeable {
 
     private final SchemaDerivation schemaDerivation;
 
+    private final SchemaChangeBehavior schemaChangeBehavior;
+
     /**
      * Not applied SchemaChangeRequest before receiving all flush success events for its table from
      * sink writers.
@@ -75,20 +80,22 @@ public class SchemaRegistryRequestHandler implements Closeable {
     /** Status of the execution of current schema change request. */
     private boolean isSchemaChangeApplying;
     /** Actual exception if failed to apply schema change. */
-    private Exception schemaChangeException;
+    @VisibleForTesting Exception schemaChangeException;
     /** Executor service to execute schema change. */
     private final ExecutorService schemaChangeThreadPool;
 
     public SchemaRegistryRequestHandler(
             MetadataApplier metadataApplier,
             SchemaManager schemaManager,
-            SchemaDerivation schemaDerivation) {
+            SchemaDerivation schemaDerivation,
+            SchemaChangeBehavior schemaChangeBehavior) {
         this.metadataApplier = metadataApplier;
         this.activeSinkWriters = new HashSet<>();
         this.flushedSinkWriters = new HashSet<>();
         this.pendingSchemaChanges = new LinkedList<>();
         this.schemaManager = schemaManager;
         this.schemaDerivation = schemaDerivation;
+        this.schemaChangeBehavior = schemaChangeBehavior;
         schemaChangeThreadPool = Executors.newSingleThreadExecutor();
         isSchemaChangeApplying = false;
     }
@@ -99,11 +106,14 @@ public class SchemaRegistryRequestHandler implements Closeable {
      * @param tableId the table need to change schema
      * @param derivedSchemaChangeEvents list of the schema changes
      */
-    private void applySchemaChange(
-            TableId tableId, List<SchemaChangeEvent> derivedSchemaChangeEvents) {
+    @VisibleForTesting
+    void applySchemaChange(TableId tableId, List<SchemaChangeEvent> derivedSchemaChangeEvents) {
         isSchemaChangeApplying = true;
         schemaChangeException = null;
         try {
+            if (ignoreApplyingSchemeChanges(tableId, derivedSchemaChangeEvents)) {
+                return;
+            }
             for (SchemaChangeEvent changeEvent : derivedSchemaChangeEvents) {
                 metadataApplier.applySchemaChange(changeEvent);
                 LOG.debug("Apply schema change {} to table {}.", changeEvent, tableId);
@@ -117,6 +127,26 @@ public class SchemaRegistryRequestHandler implements Closeable {
         } finally {
             this.isSchemaChangeApplying = false;
         }
+    }
+
+    private boolean ignoreApplyingSchemeChanges(
+            TableId tableId, List<SchemaChangeEvent> derivedSchemaChangeEvents) {
+        if (CollectionUtils.isNotEmpty(derivedSchemaChangeEvents)) {
+            if (SchemaChangeBehavior.IGNORE.equals(schemaChangeBehavior)) {
+                LOG.debug(
+                        "Ignore all derived schema changes, table {}, events {}.",
+                        tableId,
+                        derivedSchemaChangeEvents);
+                return true;
+            }
+            if (SchemaChangeBehavior.EXCEPTION.equals(schemaChangeBehavior)) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "Unrecognized schema change for table %s behavior: %s",
+                                tableId, schemaChangeBehavior));
+            }
+        }
+        return false;
     }
 
     /**
