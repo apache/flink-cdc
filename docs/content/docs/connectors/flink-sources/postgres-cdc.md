@@ -28,8 +28,7 @@ under the License.
 
 The Postgres CDC connector allows for reading snapshot data and incremental data from PostgreSQL database. This document describes how to setup the Postgres CDC connector to run SQL queries against PostgreSQL databases.
 
-Dependencies
-------------
+## Dependencies
 
 In order to setup the Postgres CDC connector, the following table provides dependency information for both projects using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR bundles.
 
@@ -45,8 +44,7 @@ Download [flink-sql-connector-postgres-cdc-3.0.1.jar](https://repo1.maven.org/ma
 
 **Note:** Refer to [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-postgres-cdc), more released versions will be available in the Maven central warehouse.
 
-How to create a Postgres CDC table
-----------------
+## How to create a Postgres CDC table
 
 The Postgres CDC table can be defined as following:
 
@@ -76,8 +74,7 @@ CREATE TABLE shipments (
 SELECT * FROM shipments;
 ```
 
-Connector Options
-----------------
+## Connector Options
 
 <div class="highlight">
 <table class="colwidths-auto docutils">
@@ -236,12 +233,29 @@ Connector Options
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
     </tr>
+    <tr>
+      <td>scan.lsn-commit.checkpoints-num-delay</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">3</td>
+      <td>Integer</td>
+      <td>The number of checkpoint delays before starting to commit the LSN offsets. <br>
+          The checkpoint LSN offsets will be committed in rolling fashion, the earliest checkpoint identifier will be committed first from the delayed checkpoints.
+      </td>
+    </tr>
     </tbody>
     </table>
 </div>
 <div>
 
-Note: `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/2.0/connectors/postgresql.html#postgresql-property-slot-name).
+### Notes
+
+#### `slot.name` option
+
+The `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/2.0/connectors/postgresql.html#postgresql-property-slot-name).
+
+#### `scan.lsn-commit.checkpoints-num-delay` option
+
+When consuming PostgreSQL logs, the LSN offset must be committed to trigger the log data cleanup for the corresponding slot. However, once the LSN offset is committed, earlier offsets become invalid. To ensure access to earlier LSN offsets for job recovery, we delay the LSN commit by `scan.lsn-commit.checkpoints-num-delay` (default value is `3`) checkpoints. This feature is available when config option `scan.incremental.snapshot.enabled` is set to true.
 
 ### Incremental Snapshot Options
 
@@ -340,8 +354,7 @@ The following options is available only when `scan.incremental.snapshot.enabled=
 </table>
 </div>
 
-Available Metadata
-----------------
+## Available Metadata
 
 The following format metadata can be exposed as read-only (VIRTUAL) columns in a table definition.
 
@@ -377,8 +390,7 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
   </tbody>
 </table>
 
-Limitation
---------
+## Limitation
 
 ### Can't perform checkpoint during scanning snapshot of tables when incremental snapshot is disabled
 
@@ -417,8 +429,7 @@ CREATE TABLE products (
 );
 ```
 
-Features
---------
+## Features
 
 ### Incremental Snapshot Reading (Experimental)
 
@@ -522,8 +533,7 @@ public class PostgreSQLSourceExample {
 }
 ```
 
-Data Type Mapping
-----------------
+## Data Type Mapping
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
