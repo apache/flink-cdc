@@ -41,7 +41,6 @@ import org.bson.BsonDocument;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.Timeout;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -60,7 +59,6 @@ import static org.apache.flink.cdc.connectors.mongodb.source.utils.MongoUtils.ge
 import static org.apache.flink.cdc.connectors.mongodb.source.utils.MongoUtils.getLatestResumeToken;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** MongoDB stream split reader test case. */

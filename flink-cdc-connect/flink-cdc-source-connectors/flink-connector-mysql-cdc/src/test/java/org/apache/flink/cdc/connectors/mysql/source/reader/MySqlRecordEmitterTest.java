@@ -37,20 +37,19 @@ import io.debezium.relational.TableId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 
 import static io.debezium.config.CommonConnectorConfig.TRANSACTION_TOPIC;
 import static io.debezium.connector.mysql.MySqlConnectorConfig.SERVER_NAME;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit test for {@link org.apache.flink.cdc.connectors.mysql.source.reader.MySqlRecordEmitter}. */
-public class MySqlRecordEmitterTest {
+class MySqlRecordEmitterTest {
 
     @Test
-    public void testHeartbeatEventHandling() throws Exception {
+    void testHeartbeatEventHandling() throws Exception {
         Configuration dezConf =
                 JdbcConfiguration.create()
                         .with(Heartbeat.HEARTBEAT_INTERVAL, 100)
@@ -83,8 +82,8 @@ public class MySqlRecordEmitterTest {
                     }
                 });
         heartbeat.close();
-        assertNotNull(splitState.getStartingOffset());
-        assertEquals(0, splitState.getStartingOffset().compareTo(fakeOffset));
+        assertThat(splitState.getStartingOffset()).isNotNull();
+        assertThat(splitState.getStartingOffset().compareTo(fakeOffset)).isZero();
     }
 
     private MySqlRecordEmitter<Void> createRecordEmitter() {

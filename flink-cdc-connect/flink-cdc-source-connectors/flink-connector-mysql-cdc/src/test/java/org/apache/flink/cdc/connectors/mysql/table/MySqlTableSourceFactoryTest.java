@@ -31,9 +31,11 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.util.ExceptionUtils;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -55,10 +57,8 @@ import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOpt
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
-import static org.apache.flink.core.testutils.FlinkAssertions.anyCauseMatches;
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link MySqlTableSource} created by {@link MySqlTableSourceFactory}. */
 class MySqlTableSourceFactoryTest {
@@ -550,185 +550,140 @@ class MySqlTableSourceFactoryTest {
     }
 
     @Test
-    void testValidation() {
+    void testValidationIllegalPort() {
         // validate illegal port
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("port", "123b");
+        options.put("port", "123b");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining("Could not parse value '123b' for key 'port'.");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "Could not parse value '123b' for key 'port'.")
-                            ).isPresent();
-        }
-
+    @Test
+    void testValidationIllegalServerId() {
         // validate illegal server id
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("server-id", "123b");
+        options.put("server-id", "123b");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining("The value of option 'server-id' is invalid: '123b'")
+                .hasStackTraceContaining("The server id 123b is not a valid numeric.");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "The value of option 'server-id' is invalid: '123b'")
-                            ).isPresent();
-            assertThat(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "The server id 123b is not a valid numeric.")
-                            ).isPresent();
-        }
-
+    @Test
+    void testValidationIllegalSplitSize() {
         // validate illegal split size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("scan.incremental.snapshot.chunk.size", "1");
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("scan.incremental.snapshot.chunk.size", "1");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(
+                        "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(t).satisfies(anyCauseMatches(
-                    "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1"));
-        }
-
+    @Test
+    void testValidationIllegalFetchSize() {
         // validate illegal fetch size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("scan.snapshot.fetch.size", "1");
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("scan.snapshot.fetch.size", "1");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(
+                        "The value of option 'scan.snapshot.fetch.size' must larger than 1, but is 1");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(t).satisfies(anyCauseMatches(
-                    "The value of option 'scan.snapshot.fetch.size' must larger than 1, but is 1"));
-        }
+    @Test
+    void testValidationIllegalChunkMetaGroupSize() {
+        // validate illegal chunk meta group size
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("chunk-meta.group.size", "1");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(
+                        "The value of option 'chunk-meta.group.size' must larger than 1, but is 1");
+    }
 
-        // validate illegal split meta group size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("chunk-meta.group.size", "1");
+    @ParameterizedTest
+    @ValueSource(
+            strings = { //
+                "split-key.even-distribution.factor.upper-bound", //
+                "chunk-key.even-distribution.factor.upper-bound" //
+            })
+    void testValidationIllegalChunkKeyUpperBound(final String optionKey) {
+        // validate illegal chunk/split upper bound
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put(optionKey, "0.8");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(
+                        "The value of option 'chunk-key.even-distribution.factor.upper-bound' must larger than or equals 1.0, but is 0.8");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(t).satisfies(anyCauseMatches(
-                    "The value of option 'chunk-meta.group.size' must larger than 1, but is 1"));
-        }
-
-        // validate illegal split meta group size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("split-key.even-distribution.factor.upper-bound", "0.8");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(t).satisfies(anyCauseMatches(
-                    "The value of option 'chunk-key.even-distribution.factor.upper-bound' must larger than or equals 1.0, but is 0.8"));
-        }
-
+    @Test
+    void testValidationIllegalConnectionPoolSize() {
         // validate illegal connection pool size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("connection.pool.size", "1");
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("connection.pool.size", "1");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(
+                        "The value of option 'connection.pool.size' must larger than 1, but is 1");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(t).satisfies(anyCauseMatches(
-                    "The value of option 'connection.pool.size' must larger than 1, but is 1"));
-        }
-
+    @Test
+    void testValidationIllegalConnectMaxRetryTimes() {
         // validate illegal connect max retry times
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("connect.max-retries", "0");
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("connect.max-retries", "0");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(
+                        "The value of option 'connect.max-retries' must larger than 0, but is 0");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(t).satisfies(anyCauseMatches(
-                    "The value of option 'connect.max-retries' must larger than 0, but is 0"));
-        }
-
+    @Test
+    void testValidationMissingRequiredOptions() {
         // validate missing required
         Factory factory = new MySqlTableSourceFactory();
         for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
             Map<String, String> properties = getAllOptions();
             properties.remove(requiredOption.key());
-
-            try {
-                createTableSource(properties);
-                fail("exception expected");
-            } catch (Throwable t) {
-                assertThat(
-                        ExceptionUtils.findThrowableWithMessage(
-                                        t,
-                                        "Missing required options are:\n\n" + requiredOption.key())
-                                ).isPresent();
-            }
+            assertThatThrownBy(() -> createTableSource(properties))
+                    .hasStackTraceContaining(
+                            "Missing required options are:\n\n" + requiredOption.key());
         }
+    }
 
+    @Test
+    void testValidationUnsupportedOption() {
         // validate unsupported option
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("unknown", "abc");
+        options.put("unknown", "abc");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining("Unsupported options:\n\nunknown");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
-                            ).isPresent();
-        }
-
+    @Test
+    void testValidationUnsupportedOptionValue() {
         // validate unsupported option
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.startup.mode", "abc");
+        options.put("scan.startup.mode", "abc");
+        final String expectedExceptionMessage =
+                "Invalid value for option 'scan.startup.mode'. Supported values are "
+                        + "[initial, snapshot, latest-offset, earliest-offset, specific-offset, timestamp], "
+                        + "but was: abc";
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(expectedExceptionMessage);
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            String msg =
-                    "Invalid value for option 'scan.startup.mode'. Supported values are "
-                            + "[initial, snapshot, latest-offset, earliest-offset, specific-offset, timestamp], "
-                            + "but was: abc";
-            assertThat(ExceptionUtils.findThrowableWithMessage(t, msg)).isPresent();
-        }
-
+    @Test
+    void testValidationInvalidDatabaseName() {
         // validate invalid database-name
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("database-name", "*_invalid_db");
-        } catch (Throwable t) {
-            String msg =
-                    String.format(
-                            "The database-name '%s' is not a valid regular expression",
-                            "*_invalid_db");
-            assertThat(ExceptionUtils.findThrowableWithMessage(t, msg)).isPresent();
-        }
+        options.put("database-name", "*_invalid_db");
+        final String expectedExceptionMessage =
+                String.format(
+                        "The database-name '%s' is not a valid regular expression", "*_invalid_db");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(expectedExceptionMessage);
+    }
+
+    @Test
+    void testValidationInvalidTableName() {
         // validate invalid table-name
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("table-name", "*_invalid_table");
-        } catch (Throwable t) {
-            String msg =
-                    String.format(
-                            "The table-name '%s' is not a valid regular expression",
-                            "*_invalid_table");
-            assertThat(ExceptionUtils.findThrowableWithMessage(t, msg)).isPresent();
-        }
+        options.put("table-name", "*_invalid_table");
+        final String expectedExceptionMessage =
+                String.format(
+                        "The table-name '%s' is not a valid regular expression", "*_invalid_table");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(expectedExceptionMessage);
     }
 
     private Map<String, String> getAllOptions() {

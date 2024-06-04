@@ -53,7 +53,6 @@ import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.Waterm
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.FULL_DOCUMENT_FIELD;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** MongoDB snapshot split reader test case. */

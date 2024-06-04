@@ -22,13 +22,13 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlChunkSplitter}. */
-public class MySqlChunkSplitterTest {
+class MySqlChunkSplitterTest {
 
     @Test
-    public void testSplitEvenlySizedChunksOverflow() {
+    void testSplitEvenlySizedChunksOverflow() {
         MySqlChunkSplitter splitter = new MySqlChunkSplitter(null, null);
         List<ChunkRange> res =
                 splitter.splitEvenlySizedChunks(
@@ -38,13 +38,13 @@ public class MySqlChunkSplitterTest {
                         20,
                         10,
                         10);
-        assertEquals(2, res.size());
-        assertEquals(ChunkRange.of(null, 2147483638), res.get(0));
-        assertEquals(ChunkRange.of(2147483638, null), res.get(1));
+        assertThat(res).hasSize(2);
+        assertThat(res.get(0)).isEqualTo(ChunkRange.of(null, 2147483638));
+        assertThat(res.get(1)).isEqualTo(ChunkRange.of(2147483638, null));
     }
 
     @Test
-    public void testSplitEvenlySizedChunksNormal() {
+    void testSplitEvenlySizedChunksNormal() {
         MySqlChunkSplitter splitter = new MySqlChunkSplitter(null, null);
         List<ChunkRange> res =
                 splitter.splitEvenlySizedChunks(
@@ -54,9 +54,9 @@ public class MySqlChunkSplitterTest {
                         20,
                         10,
                         10);
-        assertEquals(3, res.size());
-        assertEquals(ChunkRange.of(null, 2147483637), res.get(0));
-        assertEquals(ChunkRange.of(2147483637, 2147483647), res.get(1));
-        assertEquals(ChunkRange.of(2147483647, null), res.get(2));
+        assertThat(res).hasSize(3);
+        assertThat(res.get(0)).isEqualTo(ChunkRange.of(null, 2147483637));
+        assertThat(res.get(1)).isEqualTo(ChunkRange.of(2147483637, 2147483647));
+        assertThat(res.get(2)).isEqualTo(ChunkRange.of(2147483647, null));
     }
 }

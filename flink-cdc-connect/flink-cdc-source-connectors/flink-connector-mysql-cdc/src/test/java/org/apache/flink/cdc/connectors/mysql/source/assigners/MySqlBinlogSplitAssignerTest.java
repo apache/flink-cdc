@@ -23,47 +23,44 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
-
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
 import java.util.Optional;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit test for {@link
  * org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner}.
  */
-public class MySqlBinlogSplitAssignerTest {
+class MySqlBinlogSplitAssignerTest {
 
     @Test
-    public void testStartFromEarliest() {
+    void testStartFromEarliest() {
         checkAssignedBinlogOffset(StartupOptions.earliest(), BinlogOffset.ofEarliest());
     }
 
     @Test
-    public void testStartFromLatestOffset() {
+    void testStartFromLatestOffset() {
         checkAssignedBinlogOffset(StartupOptions.latest(), BinlogOffset.ofLatest());
     }
 
     @Test
-    public void testStartFromTimestamp() {
+    void testStartFromTimestamp() {
         checkAssignedBinlogOffset(
                 StartupOptions.timestamp(15213000L), BinlogOffset.ofTimestampSec(15213L));
     }
 
     @Test
-    public void testStartFromBinlogFile() {
+    void testStartFromBinlogFile() {
         checkAssignedBinlogOffset(
                 StartupOptions.specificOffset("foo-file", 15213),
                 BinlogOffset.ofBinlogFilePosition("foo-file", 15213L));
     }
 
     @Test
-    public void testStartFromGtidSet() {
+    void testStartFromGtidSet() {
         checkAssignedBinlogOffset(
                 StartupOptions.specificOffset("foo-gtid"), BinlogOffset.ofGtidSet("foo-gtid"));
     }
@@ -74,13 +71,13 @@ public class MySqlBinlogSplitAssignerTest {
         MySqlBinlogSplitAssigner assigner = new MySqlBinlogSplitAssigner(getConfig(startupOptions));
         // Get splits from assigner
         Optional<MySqlSplit> optionalSplit = assigner.getNext();
-        assertTrue(optionalSplit.isPresent());
+        assertThat(optionalSplit).isPresent());
         MySqlBinlogSplit split = optionalSplit.get().asBinlogSplit();
         // Check binlog offset
-        assertEquals(expectedOffset, split.getStartingOffset());
-        assertEquals(BinlogOffset.ofNonStopping(), split.getEndingOffset());
+        assertThat(split.getStartingOffset()).isEqualTo(expectedOffset);
+        assertThat(split.getEndingOffset()).isEqualTo(BinlogOffset.ofNonStopping());
         // There should be only one split to assign
-        assertFalse(assigner.getNext().isPresent());
+        assertThat(assigner.getNext()).isNotPresent();
         assigner.close();
     }
 
