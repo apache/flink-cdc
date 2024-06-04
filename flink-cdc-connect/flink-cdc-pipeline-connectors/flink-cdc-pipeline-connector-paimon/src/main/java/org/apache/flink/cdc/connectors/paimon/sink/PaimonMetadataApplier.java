@@ -148,22 +148,15 @@ public class PaimonMetadataApplier implements MetadataApplier {
             switch (columnWithPosition.getPosition()) {
                 case FIRST:
                     tableChange =
-                            SchemaChange.addColumn(
-                                    columnWithPosition.getAddColumn().getName(),
-                                    LogicalTypeConversion.toDataType(
-                                            DataTypeUtils.toFlinkDataType(
-                                                            columnWithPosition
-                                                                    .getAddColumn()
-                                                                    .getType())
-                                                    .getLogicalType()),
-                                    columnWithPosition.getAddColumn().getComment(),
+                            SchemaChangeProvider.add(
+                                    columnWithPosition,
                                     SchemaChange.Move.first(
                                             columnWithPosition.getAddColumn().getName()));
                     tableChangeList.add(tableChange);
                     break;
                 case LAST:
                     SchemaChange schemaChangeWithLastPosition =
-                            applyAddColumnWithLastPosition(columnWithPosition);
+                            SchemaChangeProvider.add(columnWithPosition);
                     tableChangeList.add(schemaChangeWithLastPosition);
                     break;
                 case BEFORE:
@@ -178,19 +171,11 @@ public class PaimonMetadataApplier implements MetadataApplier {
                     checkNotNull(
                             columnWithPosition.getExistedColumnName(),
                             "Existing column name must be provided for AFTER position");
-                    tableChange =
-                            SchemaChange.addColumn(
+                    SchemaChange.Move after =
+                            SchemaChange.Move.after(
                                     columnWithPosition.getAddColumn().getName(),
-                                    LogicalTypeConversion.toDataType(
-                                            DataTypeUtils.toFlinkDataType(
-                                                            columnWithPosition
-                                                                    .getAddColumn()
-                                                                    .getType())
-                                                    .getLogicalType()),
-                                    columnWithPosition.getAddColumn().getComment(),
-                                    SchemaChange.Move.after(
-                                            columnWithPosition.getAddColumn().getName(),
-                                            columnWithPosition.getExistedColumnName()));
+                                    columnWithPosition.getExistedColumnName());
+                    tableChange = SchemaChangeProvider.add(columnWithPosition, after);
                     tableChangeList.add(tableChange);
                     break;
                 default:
@@ -199,16 +184,6 @@ public class PaimonMetadataApplier implements MetadataApplier {
             }
         }
         return tableChangeList;
-    }
-
-    private SchemaChange applyAddColumnWithLastPosition(
-            AddColumnEvent.ColumnWithPosition columnWithPosition) {
-        return SchemaChange.addColumn(
-                columnWithPosition.getAddColumn().getName(),
-                LogicalTypeConversion.toDataType(
-                        DataTypeUtils.toFlinkDataType(columnWithPosition.getAddColumn().getType())
-                                .getLogicalType()),
-                columnWithPosition.getAddColumn().getComment());
     }
 
     private SchemaChange applyAddColumnWithBeforePosition(
@@ -220,15 +195,11 @@ public class PaimonMetadataApplier implements MetadataApplier {
         Table table = catalog.getTable(new Identifier(schemaName, tableName));
         List<String> columnNames = table.rowType().getFieldNames();
         int index = checkColumnPosition(existedColumnName, columnNames);
-
-        return SchemaChange.addColumn(
-                columnWithPosition.getAddColumn().getName(),
-                LogicalTypeConversion.toDataType(
-                        DataTypeUtils.toFlinkDataType(columnWithPosition.getAddColumn().getType())
-                                .getLogicalType()),
-                columnWithPosition.getAddColumn().getComment(),
+        SchemaChange.Move after =
                 SchemaChange.Move.after(
-                        columnWithPosition.getAddColumn().getName(), columnNames.get(index - 1)));
+                        columnWithPosition.getAddColumn().getName(), columnNames.get(index - 1));
+
+        return SchemaChangeProvider.add(columnWithPosition, after);
     }
 
     private int checkColumnPosition(String existedColumnName, List<String> columnNames) {
@@ -236,7 +207,7 @@ public class PaimonMetadataApplier implements MetadataApplier {
             return 0;
         }
         int index = columnNames.indexOf(existedColumnName);
-        checkArgument(index == -1, "Column %s not found", existedColumnName);
+        checkArgument(index != -1, "Column %s not found", existedColumnName);
         return index;
     }
 
@@ -245,11 +216,7 @@ public class PaimonMetadataApplier implements MetadataApplier {
                     Catalog.ColumnNotExistException {
         List<SchemaChange> tableChangeList = new ArrayList<>();
         event.getDroppedColumnNames()
-                .forEach(
-                        (column) -> {
-                            SchemaChange tableChange = SchemaChange.dropColumn(column);
-                            tableChangeList.add(tableChange);
-                        });
+                .forEach((column) -> tableChangeList.add(SchemaChangeProvider.drop(column)));
         catalog.alterTable(
                 new Identifier(event.tableId().getSchemaName(), event.tableId().getTableName()),
                 tableChangeList,
@@ -262,10 +229,8 @@ public class PaimonMetadataApplier implements MetadataApplier {
         List<SchemaChange> tableChangeList = new ArrayList<>();
         event.getNameMapping()
                 .forEach(
-                        (oldName, newName) -> {
-                            SchemaChange tableChange = SchemaChange.renameColumn(oldName, newName);
-                            tableChangeList.add(tableChange);
-                        });
+                        (oldName, newName) ->
+                                tableChangeList.add(SchemaChangeProvider.rename(oldName, newName)));
         catalog.alterTable(
                 new Identifier(event.tableId().getSchemaName(), event.tableId().getTableName()),
                 tableChangeList,
@@ -278,15 +243,9 @@ public class PaimonMetadataApplier implements MetadataApplier {
         List<SchemaChange> tableChangeList = new ArrayList<>();
         event.getTypeMapping()
                 .forEach(
-                        (oldName, newType) -> {
-                            SchemaChange tableChange =
-                                    SchemaChange.updateColumnType(
-                                            oldName,
-                                            LogicalTypeConversion.toDataType(
-                                                    DataTypeUtils.toFlinkDataType(newType)
-                                                            .getLogicalType()));
-                            tableChangeList.add(tableChange);
-                        });
+                        (oldName, newType) ->
+                                tableChangeList.add(
+                                        SchemaChangeProvider.updateColumnType(oldName, newType)));
         catalog.alterTable(
                 new Identifier(event.tableId().getSchemaName(), event.tableId().getTableName()),
                 tableChangeList,
