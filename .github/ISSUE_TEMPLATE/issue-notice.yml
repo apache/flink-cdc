@@ -50,7 +50,7 @@ body:
         感谢您选择 Flink CDC! 
 
         由于 Apache Flink 的要求，请在 [Apache Jira](https://issues.apache.org/jira) 的 `Flink` 项目下使用 `Flink CDC` 标签来反馈缺陷或新功能。
-        您需要登录 Jira 帐户才能创建 issue 去记录缺陷或新功能，如果您没有 Apache JIRA 帐户，您可以在 [ASF Jira 账号](https://selfserve.apache.org/jira-account.html)
+        您需要登录 Jira 帐户才能创建 issue 去记录缺陷或新功能，如果您没有 Apache JIRA 账号，您可以在 [ASF Jira 账号](https://selfserve.apache.org/jira-account.html)
         申请账号，账号创建会由申请项目的 PMC member 审核，通常一到两个工作日可以通过。
 
         您也可以在 Apache Flink 的开发者邮件列表（dev@flink.apache.org）中对技术问题发起讨论。
