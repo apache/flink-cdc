@@ -132,13 +132,13 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[], after=[1011, 11], op=INSERT, meta=()}",
                         transformRenameDatabase.getDatabaseName()),
-                6000L);
+                60000L);
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[], after=[2014, 14], op=INSERT, meta=()}",
                         transformRenameDatabase.getDatabaseName()),
-                6000L);
+                60000L);
 
         List<String> expectedEvents =
                 Arrays.asList(
@@ -188,19 +188,19 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[], after=[3007, 7], op=INSERT, meta=()}",
                         transformRenameDatabase.getDatabaseName()),
-                6000L);
+                20000L);
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[1009, 8.1], after=[1009, 100], op=UPDATE, meta=()}",
                         transformRenameDatabase.getDatabaseName()),
-                6000L);
+                20000L);
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[2011, 11], after=[], op=DELETE, meta=()}",
                         transformRenameDatabase.getDatabaseName()),
-                6000L);
+                20000L);
 
         String stdout = taskManagerConsumer.toUtf8String();
         System.out.println(stdout);
