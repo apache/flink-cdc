@@ -51,6 +51,21 @@ full database synchronization, sharding table synchronization, schema evolution 
       fenodes: 127.0.0.1:8030
       username: root
       password: pass
+      
+    transform:
+    - source-table: adb.web_order01
+      projection: \*, UPPER(product_name) as product_name
+      filter: id > 10 AND order_id > 100
+      description: project fields and filter
+    - source-table: adb.web_order02
+      projection: \*, UPPER(product_name) as product_name
+      filter: id > 20 AND order_id > 200
+      description: project fields and filter  
+
+    route:
+    - source-table: adb.web_order\.*
+      sink-table: adb.ods_web_orders
+      description: sync sharding tables to one destination table
     
     pipeline:
        name: MySQL to Doris Pipeline
