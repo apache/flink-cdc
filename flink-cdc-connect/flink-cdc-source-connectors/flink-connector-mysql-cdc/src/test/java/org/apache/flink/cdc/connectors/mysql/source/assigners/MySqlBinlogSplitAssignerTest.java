@@ -71,7 +71,7 @@ class MySqlBinlogSplitAssignerTest {
         MySqlBinlogSplitAssigner assigner = new MySqlBinlogSplitAssigner(getConfig(startupOptions));
         // Get splits from assigner
         Optional<MySqlSplit> optionalSplit = assigner.getNext();
-        assertThat(optionalSplit).isPresent());
+        assertThat(optionalSplit).isPresent();
         MySqlBinlogSplit split = optionalSplit.get().asBinlogSplit();
         // Check binlog offset
         assertThat(split.getStartingOffset()).isEqualTo(expectedOffset);
