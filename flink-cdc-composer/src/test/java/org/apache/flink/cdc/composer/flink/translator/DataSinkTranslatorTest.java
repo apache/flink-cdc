@@ -29,17 +29,17 @@ import org.apache.flink.streaming.api.transformations.OneInputTransformation;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
 
 /** A test for {@link DataSinkTranslator}. */
-public class DataSinkTranslatorTest {
+class DataSinkTranslatorTest {
 
     @Test
-    public void testPreWriteWithoutCommitSink() {
+    void testPreWriteWithoutCommitSink() {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         ArrayList<Event> mockEvents = Lists.newArrayList(new EmptyEvent(), new EmptyEvent());
         DataStreamSource<Event> inputStream = env.fromCollection(mockEvents);
@@ -60,7 +60,7 @@ public class DataSinkTranslatorTest {
         OneInputTransformation<Event, Event> oneInputTransformation =
                 (OneInputTransformation) env.getTransformations().get(0);
         Transformation<?> reblanceTransformation = oneInputTransformation.getInputs().get(0);
-        Assert.assertEquals(uid, reblanceTransformation.getUserProvidedNodeHash());
+        Assertions.assertEquals(uid, reblanceTransformation.getUserProvidedNodeHash());
     }
 
     private static class EmptyEvent implements Event {}
