@@ -18,6 +18,8 @@
 package io.debezium.connector.mysql;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static io.debezium.connector.mysql.GtidUtils.fixRestoredGtidSet;
 import static io.debezium.connector.mysql.GtidUtils.mergeGtidSetInto;
@@ -25,12 +27,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit test for {@link GtidUtils}. */
 class GtidUtilsTest {
-    @Test
-    void testFixingRestoredGtidSet() {
-        GtidSet serverGtidSet = new GtidSet("A:1-100");
-        GtidSet restoredGtidSet = new GtidSet("A:30-100");
-        assertThat(fixRestoredGtidSet(serverGtidSet, restoredGtidSet).toString())
-                .isEqualTo("A:1-100");
+
+    @ParameterizedTest
+    @CsvSource(value = { //
+            "A:1-100;A:30-100;A:1-100", //
+            "A:1-100;A:30-50;A:1-50", //
+            "A:1-100:102-200,B:20-200;A:106-150;A:1-100:102-150,B:20-200", //
+    }, delimiter = ';')
+    void testFixingRestoredGtidSet(String serverGtidValue, String restoredGtidValue, final String expectedValue) {
+        GtidSet serverGtidSet = new GtidSet(serverGtidValue);
+        GtidSet restoredGtidSet = new GtidSet(restoredGtidValue);
+        assertThat(fixRestoredGtidSet(serverGtidSet, restoredGtidSet).toString()).isEqualTo(expectedValue);
 
         serverGtidSet = new GtidSet("A:1-100");
         restoredGtidSet = new GtidSet("A:30-50");
