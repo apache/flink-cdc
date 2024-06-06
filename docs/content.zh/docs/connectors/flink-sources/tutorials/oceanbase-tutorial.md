@@ -165,7 +165,7 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 ```下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译```
 
 - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-- [flink-sql-connector-oceanbase-cdc-2.4.0.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/2.4.0/flink-sql-connector-oceanbase-cdc-2.4.0.jar)
+- [flink-sql-connector-oceanbase-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oceanbase-cdc/3.1.0/flink-sql-connector-oceanbase-cdc-3.1.0.jar)
 
 ### 在 Flink SQL CLI 中使用 Flink DDL 创建表
 

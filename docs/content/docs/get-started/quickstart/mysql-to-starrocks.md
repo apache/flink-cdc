@@ -142,17 +142,19 @@ This command automatically starts all the containers defined in the Docker Compo
    INSERT INTO `products` (`id`, `product`) VALUES (2, 'Cap');
    INSERT INTO `products` (`id`, `product`) VALUES (3, 'Peanut');
     ```
-   
-## Submit job using FlinkCDC cli
-1. Download the binary compressed packages listed below and extract them to the directory ` flink cdc-3.0.0 '`：    
-   [flink-cdc-3.0.0-bin.tar.gz](https://github.com/ververica/flink-cdc-connectors/releases/download/release-3.0.0/flink-cdc-3.0.0-bin.tar.gz)
-   flink-cdc-3.0.0 directory will contain four directory `bin`,`lib`,`log`,`conf`.
+
+## Submit job with Flink CDC CLI
+1. Download the binary compressed packages listed below and extract them to the directory `flink cdc-3.1.0'`：    
+   [flink-cdc-3.1.0-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-3.1.0/flink-cdc-3.1.0-bin.tar.gz)
+   flink-cdc-3.1.0 directory will contain four directory: `bin`, `lib`, `log`, and `conf`.
 
 2. Download the connector package listed below and move it to the `lib` directory  
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
-    - [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
-    - [StarRocks pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-starrocks/3.0.0/flink-cdc-pipeline-connector-starrocks-3.0.0.jar)
-    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
+   - [MySQL pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-mysql/3.1.0/flink-cdc-pipeline-connector-mysql-3.1.0.jar)
+   - [StarRocks pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-starrocks/3.1.0/flink-cdc-pipeline-connector-starrocks-3.1.0.jar)
+
+   You also need to place MySQL connector into Flink `lib` folder or pass it with `--jar` argument, since they're no longer packaged with CDC connectors:
+   - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 
 3. Write task configuration yaml file.
    Here is an example file for synchronizing the entire database `mysql-to-starrocks.yaml`：
@@ -193,7 +195,7 @@ Notice that:
 4. Finally, submit job to Flink Standalone cluster using Cli.
 
    ```shell
-   bash bin/flink-cdc.sh mysql-to-starrocks.yaml --jar lib/mysql-connector-java-8.0.27.jar
+   bash bin/flink-cdc.sh mysql-to-starrocks.yaml
    ```
    
 After successful submission, the return information is as follows：
