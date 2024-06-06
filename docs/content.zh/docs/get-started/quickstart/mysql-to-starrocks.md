@@ -140,18 +140,20 @@ under the License.
    INSERT INTO `products` (`id`, `product`) VALUES (3, 'Peanut');
     ```
 
-## 通过 FlinkCDC cli 提交任务
-1. 下载下面列出的二进制压缩包，并解压得到目录 `flink-cdc-3.0.0`：    
-   [flink-cdc-3.0.0-bin.tar.gz](https://github.com/ververica/flink-cdc-connectors/releases/download/release-3.0.0/flink-cdc-3.0.0-bin.tar.gz)
-   flink-cdc-3.0.0 下会包含 bin、lib、log、conf 四个目录。
+## 通过 Flink CDC CLI 提交任务
+1. 下载下面列出的二进制压缩包，并解压得到目录 `flink-cdc-3.1.0`；  
+   [flink-cdc-3.1.0-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-3.1.0/flink-cdc-3.1.0-bin.tar.gz)
+   flink-cdc-3.1.0 下会包含 `bin`、`lib`、`log`、`conf` 四个目录。
 
-2. 下载下面列出的 connector 包，并且移动到 lib 目录下  
-   **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译**
-   - [MySQL pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar)
-   - [StarRocks pipeline connector 3.0.0](https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-starrocks/3.0.0/flink-cdc-pipeline-connector-starrocks-3.0.0.jar)
+2. 下载下面列出的 connector 包，并且移动到 lib 目录下；
+   **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
+   - [MySQL pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-mysql/3.1.0/flink-cdc-pipeline-connector-mysql-3.1.0.jar)
+   - [StarRocks pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-starrocks/3.1.0/flink-cdc-pipeline-connector-starrocks-3.1.0.jar)
+
+   您还需要将下面的 Driver 包放在 Flink `lib` 目录下，或通过 `--jar` 参数将其传入 Flink CDC CLI，因为 CDC Connectors 不再包含这些 Drivers：
    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 
-3. 编写任务配置 yaml 文件  
+3. 编写任务配置 yaml 文件。
    下面给出了一个整库同步的示例文件 mysql-to-starrocks.yaml：
 
    ```yaml
@@ -190,7 +192,7 @@ under the License.
 4. 最后，通过命令行提交任务到 Flink Standalone cluster
 
    ```shell
-   bash bin/flink-cdc.sh mysql-to-starrocks.yaml --jar lib/mysql-connector-java-8.0.27.jar
+   bash bin/flink-cdc.sh mysql-to-starrocks.yaml
    ```
 
 提交成功后，返回信息如：

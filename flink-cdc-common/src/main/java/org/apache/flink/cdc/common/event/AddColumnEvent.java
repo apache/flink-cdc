@@ -44,6 +44,24 @@ public final class AddColumnEvent implements SchemaChangeEvent {
         this.addedColumns = addedColumns;
     }
 
+    public static AddColumnEvent.ColumnWithPosition first(Column addColumn) {
+        return new ColumnWithPosition(addColumn, ColumnPosition.FIRST, null);
+    }
+
+    public static AddColumnEvent.ColumnWithPosition last(Column addColumn) {
+        return new ColumnWithPosition(addColumn, ColumnPosition.LAST, null);
+    }
+
+    public static AddColumnEvent.ColumnWithPosition before(
+            Column addColumn, String existedColumnName) {
+        return new ColumnWithPosition(addColumn, ColumnPosition.BEFORE, existedColumnName);
+    }
+
+    public static AddColumnEvent.ColumnWithPosition after(
+            Column addColumn, String existedColumnName) {
+        return new ColumnWithPosition(addColumn, ColumnPosition.AFTER, existedColumnName);
+    }
+
     /** Returns the added columns. */
     public List<ColumnWithPosition> getAddedColumns() {
         return addedColumns;

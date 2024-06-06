@@ -48,11 +48,11 @@ using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-db2-cdc-3.0.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-db2-cdc/3.0.1/flink-sql-connector-db2-cdc-3.0.1.jar) and 
+Download [flink-sql-connector-db2-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-db2-cdc/3.1.0/flink-sql-connector-db2-cdc-3.1.0.jar) and 
 put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to
-[flink-sql-connector-db2-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-db2-cdc),
+[flink-sql-connector-db2-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc),
 more released versions will be available in the Maven central warehouse.
 
 Since Db2 Connector's IPLA license is incompatible with Flink CDC project, we can't provide Db2 connector in prebuilt connector jar packages. 

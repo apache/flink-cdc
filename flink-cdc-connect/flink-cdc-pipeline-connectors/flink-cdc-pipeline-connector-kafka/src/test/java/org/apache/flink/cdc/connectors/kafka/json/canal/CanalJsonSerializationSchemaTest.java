@@ -40,6 +40,8 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.time.ZoneId;
+
 /** Tests for {@link CanalJsonSerializationSchema}. */
 public class CanalJsonSerializationSchemaTest {
 
@@ -53,7 +55,9 @@ public class CanalJsonSerializationSchemaTest {
                         .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
         SerializationSchema<Event> serializationSchema =
                 ChangeLogJsonFormatFactory.createSerializationSchema(
-                        new Configuration(), JsonSerializationType.CANAL_JSON);
+                        new Configuration(),
+                        JsonSerializationType.CANAL_JSON,
+                        ZoneId.systemDefault());
         serializationSchema.open(new MockInitializationContext());
 
         // create table
