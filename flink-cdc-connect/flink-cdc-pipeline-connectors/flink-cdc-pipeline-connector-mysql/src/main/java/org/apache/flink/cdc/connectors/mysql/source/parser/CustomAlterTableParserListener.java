@@ -251,6 +251,35 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         super.exitAlterByRenameColumn(ctx);
     }
 
+    @Override
+    public void enterAlterByModifyColumn(MySqlParser.AlterByModifyColumnContext ctx) {
+        String columnName = parser.parseName(ctx.uid(0));
+        ColumnEditor columnEditor = Column.editor().name(columnName);
+        columnEditor.unsetDefaultValueExpression();
+
+        columnDefinitionListener =
+                new CustomColumnDefinitionParserListener(columnEditor, parser, listeners);
+        listeners.add(columnDefinitionListener);
+        super.enterAlterByModifyColumn(ctx);
+    }
+
+    @Override
+    public void exitAlterByModifyColumn(MySqlParser.AlterByModifyColumnContext ctx) {
+        parser.runIfNotNull(
+                () -> {
+                    Column column = columnDefinitionListener.getColumn();
+                    if (column != null) {
+                        Map<String, DataType> typeMapping = new HashMap<>();
+                        typeMapping.put(column.name(), fromDbzColumn(column));
+                        changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+                    }
+
+                    listeners.remove(columnDefinitionListener);
+                },
+                columnDefinitionListener);
+        super.exitAlterByModifyColumn(ctx);
+    }
+
     private org.apache.flink.cdc.common.schema.Column toCdcColumn(Column dbzColumn) {
         return org.apache.flink.cdc.common.schema.Column.physicalColumn(
                 dbzColumn.name(), fromDbzColumn(dbzColumn), dbzColumn.comment());
