@@ -38,8 +38,18 @@ public class RowTypeSerializer extends TypeSerializerSingleton<RowType> {
     /** Sharable instance of the TableIdSerializer. */
     public static final RowTypeSerializer INSTANCE = new RowTypeSerializer();
 
-    private final ListSerializer<DataField> fieldsSerializer =
-            new ListSerializer<>(DataFieldSerializer.INSTANCE);
+    private volatile ListSerializer<DataField> fieldsSerializer;
+
+    private ListSerializer<DataField> getFieldsSerializer() {
+        if (fieldsSerializer == null) {
+            synchronized (this) {
+                if (fieldsSerializer == null) {
+                    fieldsSerializer = new ListSerializer<>(DataFieldSerializer.INSTANCE);
+                }
+            }
+        }
+        return fieldsSerializer;
+    }
 
     @Override
     public boolean isImmutableType() {
@@ -53,7 +63,7 @@ public class RowTypeSerializer extends TypeSerializerSingleton<RowType> {
 
     @Override
     public RowType copy(RowType from) {
-        return new RowType(from.isNullable(), fieldsSerializer.copy(from.getFields()));
+        return new RowType(from.isNullable(), getFieldsSerializer().copy(from.getFields()));
     }
 
     @Override
@@ -69,13 +79,13 @@ public class RowTypeSerializer extends TypeSerializerSingleton<RowType> {
     @Override
     public void serialize(RowType record, DataOutputView target) throws IOException {
         target.writeBoolean(record.isNullable());
-        fieldsSerializer.serialize(record.getFields(), target);
+        getFieldsSerializer().serialize(record.getFields(), target);
     }
 
     @Override
     public RowType deserialize(DataInputView source) throws IOException {
         boolean nullable = source.readBoolean();
-        return new RowType(nullable, fieldsSerializer.deserialize(source));
+        return new RowType(nullable, getFieldsSerializer().deserialize(source));
     }
 
     @Override
