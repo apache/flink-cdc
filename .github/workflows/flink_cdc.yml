@@ -122,6 +122,18 @@ jobs:
           mvn ${{ env.MVN_COMMON_OPTIONS }} exec:java@check-license -N \
             -Dexec.args="${{ env.MVN_BUILD_OUTPUT_FILE }} $(pwd) ${{ env.MVN_VALIDATION_DIR }}"
 
+  migration_test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Compile snapshot CDC version
+        run: mvn --no-snapshot-updates -B install -DskipTests
+      - name: Run migration tests
+        run: cd flink-cdc-migration-tests && mvn clean verify
+
   compile_and_test:
     runs-on: ubuntu-latest
     strategy:
