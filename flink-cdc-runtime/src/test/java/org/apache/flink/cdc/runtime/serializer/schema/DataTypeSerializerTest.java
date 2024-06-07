@@ -26,6 +26,7 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
+
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -96,8 +97,8 @@ public class DataTypeSerializerTest extends SerializerTestBase<DataType> {
     @Test
     void testNestedRow() throws IOException {
         RowType innerMostRowType = RowType.of(DataTypes.BIGINT());
-        RowType outerRowType = RowType.of(
-                DataTypes.ROW(DataTypes.FIELD("outerRow", innerMostRowType)));
+        RowType outerRowType =
+                RowType.of(DataTypes.ROW(DataTypes.FIELD("outerRow", innerMostRowType)));
 
         DataTypeSerializer serializer = new DataTypeSerializer();
 
@@ -116,14 +117,15 @@ public class DataTypeSerializerTest extends SerializerTestBase<DataType> {
         serializer.serialize(outerRowType, outputView);
 
         // Deserialize the RowType
-        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(byteArrayOutputStream.toByteArray());
+        ByteArrayInputStream byteArrayInputStream =
+                new ByteArrayInputStream(byteArrayOutputStream.toByteArray());
         DataInputView inputView = new DataInputViewStreamWrapper(byteArrayInputStream);
         RowType deserializedRow = (RowType) serializer.deserialize(inputView);
 
         // Assert that the deserialized RowType is not null and equals the original
         assertNotNull(deserializedRow, "Deserialized RowType is null");
-        assertEquals(outerRowType, deserializedRow, "Deserialized RowType does not match the original");
+        assertEquals(
+                outerRowType, deserializedRow, "Deserialized RowType does not match the original");
         System.out.println("Deserialized RowType: " + deserializedRow);
     }
-
 }
