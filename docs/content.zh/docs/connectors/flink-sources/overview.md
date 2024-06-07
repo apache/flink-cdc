@@ -186,7 +186,7 @@ The following JSON data show the change event in JSON format.
   "transaction": null
 }
 ```
-**Note:** Please refer [Debezium documentation](https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-events
+**Note:** Please refer [Debezium documentation](https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-events
 )  to know the meaning of each field.
 
 In some cases, users can use the `JsonDebeziumDeserializationSchema(true)` Constructor to enabled include schema in the message. Then the Debezium JSON message may look like this:
