@@ -29,9 +29,9 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -41,12 +41,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link OceanBaseTableSource} created by {@link OceanBaseTableSourceFactory}. */
-public class OceanBaseTableFactoryTest {
+class OceanBaseTableFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -93,9 +92,15 @@ public class OceanBaseTableFactoryTest {
     private static final String RS_LIST = "127.0.0.1:2882:2881";
     private static final String WORKING_MODE = "storage";
 
+    private Map<String, String> options;
+
+    @BeforeEach
+    void beforeEach() {
+        options = getRequiredOptions();
+    }
+
     @Test
-    public void testCommonProperties() {
-        Map<String, String> options = getRequiredOptions();
+    void testCommonProperties() {
         options.put("database-name", DATABASE_NAME);
         options.put("table-name", TABLE_NAME);
         options.put("table-list", TABLE_LIST);
@@ -128,12 +133,11 @@ public class OceanBaseTableFactoryTest {
                         WORKING_MODE,
                         new Properties(),
                         new Properties());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testOptionalProperties() {
-        Map<String, String> options = getRequiredOptions();
+    void testOptionalProperties() {
         options.put("scan.startup.mode", "initial");
         options.put("database-name", DATABASE_NAME);
         options.put("table-name", TABLE_NAME);
@@ -170,12 +174,11 @@ public class OceanBaseTableFactoryTest {
                         WORKING_MODE,
                         new Properties(),
                         new Properties());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testMetadataColumns() {
-        Map<String, String> options = getRequiredOptions();
+    void testMetadataColumns() {
         options.put("database-name", DATABASE_NAME);
         options.put("table-name", TABLE_NAME);
         options.put("table-list", TABLE_LIST);
@@ -218,22 +221,14 @@ public class OceanBaseTableFactoryTest {
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "tenant_name", "database_name", "table_name");
 
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testValidation() {
-        try {
-            Map<String, String> properties = getRequiredOptions();
-            properties.put("unknown", "abc");
-
-            createTableSource(SCHEMA, properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
-                            .isPresent());
-        }
+    void testValidation() {
+        options.put("unknown", "abc");
+        assertThatThrownBy(() -> createTableSource(SCHEMA, options))
+                .hasStackTraceContaining("Unsupported options:\n\nunknown");
     }
 
     private Map<String, String> getRequiredOptions() {

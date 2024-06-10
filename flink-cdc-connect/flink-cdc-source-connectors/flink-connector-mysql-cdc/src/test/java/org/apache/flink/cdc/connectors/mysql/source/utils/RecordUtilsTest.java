@@ -41,16 +41,19 @@ class RecordUtilsTest {
         // general splits
         assertKeyRangeContains(new Object[] {100L}, new Object[] {1L}, new Object[] {1024L});
         assertThat(
-                splitKeyRangeContains(new Object[] {0L}, new Object[] {1L}, new Object[] {1024L})).isFalse();
+                        splitKeyRangeContains(
+                                new Object[] {0L}, new Object[] {1L}, new Object[] {1024L}))
+                .isFalse();
 
         // split key from binlog may have different type
         assertKeyRangeContains(
                 new Object[] {BigInteger.valueOf(100L)}, new Object[] {1L}, new Object[] {1024L});
         assertThat(
-                splitKeyRangeContains(
-                        new Object[] {BigInteger.valueOf(0L)},
-                        new Object[] {1L},
-                        new Object[] {1024L})).isFalse();
+                        splitKeyRangeContains(
+                                new Object[] {BigInteger.valueOf(0L)},
+                                new Object[] {1L},
+                                new Object[] {1024L}))
+                .isFalse();
     }
 
     @Test

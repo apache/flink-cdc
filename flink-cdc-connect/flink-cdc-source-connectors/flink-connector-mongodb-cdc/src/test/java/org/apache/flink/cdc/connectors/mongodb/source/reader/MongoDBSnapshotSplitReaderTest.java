@@ -155,9 +155,9 @@ class MongoDBSnapshotSplitReaderTest extends MongoDBSourceTestBase {
                                 String description =
                                         fullDocument.getString("description").getValue();
 
-                                assertThat(productKind, "KIND_" + productNo);
-                                assertThat(userId, "user_" + productNo);
-                                assertThat(description, "my shopping cart " + productNo);
+                                assertThat("KIND_" + productNo).isEqualTo(productKind);
+                                assertThat("user_" + productNo).isEqualTo(userId);
+                                assertThat("my shopping cart " + productNo).isEqualTo(description);
                                 actualCount++;
                             }
                         }

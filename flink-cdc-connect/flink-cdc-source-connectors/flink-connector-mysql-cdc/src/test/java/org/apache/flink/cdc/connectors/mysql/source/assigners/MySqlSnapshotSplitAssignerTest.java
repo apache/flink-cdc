@@ -50,7 +50,6 @@ import java.util.stream.Collectors;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset.ofEarliest;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -152,15 +151,19 @@ class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
 
     @Test
     void testAssignCompositePkTableWithWrongChunkKeyColumn() {
-        assertThatThrownBy(() ->
-            getTestAssignSnapshotSplits(
-                    customerDatabase,
-                    4,
-                    CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
-                    CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                    new String[] {"customer_card"},
-                    "errorCol")).hasStackTraceContaining(
-                "Chunk key column 'errorCol' doesn't exist in the primary keys [card_no,level] of the table");
+        assertThatThrownBy(
+                        () ->
+                                getTestAssignSnapshotSplits(
+                                        customerDatabase,
+                                        4,
+                                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                                                .defaultValue(),
+                                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                                                .defaultValue(),
+                                        new String[] {"customer_card"},
+                                        "errorCol"))
+                .hasStackTraceContaining(
+                        "Chunk key column 'errorCol' doesn't exist in the primary keys [card_no,level] of the table");
     }
 
     @Test
@@ -383,10 +386,10 @@ class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                     new String[] {"customer_card"});
         } catch (Throwable t) {
             assertThat(
-                    ExceptionUtils.findThrowableWithMessage(
+                            ExceptionUtils.findThrowableWithMessage(
                                     t,
                                     "The defined primary key [card_no] in Flink is not matched with actual primary key [card_no, level] in MySQL"))
-                            .isPresent();
+                    .isPresent();
         }
     }
 
@@ -401,10 +404,10 @@ class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                     new String[] {tableWithoutPrimaryKey});
         } catch (Throwable t) {
             assertThat(
-                    ExceptionUtils.findThrowableWithMessage(
+                            ExceptionUtils.findThrowableWithMessage(
                                     t,
                                     "'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys."))
-                            .isPresent();
+                    .isPresent();
         }
     }
 

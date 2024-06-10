@@ -23,6 +23,7 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
+
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;

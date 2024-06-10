@@ -103,8 +103,8 @@ class MySqlSplitSerializerTest {
         assertThat(serializeAndDeserializeSplit(split)).isEqualTo(split);
 
         final MySqlSplit suspendedBinlogSplit = toSuspendedBinlogSplit(split.asBinlogSplit());
-        assertThat(serializeAndDeserializeSplit(suspendedBinlogSplit)).isEqualTo(
-        suspendedBinlogSplit );
+        assertThat(serializeAndDeserializeSplit(suspendedBinlogSplit))
+                .isEqualTo(suspendedBinlogSplit);
 
         final MySqlSplit unCompletedBinlogSplit =
                 new MySqlBinlogSplit(
@@ -114,8 +114,8 @@ class MySqlSplitSerializerTest {
                         new ArrayList<>(),
                         new HashMap<>(),
                         0);
-        assertThat(serializeAndDeserializeSplit(unCompletedBinlogSplit)).isEqualTo(
-        unCompletedBinlogSplit);
+        assertThat(serializeAndDeserializeSplit(unCompletedBinlogSplit))
+                .isEqualTo(unCompletedBinlogSplit);
     }
 
     @Test

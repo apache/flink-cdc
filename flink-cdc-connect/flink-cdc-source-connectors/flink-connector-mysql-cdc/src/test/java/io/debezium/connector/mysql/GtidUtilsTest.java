@@ -17,7 +17,6 @@
 
 package io.debezium.connector.mysql;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -29,49 +28,36 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GtidUtilsTest {
 
     @ParameterizedTest
-    @CsvSource(value = { //
-            "A:1-100;A:30-100;A:1-100", //
-            "A:1-100;A:30-50;A:1-50", //
-            "A:1-100:102-200,B:20-200;A:106-150;A:1-100:102-150,B:20-200", //
-    }, delimiter = ';')
-    void testFixingRestoredGtidSet(String serverGtidValue, String restoredGtidValue, final String expectedValue) {
+    @CsvSource(
+            value = { //
+                "A:1-100;A:30-100;A:1-100", //
+                "A:1-100;A:30-50;A:1-50", //
+                "A:1-100:102-200,B:20-200;A:106-150;A:1-100:102-150,B:20-200", //
+                "A:1-100:102-200,B:20-200;A:106-150,C:1-100;A:1-100:102-150,B:20-200,C:1-100", //
+                "A:1-100:102-200,B:20-200;A:106-150:152-200,C:1-100;A:1-100:102-200,B:20-200,C:1-100", //
+            },
+            delimiter = ';')
+    void testFixingRestoredGtidSet(
+            final String serverGtidValue,
+            final String restoredGtidValue,
+            final String expectedValue) {
         GtidSet serverGtidSet = new GtidSet(serverGtidValue);
         GtidSet restoredGtidSet = new GtidSet(restoredGtidValue);
-        assertThat(fixRestoredGtidSet(serverGtidSet, restoredGtidSet).toString()).isEqualTo(expectedValue);
-
-        serverGtidSet = new GtidSet("A:1-100");
-        restoredGtidSet = new GtidSet("A:30-50");
-        assertThat(fixRestoredGtidSet(serverGtidSet, restoredGtidSet).toString())
-                .isEqualTo("A:1-50");
-
-        serverGtidSet = new GtidSet("A:1-100:102-200,B:20-200");
-        restoredGtidSet = new GtidSet("A:106-150");
-        assertThat(fixRestoredGtidSet(serverGtidSet, restoredGtidSet).toString())
-                .isEqualTo("A:1-100:102-150,B:20-200");
-
-        serverGtidSet = new GtidSet("A:1-100:102-200,B:20-200");
-        restoredGtidSet = new GtidSet("A:106-150,C:1-100");
-        assertThat(fixRestoredGtidSet(serverGtidSet, restoredGtidSet).toString())
-                .isEqualTo("A:1-100:102-150,B:20-200,C:1-100");
-
-        serverGtidSet = new GtidSet("A:1-100:102-200,B:20-200");
-        restoredGtidSet = new GtidSet("A:106-150:152-200,C:1-100");
-        assertThat(fixRestoredGtidSet(serverGtidSet, restoredGtidSet).toString())
-                .isEqualTo("A:1-100:102-200,B:20-200,C:1-100");
+        assertThat(fixRestoredGtidSet(serverGtidSet, restoredGtidSet)).hasToString(expectedValue);
     }
 
-    @Test
-    void testMergingGtidSets() {
-        GtidSet base = new GtidSet("A:1-100");
-        GtidSet toMerge = new GtidSet("A:1-10");
-        assertThat(mergeGtidSetInto(base, toMerge).toString()).isEqualTo("A:1-100");
-
-        base = new GtidSet("A:1-100");
-        toMerge = new GtidSet("B:1-10");
-        assertThat(mergeGtidSetInto(base, toMerge).toString()).isEqualTo("A:1-100,B:1-10");
-
-        base = new GtidSet("A:1-100,C:1-100");
-        toMerge = new GtidSet("A:1-10,B:1-10");
-        assertThat(mergeGtidSetInto(base, toMerge).toString()).isEqualTo("A:1-100,B:1-10,C:1-100");
+    @ParameterizedTest
+    @CsvSource(
+            value = { //
+                "A:1-100;A:1-10;A:1-100", //
+                "A:1-100;B:1-10;A:1-100,B:1-10", //
+                "A:1-100,C:1-100;A:1-10,B:1-10;A:1-100,B:1-10,C:1-100" //
+            },
+            delimiter = ';')
+    void testMergingGtidSets(
+            final String baseGtidValue, final String mergedGtidValue, final String expectedValue) {
+        GtidSet base = new GtidSet(baseGtidValue);
+        GtidSet toMerge = new GtidSet(mergedGtidValue);
+        assertThat(mergeGtidSetInto(base, toMerge)).hasToString(expectedValue);
     }
 }

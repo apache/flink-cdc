@@ -23,20 +23,21 @@ import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Tests for {@link org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils}.
- */
+/** Tests for {@link org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils}. */
 class ObjectUtilsTest {
 
     @Test
     void testMinus() {
         assertThat(ObjectUtils.minus(10000, 1)).isEqualTo(BigDecimal.valueOf(9999));
-        assertThat(ObjectUtils.minus(Integer.MAX_VALUE, Integer.MIN_VALUE)).isEqualTo(BigDecimal.valueOf(4294967295L));
+        assertThat(ObjectUtils.minus(Integer.MAX_VALUE, Integer.MIN_VALUE))
+                .isEqualTo(BigDecimal.valueOf(4294967295L));
 
-        assertThat(ObjectUtils.minus(10000000000000L, 1L)).isEqualTo(BigDecimal.valueOf(9999999999999L));
-        assertThat(ObjectUtils.minus(Long.MAX_VALUE, Long.MIN_VALUE)).isEqualTo(new BigDecimal("18446744073709551615"));
+        assertThat(ObjectUtils.minus(10000000000000L, 1L))
+                .isEqualTo(BigDecimal.valueOf(9999999999999L));
+        assertThat(ObjectUtils.minus(Long.MAX_VALUE, Long.MIN_VALUE))
+                .isEqualTo(new BigDecimal("18446744073709551615"));
 
-        assertThat(ObjectUtils.minus(new BigDecimal("100.12345"), new BigDecimal("1.00001"))).isEqualTo(
-                new BigDecimal("99.12344"));
+        assertThat(ObjectUtils.minus(new BigDecimal("100.12345"), new BigDecimal("1.00001")))
+                .isEqualTo(new BigDecimal("99.12344"));
     }
 }

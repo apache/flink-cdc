@@ -173,10 +173,11 @@ class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
 
         // Validate if the stopping offset of the binlog split is the maximum among all finished
         // offsets, which should be snapshotSplits.size() - 1
-        assertThat(binlogSplit.getEndingOffset()).isEqualTo(
-        BinlogOffset.builder()
-                .setBinlogFilePosition("foo", snapshotSplits.size() - 1)
-                .build());
+        assertThat(binlogSplit.getEndingOffset())
+                .isEqualTo(
+                        BinlogOffset.builder()
+                                .setBinlogFilePosition("foo", snapshotSplits.size() - 1)
+                                .build());
     }
 
     private MySqlSourceConfig getConfig(String[] captureTables, StartupOptions startupOptions) {

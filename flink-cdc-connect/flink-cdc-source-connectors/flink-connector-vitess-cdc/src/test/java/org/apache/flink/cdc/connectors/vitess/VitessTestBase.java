@@ -20,7 +20,7 @@ package org.apache.flink.cdc.connectors.vitess;
 import org.apache.flink.cdc.connectors.vitess.container.VitessContainer;
 import org.apache.flink.test.util.AbstractTestBase;
 
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Basic class for testing Vitess source, this contains a Vitess container. */
 public abstract class VitessTestBase extends AbstractTestBase {
@@ -57,8 +57,8 @@ public abstract class VitessTestBase extends AbstractTestBase {
                             .withExposedPorts(VitessContainer.MYSQL_PORT, VitessContainer.GRPC_PORT)
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @BeforeClass
-    public static void startContainers() {
+    @BeforeAll
+    static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(VITESS_CONTAINER)).join();
         LOG.info("Containers are started.");
@@ -75,7 +75,7 @@ public abstract class VitessTestBase extends AbstractTestBase {
     protected void initializeTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = VitessTestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        assertThat(ddlTestFile).isNotNull();
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             final List<String> statements =

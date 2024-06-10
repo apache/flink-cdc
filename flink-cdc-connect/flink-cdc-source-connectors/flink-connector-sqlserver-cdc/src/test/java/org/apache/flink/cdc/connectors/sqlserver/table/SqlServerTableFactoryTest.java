@@ -33,7 +33,8 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.FactoryUtil;
 
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -44,10 +45,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Test for {@link SqlServerTableSource} created by {@link SqlServerTableFactory}. */
-public class SqlServerTableFactoryTest {
+class SqlServerTableFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -81,12 +82,17 @@ public class SqlServerTableFactoryTest {
     private static final String MY_TABLE = "dbo.myTable";
     private static final Properties PROPERTIES = new Properties();
 
-    @Test
-    public void testCommonProperties() {
-        Map<String, String> properties = getAllOptions();
+    private Map<String, String> options;
 
+    @BeforeEach
+    void beforeEach() {
+        options = getAllOptions();
+    }
+
+    @Test
+    void testCommonProperties() {
         // validation for source
-        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA, options);
         SqlServerTableSource expectedSource =
                 new SqlServerTableSource(
                         SCHEMA,
@@ -113,25 +119,24 @@ public class SqlServerTableFactoryTest {
                         null,
                         false,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testEnableParallelReadSource() {
-        Map<String, String> properties = getAllOptions();
-        properties.put("scan.incremental.snapshot.enabled", "true");
-        properties.put("scan.incremental.snapshot.chunk.size", "8000");
-        properties.put("chunk-meta.group.size", "3000");
-        properties.put("chunk-key.even-distribution.factor.upper-bound", "40.5");
-        properties.put("chunk-key.even-distribution.factor.lower-bound", "0.01");
-        properties.put("scan.snapshot.fetch.size", "100");
-        properties.put("connect.timeout", "45s");
-        properties.put("scan.incremental.snapshot.chunk.key-column", "testCol");
-        properties.put("scan.incremental.close-idle-reader.enabled", "true");
-        properties.put("scan.incremental.snapshot.backfill.skip", "true");
+    void testEnableParallelReadSource() {
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("scan.incremental.snapshot.chunk.size", "8000");
+        options.put("chunk-meta.group.size", "3000");
+        options.put("chunk-key.even-distribution.factor.upper-bound", "40.5");
+        options.put("chunk-key.even-distribution.factor.lower-bound", "0.01");
+        options.put("scan.snapshot.fetch.size", "100");
+        options.put("connect.timeout", "45s");
+        options.put("scan.incremental.snapshot.chunk.key-column", "testCol");
+        options.put("scan.incremental.close-idle-reader.enabled", "true");
+        options.put("scan.incremental.snapshot.backfill.skip", "true");
 
         // validation for source
-        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA, options);
         SqlServerTableSource expectedSource =
                 new SqlServerTableSource(
                         SCHEMA,
@@ -156,19 +161,18 @@ public class SqlServerTableFactoryTest {
                         "testCol",
                         true,
                         true);
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testOptionalProperties() {
-        Map<String, String> properties = getAllOptions();
-        properties.put("port", "1433");
-        properties.put("debezium.snapshot.mode", "initial");
-        properties.put("server-time-zone", "Asia/Shanghai");
-        properties.put("scan.incremental.snapshot.chunk.key-column", "testCol");
-        properties.put("scan.incremental.close-idle-reader.enabled", "true");
+    void testOptionalProperties() {
+        options.put("port", "1433");
+        options.put("debezium.snapshot.mode", "initial");
+        options.put("server-time-zone", "Asia/Shanghai");
+        options.put("scan.incremental.snapshot.chunk.key-column", "testCol");
+        options.put("scan.incremental.close-idle-reader.enabled", "true");
 
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
         dbzProperties.put("snapshot.mode", "initial");
         SqlServerTableSource expectedSource =
@@ -197,15 +201,13 @@ public class SqlServerTableFactoryTest {
                         "testCol",
                         true,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testMetadataColumns() {
-        Map<String, String> properties = getAllOptions();
-
+    void testMetadataColumns() {
         // validation for source
-        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, options);
         SqlServerTableSource sqlServerTableSource = (SqlServerTableSource) actualSource;
         sqlServerTableSource.applyReadableMetadata(
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name"),
@@ -241,7 +243,7 @@ public class SqlServerTableFactoryTest {
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
 
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     private Map<String, String> getAllOptions() {

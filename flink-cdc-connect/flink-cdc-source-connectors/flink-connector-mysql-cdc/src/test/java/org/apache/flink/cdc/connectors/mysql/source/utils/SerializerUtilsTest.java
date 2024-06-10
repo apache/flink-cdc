@@ -21,6 +21,7 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetKind;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
+
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -77,15 +78,15 @@ class SerializerUtilsTest {
         specificOffsetMap.put(BinlogOffset.ROWS_TO_SKIP_OFFSET_KEY, "18613");
         BinlogOffset specificOffset = new BinlogOffset(specificOffsetMap);
         deserialized = deserializeBinlogOffset(serializeBinlogOffset(specificOffset));
-        assertThat(deserialized).isEqualTo(
-                BinlogOffset.builder()
-                        .setBinlogFilePosition("mysql-bin.000001", 4L)
-                        .setGtidSet("24DA167-0C0C-11E8-8442-00059A3C7B00:1-19")
-                        .setTimestampSec(1668690384L)
-                        .setSkipEvents(15213L)
-                        .setSkipRows(18613L)
-                        .build()
-                );
+        assertThat(deserialized)
+                .isEqualTo(
+                        BinlogOffset.builder()
+                                .setBinlogFilePosition("mysql-bin.000001", 4L)
+                                .setGtidSet("24DA167-0C0C-11E8-8442-00059A3C7B00:1-19")
+                                .setTimestampSec(1668690384L)
+                                .setSkipEvents(15213L)
+                                .setSkipRows(18613L)
+                                .build());
     }
 
     private List<BinlogOffset> createBinlogOffsets() {

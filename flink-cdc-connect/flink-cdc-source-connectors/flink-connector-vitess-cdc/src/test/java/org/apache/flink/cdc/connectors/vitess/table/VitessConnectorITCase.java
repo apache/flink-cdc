@@ -26,8 +26,8 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -37,13 +37,11 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration tests for MySQL binlog SQL source. */
-public class VitessConnectorITCase extends VitessTestBase {
+class VitessConnectorITCase extends VitessTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -51,15 +49,14 @@ public class VitessConnectorITCase extends VitessTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @Before
-    public void before() {
+    @BeforeEach
+    void beforeEach() {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(1);
     }
 
     @Test
-    public void testConsumingAllEvents()
-            throws SQLException, ExecutionException, InterruptedException {
+    void testConsumingAllEvents() throws SQLException, ExecutionException, InterruptedException {
         initializeTable("inventory");
         String sourceDDL =
                 String.format(
@@ -142,12 +139,12 @@ public class VitessConnectorITCase extends VitessTestBase {
                         "+I[spare tire, 22.200]");
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
-        assertEqualsInAnyOrder(expected, actual);
+        assertEqualsInAnyOrder(actual, expected);
         result.getJobClient().get().cancel().get();
     }
 
     @Test
-    public void testAllTypes() throws Throwable {
+    void testAllTypes() throws Throwable {
         initializeTable("column_type_test");
         String sourceDDL =
                 String.format(
@@ -208,7 +205,7 @@ public class VitessConnectorITCase extends VitessTestBase {
                         "+U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Bye World, abc, 123.102, 404.4443, 123.4567, 346, true]");
 
         List<String> actual = fetchRows(result.collect(), expected.size());
-        assertEquals(expected, actual);
+        assertThat(actual).isEqualTo(expected);
         result.getJobClient().get().cancel().get();
     }
 
@@ -222,11 +219,10 @@ public class VitessConnectorITCase extends VitessTestBase {
         return rows;
     }
 
-    public static void assertEqualsInAnyOrder(List<String> actual, List<String> expected) {
-        assertTrue(actual != null && expected != null);
-        assertEquals(
-                actual.stream().sorted().collect(Collectors.toList()),
-                expected.stream().sorted().collect(Collectors.toList()));
+    private static void assertEqualsInAnyOrder(List<String> actual, List<String> expected) {
+        assertThat(actual).isNotNull();
+        assertThat(expected).isNotNull();
+        assertThat(actual).containsExactlyInAnyOrder(expected.toArray(new String[0]));
     }
 
     private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {

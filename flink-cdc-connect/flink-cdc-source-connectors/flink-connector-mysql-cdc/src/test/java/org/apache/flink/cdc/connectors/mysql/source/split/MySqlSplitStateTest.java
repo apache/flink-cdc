@@ -95,15 +95,17 @@ class MySqlSplitStateTest {
         mySqlSplitState.setStartingOffset(
                 BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 100));
 
-        assertThat(mySqlSplitState.toMySqlSplit()).isEqualTo(
-        getTestBinlogSplitWithOffset(
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 100)));
+        assertThat(mySqlSplitState.toMySqlSplit())
+                .isEqualTo(
+                        getTestBinlogSplitWithOffset(
+                                BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 100)));
 
         mySqlSplitState.setStartingOffset(
                 BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 400));
-        assertThat(mySqlSplitState.toMySqlSplit()).isEqualTo(
-        getTestBinlogSplitWithOffset(
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 400)));
+        assertThat(mySqlSplitState.toMySqlSplit())
+                .isEqualTo(
+                        getTestBinlogSplitWithOffset(
+                                BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 400)));
     }
 
     private MySqlBinlogSplit getTestBinlogSplitWithOffset(BinlogOffset startingOffset)

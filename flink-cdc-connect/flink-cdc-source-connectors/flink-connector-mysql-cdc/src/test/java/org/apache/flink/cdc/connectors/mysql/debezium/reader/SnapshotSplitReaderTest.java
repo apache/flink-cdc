@@ -272,9 +272,12 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         mySqlConnection.commit();
 
         final int size = mySqlSplits.size();
-        final String exceptionMessage = String.format("Snapshotting of table %s failed.", tableToDrop);
-        assertThatThrownBy(() ->
-                readTableSnapshotSplits(mySqlSplits, statefulTaskContext, size, dataType))
+        final String exceptionMessage =
+                String.format("Snapshotting of table %s failed.", tableToDrop);
+        assertThatThrownBy(
+                        () ->
+                                readTableSnapshotSplits(
+                                        mySqlSplits, statefulTaskContext, size, dataType))
                 .isInstanceOf(FlinkRuntimeException.class)
                 .hasStackTraceContaining(exceptionMessage);
     }

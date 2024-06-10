@@ -39,7 +39,7 @@ import org.apache.flink.table.types.DataType;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -50,15 +50,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.sqlserver.source.utils.SqlServerConnectionUtils.createSqlServerConnection;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** Tests for {@link SqlServerScanFetchTask}. */
-public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
+class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
     @Test
-    public void testChangingDataInSnapshotScan() throws Exception {
+    void testChangingDataInSnapshotScan() throws Exception {
         String databaseName = "customer";
         String tableName = "dbo.customers";
 
@@ -125,7 +124,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testInsertDataInSnapshotScan() throws Exception {
+    void testInsertDataInSnapshotScan() throws Exception {
         String databaseName = "customer";
         String tableName = "dbo.customers";
 
@@ -190,7 +189,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testDeleteDataInSnapshotScan() throws Exception {
+    void testDeleteDataInSnapshotScan() throws Exception {
         String databaseName = "customer";
         String tableName = "dbo.customers";
 
@@ -280,8 +279,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
         sourceScanFetcher.close();
 
-        assertNotNull(sourceScanFetcher.getExecutorService());
-        assertTrue(sourceScanFetcher.getExecutorService().isTerminated());
+        assertThat(sourceScanFetcher.getExecutorService()).isNotNull();
+        assertThat(sourceScanFetcher.getExecutorService().isTerminated()).isTrue();
 
         return formatResult(result, dataType);
     }
@@ -321,7 +320,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                         .splitSize(splitSize);
     }
 
-    private boolean executeSql(SqlServerSourceConfig sourceConfig, String[] sqlStatements) {
+    private void executeSql(SqlServerSourceConfig sourceConfig, String[] sqlStatements) {
         try (JdbcConnection connection =
                 createSqlServerConnection(sourceConfig.getDbzConnectorConfig())) {
             connection.setAutoCommit(false);
@@ -329,8 +328,6 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
             connection.commit();
         } catch (SQLException e) {
             LOG.error("Failed to execute sql statements.", e);
-            return false;
         }
-        return true;
     }
 }

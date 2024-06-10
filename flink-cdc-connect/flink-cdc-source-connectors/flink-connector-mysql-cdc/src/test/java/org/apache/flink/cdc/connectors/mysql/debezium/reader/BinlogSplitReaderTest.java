@@ -444,9 +444,9 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         assertThatThrownBy(() -> readBinlogSplits(dataType, reader, 1))
                 .hasCauseInstanceOf(SchemaOutOfSyncException.class)
                 .hasStackTraceContaining(
-                "Internal schema representation is probably out of sync with real database schema. "
-                        + "The reason could be that the table schema was changed after the starting "
-                        + "binlog offset, which is not supported when startup mode is set to EARLIEST_OFFSET");
+                        "Internal schema representation is probably out of sync with real database schema. "
+                                + "The reason could be that the table schema was changed after the starting "
+                                + "binlog offset, which is not supported when startup mode is set to EARLIEST_OFFSET");
         reader.close();
     }
 
