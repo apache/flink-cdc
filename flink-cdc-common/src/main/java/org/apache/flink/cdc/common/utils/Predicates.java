@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -69,6 +70,21 @@ public class Predicates {
             return Collections.emptySet();
         }
         Set<T> matches = new LinkedHashSet<>();
+        for (String item : splitter.apply(input)) {
+            T obj = factory.apply(item);
+            if (obj != null) {
+                matches.add(obj);
+            }
+        }
+        return matches;
+    }
+
+    public static <T> List<T> listOf(
+            String input, Function<String, String[]> splitter, Function<String, T> factory) {
+        if (input == null) {
+            return Collections.emptyList();
+        }
+        List<T> matches = new LinkedList<>();
         for (String item : splitter.apply(input)) {
             T obj = factory.apply(item);
             if (obj != null) {
