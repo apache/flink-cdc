@@ -85,6 +85,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 StreamExecutionEnvironment.getExecutionEnvironment(), true);
     }
 
+    public static FlinkPipelineComposer ofApplicationCluster() {
+        return new FlinkPipelineComposer(
+                StreamExecutionEnvironment.getExecutionEnvironment(), false);
+    }
+
     private FlinkPipelineComposer(StreamExecutionEnvironment env, boolean isBlocking) {
         this.env = env;
         this.isBlocking = isBlocking;
