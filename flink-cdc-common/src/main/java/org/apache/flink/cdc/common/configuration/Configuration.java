@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -130,6 +131,17 @@ public class Configuration implements java.io.Serializable, Cloneable {
         final boolean canBePrefixMap = canBePrefixMap(option);
         setValueInternal(option.key(), value, canBePrefixMap);
         return this;
+    }
+
+    /**
+     * Returns the keys of all key/value pairs stored inside this configuration object.
+     *
+     * @return the keys of all key/value pairs stored inside this configuration object
+     */
+    public Set<String> keySet() {
+        synchronized (this.confData) {
+            return new HashSet<>(this.confData.keySet());
+        }
     }
 
     public Map<String, String> toMap() {

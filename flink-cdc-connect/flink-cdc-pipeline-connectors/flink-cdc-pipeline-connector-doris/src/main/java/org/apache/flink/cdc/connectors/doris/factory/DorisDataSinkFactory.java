@@ -69,7 +69,6 @@ public class DorisDataSinkFactory implements DataSinkFactory {
                 .validateExcept(TABLE_CREATE_PROPERTIES_PREFIX, STREAM_LOAD_PROP_PREFIX);
 
         Configuration config = context.getFactoryConfiguration();
-
         DorisOptions.Builder optionsBuilder = DorisOptions.builder();
         DorisExecutionOptions.Builder executionBuilder = DorisExecutionOptions.builder();
         config.getOptional(FENODES).ifPresent(optionsBuilder::setFenodes);
