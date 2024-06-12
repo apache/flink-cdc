@@ -32,9 +32,10 @@ class SelectorsTest {
         // nameSpace, schemaName, tableName
         Selectors selectors =
                 new Selectors.SelectorsBuilder()
-                        .includeTables("db.sc1.A[0-9]+,db.sc2.B[0-1]+")
+                        .includeTables("db.sc1.A[0-9]+,db.sc2.B[0-1]+,db.sc1.sc1")
                         .build();
 
+        assertAllowed(selectors, "db", "sc1", "sc1");
         assertAllowed(selectors, "db", "sc1", "A1");
         assertAllowed(selectors, "db", "sc1", "A2");
         assertAllowed(selectors, "db", "sc2", "B0");
@@ -50,9 +51,12 @@ class SelectorsTest {
 
         selectors =
                 new Selectors.SelectorsBuilder()
-                        .includeTables("db\\..sc1.A[0-9]+,db.sc2.B[0-1]+")
+                        .includeTables("db\\..sc1.A[0-9]+,db.sc2.B[0-1]+,db\\..sc1.sc1,db.sc1.sc1")
                         .build();
 
+        assertAllowed(selectors, "db", "sc1", "sc1");
+        assertAllowed(selectors, "db1", "sc1", "sc1");
+        assertAllowed(selectors, "dba", "sc1", "sc1");
         assertAllowed(selectors, "db1", "sc1", "A1");
         assertAllowed(selectors, "dba", "sc1", "A2");
         assertAllowed(selectors, "db", "sc2", "B0");
@@ -68,8 +72,11 @@ class SelectorsTest {
 
         // schemaName, tableName
         selectors =
-                new Selectors.SelectorsBuilder().includeTables("sc1.A[0-9]+,sc2.B[0-1]+").build();
+                new Selectors.SelectorsBuilder()
+                        .includeTables("sc1.A[0-9]+,sc2.B[0-1]+,sc1.sc1")
+                        .build();
 
+        assertAllowed(selectors, null, "sc1", "sc1");
         assertAllowed(selectors, null, "sc1", "A1");
         assertAllowed(selectors, null, "sc1", "A2");
         assertAllowed(selectors, null, "sc2", "B0");
@@ -82,8 +89,12 @@ class SelectorsTest {
         assertNotAllowed(selectors, null, "sc1A", "A1");
 
         // tableName
-        selectors = new Selectors.SelectorsBuilder().includeTables("\\.A[0-9]+,B[0-1]+").build();
+        selectors =
+                new Selectors.SelectorsBuilder().includeTables("\\.A[0-9]+,B[0-1]+,sc1").build();
 
+        assertAllowed(selectors, null, null, "sc1");
+        assertNotAllowed(selectors, "db", "sc1", "sc1");
+        assertNotAllowed(selectors, null, "sc1", "sc1");
         assertAllowed(selectors, null, null, "1A1");
         assertAllowed(selectors, null, null, "AA2");
         assertAllowed(selectors, null, null, "B0");
@@ -94,8 +105,11 @@ class SelectorsTest {
         assertNotAllowed(selectors, null, null, "2B");
 
         selectors =
-                new Selectors.SelectorsBuilder().includeTables("sc1.A[0-9]+,sc2.B[0-1]+").build();
+                new Selectors.SelectorsBuilder()
+                        .includeTables("sc1.A[0-9]+,sc2.B[0-1]+,sc1.sc1")
+                        .build();
 
+        assertAllowed(selectors, null, "sc1", "sc1");
         assertAllowed(selectors, null, "sc1", "A1");
         assertAllowed(selectors, null, "sc1", "A2");
         assertAllowed(selectors, null, "sc1", "A2");
@@ -107,6 +121,15 @@ class SelectorsTest {
         assertNotAllowed(selectors, null, "sc2", "B2");
         assertNotAllowed(selectors, null, "sc11", "A1");
         assertNotAllowed(selectors, null, "sc1A", "A1");
+
+        selectors = new Selectors.SelectorsBuilder().includeTables("sc1.sc1").build();
+        assertAllowed(selectors, null, "sc1", "sc1");
+
+        selectors = new Selectors.SelectorsBuilder().includeTables("sc1.sc[0-9]+").build();
+        assertAllowed(selectors, null, "sc1", "sc1");
+
+        selectors = new Selectors.SelectorsBuilder().includeTables("sc1.\\.*").build();
+        assertAllowed(selectors, null, "sc1", "sc1");
     }
 
     protected void assertAllowed(
