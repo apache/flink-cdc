@@ -24,7 +24,7 @@ import org.apache.flink.table.api.ValidationException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -95,10 +95,9 @@ public class FactoryHelperTests {
                         new FactoryHelper.DefaultContext(
                                 Configuration.fromMap(configurations), null, null));
 
-        Assertions.assertThrowsExactly(
-                ValidationException.class,
-                factoryHelper::validate,
-                "One or more required options are missing.");
+        Assertions.assertThatThrownBy(factoryHelper::validate)
+                .isExactlyInstanceOf(ValidationException.class)
+                .hasMessageContaining("One or more required options are missing.");
     }
 
     @Test
@@ -116,10 +115,9 @@ public class FactoryHelperTests {
                         new FactoryHelper.DefaultContext(
                                 Configuration.fromMap(configurations), null, null));
 
-        Assertions.assertThrowsExactly(
-                IllegalArgumentException.class,
-                factoryHelper::validate,
-                "Could not parse value 'Not a number' for key 'age'.");
+        Assertions.assertThatThrownBy(factoryHelper::validate)
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Could not parse value 'Not a number' for key 'age'.");
     }
 
     @Test
@@ -137,10 +135,9 @@ public class FactoryHelperTests {
                         new FactoryHelper.DefaultContext(
                                 Configuration.fromMap(configurations), null, null));
 
-        Assertions.assertThrowsExactly(
-                ValidationException.class,
-                factoryHelper::validate,
-                "Unsupported options found for 'dummy'.");
+        Assertions.assertThatThrownBy(factoryHelper::validate)
+                .isExactlyInstanceOf(ValidationException.class)
+                .hasMessageContaining("Unsupported options found for 'dummy'.");
     }
 
     @Test
@@ -160,20 +157,17 @@ public class FactoryHelperTests {
                         new FactoryHelper.DefaultContext(
                                 Configuration.fromMap(configurations), null, null));
 
-        Assertions.assertThrowsExactly(
-                ValidationException.class,
-                factoryHelper::validate,
-                "Unsupported options found for 'dummy'.");
+        Assertions.assertThatThrownBy(factoryHelper::validate)
+                .isExactlyInstanceOf(ValidationException.class)
+                .hasMessageContaining("Unsupported options found for 'dummy'.");
 
-        Assertions.assertThrowsExactly(
-                ValidationException.class,
-                () -> factoryHelper.validateExcept("debezium."),
-                "Unsupported options found for 'dummy'.");
+        Assertions.assertThatThrownBy(() -> factoryHelper.validateExcept("debezium."))
+                .isExactlyInstanceOf(ValidationException.class)
+                .hasMessageContaining("Unsupported options found for 'dummy'.");
 
-        Assertions.assertThrowsExactly(
-                ValidationException.class,
-                () -> factoryHelper.validateExcept("canal."),
-                "Unsupported options found for 'dummy'.");
+        Assertions.assertThatThrownBy(() -> factoryHelper.validateExcept("canal."))
+                .isExactlyInstanceOf(ValidationException.class)
+                .hasMessageContaining("Unsupported options found for 'dummy'.");
 
         factoryHelper.validateExcept("debezium.", "canal.");
     }

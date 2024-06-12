@@ -26,7 +26,7 @@ import org.apache.flink.table.api.ValidationException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,14 +38,14 @@ public class KafkaDataSinkFactoryTest {
     public void testCreateDataSink() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("kafka", DataSinkFactory.class);
-        Assertions.assertTrue(sinkFactory instanceof KafkaDataSinkFactory);
+        Assertions.assertThat(sinkFactory).isInstanceOf(KafkaDataSinkFactory.class);
 
         Configuration conf = Configuration.fromMap(ImmutableMap.<String, String>builder().build());
         DataSink dataSink =
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
-        Assertions.assertTrue(dataSink instanceof KafkaDataSink);
+        Assertions.assertThat(dataSink).isInstanceOf(KafkaDataSink.class);
     }
 
     @Test
@@ -53,7 +53,7 @@ public class KafkaDataSinkFactoryTest {
 
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("kafka", DataSinkFactory.class);
-        Assertions.assertTrue(sinkFactory instanceof KafkaDataSinkFactory);
+        Assertions.assertThat(sinkFactory).isInstanceOf(KafkaDataSinkFactory.class);
 
         Configuration conf =
                 Configuration.fromMap(
@@ -79,7 +79,7 @@ public class KafkaDataSinkFactoryTest {
     public void testPrefixRequireOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("kafka", DataSinkFactory.class);
-        Assertions.assertTrue(sinkFactory instanceof KafkaDataSinkFactory);
+        Assertions.assertThat(sinkFactory).isInstanceOf(KafkaDataSinkFactory.class);
 
         Configuration conf =
                 Configuration.fromMap(
@@ -90,6 +90,6 @@ public class KafkaDataSinkFactoryTest {
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
-        Assertions.assertTrue(dataSink instanceof KafkaDataSink);
+        Assertions.assertThat(dataSink).isInstanceOf(KafkaDataSink.class);
     }
 }
