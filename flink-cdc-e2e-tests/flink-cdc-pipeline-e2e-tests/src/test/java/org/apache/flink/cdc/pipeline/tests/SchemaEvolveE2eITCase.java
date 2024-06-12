@@ -55,6 +55,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
+    protected static final long EVENT_WAITING_TIMEOUT = 60000L;
 
     @ClassRule
     public static final MySqlContainer MYSQL =
@@ -101,7 +102,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                                                 tableName))
                         .collect(Collectors.toList());
 
-        validateResult(expected, taskManagerConsumer, 12000L);
+        validateResult(expected, taskManagerConsumer);
     }
 
     @Test
@@ -176,7 +177,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         .map(s -> String.format(s, schemaEvolveDatabase.getDatabaseName()))
                         .collect(Collectors.toList());
 
-        validateResult(expected, taskManagerConsumer, 12000L);
+        validateResult(expected, taskManagerConsumer);
     }
 
     @Test
@@ -234,14 +235,12 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 "java.lang.IllegalStateException: Incompatible types: \"INT\" and \"VARCHAR(17)\"",
-                taskManagerConsumer,
-                6000L);
+                taskManagerConsumer);
 
         // Ensure that job was terminated
         waitUntilSpecificEvent(
                 "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy",
-                jobManagerConsumer,
-                6000L);
+                jobManagerConsumer);
     }
 
     @Test
@@ -296,8 +295,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 String.format(
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
                         schemaEvolveDatabase.getDatabaseName()),
-                taskManagerConsumer,
-                12000L);
+                taskManagerConsumer);
 
         validateResult(
                 Arrays.asList(
@@ -308,8 +306,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                                 "java.lang.RuntimeException: Rejected schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} since error.on.schema.change is enabled.",
                                 schemaEvolveDatabase.getDatabaseName()),
                         "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"),
-                jobManagerConsumer,
-                12000L);
+                jobManagerConsumer);
     }
 
     @Test
@@ -371,22 +368,20 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         .map(s -> String.format(s, schemaEvolveDatabase.getDatabaseName()))
                         .collect(Collectors.toList());
 
-        validateResult(expected, taskManagerConsumer, 12000L);
+        validateResult(expected, taskManagerConsumer);
 
         waitUntilSpecificEvent(
                 String.format(
                         "Failed to apply schema change AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} to table %s.members.",
                         schemaEvolveDatabase.getDatabaseName(),
                         schemaEvolveDatabase.getDatabaseName()),
-                jobManagerConsumer,
-                12000L);
+                jobManagerConsumer);
 
         waitUntilSpecificEvent(
                 String.format(
                         "Rejected schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} since error.on.schema.change is enabled.",
                         schemaEvolveDatabase.getDatabaseName()),
-                jobManagerConsumer,
-                12000L);
+                jobManagerConsumer);
     }
 
     @Test
@@ -457,7 +452,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         .map(s -> String.format(s, schemaEvolveDatabase.getDatabaseName()))
                         .collect(Collectors.toList());
 
-        validateResult(expected, taskManagerConsumer, 12000L);
+        validateResult(expected, taskManagerConsumer);
     }
 
     @Test
@@ -515,8 +510,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 String.format(
                         "java.lang.RuntimeException: Refused to apply schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} in EXCEPTION mode.",
                         schemaEvolveDatabase.getDatabaseName()),
-                taskManagerConsumer,
-                6000L);
+                taskManagerConsumer);
     }
 
     @Test
@@ -626,28 +620,26 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         .map(s -> String.format(s, schemaEvolveDatabase.getDatabaseName()))
                         .collect(Collectors.toList());
 
-        validateResult(expected, taskManagerConsumer, 12000L);
+        validateResult(expected, taskManagerConsumer);
 
         waitUntilSpecificEvent(
                 String.format(
                         "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]} to table %s.members.",
                         schemaEvolveDatabase.getDatabaseName(),
                         schemaEvolveDatabase.getDatabaseName()),
-                jobManagerConsumer,
-                12000L);
+                jobManagerConsumer);
     }
 
-    private void validateResult(
-            List<String> expectedEvents, ToStringConsumer consumer, long timeout) throws Exception {
+    private void validateResult(List<String> expectedEvents, ToStringConsumer consumer)
+            throws Exception {
         for (String event : expectedEvents) {
-            waitUntilSpecificEvent(event, consumer, timeout);
+            waitUntilSpecificEvent(event, consumer);
         }
     }
 
-    private void waitUntilSpecificEvent(String event, ToStringConsumer consumer, long timeout)
-            throws Exception {
+    private void waitUntilSpecificEvent(String event, ToStringConsumer consumer) throws Exception {
         boolean result = false;
-        long endTimeout = System.currentTimeMillis() + timeout;
+        long endTimeout = System.currentTimeMillis() + SchemaEvolveE2eITCase.EVENT_WAITING_TIMEOUT;
         while (System.currentTimeMillis() < endTimeout) {
             String stdout = consumer.toUtf8String();
             if (stdout.contains(event)) {

@@ -56,6 +56,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
+    protected static final long EVENT_WAITING_TIMEOUT = 60000L;
 
     @ClassRule
     public static final MySqlContainer MYSQL =
@@ -131,14 +132,12 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[], after=[1011, 11], op=INSERT, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                60000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[], after=[2014, 14], op=INSERT, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                60000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         List<String> expectedEvents =
                 Arrays.asList(
@@ -187,20 +186,17 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[], after=[3007, 7], op=INSERT, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                20000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[1009, 8.1], after=[1009, 100], op=UPDATE, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                20000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[2011, 11], after=[], op=DELETE, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                20000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         String stdout = taskManagerConsumer.toUtf8String();
         System.out.println(stdout);
@@ -240,6 +236,10 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
+        waitUntilSpecificEvent(
+                String.format(
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`PRICEALPHA` INT,`UID` INT,`NEWVERSION` STRING}, primaryKeys=ID, options=()}",
+                        transformRenameDatabase.getDatabaseName()));
         List<String> expectedEvents =
                 Arrays.asList(
                         String.format(
@@ -296,31 +296,28 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, 8.1, 0, 2009, 8.1], after=[1009, 100, 0, 2009, 100], op=UPDATE, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                6000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7, 79, 4007, 7], op=INSERT, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                6000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Big Sur, 3011, 11], after=[], op=DELETE, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                6000L);
+                        transformRenameDatabase.getDatabaseName()));
     }
 
     private void validateResult(List<String> expectedEvents) throws Exception {
         for (String event : expectedEvents) {
-            waitUntilSpecificEvent(event, 6000L);
+            waitUntilSpecificEvent(event);
         }
     }
 
-    private void waitUntilSpecificEvent(String event, long timeout) throws Exception {
+    private void waitUntilSpecificEvent(String event) throws Exception {
         boolean result = false;
-        long endTimeout = System.currentTimeMillis() + timeout;
+        long endTimeout = System.currentTimeMillis() + TransformE2eITCase.EVENT_WAITING_TIMEOUT;
         while (System.currentTimeMillis() < endTimeout) {
             String stdout = taskManagerConsumer.toUtf8String();
             if (stdout.contains(event)) {
