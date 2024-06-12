@@ -29,4 +29,64 @@ import java.io.Serializable;
 public interface SchemaChangeEvent extends ChangeEvent, Serializable {
     /** Returns its {@link SchemaChangeEventType}. */
     SchemaChangeEventType getType();
+
+    default void visit(SchemaChangeEventVisitorVoid visitor) {
+        try {
+            if (this instanceof AddColumnEvent) {
+                visitor.visit((AddColumnEvent) this);
+            } else if (this instanceof AlterColumnCommentEvent) {
+                visitor.visit((AlterColumnCommentEvent) this);
+            } else if (this instanceof AlterColumnTypeEvent) {
+                visitor.visit((AlterColumnTypeEvent) this);
+            } else if (this instanceof AlterTableCommentEvent) {
+                visitor.visit((AlterTableCommentEvent) this);
+            } else if (this instanceof CreateTableEvent) {
+                visitor.visit((CreateTableEvent) this);
+            } else if (this instanceof DropColumnEvent) {
+                visitor.visit((DropColumnEvent) this);
+            } else if (this instanceof DropTableEvent) {
+                visitor.visit((DropTableEvent) this);
+            } else if (this instanceof RenameColumnEvent) {
+                visitor.visit((RenameColumnEvent) this);
+            } else if (this instanceof RenameTableEvent) {
+                visitor.visit((RenameTableEvent) this);
+            } else if (this instanceof TruncateTableEvent) {
+                visitor.visit((TruncateTableEvent) this);
+            } else {
+                throw new IllegalArgumentException("Unknown schema change event type " + getType());
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    default <T> T visit(SchemaChangeEventVisitor<T> visitor) {
+        try {
+            if (this instanceof AddColumnEvent) {
+                return visitor.visit((AddColumnEvent) this);
+            } else if (this instanceof AlterColumnCommentEvent) {
+                return visitor.visit((AlterColumnCommentEvent) this);
+            } else if (this instanceof AlterColumnTypeEvent) {
+                return visitor.visit((AlterColumnTypeEvent) this);
+            } else if (this instanceof AlterTableCommentEvent) {
+                return visitor.visit((AlterTableCommentEvent) this);
+            } else if (this instanceof CreateTableEvent) {
+                return visitor.visit((CreateTableEvent) this);
+            } else if (this instanceof DropColumnEvent) {
+                return visitor.visit((DropColumnEvent) this);
+            } else if (this instanceof DropTableEvent) {
+                return visitor.visit((DropTableEvent) this);
+            } else if (this instanceof RenameColumnEvent) {
+                return visitor.visit((RenameColumnEvent) this);
+            } else if (this instanceof RenameTableEvent) {
+                return visitor.visit((RenameTableEvent) this);
+            } else if (this instanceof TruncateTableEvent) {
+                return visitor.visit((TruncateTableEvent) this);
+            } else {
+                throw new IllegalArgumentException("Unknown schema change event type " + getType());
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

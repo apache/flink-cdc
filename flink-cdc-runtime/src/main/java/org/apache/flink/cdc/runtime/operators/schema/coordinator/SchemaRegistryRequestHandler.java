@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.SchemaChangeEventWithPreSchema;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -162,14 +163,27 @@ public class SchemaRegistryRequestHandler implements Closeable {
             LOG.info(
                     "Received schema change event request from table {}. Start to buffer requests for others.",
                     request.getTableId().toString());
-            if (request.getSchemaChangeEvent() instanceof CreateTableEvent
+            SchemaChangeEvent event = request.getSchemaChangeEvent();
+            if (event instanceof CreateTableEvent
                     && schemaManager.upstreamSchemaExists(request.getTableId())) {
                 return CompletableFuture.completedFuture(
                         wrap(new SchemaChangeResponse(Collections.emptyList())));
             }
-            schemaManager.applyUpstreamSchemaChange(request.getSchemaChangeEvent());
+            schemaManager.applyUpstreamSchemaChange(event);
             List<SchemaChangeEvent> derivedSchemaChangeEvents =
-                    schemaDerivation.applySchemaChange(request.getSchemaChangeEvent());
+                    schemaDerivation.applySchemaChange(event);
+
+            derivedSchemaChangeEvents.forEach(
+                    e -> {
+                        if (e instanceof SchemaChangeEventWithPreSchema) {
+                            SchemaChangeEventWithPreSchema pe = (SchemaChangeEventWithPreSchema) e;
+                            if (!pe.hasPreSchema()) {
+                                schemaManager
+                                        .getLatestEvolvedSchema(pe.tableId())
+                                        .ifPresent(pe::fillPreSchema);
+                            }
+                        }
+                    });
             CompletableFuture<CoordinationResponse> response =
                     CompletableFuture.completedFuture(
                             wrap(new SchemaChangeResponse(derivedSchemaChangeEvents)));

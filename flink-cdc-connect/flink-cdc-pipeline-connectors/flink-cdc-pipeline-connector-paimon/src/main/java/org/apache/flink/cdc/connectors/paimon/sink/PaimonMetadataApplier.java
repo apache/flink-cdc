@@ -18,13 +18,19 @@
 package org.apache.flink.cdc.connectors.paimon.sink;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnCommentEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.RenameTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.SchemaChangeEventVisitorVoid;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
@@ -118,24 +124,69 @@ public class PaimonMetadataApplier implements MetadataApplier {
         if (catalog == null) {
             catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
         }
-        try {
-            if (schemaChangeEvent instanceof CreateTableEvent) {
-                applyCreateTable((CreateTableEvent) schemaChangeEvent);
-            } else if (schemaChangeEvent instanceof AddColumnEvent) {
-                applyAddColumn((AddColumnEvent) schemaChangeEvent);
-            } else if (schemaChangeEvent instanceof DropColumnEvent) {
-                applyDropColumn((DropColumnEvent) schemaChangeEvent);
-            } else if (schemaChangeEvent instanceof RenameColumnEvent) {
-                applyRenameColumn((RenameColumnEvent) schemaChangeEvent);
-            } else if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
-                applyAlterColumn((AlterColumnTypeEvent) schemaChangeEvent);
-            } else {
-                throw new UnsupportedOperationException(
-                        "PaimonDataSink doesn't support schema change event " + schemaChangeEvent);
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        schemaChangeEvent.visit(
+                new SchemaChangeEventVisitorVoid() {
+
+                    @Override
+                    public void visit(AddColumnEvent event) throws Exception {
+                        applyAddColumn(event);
+                    }
+
+                    @Override
+                    public void visit(AlterColumnCommentEvent event) throws Exception {
+                        throw new UnsupportedOperationException(
+                                "PaimonDataSink doesn't support schema change event "
+                                        + schemaChangeEvent);
+                    }
+
+                    @Override
+                    public void visit(AlterColumnTypeEvent event) throws Exception {
+                        applyAlterColumnType(event);
+                    }
+
+                    @Override
+                    public void visit(AlterTableCommentEvent event) throws Exception {
+                        throw new UnsupportedOperationException(
+                                "PaimonDataSink doesn't support schema change event "
+                                        + schemaChangeEvent);
+                    }
+
+                    @Override
+                    public void visit(CreateTableEvent event) throws Exception {
+                        applyCreateTable(event);
+                    }
+
+                    @Override
+                    public void visit(DropColumnEvent event) throws Exception {
+                        applyDropColumn(event);
+                    }
+
+                    @Override
+                    public void visit(DropTableEvent event) throws Exception {
+                        throw new UnsupportedOperationException(
+                                "PaimonDataSink doesn't support schema change event "
+                                        + schemaChangeEvent);
+                    }
+
+                    @Override
+                    public void visit(RenameColumnEvent event) throws Exception {
+                        applyRenameColumn(event);
+                    }
+
+                    @Override
+                    public void visit(RenameTableEvent event) throws Exception {
+                        throw new UnsupportedOperationException(
+                                "PaimonDataSink doesn't support schema change event "
+                                        + schemaChangeEvent);
+                    }
+
+                    @Override
+                    public void visit(TruncateTableEvent event) throws Exception {
+                        throw new UnsupportedOperationException(
+                                "PaimonDataSink doesn't support schema change event "
+                                        + schemaChangeEvent);
+                    }
+                });
     }
 
     private void applyCreateTable(CreateTableEvent event)
@@ -275,7 +326,7 @@ public class PaimonMetadataApplier implements MetadataApplier {
                 true);
     }
 
-    private void applyAlterColumn(AlterColumnTypeEvent event)
+    private void applyAlterColumnType(AlterColumnTypeEvent event)
             throws Catalog.ColumnAlreadyExistException, Catalog.TableNotExistException,
                     Catalog.ColumnNotExistException {
         List<SchemaChange> tableChangeList = new ArrayList<>();

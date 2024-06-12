@@ -23,8 +23,11 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.RenameTableEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -300,5 +303,24 @@ public class ValuesDatabaseTest {
         results.add("default.default.table1:col1=2;newCol3=");
         results.add("default.default.table1:col1=3;newCol3=");
         Assert.assertEquals(results, ValuesDatabase.getResults(table1));
+    }
+
+    @Test
+    public void testApplyTableSchemaChangeEvent() {
+        TableId table1neo = TableId.parse("default.default.table1-neo");
+        RenameTableEvent renameTableEvent = new RenameTableEvent(table1, table1neo);
+        metadataApplier.applySchemaChange(renameTableEvent);
+        Assert.assertEquals(
+                Collections.singletonList(table1neo),
+                metadataAccessor.listTables("default", "default"));
+
+        TruncateTableEvent truncateTableEvent = new TruncateTableEvent(table1neo);
+        metadataApplier.applySchemaChange(truncateTableEvent);
+        Assert.assertEquals(Collections.emptyList(), ValuesDatabase.getResults(table1neo));
+
+        DropTableEvent dropTableEvent = new DropTableEvent(table1neo);
+        metadataApplier.applySchemaChange(dropTableEvent);
+        Assert.assertEquals(
+                Collections.emptyList(), metadataAccessor.listTables("default", "default"));
     }
 }

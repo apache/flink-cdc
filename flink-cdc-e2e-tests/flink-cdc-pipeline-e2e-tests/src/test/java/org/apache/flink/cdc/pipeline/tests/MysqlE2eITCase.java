@@ -197,9 +197,15 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
             stat.execute(
                     "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2, null, null, null, 1);"); // 110
             stat.execute(
-                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18, null, null, null, 1);"); // 111
+                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.17, null, null, null, 1);"); // 111
             stat.execute(
                     "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            stat.execute("ALTER TABLE products MODIFY COLUMN weight INT COMMENT 'mass effect';");
+            stat.execute("ALTER TABLE products RENAME COLUMN weight TO weight_tmp;");
+            stat.execute("ALTER TABLE products RENAME COLUMN weight_tmp TO weight;");
+            stat.execute("ALTER TABLE products MODIFY COLUMN weight DOUBLE COMMENT 'mass effect';");
+            stat.execute("ALTER TABLE products MODIFY COLUMN weight DOUBLE;");
+            stat.execute("ALTER TABLE products MODIFY COLUMN weight FLOAT;");
             stat.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             stat.execute("DELETE FROM products WHERE id=111;");
         } catch (SQLException e) {
@@ -227,16 +233,34 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                                 "DataChangeEvent{tableId=%s.products, before=[], after=[110, jacket, water resistent white wind breaker, 0.2, null, null, null, 1], op=INSERT, meta=()}",
                                 mysqlInventoryDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=%s.products, before=[], after=[111, scooter, Big 2-wheel scooter , 5.18, null, null, null, 1], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.products, before=[], after=[111, scooter, Big 2-wheel scooter , 5.17, null, null, null, 1], op=INSERT, meta=()}",
                                 mysqlInventoryDatabase.getDatabaseName()),
                         String.format(
                                 "DataChangeEvent{tableId=%s.products, before=[110, jacket, water resistent white wind breaker, 0.2, null, null, null, 1], after=[110, jacket, new water resistent white wind breaker, 0.5, null, null, null, 1], op=UPDATE, meta=()}",
                                 mysqlInventoryDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=%s.products, before=[111, scooter, Big 2-wheel scooter , 5.18, null, null, null, 1], after=[111, scooter, Big 2-wheel scooter , 5.17, null, null, null, 1], op=UPDATE, meta=()}",
+                                "DataChangeEvent{tableId=%s.products, before=[111, scooter, Big 2-wheel scooter , 5.0, null, null, null, 1], after=[111, scooter, Big 2-wheel scooter , 5.17, null, null, null, 1], op=UPDATE, meta=()}",
                                 mysqlInventoryDatabase.getDatabaseName()),
                         String.format(
                                 "DataChangeEvent{tableId=%s.products, before=[111, scooter, Big 2-wheel scooter , 5.17, null, null, null, 1], after=[], op=DELETE, meta=()}",
+                                mysqlInventoryDatabase.getDatabaseName()),
+                        String.format(
+                                "AlterColumnTypeEvent{tableId=%s.products, typeMapping={weight=INT}, oldTypeMapping={weight=FLOAT}}",
+                                mysqlInventoryDatabase.getDatabaseName()),
+                        String.format(
+                                "RenameColumnEvent{tableId=%s.products, nameMapping={weight=weight_tmp}}",
+                                mysqlInventoryDatabase.getDatabaseName()),
+                        String.format(
+                                "RenameColumnEvent{tableId=%s.products, nameMapping={weight_tmp=weight}}",
+                                mysqlInventoryDatabase.getDatabaseName()),
+                        String.format(
+                                "AlterColumnTypeEvent{tableId=%s.products, typeMapping={weight=DOUBLE}, oldTypeMapping={weight=INT}}",
+                                mysqlInventoryDatabase.getDatabaseName()),
+                        String.format(
+                                "AlterColumnCommentEvent{tableId=%s.products, commentMapping={weight=mass effect}, oldCommentMapping={weight=null}}",
+                                mysqlInventoryDatabase.getDatabaseName()),
+                        String.format(
+                                "AlterColumnCommentEvent{tableId=%s.products, commentMapping={weight=null}, oldCommentMapping={weight=mass effect}}",
                                 mysqlInventoryDatabase.getDatabaseName()));
         validateResult(expectedEvents);
     }

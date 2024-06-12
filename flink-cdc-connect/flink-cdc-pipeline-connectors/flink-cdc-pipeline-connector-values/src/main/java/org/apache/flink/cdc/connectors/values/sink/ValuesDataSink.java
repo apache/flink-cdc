@@ -19,10 +19,10 @@ package org.apache.flink.cdc.connectors.values.sink;
 
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -144,20 +144,18 @@ public class ValuesDataSink implements DataSink, Serializable {
         public void write(Event event, Context context) {
             if (event instanceof SchemaChangeEvent) {
                 SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
-                TableId tableId = schemaChangeEvent.tableId();
-                if (event instanceof CreateTableEvent) {
-                    Schema schema = ((CreateTableEvent) event).getSchema();
-                    schemaMaps.put(tableId, schema);
-                    fieldGetterMaps.put(tableId, SchemaUtils.createFieldGetters(schema));
+                Tuple2<TableId, Schema> appliedSchema =
+                        SchemaUtils.applySchemaChangeEvent(
+                                schemaChangeEvent,
+                                schemaMaps.getOrDefault(schemaChangeEvent.tableId(), null));
+
+                if (appliedSchema.f1 != null) {
+                    schemaMaps.put(appliedSchema.f0, appliedSchema.f1);
+                    fieldGetterMaps.put(
+                            appliedSchema.f0, SchemaUtils.createFieldGetters(appliedSchema.f1));
                 } else {
-                    if (!schemaMaps.containsKey(tableId)) {
-                        throw new RuntimeException("schema of " + tableId + " is not existed.");
-                    }
-                    Schema schema =
-                            SchemaUtils.applySchemaChangeEvent(
-                                    schemaMaps.get(tableId), schemaChangeEvent);
-                    schemaMaps.put(tableId, schema);
-                    fieldGetterMaps.put(tableId, SchemaUtils.createFieldGetters(schema));
+                    schemaMaps.remove(appliedSchema.f0);
+                    fieldGetterMaps.remove(appliedSchema.f0);
                 }
             } else if (materializedInMemory && event instanceof DataChangeEvent) {
                 ValuesDatabase.applyDataChangeEvent((DataChangeEvent) event);

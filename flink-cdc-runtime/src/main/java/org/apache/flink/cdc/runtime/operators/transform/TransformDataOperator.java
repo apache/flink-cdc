@@ -21,7 +21,6 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -195,18 +194,28 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
     }
 
     private SchemaChangeEvent cacheSchema(SchemaChangeEvent event) throws Exception {
-        TableId tableId = event.tableId();
-        Schema newSchema;
-        if (event instanceof CreateTableEvent) {
-            newSchema = ((CreateTableEvent) event).getSchema();
+        Tuple2<TableId, Schema> appliedSchema;
+        appliedSchema =
+                SchemaUtils.applySchemaChangeEvent(
+                        event,
+                        getTableInfoFromSchemaEvolutionClientNullable(event.tableId())
+                                .map(TableInfo::getSchema)
+                                .orElse(null));
+        if (appliedSchema.f1 != null) {
+            transformSchema(appliedSchema.f0, appliedSchema.f1);
+            tableInfoMap.put(appliedSchema.f0, TableInfo.of(appliedSchema.f0, appliedSchema.f1));
         } else {
-            newSchema =
-                    SchemaUtils.applySchemaChangeEvent(
-                            getTableInfoFromSchemaEvolutionClient(tableId).getSchema(), event);
+            tableInfoMap.remove(appliedSchema.f0);
         }
-        transformSchema(tableId, newSchema);
-        tableInfoMap.put(tableId, TableInfo.of(tableId, newSchema));
         return event;
+    }
+
+    private Optional<TableInfo> getTableInfoFromSchemaEvolutionClientNullable(TableId tableId) {
+        try {
+            return Optional.of(getTableInfoFromSchemaEvolutionClient(tableId));
+        } catch (Throwable t) {
+            return Optional.empty();
+        }
     }
 
     private TableInfo getTableInfoFromSchemaEvolutionClient(TableId tableId) throws Exception {

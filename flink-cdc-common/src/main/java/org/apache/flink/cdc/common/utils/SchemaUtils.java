@@ -17,13 +17,22 @@
 
 package org.apache.flink.cdc.common.utils;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnCommentEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.RenameTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventVisitor;
+import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 
@@ -57,21 +66,63 @@ public class SchemaUtils {
     }
 
     /** apply SchemaChangeEvent to the old schema and return the schema after changing. */
-    public static Schema applySchemaChangeEvent(Schema schema, SchemaChangeEvent event) {
-        if (event instanceof AddColumnEvent) {
-            return applyAddColumnEvent((AddColumnEvent) event, schema);
-        } else if (event instanceof DropColumnEvent) {
-            return applyDropColumnEvent((DropColumnEvent) event, schema);
-        } else if (event instanceof RenameColumnEvent) {
-            return applyRenameColumnEvent((RenameColumnEvent) event, schema);
-        } else if (event instanceof AlterColumnTypeEvent) {
-            return applyAlterColumnTypeEvent((AlterColumnTypeEvent) event, schema);
-        } else {
-            throw new UnsupportedOperationException(
-                    String.format(
-                            "Unsupported schema change event type \"%s\"",
-                            event.getClass().getCanonicalName()));
-        }
+    public static Tuple2<TableId, Schema> applySchemaChangeEvent(
+            SchemaChangeEvent event, Schema oldSchema) {
+        return event.visit(
+                new SchemaChangeEventVisitor<Tuple2<TableId, Schema>>() {
+                    @Override
+                    public Tuple2<TableId, Schema> visit(AddColumnEvent event) {
+                        return Tuple2.of(event.tableId(), applyAddColumnEvent(event, oldSchema));
+                    }
+
+                    @Override
+                    public Tuple2<TableId, Schema> visit(AlterColumnCommentEvent event) {
+                        return Tuple2.of(
+                                event.tableId(), applyAlterColumnCommentEvent(event, oldSchema));
+                    }
+
+                    @Override
+                    public Tuple2<TableId, Schema> visit(AlterColumnTypeEvent event) {
+                        return Tuple2.of(
+                                event.tableId(), applyAlterColumnTypeEvent(event, oldSchema));
+                    }
+
+                    @Override
+                    public Tuple2<TableId, Schema> visit(AlterTableCommentEvent event) {
+                        return Tuple2.of(
+                                event.tableId(), oldSchema.copyComment(event.getTableComment()));
+                    }
+
+                    @Override
+                    public Tuple2<TableId, Schema> visit(CreateTableEvent event) {
+                        return Tuple2.of(event.tableId(), event.getSchema());
+                    }
+
+                    @Override
+                    public Tuple2<TableId, Schema> visit(DropColumnEvent event) {
+                        return Tuple2.of(event.tableId(), applyDropColumnEvent(event, oldSchema));
+                    }
+
+                    @Override
+                    public Tuple2<TableId, Schema> visit(DropTableEvent event) {
+                        return Tuple2.of(event.tableId(), null);
+                    }
+
+                    @Override
+                    public Tuple2<TableId, Schema> visit(RenameColumnEvent event) {
+                        return Tuple2.of(event.tableId(), applyRenameColumnEvent(event, oldSchema));
+                    }
+
+                    @Override
+                    public Tuple2<TableId, Schema> visit(RenameTableEvent event) {
+                        return Tuple2.of(event.newTableId(), oldSchema);
+                    }
+
+                    @Override
+                    public Tuple2<TableId, Schema> visit(TruncateTableEvent event) {
+                        return Tuple2.of(event.tableId(), oldSchema);
+                    }
+                });
     }
 
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
@@ -160,6 +211,24 @@ public class SchemaUtils {
                             if (event.getTypeMapping().containsKey(column.getName())) {
                                 columns.add(
                                         column.copy(event.getTypeMapping().get(column.getName())));
+                            } else {
+                                columns.add(column);
+                            }
+                        });
+        return oldSchema.copy(columns);
+    }
+
+    private static Schema applyAlterColumnCommentEvent(
+            AlterColumnCommentEvent event, Schema oldSchema) {
+        List<Column> columns = new ArrayList<>();
+        oldSchema
+                .getColumns()
+                .forEach(
+                        column -> {
+                            if (event.getCommentMapping().containsKey(column.getName())) {
+                                columns.add(
+                                        column.copyComment(
+                                                event.getCommentMapping().get(column.getName())));
                             } else {
                                 columns.add(column);
                             }

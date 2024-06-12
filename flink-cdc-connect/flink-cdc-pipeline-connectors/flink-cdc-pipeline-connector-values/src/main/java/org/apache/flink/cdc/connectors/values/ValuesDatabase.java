@@ -20,14 +20,18 @@ package org.apache.flink.cdc.connectors.values;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnCommentEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.RenameTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -213,6 +217,13 @@ public class ValuesDatabase {
         return builder.primaryKey(table.primaryKeys).build();
     }
 
+    public static void applyTruncateTableEvent(TruncateTableEvent event) {
+        ValuesTable table = globalTables.get(event.tableId());
+        Preconditions.checkNotNull(table, event.tableId() + " is not existed");
+        table.applyTruncateTableEvent(event);
+        LOG.info("apply TruncateTableEvent: " + event);
+    }
+
     public static void applyDataChangeEvent(DataChangeEvent event) {
         ValuesTable table = globalTables.get(event.tableId());
         Preconditions.checkNotNull(table, event.tableId() + " is not existed");
@@ -226,6 +237,22 @@ public class ValuesDatabase {
             if (!globalTables.containsKey(tableId)) {
                 globalTables.put(
                         tableId, new ValuesTable(tableId, ((CreateTableEvent) event).getSchema()));
+            }
+        } else if (event instanceof RenameTableEvent) {
+            if (globalTables.containsKey(tableId)) {
+                TableId newTableId =
+                        TableId.tableId(
+                                tableId.getNamespace(),
+                                tableId.getSchemaName(),
+                                ((RenameTableEvent) event).newTableId().getTableName());
+                globalTables.put(newTableId, globalTables.remove(tableId));
+            }
+        } else if (event instanceof DropTableEvent) {
+            globalTables.remove(tableId);
+        } else if (event instanceof TruncateTableEvent) {
+            if (globalTables.containsKey(tableId)) {
+                ValuesTable table = globalTables.get(event.tableId());
+                table.applyTruncateTableEvent((TruncateTableEvent) event);
             }
         } else {
             ValuesTable table = globalTables.get(event.tableId());
@@ -391,6 +418,24 @@ public class ValuesDatabase {
                             });
         }
 
+        private void applyAlterColumnCommentEvent(AlterColumnCommentEvent event) {
+            event.getCommentMapping()
+                    .forEach(
+                            (columnName, columnComment) -> {
+                                for (int i = 0; i < columns.size(); i++) {
+                                    Column column = columns.get(i);
+                                    if (column.getName().equals(columnName)) {
+                                        columns.set(
+                                                i,
+                                                Column.physicalColumn(
+                                                        columnName,
+                                                        column.getType(),
+                                                        columnComment));
+                                    }
+                                }
+                            });
+        }
+
         private void applyAddColumnEvent(AddColumnEvent event) {
             for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
                 if (columns.contains(columnWithPosition.getAddColumn())) {
@@ -472,6 +517,10 @@ public class ValuesDatabase {
                                             }
                                         });
                             });
+        }
+
+        private void applyTruncateTableEvent(TruncateTableEvent event) {
+            records.clear();
         }
     }
 }

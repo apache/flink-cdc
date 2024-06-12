@@ -249,7 +249,9 @@ public class SchemaEvolveTest {
             List<Event> alterColumnTypeEvents =
                     Arrays.asList(
                             new AlterColumnTypeEvent(
-                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)),
+                                    tableId,
+                                    ImmutableMap.of("score", BIGINT, "toshi", FLOAT),
+                                    ImmutableMap.of("score", INT, "toshi", SMALLINT)),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -504,7 +506,9 @@ public class SchemaEvolveTest {
             List<Event> alterColumnTypeEvents =
                     Arrays.asList(
                             new AlterColumnTypeEvent(
-                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)),
+                                    tableId,
+                                    ImmutableMap.of("score", BIGINT, "toshi", FLOAT),
+                                    ImmutableMap.of("score", INT, "toshi", SMALLINT)),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(

@@ -19,12 +19,18 @@ package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnCommentEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.RenameTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -89,25 +95,63 @@ public class SchemaDerivation {
 
             // Many-to-1 mapping (merging tables)
             Schema derivedTableSchema = schemaManager.getLatestUpstreamSchema(derivedTable).get();
-            if (schemaChangeEvent instanceof CreateTableEvent) {
-                return handleCreateTableEvent(
-                        (CreateTableEvent) schemaChangeEvent, derivedTableSchema, derivedTable);
-            } else if (schemaChangeEvent instanceof AddColumnEvent) {
-                return handleAddColumnEvent(
-                        (AddColumnEvent) schemaChangeEvent, derivedTableSchema, derivedTable);
-            } else if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
-                return handleAlterColumnTypeEvent(
-                        (AlterColumnTypeEvent) schemaChangeEvent, derivedTableSchema, derivedTable);
-            } else if (schemaChangeEvent instanceof DropColumnEvent) {
-                return Collections.emptyList();
-            } else if (schemaChangeEvent instanceof RenameColumnEvent) {
-                return handleRenameColumnEvent(
-                        (RenameColumnEvent) schemaChangeEvent, derivedTableSchema, derivedTable);
-            } else {
-                throw new IllegalStateException(
-                        String.format(
-                                "Unrecognized SchemaChangeEvent type: %s", schemaChangeEvent));
-            }
+
+            return schemaChangeEvent.visit(
+                    new SchemaChangeEventVisitor<List<SchemaChangeEvent>>() {
+
+                        @Override
+                        public List<SchemaChangeEvent> visit(AddColumnEvent event) {
+                            return handleAddColumnEvent(event, derivedTableSchema, derivedTable);
+                        }
+
+                        @Override
+                        public List<SchemaChangeEvent> visit(AlterColumnCommentEvent event) {
+                            return Collections.emptyList();
+                        }
+
+                        @Override
+                        public List<SchemaChangeEvent> visit(AlterColumnTypeEvent event) {
+                            return handleAlterColumnTypeEvent(
+                                    event, derivedTableSchema, derivedTable);
+                        }
+
+                        @Override
+                        public List<SchemaChangeEvent> visit(AlterTableCommentEvent event) {
+                            return Collections.emptyList();
+                        }
+
+                        @Override
+                        public List<SchemaChangeEvent> visit(CreateTableEvent event) {
+                            return handleCreateTableEvent(event, derivedTableSchema, derivedTable);
+                        }
+
+                        @Override
+                        public List<SchemaChangeEvent> visit(DropColumnEvent event) {
+                            // Column drop shouldn't be spread to route destination.
+                            return Collections.emptyList();
+                        }
+
+                        @Override
+                        public List<SchemaChangeEvent> visit(DropTableEvent event) {
+                            // Column drop shouldn't be spread to route destination.
+                            return Collections.emptyList();
+                        }
+
+                        @Override
+                        public List<SchemaChangeEvent> visit(RenameColumnEvent event) {
+                            return handleRenameColumnEvent(event, derivedTableSchema, derivedTable);
+                        }
+
+                        @Override
+                        public List<SchemaChangeEvent> visit(RenameTableEvent event) {
+                            return Collections.emptyList();
+                        }
+
+                        @Override
+                        public List<SchemaChangeEvent> visit(TruncateTableEvent event) {
+                            return Collections.emptyList();
+                        }
+                    });
         }
 
         // No routes are matched

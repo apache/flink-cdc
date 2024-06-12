@@ -40,7 +40,7 @@ import java.util.Map;
 public class SchemaUtilsTest {
 
     @Test
-    public void testApplySchemaChangeEvent() {
+    public void testApplyColumnSchemaChangeEvent() {
         TableId tableId = TableId.parse("default.default.table1");
         Schema schema =
                 Schema.newBuilder()
@@ -54,7 +54,7 @@ public class SchemaUtilsTest {
                 new AddColumnEvent.ColumnWithPosition(
                         Column.physicalColumn("col3", DataTypes.STRING())));
         AddColumnEvent addColumnEvent = new AddColumnEvent(tableId, addedColumns);
-        schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
+        schema = SchemaUtils.applySchemaChangeEvent(addColumnEvent, schema).f1;
         Assert.assertEquals(
                 schema,
                 Schema.newBuilder()
@@ -71,7 +71,7 @@ public class SchemaUtilsTest {
                         AddColumnEvent.ColumnPosition.BEFORE,
                         "col3"));
         addColumnEvent = new AddColumnEvent(tableId, addedColumns);
-        schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
+        schema = SchemaUtils.applySchemaChangeEvent(addColumnEvent, schema).f1;
         Assert.assertEquals(
                 schema,
                 Schema.newBuilder()
@@ -89,7 +89,7 @@ public class SchemaUtilsTest {
                         AddColumnEvent.ColumnPosition.AFTER,
                         "col4"));
         addColumnEvent = new AddColumnEvent(tableId, addedColumns);
-        schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
+        schema = SchemaUtils.applySchemaChangeEvent(addColumnEvent, schema).f1;
         Assert.assertEquals(
                 schema,
                 Schema.newBuilder()
@@ -108,7 +108,7 @@ public class SchemaUtilsTest {
                         AddColumnEvent.ColumnPosition.FIRST,
                         null));
         addColumnEvent = new AddColumnEvent(tableId, addedColumns);
-        schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
+        schema = SchemaUtils.applySchemaChangeEvent(addColumnEvent, schema).f1;
         Assert.assertEquals(
                 schema,
                 Schema.newBuilder()
@@ -123,7 +123,7 @@ public class SchemaUtilsTest {
         // drop columns
         DropColumnEvent dropColumnEvent =
                 new DropColumnEvent(tableId, Arrays.asList("col3", "col5"));
-        schema = SchemaUtils.applySchemaChangeEvent(schema, dropColumnEvent);
+        schema = SchemaUtils.applySchemaChangeEvent(dropColumnEvent, schema).f1;
         Assert.assertEquals(
                 schema,
                 Schema.newBuilder()
@@ -138,7 +138,7 @@ public class SchemaUtilsTest {
         nameMapping.put("col2", "newCol2");
         nameMapping.put("col4", "newCol4");
         RenameColumnEvent renameColumnEvent = new RenameColumnEvent(tableId, nameMapping);
-        schema = SchemaUtils.applySchemaChangeEvent(schema, renameColumnEvent);
+        schema = SchemaUtils.applySchemaChangeEvent(renameColumnEvent, schema).f1;
         Assert.assertEquals(
                 schema,
                 Schema.newBuilder()
@@ -153,7 +153,7 @@ public class SchemaUtilsTest {
         typeMapping.put("newCol2", DataTypes.VARCHAR(10));
         typeMapping.put("newCol4", DataTypes.VARCHAR(10));
         AlterColumnTypeEvent alterColumnTypeEvent = new AlterColumnTypeEvent(tableId, typeMapping);
-        schema = SchemaUtils.applySchemaChangeEvent(schema, alterColumnTypeEvent);
+        schema = SchemaUtils.applySchemaChangeEvent(alterColumnTypeEvent, schema).f1;
         Assert.assertEquals(
                 schema,
                 Schema.newBuilder()

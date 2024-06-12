@@ -27,7 +27,7 @@ import java.util.Objects;
  * lenient column type changes.
  */
 @PublicEvolving
-public class DropColumnEvent implements SchemaChangeEvent {
+public class DropColumnEvent implements ColumnSchemaChangeEvent {
 
     private static final long serialVersionUID = 1L;
 

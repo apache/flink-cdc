@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -150,39 +151,48 @@ public class SchemaManager {
 
     /** Apply schema change to a table. */
     public void applyUpstreamSchemaChange(SchemaChangeEvent schemaChangeEvent) {
-        if (schemaChangeEvent instanceof CreateTableEvent) {
-            handleCreateTableEvent(upstreamSchemas, ((CreateTableEvent) schemaChangeEvent));
-        } else {
-            Optional<Schema> optionalSchema = getLatestUpstreamSchema(schemaChangeEvent.tableId());
+        Optional<Schema> optionalSchema = getLatestUpstreamSchema(schemaChangeEvent.tableId());
+        if (!(schemaChangeEvent instanceof CreateTableEvent)) {
             checkArgument(
                     optionalSchema.isPresent(),
                     "Unable to apply SchemaChangeEvent for table \"%s\" without existing schema",
                     schemaChangeEvent.tableId());
+        }
 
-            LOG.info("Handling upstream schema change event: {}", schemaChangeEvent);
-            registerNewSchema(
-                    upstreamSchemas,
-                    schemaChangeEvent.tableId(),
-                    SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), schemaChangeEvent));
+        LOG.info("Handling upstream schema change event: {}", schemaChangeEvent);
+        Tuple2<TableId, Schema> appliedSchema =
+                SchemaUtils.applySchemaChangeEvent(schemaChangeEvent, optionalSchema.orElse(null));
+
+        if (appliedSchema.f1 != null) {
+            registerNewSchema(upstreamSchemas, appliedSchema.f0, appliedSchema.f1);
+        } else {
+            dropSchema(upstreamSchemas, appliedSchema.f0);
         }
     }
 
     /** Apply schema change to a table. */
     public void applyEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
-        if (schemaChangeEvent instanceof CreateTableEvent) {
-            handleCreateTableEvent(evolvedSchemas, ((CreateTableEvent) schemaChangeEvent));
-        } else {
-            Optional<Schema> optionalSchema = getLatestEvolvedSchema(schemaChangeEvent.tableId());
+        Optional<Schema> optionalSchema = getLatestEvolvedSchema(schemaChangeEvent.tableId());
+        if (!(schemaChangeEvent instanceof CreateTableEvent)) {
             checkArgument(
                     optionalSchema.isPresent(),
                     "Unable to apply SchemaChangeEvent for table \"%s\" without existing schema",
                     schemaChangeEvent.tableId());
+        } else {
+            checkArgument(
+                    !optionalSchema.isPresent(),
+                    "Unable to apply CreateTableEvent to an existing schema for table \"%s\"",
+                    schemaChangeEvent.tableId());
+        }
 
-            LOG.info("Handling evolved schema change event: {}", schemaChangeEvent);
-            registerNewSchema(
-                    evolvedSchemas,
-                    schemaChangeEvent.tableId(),
-                    SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), schemaChangeEvent));
+        LOG.info("Handling upstream schema change event: {}", schemaChangeEvent);
+        Tuple2<TableId, Schema> appliedSchema =
+                SchemaUtils.applySchemaChangeEvent(schemaChangeEvent, optionalSchema.orElse(null));
+
+        if (appliedSchema.f1 != null) {
+            registerNewSchema(evolvedSchemas, appliedSchema.f0, appliedSchema.f1);
+        } else {
+            dropSchema(evolvedSchemas, appliedSchema.f0);
         }
     }
 
@@ -218,16 +228,6 @@ public class SchemaManager {
         }
     }
 
-    private void handleCreateTableEvent(
-            final Map<TableId, SortedMap<Integer, Schema>> schemaMap, CreateTableEvent event) {
-        checkArgument(
-                !schemaExists(schemaMap, event.tableId()),
-                "Unable to apply CreateTableEvent to an existing schema for table \"%s\"",
-                event.tableId());
-        LOG.info("Handling schema change event: {}", event);
-        registerNewSchema(schemaMap, event.tableId(), event.getSchema());
-    }
-
     private void registerNewSchema(
             final Map<TableId, SortedMap<Integer, Schema>> schemaMap,
             TableId tableId,
@@ -244,6 +244,11 @@ public class SchemaManager {
             versionedSchemas.put(INITIAL_SCHEMA_VERSION, newSchema);
             schemaMap.putIfAbsent(tableId, versionedSchemas);
         }
+    }
+
+    private void dropSchema(
+            final Map<TableId, SortedMap<Integer, Schema>> schemaMap, TableId tableId) {
+        schemaMap.remove(tableId, null);
     }
 
     /** Serializer for {@link SchemaManager}. */

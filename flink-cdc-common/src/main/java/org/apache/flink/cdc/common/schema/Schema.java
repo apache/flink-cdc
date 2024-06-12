@@ -168,6 +168,16 @@ public class Schema implements Serializable {
                 comment);
     }
 
+    /** Returns a copy of the schema with replaced comments. */
+    public Schema copyComment(String newComment) {
+        return new Schema(
+                columns,
+                new ArrayList<>(primaryKeys),
+                new ArrayList<>(partitionKeys),
+                new HashMap<>(options),
+                newComment);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {

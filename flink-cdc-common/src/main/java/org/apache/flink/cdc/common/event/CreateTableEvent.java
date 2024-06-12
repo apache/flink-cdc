@@ -28,7 +28,7 @@ import java.util.Objects;
  * {@link DataSource} before all {@link DataChangeEvent} with the same tableId
  */
 @PublicEvolving
-public class CreateTableEvent implements SchemaChangeEvent {
+public class CreateTableEvent implements TableSchemaChangeEvent {
 
     private static final long serialVersionUID = 1L;
 

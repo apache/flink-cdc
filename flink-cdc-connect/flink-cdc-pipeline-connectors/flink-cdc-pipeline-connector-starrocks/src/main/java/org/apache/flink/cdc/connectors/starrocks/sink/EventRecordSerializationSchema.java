@@ -18,8 +18,8 @@
 package org.apache.flink.cdc.connectors.starrocks.sink;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.RecordData;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -39,6 +39,7 @@ import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Serializer for the input {@link Event}. It will serialize a row to a json string. */
 public class EventRecordSerializationSchema implements RecordSerializationSchema<Event> {
@@ -81,26 +82,25 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
     }
 
     private void applySchemaChangeEvent(SchemaChangeEvent event) {
-        TableId tableId = event.tableId();
-        Schema newSchema;
-        if (event instanceof CreateTableEvent) {
-            newSchema = ((CreateTableEvent) event).getSchema();
-        } else {
-            TableInfo tableInfo = tableInfoMap.get(tableId);
-            if (tableInfo == null) {
-                throw new RuntimeException("schema of " + tableId + " is not existed.");
+        Tuple2<TableId, Schema> appliedSchema =
+                SchemaUtils.applySchemaChangeEvent(
+                        event,
+                        Optional.ofNullable(tableInfoMap.getOrDefault(event.tableId(), null))
+                                .map(e -> e.schema)
+                                .orElse(null));
+        if (appliedSchema.f1 != null) {
+            TableInfo tableInfo = new TableInfo();
+            tableInfo.schema = appliedSchema.f1;
+            tableInfo.fieldGetters = new RecordData.FieldGetter[appliedSchema.f1.getColumnCount()];
+            for (int i = 0; i < appliedSchema.f1.getColumnCount(); i++) {
+                tableInfo.fieldGetters[i] =
+                        StarRocksUtils.createFieldGetter(
+                                appliedSchema.f1.getColumns().get(i).getType(), i, zoneId);
             }
-            newSchema = SchemaUtils.applySchemaChangeEvent(tableInfo.schema, event);
+            tableInfoMap.put(appliedSchema.f0, tableInfo);
+        } else {
+            tableInfoMap.remove(appliedSchema.f0);
         }
-        TableInfo tableInfo = new TableInfo();
-        tableInfo.schema = newSchema;
-        tableInfo.fieldGetters = new RecordData.FieldGetter[newSchema.getColumnCount()];
-        for (int i = 0; i < newSchema.getColumnCount(); i++) {
-            tableInfo.fieldGetters[i] =
-                    StarRocksUtils.createFieldGetter(
-                            newSchema.getColumns().get(i).getType(), i, zoneId);
-        }
-        tableInfoMap.put(tableId, tableInfo);
     }
 
     private StarRocksRowData applyDataChangeEvent(DataChangeEvent event) {

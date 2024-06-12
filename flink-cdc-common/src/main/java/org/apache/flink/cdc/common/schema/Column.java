@@ -92,6 +92,9 @@ public abstract class Column implements Serializable {
     /** Returns a copy of the column with a replaced name. */
     public abstract Column copy(String newName);
 
+    /** Returns a copy of the column with a replaced comment. */
+    public abstract Column copyComment(String newComment);
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {

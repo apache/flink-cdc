@@ -17,8 +17,8 @@
 
 package org.apache.flink.cdc.connectors.doris.sink;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.RecordData;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.OperationType;
@@ -71,17 +71,14 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             return applyDataChangeEvent((DataChangeEvent) event);
         } else if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
-            TableId tableId = schemaChangeEvent.tableId();
-            if (event instanceof CreateTableEvent) {
-                schemaMaps.put(tableId, ((CreateTableEvent) event).getSchema());
+            Tuple2<TableId, Schema> appliedSchema =
+                    SchemaUtils.applySchemaChangeEvent(
+                            schemaChangeEvent, schemaMaps.get(schemaChangeEvent.tableId()));
+
+            if (appliedSchema.f1 != null) {
+                schemaMaps.put(appliedSchema.f0, appliedSchema.f1);
             } else {
-                if (!schemaMaps.containsKey(tableId)) {
-                    throw new RuntimeException("schema of " + tableId + " is not existed.");
-                }
-                schemaMaps.put(
-                        tableId,
-                        SchemaUtils.applySchemaChangeEvent(
-                                schemaMaps.get(tableId), schemaChangeEvent));
+                schemaMaps.remove(appliedSchema.f0);
             }
         }
         return null;

@@ -213,7 +213,7 @@ public class EventRecordSerializationSchemaTest {
                                 new AddColumnEvent.ColumnWithPosition(
                                         Column.physicalColumn(
                                                 "col6", new LocalZonedTimestampType()))));
-        Schema newSchema1 = SchemaUtils.applySchemaChangeEvent(schema1, addColumnEvent);
+        Schema newSchema1 = SchemaUtils.applySchemaChangeEvent(addColumnEvent, schema1).f1;
         BinaryRecordDataGenerator newGenerator1 =
                 new BinaryRecordDataGenerator(
                         newSchema1.getColumnDataTypes().toArray(new DataType[0]));
@@ -242,7 +242,7 @@ public class EventRecordSerializationSchemaTest {
         // 4. drop columns from table2, and insert data
         DropColumnEvent dropColumnEvent =
                 new DropColumnEvent(table2, Arrays.asList("col2", "col3"));
-        Schema newSchema2 = SchemaUtils.applySchemaChangeEvent(schema2, dropColumnEvent);
+        Schema newSchema2 = SchemaUtils.applySchemaChangeEvent(dropColumnEvent, schema2).f1;
         BinaryRecordDataGenerator newGenerator2 =
                 new BinaryRecordDataGenerator(
                         newSchema2.getColumnDataTypes().toArray(new DataType[0]));

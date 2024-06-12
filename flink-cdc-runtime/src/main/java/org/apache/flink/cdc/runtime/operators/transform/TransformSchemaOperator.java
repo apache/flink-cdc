@@ -23,11 +23,18 @@ import org.apache.flink.api.common.state.OperatorStateStore;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple5;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
+import org.apache.flink.cdc.common.event.ColumnSchemaChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.RenameTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TableSchemaChangeEvent;
+import org.apache.flink.cdc.common.event.TableSchemaChangeEventVisitorVoid;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
@@ -164,11 +171,37 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
-        if (event instanceof CreateTableEvent) {
-            event = cacheCreateTable((CreateTableEvent) event);
-            output.collect(new StreamRecord<>(event));
-        } else if (event instanceof SchemaChangeEvent) {
-            event = cacheChangeSchema((SchemaChangeEvent) event);
+        if (event instanceof TableSchemaChangeEvent) {
+            ((TableSchemaChangeEvent) event)
+                    .visit(
+                            new TableSchemaChangeEventVisitorVoid() {
+                                @Override
+                                public void visit(AlterTableCommentEvent event) {
+                                    output.collect(new StreamRecord<>(event));
+                                }
+
+                                @Override
+                                public void visit(CreateTableEvent event) {
+                                    output.collect(new StreamRecord<>(cacheCreateTable(event)));
+                                }
+
+                                @Override
+                                public void visit(DropTableEvent event) {
+                                    output.collect(new StreamRecord<>(event));
+                                }
+
+                                @Override
+                                public void visit(RenameTableEvent event) {
+                                    output.collect(new StreamRecord<>(cacheRenameTable(event)));
+                                }
+
+                                @Override
+                                public void visit(TruncateTableEvent event) {
+                                    output.collect(new StreamRecord<>(event));
+                                }
+                            });
+        } else if (event instanceof ColumnSchemaChangeEvent) {
+            cacheChangeSchema((ColumnSchemaChangeEvent) event);
             output.collect(new StreamRecord<>(event));
         } else if (event instanceof DataChangeEvent) {
             output.collect(new StreamRecord<>(processDataChangeEvent(((DataChangeEvent) event))));
@@ -184,14 +217,25 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         return event;
     }
 
-    private SchemaChangeEvent cacheChangeSchema(SchemaChangeEvent event) {
+    private SchemaChangeEvent cacheRenameTable(RenameTableEvent event) {
         TableId tableId = event.tableId();
         TableChangeInfo tableChangeInfo = tableChangeInfoMap.get(tableId);
-        Schema originalSchema =
-                SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getOriginalSchema(), event);
-        Schema newSchema =
-                SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getTransformedSchema(), event);
-        tableChangeInfoMap.put(tableId, TableChangeInfo.of(tableId, originalSchema, newSchema));
+        tableChangeInfoMap.put(event.newTableId(), tableChangeInfo);
+        return event;
+    }
+
+    private ColumnSchemaChangeEvent cacheChangeSchema(ColumnSchemaChangeEvent event) {
+        TableId tableId = event.tableId();
+        TableChangeInfo tableChangeInfo = tableChangeInfoMap.get(tableId);
+        Tuple2<TableId, Schema> originalSchema =
+                SchemaUtils.applySchemaChangeEvent(event, tableChangeInfo.getOriginalSchema());
+        Tuple2<TableId, Schema> newSchema =
+                SchemaUtils.applySchemaChangeEvent(event, tableChangeInfo.getTransformedSchema());
+        if (newSchema.f1 != null) {
+            tableChangeInfoMap.put(
+                    newSchema.f0,
+                    TableChangeInfo.of(originalSchema.f0, originalSchema.f1, newSchema.f1));
+        }
         return event;
     }
 
