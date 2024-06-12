@@ -48,11 +48,11 @@ using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-db2-cdc-3.0.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-db2-cdc/3.0.1/flink-sql-connector-db2-cdc-3.0.1.jar) and
+Download [flink-sql-connector-db2-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-db2-cdc/3.1.0/flink-sql-connector-db2-cdc-3.1.0.jar) and
 put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to
-[flink-sql-connector-db2-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-db2-cdc),
+[flink-sql-connector-db2-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-db2-cdc),
 more released versions will be available in the Maven central warehouse.
 
 由于 Db2 Connector 采用的 IPLA 协议与 Flink CDC 项目不兼容，我们无法在 jar 包中提供 Db2 连接器。
@@ -78,7 +78,7 @@ more released versions will be available in the Maven central warehouse.
 Setup Db2 server
 ----------------
 
-Follow the steps in the [Debezium Db2 Connector](https://debezium.io/documentation/reference/2.0/connectors/db2.html#setting-up-db2).
+Follow the steps in the [Debezium Db2 Connector](https://debezium.io/documentation/reference/1.9/connectors/db2.html#setting-up-db2).
 
 
 Notes
@@ -199,7 +199,7 @@ for more detailed information.</td>
       <td>String</td>
       <td>The session time zone in database server, e.g. "Asia/Shanghai". 
           It controls how the TIMESTAMP type in Db2 converted to STRING.
-          See more <a href="https://debezium.io/documentation/reference/2.0/connectors/db2.html#db2-temporal-types">here</a>.
+          See more <a href="https://debezium.io/documentation/reference/1.9/connectors/db2.html#db2-temporal-types">here</a>.
           If not set, then ZoneId.systemDefault() is used to determine the server time zone.
       </td>
     </tr>
@@ -251,7 +251,7 @@ for more detailed information.</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from 
 Db2 server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/2.0/connectors/db2.html#db2-connector-properties">Debezium's Db2 Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/db2.html#db2-connector-properties">Debezium's Db2 Connector properties</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>

@@ -82,10 +82,9 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final StartupOptions startupOptions;
     private final String chunkKeyColumn;
     private final boolean closeIdleReaders;
-
     private final boolean skipSnapshotBackfill;
-
     private final boolean scanNewlyAddedTableEnabled;
+    private final int lsnCommitCheckpointsDelay;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -124,7 +123,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             @Nullable String chunkKeyColumn,
             boolean closeIdleReaders,
             boolean skipSnapshotBackfill,
-            boolean isScanNewlyAddedTableEnabled) {
+            boolean isScanNewlyAddedTableEnabled,
+            int lsnCommitCheckpointsDelay) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -155,6 +155,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.closeIdleReaders = closeIdleReaders;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.scanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
+        this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
     }
 
     @Override
@@ -216,6 +217,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .closeIdleReaders(closeIdleReaders)
                             .skipSnapshotBackfill(skipSnapshotBackfill)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                            .lsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -283,7 +285,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         chunkKeyColumn,
                         closeIdleReaders,
                         skipSnapshotBackfill,
-                        scanNewlyAddedTableEnabled);
+                        scanNewlyAddedTableEnabled,
+                        lsnCommitCheckpointsDelay);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

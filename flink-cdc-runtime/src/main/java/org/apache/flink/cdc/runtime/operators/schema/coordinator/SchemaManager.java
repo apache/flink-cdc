@@ -172,7 +172,7 @@ public class SchemaManager {
     /** Serializer for {@link SchemaManager}. */
     public static class Serializer implements SimpleVersionedSerializer<SchemaManager> {
 
-        public static final int CURRENT_VERSION = 0;
+        public static final int CURRENT_VERSION = 1;
 
         @Override
         public int getVersion() {
@@ -211,30 +211,40 @@ public class SchemaManager {
 
         @Override
         public SchemaManager deserialize(int version, byte[] serialized) throws IOException {
-            TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
-            SchemaSerializer schemaSerializer = SchemaSerializer.INSTANCE;
-            try (ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
-                    DataInputStream in = new DataInputStream(bais)) {
-                // Total schema length
-                int numTables = in.readInt();
-                Map<TableId, SortedMap<Integer, Schema>> tableSchemas = new HashMap<>(numTables);
-                for (int i = 0; i < numTables; i++) {
-                    // Table ID
-                    TableId tableId =
-                            tableIdSerializer.deserialize(new DataInputViewStreamWrapper(in));
-                    // Schema with versions
-                    int numVersions = in.readInt();
-                    SortedMap<Integer, Schema> versionedSchemas = new TreeMap<>(Integer::compareTo);
-                    for (int j = 0; j < numVersions; j++) {
-                        // Version
-                        int schemaVersion = in.readInt();
-                        Schema schema =
-                                schemaSerializer.deserialize(new DataInputViewStreamWrapper(in));
-                        versionedSchemas.put(schemaVersion, schema);
+            switch (version) {
+                case 0:
+                case 1:
+                    TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
+                    SchemaSerializer schemaSerializer = SchemaSerializer.INSTANCE;
+                    try (ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
+                            DataInputStream in = new DataInputStream(bais)) {
+                        // Total schema length
+                        int numTables = in.readInt();
+                        Map<TableId, SortedMap<Integer, Schema>> tableSchemas =
+                                new HashMap<>(numTables);
+                        for (int i = 0; i < numTables; i++) {
+                            // Table ID
+                            TableId tableId =
+                                    tableIdSerializer.deserialize(
+                                            new DataInputViewStreamWrapper(in));
+                            // Schema with versions
+                            int numVersions = in.readInt();
+                            SortedMap<Integer, Schema> versionedSchemas =
+                                    new TreeMap<>(Integer::compareTo);
+                            for (int j = 0; j < numVersions; j++) {
+                                // Version
+                                int schemaVersion = in.readInt();
+                                Schema schema =
+                                        schemaSerializer.deserialize(
+                                                version, new DataInputViewStreamWrapper(in));
+                                versionedSchemas.put(schemaVersion, schema);
+                            }
+                            tableSchemas.put(tableId, versionedSchemas);
+                        }
+                        return new SchemaManager(tableSchemas);
                     }
-                    tableSchemas.put(tableId, versionedSchemas);
-                }
-                return new SchemaManager(tableSchemas);
+                default:
+                    throw new IOException("Unrecognized serialization version " + version);
             }
         }
     }

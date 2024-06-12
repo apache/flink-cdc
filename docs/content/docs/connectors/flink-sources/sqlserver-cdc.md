@@ -41,9 +41,9 @@ In order to setup the SQLServer CDC connector, the following table provides depe
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-sqlserver-cdc-3.0.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-sqlserver-cdc/3.0.1/flink-sql-connector-sqlserver-cdc-3.0.1.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-sqlserver-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-sqlserver-cdc/3.1.0/flink-sql-connector-sqlserver-cdc-3.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** Refer to [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-sqlserver-cdc), more released versions will be available in the Maven central warehouse.
+**Note:** Refer to [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc), more released versions will be available in the Maven central warehouse.
 
 Setup SQLServer Database
 ----------------
@@ -217,7 +217,7 @@ Connector Options
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from SQLServer.
           For example: <code>'debezium.snapshot.mode' = 'initial_only'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/2.0/connectors/sqlserver.html#sqlserver-required-connector-configuration-properties">Debezium's SQLServer Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#sqlserver-required-connector-configuration-properties">Debezium's SQLServer Connector properties</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -319,7 +319,7 @@ Features
 
 ### Exactly-Once Processing
 
-The SQLServer CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/2.0/connectors/sqlserver.html#how-the-sqlserver-connector-works).
+The SQLServer CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/sqlserver.html#how-the-sqlserver-connector-works).
 
 ### Startup Reading Position
 
