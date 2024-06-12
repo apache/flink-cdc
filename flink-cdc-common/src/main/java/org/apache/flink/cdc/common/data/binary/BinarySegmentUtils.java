@@ -18,8 +18,10 @@
 package org.apache.flink.cdc.common.data.binary;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimestampData;
@@ -1153,5 +1155,31 @@ public final class BinarySegmentUtils {
             }
         }
         return -1;
+    }
+
+    /**
+     * Gets an instance of {@link org.apache.flink.table.data.MapData} from underlying {@link
+     * MemorySegment}.
+     */
+    public static MapData readMapData(
+            MemorySegment[] segments, int baseOffset, long offsetAndSize) {
+        final int size = ((int) offsetAndSize);
+        int offset = (int) (offsetAndSize >> 32);
+        BinaryMapData map = new BinaryMapData();
+        map.pointTo(segments, offset + baseOffset, size);
+        return map;
+    }
+
+    /**
+     * Gets an instance of {@link org.apache.flink.table.data.ArrayData} from underlying {@link
+     * MemorySegment}.
+     */
+    public static ArrayData readArrayData(
+            MemorySegment[] segments, int baseOffset, long offsetAndSize) {
+        final int size = ((int) offsetAndSize);
+        int offset = (int) (offsetAndSize >> 32);
+        BinaryArrayData array = new BinaryArrayData();
+        array.pointTo(segments, offset + baseOffset, size);
+        return array;
     }
 }
