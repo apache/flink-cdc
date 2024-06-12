@@ -165,7 +165,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                                         + inventoryDatabase.getDatabaseName()));
     }
 
-    class MockContext implements Factory.Context {
+    static class MockContext implements Factory.Context {
 
         Configuration factoryConfiguration;
 
