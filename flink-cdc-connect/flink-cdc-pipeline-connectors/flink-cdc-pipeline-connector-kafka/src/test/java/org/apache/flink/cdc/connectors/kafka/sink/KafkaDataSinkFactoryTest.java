@@ -29,8 +29,6 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 /** Tests for {@link KafkaDataSinkFactory}. */
 public class KafkaDataSinkFactoryTest {
 
@@ -61,7 +59,7 @@ public class KafkaDataSinkFactoryTest {
                                 .put("unsupported_key", "unsupported_value")
                                 .build());
 
-        assertThatThrownBy(
+        Assertions.assertThatThrownBy(
                         () ->
                                 sinkFactory.createDataSink(
                                         new FactoryHelper.DefaultContext(

@@ -27,15 +27,13 @@ import org.apache.flink.table.api.ValidationException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
+import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkFactory}. */
 public class StarRocksDataSinkFactoryTest {
@@ -44,7 +42,7 @@ public class StarRocksDataSinkFactoryTest {
     public void testCreateDataSink() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
-        assertTrue(sinkFactory instanceof StarRocksDataSinkFactory);
+        Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);
 
         Configuration conf =
                 Configuration.fromMap(
@@ -58,14 +56,14 @@ public class StarRocksDataSinkFactoryTest {
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
-        assertTrue(dataSink instanceof StarRocksDataSink);
+        Assertions.assertThat(dataSink).isInstanceOf(StarRocksDataSink.class);
     }
 
     @Test
     public void testLackRequireOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
-        assertTrue(sinkFactory instanceof StarRocksDataSinkFactory);
+        Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);
 
         Map<String, String> options = new HashMap<>();
         options.put("jdbc-url", "jdbc:mysql://127.0.0.1:9030");
@@ -82,7 +80,7 @@ public class StarRocksDataSinkFactoryTest {
             remainingOptions.remove(requireKey);
             Configuration conf = Configuration.fromMap(remainingOptions);
 
-            assertThatThrownBy(
+            Assertions.assertThatThrownBy(
                             () ->
                                     sinkFactory.createDataSink(
                                             new FactoryHelper.DefaultContext(
@@ -104,7 +102,7 @@ public class StarRocksDataSinkFactoryTest {
     public void testUnsupportedOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
-        assertTrue(sinkFactory instanceof StarRocksDataSinkFactory);
+        Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);
 
         Configuration conf =
                 Configuration.fromMap(
@@ -116,7 +114,7 @@ public class StarRocksDataSinkFactoryTest {
                                 .put("unsupported_key", "unsupported_value")
                                 .build());
 
-        assertThatThrownBy(
+        Assertions.assertThatThrownBy(
                         () ->
                                 sinkFactory.createDataSink(
                                         new FactoryHelper.DefaultContext(
@@ -134,7 +132,7 @@ public class StarRocksDataSinkFactoryTest {
     public void testPrefixRequireOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
-        assertTrue(sinkFactory instanceof StarRocksDataSinkFactory);
+        Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);
 
         Configuration conf =
                 Configuration.fromMap(
@@ -150,6 +148,6 @@ public class StarRocksDataSinkFactoryTest {
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
-        assertTrue(dataSink instanceof StarRocksDataSink);
+        Assertions.assertThat(dataSink).isInstanceOf(StarRocksDataSink.class);
     }
 }

@@ -27,7 +27,7 @@ import org.apache.flink.table.api.ValidationException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -38,8 +38,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 /** Tests for {@link PaimonDataSinkFactory}. */
 public class PaimonDataSinkFactoryTest {
 
@@ -49,7 +47,7 @@ public class PaimonDataSinkFactoryTest {
     public void testCreateDataSink() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("paimon", DataSinkFactory.class);
-        Assertions.assertInstanceOf(PaimonDataSinkFactory.class, sinkFactory);
+        Assertions.assertThat(sinkFactory).isInstanceOf(PaimonDataSinkFactory.class);
 
         Configuration conf =
                 Configuration.fromMap(
@@ -66,14 +64,14 @@ public class PaimonDataSinkFactoryTest {
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
-        Assertions.assertInstanceOf(PaimonDataSink.class, dataSink);
+        Assertions.assertThat(dataSink).isInstanceOf(PaimonDataSink.class);
     }
 
     @Test
     public void testLackRequireOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("paimon", DataSinkFactory.class);
-        Assertions.assertInstanceOf(PaimonDataSinkFactory.class, sinkFactory);
+        Assertions.assertThat(sinkFactory).isInstanceOf(PaimonDataSinkFactory.class);
 
         Map<String, String> options = new HashMap<>();
         options.put(PaimonDataSinkOptions.METASTORE.key(), "filesystem");
@@ -90,7 +88,7 @@ public class PaimonDataSinkFactoryTest {
             remainingOptions.remove(requireKey);
             Configuration conf = Configuration.fromMap(remainingOptions);
 
-            assertThatThrownBy(
+            Assertions.assertThatThrownBy(
                             () ->
                                     sinkFactory.createDataSink(
                                             new FactoryHelper.DefaultContext(
@@ -112,7 +110,7 @@ public class PaimonDataSinkFactoryTest {
     public void testUnsupportedOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("paimon", DataSinkFactory.class);
-        Assertions.assertInstanceOf(PaimonDataSinkFactory.class, sinkFactory);
+        Assertions.assertThat(sinkFactory).isInstanceOf(PaimonDataSinkFactory.class);
 
         Configuration conf =
                 Configuration.fromMap(
@@ -127,7 +125,7 @@ public class PaimonDataSinkFactoryTest {
                                 .put("unsupported_key", "unsupported_value")
                                 .build());
 
-        assertThatThrownBy(
+        Assertions.assertThatThrownBy(
                         () ->
                                 sinkFactory.createDataSink(
                                         new FactoryHelper.DefaultContext(
@@ -145,7 +143,7 @@ public class PaimonDataSinkFactoryTest {
     public void testPrefixRequireOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("paimon", DataSinkFactory.class);
-        Assertions.assertInstanceOf(PaimonDataSinkFactory.class, sinkFactory);
+        Assertions.assertThat(sinkFactory).isInstanceOf(PaimonDataSinkFactory.class);
         Configuration conf =
                 Configuration.fromMap(
                         ImmutableMap.<String, String>builder()
@@ -164,6 +162,6 @@ public class PaimonDataSinkFactoryTest {
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
-        Assertions.assertInstanceOf(PaimonDataSink.class, dataSink);
+        Assertions.assertThat(dataSink).isInstanceOf(PaimonDataSink.class);
     }
 }
