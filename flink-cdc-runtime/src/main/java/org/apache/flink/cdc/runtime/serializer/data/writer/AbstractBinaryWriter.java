@@ -27,11 +27,14 @@ import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
+import org.apache.flink.cdc.common.data.binary.BinaryArrayData;
 import org.apache.flink.cdc.common.data.binary.BinaryFormat;
+import org.apache.flink.cdc.common.data.binary.BinaryMapData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinarySegmentUtils;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.runtime.serializer.data.ArrayDataSerializer;
+import org.apache.flink.cdc.runtime.serializer.data.MapDataSerializer;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.core.memory.MemorySegmentFactory;
@@ -103,12 +106,16 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
 
     @Override
     public void writeArray(int pos, ArrayData input, ArrayDataSerializer serializer) {
-        throw new UnsupportedOperationException("Not support array data.");
+        BinaryArrayData binary = serializer.toBinaryArray(input);
+        writeSegmentsToVarLenPart(
+                pos, binary.getSegments(), binary.getOffset(), binary.getSizeInBytes());
     }
 
     @Override
-    public void writeMap(int pos, MapData input, TypeSerializer<MapData> serializer) {
-        throw new UnsupportedOperationException("Not support map data.");
+    public void writeMap(int pos, MapData input, MapDataSerializer serializer) {
+        BinaryMapData binary = serializer.toBinaryMap(input);
+        writeSegmentsToVarLenPart(
+                pos, binary.getSegments(), binary.getOffset(), binary.getSizeInBytes());
     }
 
     private DataOutputViewStreamWrapper getOutputView() {

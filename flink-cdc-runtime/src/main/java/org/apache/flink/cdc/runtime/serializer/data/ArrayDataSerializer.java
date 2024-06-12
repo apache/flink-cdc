@@ -25,11 +25,14 @@ import org.apache.flink.api.java.typeutils.runtime.DataOutputViewStream;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.binary.BinaryArrayData;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 import org.apache.flink.cdc.common.utils.InstantiationUtil;
 import org.apache.flink.cdc.runtime.serializer.InternalSerializers;
 import org.apache.flink.cdc.runtime.serializer.NullableSerializerWrapper;
+import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryArrayWriter;
+import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryWriter;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
@@ -45,6 +48,8 @@ public class ArrayDataSerializer extends TypeSerializer<ArrayData> {
     private final DataType eleType;
     private final TypeSerializer<Object> eleSer;
     private final ArrayData.ElementGetter elementGetter;
+    private transient BinaryArrayData reuseArray;
+    private transient BinaryArrayWriter reuseWriter;
 
     public ArrayDataSerializer(DataType eleType) {
         this(eleType, InternalSerializers.create(eleType));
@@ -128,6 +133,38 @@ public class ArrayDataSerializer extends TypeSerializer<ArrayData> {
         for (int i = 0; i < record.size(); i++) {
             eleSer.serialize(elementGetter.getElementOrNull(record, i), target);
         }
+    }
+
+    public BinaryArrayData toBinaryArray(ArrayData from) {
+        if (from instanceof BinaryArrayData) {
+            return (BinaryArrayData) from;
+        }
+
+        int numElements = from.size();
+        if (reuseArray == null) {
+            reuseArray = new BinaryArrayData();
+        }
+        if (reuseWriter == null || reuseWriter.getNumElements() != numElements) {
+            reuseWriter =
+                    new BinaryArrayWriter(
+                            reuseArray,
+                            numElements,
+                            BinaryArrayData.calculateFixLengthPartSize(eleType));
+        } else {
+            reuseWriter.reset();
+        }
+
+        for (int i = 0; i < numElements; i++) {
+            if (from.isNullAt(i)) {
+                reuseWriter.setNullAt(i, eleType);
+            } else {
+                BinaryWriter.write(
+                        reuseWriter, i, elementGetter.getElementOrNull(from, i), eleType, eleSer);
+            }
+        }
+        reuseWriter.complete();
+
+        return reuseArray;
     }
 
     @Override
