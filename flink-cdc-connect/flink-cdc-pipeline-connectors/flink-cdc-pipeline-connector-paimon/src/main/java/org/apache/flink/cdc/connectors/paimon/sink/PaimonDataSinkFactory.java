@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.utils.Preconditions;
@@ -47,6 +48,9 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
 
     @Override
     public DataSink createDataSink(Context context) {
+        FactoryHelper factoryHelper = new FactoryHelper(this, context.getFactoryConfiguration());
+        factoryHelper.validateExcept("catalog.properties.", "table.properties.");
+
         Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
         Map<String, String> catalogOptions = new HashMap<>();
         Map<String, String> tableOptions = new HashMap<>();

@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.starrocks.sink;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
 
 import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
@@ -39,6 +40,9 @@ public class StarRocksDataSinkFactory implements DataSinkFactory {
 
     @Override
     public DataSink createDataSink(Context context) {
+        FactoryHelper factoryHelper = new FactoryHelper(this, context.getFactoryConfiguration());
+        factoryHelper.validateExcept("table.create.properties.", "sink.properties.");
+
         StarRocksSinkOptions sinkOptions =
                 buildSinkConnectorOptions(context.getFactoryConfiguration());
         TableCreateConfig tableCreateConfig =
