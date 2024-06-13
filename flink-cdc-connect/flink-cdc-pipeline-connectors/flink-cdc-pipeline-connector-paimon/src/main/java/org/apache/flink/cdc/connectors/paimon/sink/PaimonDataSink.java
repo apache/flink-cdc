@@ -23,8 +23,8 @@ import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonEventSink;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonRecordSerializer;
-import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonSink;
 
 import org.apache.paimon.options.Options;
 
@@ -62,7 +62,7 @@ public class PaimonDataSink implements DataSink, Serializable {
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        return FlinkSinkProvider.of(new PaimonSink<>(options, commitUser, serializer));
+        return FlinkSinkProvider.of(new PaimonEventSink(options, commitUser, serializer));
     }
 
     @Override
