@@ -40,6 +40,7 @@ import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /** A serializer for Event to Record. */
 public class OceanBaseEventSerializationSchema implements RecordSerializationSchema<Event> {
@@ -100,6 +101,8 @@ public class OceanBaseEventSerializationSchema implements RecordSerializationSch
 
     private DataChangeRecord buildDataChangeRecord(
             TableId tableId, Schema schema, Object[] values, boolean isDelete) {
+        Preconditions.checkState(
+                Objects.nonNull(tableId.getSchemaName()), "schema name cannot be null or empty.");
         com.oceanbase.connector.flink.table.TableId oceanBaseTableId =
                 new com.oceanbase.connector.flink.table.TableId(
                         tableId.getSchemaName(), tableId.getTableName());

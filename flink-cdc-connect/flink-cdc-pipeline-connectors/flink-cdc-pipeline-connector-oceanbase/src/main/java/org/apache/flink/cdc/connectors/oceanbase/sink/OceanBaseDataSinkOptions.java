@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.sink;
 
+import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
 
@@ -87,48 +88,56 @@ public class OceanBaseDataSinkOptions {
                     .withDescription(
                             "Whether to enable partition calculation and flush records by partitions. Default value is 'false'.");
 
+    @Experimental
     public static final ConfigOption<Boolean> DIRECT_LOAD_ENABLED =
             ConfigOptions.key("direct-load.enabled")
                     .booleanType()
                     .defaultValue(false)
                     .withDescription("Whether to enable direct load.");
 
+    @Experimental
     public static final ConfigOption<String> DIRECT_LOAD_HOST =
             ConfigOptions.key("direct-load.host")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Hostname used in direct load.");
 
+    @Experimental
     public static final ConfigOption<Integer> DIRECT_LOAD_PORT =
             ConfigOptions.key("direct-load.port")
                     .intType()
                     .defaultValue(2882)
                     .withDescription("Rpc port number used in direct load.");
 
+    @Experimental
     public static final ConfigOption<Integer> DIRECT_LOAD_PARALLEL =
             ConfigOptions.key("direct-load.parallel")
                     .intType()
                     .defaultValue(8)
                     .withDescription("Parallelism of direct load.");
 
+    @Experimental
     public static final ConfigOption<Long> DIRECT_LOAD_MAX_ERROR_ROWS =
             ConfigOptions.key("direct-load.max-error-rows")
                     .longType()
                     .defaultValue(0L)
                     .withDescription("Maximum tolerable number of error rows.");
 
+    @Experimental
     public static final ConfigOption<ObLoadDupActionType> DIRECT_LOAD_DUP_ACTION =
             ConfigOptions.key("direct-load.dup-action")
                     .enumType(ObLoadDupActionType.class)
                     .defaultValue(ObLoadDupActionType.REPLACE)
                     .withDescription("Action when there is duplicated record in direct load.");
 
+    @Experimental
     public static final ConfigOption<Duration> DIRECT_LOAD_TIMEOUT =
             ConfigOptions.key("direct-load.timeout")
                     .durationType()
                     .defaultValue(Duration.ofDays(7))
                     .withDescription("Timeout for direct load task.");
 
+    @Experimental
     public static final ConfigOption<Duration> DIRECT_LOAD_HEARTBEAT_TIMEOUT =
             ConfigOptions.key("direct-load.heartbeat-timeout")
                     .durationType()
