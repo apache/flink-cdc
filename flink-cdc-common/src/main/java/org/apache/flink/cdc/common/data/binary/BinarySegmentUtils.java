@@ -1157,10 +1157,7 @@ public final class BinarySegmentUtils {
         return -1;
     }
 
-    /**
-     * Gets an instance of {@link org.apache.flink.table.data.MapData} from underlying {@link
-     * MemorySegment}.
-     */
+    /** Gets an instance of {@link MapData} from underlying {@link MemorySegment}. */
     public static MapData readMapData(
             MemorySegment[] segments, int baseOffset, long offsetAndSize) {
         final int size = ((int) offsetAndSize);
@@ -1170,10 +1167,7 @@ public final class BinarySegmentUtils {
         return map;
     }
 
-    /**
-     * Gets an instance of {@link org.apache.flink.table.data.ArrayData} from underlying {@link
-     * MemorySegment}.
-     */
+    /** Gets an instance of {@link ArrayData} from underlying {@link MemorySegment}. */
     public static ArrayData readArrayData(
             MemorySegment[] segments, int baseOffset, long offsetAndSize) {
         final int size = ((int) offsetAndSize);

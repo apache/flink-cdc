@@ -40,7 +40,7 @@ import static org.apache.flink.core.memory.MemoryUtils.UNSAFE;
  * <p>For fields that hold fixed-length primitive types, such as long, double or int, they are
  * stored compacted in bytes, just like the original java array.
  *
- * <p>The binary layout of {@link org.apache.flink.table.data.binary.BinaryArrayData}:
+ * <p>The binary layout of {@link BinaryArrayData}:
  *
  * <pre>
  * [size(int)] + [null bits(4-byte word boundaries)] + [values or offset&length] + [variable length part].
@@ -501,12 +501,11 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
         return values;
     }
 
-    public org.apache.flink.table.data.binary.BinaryArrayData copy() {
-        return copy(new org.apache.flink.table.data.binary.BinaryArrayData());
+    public BinaryArrayData copy() {
+        return copy(new BinaryArrayData());
     }
 
-    public org.apache.flink.table.data.binary.BinaryArrayData copy(
-            org.apache.flink.table.data.binary.BinaryArrayData reuse) {
+    public BinaryArrayData copy(BinaryArrayData reuse) {
         byte[] bytes = BinarySegmentUtils.copyToBytes(segments, offset, sizeInBytes);
         reuse.pointTo(MemorySegmentFactory.wrap(bytes), 0, sizeInBytes);
         return reuse;
@@ -521,41 +520,35 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
     // Construction Utilities
     // ------------------------------------------------------------------------------------------
 
-    public static org.apache.flink.table.data.binary.BinaryArrayData fromPrimitiveArray(
-            boolean[] arr) {
+    public static BinaryArrayData fromPrimitiveArray(boolean[] arr) {
         return fromPrimitiveArray(arr, BOOLEAN_ARRAY_OFFSET, arr.length, 1);
     }
 
-    public static org.apache.flink.table.data.binary.BinaryArrayData fromPrimitiveArray(
-            byte[] arr) {
+    public static BinaryArrayData fromPrimitiveArray(byte[] arr) {
         return fromPrimitiveArray(arr, BYTE_ARRAY_BASE_OFFSET, arr.length, 1);
     }
 
-    public static org.apache.flink.table.data.binary.BinaryArrayData fromPrimitiveArray(
-            short[] arr) {
+    public static BinaryArrayData fromPrimitiveArray(short[] arr) {
         return fromPrimitiveArray(arr, SHORT_ARRAY_OFFSET, arr.length, 2);
     }
 
-    public static org.apache.flink.table.data.binary.BinaryArrayData fromPrimitiveArray(int[] arr) {
+    public static BinaryArrayData fromPrimitiveArray(int[] arr) {
         return fromPrimitiveArray(arr, INT_ARRAY_OFFSET, arr.length, 4);
     }
 
-    public static org.apache.flink.table.data.binary.BinaryArrayData fromPrimitiveArray(
-            long[] arr) {
+    public static BinaryArrayData fromPrimitiveArray(long[] arr) {
         return fromPrimitiveArray(arr, LONG_ARRAY_OFFSET, arr.length, 8);
     }
 
-    public static org.apache.flink.table.data.binary.BinaryArrayData fromPrimitiveArray(
-            float[] arr) {
+    public static BinaryArrayData fromPrimitiveArray(float[] arr) {
         return fromPrimitiveArray(arr, FLOAT_ARRAY_OFFSET, arr.length, 4);
     }
 
-    public static org.apache.flink.table.data.binary.BinaryArrayData fromPrimitiveArray(
-            double[] arr) {
+    public static BinaryArrayData fromPrimitiveArray(double[] arr) {
         return fromPrimitiveArray(arr, DOUBLE_ARRAY_OFFSET, arr.length, 8);
     }
 
-    private static org.apache.flink.table.data.binary.BinaryArrayData fromPrimitiveArray(
+    private static BinaryArrayData fromPrimitiveArray(
             Object arr, int offset, int length, int elementSize) {
         final long headerInBytes = calculateHeaderInBytes(length);
         final long valueRegionInBytes = elementSize * length;
@@ -574,8 +567,7 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
         UNSAFE.copyMemory(
                 arr, offset, data, BYTE_ARRAY_BASE_OFFSET + headerInBytes, valueRegionInBytes);
 
-        org.apache.flink.table.data.binary.BinaryArrayData result =
-                new org.apache.flink.table.data.binary.BinaryArrayData();
+        BinaryArrayData result = new BinaryArrayData();
         result.pointTo(MemorySegmentFactory.wrap(data), 0, (int) totalSize);
         return result;
     }

@@ -50,8 +50,7 @@ public class BinaryMapData extends BinarySection implements MapData {
     @Override
     public void pointTo(MemorySegment[] segments, int offset, int sizeInBytes) {
         // Read the numBytes of key array from the first 4 bytes.
-        final int keyArrayBytes =
-                org.apache.flink.table.data.binary.BinarySegmentUtils.getInt(segments, offset);
+        final int keyArrayBytes = BinarySegmentUtils.getInt(segments, offset);
         assert keyArrayBytes >= 0 : "keyArraySize (" + keyArrayBytes + ") should >= 0";
         final int valueArrayBytes = sizeInBytes - keyArrayBytes - 4;
         assert valueArrayBytes >= 0 : "valueArraySize (" + valueArrayBytes + ") should >= 0";
@@ -90,9 +89,7 @@ public class BinaryMapData extends BinarySection implements MapData {
     }
 
     public BinaryMapData copy(BinaryMapData reuse) {
-        byte[] bytes =
-                org.apache.flink.table.data.binary.BinarySegmentUtils.copyToBytes(
-                        segments, offset, sizeInBytes);
+        byte[] bytes = BinarySegmentUtils.copyToBytes(segments, offset, sizeInBytes);
         reuse.pointTo(MemorySegmentFactory.wrap(bytes), 0, sizeInBytes);
         return reuse;
     }
