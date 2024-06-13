@@ -40,7 +40,7 @@ import org.apache.flink.util.InstantiationUtil;
 
 import java.io.IOException;
 
-/** Serializer for {@link org.apache.flink.table.data.MapData}. */
+/** Serializer for {@link MapData}. */
 @Internal
 public class MapDataSerializer extends TypeSerializer<MapData> {
 
