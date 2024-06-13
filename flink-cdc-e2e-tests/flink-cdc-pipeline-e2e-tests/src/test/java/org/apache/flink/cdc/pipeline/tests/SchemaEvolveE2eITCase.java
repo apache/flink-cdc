@@ -105,6 +105,17 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
         validateResult(expected, taskManagerConsumer);
     }
 
+    private void waitForIncrementalStage(String tableName, Statement stmt) throws Exception {
+        stmt.execute("INSERT INTO members VALUES (0, '__fence__', 0);");
+
+        // Ensure we change schema after incremental stage
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.%s, before=[], after=[0, __fence__, 0], op=INSERT, meta=()}",
+                        schemaEvolveDatabase.getDatabaseName(), tableName),
+                taskManagerConsumer);
+    }
+
     @Test
     public void testSchemaEvolve() throws Exception {
         String pipelineJob =
@@ -149,6 +160,8 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         DriverManager.getConnection(
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stmt = conn.createStatement()) {
+
+            waitForIncrementalStage("members", stmt);
 
             // triggers AddColumnEvent
             stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
@@ -229,6 +242,8 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         DriverManager.getConnection(
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stmt = conn.createStatement()) {
+            waitForIncrementalStage("merged", stmt);
+
             // incompatible type INT and VARCHAR cannot be merged
             stmt.execute("ALTER TABLE members CHANGE COLUMN age age VARCHAR(17);");
         }
@@ -288,6 +303,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         DriverManager.getConnection(
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stmt = conn.createStatement()) {
+            waitForIncrementalStage("members", stmt);
             stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
         }
 
@@ -353,6 +369,9 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         DriverManager.getConnection(
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stmt = conn.createStatement()) {
+
+            waitForIncrementalStage("members", stmt);
+
             stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
             stmt.execute("INSERT INTO members VALUES (1012, 'Eve', 17, 0);");
             stmt.execute("UPDATE members SET name = 'Eva' WHERE id = 1012;");
@@ -430,6 +449,8 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stmt = conn.createStatement()) {
 
+            waitForIncrementalStage("members", stmt);
+
             // triggers AddColumnEvent
             stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
             stmt.execute("INSERT INTO members VALUES (1012, 'Eve', 17, 0);");
@@ -501,6 +522,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         DriverManager.getConnection(
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stmt = conn.createStatement()) {
+            waitForIncrementalStage("members", stmt);
 
             // triggers AddColumnEvent
             stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
@@ -593,6 +615,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         DriverManager.getConnection(
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stmt = conn.createStatement()) {
+            waitForIncrementalStage("members", stmt);
 
             // triggers AddColumnEvent
             stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
