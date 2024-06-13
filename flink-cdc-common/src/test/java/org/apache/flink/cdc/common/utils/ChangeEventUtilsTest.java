@@ -17,9 +17,9 @@
 
 package org.apache.flink.cdc.common.utils;
 
+import org.assertj.core.api.Assertions;
 import org.assertj.core.util.Sets;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -34,86 +34,85 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COL
 public class ChangeEventUtilsTest {
     @Test
     public void testResolveSchemaEvolutionOptions() {
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionOptions(
-                        Collections.emptyList(), Collections.emptyList()),
-                Sets.set(CREATE_TABLE, ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN));
+        Assertions.assertThat(
+                        ChangeEventUtils.resolveSchemaEvolutionOptions(
+                                Collections.emptyList(), Collections.emptyList()))
+                .isEqualTo(
+                        Sets.set(
+                                CREATE_TABLE,
+                                ADD_COLUMN,
+                                ALTER_COLUMN_TYPE,
+                                DROP_COLUMN,
+                                RENAME_COLUMN));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionOptions(
-                        Collections.emptyList(), Collections.singletonList("drop")),
-                Sets.set(CREATE_TABLE, ADD_COLUMN, ALTER_COLUMN_TYPE, RENAME_COLUMN));
+        Assertions.assertThat(
+                        ChangeEventUtils.resolveSchemaEvolutionOptions(
+                                Collections.emptyList(), Collections.singletonList("drop")))
+                .isEqualTo(Sets.set(CREATE_TABLE, ADD_COLUMN, ALTER_COLUMN_TYPE, RENAME_COLUMN));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionOptions(
-                        Arrays.asList("create", "add"), Collections.emptyList()),
-                Sets.set(CREATE_TABLE, ADD_COLUMN));
+        Assertions.assertThat(
+                        ChangeEventUtils.resolveSchemaEvolutionOptions(
+                                Arrays.asList("create", "add"), Collections.emptyList()))
+                .isEqualTo(Sets.set(CREATE_TABLE, ADD_COLUMN));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionOptions(
-                        Collections.singletonList("column"),
-                        Collections.singletonList("drop.column")),
-                Sets.set(ADD_COLUMN, ALTER_COLUMN_TYPE, RENAME_COLUMN));
+        Assertions.assertThat(
+                        ChangeEventUtils.resolveSchemaEvolutionOptions(
+                                Collections.singletonList("column"),
+                                Collections.singletonList("drop.column")))
+                .isEqualTo(Sets.set(ADD_COLUMN, ALTER_COLUMN_TYPE, RENAME_COLUMN));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionOptions(
-                        Collections.emptyList(), Collections.singletonList("drop.column")),
-                Sets.set(CREATE_TABLE, ADD_COLUMN, ALTER_COLUMN_TYPE, RENAME_COLUMN));
+        Assertions.assertThat(
+                        ChangeEventUtils.resolveSchemaEvolutionOptions(
+                                Collections.emptyList(), Collections.singletonList("drop.column")))
+                .isEqualTo(Sets.set(CREATE_TABLE, ADD_COLUMN, ALTER_COLUMN_TYPE, RENAME_COLUMN));
     }
 
     @Test
     public void testResolveSchemaEvolutionTag() {
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("all"),
-                Arrays.asList(
-                        ADD_COLUMN, CREATE_TABLE, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("all"))
+                .isEqualTo(
+                        Arrays.asList(
+                                ADD_COLUMN,
+                                CREATE_TABLE,
+                                ALTER_COLUMN_TYPE,
+                                DROP_COLUMN,
+                                RENAME_COLUMN));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("column"),
-                Arrays.asList(ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("column"))
+                .isEqualTo(
+                        Arrays.asList(ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("table"),
-                Collections.singletonList(CREATE_TABLE));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("table"))
+                .isEqualTo(Collections.singletonList(CREATE_TABLE));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("rename"),
-                Collections.singletonList(RENAME_COLUMN));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("rename"))
+                .isEqualTo(Collections.singletonList(RENAME_COLUMN));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("rename.column"),
-                Collections.singletonList(RENAME_COLUMN));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("rename.column"))
+                .isEqualTo(Collections.singletonList(RENAME_COLUMN));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("drop"),
-                Collections.singletonList(DROP_COLUMN));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("drop"))
+                .isEqualTo(Collections.singletonList(DROP_COLUMN));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("drop.column"),
-                Collections.singletonList(DROP_COLUMN));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("drop.column"))
+                .isEqualTo(Collections.singletonList(DROP_COLUMN));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("create"),
-                Collections.singletonList(CREATE_TABLE));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("create"))
+                .isEqualTo(Collections.singletonList(CREATE_TABLE));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("create.table"),
-                Collections.singletonList(CREATE_TABLE));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("create.table"))
+                .isEqualTo(Collections.singletonList(CREATE_TABLE));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("alter"),
-                Collections.singletonList(ALTER_COLUMN_TYPE));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("alter"))
+                .isEqualTo(Collections.singletonList(ALTER_COLUMN_TYPE));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("alter.column.type"),
-                Collections.singletonList(ALTER_COLUMN_TYPE));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("alter.column.type"))
+                .isEqualTo(Collections.singletonList(ALTER_COLUMN_TYPE));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("add"),
-                Collections.singletonList(ADD_COLUMN));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("add"))
+                .isEqualTo(Collections.singletonList(ADD_COLUMN));
 
-        Assert.assertEquals(
-                ChangeEventUtils.resolveSchemaEvolutionTag("add.column"),
-                Collections.singletonList(ADD_COLUMN));
+        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("add.column"))
+                .isEqualTo(Collections.singletonList(ADD_COLUMN));
     }
 }

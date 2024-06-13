@@ -44,8 +44,8 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import org.apache.commons.collections.ListUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -105,16 +105,17 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, createAndInsertDataEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)),
-                            createAndInsertDataEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    createAndInsertDataEvents))
+                    .isEqualTo(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()));
 
-            Assert.assertEquals(schemaV1, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV1, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
         }
@@ -160,12 +161,14 @@ public class SchemaEvolveTest {
                                             160.)));
             processEvent(schemaOperator, addColumnEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)), addColumnEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    addColumnEvents));
 
             Schema schemaV2 =
                     Schema.newBuilder()
@@ -176,8 +179,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV2, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV2, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
 
             harness.clearOutputRecords();
         }
@@ -217,12 +220,14 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, renameColumnEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)), renameColumnEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    renameColumnEvents));
 
             Schema schemaV3 =
                     Schema.newBuilder()
@@ -233,8 +238,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV3, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV3, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3);
 
             harness.clearOutputRecords();
         }
@@ -258,13 +263,14 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, alterColumnTypeEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)),
-                            alterColumnTypeEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    alterColumnTypeEvents));
 
             Schema schemaV4 =
                     Schema.newBuilder()
@@ -275,8 +281,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV4, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV4, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4);
 
             harness.clearOutputRecords();
         }
@@ -293,12 +299,14 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, dropColumnEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)), dropColumnEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    dropColumnEvents));
 
             Schema schemaV5 =
                     Schema.newBuilder()
@@ -307,8 +315,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("toshi", FLOAT)
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV5, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV5, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV5);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV5);
 
             harness.clearOutputRecords();
         }
@@ -352,16 +360,17 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, createAndInsertDataEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)),
-                            createAndInsertDataEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    createAndInsertDataEvents));
 
-            Assert.assertEquals(schemaV1, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV1, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
         }
@@ -407,12 +416,14 @@ public class SchemaEvolveTest {
                                             160.)));
             processEvent(schemaOperator, addColumnEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)), addColumnEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    addColumnEvents));
 
             Schema schemaV2 =
                     Schema.newBuilder()
@@ -423,8 +434,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV2, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV2, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
 
             harness.clearOutputRecords();
         }
@@ -464,12 +475,14 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, renameColumnEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)), renameColumnEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    renameColumnEvents));
 
             Schema schemaV3 =
                     Schema.newBuilder()
@@ -480,8 +493,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV3, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV3, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3);
 
             harness.clearOutputRecords();
         }
@@ -505,13 +518,14 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, alterColumnTypeEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)),
-                            alterColumnTypeEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    alterColumnTypeEvents));
 
             Schema schemaV4 =
                     Schema.newBuilder()
@@ -522,8 +536,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV4, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV4, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4);
 
             harness.clearOutputRecords();
         }
@@ -540,12 +554,14 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, dropColumnEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)), dropColumnEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    dropColumnEvents));
 
             Schema schemaV5 =
                     Schema.newBuilder()
@@ -554,8 +570,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("toshi", FLOAT)
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV5, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV5, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV5);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV5);
 
             harness.clearOutputRecords();
         }
@@ -599,16 +615,17 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, createAndInsertDataEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)),
-                            createAndInsertDataEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    createAndInsertDataEvents));
 
-            Assert.assertEquals(schemaV1, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV1, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
         }
@@ -626,11 +643,10 @@ public class SchemaEvolveTest {
                                             new AddColumnEvent.ColumnWithPosition(
                                                     Column.physicalColumn(
                                                             "height", DOUBLE, "Height data")))));
-            Assert.assertThrows(
-                    Throwable.class, () -> processEvent(schemaOperator, addColumnEvents));
+            Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents));
 
             // No schema change events should be sent to downstream
-            Assert.assertTrue(harness.getOutputRecords().isEmpty());
+            Assertions.assertThat(harness.getOutputRecords()).isEmpty();
         }
 
         // Test RenameColumnEvent (expected to fail)
@@ -639,11 +655,10 @@ public class SchemaEvolveTest {
                     Collections.singletonList(
                             new RenameColumnEvent(
                                     tableId, ImmutableMap.of("name", "namae", "age", "toshi")));
-            Assert.assertThrows(
-                    Throwable.class, () -> processEvent(schemaOperator, addColumnEvents));
+            Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents));
 
             // No schema change events should be sent to downstream
-            Assert.assertTrue(harness.getOutputRecords().isEmpty());
+            Assertions.assertThat(harness.getOutputRecords()).isEmpty();
         }
 
         // Test AlterColumnTypeEvent (expected to fail)
@@ -652,11 +667,10 @@ public class SchemaEvolveTest {
                     Collections.singletonList(
                             new AlterColumnTypeEvent(
                                     tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)));
-            Assert.assertThrows(
-                    Throwable.class, () -> processEvent(schemaOperator, addColumnEvents));
+            Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents));
 
             // No schema change events should be sent to downstream
-            Assert.assertTrue(harness.getOutputRecords().isEmpty());
+            Assertions.assertThat(harness.getOutputRecords()).isEmpty();
         }
 
         // Test DropColumnEvent (expected to fail)
@@ -664,11 +678,10 @@ public class SchemaEvolveTest {
             List<Event> addColumnEvents =
                     Collections.singletonList(
                             new DropColumnEvent(tableId, Arrays.asList("score", "height")));
-            Assert.assertThrows(
-                    Throwable.class, () -> processEvent(schemaOperator, addColumnEvents));
+            Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents));
 
             // No schema change events should be sent to downstream
-            Assert.assertTrue(harness.getOutputRecords().isEmpty());
+            Assertions.assertThat(harness.getOutputRecords()).isEmpty();
         }
 
         harness.close();
@@ -711,16 +724,17 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, createAndInsertDataEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)),
-                            createAndInsertDataEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    createAndInsertDataEvents));
 
-            Assert.assertEquals(schemaV1, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV1, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
         }
@@ -776,11 +790,11 @@ public class SchemaEvolveTest {
                                     tableId,
                                     buildRecord(INT, 5, STRING, "Eve", SMALLINT, (short) 21)));
 
-            Assert.assertEquals(
-                    expectedEvents,
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(expectedEvents);
 
             Schema schemaV2 =
                     Schema.newBuilder()
@@ -793,8 +807,8 @@ public class SchemaEvolveTest {
                             .build();
 
             // Downstream schema should not evolve in IGNORE mode
-            Assert.assertEquals(schemaV2, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV1, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
         }
@@ -843,11 +857,11 @@ public class SchemaEvolveTest {
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(INT, 7, STRING, null, SMALLINT, (short) 23)));
-            Assert.assertEquals(
-                    expectedEvents,
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(expectedEvents);
 
             Schema schemaV3 =
                     Schema.newBuilder()
@@ -858,8 +872,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV3, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV1, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
         }
@@ -891,11 +905,11 @@ public class SchemaEvolveTest {
                             DataChangeEvent.insertEvent(
                                     tableId, buildRecord(INT, 9, STRING, null, SMALLINT, null)));
 
-            Assert.assertEquals(
-                    expectedEvents,
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(expectedEvents);
 
             Schema schemaV4 =
                     Schema.newBuilder()
@@ -906,8 +920,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV4, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV1, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
         }
@@ -931,11 +945,11 @@ public class SchemaEvolveTest {
                                     tableId, buildRecord(INT, 12, STRING, null, DOUBLE, null)),
                             DataChangeEvent.insertEvent(
                                     tableId, buildRecord(INT, 13, STRING, null, DOUBLE, null)));
-            Assert.assertEquals(
-                    expectedEvents,
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(expectedEvents);
 
             Schema schemaV5 =
                     Schema.newBuilder()
@@ -944,8 +958,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("age", FLOAT)
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV5, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV1, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV5);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
         }
@@ -996,16 +1010,17 @@ public class SchemaEvolveTest {
 
         processEvent(schemaOperator, createAndInsertDataEvents);
 
-        Assert.assertEquals(
-                ListUtils.union(
-                        Collections.singletonList(new FlushEvent(tableId)),
-                        createAndInsertDataEvents),
-                harness.getOutputRecords().stream()
-                        .map(StreamRecord::getValue)
-                        .collect(Collectors.toList()));
+        Assertions.assertThat(
+                        harness.getOutputRecords().stream()
+                                .map(StreamRecord::getValue)
+                                .collect(Collectors.toList()))
+                .isEqualTo(
+                        ListUtils.union(
+                                Collections.singletonList(new FlushEvent(tableId)),
+                                createAndInsertDataEvents));
 
-        Assert.assertEquals(schemaV1, harness.getLatestUpstreamSchema(tableId));
-        Assert.assertEquals(schemaV1, harness.getLatestEvolvedSchema(tableId));
+        Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+        Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
         harness.clearOutputRecords();
 
@@ -1020,10 +1035,9 @@ public class SchemaEvolveTest {
                                         new AddColumnEvent.ColumnWithPosition(
                                                 Column.physicalColumn(
                                                         "height", DOUBLE, "Height data")))));
-        Assert.assertThrows(
-                "Failed to apply schema change",
-                RuntimeException.class,
-                () -> processEvent(schemaOperator, addColumnEvents));
+        Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents))
+                .isExactlyInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Failed to apply schema change");
         harness.close();
     }
 
@@ -1076,16 +1090,17 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, createAndInsertDataEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)),
-                            createAndInsertDataEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    createAndInsertDataEvents));
 
-            Assert.assertEquals(schemaV1, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV1, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
         }
@@ -1135,11 +1150,11 @@ public class SchemaEvolveTest {
             expectedEvents.add(new FlushEvent(tableId));
             expectedEvents.addAll(addColumnEvents);
 
-            Assert.assertEquals(
-                    expectedEvents,
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(expectedEvents);
 
             Schema schemaV2 =
                     Schema.newBuilder()
@@ -1152,8 +1167,8 @@ public class SchemaEvolveTest {
                             .build();
 
             // Downstream schema should not evolve in IGNORE mode
-            Assert.assertEquals(schemaV2, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV2, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
 
             harness.clearOutputRecords();
         }
@@ -1197,11 +1212,11 @@ public class SchemaEvolveTest {
             expectedEvents.add(new FlushEvent(tableId));
             expectedEvents.addAll(renameColumnEvents);
 
-            Assert.assertEquals(
-                    expectedEvents,
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(expectedEvents);
 
             Schema schemaV3 =
                     Schema.newBuilder()
@@ -1212,8 +1227,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV3, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV3, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3);
 
             harness.clearOutputRecords();
         }
@@ -1251,11 +1266,11 @@ public class SchemaEvolveTest {
                                             INT, 9, STRING, "Iva", SMALLINT, null, INT, null,
                                             DOUBLE, 160.)));
 
-            Assert.assertEquals(
-                    expectedEvents,
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(expectedEvents);
 
             Schema schemaV4 =
                     Schema.newBuilder()
@@ -1277,8 +1292,8 @@ public class SchemaEvolveTest {
                             .primaryKey("id")
                             .build();
 
-            Assert.assertEquals(schemaV4, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV4E, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4E);
 
             harness.clearOutputRecords();
         }
@@ -1308,11 +1323,11 @@ public class SchemaEvolveTest {
                                     buildRecord(
                                             INT, 13, STRING, "Kryo", SMALLINT, null, INT, null,
                                             DOUBLE, null)));
-            Assert.assertEquals(
-                    expectedEvents,
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(expectedEvents);
 
             Schema schemaV5 =
                     Schema.newBuilder()
@@ -1330,8 +1345,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV5, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV5E, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV5);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV5E);
 
             harness.clearOutputRecords();
         }
@@ -1387,16 +1402,17 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, createAndInsertDataEvents);
 
-            Assert.assertEquals(
-                    ListUtils.union(
-                            Collections.singletonList(new FlushEvent(tableId)),
-                            createAndInsertDataEvents),
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    createAndInsertDataEvents));
 
-            Assert.assertEquals(schemaV1, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV1, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
         }
@@ -1446,11 +1462,11 @@ public class SchemaEvolveTest {
             expectedEvents.add(new FlushEvent(tableId));
             expectedEvents.addAll(addColumnEvents);
 
-            Assert.assertEquals(
-                    expectedEvents,
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(expectedEvents);
 
             Schema schemaV2 =
                     Schema.newBuilder()
@@ -1463,8 +1479,8 @@ public class SchemaEvolveTest {
                             .build();
 
             // Downstream schema should not evolve in IGNORE mode
-            Assert.assertEquals(schemaV2, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV2, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
 
             harness.clearOutputRecords();
         }
@@ -1508,11 +1524,11 @@ public class SchemaEvolveTest {
             expectedEvents.add(new FlushEvent(tableId));
             expectedEvents.addAll(renameColumnEvents);
 
-            Assert.assertEquals(
-                    expectedEvents,
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(expectedEvents);
 
             Schema schemaV3 =
                     Schema.newBuilder()
@@ -1523,8 +1539,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV3, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV3, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3);
 
             harness.clearOutputRecords();
         }
@@ -1562,11 +1578,11 @@ public class SchemaEvolveTest {
                                             INT, 9, STRING, "Iva", SMALLINT, null, INT, null,
                                             DOUBLE, 160.)));
 
-            Assert.assertEquals(
-                    expectedEvents,
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(expectedEvents);
 
             Schema schemaV4 =
                     Schema.newBuilder()
@@ -1588,8 +1604,8 @@ public class SchemaEvolveTest {
                             .primaryKey("id")
                             .build();
 
-            Assert.assertEquals(schemaV4, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV4E, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4E);
 
             harness.clearOutputRecords();
         }
@@ -1619,11 +1635,11 @@ public class SchemaEvolveTest {
                                     buildRecord(
                                             INT, 13, STRING, "Kryo", SMALLINT, null, INT, null,
                                             DOUBLE, null)));
-            Assert.assertEquals(
-                    expectedEvents,
-                    harness.getOutputRecords().stream()
-                            .map(StreamRecord::getValue)
-                            .collect(Collectors.toList()));
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(expectedEvents);
 
             Schema schemaV5 =
                     Schema.newBuilder()
@@ -1641,8 +1657,8 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assert.assertEquals(schemaV5, harness.getLatestUpstreamSchema(tableId));
-            Assert.assertEquals(schemaV5E, harness.getLatestEvolvedSchema(tableId));
+            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV5);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV5E);
 
             harness.clearOutputRecords();
         }
