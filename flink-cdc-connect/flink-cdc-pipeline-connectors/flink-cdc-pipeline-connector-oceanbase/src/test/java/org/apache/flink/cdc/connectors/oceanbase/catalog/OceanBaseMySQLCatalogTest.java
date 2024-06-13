@@ -17,8 +17,6 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.catalog;
 
-import org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestBase;
-
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
@@ -29,13 +27,13 @@ import org.junit.jupiter.api.Assertions;
 import java.util.List;
 
 /** Tests for {@link OceanBaseMySQLCatalogTest}. */
-public class OceanBaseMySQLCatalogTest extends OceanBaseTestBase {
+public class OceanBaseMySQLCatalogTest {
 
     private static final ImmutableMap<String, String> configMap =
             ImmutableMap.<String, String>builder()
-                    .put("url", OB_SERVER.getJdbcUrl())
-                    .put("username", OB_SERVER.getUsername())
-                    .put("password", OB_SERVER.getPassword())
+                    .put("url", "localhost")
+                    .put("username", "test")
+                    .put("password", "test")
                     .build();
 
     @Test

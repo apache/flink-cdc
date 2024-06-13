@@ -53,6 +53,7 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
     public OceanBaseMetadataApplier(
             OceanBaseConnectorOptions connectorOptions, Configuration config) throws Exception {
         this.catalog = OceanBaseCatalogFactory.createOceanBaseCatalog(connectorOptions);
+        catalog.open();
     }
 
     @Override

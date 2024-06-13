@@ -20,6 +20,8 @@ package org.apache.flink.cdc.connectors.oceanbase.catalog;
 import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
 import com.oceanbase.connector.flink.connection.OceanBaseConnectionProvider;
 import org.apache.commons.compress.utils.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.sql.Connection;
@@ -33,11 +35,19 @@ import java.util.Objects;
 /** A {@link OceanBaseCatalog} for OceanBase connector that supports schema evolution. */
 public abstract class OceanBaseCatalog implements Serializable {
     private static final long serialVersionUID = 1L;
-    private final OceanBaseConnectionProvider connectionProvider;
+    private static final Logger LOG = LoggerFactory.getLogger(OceanBaseCatalog.class);
+
+    private OceanBaseConnectionProvider connectionProvider;
+    private final OceanBaseConnectorOptions connectorOptions;
 
     public OceanBaseCatalog(OceanBaseConnectorOptions connectorOptions) {
         assert Objects.nonNull(connectorOptions);
+        this.connectorOptions = connectorOptions;
+    }
+
+    public void open() {
         this.connectionProvider = new OceanBaseConnectionProvider(connectorOptions);
+        LOG.info("Open OceanBase catalog");
     }
 
     protected List<String> executeSingleColumnStatement(String sql) throws SQLException {
@@ -74,4 +84,8 @@ public abstract class OceanBaseCatalog implements Serializable {
 
     public abstract void renameColumn(
             String schemaName, String tableName, String oldColumnName, String newColumnName);
+
+    public void close() {
+        LOG.info("Close OceanBase catalog");
+    }
 }
