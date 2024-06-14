@@ -19,3 +19,6 @@ source:
 
 sink:
   type: kafka
+
+pipeline:
+  parallelism: 1

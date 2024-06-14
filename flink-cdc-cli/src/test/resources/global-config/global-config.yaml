@@ -15,4 +15,4 @@
 # limitations under the License.
 ################################################################################
 parallelism: 1
-foo: bar
+schema.change.behavior: ignore
