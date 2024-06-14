@@ -120,7 +120,7 @@ pipeline:
                 <td>否</td>
                 <td>com.mysql.cj.jdbc.Driver</td>
                 <td>String</td>
-                <td>驱动类名，默认为 'com.mysql.cj.jdbc.Driver'，如果设置了其他值，需要手动引入对应的依赖。</td>
+                <td>驱动类名，默认为 'com.mysql.cj.jdbc.Driver'。同时该connector并不包含对应驱动，需手动引入。</td>
             </tr>
             <tr>
                 <td>druid-properties</td>

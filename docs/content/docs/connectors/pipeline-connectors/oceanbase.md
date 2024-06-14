@@ -113,7 +113,7 @@ pipeline:
       <td>No</td>
       <td>com.mysql.cj.jdbc.Driver</td>
       <td>String</td>
-      <td>The driver class name, use 'com.mysql.cj.jdbc.Driver' by default. If other value is set, you need to introduce the driver manually.</td>
+      <td>The driver class name, use 'com.mysql.cj.jdbc.Driver' by default. And the connector does not contain the corresponding driver and needs to be introduced manually.</td>
     </tr>
     <tr>
       <td>druid-properties</td>
