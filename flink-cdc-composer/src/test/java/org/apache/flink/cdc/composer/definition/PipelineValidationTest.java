@@ -30,7 +30,7 @@ import java.util.Map;
 public class PipelineValidationTest {
 
     @Test
-    public void testNormalConfigValidation() {
+    void testNormalConfigValidation() {
         // A common configuration file
         Map<String, String> configurations = new HashMap<>();
 
@@ -41,7 +41,7 @@ public class PipelineValidationTest {
     }
 
     @Test
-    public void testTypeMismatchValidation() {
+    void testTypeMismatchValidation() {
         Map<String, String> configurations = new HashMap<>();
 
         // option value with mismatched type.
@@ -55,7 +55,7 @@ public class PipelineValidationTest {
     }
 
     @Test
-    public void testEmptyConfigValidation() {
+    void testEmptyConfigValidation() {
 
         // An empty configuration should fail
         Map<String, String> configurations = new HashMap<>();
@@ -68,7 +68,7 @@ public class PipelineValidationTest {
     }
 
     @Test
-    public void testUnknownConfigValidation() {
+    void testUnknownConfigValidation() {
         // An empty configuration should fail
         Map<String, String> configurations = new HashMap<>();
 

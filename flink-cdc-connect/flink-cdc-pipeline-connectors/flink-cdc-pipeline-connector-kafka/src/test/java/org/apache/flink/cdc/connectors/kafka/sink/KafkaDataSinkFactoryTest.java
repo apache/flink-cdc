@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 public class KafkaDataSinkFactoryTest {
 
     @Test
-    public void testCreateDataSink() {
+    void testCreateDataSink() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("kafka", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(KafkaDataSinkFactory.class);
@@ -47,7 +47,7 @@ public class KafkaDataSinkFactoryTest {
     }
 
     @Test
-    public void testUnsupportedOption() {
+    void testUnsupportedOption() {
 
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("kafka", DataSinkFactory.class);
@@ -74,7 +74,7 @@ public class KafkaDataSinkFactoryTest {
     }
 
     @Test
-    public void testPrefixRequireOption() {
+    void testPrefixRequireOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("kafka", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(KafkaDataSinkFactory.class);

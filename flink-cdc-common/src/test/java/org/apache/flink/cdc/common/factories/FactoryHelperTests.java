@@ -64,7 +64,7 @@ public class FactoryHelperTests {
     }
 
     @Test
-    public void testCorrectConfigValidation() {
+    void testCorrectConfigValidation() {
         // This is a valid configuration.
         Map<String, String> configurations = new HashMap<>();
         configurations.put("id", "1");
@@ -82,7 +82,7 @@ public class FactoryHelperTests {
     }
 
     @Test
-    public void testMissingRequiredOptionConfigValidation() {
+    void testMissingRequiredOptionConfigValidation() {
         // This configuration doesn't provide all required options.
         Map<String, String> configurations = new HashMap<>();
         configurations.put("id", "1");
@@ -101,7 +101,7 @@ public class FactoryHelperTests {
     }
 
     @Test
-    public void testIncompatibleTypeValidation() {
+    void testIncompatibleTypeValidation() {
         // This configuration has an option with mismatched type.
         Map<String, String> configurations = new HashMap<>();
         configurations.put("id", "1");
@@ -121,7 +121,7 @@ public class FactoryHelperTests {
     }
 
     @Test
-    public void testRedundantConfigValidation() {
+    void testRedundantConfigValidation() {
         // This configuration has redundant config options.
         Map<String, String> configurations = new HashMap<>();
         configurations.put("id", "1");
@@ -141,7 +141,7 @@ public class FactoryHelperTests {
     }
 
     @Test
-    public void testAllowedPrefixConfigValidation() {
+    void testAllowedPrefixConfigValidation() {
         // This configuration has allowed prefix options.
         Map<String, String> configurations = new HashMap<>();
         configurations.put("id", "1");

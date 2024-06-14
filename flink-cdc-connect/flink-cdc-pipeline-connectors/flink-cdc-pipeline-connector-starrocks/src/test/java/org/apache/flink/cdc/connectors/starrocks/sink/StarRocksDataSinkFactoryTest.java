@@ -28,7 +28,7 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.List;
@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 public class StarRocksDataSinkFactoryTest {
 
     @Test
-    public void testCreateDataSink() {
+    void testCreateDataSink() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);
@@ -60,7 +60,7 @@ public class StarRocksDataSinkFactoryTest {
     }
 
     @Test
-    public void testLackRequireOption() {
+    void testLackRequireOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);
@@ -99,7 +99,7 @@ public class StarRocksDataSinkFactoryTest {
     }
 
     @Test
-    public void testUnsupportedOption() {
+    void testUnsupportedOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);
@@ -129,7 +129,7 @@ public class StarRocksDataSinkFactoryTest {
     }
 
     @Test
-    public void testPrefixRequireOption() {
+    void testPrefixRequireOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);

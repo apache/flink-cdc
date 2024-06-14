@@ -44,7 +44,7 @@ public class PaimonDataSinkFactoryTest {
     @TempDir public static java.nio.file.Path temporaryFolder;
 
     @Test
-    public void testCreateDataSink() {
+    void testCreateDataSink() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("paimon", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(PaimonDataSinkFactory.class);
@@ -68,7 +68,7 @@ public class PaimonDataSinkFactoryTest {
     }
 
     @Test
-    public void testLackRequireOption() {
+    void testLackRequireOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("paimon", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(PaimonDataSinkFactory.class);
@@ -107,7 +107,7 @@ public class PaimonDataSinkFactoryTest {
     }
 
     @Test
-    public void testUnsupportedOption() {
+    void testUnsupportedOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("paimon", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(PaimonDataSinkFactory.class);
@@ -140,7 +140,7 @@ public class PaimonDataSinkFactoryTest {
     }
 
     @Test
-    public void testPrefixRequireOption() {
+    void testPrefixRequireOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("paimon", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(PaimonDataSinkFactory.class);
