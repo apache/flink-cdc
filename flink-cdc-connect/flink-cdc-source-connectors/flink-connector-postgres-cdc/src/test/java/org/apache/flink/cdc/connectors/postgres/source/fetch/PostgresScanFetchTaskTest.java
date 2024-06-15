@@ -39,7 +39,7 @@ import org.apache.flink.table.types.DataType;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,11 +47,10 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link PostgresScanFetchTask}. */
-public class PostgresScanFetchTaskTest extends PostgresTestBase {
+class PostgresScanFetchTaskTest extends PostgresTestBase {
 
     private static final int USE_POST_LOWWATERMARK_HOOK = 1;
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
@@ -68,7 +67,7 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
                     POSTGRES_CONTAINER.getPassword());
 
     @Test
-    public void testChangingDataInSnapshotScan() throws Exception {
+    void testChangingDataInSnapshotScan() throws Exception {
         customDatabase.createAndInitialize();
 
         String tableId = schemaName + "." + tableName;
@@ -101,7 +100,7 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     }
 
     @Test
-    public void testInsertDataInSnapshotScan() throws Exception {
+    void testInsertDataInSnapshotScan() throws Exception {
         customDatabase.createAndInitialize();
         String tableId = schemaName + "." + tableName;
         String[] insertDataSql =
@@ -130,7 +129,7 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     }
 
     @Test
-    public void testDeleteDataInSnapshotScan() throws Exception {
+    void testDeleteDataInSnapshotScan() throws Exception {
         customDatabase.createAndInitialize();
         String tableId = schemaName + "." + tableName;
         String[] deleteDataSql =
@@ -155,7 +154,7 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     }
 
     @Test
-    public void testSnapshotScanSkipBackfillWithPostLowWatermark() throws Exception {
+    void testSnapshotScanSkipBackfillWithPostLowWatermark() throws Exception {
         customDatabase.createAndInitialize();
 
         String tableId = schemaName + "." + tableName;
@@ -190,7 +189,7 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     }
 
     @Test
-    public void testSnapshotScanSkipBackfillWithPreHighWatermark() throws Exception {
+    void testSnapshotScanSkipBackfillWithPreHighWatermark() throws Exception {
         customDatabase.createAndInitialize();
 
         String tableId = schemaName + "." + tableName;
@@ -302,8 +301,8 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
 
         sourceScanFetcher.close();
 
-        assertNotNull(sourceScanFetcher.getExecutorService());
-        assertTrue(sourceScanFetcher.getExecutorService().isTerminated());
+        assertThat(sourceScanFetcher.getExecutorService()).isNotNull();
+        assertThat(sourceScanFetcher.getExecutorService().isTerminated()).isTrue();
 
         return formatResult(result, dataType);
     }

@@ -25,9 +25,9 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,26 +35,34 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
-/** Integration tests for TiDB change stream event SQL source. */
-public class TiDBConnectorRegionITCase extends TiDBTestBase {
+import static org.assertj.core.api.Assertions.assertThat;
 
+/** Integration tests for TiDB change stream event SQL source. */
+class TiDBConnectorRegionITCase extends TiDBTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBConnectorRegionITCase.class);
+
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment().setParallelism(1);
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    private static final LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
-    @Before
-    public void before() {
+    @BeforeEach
+    void beforeEach() {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(1);
+        usesLegacyRows.before();
+    }
+
+    @AfterEach
+    void afterEach() {
+        usesLegacyRows.after();
     }
 
     @Test
-    public void testRegionChange() throws Exception {
+    void testRegionChange() throws Exception {
         initializeTidbTable("region_switch_test");
         String sourceDDL =
                 String.format(
@@ -69,7 +77,7 @@ public class TiDBConnectorRegionITCase extends TiDBTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        PD.getHost() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
                         "region_switch_test",
                         "t1");
 
@@ -123,6 +131,7 @@ public class TiDBConnectorRegionITCase extends TiDBTestBase {
             resultSetCount.next();
             count = resultSetCount.getInt(1);
             LOG.info("count: {}", count);
+            assertThat(count).isEqualTo(121010);
         }
 
         waitForSinkSize("sink", count);

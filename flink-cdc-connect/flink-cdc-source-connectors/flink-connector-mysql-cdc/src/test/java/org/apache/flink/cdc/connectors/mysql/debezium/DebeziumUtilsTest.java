@@ -29,10 +29,11 @@ import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Properties;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils}. */
-public class DebeziumUtilsTest {
+class DebeziumUtilsTest {
+
     @Test
     void testCreateMySqlConnection() {
         // test without set useSSL
@@ -91,6 +92,6 @@ public class DebeziumUtilsTest {
         Arrays.sort(expectedParam);
         String[] actualParam = actual.split("&");
         Arrays.sort(actualParam);
-        assertArrayEquals(expectedParam, actualParam);
+        assertThat(actualParam).isEqualTo(expectedParam);
     }
 }

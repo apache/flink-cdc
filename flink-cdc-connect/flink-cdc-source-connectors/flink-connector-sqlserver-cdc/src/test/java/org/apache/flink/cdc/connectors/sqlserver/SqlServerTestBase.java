@@ -22,8 +22,8 @@ import org.apache.flink.test.util.AbstractTestBase;
 
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.MSSQLServerContainer;
@@ -46,7 +46,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Utility class for sqlserver tests. */
 public class SqlServerTestBase extends AbstractTestBase {
@@ -66,15 +66,15 @@ public class SqlServerTestBase extends AbstractTestBase {
                     .withEnv("MSSQL_PID", "Standard")
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @BeforeClass
-    public static void startContainers() {
+    @BeforeAll
+    static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MSSQL_SERVER_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
-    @AfterClass
-    public static void stopContainers() {
+    @AfterAll
+    static void stopContainers() {
         LOG.info("Stopping containers...");
         if (MSSQL_SERVER_CONTAINER != null) {
             MSSQL_SERVER_CONTAINER.stop();
@@ -173,7 +173,7 @@ public class SqlServerTestBase extends AbstractTestBase {
     protected void initializeSqlServerTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = SqlServerTestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        assertThat(ddlTestFile).isNotNull();
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             dropTestDatabase(connection, sqlFile);

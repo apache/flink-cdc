@@ -37,7 +37,8 @@ import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
 import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -62,12 +63,11 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 /** Test for {@link MongoDBTableSource} created by {@link MongoDBTableSourceFactory}. */
-public class MongoDBTableFactoryTest {
+class MongoDBTableFactoryTest {
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
                     Arrays.asList(
@@ -125,12 +125,17 @@ public class MongoDBTableFactoryTest {
     private static final boolean SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT =
             SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue();
 
-    @Test
-    public void testCommonProperties() {
-        Map<String, String> properties = getAllOptions();
+    private Map<String, String> options;
 
+    @BeforeEach
+    void beforeEach() {
+        options = getAllOptions();
+    }
+
+    @Test
+    void testCommonProperties() {
         // validation for source
-        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA, options);
         MongoDBTableSource expectedSource =
                 new MongoDBTableSource(
                         SCHEMA,
@@ -157,12 +162,11 @@ public class MongoDBTableFactoryTest {
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
                         SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT);
-        assertEquals(expectedSource, actualSource);
+        assertThat(expectedSource).isEqualTo(actualSource);
     }
 
     @Test
-    public void testOptionalProperties() {
-        Map<String, String> options = getAllOptions();
+    void testOptionalProperties() {
         options.put("scheme", MONGODB_SRV_SCHEME);
         options.put("connection.options", "replicaSet=test&connectTimeoutMS=300000");
         options.put("scan.startup.mode", "timestamp");
@@ -209,15 +213,13 @@ public class MongoDBTableFactoryTest {
                         false,
                         true,
                         true);
-        assertEquals(expectedSource, actualSource);
+        assertThat(expectedSource).isEqualTo(actualSource);
     }
 
     @Test
-    public void testMetadataColumns() {
-        Map<String, String> properties = getAllOptions();
-
+    void testMetadataColumns() {
         // validation for source
-        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, options);
         MongoDBTableSource mongoDBSource = (MongoDBTableSource) actualSource;
         mongoDBSource.applyReadableMetadata(
                 Arrays.asList("op_ts", "database_name"),
@@ -254,7 +256,7 @@ public class MongoDBTableFactoryTest {
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 
-        assertEquals(expectedSource, actualSource);
+        assertThat(expectedSource).isEqualTo(actualSource);
 
         ScanTableSource.ScanRuntimeProvider provider =
                 mongoDBSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
@@ -265,18 +267,18 @@ public class MongoDBTableFactoryTest {
     }
 
     @Test
-    public void testValidation() {
+    void testValidation() {
         // validate unsupported option
         try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("unknown", "abc");
+            options.put("unknown", "abc");
 
-            createTableSource(SCHEMA, properties);
+            createTableSource(SCHEMA, options);
             fail("exception expected");
         } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
-                            .isPresent());
+            assertThat(
+                            ExceptionUtils.findThrowableWithMessage(
+                                    t, "Unsupported options:\n\nunknown"))
+                    .isPresent();
         }
     }
 

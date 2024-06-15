@@ -34,7 +34,7 @@ import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -46,12 +46,11 @@ import java.util.Properties;
 
 import static org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 /** Test for {@link Db2TableSource} created by {@link Db2TableSourceFactory}. */
-public class Db2TableSourceFactoryTest {
+class Db2TableSourceFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -88,7 +87,7 @@ public class Db2TableSourceFactoryTest {
     private static final Properties PROPERTIES = new Properties();
 
     @Test
-    public void testCommonProperties() {
+    void testCommonProperties() {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
@@ -119,11 +118,11 @@ public class Db2TableSourceFactoryTest {
                         null,
                         false,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(expectedSource).isEqualTo(actualSource);
     }
 
     @Test
-    public void testOptionalProperties() {
+    void testOptionalProperties() {
         Map<String, String> options = getAllOptions();
         options.put("port", "50000");
         options.put("server-time-zone", "Asia/Shanghai");
@@ -158,11 +157,11 @@ public class Db2TableSourceFactoryTest {
                         null,
                         false,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(expectedSource).isEqualTo(actualSource);
     }
 
     @Test
-    public void testValidation() {
+    void testValidation() {
         // validate illegal port
         try {
             Map<String, String> properties = getAllOptions();
@@ -171,10 +170,11 @@ public class Db2TableSourceFactoryTest {
             createTableSource(properties, SCHEMA);
             fail("exception expected");
         } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "Could not parse value '123b' for key 'port'.")
-                            .isPresent());
+            assertThat(
+                            ExceptionUtils.findThrowableWithMessage(
+                                            t, "Could not parse value '123b' for key 'port'.")
+                                    .isPresent())
+                    .isTrue();
         }
 
         // validate missing required
@@ -187,11 +187,13 @@ public class Db2TableSourceFactoryTest {
                 createTableSource(properties, SCHEMA);
                 fail("exception expected");
             } catch (Throwable t) {
-                assertTrue(
-                        ExceptionUtils.findThrowableWithMessage(
-                                        t,
-                                        "Missing required options are:\n\n" + requiredOption.key())
-                                .isPresent());
+                assertThat(
+                                ExceptionUtils.findThrowableWithMessage(
+                                                t,
+                                                "Missing required options are:\n\n"
+                                                        + requiredOption.key())
+                                        .isPresent())
+                        .isTrue();
             }
         }
 
@@ -203,14 +205,16 @@ public class Db2TableSourceFactoryTest {
             createTableSource(properties, SCHEMA);
             fail("exception expected");
         } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
-                            .isPresent());
+            assertThat(
+                            ExceptionUtils.findThrowableWithMessage(
+                                            t, "Unsupported options:\n\nunknown")
+                                    .isPresent())
+                    .isTrue();
         }
     }
 
     @Test
-    public void testMetadataColumns() {
+    void testMetadataColumns() {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
@@ -250,7 +254,7 @@ public class Db2TableSourceFactoryTest {
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");
 
-        assertEquals(expectedSource, actualSource);
+        assertThat(expectedSource).isEqualTo(actualSource);
     }
 
     private Map<String, String> getAllOptions() {

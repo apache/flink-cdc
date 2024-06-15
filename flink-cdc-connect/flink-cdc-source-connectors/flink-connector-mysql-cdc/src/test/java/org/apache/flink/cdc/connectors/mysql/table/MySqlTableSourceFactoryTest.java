@@ -31,9 +31,11 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -55,14 +57,11 @@ import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOpt
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
-import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link MySqlTableSource} created by {@link MySqlTableSourceFactory}. */
-public class MySqlTableSourceFactoryTest {
+class MySqlTableSourceFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -94,12 +93,17 @@ public class MySqlTableSourceFactoryTest {
     private static final String MY_TABLE = "myTable";
     private static final Properties PROPERTIES = new Properties();
 
-    @Test
-    public void testCommonProperties() {
-        Map<String, String> properties = getAllOptions();
+    private Map<String, String> options;
 
+    @BeforeEach
+    void beforeEach() {
+        options = getAllOptions();
+    }
+
+    @Test
+    void testCommonProperties() {
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(options);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
                         SCHEMA,
@@ -128,24 +132,23 @@ public class MySqlTableSourceFactoryTest {
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testEnableParallelReadSource() {
-        Map<String, String> properties = getAllOptions();
-        properties.put("scan.incremental.snapshot.enabled", "true");
-        properties.put("server-id", "123-126");
-        properties.put("scan.incremental.snapshot.chunk.size", "8000");
-        properties.put("chunk-meta.group.size", "3000");
-        properties.put("chunk-key.even-distribution.factor.upper-bound", "40.5");
-        properties.put("chunk-key.even-distribution.factor.lower-bound", "0.01");
-        properties.put("scan.snapshot.fetch.size", "100");
-        properties.put("connect.timeout", "45s");
-        properties.put("scan.incremental.snapshot.chunk.key-column", "testCol");
+    void testEnableParallelReadSource() {
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("server-id", "123-126");
+        options.put("scan.incremental.snapshot.chunk.size", "8000");
+        options.put("chunk-meta.group.size", "3000");
+        options.put("chunk-key.even-distribution.factor.upper-bound", "40.5");
+        options.put("chunk-key.even-distribution.factor.lower-bound", "0.01");
+        options.put("scan.snapshot.fetch.size", "100");
+        options.put("connect.timeout", "45s");
+        options.put("scan.incremental.snapshot.chunk.key-column", "testCol");
 
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(options);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
                         SCHEMA,
@@ -174,20 +177,19 @@ public class MySqlTableSourceFactoryTest {
                         HEARTBEAT_INTERVAL.defaultValue(),
                         "testCol",
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testEnableParallelReadSourceWithSingleServerId() {
-        Map<String, String> properties = getAllOptions();
-        properties.put("scan.incremental.snapshot.enabled", "true");
-        properties.put("server-id", "123");
-        properties.put("scan.incremental.snapshot.chunk.size", "8000");
-        properties.put("scan.snapshot.fetch.size", "100");
-        properties.put("connect.timeout", "45s");
+    void testEnableParallelReadSourceWithSingleServerId() {
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("server-id", "123");
+        options.put("scan.incremental.snapshot.chunk.size", "8000");
+        options.put("scan.snapshot.fetch.size", "100");
+        options.put("connect.timeout", "45s");
 
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(options);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
                         SCHEMA,
@@ -216,18 +218,17 @@ public class MySqlTableSourceFactoryTest {
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testEnableParallelReadSourceLatestOffset() {
-        Map<String, String> properties = getAllOptions();
-        properties.put("scan.incremental.snapshot.enabled", "true");
-        properties.put("server-id", "123-126");
-        properties.put("scan.startup.mode", "latest-offset");
+    void testEnableParallelReadSourceLatestOffset() {
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("server-id", "123-126");
+        options.put("scan.startup.mode", "latest-offset");
 
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(options);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
                         SCHEMA,
@@ -256,12 +257,11 @@ public class MySqlTableSourceFactoryTest {
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testOptionalProperties() {
-        Map<String, String> options = getAllOptions();
+    void testOptionalProperties() {
         options.put("port", "3307");
         options.put("server-id", "4321");
         options.put("server-time-zone", "Asia/Shanghai");
@@ -306,24 +306,23 @@ public class MySqlTableSourceFactoryTest {
                         Duration.ofMillis(15213),
                         "testCol",
                         true);
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testStartupFromSpecificOffset() {
+    void testStartupFromSpecificOffset() {
         final String offsetFile = "mysql-bin.000003";
         final int offsetPos = 100203;
 
-        Map<String, String> properties = getAllOptions();
-        properties.put("port", "3307");
-        properties.put("server-id", "4321");
-        properties.put("scan.startup.mode", "specific-offset");
-        properties.put("scan.startup.specific-offset.file", offsetFile);
-        properties.put("scan.startup.specific-offset.pos", String.valueOf(offsetPos));
+        options.put("port", "3307");
+        options.put("server-id", "4321");
+        options.put("scan.startup.mode", "specific-offset");
+        options.put("scan.startup.specific-offset.file", offsetFile);
+        options.put("scan.startup.specific-offset.pos", String.valueOf(offsetPos));
 
-        createTableSource(properties);
+        createTableSource(options);
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(options);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
                         SCHEMA,
@@ -352,16 +351,15 @@ public class MySqlTableSourceFactoryTest {
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testStartupFromInitial() {
-        Map<String, String> properties = getAllOptions();
-        properties.put("scan.startup.mode", "initial");
+    void testStartupFromInitial() {
+        options.put("scan.startup.mode", "initial");
 
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(options);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
                         SCHEMA,
@@ -390,17 +388,16 @@ public class MySqlTableSourceFactoryTest {
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testStartupFromEarliestOffset() {
-        Map<String, String> properties = getAllOptions();
-        properties.put("scan.startup.mode", "earliest-offset");
-        createTableSource(properties);
-        createTableSource(properties);
+    void testStartupFromEarliestOffset() {
+        options.put("scan.startup.mode", "earliest-offset");
+        createTableSource(options);
+        createTableSource(options);
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(options);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
                         SCHEMA,
@@ -429,18 +426,17 @@ public class MySqlTableSourceFactoryTest {
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testStartupFromSpecificTimestamp() {
-        Map<String, String> properties = getAllOptions();
-        properties.put("scan.startup.mode", "timestamp");
-        properties.put("scan.startup.timestamp-millis", "0");
-        createTableSource(properties);
+    void testStartupFromSpecificTimestamp() {
+        options.put("scan.startup.mode", "timestamp");
+        options.put("scan.startup.timestamp-millis", "0");
+        createTableSource(options);
 
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(options);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
                         SCHEMA,
@@ -469,16 +465,15 @@ public class MySqlTableSourceFactoryTest {
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testStartupFromLatestOffset() {
-        Map<String, String> properties = getAllOptions();
-        properties.put("scan.startup.mode", "latest-offset");
+    void testStartupFromLatestOffset() {
+        options.put("scan.startup.mode", "latest-offset");
 
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(options);
         MySqlTableSource expectedSource =
                 new MySqlTableSource(
                         SCHEMA,
@@ -507,15 +502,13 @@ public class MySqlTableSourceFactoryTest {
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testMetadataColumns() {
-        Map<String, String> properties = getAllOptions();
-
+    void testMetadataColumns() {
         // validation for source
-        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, options);
         MySqlTableSource mySqlSource = (MySqlTableSource) actualSource;
         mySqlSource.applyReadableMetadata(
                 Arrays.asList("op_ts", "database_name"),
@@ -553,201 +546,144 @@ public class MySqlTableSourceFactoryTest {
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testValidation() {
+    void testValidationIllegalPort() {
         // validate illegal port
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("port", "123b");
+        options.put("port", "123b");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining("Could not parse value '123b' for key 'port'.");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "Could not parse value '123b' for key 'port'.")
-                            .isPresent());
-        }
-
+    @Test
+    void testValidationIllegalServerId() {
         // validate illegal server id
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("server-id", "123b");
+        options.put("server-id", "123b");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining("The value of option 'server-id' is invalid: '123b'")
+                .hasStackTraceContaining("The server id 123b is not a valid numeric.");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "The value of option 'server-id' is invalid: '123b'")
-                            .isPresent());
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "The server id 123b is not a valid numeric.")
-                            .isPresent());
-        }
-
+    @Test
+    void testValidationIllegalSplitSize() {
         // validate illegal split size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("scan.incremental.snapshot.chunk.size", "1");
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("scan.incremental.snapshot.chunk.size", "1");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(
+                        "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    t,
-                    containsMessage(
-                            "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1"));
-        }
-
+    @Test
+    void testValidationIllegalFetchSize() {
         // validate illegal fetch size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("scan.snapshot.fetch.size", "1");
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("scan.snapshot.fetch.size", "1");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(
+                        "The value of option 'scan.snapshot.fetch.size' must larger than 1, but is 1");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    t,
-                    containsMessage(
-                            "The value of option 'scan.snapshot.fetch.size' must larger than 1, but is 1"));
-        }
+    @Test
+    void testValidationIllegalChunkMetaGroupSize() {
+        // validate illegal chunk meta group size
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("chunk-meta.group.size", "1");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(
+                        "The value of option 'chunk-meta.group.size' must larger than 1, but is 1");
+    }
 
-        // validate illegal split meta group size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("chunk-meta.group.size", "1");
+    @ParameterizedTest
+    @ValueSource(
+            strings = { //
+                "split-key.even-distribution.factor.upper-bound", //
+                "chunk-key.even-distribution.factor.upper-bound" //
+            })
+    void testValidationIllegalChunkKeyUpperBound(final String optionKey) {
+        // validate illegal chunk/split upper bound
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put(optionKey, "0.8");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(
+                        "The value of option 'chunk-key.even-distribution.factor.upper-bound' must larger than or equals 1.0, but is 0.8");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    t,
-                    containsMessage(
-                            "The value of option 'chunk-meta.group.size' must larger than 1, but is 1"));
-        }
-
-        // validate illegal split meta group size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("split-key.even-distribution.factor.upper-bound", "0.8");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    t,
-                    containsMessage(
-                            "The value of option 'chunk-key.even-distribution.factor.upper-bound' must larger than or equals 1.0, but is 0.8"));
-        }
-
+    @Test
+    void testValidationIllegalConnectionPoolSize() {
         // validate illegal connection pool size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("connection.pool.size", "1");
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("connection.pool.size", "1");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(
+                        "The value of option 'connection.pool.size' must larger than 1, but is 1");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    t,
-                    containsMessage(
-                            "The value of option 'connection.pool.size' must larger than 1, but is 1"));
-        }
-
+    @Test
+    void testValidationIllegalConnectMaxRetryTimes() {
         // validate illegal connect max retry times
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("connect.max-retries", "0");
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("connect.max-retries", "0");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(
+                        "The value of option 'connect.max-retries' must larger than 0, but is 0");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    t,
-                    containsMessage(
-                            "The value of option 'connect.max-retries' must larger than 0, but is 0"));
-        }
-
+    @Test
+    void testValidationMissingRequiredOptions() {
         // validate missing required
         Factory factory = new MySqlTableSourceFactory();
         for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
             Map<String, String> properties = getAllOptions();
             properties.remove(requiredOption.key());
-
-            try {
-                createTableSource(properties);
-                fail("exception expected");
-            } catch (Throwable t) {
-                assertTrue(
-                        ExceptionUtils.findThrowableWithMessage(
-                                        t,
-                                        "Missing required options are:\n\n" + requiredOption.key())
-                                .isPresent());
-            }
+            assertThatThrownBy(() -> createTableSource(properties))
+                    .hasStackTraceContaining(
+                            "Missing required options are:\n\n" + requiredOption.key());
         }
+    }
 
+    @Test
+    void testValidationUnsupportedOption() {
         // validate unsupported option
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("unknown", "abc");
+        options.put("unknown", "abc");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining("Unsupported options:\n\nunknown");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
-                            .isPresent());
-        }
-
+    @Test
+    void testValidationUnsupportedOptionValue() {
         // validate unsupported option
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.startup.mode", "abc");
+        options.put("scan.startup.mode", "abc");
+        final String expectedExceptionMessage =
+                "Invalid value for option 'scan.startup.mode'. Supported values are "
+                        + "[initial, snapshot, latest-offset, earliest-offset, specific-offset, timestamp], "
+                        + "but was: abc";
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(expectedExceptionMessage);
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            String msg =
-                    "Invalid value for option 'scan.startup.mode'. Supported values are "
-                            + "[initial, snapshot, latest-offset, earliest-offset, specific-offset, timestamp], "
-                            + "but was: abc";
-            assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
-        }
-
+    @Test
+    void testValidationInvalidDatabaseName() {
         // validate invalid database-name
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("database-name", "*_invalid_db");
-        } catch (Throwable t) {
-            String msg =
-                    String.format(
-                            "The database-name '%s' is not a valid regular expression",
-                            "*_invalid_db");
-            assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
-        }
+        options.put("database-name", "*_invalid_db");
+        final String expectedExceptionMessage =
+                String.format(
+                        "The database-name '%s' is not a valid regular expression", "*_invalid_db");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(expectedExceptionMessage);
+    }
+
+    @Test
+    void testValidationInvalidTableName() {
         // validate invalid table-name
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("table-name", "*_invalid_table");
-        } catch (Throwable t) {
-            String msg =
-                    String.format(
-                            "The table-name '%s' is not a valid regular expression",
-                            "*_invalid_table");
-            assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
-        }
+        options.put("table-name", "*_invalid_table");
+        final String expectedExceptionMessage =
+                String.format(
+                        "The table-name '%s' is not a valid regular expression", "*_invalid_table");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining(expectedExceptionMessage);
     }
 
     private Map<String, String> getAllOptions() {

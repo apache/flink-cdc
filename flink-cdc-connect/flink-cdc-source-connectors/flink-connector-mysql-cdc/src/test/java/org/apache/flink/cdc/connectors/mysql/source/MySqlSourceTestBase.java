@@ -30,9 +30,8 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.util.TestLogger;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -43,9 +42,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Basic class for testing {@link MySqlSource}. */
 public abstract class MySqlSourceTestBase extends TestLogger {
@@ -56,7 +53,6 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     protected static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
     protected InMemoryReporter metricReporter = InMemoryReporter.createWithRetainedMetrics();
 
-    @Rule
     public final MiniClusterWithClientResource miniClusterResource =
             new MiniClusterWithClientResource(
                     new MiniClusterResourceConfiguration.Builder()
@@ -68,14 +64,14 @@ public abstract class MySqlSourceTestBase extends TestLogger {
                                     metricReporter.addToConfiguration(new Configuration()))
                             .build());
 
-    @BeforeClass
+    @BeforeAll
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void stopContainers() {
         LOG.info("Stopping containers...");
         if (MYSQL_CONTAINER != null) {
@@ -103,23 +99,24 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     //  test utilities
     // ------------------------------------------------------------------------
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
+        assertThat(expected != null && actual != null).isTrue();
         assertEqualsInOrder(
                 expected.stream().sorted().collect(Collectors.toList()),
                 actual.stream().sorted().collect(Collectors.toList()));
     }
 
     public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+        assertThat(expected != null && actual != null).isTrue();
+        assertThat(actual).hasSameSizeAs(expected);
+        assertThat(actual.toArray(new String[0])).isEqualTo(expected.toArray(new String[0]));
     }
 
-    public static void assertMapEquals(Map<String, ?> expected, Map<String, ?> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
+    public static <T> void assertMapEquals(Map<String, T> expected, Map<String, T> actual) {
+        assertThat(expected != null && actual != null).isTrue();
+        assertThat(actual).hasSameSizeAs(expected);
         for (String key : expected.keySet()) {
-            assertEquals(expected.get(key), actual.get(key));
+            final T value = expected.get(key);
+            assertThat(actual).containsEntry(key, value);
         }
     }
 

@@ -31,9 +31,9 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,12 +42,11 @@ import java.util.Map;
 import java.util.Properties;
 
 import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link VitessTableSource} created by {@link VitessTableFactory}. */
-public class VitessTableFactoryTest {
+class VitessTableFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -67,12 +66,17 @@ public class VitessTableFactoryTest {
     private static final String MY_TABLE = "myTable";
     private static final Properties PROPERTIES = new Properties();
 
-    @Test
-    public void testCommonProperties() {
-        Map<String, String> properties = getAllOptions();
+    private Map<String, String> options;
 
+    @BeforeEach
+    void beforeEach() {
+        options = getAllOptions();
+    }
+
+    @Test
+    void testCommonProperties() {
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(options);
         VitessTableSource expectedSource =
                 new VitessTableSource(
                         SCHEMA,
@@ -91,12 +95,11 @@ public class VitessTableFactoryTest {
                         "decoderbufs",
                         "flink",
                         PROPERTIES);
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testOptionalProperties() {
-        Map<String, String> options = getAllOptions();
+    void testOptionalProperties() {
         options.put("port", "5444");
         options.put("decoding.plugin.name", "wal2json");
         options.put("debezium.snapshot.mode", "never");
@@ -126,55 +129,34 @@ public class VitessTableFactoryTest {
                         "wal2json",
                         "flink",
                         dbzProperties);
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testValidation() {
-        // validate illegal port
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("port", "123b");
+    void testValidationIllegalPort() {
+        options.put("port", "123b");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining("Could not parse value '123b' for key 'port'.");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "Could not parse value '123b' for key 'port'.")
-                            .isPresent());
-        }
-
-        // validate missing required
+    @Test
+    void testValidationMissingRequiredOption() {
         Factory factory = new VitessTableFactory();
         for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
             Map<String, String> properties = getAllOptions();
             properties.remove(requiredOption.key());
 
-            try {
-                createTableSource(properties);
-                fail("exception expected");
-            } catch (Throwable t) {
-                assertTrue(
-                        ExceptionUtils.findThrowableWithMessage(
-                                        t,
-                                        "Missing required options are:\n\n" + requiredOption.key())
-                                .isPresent());
-            }
+            assertThatThrownBy(() -> createTableSource(properties))
+                    .hasStackTraceContaining(
+                            "Missing required options are:\n\n" + requiredOption.key());
         }
+    }
 
-        // validate unsupported option
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("unknown", "abc");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
-                            .isPresent());
-        }
+    @Test
+    void testValidationUnsupportedOption() {
+        options.put("unknown", "abc");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining("Unsupported options:\n\nunknown");
     }
 
     private Map<String, String> getAllOptions() {

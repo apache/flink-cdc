@@ -24,8 +24,7 @@ import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoDatabase;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
@@ -45,15 +44,15 @@ public class LegacyMongoDBTestBase extends AbstractTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(LegacyMongoDBTestBase.class);
 
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
+    private static final Network NETWORK = Network.newNetwork();
 
     protected static final LegacyMongoDBContainer MONGODB_CONTAINER =
             new LegacyMongoDBContainer(NETWORK).withLogConsumer(new Slf4jLogConsumer(LOG));
 
     protected static MongoClient mongodbClient;
 
-    @BeforeClass
-    public static void startContainers() {
+    @BeforeAll
+    static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MONGODB_CONTAINER)).join();
         initialClient();

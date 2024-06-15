@@ -27,8 +27,8 @@ import org.apache.flink.types.Row;
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConfiguration;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -54,10 +54,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Basic class for testing PostgreSQL source, this contains a PostgreSQL container which enables wal
@@ -87,15 +84,15 @@ public abstract class PostgresTestBase extends AbstractTestBase {
                             "-c",
                             "max_replication_slots=20");
 
-    @BeforeClass
-    public static void startContainers() {
+    @BeforeAll
+    static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(POSTGRES_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
-    @AfterClass
-    public static void stopContainers() {
+    @AfterAll
+    static void stopContainers() {
         LOG.info("Stopping containers...");
         POSTGRES_CONTAINER.stop();
         LOG.info("Containers are stopped.");
@@ -131,7 +128,7 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     protected void initializePostgresTable(PostgreSQLContainer container, String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = PostgresTestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        assertThat(ddlTestFile).isNotNull();
         try (Connection connection = getJdbcConnection(container);
                 Statement statement = connection.createStatement()) {
             final List<String> statements =
@@ -235,15 +232,17 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     }
 
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
+        assertThat(actual).isNotNull();
+        assertThat(expected).isNotNull();
         assertEqualsInOrder(
                 expected.stream().sorted().collect(Collectors.toList()),
                 actual.stream().sorted().collect(Collectors.toList()));
     }
 
     public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+        assertThat(actual).isNotNull();
+        assertThat(expected).isNotNull();
+        assertThat(actual).hasSize(expected.size());
+        assertThat(actual.toArray(new String[0])).isEqualTo(expected.toArray(new String[0]));
     }
 }

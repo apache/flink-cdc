@@ -20,43 +20,42 @@ package org.apache.flink.cdc.connectors.tidb.metrics;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.testutils.MetricListener;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 
 import static org.apache.flink.runtime.metrics.MetricNames.CURRENT_EMIT_EVENT_TIME_LAG;
 import static org.apache.flink.runtime.metrics.MetricNames.CURRENT_FETCH_EVENT_TIME_LAG;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit test for {@link TiDBSourceMetrics}. */
-public class TiDBSourceMetricsTest {
+class TiDBSourceMetricsTest {
     private MetricListener metricListener;
     private TiDBSourceMetrics sourceMetrics;
 
-    @Before
-    public void setUp() {
+    @BeforeEach
+    void setUp() {
         metricListener = new MetricListener();
         sourceMetrics = new TiDBSourceMetrics(metricListener.getMetricGroup());
         sourceMetrics.registerMetrics();
     }
 
     @Test
-    public void testFetchEventTimeLagTracking() {
+    void testFetchEventTimeLagTracking() {
         sourceMetrics.recordFetchDelay(5L);
         assertGauge(metricListener, CURRENT_FETCH_EVENT_TIME_LAG, 5L);
     }
 
     @Test
-    public void testEmitEventTimeLagTracking() {
+    void testEmitEventTimeLagTracking() {
         sourceMetrics.recordEmitDelay(3L);
         assertGauge(metricListener, CURRENT_EMIT_EVENT_TIME_LAG, 3L);
     }
 
     private void assertGauge(MetricListener metricListener, String identifier, long expected) {
         Optional<Gauge<Object>> gauge = metricListener.getGauge(identifier);
-        assertTrue(gauge.isPresent());
-        assertEquals(expected, (long) gauge.get().getValue());
+        assertThat(gauge).isPresent();
+        assertThat((long) gauge.get().getValue()).isEqualTo(expected);
     }
 }

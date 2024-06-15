@@ -40,8 +40,8 @@ import io.debezium.relational.TableId;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.bson.BsonDocument;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,11 +53,10 @@ import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.Waterm
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.FULL_DOCUMENT_FIELD;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** MongoDB snapshot split reader test case. */
-public class MongoDBSnapshotSplitReaderTest extends MongoDBSourceTestBase {
+class MongoDBSnapshotSplitReaderTest extends MongoDBSourceTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoDBSnapshotSplitReaderTest.class);
 
@@ -71,8 +70,8 @@ public class MongoDBSnapshotSplitReaderTest extends MongoDBSourceTestBase {
 
     private SplitContext splitContext;
 
-    @Before
-    public void before() {
+    @BeforeEach
+    void beforeEach() {
         database = CONTAINER.executeCommandFileInSeparateDatabase("chunk_test");
 
         MongoDBSourceConfigFactory configFactory =
@@ -94,28 +93,28 @@ public class MongoDBSnapshotSplitReaderTest extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testMongoDBSnapshotSplitReaderWithShardedSplitter() throws Exception {
+    void testMongoDBSnapshotSplitReaderWithShardedSplitter() throws Exception {
         testMongoDBSnapshotSplitReader(ShardedSplitStrategy.INSTANCE);
     }
 
     @Test
-    public void testMongoDBSnapshotSplitReaderWithSplitVectorSplitter() throws Exception {
+    void testMongoDBSnapshotSplitReaderWithSplitVectorSplitter() throws Exception {
         testMongoDBSnapshotSplitReader(SplitVectorSplitStrategy.INSTANCE);
     }
 
     @Test
-    public void testMongoDBSnapshotSplitReaderWithSamplerSplitter() throws Exception {
+    void testMongoDBSnapshotSplitReaderWithSamplerSplitter() throws Exception {
         testMongoDBSnapshotSplitReader(SampleBucketSplitStrategy.INSTANCE);
     }
 
     @Test
-    public void testMongoDBSnapshotSplitReaderWithSingleSplitter() throws Exception {
+    void testMongoDBSnapshotSplitReaderWithSingleSplitter() throws Exception {
         testMongoDBSnapshotSplitReader(SingleSplitStrategy.INSTANCE);
     }
 
     private void testMongoDBSnapshotSplitReader(SplitStrategy splitter) throws Exception {
         LinkedList<SnapshotSplit> snapshotSplits = new LinkedList<>(splitter.split(splitContext));
-        assertTrue(snapshotSplits.size() > 0);
+        assertThat(snapshotSplits).isNotEmpty();
 
         IncrementalSourceReaderContext incrementalSourceReaderContext =
                 new IncrementalSourceReaderContext(new TestingReaderContext());
@@ -156,9 +155,9 @@ public class MongoDBSnapshotSplitReaderTest extends MongoDBSourceTestBase {
                                 String description =
                                         fullDocument.getString("description").getValue();
 
-                                assertEquals("KIND_" + productNo, productKind);
-                                assertEquals("user_" + productNo, userId);
-                                assertEquals("my shopping cart " + productNo, description);
+                                assertThat("KIND_" + productNo).isEqualTo(productKind);
+                                assertThat("user_" + productNo).isEqualTo(userId);
+                                assertThat("my shopping cart " + productNo).isEqualTo(description);
                                 actualCount++;
                             }
                         }
@@ -174,6 +173,6 @@ public class MongoDBSnapshotSplitReaderTest extends MongoDBSourceTestBase {
             snapshotSplitReader.close();
         }
 
-        assertEquals(splitContext.getDocumentCount(), actualCount);
+        assertThat(actualCount).isEqualTo(splitContext.getDocumentCount());
     }
 }

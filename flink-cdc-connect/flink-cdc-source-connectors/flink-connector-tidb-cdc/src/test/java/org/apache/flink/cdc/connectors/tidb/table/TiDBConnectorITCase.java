@@ -25,9 +25,9 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,32 +36,35 @@ import java.sql.Statement;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration tests for TiDB change stream event SQL source. */
-public class TiDBConnectorITCase extends TiDBTestBase {
-
+class TiDBConnectorITCase extends TiDBTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBConnectorITCase.class);
+
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment().setParallelism(1);
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    private static final LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
-    @Before
-    public void before() {
+    @BeforeEach
+    void beforeEach() {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(1);
+        usesLegacyRows.before();
+    }
+
+    @AfterEach
+    void afterEach() {
+        usesLegacyRows.after();
     }
 
     @Test
-    public void testConsumingAllEvents() throws Exception {
+    void testConsumingAllEvents() throws Exception {
         initializeTidbTable("inventory");
         String sourceDDL =
                 String.format(
@@ -166,7 +169,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
     }
 
     @Test
-    public void testDeleteColumn() throws Exception {
+    void testDeleteColumn() throws Exception {
         initializeTidbTable("inventory");
         String sourceDDL =
                 String.format(
@@ -637,16 +640,9 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         }
     }
 
-    public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
-    }
-
-    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+    private static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
+        assertThat(actual).isNotNull();
+        assertThat(expected).isNotNull();
+        assertThat(actual).containsExactlyInAnyOrder(expected.toArray(new String[0]));
     }
 }

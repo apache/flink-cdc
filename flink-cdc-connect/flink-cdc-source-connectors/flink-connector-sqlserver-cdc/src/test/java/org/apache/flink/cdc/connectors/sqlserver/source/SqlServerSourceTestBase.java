@@ -30,14 +30,11 @@ import org.apache.flink.util.TestLogger;
 
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Rule;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.MSSQLServerContainer;
-import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
@@ -57,16 +54,12 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Basic class for testing {@link SqlServerSource}. */
 public abstract class SqlServerSourceTestBase extends TestLogger {
-
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
     protected static final Logger LOG = LoggerFactory.getLogger(SqlServerSourceTestBase.class);
+
     public static final MSSQLServerContainer MSSQL_SERVER_CONTAINER =
             new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
                     .withPassword("Password!")
@@ -82,7 +75,6 @@ public abstract class SqlServerSourceTestBase extends TestLogger {
             "IF EXISTS(select 1 from sys.databases where name='#' AND is_cdc_enabled=1)\n"
                     + "EXEC sys.sp_cdc_disable_db";
 
-    @Rule
     public final MiniClusterWithClientResource miniClusterResource =
             new MiniClusterWithClientResource(
                     new MiniClusterResourceConfiguration.Builder()
@@ -92,15 +84,15 @@ public abstract class SqlServerSourceTestBase extends TestLogger {
                             .withHaLeadershipControl()
                             .build());
 
-    @BeforeClass
-    public static void startContainers() {
+    @BeforeAll
+    static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MSSQL_SERVER_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
-    @AfterClass
-    public static void stopContainers() {
+    @AfterAll
+    static void stopContainers() {
         LOG.info("Stopping containers...");
         if (MSSQL_SERVER_CONTAINER != null) {
             MSSQL_SERVER_CONTAINER.stop();
@@ -186,16 +178,9 @@ public abstract class SqlServerSourceTestBase extends TestLogger {
     }
 
     protected static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
-    }
-
-    protected static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+        assertThat(actual).isNotNull();
+        assertThat(expected).isNotNull();
+        assertThat(actual).containsExactlyInAnyOrder(expected.toArray(new String[0]));
     }
 
     protected static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
@@ -244,7 +229,7 @@ public abstract class SqlServerSourceTestBase extends TestLogger {
     protected void initializeSqlServerTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = SqlServerTestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        assertThat(ddlTestFile).isNotNull();
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             dropTestDatabase(connection, sqlFile);

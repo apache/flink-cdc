@@ -38,9 +38,9 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
-import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -64,12 +64,11 @@ import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSou
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link PostgreSQLTableSource} created by {@link PostgreSQLTableFactory}. */
-public class PostgreSQLTableFactoryTest {
+class PostgreSQLTableFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -118,12 +117,17 @@ public class PostgreSQLTableFactoryTest {
     private static final boolean SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT =
             SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue();
 
-    @Test
-    public void testCommonProperties() {
-        Map<String, String> properties = getAllOptions();
+    private Map<String, String> options;
 
+    @BeforeEach
+    void beforeEach() {
+        options = getAllOptions();
+    }
+
+    @Test
+    void testCommonProperties() {
         // validation for source
-        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA, options);
         PostgreSQLTableSource expectedSource =
                 new PostgreSQLTableSource(
                         SCHEMA,
@@ -154,12 +158,11 @@ public class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testOptionalProperties() {
-        Map<String, String> options = getAllOptions();
+    void testOptionalProperties() {
         options.put("port", "5444");
         options.put("decoding.plugin.name", "wal2json");
         options.put("debezium.snapshot.mode", "never");
@@ -200,15 +203,13 @@ public class PostgreSQLTableFactoryTest {
                         true,
                         true,
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testMetadataColumns() {
-        Map<String, String> properties = getAllOptions();
-
+    void testMetadataColumns() {
         // validation for source
-        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, options);
         PostgreSQLTableSource postgreSQLTableSource = (PostgreSQLTableSource) actualSource;
         postgreSQLTableSource.applyReadableMetadata(
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name"),
@@ -248,7 +249,7 @@ public class PostgreSQLTableFactoryTest {
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
 
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
 
         ScanTableSource.ScanRuntimeProvider provider =
                 postgreSQLTableSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
@@ -259,15 +260,14 @@ public class PostgreSQLTableFactoryTest {
     }
 
     @Test
-    public void testEnableParallelReadSource() {
-        Map<String, String> properties = getAllOptions();
-        properties.put("scan.incremental.snapshot.enabled", "true");
-        properties.put("scan.incremental.snapshot.chunk.size", "8000");
-        properties.put("scan.snapshot.fetch.size", "100");
-        properties.put("connect.timeout", "45s");
+    void testEnableParallelReadSource() {
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("scan.incremental.snapshot.chunk.size", "8000");
+        options.put("scan.snapshot.fetch.size", "100");
+        options.put("connect.timeout", "45s");
 
         // validation for source
-        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        DynamicTableSource actualSource = createTableSource(SCHEMA, options);
         PostgreSQLTableSource expectedSource =
                 new PostgreSQLTableSource(
                         SCHEMA,
@@ -298,20 +298,19 @@ public class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testStartupFromLatestOffset() {
-        Map<String, String> properties = getAllOptions();
-        properties.put("scan.incremental.snapshot.enabled", "true");
-        properties.put("scan.incremental.snapshot.chunk.size", "8000");
-        properties.put("scan.snapshot.fetch.size", "100");
-        properties.put("connect.timeout", "45s");
-        properties.put("scan.startup.mode", "latest-offset");
+    void testStartupFromLatestOffset() {
+        options.put("scan.incremental.snapshot.enabled", "true");
+        options.put("scan.incremental.snapshot.chunk.size", "8000");
+        options.put("scan.snapshot.fetch.size", "100");
+        options.put("connect.timeout", "45s");
+        options.put("scan.startup.mode", "latest-offset");
 
         // validation for source
-        DynamicTableSource actualSource = createTableSource(properties);
+        DynamicTableSource actualSource = createTableSource(options);
         PostgreSQLTableSource expectedSource =
                 new PostgreSQLTableSource(
                         SCHEMA,
@@ -342,71 +341,41 @@ public class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testValidation() {
-        // validate illegal port
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("port", "123b");
+    void testValidationIllegalPort() {
+        options.put("port", "123b");
+        assertThatThrownBy(() -> createTableSource(options))
+                .hasStackTraceContaining("Could not parse value '123b' for key 'port'.");
+    }
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "Could not parse value '123b' for key 'port'.")
-                            .isPresent());
-        }
-
-        // validate missing required
+    @Test
+    void testValidationMissingRequiredOption() {
         Factory factory = new PostgreSQLTableFactory();
         for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
             Map<String, String> properties = getAllOptions();
             properties.remove(requiredOption.key());
-
-            try {
-                createTableSource(SCHEMA, properties);
-                fail("exception expected");
-            } catch (Throwable t) {
-                assertTrue(
-                        ExceptionUtils.findThrowableWithMessage(
-                                        t,
-                                        "Missing required options are:\n\n" + requiredOption.key())
-                                .isPresent());
-            }
-        }
-
-        // validate unsupported option
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("unknown", "abc");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
-                            .isPresent());
+            assertThatThrownBy(() -> createTableSource(properties))
+                    .hasStackTraceContaining(
+                            "Missing required options are:\n\n" + requiredOption.key());
         }
     }
 
     @Test
-    public void testUpsertModeWithoutPrimaryKeyError() {
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("changelog-mode", "upsert");
+    void testValidationUnsupportedOptionKey() {
+        options.put("unknown", "abc");
+        assertThatThrownBy(() -> createTableSource(SCHEMA, options))
+                .hasStackTraceContaining("Unsupported options:\n\nunknown");
+    }
 
-            createTableSource(SCHEMA_WITHOUT_PRIMARY_KEY, properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "Primary key must be present when upsert mode is selected.")
-                            .isPresent());
-        }
+    @Test
+    void testUpsertModeWithoutPrimaryKeyError() {
+        options.put("changelog-mode", "upsert");
+        assertThatThrownBy(() -> createTableSource(SCHEMA_WITHOUT_PRIMARY_KEY, options))
+                .hasStackTraceContaining(
+                        "Primary key must be present when upsert mode is selected.");
     }
 
     private Map<String, String> getAllOptions() {
