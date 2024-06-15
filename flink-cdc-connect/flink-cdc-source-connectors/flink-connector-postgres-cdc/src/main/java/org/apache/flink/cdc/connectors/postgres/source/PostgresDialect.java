@@ -159,9 +159,7 @@ public class PostgresDialect implements JdbcDataSourceDialect {
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
             return TableDiscoveryUtils.listTables(
                     // there is always a single database provided
-                    sourceConfig.getDatabaseList().get(0),
-                    jdbc,
-                    ((PostgresSourceConfig) sourceConfig).getTableFilters());
+                    sourceConfig.getDatabaseList().get(0), jdbc, sourceConfig.getTableFilters());
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Error to discover tables: " + e.getMessage(), e);
         }
