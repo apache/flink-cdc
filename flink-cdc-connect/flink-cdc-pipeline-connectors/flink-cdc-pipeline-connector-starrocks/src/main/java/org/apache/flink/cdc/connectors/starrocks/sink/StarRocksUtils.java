@@ -120,7 +120,7 @@ public class StarRocksUtils {
 
     /** Format timestamp-related type data. */
     private static final DateTimeFormatter DATETIME_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");
 
     /**
      * Creates an accessor for getting elements in an internal RecordData structure at the given
