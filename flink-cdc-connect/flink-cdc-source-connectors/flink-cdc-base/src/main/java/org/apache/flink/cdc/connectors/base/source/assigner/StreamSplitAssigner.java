@@ -28,9 +28,6 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSp
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,7 +39,6 @@ import java.util.Optional;
 /** Assigner for stream split. */
 public class StreamSplitAssigner implements SplitAssigner {
 
-    private static final Logger LOG = LoggerFactory.getLogger(StreamSplitAssigner.class);
     private static final String STREAM_SPLIT_ID = "stream-split";
 
     private final SourceConfig sourceConfig;
