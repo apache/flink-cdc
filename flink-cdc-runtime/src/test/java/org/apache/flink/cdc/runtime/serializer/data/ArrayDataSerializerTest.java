@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryArrayData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
+import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryArrayWriter;
 import org.apache.flink.testutils.DeeplyEqualsChecker;
 
 import org.junit.jupiter.api.Assertions;
@@ -89,6 +90,16 @@ class ArrayDataSerializerTest extends SerializerTestBase<ArrayData> {
                         BinaryStringData.fromString("11"), null, BinaryStringData.fromString("ke")
                     })
         };
+    }
+
+    static BinaryArrayData createArray(String... vs) {
+        BinaryArrayData array = new BinaryArrayData();
+        BinaryArrayWriter writer = new BinaryArrayWriter(array, vs.length, 8);
+        for (int i = 0; i < vs.length; i++) {
+            writer.writeString(i, BinaryStringData.fromString(vs[i]));
+        }
+        writer.complete();
+        return array;
     }
 
     @Test
