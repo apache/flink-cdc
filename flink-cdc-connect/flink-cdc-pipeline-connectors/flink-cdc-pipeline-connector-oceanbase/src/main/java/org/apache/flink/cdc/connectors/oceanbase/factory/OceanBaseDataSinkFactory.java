@@ -24,8 +24,10 @@ import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.oceanbase.sink.OceanBaseDataSink;
 import org.apache.flink.cdc.connectors.oceanbase.sink.OceanBaseDataSinkOptions;
+import org.apache.flink.cdc.connectors.oceanbase.utils.OptionUtils;
 
 import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
+import org.apache.commons.lang3.StringUtils;
 
 import java.time.ZoneId;
 import java.util.HashSet;
@@ -39,30 +41,35 @@ import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCA
 @Internal
 public class OceanBaseDataSinkFactory implements DataSinkFactory {
 
+    private static final String IDENTIFIER = "oceanbase";
+
     @Override
     public DataSink createDataSink(Context context) {
         Configuration config = context.getFactoryConfiguration();
-        OceanBaseConnectorOptions connectorOptions =
-                new OceanBaseConnectorOptions(buildOceanBaseOptions(config));
-        String zoneStr = context.getFactoryConfiguration().get(PIPELINE_LOCAL_TIME_ZONE);
+        Map<String, String> configMap = buildOceanBaseOptions(config);
+        OptionUtils.printOptions(IDENTIFIER, configMap);
+
+        OceanBaseConnectorOptions connectorOptions = new OceanBaseConnectorOptions(configMap);
+        String zoneStr = context.getPipelineConfiguration().get(PIPELINE_LOCAL_TIME_ZONE);
         ZoneId zoneId =
                 PIPELINE_LOCAL_TIME_ZONE.defaultValue().equals(zoneStr)
                         ? ZoneId.systemDefault()
                         : ZoneId.of(zoneStr);
-        return new OceanBaseDataSink(connectorOptions, config, zoneId);
+        return new OceanBaseDataSink(connectorOptions, zoneId);
     }
 
     public Map<String, String> buildOceanBaseOptions(Configuration config) {
         Optional<String> optional = config.getOptional(OceanBaseDataSinkOptions.PASSWORD);
+        // Avoid NullPointerException when PASSWORD is empty.
         config.remove(OceanBaseDataSinkOptions.PASSWORD);
-        Map<String, String> map = config.toMap();
-        map.put(OceanBaseDataSinkOptions.PASSWORD.key(), optional.orElse(""));
-        return map;
+        Map<String, String> configMap = config.toMap();
+        configMap.put(OceanBaseDataSinkOptions.PASSWORD.key(), optional.orElse(StringUtils.EMPTY));
+        return configMap;
     }
 
     @Override
     public String identifier() {
-        return "oceanbase";
+        return IDENTIFIER;
     }
 
     @Override

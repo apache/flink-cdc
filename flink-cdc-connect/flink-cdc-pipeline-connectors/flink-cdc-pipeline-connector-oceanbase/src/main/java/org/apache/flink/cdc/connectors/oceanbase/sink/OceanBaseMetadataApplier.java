@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.sink;
 
-import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -50,10 +49,13 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
 
     private final OceanBaseCatalog catalog;
 
-    public OceanBaseMetadataApplier(
-            OceanBaseConnectorOptions connectorOptions, Configuration config) throws Exception {
-        this.catalog = OceanBaseCatalogFactory.createOceanBaseCatalog(connectorOptions);
-        catalog.open();
+    public OceanBaseMetadataApplier(OceanBaseConnectorOptions connectorOptions) {
+        try {
+            this.catalog = OceanBaseCatalogFactory.createOceanBaseCatalog(connectorOptions);
+            catalog.open();
+        } catch (Exception e) {
+            throw new OceanBaseCatalogException("Fail to init OceanBaseMetadataApplier.", e);
+        }
     }
 
     @Override

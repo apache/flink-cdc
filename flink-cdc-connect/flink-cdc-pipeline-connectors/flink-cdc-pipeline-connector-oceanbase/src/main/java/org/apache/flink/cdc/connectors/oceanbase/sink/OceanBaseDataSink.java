@@ -17,12 +17,10 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.sink;
 
-import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
-import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogException;
 
 import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
 import com.oceanbase.connector.flink.connection.OceanBaseConnectionProvider;
@@ -38,14 +36,10 @@ public class OceanBaseDataSink implements DataSink, Serializable {
 
     private final OceanBaseConnectorOptions connectorOptions;
 
-    private final Configuration config;
-
     private final ZoneId zoneId;
 
-    public OceanBaseDataSink(
-            OceanBaseConnectorOptions options, Configuration config, ZoneId zoneId) {
+    public OceanBaseDataSink(OceanBaseConnectorOptions options, ZoneId zoneId) {
         this.connectorOptions = options;
-        this.config = config;
         this.zoneId = zoneId;
     }
 
@@ -66,10 +60,6 @@ public class OceanBaseDataSink implements DataSink, Serializable {
 
     @Override
     public MetadataApplier getMetadataApplier() {
-        try {
-            return new OceanBaseMetadataApplier(connectorOptions, config);
-        } catch (Exception e) {
-            throw new OceanBaseCatalogException("Fail to create oceanbase metadata applier.", e);
-        }
+        return new OceanBaseMetadataApplier(connectorOptions);
     }
 }

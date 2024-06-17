@@ -94,7 +94,7 @@ public class OceanBaseEventSerializationSchema implements RecordSerializationSch
                 isDelete = true;
                 break;
             default:
-                throw new UnsupportedOperationException("Unsupport Operation " + op);
+                throw new UnsupportedOperationException("Unsupported Operation " + op);
         }
         return buildDataChangeRecord(tableId, schema, values, isDelete);
     }
@@ -102,7 +102,7 @@ public class OceanBaseEventSerializationSchema implements RecordSerializationSch
     private DataChangeRecord buildDataChangeRecord(
             TableId tableId, Schema schema, Object[] values, boolean isDelete) {
         Preconditions.checkState(
-                Objects.nonNull(tableId.getSchemaName()), "schema name cannot be null or empty.");
+                Objects.nonNull(tableId.getSchemaName()), "Schema name cannot be null or empty.");
         com.oceanbase.connector.flink.table.TableId oceanBaseTableId =
                 new com.oceanbase.connector.flink.table.TableId(
                         tableId.getSchemaName(), tableId.getTableName());

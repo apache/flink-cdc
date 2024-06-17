@@ -36,7 +36,8 @@ public class OceanBaseCatalogFactory {
             } else if (dialect instanceof OceanBaseOracleDialect) {
                 return new OceanBaseOracleCatalog(connectorOptions);
             } else {
-                throw new OceanBaseCatalogException("This tenant is not supported currently");
+                throw new OceanBaseCatalogException(
+                        "Fail to create OceanBaseCatalog: unknown tenant.");
             }
         }
     }
