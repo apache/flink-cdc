@@ -128,11 +128,11 @@ public class EventRecordSerializationSchemaTest {
                                     1,
                                     true,
                                     TimestampData.fromTimestamp(
-                                            Timestamp.valueOf("2023-11-27 18:00:00"))
+                                            Timestamp.valueOf("2023-11-27 18:00:00.000000"))
                                 }));
         verifySerializeResult(
                 table1,
-                "{\"col1\":1,\"col2\":true,\"col3\":\"2023-11-27 18:00:00\",\"__op\":0}",
+                "{\"col1\":1,\"col2\":true,\"col3\":\"2023-11-27 18:00:00.000000\",\"__op\":0}",
                 serializer.serialize(insertEvent1));
 
         DataChangeEvent deleteEvent1 =
