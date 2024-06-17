@@ -143,11 +143,11 @@ public class EventRecordSerializationSchemaTest {
                                     2,
                                     false,
                                     TimestampData.fromTimestamp(
-                                            Timestamp.valueOf("2023-11-27 19:00:00"))
+                                            Timestamp.valueOf("2023-11-27 19:00:00.000000"))
                                 }));
         verifySerializeResult(
                 table1,
-                "{\"col1\":2,\"col2\":false,\"col3\":\"2023-11-27 19:00:00\",\"__op\":1}",
+                "{\"col1\":2,\"col2\":false,\"col3\":\"2023-11-27 19:00:00.000000\",\"__op\":1}",
                 serializer.serialize(deleteEvent1));
 
         DataChangeEvent updateEvent1 =
@@ -165,11 +165,11 @@ public class EventRecordSerializationSchemaTest {
                                     3,
                                     true,
                                     TimestampData.fromTimestamp(
-                                            Timestamp.valueOf("2023-11-27 21:00:00"))
+                                            Timestamp.valueOf("2023-11-27 21:00:00.000000"))
                                 }));
         verifySerializeResult(
                 table1,
-                "{\"col1\":3,\"col2\":true,\"col3\":\"2023-11-27 21:00:00\",\"__op\":0}",
+                "{\"col1\":3,\"col2\":true,\"col3\":\"2023-11-27 21:00:00.000000\",\"__op\":0}",
                 serializer.serialize(updateEvent1));
 
         // 2. create table2, and insert data
@@ -227,7 +227,7 @@ public class EventRecordSerializationSchemaTest {
                                     4,
                                     true,
                                     TimestampData.fromTimestamp(
-                                            Timestamp.valueOf("2023-11-27 21:00:00")),
+                                            Timestamp.valueOf("2023-11-27 21:00:00.000000")),
                                     DecimalData.fromBigDecimal(new BigDecimal("83.23"), 20, 5),
                                     (short) 9,
                                     LocalZonedTimestampData.fromInstant(
@@ -236,7 +236,7 @@ public class EventRecordSerializationSchemaTest {
                                 }));
         verifySerializeResult(
                 table1,
-                "{\"col1\":4,\"col2\":true,\"col3\":\"2023-11-27 21:00:00\",\"col4\":83.23,\"col5\":9,\"col6\":\"2023-11-27 19:00:00\",\"__op\":1}",
+                "{\"col1\":4,\"col2\":true,\"col3\":\"2023-11-27 21:00:00.000000\",\"col4\":83.23,\"col5\":9,\"col6\":\"2023-11-27 19:00:00.000000\",\"__op\":1}",
                 Objects.requireNonNull(serializer.serialize(deleteEvent2)));
 
         // 4. drop columns from table2, and insert data
