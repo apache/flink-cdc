@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.connector.sink2.StatefulSink;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.FlushEvent;
@@ -29,7 +30,10 @@ import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.sink.MultiTableCommittable;
+import org.apache.paimon.flink.sink.StoreMultiCommitter;
 import org.apache.paimon.flink.sink.StoreSinkWrite;
+import org.apache.paimon.manifest.ManifestCommittable;
+import org.apache.paimon.manifest.WrappedManifestCommittable;
 import org.apache.paimon.memory.HeapMemorySegmentPool;
 import org.apache.paimon.memory.MemoryPoolFactory;
 import org.apache.paimon.options.Options;
@@ -40,6 +44,7 @@ import org.apache.paimon.utils.ExecutorThreadFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +54,8 @@ import java.util.stream.Collectors;
 
 /** A {@link Sink} to write {@link DataChangeEvent} to Paimon storage. */
 public class PaimonWriter<InputT>
-        implements TwoPhaseCommittingSink.PrecommittingSinkWriter<InputT, MultiTableCommittable> {
+        implements TwoPhaseCommittingSink.PrecommittingSinkWriter<InputT, MultiTableCommittable>,
+                StatefulSink.StatefulSinkWriter<InputT, MultiTableCommittable> {
 
     // use `static` because Catalog is unSerializable.
     private static Catalog catalog;
@@ -86,6 +92,47 @@ public class PaimonWriter<InputT>
                         new ExecutorThreadFactory(
                                 Thread.currentThread().getName() + "-CdcMultiWrite-Compaction"));
         this.serializer = serializer;
+    }
+
+    public PaimonWriter(
+            Options catalogOptions,
+            MetricGroup metricGroup,
+            String commitUser,
+            PaimonRecordSerializer<InputT> serializer,
+            Collection<MultiTableCommittable> commitRequests) {
+        this(catalogOptions, metricGroup, commitUser, serializer);
+        tryCommitLastCommittables(commitRequests);
+    }
+
+    /**
+     * When the job restarts, these {@link ManifestCommittable}s will be restored and committed,
+     * then an intended failure will occur, hoping that after the job restarts, all writers can
+     * start writing based on the restored snapshot.
+     */
+    private void tryCommitLastCommittables(Collection<MultiTableCommittable> commitRequests) {
+        if (commitRequests.isEmpty()) {
+            return;
+        }
+        try {
+            StoreMultiCommitter storeMultiCommitter =
+                    new StoreMultiCommitter(() -> catalog, commitUser, null);
+            List<MultiTableCommittable> commitRequestList = new ArrayList<>(commitRequests);
+            long checkpointId = commitRequestList.get(0).checkpointId();
+            WrappedManifestCommittable wrappedManifestCommittable =
+                    storeMultiCommitter.combine(checkpointId, 1L, commitRequestList);
+            int numCommitted =
+                    storeMultiCommitter.filterAndCommit(
+                            Collections.singletonList(wrappedManifestCommittable));
+            if (numCommitted > 0) {
+                throw new RuntimeException(
+                        "This exception is intentionally thrown "
+                                + "after committing the restored checkpoints. "
+                                + "By restarting the job we hope that "
+                                + "writers can start writing based on these new commits.");
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to recommit last Committable.", e);
+        }
     }
 
     @Override
@@ -193,5 +240,20 @@ public class PaimonWriter<InputT>
         if (compactExecutor != null) {
             compactExecutor.shutdownNow();
         }
+    }
+
+    @Override
+    public List<MultiTableCommittable> snapshotState(long checkpointId) {
+        List<MultiTableCommittable> committableList = new ArrayList<>();
+        for (MultiTableCommittable committable : committables) {
+            committableList.add(
+                    new MultiTableCommittable(
+                            committable.getDatabase(),
+                            committable.getTable(),
+                            checkpointId,
+                            committable.kind(),
+                            committable.wrappedCommittable()));
+        }
+        return committableList;
     }
 }

@@ -47,7 +47,7 @@ public class PaimonCommitter implements Committer<MultiTableCommittable> {
 
     @Override
     public void commit(Collection<CommitRequest<MultiTableCommittable>> commitRequests)
-            throws IOException, InterruptedException {
+            throws IOException {
         if (commitRequests.isEmpty()) {
             return;
         }
@@ -58,7 +58,7 @@ public class PaimonCommitter implements Committer<MultiTableCommittable> {
         long checkpointId = committables.get(0).checkpointId();
         WrappedManifestCommittable wrappedManifestCommittable =
                 storeMultiCommitter.combine(checkpointId, 1L, committables);
-        storeMultiCommitter.commit(Collections.singletonList(wrappedManifestCommittable));
+        storeMultiCommitter.filterAndCommit(Collections.singletonList(wrappedManifestCommittable));
     }
 
     @Override

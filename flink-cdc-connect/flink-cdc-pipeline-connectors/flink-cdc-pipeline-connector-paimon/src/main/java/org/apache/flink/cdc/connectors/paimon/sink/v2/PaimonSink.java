@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.connector.sink2.StatefulSink;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
@@ -32,10 +33,14 @@ import org.apache.paimon.flink.sink.MultiTableCommittableSerializer;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.table.sink.CommitMessageSerializer;
 
+import java.util.Collection;
+
 /**
  * A {@link Sink} for Paimon. Maintain this package until Paimon has it own sinkV2 implementation.
  */
-public class PaimonSink<InputT> implements WithPreCommitTopology<InputT, MultiTableCommittable> {
+public class PaimonSink<InputT>
+        implements WithPreCommitTopology<InputT, MultiTableCommittable>,
+                StatefulSink<InputT, MultiTableCommittable> {
 
     // provided a default commit user.
     public static final String DEFAULT_COMMIT_USER = "admin";
@@ -60,8 +65,21 @@ public class PaimonSink<InputT> implements WithPreCommitTopology<InputT, MultiTa
     }
 
     @Override
-    public PaimonWriter<InputT> createWriter(InitContext context) {
-        return new PaimonWriter<>(catalogOptions, context.metricGroup(), commitUser, serializer);
+    public PaimonWriter<InputT> createWriter(InitContext initContext) {
+        return new PaimonWriter<>(
+                catalogOptions, initContext.metricGroup(), commitUser, serializer);
+    }
+
+    @Override
+    public StatefulSinkWriter<InputT, MultiTableCommittable> restoreWriter(
+            InitContext initContext, Collection<MultiTableCommittable> collection) {
+        return new PaimonWriter<>(
+                catalogOptions, initContext.metricGroup(), commitUser, serializer, collection);
+    }
+
+    @Override
+    public SimpleVersionedSerializer<MultiTableCommittable> getWriterStateSerializer() {
+        return new MultiTableCommittableSerializer(new CommitMessageSerializer());
     }
 
     @Override
