@@ -25,14 +25,14 @@ limitations under the License.
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>flink-cdc-pipeline-e2e-tests</artifactId>
-
     <properties>
         <flink-1.19>1.19.2</flink-1.19>
         <flink-1.20>1.20.1</flink-1.20>
         <flink-major-1.19>1.19</flink-major-1.19>
         <flink-major-1.20>1.20</flink-major-1.20>
-        <mysql.driver.version>8.0.27</mysql.driver.version>
+        <jdbc.version-1.19>3.2.0-1.19</jdbc.version-1.19>
+        <!-- TODO: Bump JDBC connector version after it supports Flink 1.20 -->
+        <jdbc.version-1.20>3.2.0-1.19</jdbc.version-1.20>
         <!-- TODO: Update this, when StarRocks releases a 1.20 compatible connector. -->
         <starrocks.connector.version>1.2.10_flink-${flink-major-1.19}</starrocks.connector.version>
         <paimon.version>1.2.0</paimon.version>
@@ -44,6 +44,8 @@ limitations under the License.
         <hive.version>2.3.9</hive.version>
         <fluss.version>0.7.0</fluss.version>
     </properties>
+
+    <artifactId>flink-cdc-pipeline-e2e-tests</artifactId>
 
     <dependencies>
         <dependency>
@@ -80,6 +82,12 @@ limitations under the License.
             <artifactId>flink-connector-mysql-cdc</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-connector-jdbc</artifactId>
+            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -528,6 +536,26 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-connector-jdbc</artifactId>
+                            <version>${jdbc.version-1.19}</version>
+                            <destFileName>jdbc-connector_${flink-1.19}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-connector-jdbc</artifactId>
+                            <version>${jdbc.version-1.20}</version>
+                            <destFileName>jdbc-connector_${flink-1.20}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-cdc-pipeline-connector-doris</artifactId>
                             <version>${project.version}</version>
                             <destFileName>doris-cdc-pipeline-connector.jar</destFileName>
@@ -590,6 +618,15 @@ limitations under the License.
                             <artifactId>flink-cdc-pipeline-connector-paimon</artifactId>
                             <version>${project.version}</version>
                             <destFileName>paimon-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-jdbc</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>jdbc-cdc-pipeline-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

@@ -706,6 +706,7 @@ public class PaimonSinkITCase {
         sinkTranslator.translate(
                 new SinkDef("paimon", "Paimon Sink", conf),
                 stream,
+                DEFAULT_PARALLELISM,
                 paimonSink,
                 isBatchMode,
                 schemaOperatorIDGenerator.generate(),

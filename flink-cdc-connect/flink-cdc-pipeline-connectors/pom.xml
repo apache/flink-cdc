@@ -40,6 +40,7 @@ limitations under the License.
         <module>flink-cdc-pipeline-connector-maxcompute</module>
         <module>flink-cdc-pipeline-connector-iceberg</module>
         <module>flink-cdc-pipeline-connector-fluss</module>
+        <module>flink-cdc-pipeline-connector-jdbc-parent</module>
     </modules>
 
     <dependencies>

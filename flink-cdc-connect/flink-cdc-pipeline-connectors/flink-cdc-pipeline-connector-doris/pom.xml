@@ -28,7 +28,6 @@ limitations under the License.
 
     <properties>
         <doris.connector.version>25.0.0</doris.connector.version>
-        <mysql.connector.version>8.0.26</mysql.connector.version>
     </properties>
 
     <dependencies>
@@ -99,7 +98,7 @@ limitations under the License.
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
-            <version>${mysql.connector.version}</version>
+            <version>${mysql.driver.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

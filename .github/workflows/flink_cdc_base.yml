@@ -135,6 +135,11 @@ env:
   MODULES_FLUSS: "\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-fluss"
 
+  MODULES_JDBC: "\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-jdbc-parent/flink-cdc-pipeline-connector-jdbc,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-jdbc-parent/flink-cdc-pipeline-connector-jdbc-core,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-jdbc-parent/flink-cdc-pipeline-connector-jdbc-mysql"
+
   MODULES_PIPELINE_E2E: "\
   flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests"
 
@@ -261,6 +266,9 @@ jobs:
               ;;
               ("fluss")
                modules=${{ env.MODULES_FLUSS }}
+              ;;
+              ("jdbc")
+               modules=${{ env.MODULES_JDBC }}
               ;;
               ("pipeline_e2e")
                compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL_SOURCE }},${{ env.MODULES_POSTGRES_SOURCE }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE_SOURCE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_PIPELINE_E2E }}"

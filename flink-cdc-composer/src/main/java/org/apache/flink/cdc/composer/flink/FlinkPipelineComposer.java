@@ -254,6 +254,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
         sinkTranslator.translate(
                 pipelineDef.getSink(),
                 stream,
+                parallelism,
                 dataSink,
                 isBatchMode,
                 schemaOperatorIDGenerator.generate(),

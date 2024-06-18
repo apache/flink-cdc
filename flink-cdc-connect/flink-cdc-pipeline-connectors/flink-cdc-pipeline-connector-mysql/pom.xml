@@ -28,9 +28,6 @@ limitations under the License.
 
     <artifactId>flink-cdc-pipeline-connector-mysql</artifactId>
 
-    <properties>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>org.apache.flink</groupId>

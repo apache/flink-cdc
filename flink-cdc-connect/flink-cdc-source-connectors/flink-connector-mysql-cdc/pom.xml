@@ -72,7 +72,7 @@ limitations under the License.
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
-            <version>4.0.3</version>
+            <version>${hikari.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
@@ -205,8 +205,6 @@ limitations under the License.
                     </execution>
                 </executions>
             </plugin>
-
         </plugins>
     </build>
-
 </project>
