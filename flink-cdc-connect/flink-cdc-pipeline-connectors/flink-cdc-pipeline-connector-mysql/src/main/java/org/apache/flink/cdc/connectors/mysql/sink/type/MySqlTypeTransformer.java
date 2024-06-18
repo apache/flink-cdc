@@ -17,9 +17,27 @@
 
 package org.apache.flink.cdc.connectors.mysql.sink.type;
 
-import com.mysql.cj.MysqlType;
-import org.apache.flink.cdc.common.types.*;
+import org.apache.flink.cdc.common.types.BigIntType;
+import org.apache.flink.cdc.common.types.BinaryType;
+import org.apache.flink.cdc.common.types.BooleanType;
+import org.apache.flink.cdc.common.types.CharType;
+import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypeDefaultVisitor;
+import org.apache.flink.cdc.common.types.DateType;
+import org.apache.flink.cdc.common.types.DecimalType;
+import org.apache.flink.cdc.common.types.DoubleType;
+import org.apache.flink.cdc.common.types.FloatType;
+import org.apache.flink.cdc.common.types.IntType;
+import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
+import org.apache.flink.cdc.common.types.SmallIntType;
+import org.apache.flink.cdc.common.types.TimeType;
+import org.apache.flink.cdc.common.types.TimestampType;
+import org.apache.flink.cdc.common.types.TinyIntType;
+import org.apache.flink.cdc.common.types.VarBinaryType;
+import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.connectors.jdbc.catalog.JdbcColumn;
+
+import com.mysql.cj.MysqlType;
 
 /** MySQL type transformer from {@DataType}. */
 public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Builder> {

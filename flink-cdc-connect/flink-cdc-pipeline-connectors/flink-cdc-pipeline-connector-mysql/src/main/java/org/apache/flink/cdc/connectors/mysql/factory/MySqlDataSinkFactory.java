@@ -28,6 +28,7 @@ import org.apache.flink.cdc.connectors.mysql.sink.MysqlPooledDataSinkFactory;
 import org.apache.flink.cdc.connectors.mysql.sink.catalog.MySqlCatalog;
 import org.apache.flink.cdc.connectors.mysql.sink.catalog.MySqlCatalogFactory;
 import org.apache.flink.cdc.connectors.mysql.utils.OptionUtils;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,16 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.*;
+import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.CONNECTION_POOL_SIZE;
+import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.CONNECT_MAX_RETRIES;
+import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.CONNECT_TIMEOUT;
+import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.DRIVER_CLASS_NAME;
+import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.HOSTNAME;
+import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.JDBC_PROPERTIES;
+import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.PASSWORD;
+import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.PORT;
+import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.SERVER_TIME_ZONE;
+import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.USERNAME;
 
 /** Factory for creating configured instance of {@link DataSinkFactory}. */
 public class MySqlDataSinkFactory implements DataSinkFactory {
