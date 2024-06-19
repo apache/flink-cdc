@@ -88,16 +88,15 @@ import static org.apache.flink.cdc.common.types.DataTypeChecks.getScale;
  */
 public class TypeConvertUtils {
 
+    /** this method ignore the message of primary key in flinkSchema. */
     public static TableSchema toMaxCompute(Schema flinkSchema) {
         Preconditions.checkNotNull(flinkSchema, "flink Schema");
         TableSchema tableSchema = new TableSchema();
-        Set<String> primaryKeys = new HashSet<>(flinkSchema.primaryKeys());
         Set<String> partitionKeys = new HashSet<>(flinkSchema.partitionKeys());
         List<org.apache.flink.cdc.common.schema.Column> columns = flinkSchema.getColumns();
         for (int i = 0; i < flinkSchema.getColumnCount(); i++) {
             org.apache.flink.cdc.common.schema.Column flinkColumn = columns.get(i);
-            Column odpsColumn =
-                    toMaxCompute(flinkColumn, primaryKeys.contains(flinkColumn.getName()));
+            Column odpsColumn = toMaxCompute(flinkColumn);
             if (partitionKeys.contains(flinkColumn.getName())) {
                 tableSchema.addPartitionColumn(odpsColumn);
             } else {
@@ -107,17 +106,13 @@ public class TypeConvertUtils {
         return tableSchema;
     }
 
-    public static Column toMaxCompute(
-            org.apache.flink.cdc.common.schema.Column flinkColumn, boolean isPrimaryKey) {
+    public static Column toMaxCompute(org.apache.flink.cdc.common.schema.Column flinkColumn) {
         Preconditions.checkNotNull(flinkColumn, "flink Schema Column");
         DataType type = flinkColumn.getType();
         Column.ColumnBuilder columnBuilder =
                 Column.newBuilder(flinkColumn.getName(), toMaxCompute(type));
         if (!type.isNullable()) {
             columnBuilder.notNull();
-        }
-        if (isPrimaryKey) {
-            columnBuilder.primaryKey();
         }
         return columnBuilder.build();
     }
