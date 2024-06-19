@@ -20,8 +20,9 @@ package org.apache.flink.cdc.connectors.mysql.factory;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
-import org.apache.flink.cdc.connectors.jdbc.config.JdbcPropertiesFormatter;
+import org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions;
 import org.apache.flink.cdc.connectors.jdbc.sink.JdbcDataSink;
 import org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkConfig;
 import org.apache.flink.cdc.connectors.mysql.sink.MysqlPooledDataSinkFactory;
@@ -35,14 +36,15 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
+import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.JDBC_PROPERTIES_PROP_PREFIX;
 import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.CONNECTION_POOL_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.CONNECT_MAX_RETRIES;
 import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.CONNECT_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.DRIVER_CLASS_NAME;
 import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.HOSTNAME;
-import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.JDBC_PROPERTIES;
 import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.sink.MySqlDataSinkOptions.SERVER_TIME_ZONE;
@@ -56,6 +58,9 @@ public class MySqlDataSinkFactory implements DataSinkFactory {
 
     @Override
     public DataSink createDataSink(Context context) {
+        FactoryHelper.createFactoryHelper(this, context)
+                .validateExcept(JDBC_PROPERTIES_PROP_PREFIX);
+
         final Configuration config = context.getFactoryConfiguration();
         MySqlDataSinkConfig.Builder builder = new MySqlDataSinkConfig.Builder();
 
@@ -68,13 +73,15 @@ public class MySqlDataSinkFactory implements DataSinkFactory {
                 config.getOptional(CONNECT_TIMEOUT).orElseGet(() -> Duration.ofSeconds(30)));
         builder.connectionPoolSize(config.getOptional(CONNECTION_POOL_SIZE).orElseGet(() -> 20));
         builder.connectMaxRetries(config.getOptional(CONNECT_MAX_RETRIES).orElseGet(() -> 3));
-        // jdbc properties
-        config.getOptional(JDBC_PROPERTIES)
-                .map(JdbcPropertiesFormatter::formatJdbcProperties)
-                .ifPresent(builder::jdbcProperties);
         // driver class name
         builder.driverClassName(
                 config.getOptional(DRIVER_CLASS_NAME).orElseGet(() -> "com.mysql.cj.jdbc.Driver"));
+        // builder jdbc properties
+        Properties properties = new Properties();
+        Map<String, String> jdbcProperties =
+                JdbcSinkOptions.getPropertiesByPrefix(config, JDBC_PROPERTIES_PROP_PREFIX);
+        properties.putAll(jdbcProperties);
+        builder.jdbcProperties(properties);
         // get jdbc url
         String jdbcUrl = MysqlPooledDataSinkFactory.INSTANCE.getJdbcUrl(builder.build());
         builder.connUrl(jdbcUrl);
@@ -112,7 +119,6 @@ public class MySqlDataSinkFactory implements DataSinkFactory {
         options.add(CONNECT_TIMEOUT);
         options.add(CONNECTION_POOL_SIZE);
         options.add(CONNECT_MAX_RETRIES);
-        options.add(JDBC_PROPERTIES);
 
         return options;
     }

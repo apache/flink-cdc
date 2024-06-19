@@ -18,6 +18,7 @@
 package connectors.jdbc.config;
 
 import org.apache.flink.cdc.connectors.jdbc.config.JdbcSinkConfig;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

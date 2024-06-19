@@ -19,8 +19,11 @@ package org.apache.flink.cdc.connectors.jdbc.options;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
+import org.apache.flink.cdc.common.configuration.Configuration;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 
 /** Configurations for JDBC data source. */
 public class JdbcSinkOptions {
@@ -81,11 +84,18 @@ public class JdbcSinkOptions {
                     .defaultValue(3)
                     .withDescription(
                             "The max retry times that the connector should retry to build database server connection.");
+    public static final String JDBC_PROPERTIES_PROP_PREFIX = "jdbc.properties.";
 
-    public static final ConfigOption<String> JDBC_PROPERTIES =
-            ConfigOptions.key("jdbc-properties")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Option to pass custom JDBC URL properties (separate multiple with ,). User can pass custom properties, such as 'useSSL=false'.");
+    public static Map<String, String> getPropertiesByPrefix(
+            Configuration tableOptions, String prefix) {
+        final Map<String, String> props = new HashMap<>();
+
+        for (Map.Entry<String, String> entry : tableOptions.toMap().entrySet()) {
+            if (entry.getKey().startsWith(prefix)) {
+                String subKey = entry.getKey().substring(prefix.length());
+                props.put(subKey, entry.getValue());
+            }
+        }
+        return props;
+    }
 }
