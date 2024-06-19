@@ -22,26 +22,21 @@ import org.apache.flink.cdc.common.schema.Schema;
 
 /** implementation class for {@link JdbcRowData}. */
 public class DefaultJdbcRowData implements JdbcRowData {
-    private String uniqueKey;
-    private String database;
     private TableId tableId;
     private Schema schema;
+    private RowKind rowKind;
     private byte[] rows;
-
-    public void setUniqueKey(String uniqueKey) {
-        this.uniqueKey = uniqueKey;
-    }
 
     public void setTableId(TableId tableId) {
         this.tableId = tableId;
     }
 
-    public void setDatabase(String database) {
-        this.database = database;
-    }
-
     public void setSchema(Schema schema) {
         this.schema = schema;
+    }
+
+    public void setRowKind(RowKind rowKind) {
+        this.rowKind = rowKind;
     }
 
     public void setRows(byte[] rows) {
@@ -50,21 +45,9 @@ public class DefaultJdbcRowData implements JdbcRowData {
 
     public DefaultJdbcRowData() {}
 
-    public DefaultJdbcRowData(String uniqueKey, String database, TableId tableId, byte[] rows) {
-        this.uniqueKey = uniqueKey;
-        this.database = database;
+    public DefaultJdbcRowData(TableId tableId, byte[] rows) {
         this.tableId = tableId;
         this.rows = rows;
-    }
-
-    @Override
-    public String getUniqueKey() {
-        return uniqueKey;
-    }
-
-    @Override
-    public String getDatabase() {
-        return database;
     }
 
     @Override
@@ -75,6 +58,11 @@ public class DefaultJdbcRowData implements JdbcRowData {
     @Override
     public Schema getSchema() {
         return schema;
+    }
+
+    @Override
+    public RowKind getRowKind() {
+        return rowKind;
     }
 
     @Override

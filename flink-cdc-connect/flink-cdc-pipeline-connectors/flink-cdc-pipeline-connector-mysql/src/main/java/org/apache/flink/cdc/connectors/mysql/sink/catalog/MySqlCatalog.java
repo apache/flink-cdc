@@ -40,6 +40,11 @@ public class MySqlCatalog extends AbstractJdbcCatalog {
     }
 
     @Override
+    protected String buildDeleteSql(TableId tableId, List<String> primaryKeys) {
+        return MySqlSmtCreatorFactory.INSTANCE.buildDeleteSql(tableId, primaryKeys);
+    }
+
+    @Override
     protected String buildCreateTableSql(TableId tableId, Schema schema, boolean ignoreIfExists) {
         return MySqlSmtCreatorFactory.INSTANCE.buildCreateTableSql(tableId, schema, ignoreIfExists);
     }

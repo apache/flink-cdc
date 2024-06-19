@@ -66,6 +66,19 @@ public class MySqlSmtCreatorFactory {
         return query.toString();
     }
 
+    public String buildDeleteSql(TableId tableId, List<String> primaryKeys) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(String.format("DELETE FROM %s ", tableId.identifier()));
+        builder.append("WHERE ");
+        primaryKeys.forEach(
+                pk -> {
+                    builder.append(pk).append(" = ? AND ");
+                });
+        // remove latest " AND "
+        builder.setLength(builder.length() - 5);
+        return builder.toString();
+    }
+
     public String buildAlterAddColumnsSql(
             TableId tableId, List<AddColumnEvent.ColumnWithPosition> addedColumns) {
         StringBuilder builder = new StringBuilder();

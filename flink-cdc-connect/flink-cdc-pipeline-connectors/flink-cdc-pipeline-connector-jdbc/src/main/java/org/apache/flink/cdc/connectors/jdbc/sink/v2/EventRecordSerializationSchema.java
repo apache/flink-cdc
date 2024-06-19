@@ -89,7 +89,6 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
         Preconditions.checkNotNull(tableInfo, event.tableId() + " is not existed");
 
         DefaultJdbcRowData reusableRowData = new DefaultJdbcRowData();
-        reusableRowData.setDatabase(event.tableId().getSchemaName());
         reusableRowData.setTableId(event.tableId());
         reusableRowData.setSchema(tableInfo.schema);
 
@@ -98,22 +97,27 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
             case INSERT:
             case UPDATE:
             case REPLACE:
-                value = serializeRecord(tableInfo, event.after(), false);
+                reusableRowData.setRowKind(RowKind.INSERT);
+                value = serializeRecord(event.tableId(), tableInfo, event.after());
                 break;
             case DELETE:
-                value = serializeRecord(tableInfo, event.before(), true);
+                reusableRowData.setRowKind(RowKind.DELETE);
+                value = serializeRecord(event.tableId(), tableInfo, event.before());
                 break;
             default:
                 throw new UnsupportedOperationException(
                         "Don't support operation type " + event.op());
         }
+
         reusableRowData.setRows(value);
 
         return reusableRowData;
     }
 
-    private byte[] serializeRecord(TableInfo tableInfo, RecordData record, boolean isDelete)
+    private byte[] serializeRecord(TableId tableId, TableInfo tableInfo, RecordData record)
             throws JsonProcessingException {
+        Preconditions.checkNotNull(record, tableId + " record is null");
+
         List<Column> columns = tableInfo.schema.getColumns();
         Preconditions.checkArgument(columns.size() == record.getArity());
 
@@ -121,7 +125,6 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
         for (int i = 0; i < record.getArity(); i++) {
             rowMap.put(columns.get(i).getName(), tableInfo.fieldGetters[i].getFieldOrNull(record));
         }
-        rowMap.put("__op", isDelete ? 1 : 0);
 
         return jsonWrapper.toJSONString(rowMap).getBytes(StandardCharsets.UTF_8);
     }

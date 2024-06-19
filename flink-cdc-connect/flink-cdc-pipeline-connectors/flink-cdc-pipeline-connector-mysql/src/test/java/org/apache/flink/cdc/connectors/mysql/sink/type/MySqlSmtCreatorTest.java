@@ -62,6 +62,30 @@ public class MySqlSmtCreatorTest {
     }
 
     @Test
+    public void testBuildDeleteSql() {
+        TableId tableId = TableId.tableId("my_schema", "my_table");
+        List<String> primaryKeys = Arrays.asList("id", "name");
+
+        String expectedSql = "DELETE FROM my_schema.my_table WHERE id = ? AND name = ?";
+        String actualSql = buildDeleteSql(tableId, primaryKeys);
+
+        assertEquals(expectedSql, actualSql);
+    }
+
+    public String buildDeleteSql(TableId tableId, List<String> primaryKeys) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(String.format("DELETE FROM %s ", tableId.identifier()));
+        builder.append("WHERE ");
+        primaryKeys.forEach(
+                pk -> {
+                    builder.append(pk).append(" = ? AND ");
+                });
+        // remove latest " AND "
+        builder.setLength(builder.length() - 5);
+        return builder.toString();
+    }
+
+    @Test
     public void testBuildRenameColumnSql() {
         TableId tableId = TableId.tableId("test_schema", "test_table");
         String oldName = "old_name";

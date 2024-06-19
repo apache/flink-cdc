@@ -203,6 +203,13 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
         return buildUpsertSql(tableId, schema);
     }
 
+    @Override
+    public String getDeleteStatement(TableId tableId, List<String> primaryKeys) {
+        checkTableIdArguments(tableId);
+
+        return buildDeleteSql(tableId, primaryKeys);
+    }
+
     protected void checkTableIdArguments(TableId tableId) {
         Preconditions.checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(tableId.getSchemaName()),
@@ -213,6 +220,8 @@ public abstract class AbstractJdbcCatalog extends AbstractCatalog {
     }
 
     protected abstract String buildUpsertSql(TableId tableId, Schema schema);
+
+    protected abstract String buildDeleteSql(TableId tableId, List<String> primaryKeys);
 
     protected abstract String buildCreateTableSql(
             TableId tableId, Schema schema, boolean ignoreIfExists);

@@ -63,7 +63,12 @@ public class JdbcWriter<IN> implements StatefulSink.StatefulSinkWriter<IN, JdbcW
     private final Map<
                     TableId,
                     JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>>>
-            jdbcOutputs;
+            jdbcUpsertOutputs;
+
+    private final Map<
+                    TableId,
+                    JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>>>
+            jdbcDeleteOutputs;
 
     private JdbcOutputFormat<IN, IN, JdbcBatchStatementExecutor<IN>> jdbcOutput;
 
@@ -88,7 +93,8 @@ public class JdbcWriter<IN> implements StatefulSink.StatefulSinkWriter<IN, JdbcW
         this.outputSerializer = outputSerializer;
         this.serializationSchema = serializationSchema;
         this.catalog = catalog;
-        this.jdbcOutputs = new ConcurrentHashMap<>();
+        this.jdbcUpsertOutputs = new ConcurrentHashMap<>();
+        this.jdbcDeleteOutputs = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -103,39 +109,60 @@ public class JdbcWriter<IN> implements StatefulSink.StatefulSinkWriter<IN, JdbcW
             return;
         }
 
-        String upsertSql = catalog.getUpsertStatement(rowData.getTableId(), rowData.getSchema());
-        JdbcStatementBuilder<JdbcRowData> jdbcStatementBuilder =
-                getJdbcStatementBuilder(rowData.getSchema().getColumns());
-
         JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>>
-                outputFormat =
-                        jdbcOutputs.computeIfAbsent(
-                                rowData.getTableId(),
-                                id -> {
-                                    JdbcOutputFormat<
-                                                    Object,
-                                                    JdbcRowData,
-                                                    JdbcBatchStatementExecutor<JdbcRowData>>
-                                            jdbcOutputFormat =
-                                                    new JdbcOutputFormat<>(
-                                                            connectionProvider,
-                                                            executionOptions,
-                                                            () ->
-                                                                    JdbcBatchStatementExecutor
-                                                                            .simple(
-                                                                                    upsertSql,
-                                                                                    jdbcStatementBuilder));
-                                    try {
-                                        jdbcOutputFormat.open(outputSerializer);
-                                    } catch (IOException e) {
-                                        throw new RuntimeException(e);
-                                    }
-                                    return jdbcOutputFormat;
-                                });
+                outputFormat = null;
+
+        // insert event
+        if (RowKind.INSERT.is(rowData.getRowKind())) {
+            String upsertSmt =
+                    catalog.getUpsertStatement(rowData.getTableId(), rowData.getSchema());
+            JdbcStatementBuilder<JdbcRowData> upsertSmtBuilder =
+                    getUpsertStatementBuilder(rowData.getSchema().getColumns());
+
+            outputFormat =
+                    jdbcUpsertOutputs.computeIfAbsent(
+                            rowData.getTableId(),
+                            id -> getJdbcOutputFormat(upsertSmt, upsertSmtBuilder));
+
+            outputFormat.writeRecord(rowData);
+            outputFormat.flush();
+        }
+
+        // delete event
+        if (RowKind.DELETE.is(rowData.getRowKind())) {
+            String deleteSmt =
+                    catalog.getDeleteStatement(
+                            rowData.getTableId(), rowData.getSchema().primaryKeys());
+            JdbcStatementBuilder<JdbcRowData> delSmtBuilder =
+                    getDeleteStatementBuilder(rowData.getSchema().primaryKeys());
+
+            outputFormat =
+                    jdbcDeleteOutputs.computeIfAbsent(
+                            rowData.getTableId(),
+                            id -> getJdbcOutputFormat(deleteSmt, delSmtBuilder));
+        }
 
         outputFormat.writeRecord(rowData);
         outputFormat.flush();
     }
+
+    private JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>>
+            getJdbcOutputFormat(String sql, JdbcStatementBuilder<JdbcRowData> builder) {
+        JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>>
+                jdbcOutputFormat =
+                        new JdbcOutputFormat<>(
+                                connectionProvider,
+                                executionOptions,
+                                () -> JdbcBatchStatementExecutor.simple(sql, builder));
+        try {
+            jdbcOutputFormat.open(outputSerializer);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return jdbcOutputFormat;
+    }
+
+    private void deleteWrite() {}
 
     @Override
     public void flush(boolean b) throws IOException, InterruptedException {
@@ -152,16 +179,9 @@ public class JdbcWriter<IN> implements StatefulSink.StatefulSinkWriter<IN, JdbcW
         // this.jdbcOutput.close();
     }
 
-    private JdbcStatementBuilder<JdbcRowData> getJdbcStatementBuilder(List<Column> columns) {
+    private JdbcStatementBuilder<JdbcRowData> getUpsertStatementBuilder(List<Column> columns) {
         return (ps, rowData) -> {
-            Map<String, Object> recordMap;
-            try {
-                recordMap =
-                        jsonWrapper.parseObject(
-                                rowData.getRows(), new TypeReference<Map<String, Object>>() {});
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            Map<String, Object> recordMap = parserRowData(rowData.getRows());
 
             if (!recordMap.isEmpty()) {
                 for (int i = 0; i < columns.size(); i++) {
@@ -170,5 +190,26 @@ public class JdbcWriter<IN> implements StatefulSink.StatefulSinkWriter<IN, JdbcW
                 }
             }
         };
+    }
+
+    private JdbcStatementBuilder<JdbcRowData> getDeleteStatementBuilder(List<String> primaryKeys) {
+        return (ps, rowData) -> {
+            Map<String, Object> recordMap = parserRowData(rowData.getRows());
+
+            if (!recordMap.isEmpty()) {
+                for (int i = 0; i < primaryKeys.size(); i++) {
+                    String pk = primaryKeys.get(i);
+                    ps.setObject(i + 1, recordMap.get(pk));
+                }
+            }
+        };
+    }
+
+    private Map<String, Object> parserRowData(byte[] rowData) {
+        try {
+            return jsonWrapper.parseObject(rowData, new TypeReference<Map<String, Object>>() {});
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

@@ -29,6 +29,7 @@ import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 
 import java.io.Serializable;
+import java.util.List;
 
 /** Database catalog interface. */
 public interface Catalog extends Serializable {
@@ -102,4 +103,13 @@ public interface Catalog extends Serializable {
      * @return
      */
     String getUpsertStatement(TableId tableId, Schema schema);
+
+    /**
+     * Get delete statement.
+     *
+     * @param tableId
+     * @param schema
+     * @return
+     */
+    String getDeleteStatement(TableId tableId, List<String> primaryKeys);
 }
