@@ -148,7 +148,8 @@ public class PipelineDef {
                         PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR,
                         PipelineOptions.PIPELINE_LOCAL_TIME_ZONE,
                         PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID,
-                        PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT);
+                        PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT,
+                        PipelineOptions.PIPELINE_ROUTE_BEHAVIOR);
 
         Set<String> optionKeys =
                 options.stream().map(ConfigOption::key).collect(Collectors.toSet());

@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteBehavior;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
@@ -100,20 +101,25 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
 
     private SchemaDerivation schemaDerivation;
 
+    private RouteBehavior routeBehavior;
+
     public SchemaRegistry(
             String operatorName,
             OperatorCoordinator.Context context,
             MetadataApplier metadataApplier,
-            List<Tuple2<Selectors, TableId>> routes) {
+            List<Tuple2<Selectors, TableId>> routes,
+            RouteBehavior routeBehavior) {
         this.context = context;
         this.operatorName = operatorName;
         this.failedReasons = new HashMap<>();
         this.metadataApplier = metadataApplier;
         this.routes = routes;
         schemaManager = new SchemaManager();
-        schemaDerivation = new SchemaDerivation(schemaManager, routes, new HashMap<>());
+        schemaDerivation =
+                new SchemaDerivation(schemaManager, routes, new HashMap<>(), routeBehavior);
         requestHandler =
                 new SchemaRegistryRequestHandler(metadataApplier, schemaManager, schemaDerivation);
+        this.routeBehavior = routeBehavior;
     }
 
     @Override
@@ -208,7 +214,11 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                                 SchemaManager.SERIALIZER.deserialize(
                                         schemaManagerSerializerVersion, serializedSchemaManager);
                         schemaDerivation =
-                                new SchemaDerivation(schemaManager, routes, Collections.emptyMap());
+                                new SchemaDerivation(
+                                        schemaManager,
+                                        routes,
+                                        Collections.emptyMap(),
+                                        routeBehavior);
                         requestHandler =
                                 new SchemaRegistryRequestHandler(
                                         metadataApplier, schemaManager, schemaDerivation);
@@ -225,7 +235,8 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                         Map<TableId, Set<TableId>> derivationMapping =
                                 SchemaDerivation.deserializerDerivationMapping(in);
                         schemaDerivation =
-                                new SchemaDerivation(schemaManager, routes, derivationMapping);
+                                new SchemaDerivation(
+                                        schemaManager, routes, derivationMapping, routeBehavior);
                         requestHandler =
                                 new SchemaRegistryRequestHandler(
                                         metadataApplier, schemaManager, schemaDerivation);

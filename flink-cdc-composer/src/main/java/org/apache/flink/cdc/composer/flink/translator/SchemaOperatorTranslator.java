@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteBehavior;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.composer.definition.RouteDef;
@@ -39,6 +40,7 @@ import java.util.List;
 @Internal
 public class SchemaOperatorTranslator {
     private final SchemaChangeBehavior schemaChangeBehavior;
+    private final RouteBehavior routeBehavior;
     private final String schemaOperatorUid;
 
     private final Duration rpcTimeOut;
@@ -46,10 +48,12 @@ public class SchemaOperatorTranslator {
     public SchemaOperatorTranslator(
             SchemaChangeBehavior schemaChangeBehavior,
             String schemaOperatorUid,
-            Duration rpcTimeOut) {
+            Duration rpcTimeOut,
+            RouteBehavior routeBehavior) {
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.schemaOperatorUid = schemaOperatorUid;
         this.rpcTimeOut = rpcTimeOut;
+        this.routeBehavior = routeBehavior;
     }
 
     public DataStream<Event> translate(
@@ -59,7 +63,8 @@ public class SchemaOperatorTranslator {
             List<RouteDef> routes) {
         switch (schemaChangeBehavior) {
             case EVOLVE:
-                return addSchemaOperator(input, parallelism, metadataApplier, routes);
+                return addSchemaOperator(
+                        input, parallelism, metadataApplier, routes, routeBehavior);
             case IGNORE:
                 return dropSchemaChangeEvent(input, parallelism);
             case EXCEPTION:
@@ -79,7 +84,8 @@ public class SchemaOperatorTranslator {
             DataStream<Event> input,
             int parallelism,
             MetadataApplier metadataApplier,
-            List<RouteDef> routes) {
+            List<RouteDef> routes,
+            RouteBehavior routeBehavior) {
         List<Tuple2<String, TableId>> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
             routingRules.add(
@@ -89,7 +95,8 @@ public class SchemaOperatorTranslator {
                 input.transform(
                         "SchemaOperator",
                         new EventTypeInfo(),
-                        new SchemaOperatorFactory(metadataApplier, routingRules, rpcTimeOut));
+                        new SchemaOperatorFactory(
+                                metadataApplier, routingRules, rpcTimeOut, routeBehavior));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
     }

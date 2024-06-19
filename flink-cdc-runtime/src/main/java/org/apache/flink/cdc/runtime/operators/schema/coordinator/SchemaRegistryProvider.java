@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteBehavior;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -37,16 +38,19 @@ public class SchemaRegistryProvider implements OperatorCoordinator.Provider {
     private final String operatorName;
     private final MetadataApplier metadataApplier;
     private final List<Tuple2<String, TableId>> routingRules;
+    private final RouteBehavior routeBehavior;
 
     public SchemaRegistryProvider(
             OperatorID operatorID,
             String operatorName,
             MetadataApplier metadataApplier,
-            List<Tuple2<String, TableId>> routingRules) {
+            List<Tuple2<String, TableId>> routingRules,
+            RouteBehavior routeBehavior) {
         this.operatorID = operatorID;
         this.operatorName = operatorName;
         this.metadataApplier = metadataApplier;
         this.routingRules = routingRules;
+        this.routeBehavior = routeBehavior;
     }
 
     @Override
@@ -69,6 +73,6 @@ public class SchemaRegistryProvider implements OperatorCoordinator.Provider {
                                     return new Tuple2<>(selectors, replaceBy);
                                 })
                         .collect(Collectors.toList());
-        return new SchemaRegistry(operatorName, context, metadataApplier, routes);
+        return new SchemaRegistry(operatorName, context, metadataApplier, routes, routeBehavior);
     }
 }

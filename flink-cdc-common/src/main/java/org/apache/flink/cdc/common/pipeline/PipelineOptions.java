@@ -96,5 +96,21 @@ public class PipelineOptions {
                     .withDescription(
                             "The timeout time for SchemaOperator to wait downstream SchemaChangeEvent applying finished, the default value is 3 minutes.");
 
+    public static final ConfigOption<RouteBehavior> PIPELINE_ROUTE_BEHAVIOR =
+            ConfigOptions.key("route.behavior")
+                    .enumType(RouteBehavior.class)
+                    .defaultValue(RouteBehavior.FIRST_MATCH)
+                    .withDescription(
+                            Description.builder()
+                                    .text("Indicates how pipeline should apply route behaviors.")
+                                    .linebreak()
+                                    .add(
+                                            ListElement.list(
+                                                    text(
+                                                            "FIRST_MATCH (default): Apply the first matching route rule only, ignores any following matched rules."),
+                                                    text(
+                                                            "COMPLETE: Applies every matching route rules.")))
+                                    .build());
+
     private PipelineOptions() {}
 }
