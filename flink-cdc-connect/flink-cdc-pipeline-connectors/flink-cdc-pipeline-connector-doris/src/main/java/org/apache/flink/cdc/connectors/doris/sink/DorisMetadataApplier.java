@@ -37,6 +37,7 @@ import org.apache.flink.util.CollectionUtil;
 
 import org.apache.doris.flink.catalog.DorisTypeMapper;
 import org.apache.doris.flink.catalog.doris.DataModel;
+import org.apache.doris.flink.catalog.doris.DorisSystem;
 import org.apache.doris.flink.catalog.doris.FieldSchema;
 import org.apache.doris.flink.catalog.doris.TableSchema;
 import org.apache.doris.flink.cfg.DorisOptions;
@@ -59,12 +60,14 @@ public class DorisMetadataApplier implements MetadataApplier {
     private static final Logger LOG = LoggerFactory.getLogger(DorisMetadataApplier.class);
     private DorisOptions dorisOptions;
     private SchemaChangeManager schemaChangeManager;
+    private DorisSystem dorisSystem;
     private Configuration config;
 
     public DorisMetadataApplier(DorisOptions dorisOptions, Configuration config) {
         this.dorisOptions = dorisOptions;
         this.schemaChangeManager = new SchemaChangeManager(dorisOptions);
         this.config = config;
+        this.dorisSystem = new DorisSystem(dorisOptions);
     }
 
     @Override
@@ -97,6 +100,10 @@ public class DorisMetadataApplier implements MetadataApplier {
         tableSchema.setDatabase(tableId.getSchemaName());
         tableSchema.setFields(buildFields(schema));
         tableSchema.setDistributeKeys(buildDistributeKeys(schema));
+
+        if (!dorisSystem.databaseExists(tableId.getSchemaName())) {
+            dorisSystem.createDatabase(tableId.getSchemaName());
+        }
 
         if (CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
             tableSchema.setModel(DataModel.DUPLICATE);
