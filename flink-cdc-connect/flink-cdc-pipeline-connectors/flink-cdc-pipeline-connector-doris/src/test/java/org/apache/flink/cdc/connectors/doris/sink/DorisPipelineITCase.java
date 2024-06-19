@@ -48,6 +48,7 @@ import java.util.List;
 
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.BENODES;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.FENODES;
+import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.JDBC_URL;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_ENABLE_BATCH_MODE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_ENABLE_DELETE;
@@ -185,6 +186,7 @@ public class DorisPipelineITCase extends DorisSinkTestBase {
                 new Configuration()
                         .set(FENODES, DORIS_CONTAINER.getFeNodes())
                         .set(BENODES, DORIS_CONTAINER.getBeNodes())
+                        .set(JDBC_URL, DORIS_CONTAINER.getJdbcUrl())
                         .set(USERNAME, DorisContainer.DORIS_USERNAME)
                         .set(PASSWORD, DorisContainer.DORIS_PASSWORD)
                         .set(SINK_ENABLE_BATCH_MODE, batchMode)
