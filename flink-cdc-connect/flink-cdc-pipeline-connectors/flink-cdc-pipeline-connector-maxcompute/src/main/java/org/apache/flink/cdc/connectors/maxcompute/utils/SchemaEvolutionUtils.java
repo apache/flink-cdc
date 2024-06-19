@@ -85,7 +85,10 @@ public class SchemaEvolutionUtils {
                         .ifNotExists()
                         .debug();
         if (!CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
-            tableCreator.transactionTable().withBucketNum(options.getBucketSize());
+            tableCreator
+                    .transactionTable()
+                    .withBucketNum(options.getBucketSize())
+                    .withPrimaryKeys(schema.primaryKeys());
         }
         if (options.isSupportSchema()) {
             if (StringUtils.isNullOrWhitespaceOnly(tableId.getNamespace())) {
