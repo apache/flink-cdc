@@ -29,8 +29,8 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import com.aliyun.odps.OdpsException;
 import com.aliyun.odps.TableSchema;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -57,8 +57,10 @@ class SchemaEvolutionUtilsTest extends EmulatorTestBase {
                             .physicalColumn("ID2", DataTypes.BIGINT())
                             .primaryKey("PK")
                             .build());
+            Assertions.assertEquals(
+                    ImmutableList.of("PK"), odps.tables().get(TEST_TABLE).getPrimaryKey());
         } catch (Exception e) {
-            Assert.fail(e.getMessage());
+            Assertions.fail(e.getMessage());
         }
     }
 
@@ -80,14 +82,14 @@ class SchemaEvolutionUtilsTest extends EmulatorTestBase {
                                     Column.physicalColumn("NAME", DataTypes.STRING()))));
             TableSchema schema = odps.tables().get(TEST_TABLE).getSchema();
 
-            Assert.assertEquals(5, schema.getColumns().size());
-            Assert.assertEquals("PK", schema.getColumns().get(0).getName());
-            Assert.assertEquals("ID1", schema.getColumns().get(1).getName());
-            Assert.assertEquals("ID2", schema.getColumns().get(2).getName());
-            Assert.assertEquals("ID3", schema.getColumns().get(3).getName());
-            Assert.assertEquals("NAME", schema.getColumns().get(4).getName());
+            Assertions.assertEquals(5, schema.getColumns().size());
+            Assertions.assertEquals("PK", schema.getColumns().get(0).getName());
+            Assertions.assertEquals("ID1", schema.getColumns().get(1).getName());
+            Assertions.assertEquals("ID2", schema.getColumns().get(2).getName());
+            Assertions.assertEquals("ID3", schema.getColumns().get(3).getName());
+            Assertions.assertEquals("NAME", schema.getColumns().get(4).getName());
         } catch (Exception e) {
-            Assert.fail(e.getMessage());
+            Assertions.fail(e.getMessage());
         }
     }
 
@@ -98,10 +100,10 @@ class SchemaEvolutionUtilsTest extends EmulatorTestBase {
                     testOptions, TableId.tableId(TEST_TABLE), ImmutableList.of("ID1", "ID2"));
             TableSchema schema = odps.tables().get(TEST_TABLE).getSchema();
 
-            Assert.assertEquals(1, schema.getColumns().size());
-            Assert.assertEquals("PK", schema.getColumns().get(0).getName());
+            Assertions.assertEquals(1, schema.getColumns().size());
+            Assertions.assertEquals("PK", schema.getColumns().get(0).getName());
         } catch (Exception e) {
-            Assert.fail(e.getMessage());
+            Assertions.fail(e.getMessage());
         }
     }
 
@@ -109,8 +111,8 @@ class SchemaEvolutionUtilsTest extends EmulatorTestBase {
     void testRenameColumn() {
         try {
             TableSchema originSchema = odps.tables().get(TEST_TABLE).getSchema();
-            Assert.assertEquals("ID1", originSchema.getColumns().get(1).getName());
-            Assert.assertEquals("ID2", originSchema.getColumns().get(2).getName());
+            Assertions.assertEquals("ID1", originSchema.getColumns().get(1).getName());
+            Assertions.assertEquals("ID2", originSchema.getColumns().get(2).getName());
 
             SchemaEvolutionUtils.renameColumn(
                     testOptions,
@@ -118,10 +120,10 @@ class SchemaEvolutionUtilsTest extends EmulatorTestBase {
                     ImmutableMap.of("ID1", "ID1_NEW", "ID2", "ID2_NEW"));
 
             TableSchema expectSchema = odps.tables().get(TEST_TABLE).getSchema();
-            Assert.assertEquals("ID1_NEW", expectSchema.getColumns().get(1).getName());
-            Assert.assertEquals("ID2_NEW", expectSchema.getColumns().get(2).getName());
+            Assertions.assertEquals("ID1_NEW", expectSchema.getColumns().get(1).getName());
+            Assertions.assertEquals("ID2_NEW", expectSchema.getColumns().get(2).getName());
         } catch (Exception e) {
-            Assert.fail(e.getMessage());
+            Assertions.fail(e.getMessage());
         }
     }
 }
