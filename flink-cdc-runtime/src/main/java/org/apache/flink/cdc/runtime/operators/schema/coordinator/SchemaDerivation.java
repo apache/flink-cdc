@@ -80,13 +80,16 @@ public class SchemaDerivation {
 
     public List<SchemaChangeEvent> applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
         List<SchemaChangeEvent> events = new ArrayList<>();
-        for (Tuple2<Selectors, TableId> route : routes) {
-            TableId originalTable = schemaChangeEvent.tableId();
+        TableId originalTable = schemaChangeEvent.tableId();
+        boolean noRouteMatched = true;
 
+        for (Tuple2<Selectors, TableId> route : routes) {
             // Check routing table
             if (!route.f0.isMatch(originalTable)) {
                 continue;
             }
+
+            noRouteMatched = false;
 
             // Matched a routing rule
             TableId derivedTable = route.f1;
@@ -140,7 +143,7 @@ public class SchemaDerivation {
             }
         }
 
-        if (events.isEmpty()) {
+        if (noRouteMatched) {
             // No routes are matched, leave it as-is
             return Collections.singletonList(schemaChangeEvent);
         } else {
