@@ -202,7 +202,7 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
         builder.length(precision);
         builder.isNullable(localZonedTimestampType.isNullable());
         if (precision > 0) {
-            builder.columnType(String.format("TIMESTAMP(%d)",precision));
+            builder.columnType(String.format("TIMESTAMP(%d)", precision));
         } else {
             builder.columnType("TIMESTAMP");
         }

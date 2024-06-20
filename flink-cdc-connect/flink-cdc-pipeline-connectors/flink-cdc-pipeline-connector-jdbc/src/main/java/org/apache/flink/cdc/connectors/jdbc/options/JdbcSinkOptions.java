@@ -31,13 +31,13 @@ public class JdbcSinkOptions {
             ConfigOptions.key("hostname")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("IP address or hostname of the MySQL database server.");
+                    .withDescription("IP address or hostname of the Jdbc database server.");
 
     public static final ConfigOption<Integer> PORT =
             ConfigOptions.key("port")
                     .intType()
                     .defaultValue(3306)
-                    .withDescription("Integer port number of the MySQL database server.");
+                    .withDescription("Integer port number of the Jdbc database server.");
 
     public static final ConfigOption<String> USERNAME =
             ConfigOptions.key("username")

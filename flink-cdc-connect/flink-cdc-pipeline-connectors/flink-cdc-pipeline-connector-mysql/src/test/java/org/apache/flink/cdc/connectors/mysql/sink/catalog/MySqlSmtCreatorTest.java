@@ -15,14 +15,13 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.mysql.sink.type;
+package org.apache.flink.cdc.connectors.mysql.sink.catalog;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.connectors.mysql.sink.catalog.MySqlSmtCreatorFactory;
 
 import org.junit.jupiter.api.Test;
 
