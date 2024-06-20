@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSource;
@@ -76,7 +77,9 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
+import static org.apache.flink.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static org.apache.flink.cdc.debezium.utils.JdbcUrlUtils.PROPERTIES_PREFIX;
 import static org.apache.flink.cdc.debezium.utils.JdbcUrlUtils.getJdbcProperties;
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -90,6 +93,9 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
     @Override
     public DataSource createDataSource(Context context) {
+        FactoryHelper.createFactoryHelper(this, context)
+                .validateExcept(PROPERTIES_PREFIX, DEBEZIUM_OPTIONS_PREFIX);
+
         final Configuration config = context.getFactoryConfiguration();
         String hostname = config.get(HOSTNAME);
         int port = config.get(PORT);
@@ -195,27 +201,28 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PORT);
-        options.add(SERVER_TIME_ZONE);
+        options.add(TABLES_EXCLUDE);
+        options.add(SCHEMA_CHANGE_ENABLED);
         options.add(SERVER_ID);
+        options.add(SERVER_TIME_ZONE);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(SCAN_STARTUP_MODE);
+        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS);
-        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
-        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
-        options.add(CHUNK_META_GROUP_SIZE);
-        options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(CONNECT_TIMEOUT);
-        options.add(CONNECTION_POOL_SIZE);
-        options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
-        options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(CONNECT_MAX_RETRIES);
+        options.add(CONNECTION_POOL_SIZE);
+        options.add(HEARTBEAT_INTERVAL);
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
-        options.add(HEARTBEAT_INTERVAL);
-        options.add(SCHEMA_CHANGE_ENABLED);
+        options.add(CHUNK_META_GROUP_SIZE);
+        options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
+        options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         return options;
     }
 

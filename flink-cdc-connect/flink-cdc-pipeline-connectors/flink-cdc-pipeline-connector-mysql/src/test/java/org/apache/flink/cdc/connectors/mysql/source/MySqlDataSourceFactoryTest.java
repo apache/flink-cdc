@@ -17,10 +17,12 @@
 
 package org.apache.flink.cdc.connectors.mysql.source;
 
+import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
+import org.apache.flink.table.api.ValidationException;
 
 import org.junit.Test;
 
@@ -29,7 +31,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
@@ -163,6 +167,76 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                                 inventoryDatabase.getDatabaseName()
                                         + "."
                                         + inventoryDatabase.getDatabaseName()));
+    }
+
+    @Test
+    public void testLackRequireOption() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        List<String> requireKeys =
+                factory.requiredOptions().stream()
+                        .map(ConfigOption::key)
+                        .collect(Collectors.toList());
+        for (String requireKey : requireKeys) {
+            Map<String, String> remainingOptions = new HashMap<>(options);
+            remainingOptions.remove(requireKey);
+            Factory.Context context = new MockContext(Configuration.fromMap(remainingOptions));
+
+            assertThatThrownBy(() -> factory.createDataSource(context))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining(
+                            String.format(
+                                    "One or more required options are missing.\n\n"
+                                            + "Missing required options are:\n\n"
+                                            + "%s",
+                                    requireKey));
+        }
+    }
+
+    @Test
+    public void testUnsupportedOption() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        options.put("unsupported_key", "unsupported_value");
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining(
+                        "Unsupported options found for 'mysql'.\n\n"
+                                + "Unsupported options:\n\n"
+                                + "unsupported_key");
+    }
+
+    @Test
+    public void testPrefixRequireOption() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        options.put("jdbc.properties.requireSSL", "true");
+        options.put("debezium.snapshot.mode", "initial");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+        assertThat(dataSource.getSourceConfig().getTableList())
+                .isEqualTo(Arrays.asList(inventoryDatabase.getDatabaseName() + ".products"));
     }
 
     static class MockContext implements Factory.Context {
