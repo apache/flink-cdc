@@ -36,12 +36,13 @@ improving website, testing release candidates and writing corresponding blog etc
 Contributing to Flink CDC goes beyond writing code for the project. Here are different opportunities to help the 
 project as follows.
 
-| Area            | Further information                                                                                                                                                                                                                                                                                                                                 |
-|:----------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Report Bug      | To report a problem, open an issue in [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) and select `Flink CDC` in `Component/s`. Please give detailed information about the problem you encountered and, if possible, add a description that helps to reproduce the problem.                                                       |
-| Contribute Code | Read the <a href="#code-contribution-guide">Code Contribution Guide</a>                                                                                                                                                                                                                                                                             |
-| Code Reviews    | Read the <a href="#code-review-guide">Code Review Guide</a>                                                                                                                                                                                                                                                                                         |
-| Support Users   | Reply to questions on the [flink user mailing list](https://flink.apache.org/what-is-flink/community/#mailing-lists), check the latest issues in [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) for tickets which are actually user questions.                                                                                  |
+| Area                 | Further information                                                                                                                                                                                                                                                                           |
+|:---------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Report Bug           | To report a problem, open an issue in [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) and select `Flink CDC` in `Component/s`. Please give detailed information about the problem you encountered and, if possible, add a description that helps to reproduce the problem. |
+| Contribute Code      | Read the <a href="#code-contribution-guide">Code Contribution Guide</a>                                                                                                                                                                                                                       |
+| Code Reviews         | Read the <a href="#code-review-guide">Code Review Guide</a>                                                                                                                                                                                                                                   |
+| Release Verification | Read the <a href="#release-validation-guide">Code Review Guide</a>                                                                                                                                                                                                                            |
+| Support Users        | Reply to questions on the [flink user mailing list](https://flink.apache.org/what-is-flink/community/#mailing-lists), check the latest issues in [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) for tickets which are actually user questions.                            |
 
 Any other question? Reach out to the Dev mail list to get help!
 
@@ -82,3 +83,56 @@ not need a long description.
 3. Are the Documentation Updated?
 
 If the pull request introduces a new feature, the feature should be documented.
+
+<h2 id="release-validation-guide">Release Verification Guide</h2>
+
+We will prepare for new releases of Flink CDC regularly.
+
+According to the Apache Software Foundation releasing SOP,
+we will make a release candidate version before each release,
+and invite community members to test and vote on this pre-release version.
+
+Everyone is welcomed to participate in the version verification work in `dev@flink.apache.org` mailing list.
+The verification content may include the following aspects:
+
+1. Verify if source code could be compiled successfully.
+
+Currently, Flink CDC uses [Maven](https://maven.apache.org/) 3 as the build tool and compiles on the JDK 8 platform.
+You can download the RC version of the source code package and compile it using the `mvn clean package -Dfast` command,
+and check if there's any unexpected errors or warnings.
+
+2. Verify if tarball checksum matches.
+
+To ensure the genuinity and integrity of released binary packages, a SHA512 hash value of the corresponding file is attached to any released binary tarball so that users can verify the integrity.
+You can download the binary tarball of the RC version and calculate its SHA512 hash value with the following command:
+
+* Linux: `sha512sum flink-cdc-*-bin.tar.gz`
+* macOS: `shasum -a 512 flink-cdc-*-bin.tar.gz`
+* Windows (PowerShell): `Get-FileHash flink-cdc-*-bin.tar.gz -Algorithm SHA512 | Format-List`
+
+3. Verify that the binary package was compiled with JDK 8.
+
+Unpack the precompiled binary jar package and check if the `Build-Jdk` entry in the `META-INF\MANIFEST.MF` file is correct.
+
+4. Run migration tests.
+
+Flink CDC tries to ensure backward compatibility of state, that is, the job state (Checkpoint/Savepoint) saved with previous CDC version should be usable in the new version.
+You can run CDC migration verification locally with [Flink CDC Migration Test Utils](https://github.com/yuxiqian/migration-test) script.
+
+* [Pipeline Job Migration Test Guide](https://github.com/yuxiqian/migration-test/blob/main/README.md)
+* [DataStream Job Migration Test Guide](https://github.com/yuxiqian/migration-test/blob/main/datastream/README.md)
+
+5. Run end-to-end tests.
+
+You may configure the RC version of Flink CDC together with a supported Flink version,
+try running some Pipeline/SQL/DataStream jobs,
+and observe if jobs are working properly.
+
+6. Check third-party software licenses.
+
+Flink CDC depends on a few third-party open source software, 
+we need to ensure their licenses are correctly included in the NOTICE file.
+
+In addition, some license agreements are incompatible with the Apache 2.0 license used by Flink CDC,
+and any software licensed under these agreements cannot be packaged into Flink CDC.
+You can get more information at [ASF 3RD PARTY LICENSE POLICY](https://www.apache.org/legal/resolved.html).

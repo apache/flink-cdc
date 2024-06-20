@@ -27,7 +27,15 @@ full database synchronization, sharding table synchronization, schema evolution 
 
 ![Flink CDC framework desigin](docs/static/fig/architecture.png)
 
+### Installation
 
+* Flink CDC tar could be downloaded from [Apache Flink Website](https://flink.apache.org/downloads/#apache-flink-cdc) or [GitHub Release Page](https://github.com/apache/flink-cdc/releases).
+* Pipeline and source connectors could be downloaded from [Maven Central Repository](https://mvnrepository.com/artifact/org.apache.flink) or [GitHub Release Page](https://github.com/apache/flink-cdc/releases).
+* If you're using Linux or macOS, you may install Flink CDC and connectors with Homebrew:
+
+```bash
+brew install apache-flink-cdc
+```
 
 ### Getting Started
 

@@ -34,10 +34,11 @@ Bug报告，提议新的功能，加入社区邮件列表的讨论，贡献代�
 Flink CDC 社区的贡献不仅限于为项目贡献代码，下面列举了一些可以在社区贡献的内容。
 
 | 贡献方式  | 更多信息                                                                                                                                                                            |
-|:------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|:------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 提交BUG | 为了提交问题，您需要首先在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 建立对应的issue，并在`Component/s`选择`Flink CDC`。然后在问题描述中详细描述遇到的问题的信息，如果可能的话，最好提供一下能够复现问题的操作步骤。         |
-| 贡献代码  | 请阅读 <a href="#code-contribution-guide">贡献代码指导</a>                                                                                                                                    |
-| 代码评审  | 请阅读 <a href="#code-review-guide">代码评审指导</a>                                                                                                                                          |
+| 贡献代码  | 请阅读 <a href="#code-contribution-guide">贡献代码指导</a>                                                                                                                               |
+| 代码评审  | 请阅读 <a href="#code-review-guide">代码评审指导</a>                                                                                                                                     |
+| 版本验证  | 请阅读 <a href="#release-validation-guide">版本验证指导</a>                                                                                                                              |                                                                                     |
 | 用户支持  | 通过 [Flink 用户邮件列表](https://flink.apache.org/what-is-flink/community/#mailing-lists) 来帮助回复用户问题，在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 可以查询到最新的已知问题。 |
 
 如果还有其他问题，可以通过 Flink Dev 邮件列表寻求帮助。
@@ -77,3 +78,57 @@ Flink CDC 项目通过众多贡献者的代码贡献来维护，改进和拓展�
 3. 文档是否需要更新？
 
 如果代码提交加入了新的功能，这个新功能需要同时更新到文档中。
+
+<h2 id="release-validation-guide">版本验证指导</h2>
+
+我们会定期发布新版本的 Flink CDC。
+
+根据 Apache Software Foundation 版本发布规则，
+我们会在每次发布前制作发布候选（Release Candidate）版本，
+并邀请社区成员对这一预发布版本进行测试与投票。
+
+欢迎您在 `dev@flink.apache.org` 邮件列表中参与版本验证工作。
+验证内容可能包括以下方面：
+
+1. 验证源代码是否可以正常编译。
+
+目前，Flink CDC 使用 [Maven](https://maven.apache.org/) 3 作为构建工具，并在 JDK 8 平台上进行编译。
+您可以下载 RC 版本的源代码包，并使用 `mvn clean package -Dfast` 命令进行编译，
+并留意任何意料之外的错误或警告。
+
+2. 验证二进制包签名是否一致。
+
+为了确保发布的预编译包没有被篡改，在发布任何二进制 tar 包时总会附上对应文件的哈希值，以便用户进行完整性校验。
+您可以下载 RC 版本的二进制 tar 包，并使用以下命令计算其 SHA512 哈希值：
+
+* Linux: `sha512sum flink-cdc-*-bin.tar.gz`
+* macOS: `shasum -a 512 flink-cdc-*-bin.tar.gz`
+* Windows (PowerShell): `Get-FileHash flink-cdc-*-bin.tar.gz -Algorithm SHA512 | Format-List`
+
+并验证结果是否与发布页面上的哈希值一致。
+
+3. 验证二进制包是否使用 JDK 8 进行编译。
+
+解压预编译的二进制 jar 包，并检查其中的 `META-INF\MANIFEST.MF` 文件的 `Build-Jdk` 条目是否正确。
+
+4. 执行迁移测试。
+
+Flink CDC 尽力确保状态向后兼容性，即使用旧版本 CDC 保存的作业状态（Checkpoint / Savepoint）能够用于新版本的作业恢复。
+您可以通过 [Flink CDC Migration Test Utils](https://github.com/yuxiqian/migration-test) 脚本执行 CDC 迁移验证。
+
+* [Pipeline 作业迁移测试指南](https://github.com/yuxiqian/migration-test/blob/main/README.md)
+* [DataStream 作业迁移测试指南](https://github.com/yuxiqian/migration-test/blob/main/datastream/README.md)
+
+5. 执行端到端测试。
+
+您可以使用 RC 版本的 Flink CDC 与受支持的 Flink 版本一起，
+尝试编写一些 Pipeline / SQL / DataStream 作业，
+观察作业工作状况是否正常。
+
+6. 检查许可协议。
+
+Flink CDC 依赖许多第三方开源软件，我们需要确保这些依赖的许可证信息被正确地包含在 NOTICE 文件中。
+
+此外，一些许可协议与 Flink CDC 采用的 Apache 2.0 许可证不兼容，
+使用这些协议的软件不能被打包到 Flink CDC 中。
+您可以在 [ASF 3RD PARTY LICENSE POLICY](https://www.apache.org/legal/resolved.html) 获取更多信息。
