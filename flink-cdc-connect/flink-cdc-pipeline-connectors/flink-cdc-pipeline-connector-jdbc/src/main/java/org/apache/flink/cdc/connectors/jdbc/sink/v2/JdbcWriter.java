@@ -201,15 +201,17 @@ public class JdbcWriter<IN> implements StatefulSink.StatefulSinkWriter<IN, JdbcW
 
     @Override
     public void close() throws Exception {
-        jdbcUpsertOutputs.forEach((key, value) -> {
-          value.close();
-          jdbcUpsertOutputs.remove(key);
-        });
+        jdbcUpsertOutputs.forEach(
+                (key, value) -> {
+                    value.close();
+                    jdbcUpsertOutputs.remove(key);
+                });
 
-        jdbcDeleteOutputs.forEach((key, value) -> {
-            value.close();
-            jdbcUpsertOutputs.remove(key);
-        });
+        jdbcDeleteOutputs.forEach(
+                (key, value) -> {
+                    value.close();
+                    jdbcUpsertOutputs.remove(key);
+                });
     }
 
     private JdbcStatementBuilder<JdbcRowData> getUpsertStatementBuilder(List<Column> columns) {

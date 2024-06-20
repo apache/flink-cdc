@@ -67,6 +67,7 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
     public JdbcColumn.Builder visit(BooleanType booleanType) {
         builder.dataType(MysqlType.TINYINT.name());
         builder.columnType("TINYINT(1)");
+        builder.isNullable(booleanType.isNullable());
         return builder;
     }
 
@@ -87,6 +88,7 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
     public JdbcColumn.Builder visit(TinyIntType tinyIntType) {
         builder.dataType(MysqlType.TINYINT.name());
         builder.columnType(tinyIntType.asSerializableString());
+        builder.isNullable(tinyIntType.isNullable());
 
         return builder;
     }
@@ -95,6 +97,7 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
     public JdbcColumn.Builder visit(SmallIntType smallIntType) {
         builder.dataType(MysqlType.SMALLINT.name());
         builder.columnType(smallIntType.asSerializableString());
+        builder.isNullable(smallIntType.isNullable());
 
         return builder;
     }
@@ -103,6 +106,7 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
     public JdbcColumn.Builder visit(IntType intType) {
         builder.dataType(MysqlType.INT.name());
         builder.columnType(intType.asSerializableString());
+        builder.isNullable(intType.isNullable());
 
         return builder;
     }
@@ -111,6 +115,7 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
     public JdbcColumn.Builder visit(BigIntType bigIntType) {
         builder.dataType(MysqlType.BIGINT.name());
         builder.columnType(bigIntType.asSerializableString());
+        builder.isNullable(bigIntType.isNullable());
 
         return builder;
     }
@@ -127,6 +132,7 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
     public JdbcColumn.Builder visit(DoubleType doubleType) {
         builder.dataType(MysqlType.DOUBLE.name());
         builder.columnType(doubleType.asSerializableString());
+        builder.isNullable(doubleType.isNullable());
 
         return builder;
     }
@@ -136,6 +142,7 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
         builder.dataType(MysqlType.BINARY.name());
         builder.length(binaryType.getLength());
         builder.columnType(binaryType.asSerializableString());
+        builder.isNullable(binaryType.isNullable());
 
         return builder;
     }
@@ -145,6 +152,7 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
         builder.dataType(MysqlType.BINARY.name());
         builder.length(bytesType.getLength());
         builder.columnType(bytesType.asSerializableString());
+        builder.isNullable(bytesType.isNullable());
 
         return builder;
     }
@@ -153,15 +161,21 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
     public JdbcColumn.Builder visit(DateType dateType) {
         builder.dataType(MysqlType.DATE.name());
         builder.columnType(dateType.asSerializableString());
+        builder.isNullable(dateType.isNullable());
 
         return builder;
     }
 
     @Override
     public JdbcColumn.Builder visit(TimeType timeType) {
-        builder.length(timeType.getPrecision());
+        int precision = timeType.getPrecision();
+        builder.length(precision);
         builder.dataType(MysqlType.TIME.name());
-        builder.columnType(timeType.asSerializableString());
+        if (precision > 0) {
+            builder.columnType(timeType.asSerializableString());
+        } else {
+            builder.columnType("TIME");
+        }
 
         return builder;
     }
@@ -170,9 +184,13 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
     public JdbcColumn.Builder visit(TimestampType timestampType) {
         int precision = timestampType.getPrecision();
         builder.dataType(MysqlType.DATETIME.name());
-        builder.columnType(MysqlType.TIMESTAMP.name());
-        builder.columnType(timestampType.asSerializableString());
         builder.length(precision);
+        builder.isNullable(timestampType.isNullable());
+        if (precision > 0) {
+            builder.columnType(timestampType.asSerializableString());
+        } else {
+            builder.columnType("TIMESTAMP");
+        }
 
         return builder;
     }
@@ -182,13 +200,18 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
         int precision = localZonedTimestampType.getPrecision();
         builder.dataType(MysqlType.TIMESTAMP.name());
         builder.length(precision);
-        builder.columnType(localZonedTimestampType.asSerializableString());
+        builder.isNullable(localZonedTimestampType.isNullable());
+        if (precision > 0) {
+            builder.columnType(String.format("TIMESTAMP(%d)",precision));
+        } else {
+            builder.columnType("TIMESTAMP");
+        }
 
         return builder;
     }
 
     @Override
     protected JdbcColumn.Builder defaultMethod(DataType dataType) {
-        return null;
+        throw new UnsupportedOperationException("Unsupported CDC data type " + dataType);
     }
 }
