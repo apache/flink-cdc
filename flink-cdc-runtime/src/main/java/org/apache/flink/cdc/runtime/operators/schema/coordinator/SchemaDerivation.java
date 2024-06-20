@@ -25,7 +25,6 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.pipeline.RouteBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -55,7 +54,6 @@ public class SchemaDerivation {
     private final SchemaManager schemaManager;
     private final List<Tuple2<Selectors, TableId>> routes;
     private final Map<TableId, Set<TableId>> derivationMapping;
-    private final RouteBehavior routeBehavior;
 
     public SchemaDerivation(
             SchemaManager schemaManager,
@@ -64,18 +62,6 @@ public class SchemaDerivation {
         this.schemaManager = schemaManager;
         this.routes = routes;
         this.derivationMapping = derivationMapping;
-        this.routeBehavior = RouteBehavior.FIRST_MATCH;
-    }
-
-    public SchemaDerivation(
-            SchemaManager schemaManager,
-            List<Tuple2<Selectors, TableId>> routes,
-            Map<TableId, Set<TableId>> derivationMapping,
-            RouteBehavior routeBehavior) {
-        this.schemaManager = schemaManager;
-        this.routes = routes;
-        this.derivationMapping = derivationMapping;
-        this.routeBehavior = routeBehavior;
     }
 
     public List<SchemaChangeEvent> applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
@@ -137,9 +123,6 @@ public class SchemaDerivation {
                             String.format(
                                     "Unrecognized SchemaChangeEvent type: %s", schemaChangeEvent));
                 }
-            }
-            if (routeBehavior.equals(RouteBehavior.FIRST_MATCH)) {
-                break;
             }
         }
 

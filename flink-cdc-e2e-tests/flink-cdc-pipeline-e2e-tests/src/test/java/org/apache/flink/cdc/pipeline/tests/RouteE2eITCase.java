@@ -44,7 +44,6 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Stream;
 
 /** E2e tests for the {@link TransformSchemaOperator}. */
 @RunWith(Parameterized.class)
@@ -543,7 +542,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testMultipleRouteInFirstMatchMode() throws Exception {
+    public void testMultipleRoute() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -626,6 +625,18 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2014, 14], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
+                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2011, 11], op=INSERT, meta=()}",
+                                routeTestDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2012, 12], op=INSERT, meta=()}",
+                                routeTestDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2013, 13], op=INSERT, meta=()}",
+                                routeTestDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2014, 14], op=INSERT, meta=()}",
+                                routeTestDatabase.getDatabaseName()),
+                        String.format(
                                 "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3015, Amber], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
@@ -656,22 +667,6 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()));
         validateResult(expectedEvents);
-
-        Stream.of(
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2012, 12], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2013, 13], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2014, 14], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()))
-                .forEach(this::assertNotExists);
-
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
         String mysqlJdbcUrl =
@@ -707,6 +702,12 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
+                        "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
+                        routeTestDatabase.getDatabaseName()),
+                20000L);
+
+        waitUntilSpecificEvent(
+                String.format(
                         "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3019, Emerald], op=INSERT, meta=()}",
                         routeTestDatabase.getDatabaseName()),
                 20000L);
@@ -716,15 +717,10 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                         "DataChangeEvent{tableId=%s.TABLEDELTA, before=[4024, Catalina], after=[], op=DELETE, meta=()}",
                         routeTestDatabase.getDatabaseName()),
                 20000L);
-
-        assertNotExists(
-                String.format(
-                        "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
-                        routeTestDatabase.getDatabaseName()));
     }
 
     @Test
-    public void testMultipleRouteInCompleteMode() throws Exception {
+    public void testOneToManyRoute() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -740,17 +736,20 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "sink:\n"
                                 + "  type: values\n"
                                 + "route:\n"
-                                + "  - source-table: %s.(TABLEALPHA|TABLEBETA)\n"
-                                + "    sink-table: NEW_%s.ALPHABET\n"
-                                + "  - source-table: %s.(TABLEBETA|TABLEGAMMA)\n"
-                                + "    sink-table: NEW_%s.BETAGAMM\n"
+                                + "  - source-table: %s.TABLEALPHA\n"
+                                + "    sink-table: NEW_%s.TABLEA\n"
+                                + "  - source-table: %s.TABLEALPHA\n"
+                                + "    sink-table: NEW_%s.TABLEB\n"
+                                + "  - source-table: %s.TABLEALPHA\n"
+                                + "    sink-table: NEW_%s.TABLEC\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  route.behavior: complete\n"
                                 + "  parallelism: 1",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        routeTestDatabase.getDatabaseName(),
+                        routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
@@ -765,90 +764,61 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.TABLEA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()),
                 60000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=NEW_%s.BETAGAMM, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.TABLEB, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()),
                 60000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.TABLEC, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()),
                 60000L);
 
         List<String> expectedEvents =
                 Arrays.asList(
                         String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1008, 8], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1008, 8], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1010, 10], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1010, 10], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1011, 11], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1011, 11], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2011, 11], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[1008, 8], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2012, 12], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2013, 13], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[1010, 10], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2014, 14], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[1011, 11], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2011, 11], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1008, 8], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2012, 12], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2013, 13], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1010, 10], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()),
                         String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2014, 14], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3015, Amber], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3016, Black], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3017, Cyan], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3018, Denim], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4019, Yosemite], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4020, El Capitan], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4021, Sierra], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4022, High Sierra], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1011, 11], op=INSERT, meta=()}",
                                 routeTestDatabase.getDatabaseName()));
+
         validateResult(expectedEvents);
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
@@ -863,9 +833,6 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stat = conn.createStatement()) {
             stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7');");
-            stat.execute("UPDATE TABLEBETA SET VERSION='2014' WHERE id=2014;");
-            stat.execute("INSERT INTO TABLEGAMMA VALUES (3019, 'Emerald');");
-            stat.execute("DELETE FROM TABLEDELTA WHERE id=4024;");
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
             throw e;
@@ -873,31 +840,19 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[3007, 7], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[3007, 7], op=INSERT, meta=()}",
                         routeTestDatabase.getDatabaseName()),
                 20000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
+                        "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[3007, 7], op=INSERT, meta=()}",
                         routeTestDatabase.getDatabaseName()),
                 20000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3019, Emerald], op=INSERT, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.TABLEDELTA, before=[4024, Catalina], after=[], op=DELETE, meta=()}",
+                        "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[3007, 7], op=INSERT, meta=()}",
                         routeTestDatabase.getDatabaseName()),
                 20000L);
     }

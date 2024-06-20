@@ -21,7 +21,6 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.pipeline.RouteBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
@@ -83,8 +82,7 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
                         new MockOperatorCoordinatorContext(
                                 SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
                         new CollectingMetadataApplier(null),
-                        new ArrayList<>(),
-                        RouteBehavior.FIRST_MATCH);
+                        new ArrayList<>());
         schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
     }
 
@@ -97,8 +95,7 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
                         new MockOperatorCoordinatorContext(
                                 SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
                         new CollectingMetadataApplier(duration),
-                        new ArrayList<>(),
-                        RouteBehavior.FIRST_MATCH);
+                        new ArrayList<>());
         schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
     }
 

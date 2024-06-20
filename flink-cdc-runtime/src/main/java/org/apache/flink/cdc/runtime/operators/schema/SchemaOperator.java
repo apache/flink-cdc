@@ -26,7 +26,6 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.pipeline.RouteBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
@@ -68,7 +67,6 @@ import javax.annotation.Nullable;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -98,30 +96,17 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private transient LoadingCache<TableId, Schema> cachedSchemas;
 
     private final long rpcTimeOutInMillis;
-    private final RouteBehavior routeBehavior;
 
     public SchemaOperator(List<Tuple2<String, TableId>> routingRules) {
         this.routingRules = routingRules;
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT.toMillis();
-        this.routeBehavior = RouteBehavior.FIRST_MATCH;
     }
 
     public SchemaOperator(List<Tuple2<String, TableId>> routingRules, Duration rpcTimeOut) {
         this.routingRules = routingRules;
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = rpcTimeOut.toMillis();
-        this.routeBehavior = RouteBehavior.FIRST_MATCH;
-    }
-
-    public SchemaOperator(
-            List<Tuple2<String, TableId>> routingRules,
-            Duration rpcTimeOut,
-            RouteBehavior routeBehavior) {
-        this.routingRules = routingRules;
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
-        this.rpcTimeOutInMillis = rpcTimeOut.toMillis();
-        this.routeBehavior = routeBehavior;
     }
 
     @Override
@@ -283,22 +268,10 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     }
 
     private List<TableId> getRoutedTables(TableId originalTableId) {
-        switch (routeBehavior) {
-            case FIRST_MATCH:
-                for (Tuple2<Selectors, TableId> route : routes) {
-                    if (route.f0.isMatch(originalTableId)) {
-                        return Collections.singletonList(route.f1);
-                    }
-                }
-                return Collections.emptyList();
-            case COMPLETE:
-                return routes.stream()
-                        .filter(route -> route.f0.isMatch(originalTableId))
-                        .map(route -> route.f1)
-                        .collect(Collectors.toList());
-            default:
-                throw new RuntimeException("Unknown route behavior: " + routeBehavior);
-        }
+        return routes.stream()
+                .filter(route -> route.f0.isMatch(originalTableId))
+                .map(route -> route.f1)
+                .collect(Collectors.toList());
     }
 
     private void handleSchemaChangeEvent(TableId tableId, SchemaChangeEvent schemaChangeEvent)

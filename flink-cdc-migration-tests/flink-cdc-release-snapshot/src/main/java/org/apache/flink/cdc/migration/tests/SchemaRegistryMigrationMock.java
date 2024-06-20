@@ -19,7 +19,6 @@ package org.apache.flink.cdc.migration.tests;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.pipeline.RouteBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -56,8 +55,7 @@ public class SchemaRegistryMigrationMock implements MigrationMockBase {
     }
 
     public SchemaRegistry generateSchemaRegistry() {
-        return new SchemaRegistry(
-                "Dummy Name", null, e -> {}, new ArrayList<>(), RouteBehavior.FIRST_MATCH);
+        return new SchemaRegistry("Dummy Name", null, e -> {}, new ArrayList<>());
     }
 
     private SchemaManager getSchemaManager(SchemaRegistry schemaRegistry) throws Exception {
