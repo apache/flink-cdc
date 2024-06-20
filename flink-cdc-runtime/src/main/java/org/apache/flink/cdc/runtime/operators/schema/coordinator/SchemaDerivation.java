@@ -84,13 +84,13 @@ public class SchemaDerivation {
             originalTables.add(originalTable);
 
             if (originalTables.size() == 1) {
-                // 1-to-1 mapping. Replace the table ID directly
+                // single source mapping, replace the table ID directly
                 SchemaChangeEvent derivedSchemaChangeEvent =
                         ChangeEventUtils.recreateSchemaChangeEvent(schemaChangeEvent, derivedTable);
                 schemaManager.applySchemaChange(derivedSchemaChangeEvent);
                 events.add(derivedSchemaChangeEvent);
             } else {
-                // Many-to-1 mapping (merging tables)
+                // multiple source mapping (merging tables)
                 Schema derivedTableSchema = schemaManager.getLatestSchema(derivedTable).get();
                 if (schemaChangeEvent instanceof CreateTableEvent) {
                     events.addAll(
