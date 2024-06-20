@@ -59,7 +59,6 @@ public class JdbcWriter<IN> implements StatefulSink.StatefulSinkWriter<IN, JdbcW
 
     // Catalog is unSerializable.
     private final Catalog catalog;
-
     private final Map<
                     TableId,
                     JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>>>
@@ -109,8 +108,27 @@ public class JdbcWriter<IN> implements StatefulSink.StatefulSinkWriter<IN, JdbcW
             return;
         }
 
-        JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>>
-                outputFormat = null;
+        if (RowKind.SCHEMA_CHANGE.is(rowData.getRowKind())) {
+            TableId tableId = rowData.getTableId();
+
+            // Close and remove from jdbcUpsertOutputs
+            JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>>
+                    upsertOutput = jdbcUpsertOutputs.get(tableId);
+            if (upsertOutput != null) {
+                upsertOutput.close();
+                jdbcUpsertOutputs.remove(tableId);
+            }
+
+            // Close and remove from jdbcDeleteOutputs
+            JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>>
+                    deleteOutput = jdbcDeleteOutputs.get(tableId);
+            if (deleteOutput != null) {
+                deleteOutput.close();
+                jdbcDeleteOutputs.remove(tableId);
+            }
+
+            return;
+        }
 
         // insert event
         if (RowKind.INSERT.is(rowData.getRowKind())) {
@@ -119,13 +137,19 @@ public class JdbcWriter<IN> implements StatefulSink.StatefulSinkWriter<IN, JdbcW
             JdbcStatementBuilder<JdbcRowData> upsertSmtBuilder =
                     getUpsertStatementBuilder(rowData.getSchema().getColumns());
 
-            outputFormat =
-                    jdbcUpsertOutputs.computeIfAbsent(
-                            rowData.getTableId(),
-                            id -> getJdbcOutputFormat(upsertSmt, upsertSmtBuilder));
+            JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>>
+                    outputFormat =
+                            jdbcUpsertOutputs.computeIfAbsent(
+                                    rowData.getTableId(),
+                                    id -> getJdbcOutputFormat(upsertSmt, upsertSmtBuilder));
 
             outputFormat.writeRecord(rowData);
             outputFormat.flush();
+            LOG.info(
+                    "Success to upsert column table {}.{}, sql: {}",
+                    rowData.getTableId().getSchemaName(),
+                    rowData.getTableId().getTableName(),
+                    upsertSmt);
         }
 
         // delete event
@@ -136,14 +160,20 @@ public class JdbcWriter<IN> implements StatefulSink.StatefulSinkWriter<IN, JdbcW
             JdbcStatementBuilder<JdbcRowData> delSmtBuilder =
                     getDeleteStatementBuilder(rowData.getSchema().primaryKeys());
 
-            outputFormat =
-                    jdbcDeleteOutputs.computeIfAbsent(
-                            rowData.getTableId(),
-                            id -> getJdbcOutputFormat(deleteSmt, delSmtBuilder));
-        }
+            JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>>
+                    outputFormat =
+                            jdbcDeleteOutputs.computeIfAbsent(
+                                    rowData.getTableId(),
+                                    id -> getJdbcOutputFormat(deleteSmt, delSmtBuilder));
 
-        outputFormat.writeRecord(rowData);
-        outputFormat.flush();
+            outputFormat.writeRecord(rowData);
+            outputFormat.flush();
+            LOG.info(
+                    "Success to delete column table {}.{}, sql: {}",
+                    rowData.getTableId().getSchemaName(),
+                    rowData.getTableId().getTableName(),
+                    deleteSmt);
+        }
     }
 
     private JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>>
@@ -162,21 +192,24 @@ public class JdbcWriter<IN> implements StatefulSink.StatefulSinkWriter<IN, JdbcW
         return jdbcOutputFormat;
     }
 
-    private void deleteWrite() {}
-
     @Override
-    public void flush(boolean b) throws IOException, InterruptedException {
-        LOG.info("flush...");
-        // TODO
-        //        jdbcOutput.flush();
-        //        jdbcOutput.checkFlushException();
+    public void flush(boolean b) throws IOException, RuntimeException {
+        // To ensure the sequential execution of insert and delete,
+        // PrepareStatements cannot perform insert and delete batch operations at the same time,
+        // so flush operations are not used separately.
     }
 
     @Override
     public void close() throws Exception {
-        LOG.info("close...");
-        // this.jdbcOutput.close();
-        // this.jdbcOutput.close();
+        jdbcUpsertOutputs.forEach((key, value) -> {
+          value.close();
+          jdbcUpsertOutputs.remove(key);
+        });
+
+        jdbcDeleteOutputs.forEach((key, value) -> {
+            value.close();
+            jdbcUpsertOutputs.remove(key);
+        });
     }
 
     private JdbcStatementBuilder<JdbcRowData> getUpsertStatementBuilder(List<Column> columns) {

@@ -52,8 +52,7 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
     @Override
     public JdbcRowData serialize(Event record) throws IOException {
         if (record instanceof SchemaChangeEvent) {
-            applySchemaChangeEvent((SchemaChangeEvent) record);
-            return null;
+            return applySchemaChangeEvent((SchemaChangeEvent) record);
         } else if (record instanceof DataChangeEvent) {
             return applyDataChangeEvent((DataChangeEvent) record);
         } else {
@@ -61,7 +60,7 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
         }
     }
 
-    private void applySchemaChangeEvent(SchemaChangeEvent event) {
+    private JdbcRowData applySchemaChangeEvent(SchemaChangeEvent event) {
         TableId tableId = event.tableId();
         Schema newSchema;
         if (event instanceof CreateTableEvent) {
@@ -82,6 +81,12 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
         }
 
         tableInfoMap.put(tableId, tableInfo);
+
+        DefaultJdbcRowData reusableRowData = new DefaultJdbcRowData();
+        reusableRowData.setRowKind(RowKind.SCHEMA_CHANGE);
+        reusableRowData.setTableId(event.tableId());
+
+        return reusableRowData;
     }
 
     private JdbcRowData applyDataChangeEvent(DataChangeEvent event) throws JsonProcessingException {

@@ -22,7 +22,8 @@ public enum RowKind {
     INSERT,
     UPDATE_BEFORE,
     UPDATE_AFTER,
-    DELETE;
+    DELETE,
+    SCHEMA_CHANGE;
 
     public boolean is(RowKind otherKind) {
         return this == otherKind;
