@@ -61,6 +61,32 @@ public class MySqlSmtCreatorTest {
     }
 
     @Test
+    public void testBuildCreateTableSqlWithoutPrimaryKey() {
+        TableId tableId = TableId.tableId("test_schema", "test_table");
+        boolean ignoreIfExists = true;
+
+        Column column1 = Column.physicalColumn("id", DataTypes.INT(), "Primary Key");
+        Column column2 = Column.physicalColumn("name", DataTypes.VARCHAR(32), "Name of the entity");
+        Column column3 = Column.physicalColumn("age", DataTypes.INT(), null);
+
+        List<Column> columns = Arrays.asList(column1, column2, column3);
+
+        Schema schema = Schema.newBuilder().setColumns(columns).build();
+
+        String createTableSql =
+                MySqlSmtCreatorFactory.INSTANCE.buildCreateTableSql(tableId, schema, true);
+
+        String expectedSql =
+                "CREATE TABLE IF NOT EXISTS test_schema.test_table (\n"
+                        + "`id` INT COMMENT \"Primary Key\",\n"
+                        + "`name` VARCHAR(32) COMMENT \"Name of the entity\",\n"
+                        + "`age` INT\n"
+                        + ") ;";
+
+        assertEquals(expectedSql, createTableSql);
+    }
+
+    @Test
     public void testBuildDeleteSql() {
         TableId tableId = TableId.tableId("my_schema", "my_table");
         List<String> primaryKeys = Arrays.asList("id", "name");

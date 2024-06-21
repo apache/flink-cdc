@@ -167,13 +167,15 @@ public class MySqlSmtCreatorFactory {
                         .map(this::buildColumnStmt)
                         .collect(Collectors.joining(",\n"));
         builder.append(columnsStmt);
-        builder.append(",\n");
 
-        String tableKeys =
-                schema.primaryKeys().stream()
-                        .map(key -> "`" + key + "`")
-                        .collect(Collectors.joining(", "));
-        builder.append(String.format("PRIMARY KEY (%s)", tableKeys));
+        if(!schema.primaryKeys().isEmpty()){
+            builder.append(",\n");
+            String tableKeys =
+                    schema.primaryKeys().stream()
+                            .map(key -> "`" + key + "`")
+                            .collect(Collectors.joining(", "));
+            builder.append(String.format("PRIMARY KEY (%s)", tableKeys));
+        }
         builder.append("\n) ");
         builder.append(";");
         return builder.toString();

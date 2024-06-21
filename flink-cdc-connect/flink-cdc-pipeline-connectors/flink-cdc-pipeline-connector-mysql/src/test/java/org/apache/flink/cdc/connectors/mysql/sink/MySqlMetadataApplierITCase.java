@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
@@ -54,7 +55,9 @@ import java.util.List;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 
-/** IT tests for {@link org.apache.flink.cdc.connectors.jdbc.sink.JdbcMetadataApplier}. */
+/**
+ * IT tests for {@link org.apache.flink.cdc.connectors.jdbc.sink.JdbcMetadataApplier}.
+ */
 // @RunWith(Parameterized.class)
 public class MySqlMetadataApplierITCase extends MySqlSinkTestBase {
     private static final StreamExecutionEnvironment env =
@@ -172,6 +175,36 @@ public class MySqlMetadataApplierITCase extends MySqlSinkTestBase {
                         tableId, Collections.singletonMap("number", DataTypes.FLOAT())));
     }
 
+    private List<Event> generateAddColumnWithPosition(TableId tableId) {
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("col1", DataTypes.VARCHAR(10), null))
+                        .column(new PhysicalColumn("col2", DataTypes.VARCHAR(10), null))
+                        .column(new PhysicalColumn("col3", DataTypes.VARCHAR(10), null))
+                        .build();
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                AddColumnEvent.first(
+                        Column.physicalColumn(
+                                "col4_first", DataTypes.VARCHAR(10))));
+        addedColumns.add(
+                AddColumnEvent.last(
+                        Column.physicalColumn(
+                                "col5_last", DataTypes.VARCHAR(10))));
+
+        addedColumns.add(
+                AddColumnEvent.after(
+                        Column.physicalColumn(
+                                "col7_after", DataTypes.VARCHAR(10)),
+                        "col2"));
+
+        return Arrays.asList(
+                new CreateTableEvent(tableId, schema),
+                new AddColumnEvent(tableId,addedColumns)
+        );
+    }
+
     @Test
     public void testMySqlAddColumn() throws Exception {
         TableId tableId = TableId.tableId(MySqlContainer.DATABASE_NAME, MySqlContainer.TABLE_NAME);
@@ -253,6 +286,24 @@ public class MySqlMetadataApplierITCase extends MySqlSinkTestBase {
                         "id | int | NO | PRI | null",
                         "number | float | YES |  | null",
                         "name | varchar(17) | YES |  | null");
+
+        assertEqualsInOrder(expected, actual);
+    }
+
+    @Test
+    public void testAddColumnWithPosition()throws Exception{
+        TableId tableId = TableId.tableId(MySqlContainer.DATABASE_NAME, MySqlContainer.TABLE_NAME);
+        runJobWithEvents(generateAddColumnWithPosition(tableId));
+
+        List<String> actual = inspectTableSchema(tableId);
+        List<String> expected =
+                Arrays.asList(
+                        "col4_first | varchar(10) | YES |  | null",
+                        "col1 | varchar(10) | YES |  | null",
+                        "col2 | varchar(10) | YES |  | null",
+                        "col7_after | varchar(10) | YES |  | null",
+                        "col3 | varchar(10) | YES |  | null",
+                        "col5_last | varchar(10) | YES |  | null");
 
         assertEqualsInOrder(expected, actual);
     }
