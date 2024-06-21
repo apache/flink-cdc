@@ -41,8 +41,6 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 /** E2e tests for the {@link TransformSchemaOperator}. */
@@ -57,6 +55,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
+    protected static final long EVENT_DEFAULT_TIMEOUT = 60000L;
 
     @ClassRule
     public static final MySqlContainer MYSQL =
@@ -85,6 +84,57 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     public void after() {
         super.after();
         routeTestDatabase.dropDatabase();
+    }
+
+    private void generateIncrementalChanges() throws SQLException {
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        routeTestDatabase.getDatabaseName());
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7');");
+            stat.execute("UPDATE TABLEBETA SET VERSION='2014' WHERE id=2014;");
+            stat.execute("INSERT INTO TABLEGAMMA VALUES (3019, 'Emerald');");
+            stat.execute("DELETE FROM TABLEDELTA WHERE id=4024;");
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+    }
+
+    /** Generate schema change events. This must not be called until incremental stage starts. */
+    private void generateSchemaChanges() throws SQLException {
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        routeTestDatabase.getDatabaseName());
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("ALTER TABLE TABLEALPHA ADD COLUMN `NAME` VARCHAR(17);");
+            stat.execute("INSERT INTO TABLEALPHA VALUES (10001, '12', 'Derrida');");
+
+            stat.execute("ALTER TABLE TABLEBETA RENAME COLUMN `VERSION` TO `VERSION_EX`;");
+            stat.execute("INSERT INTO TABLEBETA VALUES (10002, '15');");
+
+            stat.execute(
+                    "ALTER TABLE TABLEGAMMA CHANGE COLUMN `VERSION` `VERSION_EX` VARCHAR(19);");
+            stat.execute("INSERT INTO TABLEGAMMA VALUES (10003, 'Fluorite');");
+
+            stat.execute("ALTER TABLE TABLEDELTA DROP COLUMN `VERSION`;");
+            stat.execute("INSERT INTO TABLEDELTA VALUES (10004);");
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
     }
 
     @Test
@@ -120,125 +170,62 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=%s.TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
 
-        List<String> expectedEvents =
-                Arrays.asList(
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3015, Amber], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3016, Black], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3017, Cyan], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3018, Denim], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4019, Yosemite], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4020, El Capitan], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4021, Sierra], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4022, High Sierra], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()));
-        validateResult(expectedEvents);
+        validateResult(
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3015, Amber], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3016, Black], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3017, Cyan], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3018, Denim], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4019, Yosemite], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4020, El Capitan], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4021, Sierra], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4022, High Sierra], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}");
+
         LOG.info("Begin incremental reading stage.");
+
         // generate binlogs
-        String mysqlJdbcUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        routeTestDatabase.getDatabaseName());
-        try (Connection conn =
-                        DriverManager.getConnection(
-                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-                Statement stat = conn.createStatement()) {
-            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7');");
-            stat.execute("UPDATE TABLEBETA SET VERSION='2014' WHERE id=2014;");
-            stat.execute("INSERT INTO TABLEGAMMA VALUES (3019, 'Emerald');");
-            stat.execute("DELETE FROM TABLEDELTA WHERE id=4024;");
-        } catch (SQLException e) {
-            LOG.error("Update table for CDC failed.", e);
-            throw e;
-        }
+        generateIncrementalChanges();
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7], op=INSERT, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        validateResult(
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3019, Emerald], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[4024, Catalina], after=[], op=DELETE, meta=()}");
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.TABLEBETA, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        generateSchemaChanges();
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3019, Emerald], op=INSERT, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.TABLEDELTA, before=[4024, Catalina], after=[], op=DELETE, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        validateResult(
+                "AddColumnEvent{tableId=%s.TABLEALPHA, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
+                "RenameColumnEvent{tableId=%s.TABLEBETA, nameMapping={VERSION=VERSION_EX}}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[10002, 15], op=INSERT, meta=()}",
+                "AlterColumnTypeEvent{tableId=%s.TABLEGAMMA, nameMapping={VERSION=VARCHAR(19)}}",
+                "RenameColumnEvent{tableId=%s.TABLEGAMMA, nameMapping={VERSION=VERSION_EX}}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[10003, Fluorite], op=INSERT, meta=()}",
+                "DropColumnEvent{tableId=%s.TABLEDELTA, droppedColumnNames=[VERSION]}");
     }
 
     @Test
@@ -279,110 +266,49 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=%s.ALL, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
 
-        List<String> expectedEvents =
-                Arrays.asList(
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[1008, 8], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[1010, 10], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[1011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[2011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[2012, 12], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[2013, 13], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[2014, 14], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3015, Amber], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3016, Black], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3017, Cyan], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3018, Denim], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4019, Yosemite], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4020, El Capitan], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4021, Sierra], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4022, High Sierra], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4024, Catalina], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()));
-        validateResult(expectedEvents);
+        validateResult(
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[1008, 8], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[1010, 10], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[1011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[2011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[2012, 12], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[2013, 13], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[2014, 14], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3015, Amber], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3016, Black], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3017, Cyan], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3018, Denim], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4019, Yosemite], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4020, El Capitan], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4021, Sierra], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4022, High Sierra], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4024, Catalina], op=INSERT, meta=()}");
+
         LOG.info("Begin incremental reading stage.");
+
         // generate binlogs
-        String mysqlJdbcUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        routeTestDatabase.getDatabaseName());
-        try (Connection conn =
-                        DriverManager.getConnection(
-                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-                Statement stat = conn.createStatement()) {
-            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7');");
-            stat.execute("UPDATE TABLEBETA SET VERSION='2014' WHERE id=2014;");
-            stat.execute("INSERT INTO TABLEGAMMA VALUES (3019, 'Emerald');");
-            stat.execute("DELETE FROM TABLEDELTA WHERE id=4024;");
-        } catch (SQLException e) {
-            LOG.error("Update table for CDC failed.", e);
-            throw e;
-        }
+        generateIncrementalChanges();
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.ALL, before=[], after=[3007, 7], op=INSERT, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        validateResult(
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3007, 7], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3019, Emerald], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[4024, Catalina], after=[], op=DELETE, meta=()}");
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.ALL, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        generateSchemaChanges();
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.ALL, before=[], after=[3019, Emerald], op=INSERT, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.ALL, before=[4024, Catalina], after=[], op=DELETE, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        validateResult(
+                "AddColumnEvent{tableId=%s.ALL, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
+                "AddColumnEvent{tableId=%s.ALL, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[10002, null, null, 15], op=INSERT, meta=()}",
+                "AlterColumnTypeEvent{tableId=%s.ALL, nameMapping={VERSION=STRING}}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[10003, null, null, Fluorite], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[10004, null, null, null], op=INSERT, meta=()}");
     }
 
     @Test
@@ -423,122 +349,61 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=%s.TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
 
-        List<String> expectedEvents =
-                Arrays.asList(
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1008, 8], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1010, 10], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2012, 12], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2013, 13], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2014, 14], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3015, Amber], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3016, Black], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3017, Cyan], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3018, Denim], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4019, Yosemite], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4020, El Capitan], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4021, Sierra], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4022, High Sierra], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()));
-        validateResult(expectedEvents);
+        validateResult(
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1008, 8], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1010, 10], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2012, 12], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2013, 13], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2014, 14], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3015, Amber], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3016, Black], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3017, Cyan], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3018, Denim], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4019, Yosemite], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4020, El Capitan], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4021, Sierra], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4022, High Sierra], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}");
+
         LOG.info("Begin incremental reading stage.");
+
         // generate binlogs
-        String mysqlJdbcUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        routeTestDatabase.getDatabaseName());
-        try (Connection conn =
-                        DriverManager.getConnection(
-                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-                Statement stat = conn.createStatement()) {
-            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7');");
-            stat.execute("UPDATE TABLEBETA SET VERSION='2014' WHERE id=2014;");
-            stat.execute("INSERT INTO TABLEGAMMA VALUES (3019, 'Emerald');");
-            stat.execute("DELETE FROM TABLEDELTA WHERE id=4024;");
-        } catch (SQLException e) {
-            LOG.error("Update table for CDC failed.", e);
-            throw e;
-        }
+        generateIncrementalChanges();
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[3007, 7], op=INSERT, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        validateResult(
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[3007, 7], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3019, Emerald], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[4024, Catalina], after=[], op=DELETE, meta=()}");
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        generateSchemaChanges();
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[3019, Emerald], op=INSERT, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.TABLEDELTA, before=[4024, Catalina], after=[], op=DELETE, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        validateResult(
+                "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
+                "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[10002, null, null, 15], op=INSERT, meta=()}",
+                "AlterColumnTypeEvent{tableId=%s.TABLEGAMMA, nameMapping={VERSION=VARCHAR(19)}}",
+                "RenameColumnEvent{tableId=%s.TABLEGAMMA, nameMapping={VERSION=VERSION_EX}}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[10003, Fluorite], op=INSERT, meta=()}",
+                "DropColumnEvent{tableId=%s.TABLEDELTA, droppedColumnNames=[VERSION]}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[10004], op=INSERT, meta=()}");
     }
 
     @Test
@@ -583,140 +448,67 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=NEW_%s.BETAGAMM, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
 
-        List<String> expectedEvents =
-                Arrays.asList(
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1008, 8], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1010, 10], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2012, 12], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2013, 13], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2014, 14], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2012, 12], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2013, 13], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2014, 14], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3015, Amber], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3016, Black], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3017, Cyan], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3018, Denim], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4019, Yosemite], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4020, El Capitan], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4021, Sierra], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4022, High Sierra], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()));
-        validateResult(expectedEvents);
+        validateResult(
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1008, 8], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1010, 10], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2012, 12], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2013, 13], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[2014, 14], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2012, 12], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2013, 13], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[2014, 14], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3015, Amber], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3016, Black], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3017, Cyan], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3018, Denim], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4019, Yosemite], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4020, El Capitan], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4021, Sierra], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4022, High Sierra], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}");
+
         LOG.info("Begin incremental reading stage.");
+
         // generate binlogs
-        String mysqlJdbcUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        routeTestDatabase.getDatabaseName());
-        try (Connection conn =
-                        DriverManager.getConnection(
-                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-                Statement stat = conn.createStatement()) {
-            stat.execute("INSERT INTO TABLEALPHA VALUES (3007, '7');");
-            stat.execute("UPDATE TABLEBETA SET VERSION='2014' WHERE id=2014;");
-            stat.execute("INSERT INTO TABLEGAMMA VALUES (3019, 'Emerald');");
-            stat.execute("DELETE FROM TABLEDELTA WHERE id=4024;");
-        } catch (SQLException e) {
-            LOG.error("Update table for CDC failed.", e);
-            throw e;
-        }
+        generateIncrementalChanges();
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[3007, 7], op=INSERT, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        validateResult(
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[3007, 7], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3019, Emerald], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[4024, Catalina], after=[], op=DELETE, meta=()}");
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        generateSchemaChanges();
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[3019, Emerald], op=INSERT, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.TABLEDELTA, before=[4024, Catalina], after=[], op=DELETE, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        validateResult(
+                "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
+                "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "AddColumnEvent{tableId=NEW_%s.BETAGAMM, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[10002, null, null, 15], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[10002, null, 15], op=INSERT, meta=()}",
+                "AlterColumnTypeEvent{tableId=NEW_%s.BETAGAMM, nameMapping={VERSION=STRING}}",
+                "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[10003, null, Fluorite], op=INSERT, meta=()}",
+                "DropColumnEvent{tableId=%s.TABLEDELTA, droppedColumnNames=[VERSION]}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[10004], op=INSERT, meta=()}");
     }
 
     @Test
@@ -765,61 +557,32 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=NEW_%s.TABLEA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=NEW_%s.TABLEB, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "CreateTableEvent{tableId=NEW_%s.TABLEC, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()),
-                60000L);
+                        routeTestDatabase.getDatabaseName()));
 
-        List<String> expectedEvents =
-                Arrays.asList(
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1008, 8], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1010, 10], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[1008, 8], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[1010, 10], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[1011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1008, 8], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1010, 10], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()),
-                        String.format(
-                                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1011, 11], op=INSERT, meta=()}",
-                                routeTestDatabase.getDatabaseName()));
+        validateResult(
+                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1008, 8], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1010, 10], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[1008, 8], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[1010, 10], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[1011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1008, 8], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1010, 10], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1011, 11], op=INSERT, meta=()}");
 
-        validateResult(expectedEvents);
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
         String mysqlJdbcUrl =
@@ -838,34 +601,38 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
             throw e;
         }
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[3007, 7], op=INSERT, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        validateResult(
+                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[3007, 7], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[3007, 7], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[3007, 7], op=INSERT, meta=()}");
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[3007, 7], op=INSERT, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        generateSchemaChanges();
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[3007, 7], op=INSERT, meta=()}",
-                        routeTestDatabase.getDatabaseName()),
-                20000L);
+        validateResult(
+                "AddColumnEvent{tableId=NEW_%s.TABLEA, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "AddColumnEvent{tableId=NEW_%s.TABLEB, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "AddColumnEvent{tableId=NEW_%s.TABLEC, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEB, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
+                "RenameColumnEvent{tableId=%s.TABLEBETA, nameMapping={VERSION=VERSION_EX}}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[10002, 15], op=INSERT, meta=()}",
+                "AlterColumnTypeEvent{tableId=%s.TABLEGAMMA, nameMapping={VERSION=VARCHAR(19)}}",
+                "RenameColumnEvent{tableId=%s.TABLEGAMMA, nameMapping={VERSION=VERSION_EX}}",
+                "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[10003, Fluorite], op=INSERT, meta=()}",
+                "DropColumnEvent{tableId=%s.TABLEDELTA, droppedColumnNames=[VERSION]}",
+                "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[10004], op=INSERT, meta=()}");
     }
 
-    private void validateResult(List<String> expectedEvents) throws Exception {
+    private void validateResult(String... expectedEvents) throws Exception {
         for (String event : expectedEvents) {
-            waitUntilSpecificEvent(event, 6000L);
+            waitUntilSpecificEvent(String.format(event, routeTestDatabase.getDatabaseName()));
         }
     }
 
-    private void waitUntilSpecificEvent(String event, long timeout) throws Exception {
+    private void waitUntilSpecificEvent(String event) throws Exception {
         boolean result = false;
-        long endTimeout = System.currentTimeMillis() + timeout;
+        long endTimeout = System.currentTimeMillis() + EVENT_DEFAULT_TIMEOUT;
         while (System.currentTimeMillis() < endTimeout) {
             String stdout = taskManagerConsumer.toUtf8String();
             if (stdout.contains(event)) {
