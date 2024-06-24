@@ -31,7 +31,7 @@ import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.RetryUtils;
-import org.apache.flink.cdc.connectors.maxcompute.utils.SessionCommitCoordinator;
+import org.apache.flink.cdc.connectors.maxcompute.utils.SessionCommitCoordinateHelper;
 import org.apache.flink.cdc.connectors.maxcompute.writer.MaxComputeWriter;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -71,7 +71,7 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
     private final MaxComputeWriteOptions writeOptions;
     private final MaxComputeExecutionOptions executionOptions;
     private final int parallelism;
-    private SessionCommitCoordinator sessionCommitCoordinator;
+    private SessionCommitCoordinateHelper sessionCommitCoordinateHelper;
     private Map<SessionIdentifier, MaxComputeWriter> sessionCache;
     private Map<String, SessionIdentifier> sessionIdMap;
     private CompletableFuture<CoordinationResponse>[] waitingFlushFutures;
@@ -100,7 +100,7 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
         this.executor = Executors.newFixedThreadPool(writeOptions.getNumCommitThread());
 
         this.waitingFlushFutures = new CompletableFuture[parallelism];
-        this.sessionCommitCoordinator = new SessionCommitCoordinator(parallelism);
+        this.sessionCommitCoordinateHelper = new SessionCommitCoordinateHelper(parallelism);
     }
 
     @Override
@@ -168,17 +168,17 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
             CommitSessionRequest commitSessionRequest = (CommitSessionRequest) request;
 
             CompletableFuture<CoordinationResponse> future =
-                    sessionCommitCoordinator.commit(
+                    sessionCommitCoordinateHelper.commit(
                             commitSessionRequest.getOperatorIndex(),
                             commitSessionRequest.getSessionId());
-            String toSubmitSessionId = sessionCommitCoordinator.getToCommitSessionId();
-            while (sessionCommitCoordinator.isCommitting() && toSubmitSessionId != null) {
+            String toSubmitSessionId = sessionCommitCoordinateHelper.getToCommitSessionId();
+            while (sessionCommitCoordinateHelper.isCommitting() && toSubmitSessionId != null) {
                 commitSession(toSubmitSessionId);
-                toSubmitSessionId = sessionCommitCoordinator.getToCommitSessionId();
+                toSubmitSessionId = sessionCommitCoordinateHelper.getToCommitSessionId();
             }
-            if (!sessionCommitCoordinator.isCommitting()) {
-                sessionCommitCoordinator.commitSuccess(Constant.END_OF_SESSION, true);
-                sessionCommitCoordinator.clear();
+            if (!sessionCommitCoordinateHelper.isCommitting()) {
+                sessionCommitCoordinateHelper.commitSuccess(Constant.END_OF_SESSION, true);
+                sessionCommitCoordinateHelper.clear();
 
                 if (!sessionCache.isEmpty()) {
                     throw new FlinkOdpsException(
@@ -237,7 +237,7 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
         } catch (Exception e) {
             isSuccess.set(false);
         }
-        sessionCommitCoordinator.commitSuccess(toSubmitSessionId, isSuccess.get());
+        sessionCommitCoordinateHelper.commitSuccess(toSubmitSessionId, isSuccess.get());
     }
 
     private void completeAllFlushFutures() {
