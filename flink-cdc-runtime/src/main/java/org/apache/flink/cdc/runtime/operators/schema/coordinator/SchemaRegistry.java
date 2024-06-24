@@ -17,9 +17,8 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
@@ -90,7 +89,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     /** Metadata applier for applying schema changes to external system. */
     private final MetadataApplier metadataApplier;
 
-    private final List<Tuple2<Selectors, TableId>> routes;
+    private final List<RouteRule> routes;
 
     /** The request handler that handle all requests and events. */
     private SchemaRegistryRequestHandler requestHandler;
@@ -104,7 +103,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             String operatorName,
             OperatorCoordinator.Context context,
             MetadataApplier metadataApplier,
-            List<Tuple2<Selectors, TableId>> routes) {
+            List<RouteRule> routes) {
         this.context = context;
         this.operatorName = operatorName;
         this.failedReasons = new HashMap<>();

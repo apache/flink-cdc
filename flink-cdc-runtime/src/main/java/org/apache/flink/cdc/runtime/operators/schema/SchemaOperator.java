@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.schema;
 
-import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
@@ -88,22 +89,22 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private static final Logger LOG = LoggerFactory.getLogger(SchemaOperator.class);
     private static final Duration CACHE_EXPIRE_DURATION = Duration.ofDays(1);
 
-    private final List<Tuple2<String, TableId>> routingRules;
+    private final List<RouteRule> routingRules;
 
-    private transient List<Tuple2<Selectors, TableId>> routes;
+    private transient List<Tuple3<Selectors, String, String>> routes;
     private transient TaskOperatorEventGateway toCoordinator;
     private transient SchemaEvolutionClient schemaEvolutionClient;
     private transient LoadingCache<TableId, Schema> cachedSchemas;
 
     private final long rpcTimeOutInMillis;
 
-    public SchemaOperator(List<Tuple2<String, TableId>> routingRules) {
+    public SchemaOperator(List<RouteRule> routingRules) {
         this.routingRules = routingRules;
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT.toMillis();
     }
 
-    public SchemaOperator(List<Tuple2<String, TableId>> routingRules, Duration rpcTimeOut) {
+    public SchemaOperator(List<RouteRule> routingRules, Duration rpcTimeOut) {
         this.routingRules = routingRules;
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = rpcTimeOut.toMillis();
@@ -119,14 +120,14 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         routes =
                 routingRules.stream()
                         .map(
-                                tuple2 -> {
-                                    String tableInclusions = tuple2.f0;
-                                    TableId replaceBy = tuple2.f1;
+                                rule -> {
+                                    String tableInclusions = rule.sourceTable;
                                     Selectors selectors =
                                             new Selectors.SelectorsBuilder()
                                                     .includeTables(tableInclusions)
                                                     .build();
-                                    return new Tuple2<>(selectors, replaceBy);
+                                    return new Tuple3<>(
+                                            selectors, rule.sinkTable, rule.replaceSymbol);
                                 })
                         .collect(Collectors.toList());
         schemaEvolutionClient = new SchemaEvolutionClient(toCoordinator, getOperatorID());
@@ -270,8 +271,16 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private List<TableId> getRoutedTables(TableId originalTableId) {
         return routes.stream()
                 .filter(route -> route.f0.isMatch(originalTableId))
-                .map(route -> route.f1)
+                .map(route -> resolveReplacement(originalTableId, route))
                 .collect(Collectors.toList());
+    }
+
+    private TableId resolveReplacement(
+            TableId originalTable, Tuple3<Selectors, String, String> route) {
+        if (route.f2 != null) {
+            return TableId.parse(route.f1.replace(route.f2, originalTable.getTableName()));
+        }
+        return TableId.parse(route.f1);
     }
 
     private void handleSchemaChangeEvent(TableId tableId, SchemaChangeEvent schemaChangeEvent)

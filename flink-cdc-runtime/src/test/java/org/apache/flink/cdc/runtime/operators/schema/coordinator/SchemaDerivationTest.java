@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -25,10 +24,10 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 
@@ -81,13 +80,9 @@ class SchemaDerivationTest {
                     .column(Column.physicalColumn("gender", DataTypes.STRING()))
                     .build();
 
-    private static final List<Tuple2<Selectors, TableId>> ROUTES =
+    private static final List<RouteRule> ROUTES =
             Collections.singletonList(
-                    Tuple2.of(
-                            new Selectors.SelectorsBuilder()
-                                    .includeTables("mydb.myschema.mytable[0-9]")
-                                    .build(),
-                            MERGED_TABLE));
+                    new RouteRule("mydb.myschema.mytable[0-9]", MERGED_TABLE.toString(), null));
 
     @Test
     void testOneToOneMapping() {
