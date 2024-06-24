@@ -65,13 +65,17 @@ public class SchemaDerivation {
     }
 
     public List<SchemaChangeEvent> applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
-        for (Tuple2<Selectors, TableId> route : routes) {
-            TableId originalTable = schemaChangeEvent.tableId();
+        List<SchemaChangeEvent> events = new ArrayList<>();
+        TableId originalTable = schemaChangeEvent.tableId();
+        boolean noRouteMatched = true;
 
+        for (Tuple2<Selectors, TableId> route : routes) {
             // Check routing table
             if (!route.f0.isMatch(originalTable)) {
                 continue;
             }
+
+            noRouteMatched = false;
 
             // Matched a routing rule
             TableId derivedTable = route.f1;
@@ -80,38 +84,54 @@ public class SchemaDerivation {
             originalTables.add(originalTable);
 
             if (originalTables.size() == 1) {
-                // 1-to-1 mapping. Replace the table ID directly
+                // single source mapping, replace the table ID directly
                 SchemaChangeEvent derivedSchemaChangeEvent =
                         ChangeEventUtils.recreateSchemaChangeEvent(schemaChangeEvent, derivedTable);
                 schemaManager.applySchemaChange(derivedSchemaChangeEvent);
-                return Collections.singletonList(derivedSchemaChangeEvent);
-            }
-
-            // Many-to-1 mapping (merging tables)
-            Schema derivedTableSchema = schemaManager.getLatestSchema(derivedTable).get();
-            if (schemaChangeEvent instanceof CreateTableEvent) {
-                return handleCreateTableEvent(
-                        (CreateTableEvent) schemaChangeEvent, derivedTableSchema, derivedTable);
-            } else if (schemaChangeEvent instanceof AddColumnEvent) {
-                return handleAddColumnEvent(
-                        (AddColumnEvent) schemaChangeEvent, derivedTableSchema, derivedTable);
-            } else if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
-                return handleAlterColumnTypeEvent(
-                        (AlterColumnTypeEvent) schemaChangeEvent, derivedTableSchema, derivedTable);
-            } else if (schemaChangeEvent instanceof DropColumnEvent) {
-                return Collections.emptyList();
-            } else if (schemaChangeEvent instanceof RenameColumnEvent) {
-                return handleRenameColumnEvent(
-                        (RenameColumnEvent) schemaChangeEvent, derivedTableSchema, derivedTable);
+                events.add(derivedSchemaChangeEvent);
             } else {
-                throw new IllegalStateException(
-                        String.format(
-                                "Unrecognized SchemaChangeEvent type: %s", schemaChangeEvent));
+                // multiple source mapping (merging tables)
+                Schema derivedTableSchema = schemaManager.getLatestSchema(derivedTable).get();
+                if (schemaChangeEvent instanceof CreateTableEvent) {
+                    events.addAll(
+                            handleCreateTableEvent(
+                                    (CreateTableEvent) schemaChangeEvent,
+                                    derivedTableSchema,
+                                    derivedTable));
+                } else if (schemaChangeEvent instanceof AddColumnEvent) {
+                    events.addAll(
+                            handleAddColumnEvent(
+                                    (AddColumnEvent) schemaChangeEvent,
+                                    derivedTableSchema,
+                                    derivedTable));
+                } else if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
+                    events.addAll(
+                            handleAlterColumnTypeEvent(
+                                    (AlterColumnTypeEvent) schemaChangeEvent,
+                                    derivedTableSchema,
+                                    derivedTable));
+                } else if (schemaChangeEvent instanceof DropColumnEvent) {
+                    // Do nothing: drop column event should not be sent to downstream
+                } else if (schemaChangeEvent instanceof RenameColumnEvent) {
+                    events.addAll(
+                            handleRenameColumnEvent(
+                                    (RenameColumnEvent) schemaChangeEvent,
+                                    derivedTableSchema,
+                                    derivedTable));
+                } else {
+                    throw new IllegalStateException(
+                            String.format(
+                                    "Unrecognized SchemaChangeEvent type: %s", schemaChangeEvent));
+                }
             }
         }
 
-        // No routes are matched
-        return Collections.singletonList(schemaChangeEvent);
+        if (noRouteMatched) {
+            // No routes are matched, leave it as-is
+            return Collections.singletonList(schemaChangeEvent);
+        } else {
+            return events;
+        }
     }
 
     public Map<TableId, Set<TableId>> getDerivationMapping() {
