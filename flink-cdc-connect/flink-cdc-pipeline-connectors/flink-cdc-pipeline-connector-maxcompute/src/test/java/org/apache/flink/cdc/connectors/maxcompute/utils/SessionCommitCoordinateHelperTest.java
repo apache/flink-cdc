@@ -28,22 +28,23 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 /** */
-public class SessionCommitCoordinatorTest {
+public class SessionCommitCoordinateHelperTest {
 
     @Test
     public void test() throws ExecutionException, InterruptedException {
-        SessionCommitCoordinator sessionCommitCoordinator = new SessionCommitCoordinator(4);
-        sessionCommitCoordinator.clear();
+        SessionCommitCoordinateHelper sessionCommitCoordinateHelper =
+                new SessionCommitCoordinateHelper(4);
+        sessionCommitCoordinateHelper.clear();
         ExecutorService executorService = Executors.newFixedThreadPool(5);
 
         Future<?> future =
                 executorService.submit(
                         () -> {
                             int expect = 1;
-                            while (sessionCommitCoordinator.isCommitting()) {
+                            while (sessionCommitCoordinateHelper.isCommitting()) {
                                 try {
                                     String toCommitSessionId =
-                                            sessionCommitCoordinator.getToCommitSessionId();
+                                            sessionCommitCoordinateHelper.getToCommitSessionId();
                                     if (toCommitSessionId != null) {
                                         Assert.assertEquals(
                                                 expect, Integer.parseInt(toCommitSessionId));
@@ -60,9 +61,9 @@ public class SessionCommitCoordinatorTest {
                 () -> {
                     try {
                         Thread.sleep(3000);
-                        sessionCommitCoordinator.commit(0, "1");
+                        sessionCommitCoordinateHelper.commit(0, "1");
                         Thread.sleep(5000);
-                        sessionCommitCoordinator.commit(0, Constant.END_OF_SESSION);
+                        sessionCommitCoordinateHelper.commit(0, Constant.END_OF_SESSION);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -71,11 +72,11 @@ public class SessionCommitCoordinatorTest {
                 () -> {
                     try {
                         Thread.sleep(2000);
-                        sessionCommitCoordinator.commit(1, "1");
+                        sessionCommitCoordinateHelper.commit(1, "1");
                         Thread.sleep(5000);
-                        sessionCommitCoordinator.commit(1, "2");
+                        sessionCommitCoordinateHelper.commit(1, "2");
                         Thread.sleep(1000);
-                        sessionCommitCoordinator.commit(1, Constant.END_OF_SESSION);
+                        sessionCommitCoordinateHelper.commit(1, Constant.END_OF_SESSION);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -84,11 +85,11 @@ public class SessionCommitCoordinatorTest {
                 () -> {
                     try {
                         Thread.sleep(4000);
-                        sessionCommitCoordinator.commit(2, "2");
+                        sessionCommitCoordinateHelper.commit(2, "2");
                         Thread.sleep(3000);
-                        sessionCommitCoordinator.commit(2, "3");
+                        sessionCommitCoordinateHelper.commit(2, "3");
                         Thread.sleep(2000);
-                        sessionCommitCoordinator.commit(2, Constant.END_OF_SESSION);
+                        sessionCommitCoordinateHelper.commit(2, Constant.END_OF_SESSION);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -97,12 +98,12 @@ public class SessionCommitCoordinatorTest {
                 () -> {
                     try {
                         Thread.sleep(2000);
-                        sessionCommitCoordinator.commit(3, "1");
+                        sessionCommitCoordinateHelper.commit(3, "1");
                         Thread.sleep(2000);
-                        sessionCommitCoordinator.commit(3, "2");
+                        sessionCommitCoordinateHelper.commit(3, "2");
                         Thread.sleep(2000);
-                        sessionCommitCoordinator.commit(3, "3");
-                        sessionCommitCoordinator.commit(3, Constant.END_OF_SESSION);
+                        sessionCommitCoordinateHelper.commit(3, "3");
+                        sessionCommitCoordinateHelper.commit(3, Constant.END_OF_SESSION);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }

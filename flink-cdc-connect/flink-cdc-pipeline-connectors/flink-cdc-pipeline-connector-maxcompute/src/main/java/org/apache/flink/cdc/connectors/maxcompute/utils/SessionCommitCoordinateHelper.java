@@ -65,8 +65,8 @@ import java.util.concurrent.CompletableFuture;
  * completion status of an executor, allowing the system to determine whether all relevant sessions
  * have been processed.
  */
-public class SessionCommitCoordinator {
-    private static final Logger LOG = LoggerFactory.getLogger(SessionCommitCoordinator.class);
+public class SessionCommitCoordinateHelper {
+    private static final Logger LOG = LoggerFactory.getLogger(SessionCommitCoordinateHelper.class);
     private final Queue<String>[] toCommitSessionIds;
     private final Map<String, CompletableFuture<CoordinationResponse>> toCommitFutures;
     private boolean isCommitting;
@@ -89,7 +89,7 @@ public class SessionCommitCoordinator {
                 return a.compareTo(b);
             };
 
-    public SessionCommitCoordinator(int parallelism) {
+    public SessionCommitCoordinateHelper(int parallelism) {
         Preconditions.checkArgument(parallelism > 0);
         isCommitting = true;
         toCommitFutures = new HashMap<>();
