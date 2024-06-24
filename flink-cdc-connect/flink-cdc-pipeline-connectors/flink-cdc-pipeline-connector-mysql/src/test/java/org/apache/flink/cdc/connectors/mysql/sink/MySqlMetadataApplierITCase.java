@@ -55,9 +55,7 @@ import java.util.List;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 
-/**
- * IT tests for {@link org.apache.flink.cdc.connectors.jdbc.sink.JdbcMetadataApplier}.
- */
+/** IT tests for {@link org.apache.flink.cdc.connectors.jdbc.sink.JdbcMetadataApplier}. */
 // @RunWith(Parameterized.class)
 public class MySqlMetadataApplierITCase extends MySqlSinkTestBase {
     private static final StreamExecutionEnvironment env =
@@ -185,24 +183,16 @@ public class MySqlMetadataApplierITCase extends MySqlSinkTestBase {
 
         List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
         addedColumns.add(
-                AddColumnEvent.first(
-                        Column.physicalColumn(
-                                "col4_first", DataTypes.VARCHAR(10))));
+                AddColumnEvent.first(Column.physicalColumn("col4_first", DataTypes.VARCHAR(10))));
         addedColumns.add(
-                AddColumnEvent.last(
-                        Column.physicalColumn(
-                                "col5_last", DataTypes.VARCHAR(10))));
+                AddColumnEvent.last(Column.physicalColumn("col5_last", DataTypes.VARCHAR(10))));
 
         addedColumns.add(
                 AddColumnEvent.after(
-                        Column.physicalColumn(
-                                "col7_after", DataTypes.VARCHAR(10)),
-                        "col2"));
+                        Column.physicalColumn("col7_after", DataTypes.VARCHAR(10)), "col2"));
 
         return Arrays.asList(
-                new CreateTableEvent(tableId, schema),
-                new AddColumnEvent(tableId,addedColumns)
-        );
+                new CreateTableEvent(tableId, schema), new AddColumnEvent(tableId, addedColumns));
     }
 
     @Test
@@ -291,7 +281,7 @@ public class MySqlMetadataApplierITCase extends MySqlSinkTestBase {
     }
 
     @Test
-    public void testAddColumnWithPosition()throws Exception{
+    public void testAddColumnWithPosition() throws Exception {
         TableId tableId = TableId.tableId(MySqlContainer.DATABASE_NAME, MySqlContainer.TABLE_NAME);
         runJobWithEvents(generateAddColumnWithPosition(tableId));
 

@@ -168,7 +168,7 @@ public class MySqlSmtCreatorFactory {
                         .collect(Collectors.joining(",\n"));
         builder.append(columnsStmt);
 
-        if(!schema.primaryKeys().isEmpty()){
+        if (!schema.primaryKeys().isEmpty()) {
             builder.append(",\n");
             String tableKeys =
                     schema.primaryKeys().stream()

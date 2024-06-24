@@ -44,7 +44,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/** Mysql sink test base.*/
+/** Mysql sink test base. */
 public class MySqlSinkTestBase {
     protected static final Logger LOG = LoggerFactory.getLogger(MySqlSinkTestBase.class);
     protected static final int DEFAULT_PARALLELISM = 1;
