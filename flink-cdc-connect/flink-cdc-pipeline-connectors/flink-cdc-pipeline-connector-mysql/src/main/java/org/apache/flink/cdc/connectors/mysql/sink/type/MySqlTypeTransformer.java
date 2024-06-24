@@ -42,6 +42,10 @@ import com.mysql.cj.MysqlType;
 /** MySQL type transformer from {@DataType}. */
 public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Builder> {
     private final JdbcColumn.Builder builder;
+    public static final int POWER_2_8 = (int) Math.pow(2, 8);
+    public static final int POWER_2_16 = (int) Math.pow(2, 16);
+    public static final int POWER_2_24 = (int) Math.pow(2, 24);
+    public static final int POWER_2_32 = (int) Math.pow(2, 32);
 
     public MySqlTypeTransformer(JdbcColumn.Builder builder) {
         this.builder = builder;
@@ -57,9 +61,25 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
 
     @Override
     public JdbcColumn.Builder visit(VarCharType varCharType) {
-        builder.length(varCharType.getLength());
-        builder.dataType(MysqlType.VARCHAR.name());
-        builder.columnType(varCharType.asSerializableString());
+        int length = varCharType.getLength();
+
+        if (length < POWER_2_16 - 1) {
+            builder.dataType(MysqlType.VARCHAR.name());
+            builder.columnType(String.format("%s(%s)", MysqlType.VARCHAR, length));
+        } else if (length < POWER_2_24) {
+            builder.dataType(MysqlType.MEDIUMTEXT.name());
+            builder.columnType(MysqlType.MEDIUMTEXT.name());
+        } else if (length < POWER_2_32) {
+            builder.dataType(MysqlType.LONGTEXT.name());
+            builder.columnType(MysqlType.LONGTEXT.name());
+        } else {
+            builder.dataType(MysqlType.TEXT.name());
+            builder.columnType(MysqlType.TEXT.name());
+        }
+
+        builder.length(length);
+        builder.isNullable(varCharType.isNullable());
+
         return builder;
     }
 
@@ -149,9 +169,23 @@ public class MySqlTypeTransformer extends DataTypeDefaultVisitor<JdbcColumn.Buil
 
     @Override
     public JdbcColumn.Builder visit(VarBinaryType bytesType) {
-        builder.dataType(MysqlType.BINARY.name());
-        builder.length(bytesType.getLength());
-        builder.columnType(bytesType.asSerializableString());
+        int length = bytesType.getLength();
+
+        if (length <= POWER_2_16 - 1) {
+            builder.dataType(MysqlType.VARBINARY.name());
+            builder.columnType(String.format("%s(%d)", MysqlType.VARBINARY.name(), length));
+        } else if (length < POWER_2_24) {
+            builder.dataType(MysqlType.MEDIUMBLOB.name());
+            builder.columnType(MysqlType.MEDIUMBLOB.name());
+        } else if (length < POWER_2_32) {
+            builder.dataType(MysqlType.LONGBLOB.name());
+            builder.columnType(MysqlType.LONGBLOB.name());
+        } else {
+            builder.dataType(MysqlType.LONGBLOB.name());
+            builder.columnType(MysqlType.LONGBLOB.name());
+        }
+
+        builder.length(length);
         builder.isNullable(bytesType.isNullable());
 
         return builder;
