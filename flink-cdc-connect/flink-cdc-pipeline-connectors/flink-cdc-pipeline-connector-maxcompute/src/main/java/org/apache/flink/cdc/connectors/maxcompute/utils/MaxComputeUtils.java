@@ -63,6 +63,7 @@ public class MaxComputeUtils {
         odps.setEndpoint(maxComputeOptions.getEndpoint());
         odps.setTunnelEndpoint(maxComputeOptions.getTunnelEndpoint());
         odps.setDefaultProject(maxComputeOptions.getProject());
+        odps.setUserAgent("Flink CDC");
         return odps;
     }
 
