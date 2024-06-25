@@ -49,9 +49,10 @@ env:
   flink-cdc-common,\
   flink-cdc-composer,\
   flink-cdc-runtime"
-  
+
   MODULES_PIPELINE_CONNECTORS: "\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-jdbc,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,\
@@ -61,39 +62,39 @@ env:
   MODULES_MYSQL: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc"
-  
+
   MODULES_POSTGRES: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-postgres-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-postgres-cdc"
-  
+
   MODULES_ORACLE: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oracle-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oracle-cdc"
-  
+
   MODULES_MONGODB: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mongodb-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mongodb-cdc"
-  
+
   MODULES_SQLSERVER: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-sqlserver-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-sqlserver-cdc"
-  
+
   MODULES_TIDB: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-tidb-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-tidb-cdc"
-  
+
   MODULES_OCEANBASE: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oceanbase-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oceanbase-cdc"
-  
+
   MODULES_DB2: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-db2-cdc"
-  
+
   MODULES_VITESS: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-vitess-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-vitess-cdc"
-  
+
   MODULES_E2E: "\
   flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests,\
   flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
