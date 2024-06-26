@@ -33,11 +33,11 @@ sink:
 
 route:
   - source-table: mydb.default.app_order_.*
-    sink-table: odsdb.default.app_order
+    sink-table: odsdb.default.app_order_<>
     replace-symbol: "<>"
     description: sync all sharding tables to one
   - source-table: mydb.default.web_order
-    sink-table: odsdb.default.ods_web_order
+    sink-table: odsdb.default.ods_web_order_>_<
     replace-symbol: ">_<"
     description: sync table to with given prefix ods_
 

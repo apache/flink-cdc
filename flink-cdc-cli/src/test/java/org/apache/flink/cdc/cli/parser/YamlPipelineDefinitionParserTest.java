@@ -373,12 +373,12 @@ class YamlPipelineDefinitionParserTest {
                     Arrays.asList(
                             new RouteDef(
                                     "mydb.default.app_order_.*",
-                                    "odsdb.default.app_order",
+                                    "odsdb.default.app_order_<>",
                                     "<>",
                                     "sync all sharding tables to one"),
                             new RouteDef(
                                     "mydb.default.web_order",
-                                    "odsdb.default.ods_web_order",
+                                    "odsdb.default.ods_web_order_>_<",
                                     ">_<",
                                     "sync table to with given prefix ods_")),
                     Arrays.asList(

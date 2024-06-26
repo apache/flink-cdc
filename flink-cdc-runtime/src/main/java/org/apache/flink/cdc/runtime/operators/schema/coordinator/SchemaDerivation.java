@@ -55,6 +55,11 @@ import java.util.stream.Collectors;
 public class SchemaDerivation {
     private final SchemaManager schemaManager;
     private final Map<TableId, Set<TableId>> derivationMapping;
+
+    /**
+     * Storing route source table selector, sink table name (before symbol replacement), and replace
+     * symbol in a tuple.
+     */
     private transient List<Tuple3<Selectors, String, String>> routes;
 
     public SchemaDerivation(

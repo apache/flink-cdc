@@ -91,7 +91,12 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     private final List<RouteRule> routingRules;
 
+    /**
+     * Storing route source table selector, sink table name (before symbol replacement), and replace
+     * symbol in a tuple.
+     */
     private transient List<Tuple3<Selectors, String, String>> routes;
+
     private transient TaskOperatorEventGateway toCoordinator;
     private transient SchemaEvolutionClient schemaEvolutionClient;
     private transient LoadingCache<TableId, Schema> cachedSchemas;
