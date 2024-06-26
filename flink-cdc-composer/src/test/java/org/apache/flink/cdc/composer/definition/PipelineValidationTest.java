@@ -69,15 +69,14 @@ public class PipelineValidationTest {
 
     @Test
     void testUnknownConfigValidation() {
-        // An empty configuration should fail
+        // Unknown configuration entries should be tolerated
         Map<String, String> configurations = new HashMap<>();
 
         configurations.put("parallelism", "1");
         configurations.put("name", "Pipeline Job");
         configurations.put("unknown", "optionValue");
 
-        Assertions.assertThrowsExactly(
-                ValidationException.class,
+        Assertions.assertDoesNotThrow(
                 () ->
                         PipelineDef.validatePipelineDefinition(
                                 Configuration.fromMap(configurations)));

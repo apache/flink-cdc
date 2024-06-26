@@ -30,9 +30,7 @@ import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.TimeZone;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 
@@ -149,19 +147,6 @@ public class PipelineDef {
                         PipelineOptions.PIPELINE_LOCAL_TIME_ZONE,
                         PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID,
                         PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT);
-
-        Set<String> optionKeys =
-                options.stream().map(ConfigOption::key).collect(Collectors.toSet());
-
-        configuration
-                .getKeys()
-                .forEach(
-                        key -> {
-                            if (!optionKeys.contains(key)) {
-                                throw new ValidationException(
-                                        String.format("Unknown configuration key `%s`", key));
-                            }
-                        });
 
         options.forEach(
                 option -> {
