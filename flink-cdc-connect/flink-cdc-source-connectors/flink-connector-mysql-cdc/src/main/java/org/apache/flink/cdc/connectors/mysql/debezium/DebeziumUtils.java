@@ -54,7 +54,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
 /** Utilities related to Debezium. */
@@ -330,12 +329,17 @@ public class DebeziumUtils {
         } finally {
             client.unregisterEventListener(eventListener);
         }
-
-        Long timestamp = binlogTimestamps.poll(5, TimeUnit.SECONDS);
-        if (timestamp == null) {
-            timestamp = 0L;
-            LOG.info("Failed to get binlog file {} 's timestamp within 5 seconds", binlogFile);
+        if (binlogTimestamps.isEmpty()) {
+            try {
+                if (client.isConnected()) {
+                    client.disconnect();
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            LOG.warn("Failed to register eventListener and try to register it again");
+            return getBinlogTimestamp(client, binlogFile);
         }
-        return timestamp;
+        return binlogTimestamps.take();
     }
 }
