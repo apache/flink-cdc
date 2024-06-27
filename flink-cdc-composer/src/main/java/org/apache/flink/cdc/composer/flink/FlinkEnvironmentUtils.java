@@ -39,6 +39,8 @@ import java.util.stream.Stream;
 public class FlinkEnvironmentUtils {
     private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvironmentUtils.class);
 
+    private FlinkEnvironmentUtils() {}
+
     /**
      * Add the specified JAR to {@link StreamExecutionEnvironment} so that the JAR will be uploaded
      * together with the job graph.
