@@ -18,43 +18,32 @@
 package org.apache.flink.cdc.connectors.oceanbase.table;
 
 import org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestBase;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.LogProxyContainer;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseCdcMetadata;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseContainer;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseMySQLCdcMetadata;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.lifecycle.Startables;
-import org.testcontainers.utility.MountableFile;
+import org.testcontainers.containers.Network;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Stream;
+
+import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.createLogProxyContainer;
+import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.createOceanBaseContainerForCDC;
 
 /** Integration tests for OceanBase MySQL mode table source. */
-@RunWith(Parameterized.class)
 public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
-
-    private static final Logger LOG = LoggerFactory.getLogger(OceanBaseMySQLModeITCase.class);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -62,45 +51,22 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    private static final String NETWORK_MODE = "host";
-    private static final String OB_SYS_PASSWORD = "123456";
+    @ClassRule public static final Network NETWORK = Network.newNetwork();
 
     @ClassRule
-    public static final GenericContainer<?> OB_SERVER =
-            new GenericContainer<>("oceanbase/oceanbase-ce:4.2.0.0")
-                    .withNetworkMode(NETWORK_MODE)
-                    .withEnv("MODE", "slim")
-                    .withEnv("OB_ROOT_PASSWORD", OB_SYS_PASSWORD)
-                    .withEnv("OB_DATAFILE_SIZE", "1G")
-                    .withEnv("OB_LOG_DISK_SIZE", "4G")
-                    .withCopyFileToContainer(
-                            MountableFile.forClasspathResource("ddl/mysql/docker_init.sql"),
-                            "/root/boot/init.d/init.sql")
-                    .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
-                    .withStartupTimeout(Duration.ofMinutes(4))
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+    public static final OceanBaseContainer OB_SERVER =
+            createOceanBaseContainerForCDC().withNetwork(NETWORK);
 
     @ClassRule
-    public static final GenericContainer<?> LOG_PROXY =
-            new GenericContainer<>("whhe/oblogproxy:1.1.3_4x")
-                    .withNetworkMode(NETWORK_MODE)
-                    .withEnv("OB_SYS_PASSWORD", OB_SYS_PASSWORD)
-                    .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
-                    .withStartupTimeout(Duration.ofMinutes(1))
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+    public static final LogProxyContainer LOG_PROXY =
+            createLogProxyContainer().withNetwork(NETWORK);
 
-    @BeforeClass
-    public static void startContainers() {
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(OB_SERVER, LOG_PROXY)).join();
-        LOG.info("Containers are started.");
-    }
+    private static final OceanBaseCdcMetadata METADATA =
+            new OceanBaseMySQLCdcMetadata(OB_SERVER, LOG_PROXY);
 
-    @AfterClass
-    public static void stopContainers() {
-        LOG.info("Stopping containers...");
-        Stream.of(OB_SERVER, LOG_PROXY).forEach(GenericContainer::stop);
-        LOG.info("Containers are stopped.");
+    @Override
+    protected OceanBaseCdcMetadata metadata() {
+        return METADATA;
     }
 
     @Before
@@ -110,47 +76,11 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
         env.getCheckpointConfig().setMinPauseBetweenCheckpoints(500);
     }
 
-    private final String rsList;
-
-    public OceanBaseMySQLModeITCase(
-            String username,
-            String password,
-            String hostname,
-            int port,
-            String logProxyHost,
-            int logProxyPort,
-            String tenant,
-            String rsList) {
-        super("mysql", username, password, hostname, port, logProxyHost, logProxyPort, tenant);
-        this.rsList = rsList;
-    }
-
-    @Parameterized.Parameters
-    public static List<Object[]> parameters() {
-        return Collections.singletonList(
-                new Object[] {
-                    "root@test",
-                    "123456",
-                    "127.0.0.1",
-                    2881,
-                    "127.0.0.1",
-                    2983,
-                    "test",
-                    "127.0.0.1:2882:2881"
-                });
-    }
-
     @Override
     protected String logProxyOptionsString() {
         return super.logProxyOptionsString()
                 + " , "
-                + String.format(" 'rootserver-list' = '%s'", rsList);
-    }
-
-    @Override
-    protected Connection getJdbcConnection() throws SQLException {
-        return DriverManager.getConnection(
-                "jdbc:mysql://" + hostname + ":" + port + "/?useSSL=false", username, password);
+                + String.format(" 'rootserver-list' = '%s'", METADATA.getRsList());
     }
 
     @Test
@@ -311,6 +241,8 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
         }
 
         waitForSinkSize("sink", snapshotSize + 1);
+
+        String tenant = metadata().getTenantName();
 
         List<String> expected =
                 Arrays.asList(
