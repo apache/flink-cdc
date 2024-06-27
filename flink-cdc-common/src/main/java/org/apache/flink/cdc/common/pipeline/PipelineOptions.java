@@ -45,6 +45,15 @@ public class PipelineOptions {
                     .noDefaultValue()
                     .withDescription("Parallelism of the pipeline");
 
+
+
+    public static final ConfigOption<Integer> SINK_PARALLELISM =
+            ConfigOptions.key("sink.parallelism")
+                    .intType()
+                    .noDefaultValue()
+                    .withDescription("Parallelism of the sink in the pipeline");
+
+
     public static final ConfigOption<SchemaChangeBehavior> PIPELINE_SCHEMA_CHANGE_BEHAVIOR =
             ConfigOptions.key("schema.change.behavior")
                     .enumType(SchemaChangeBehavior.class)
