@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.utils.Preconditions;
@@ -40,6 +41,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import static org.apache.flink.cdc.connectors.paimon.sink.PaimonDataSinkOptions.PREFIX_CATALOG_PROPERTIES;
+import static org.apache.flink.cdc.connectors.paimon.sink.PaimonDataSinkOptions.PREFIX_TABLE_PROPERTIES;
+
 /** A {@link DataSinkFactory} to create {@link PaimonDataSink}. */
 public class PaimonDataSinkFactory implements DataSinkFactory {
 
@@ -47,16 +51,16 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
 
     @Override
     public DataSink createDataSink(Context context) {
+        FactoryHelper.createFactoryHelper(this, context)
+                .validateExcept(PREFIX_TABLE_PROPERTIES, PREFIX_CATALOG_PROPERTIES);
+
         Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
         Map<String, String> catalogOptions = new HashMap<>();
         Map<String, String> tableOptions = new HashMap<>();
         allOptions.forEach(
                 (key, value) -> {
-                    if (key.startsWith(PaimonDataSinkOptions.PREFIX_TABLE_PROPERTIES)) {
-                        tableOptions.put(
-                                key.substring(
-                                        PaimonDataSinkOptions.PREFIX_TABLE_PROPERTIES.length()),
-                                value);
+                    if (key.startsWith(PREFIX_TABLE_PROPERTIES)) {
+                        tableOptions.put(key.substring(PREFIX_TABLE_PROPERTIES.length()), value);
                     } else if (key.startsWith(PaimonDataSinkOptions.PREFIX_CATALOG_PROPERTIES)) {
                         catalogOptions.put(
                                 key.substring(
@@ -118,9 +122,10 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(PaimonDataSinkOptions.URI);
         options.add(PaimonDataSinkOptions.WAREHOUSE);
+        options.add(PaimonDataSinkOptions.URI);
         options.add(PaimonDataSinkOptions.COMMIT_USER);
+        options.add(PaimonDataSinkOptions.PARTITION_KEY);
         return options;
     }
 }

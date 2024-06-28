@@ -119,7 +119,7 @@ public class MySqlSourceOptions {
                     .durationType()
                     .defaultValue(Duration.ofSeconds(30))
                     .withDescription(
-                            "The maximum time that the connector should wait after trying to connect to the MySQL database server before timing out.");
+                            "The maximum time that the connector should wait after trying to connect to the MySQL database server before timing out. This value cannot be less than 250ms.");
 
     public static final ConfigOption<Integer> CONNECTION_POOL_SIZE =
             ConfigOptions.key("connection.pool.size")

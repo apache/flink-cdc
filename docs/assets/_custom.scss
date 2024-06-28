@@ -250,6 +250,7 @@ pre.chroma code {
     }
 
     .link-as-button {
+        display: inline-block;
         transform: translate(0, 0) rotate(0) skewX(0) skewY(0) scaleX(1) scaleY(1);
         transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
         transition-duration: 300ms;
@@ -298,6 +299,10 @@ pre.chroma code {
         flex-direction: column;
     }
 
+    .flex-row {
+        flex-direction: row;
+    }
+
     .flex-shrink {
         flex-shrink: 1;
     }
@@ -315,6 +320,10 @@ pre.chroma code {
 
     .justify-center {
         justify-content: center;
+    }
+
+    .justify-between {
+        justify-content: space-between;
     }
 
     .w-1\/2 {
@@ -377,6 +386,14 @@ pre.chroma code {
         margin-right: auto;
     }
 
+    .ml-0 {
+        margin-left: 0;
+    }
+
+    .gap-6 {
+        margin-bottom: 1.5rem;
+    }
+
     .p-0 {
         padding: 0;
     }
@@ -401,6 +418,11 @@ pre.chroma code {
         padding-bottom: 2rem;
     }
 
+    .py-12 {
+        padding-top: 3rem;
+        padding-bottom: 3rem;
+    }
+
     .m-8 {
         margin: 2rem;
     }
@@ -421,6 +443,10 @@ pre.chroma code {
 
     .mt-6 {
         margin-top: 1.5rem;
+    }
+
+    .mt-8 {
+        margin-top: 2rem;
     }
 
     .-mt-8 {
@@ -506,6 +532,37 @@ pre.chroma code {
         .link-as-button {
             margin-left: 0;
             margin-right: 0;
+        }
+    }
+
+    @media (min-width: 1280px) {
+        .xl\:mt-0 {
+            margin-top: 0;
+        }
+        .xl\:ml-16 {
+            margin-left: 4rem;
+        }
+        .xl\:items-start {
+            align-items: flex-start;
+        }
+        .xl\:text-left {
+            text-align: left;
+        }
+        .xl\:flex-row {
+            flex-direction: row;
+        }
+        .xl\:justify-between {
+            justify-content: space-between;
+        }
+        .xl\:w-\[max-content\] {
+            width: max-content;
+        }
+        .xl\:min-w-\[max-content\] {
+            min-width: max-content;
+        }
+        .xl\:my-auto {
+            margin-top: auto;
+            margin-bottom: auto;
         }
     }
 }
