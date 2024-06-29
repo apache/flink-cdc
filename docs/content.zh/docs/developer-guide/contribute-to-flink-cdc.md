@@ -33,13 +33,14 @@ Bug报告，提议新的功能，加入社区邮件列表的讨论，贡献代�
 
 Flink CDC 社区的贡献不仅限于为项目贡献代码，下面列举了一些可以在社区贡献的内容。
 
-| 贡献方式  | 更多信息                                                                                                                                                                            |
-|:------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 提交BUG | 为了提交问题，您需要首先在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 建立对应的issue，并在`Component/s`选择`Flink CDC`。然后在问题描述中详细描述遇到的问题的信息，如果可能的话，最好提供一下能够复现问题的操作步骤。         |
-| 贡献代码  | 请阅读 <a href="#code-contribution-guide">贡献代码指导</a>                                                                                                                               |
-| 代码评审  | 请阅读 <a href="#code-review-guide">代码评审指导</a>                                                                                                                                     |
-| 版本验证  | 请阅读 <a href="#release-validation-guide">版本验证指导</a>                                                                                                                              |                                                                                     |
-| 用户支持  | 通过 [Flink 用户邮件列表](https://flink.apache.org/what-is-flink/community/#mailing-lists) 来帮助回复用户问题，在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 可以查询到最新的已知问题。 |
+| 贡献方式      | 更多信息                                                                                                                                                                            |
+|:----------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 提交BUG     | 为了提交问题，您需要首先在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 建立对应的issue，并在`Component/s`选择`Flink CDC`。然后在问题描述中详细描述遇到的问题的信息，如果可能的话，最好提供一下能够复现问题的操作步骤。         |
+| 贡献代码      | 请阅读 <a href="#code-contribution-guide">贡献代码指导</a>                                                                                                                               |
+| 代码评审      | 请阅读 <a href="#code-review-guide">代码评审指导</a>                                                                                                                                     |
+| 版本验证      | 请阅读 <a href="#release-validation-guide">版本验证指导</a>                                                                                                                              |                                                            |
+| 用户支持      | 通过 [Flink 用户邮件列表](https://flink.apache.org/what-is-flink/community/#mailing-lists) 来帮助回复用户问题，在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 可以查询到最新的已知问题。 |
+| 加入开发者邮件列表 | 关注 [Flink 开发者邮件列表](https://lists.apache.org/list.html?dev@flink.apache.org) 来参与设计方案讨论。                                                                                          |
 
 如果还有其他问题，可以通过 Flink Dev 邮件列表寻求帮助。
 
@@ -83,8 +84,8 @@ Flink CDC 项目通过众多贡献者的代码贡献来维护，改进和拓展�
 
 我们会定期发布新版本的 Flink CDC。
 
-根据 Apache Software Foundation 版本发布规则，
-我们会在每次发布前制作发布候选（Release Candidate）版本，
+根据 [Apache Software Foundation 版本发布规则](https://www.apache.org/legal/release-policy.html)，
+我们会在每次发布前制作发布候选（Release Candidate, RC）版本，
 并邀请社区成员对这一预发布版本进行测试与投票。
 
 欢迎您在 `dev@flink.apache.org` 邮件列表中参与版本验证工作。
@@ -106,6 +107,36 @@ Flink CDC 项目通过众多贡献者的代码贡献来维护，改进和拓展�
 * Windows (PowerShell): `Get-FileHash flink-cdc-*-bin.tar.gz -Algorithm SHA512 | Format-List`
 
 并验证结果是否与发布页面上的哈希值一致。
+
+为了验证软件包签名，您需要先安装 gpg（2.4 及更高版本）。
+
+首先，从 [KEYS](https://dist.apache.org/repos/dist/release/flink/KEYS) 下载负责发布的项目 PMC / Committer 的 GPG 公钥并导入：
+
+```bash
+gpg --import <releaser-public-key>
+```
+
+例如：
+
+```bash
+gpg  --import leonard-xu.pub
+```
+
+这里，`leonard-xu.pub` 文件即为之前下载的 @leonardBang 的公钥。
+
+然后，我们就可以使用 gpg 命令来验证签名：
+
+```bash
+gpg --verify flink-cdc-<VERSION>-src.tgz.asc flink-cdc-<VERSION>-src.tgz
+```
+
+例如，使用以下命令来验证 3.1.0 的源码包是否被正确签名：
+
+```bash
+gpg --verify flink-cdc-3.1.0-src.tgz.asc flink-cdc-3.1.0-src.tgz
+```
+
+正常情况下应该打印出 Good signature from "Leonard Xu ..."。
 
 3. 验证二进制包是否使用 JDK 8 进行编译。
 
