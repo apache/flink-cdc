@@ -82,13 +82,22 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     @Override
     public PipelineDef parse(Path pipelineDefPath, Configuration globalPipelineConfig)
             throws Exception {
-        JsonNode root = mapper.readTree(pipelineDefPath.toFile());
+        return parse(mapper.readTree(pipelineDefPath.toFile()), globalPipelineConfig);
+    }
 
+    @Override
+    public PipelineDef parse(String pipelineDefText, Configuration globalPipelineConfig)
+            throws Exception {
+        return parse(mapper.readTree(pipelineDefText), globalPipelineConfig);
+    }
+
+    private PipelineDef parse(JsonNode pipelineDefJsonNode, Configuration globalPipelineConfig)
+            throws Exception {
         // Source is required
         SourceDef sourceDef =
                 toSourceDef(
                         checkNotNull(
-                                root.get(SOURCE_KEY),
+                                pipelineDefJsonNode.get(SOURCE_KEY),
                                 "Missing required field \"%s\" in pipeline definition",
                                 SOURCE_KEY));
 
@@ -96,13 +105,13 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         SinkDef sinkDef =
                 toSinkDef(
                         checkNotNull(
-                                root.get(SINK_KEY),
+                                pipelineDefJsonNode.get(SINK_KEY),
                                 "Missing required field \"%s\" in pipeline definition",
                                 SINK_KEY));
 
         // Transforms are optional
         List<TransformDef> transformDefs = new ArrayList<>();
-        Optional.ofNullable(root.get(TRANSFORM_KEY))
+        Optional.ofNullable(pipelineDefJsonNode.get(TRANSFORM_KEY))
                 .ifPresent(
                         node ->
                                 node.forEach(
@@ -110,11 +119,11 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
         // Routes are optional
         List<RouteDef> routeDefs = new ArrayList<>();
-        Optional.ofNullable(root.get(ROUTE_KEY))
+        Optional.ofNullable(pipelineDefJsonNode.get(ROUTE_KEY))
                 .ifPresent(node -> node.forEach(route -> routeDefs.add(toRouteDef(route))));
 
         // Pipeline configs are optional
-        Configuration userPipelineConfig = toPipelineConfig(root.get(PIPELINE_KEY));
+        Configuration userPipelineConfig = toPipelineConfig(pipelineDefJsonNode.get(PIPELINE_KEY));
 
         // Merge user config into global config
         Configuration pipelineConfig = new Configuration();
