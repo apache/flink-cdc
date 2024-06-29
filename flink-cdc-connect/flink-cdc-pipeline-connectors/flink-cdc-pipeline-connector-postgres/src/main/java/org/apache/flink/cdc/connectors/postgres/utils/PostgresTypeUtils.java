@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.postgres.utils;
 
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.table.types.logical.DecimalType;
 
 import io.debezium.relational.Column;
@@ -60,6 +61,9 @@ public class PostgresTypeUtils {
     private static final String PG_CHARACTER_ARRAY = "_character";
     private static final String PG_CHARACTER_VARYING = "varchar";
     private static final String PG_CHARACTER_VARYING_ARRAY = "_varchar";
+    private static final String PG_UUID = "uuid";
+    private static final String PG_GEOMETRY = "geometry";
+    private static final String PG_GEOGRAPHY = "geography";
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
     public static DataType fromDbzColumn(Column column) {
@@ -118,13 +122,13 @@ public class PostgresTypeUtils {
                 if (precision > 0) {
                     return DataTypes.DECIMAL(precision, scale);
                 }
-                return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 18);
+                return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0);
             case PG_NUMERIC_ARRAY:
                 // see SPARK-26538: handle numeric without explicit precision and scale.
                 if (precision > 0) {
                     return DataTypes.ARRAY(DataTypes.DECIMAL(precision, scale));
                 }
-                return DataTypes.ARRAY(DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 18));
+                return DataTypes.ARRAY(DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0));
             case PG_CHAR:
             case PG_CHARACTER:
                 return DataTypes.CHAR(precision);
@@ -136,6 +140,9 @@ public class PostgresTypeUtils {
             case PG_CHARACTER_VARYING_ARRAY:
                 return DataTypes.ARRAY(DataTypes.VARCHAR(precision));
             case PG_TEXT:
+            case PG_GEOMETRY:
+            case PG_GEOGRAPHY:
+            case PG_UUID:
                 return DataTypes.STRING();
             case PG_TEXT_ARRAY:
                 return DataTypes.ARRAY(DataTypes.STRING());
@@ -143,6 +150,10 @@ public class PostgresTypeUtils {
                 return DataTypes.TIMESTAMP(scale);
             case PG_TIMESTAMP_ARRAY:
                 return DataTypes.ARRAY(DataTypes.TIMESTAMP(scale));
+            case PG_TIMESTAMPTZ:
+                return new ZonedTimestampType(scale);
+            case PG_TIMESTAMPTZ_ARRAY:
+                return DataTypes.ARRAY(new ZonedTimestampType(scale));
             case PG_TIME:
                 return DataTypes.TIME(scale);
             case PG_TIME_ARRAY:

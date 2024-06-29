@@ -33,10 +33,14 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.source.reader.PostgresPipelineRecordEmitter;
+import org.apache.flink.cdc.connectors.postgres.table.PostgreSQLReadableMetadata;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /** A {@link DataSource} for Postgres cdc connector. */
 @Internal
@@ -45,16 +49,24 @@ public class PostgresDataSource implements DataSource {
     private final PostgresSourceConfigFactory configFactory;
     private final PostgresSourceConfig postgresSourceConfig;
 
+    private final List<PostgreSQLReadableMetadata> readableMetadataList;
+
     public PostgresDataSource(PostgresSourceConfigFactory configFactory) {
+        this(configFactory, new ArrayList<>());
+    }
+
+    public PostgresDataSource(
+            PostgresSourceConfigFactory configFactory,
+            List<PostgreSQLReadableMetadata> readableMetadataList) {
         this.configFactory = configFactory;
         this.postgresSourceConfig = configFactory.create(0);
+        this.readableMetadataList = readableMetadataList;
     }
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
         DebeziumEventDeserializationSchema deserializer =
-                new PostgresEventDeserializer(
-                        DebeziumChangelogMode.ALL, postgresSourceConfig.isIncludeSchemaChanges());
+                new PostgresEventDeserializer(DebeziumChangelogMode.ALL, readableMetadataList);
 
         PostgresOffsetFactory postgresOffsetFactory = new PostgresOffsetFactory();
         PostgresDialect postgresDialect = new PostgresDialect(postgresSourceConfig);

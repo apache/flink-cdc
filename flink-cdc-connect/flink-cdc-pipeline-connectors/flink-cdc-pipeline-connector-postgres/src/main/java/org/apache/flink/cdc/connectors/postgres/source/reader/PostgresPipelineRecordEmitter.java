@@ -21,7 +21,7 @@ import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.connectors.base.options.StartupMode;
+import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
@@ -44,8 +44,11 @@ import java.util.List;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isLowWatermarkEvent;
+import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getTableId;
+import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
+import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isSchemaChangeEvent;
 
-/** The {@link RecordEmitter} implementation for pipeline oracle connector. */
+/** The {@link RecordEmitter} implementation for PostgreSQL pipeline connector. */
 public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmitter<T> {
     private final PostgresSourceConfig sourceConfig;
     private final PostgresDialect postgresDialect;
@@ -54,8 +57,10 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
     private Set<TableId> alreadySendCreateTableTables;
 
     // Used when startup mode is not initial
-    private boolean alreadySendCreateTableForBinlogSplit = false;
-    private final List<CreateTableEvent> createTableEventCache;
+    private boolean shouldEmitAllCreateTableEventsInSnapshotMode = true;
+    private boolean isBounded = false;
+
+    private final List<CreateTableEvent> createTableEventCache = new ArrayList<>();
 
     public PostgresPipelineRecordEmitter(
             DebeziumDeserializationSchema debeziumDeserializationSchema,
@@ -71,34 +76,21 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
         this.sourceConfig = sourceConfig;
         this.postgresDialect = postgresDialect;
         this.alreadySendCreateTableTables = new HashSet<>();
-        this.createTableEventCache = new ArrayList<>();
-
-        if (!sourceConfig.getStartupOptions().startupMode.equals(StartupMode.INITIAL)) {
-            try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
-                List<TableId> capturedTableIds =
-                        TableDiscoveryUtils.listTables(
-                                sourceConfig.getDatabaseList().get(0),
-                                jdbc,
-                                sourceConfig.getTableFilters());
-                for (TableId tableId : capturedTableIds) {
-                    Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
-                    createTableEventCache.add(
-                            new CreateTableEvent(
-                                    org.apache.flink.cdc.common.event.TableId.tableId(
-                                            tableId.schema(), tableId.table()),
-                                    schema));
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
-            }
-        }
+        generateCreateTableEvent(sourceConfig);
+        this.isBounded = StartupOptions.snapshot().equals(sourceConfig.getStartupOptions());
     }
 
     @Override
     protected void processElement(
             SourceRecord element, SourceOutput<T> output, SourceSplitState splitState)
             throws Exception {
-        if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
+        if (shouldEmitAllCreateTableEventsInSnapshotMode && isBounded) {
+            // In snapshot mode, we simply emit all schemas at once.
+            for (CreateTableEvent createTableEvent : createTableEventCache) {
+                output.collect((T) createTableEvent);
+            }
+            shouldEmitAllCreateTableEventsInSnapshotMode = false;
+        } else if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
             TableId tableId = splitState.asSnapshotSplitState().toSourceSplit().getTableId();
             if (!alreadySendCreateTableTables.contains(tableId)) {
                 try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
@@ -106,13 +98,18 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
                     alreadySendCreateTableTables.add(tableId);
                 }
             }
-        } else if (splitState.isStreamSplitState()
-                && !alreadySendCreateTableForBinlogSplit
-                && !sourceConfig.getStartupOptions().startupMode.equals(StartupMode.INITIAL)) {
-            for (CreateTableEvent createTableEvent : createTableEventCache) {
-                output.collect((T) createTableEvent);
+        } else {
+            if (isDataChangeRecord(element) || isSchemaChangeEvent(element)) {
+                TableId tableId = getTableId(element);
+                if (!alreadySendCreateTableTables.contains(tableId)) {
+                    for (CreateTableEvent createTableEvent : createTableEventCache) {
+                        if (createTableEvent != null) {
+                            output.collect((T) createTableEvent);
+                        }
+                    }
+                    alreadySendCreateTableTables.add(tableId);
+                }
             }
-            alreadySendCreateTableForBinlogSplit = true;
         }
         super.processElement(element, output, splitState);
     }
@@ -125,5 +122,25 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
                         org.apache.flink.cdc.common.event.TableId.tableId(
                                 tableId.schema(), tableId.table()),
                         schema));
+    }
+
+    private void generateCreateTableEvent(PostgresSourceConfig sourceConfig) {
+        try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
+            List<TableId> capturedTableIds =
+                    TableDiscoveryUtils.listTables(
+                            sourceConfig.getDatabaseList().get(0),
+                            jdbc,
+                            sourceConfig.getTableFilters());
+            for (TableId tableId : capturedTableIds) {
+                Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
+                createTableEventCache.add(
+                        new CreateTableEvent(
+                                org.apache.flink.cdc.common.event.TableId.tableId(
+                                        tableId.schema(), tableId.table()),
+                                schema));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
+        }
     }
 }

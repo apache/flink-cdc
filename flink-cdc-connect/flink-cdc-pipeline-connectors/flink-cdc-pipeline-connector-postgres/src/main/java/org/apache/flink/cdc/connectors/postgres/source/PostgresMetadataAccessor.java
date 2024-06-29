@@ -24,8 +24,6 @@ import org.apache.flink.cdc.common.source.MetadataAccessor;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils;
 
-import io.debezium.connector.postgresql.PostgresPartition;
-
 import javax.annotation.Nullable;
 
 import java.util.List;
@@ -36,12 +34,8 @@ public class PostgresMetadataAccessor implements MetadataAccessor {
 
     private final PostgresSourceConfig sourceConfig;
 
-    private final PostgresPartition partition;
-
     public PostgresMetadataAccessor(PostgresSourceConfig sourceConfig) {
         this.sourceConfig = sourceConfig;
-        this.partition =
-                new PostgresPartition(sourceConfig.getDbzConnectorConfig().getLogicalName());
     }
 
     /**
@@ -50,7 +44,7 @@ public class PostgresMetadataAccessor implements MetadataAccessor {
      */
     @Override
     public List<String> listNamespaces() {
-        throw new UnsupportedOperationException("List namespace is not supported by postgres.");
+        return PostgresSchemaUtils.listNamespaces(sourceConfig);
     }
 
     /**
@@ -61,7 +55,7 @@ public class PostgresMetadataAccessor implements MetadataAccessor {
      */
     @Override
     public List<String> listSchemas(@Nullable String namespace) {
-        return PostgresSchemaUtils.listDatabases(sourceConfig);
+        return PostgresSchemaUtils.listSchemas(sourceConfig, namespace);
     }
 
     /**
@@ -84,6 +78,6 @@ public class PostgresMetadataAccessor implements MetadataAccessor {
      */
     @Override
     public Schema getTableSchema(TableId tableId) {
-        return PostgresSchemaUtils.getTableSchema(sourceConfig, partition, tableId);
+        return PostgresSchemaUtils.getTableSchema(sourceConfig, tableId);
     }
 }
