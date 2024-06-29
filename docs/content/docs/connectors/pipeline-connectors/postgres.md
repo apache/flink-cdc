@@ -120,6 +120,13 @@ pipeline:
           <br/>Slot names must conform to <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL replication slot naming rules</a>, which state: "Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character."</td>
     </tr> 
     <tr>
+      <td>decoding.plugin.name</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The name of the Postgres logical decoding plug-in installed on the server. Supported values are decoderbufs and pgoutput.</td>
+    </tr> 
+    <tr>
       <td>tables.exclude</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>

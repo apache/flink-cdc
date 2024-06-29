@@ -115,6 +115,13 @@ pipeline:
       <td>String</td>
       <td>为从特定插件以流式传输方式获取某个数据库/模式的变更数据，所创建的 Postgre 逻辑解码槽（logical decoding slot）的名称。服务器使用这个槽（slot）将事件流式传输给你要配置的连接器（connector）。
           <br/>复制槽名称必须符合 <a href="https://www.postgresql.org/docs/current/static/warm-standby.html#STREAMING-REPLICATION-SLOTS-MANIPULATION">PostgreSQL 复制插槽的命名规则</a>, 其规则如下: "Each replication slot has a name, which can contain lower-case letters, numbers, and the underscore character."</td>
+    </tr>
+    <tr>
+      <td>decoding.plugin.name</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The name of the Postgres logical decoding plug-in installed on the server. Supported values are decoderbufs and pgoutput.</td>
     </tr> 
     <tr>
       <td>tables.exclude</td>

@@ -152,6 +152,7 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                                 .serverTimeZone("UTC");
         configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
         configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
 
         FlinkSourceProvider sourceProvider =
                 (FlinkSourceProvider)
