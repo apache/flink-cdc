@@ -48,7 +48,7 @@ public class OracleMetadataAccessor implements MetadataAccessor {
      */
     @Override
     public List<String> listNamespaces() {
-        throw new UnsupportedOperationException("List namespace is not supported by Oracle.");
+        return OracleSchemaUtils.listNamespaces(sourceConfig);
     }
 
     /**
@@ -59,7 +59,7 @@ public class OracleMetadataAccessor implements MetadataAccessor {
      */
     @Override
     public List<String> listSchemas(@Nullable String namespace) {
-        return OracleSchemaUtils.listDatabases(sourceConfig);
+        return OracleSchemaUtils.listSchemas(sourceConfig);
     }
 
     /**

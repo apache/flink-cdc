@@ -46,12 +46,21 @@ public class OracleSchemaUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleSchemaUtils.class);
 
-    public static List<String> listDatabases(OracleSourceConfig sourceConfig) {
-        try (JdbcConnection jdbc =
+    public static List<String> listSchemas(OracleSourceConfig sourceConfig) {
+        try (OracleConnection jdbc =
                 createOracleConnection(sourceConfig.getDbzConnectorConfig().getJdbcConfig())) {
-            return listDatabases(jdbc);
+            return listSchemas(jdbc);
         } catch (SQLException e) {
-            throw new RuntimeException("Error to list databases: " + e.getMessage(), e);
+            throw new RuntimeException("Error to list schemas: " + e.getMessage(), e);
+        }
+    }
+
+    public static List<String> listNamespaces(OracleSourceConfig sourceConfig) {
+        try (OracleConnection jdbc =
+                createOracleConnection(sourceConfig.getDbzConnectorConfig().getJdbcConfig())) {
+            return listNamespaces(jdbc);
+        } catch (SQLException e) {
+            throw new RuntimeException("Error to list namespaces: " + e.getMessage(), e);
         }
     }
 
@@ -85,21 +94,35 @@ public class OracleSchemaUtils {
         }
     }
 
-    public static List<String> listDatabases(JdbcConnection jdbc) throws SQLException {
+    public static List<String> listSchemas(JdbcConnection jdbc) throws SQLException {
         // -------------------
         // READ DATABASE NAMES
         // -------------------
         // Get the list of databases ...
-        LOG.info("Read list of available databases");
+        LOG.info("Read list of available schemas");
         final List<String> databaseNames = new ArrayList<>();
         jdbc.query(
-                "SHOW DATABASES WHERE `database` NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')",
+                "SELECT USERNAME  FROM SYS.DBA_USERS",
                 rs -> {
                     while (rs.next()) {
                         databaseNames.add(rs.getString(1));
                     }
                 });
-        LOG.info("\t list of available databases are: {}", databaseNames);
+        LOG.info("\t list of available schemas are: {}", databaseNames);
+        return databaseNames;
+    }
+
+    public static List<String> listNamespaces(JdbcConnection jdbc) throws SQLException {
+        LOG.info("Read list of available namespaces");
+        final List<String> databaseNames = new ArrayList<>();
+        jdbc.query(
+                "SELECT NAME FROM V$DATABASE",
+                rs -> {
+                    while (rs.next()) {
+                        databaseNames.add(rs.getString(1));
+                    }
+                });
+        LOG.info("\t list of available namespaces are: {}", databaseNames);
         return databaseNames;
     }
 
