@@ -50,7 +50,7 @@ public class PostgresMetadataAccessor implements MetadataAccessor {
      */
     @Override
     public List<String> listNamespaces() {
-        throw new UnsupportedOperationException("List namespace is not supported by postgres.");
+        return PostgresSchemaUtils.listNamespaces(sourceConfig);
     }
 
     /**
@@ -61,7 +61,7 @@ public class PostgresMetadataAccessor implements MetadataAccessor {
      */
     @Override
     public List<String> listSchemas(@Nullable String namespace) {
-        return PostgresSchemaUtils.listDatabases(sourceConfig);
+        return PostgresSchemaUtils.listSchemas(sourceConfig, namespace);
     }
 
     /**

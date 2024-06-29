@@ -47,11 +47,19 @@ public class PostgresSchemaUtils {
 
     private static volatile PostgresDialect postgresDialect;
 
-    public static List<String> listDatabases(PostgresSourceConfig sourceConfig) {
+    public static List<String> listSchemas(PostgresSourceConfig sourceConfig, String namespace) {
         try (JdbcConnection jdbc = getPostgresDialect(sourceConfig).openJdbcConnection()) {
-            return listDatabases(jdbc);
+            return listSchemas(jdbc, namespace);
         } catch (SQLException e) {
-            throw new RuntimeException("Error to list databases: " + e.getMessage(), e);
+            throw new RuntimeException("Error to list schemas: " + e.getMessage(), e);
+        }
+    }
+
+    public static List<String> listNamespaces(PostgresSourceConfig sourceConfig) {
+        try (JdbcConnection jdbc = getPostgresDialect(sourceConfig).openJdbcConnection()) {
+            return listNamespaces(jdbc);
+        } catch (SQLException e) {
+            throw new RuntimeException("Error to list namespaces: " + e.getMessage(), e);
         }
     }
 
@@ -96,22 +104,43 @@ public class PostgresSchemaUtils {
         return postgresDialect;
     }
 
-    public static List<String> listDatabases(JdbcConnection jdbc) throws SQLException {
-        // -------------------
-        // READ DATABASE NAMES
-        // -------------------
-        // Get the list of databases ...
-        LOG.info("Read list of available databases");
-        final List<String> databaseNames = new ArrayList<>();
+    public static List<String> listSchemas(JdbcConnection jdbc, String namespace)
+            throws SQLException {
+        LOG.info("Read list of available schemas");
+        final List<String> schemaNames = new ArrayList<>();
+
+        String querySql =
+                String.format(
+                        "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = %s",
+                        quote(namespace));
+
         jdbc.query(
-                "SHOW DATABASES WHERE `database` NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')",
+                querySql,
                 rs -> {
                     while (rs.next()) {
-                        databaseNames.add(rs.getString(1));
+                        schemaNames.add(rs.getString(1));
                     }
                 });
-        LOG.info("\t list of available databases are: {}", databaseNames);
-        return databaseNames;
+        LOG.info("\t list of available schemas are: {}", schemaNames);
+        return schemaNames;
+    }
+
+    public static List<String> listNamespaces(JdbcConnection jdbc) throws SQLException {
+        LOG.info("Read list of available namespaces");
+        final List<String> namespaceNames = new ArrayList<>();
+        jdbc.query(
+                "SELECT DATNAME FROM PG_DATABASE",
+                rs -> {
+                    while (rs.next()) {
+                        namespaceNames.add(rs.getString(1));
+                    }
+                });
+        LOG.info("\t list of available namespaces are: {}", namespaceNames);
+        return namespaceNames;
+    }
+
+    public static String quote(String dbOrTableName) {
+        return "\"" + dbOrTableName + "\"";
     }
 
     public static Schema getTableSchema(
