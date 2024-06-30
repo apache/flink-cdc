@@ -159,6 +159,11 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
+    public void addAlreadyProcessedTables(TableId tableId){
+        snapshotSplitAssigner.addAlreadyProcessedTables(tableId);
+    }
+
+    @Override
     public PendingSplitsState snapshotState(long checkpointId) {
         return new HybridPendingSplitsState(
                 snapshotSplitAssigner.snapshotState(checkpointId), isBinlogSplitAssigned);

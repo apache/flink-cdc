@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.assigners;
 
+import io.debezium.relational.TableId;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -119,6 +120,9 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public void onBinlogSplitUpdated() {}
+
+    @Override
+    public void addAlreadyProcessedTables(TableId tableId) {}
 
     @Override
     public void close() {}

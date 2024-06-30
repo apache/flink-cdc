@@ -71,10 +71,12 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     private final List<CreateTableEvent> createTableEventCache;
 
     public MySqlPipelineRecordEmitter(
+            MySqlSourceReaderContext context,
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
             MySqlSourceConfig sourceConfig) {
         super(
+                context,
                 debeziumDeserializationSchema,
                 sourceReaderMetrics,
                 sourceConfig.isIncludeSchemaChanges());

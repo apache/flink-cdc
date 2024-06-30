@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.assigners;
 
+import io.debezium.relational.TableId;
 import org.apache.flink.api.common.state.CheckpointListener;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
@@ -115,6 +116,8 @@ public interface MySqlSplitAssigner {
      * is useful to check the newly added tables has been finished or not.
      */
     void onBinlogSplitUpdated();
+
+    void addAlreadyProcessedTables(TableId tableId);
 
     /**
      * Called to close the assigner, in case it holds on to any resources, like threads or network

@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.source.MetadataAccessor;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEmitter;
+import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReaderContext;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
 /** A {@link DataSource} for mysql cdc connector. */
@@ -51,9 +52,9 @@ public class MySqlDataSource implements DataSource {
                 new MySqlSource<>(
                         configFactory,
                         deserializer,
-                        (sourceReaderMetrics, sourceConfig) ->
+                        (mySqlSourceReaderContext, sourceReaderMetrics, sourceConfig) ->
                                 new MySqlPipelineRecordEmitter(
-                                        deserializer, sourceReaderMetrics, sourceConfig));
+                                        mySqlSourceReaderContext, deserializer, sourceReaderMetrics, sourceConfig));
 
         return FlinkSourceProvider.of(source);
     }

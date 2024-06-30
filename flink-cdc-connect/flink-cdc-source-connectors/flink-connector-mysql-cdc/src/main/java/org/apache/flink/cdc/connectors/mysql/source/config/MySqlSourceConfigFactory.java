@@ -61,7 +61,7 @@ public class MySqlSourceConfigFactory implements Serializable {
             MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue();
     private double distributionFactorLower =
             MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
-    private boolean includeSchemaChanges = false;
+    private boolean includeSchemaChanges = true;
     private boolean scanNewlyAddedTableEnabled = false;
     private boolean closeIdleReaders = false;
     private Properties jdbcProperties;

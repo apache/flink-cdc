@@ -231,10 +231,15 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 // Get the removed tables with the new table filter
                 Set<TableId> tablesToRemove = new HashSet<>(previousCapturedTables);
                 tablesToRemove.removeAll(currentCapturedTables);
+                System.out.println(currentCapturedTables);
+                System.out.println(alreadyProcessedTables);
+                System.out.println(previousCapturedTables);
+                System.out.println(tablesToRemove);
 
                 // Get the newly added tables
                 currentCapturedTables.removeAll(previousCapturedTables);
                 List<TableId> newlyAddedTables = currentCapturedTables;
+                System.out.println(newlyAddedTables);
 
                 // case 1: there are old tables to remove from state
                 if (!tablesToRemove.isEmpty()) {
@@ -424,6 +429,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public SnapshotPendingSplitsState snapshotState(long checkpointId) {
+        LOG.info("trigger checkpoint 手动， {}", alreadyProcessedTables);
         SnapshotPendingSplitsState state =
                 new SnapshotPendingSplitsState(
                         alreadyProcessedTables,
@@ -598,13 +604,18 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                     mySqlSchema,
                     sourceConfig,
                     tableId != null
-                                    && sourceConfig
-                                            .getTableFilters()
-                                            .dataCollectionFilter()
-                                            .isIncluded(tableId)
+                            && sourceConfig
+                            .getTableFilters()
+                            .dataCollectionFilter()
+                            .isIncluded(tableId)
                             ? chunkSplitterState
                             : ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
         }
         return new MySqlChunkSplitter(mySqlSchema, sourceConfig);
+    }
+
+    @Override
+    public void addAlreadyProcessedTables(TableId tableId) {
+        alreadyProcessedTables.add(tableId);
     }
 }

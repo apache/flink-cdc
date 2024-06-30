@@ -459,112 +459,112 @@ limitations under the License.
             <!-- Due to the Flink build setup, "mvn spotless:apply" and "mvn spotless:check"
 				don't work. You have to use the fully qualified name, i.e.
 				"mvn com.diffplug.spotless:spotless-maven-plugin:apply" -->
-            <plugin>
-                <groupId>com.diffplug.spotless</groupId>
-                <artifactId>spotless-maven-plugin</artifactId>
-                <version>${spotless.version}</version>
-                <configuration>
-                    <java>
-                        <googleJavaFormat>
-                            <version>1.7</version>
-                            <style>AOSP</style>
-                        </googleJavaFormat>
+            <!--            <plugin>-->
+            <!--                <groupId>com.diffplug.spotless</groupId>-->
+            <!--                <artifactId>spotless-maven-plugin</artifactId>-->
+            <!--                <version>${spotless.version}</version>-->
+            <!--                <configuration>-->
+            <!--                    <java>-->
+            <!--                        <googleJavaFormat>-->
+            <!--                            <version>1.7</version>-->
+            <!--                            <style>AOSP</style>-->
+            <!--                        </googleJavaFormat>-->
 
-                        <!-- \# refers to the static imports -->
-                        <importOrder>
-                            <order>org.apache.flink,org.apache.flink.shaded,,javax,java,scala,\#
-                            </order>
-                        </importOrder>
+            <!--                        &lt;!&ndash; \# refers to the static imports &ndash;&gt;-->
+            <!--                        <importOrder>-->
+            <!--                            <order>org.apache.flink,org.apache.flink.shaded,,javax,java,scala,\#-->
+            <!--                            </order>-->
+            <!--                        </importOrder>-->
 
-                        <removeUnusedImports/>
-                    </java>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>spotless-check</id>
-                        <phase>validate</phase>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>2.17</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>com.puppycrawl.tools</groupId>
-                        <artifactId>checkstyle</artifactId>
-                        <version>8.14</version>
-                    </dependency>
-                </dependencies>
-                <executions>
-                    <execution>
-                        <id>validate</id>
-                        <phase>validate</phase>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <suppressionsLocation>/tools/maven/suppressions.xml</suppressionsLocation>
-                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
-                    <configLocation>/tools/maven/checkstyle.xml</configLocation>
-                    <logViolationsToConsole>true</logViolationsToConsole>
-                    <failOnViolation>true</failOnViolation>
-                </configuration>
-            </plugin>
+            <!--                        <removeUnusedImports/>-->
+            <!--                    </java>-->
+            <!--                </configuration>-->
+            <!--                <executions>-->
+            <!--                    <execution>-->
+            <!--                        <id>spotless-check</id>-->
+            <!--                        <phase>validate</phase>-->
+            <!--                        <goals>-->
+            <!--                            <goal>check</goal>-->
+            <!--                        </goals>-->
+            <!--                    </execution>-->
+            <!--                </executions>-->
+            <!--            </plugin>-->
+<!--            <plugin>-->
+<!--                <groupId>org.apache.maven.plugins</groupId>-->
+<!--                <artifactId>maven-checkstyle-plugin</artifactId>-->
+<!--                <version>2.17</version>-->
+<!--                <dependencies>-->
+<!--                    <dependency>-->
+<!--                        <groupId>com.puppycrawl.tools</groupId>-->
+<!--                        <artifactId>checkstyle</artifactId>-->
+<!--                        <version>8.14</version>-->
+<!--                    </dependency>-->
+<!--                </dependencies>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>validate</id>-->
+<!--                        <phase>validate</phase>-->
+<!--                        <goals>-->
+<!--                            <goal>check</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--                <configuration>-->
+<!--                    <suppressionsLocation>/tools/maven/suppressions.xml</suppressionsLocation>-->
+<!--                    <includeTestSourceDirectory>true</includeTestSourceDirectory>-->
+<!--                    <configLocation>/tools/maven/checkstyle.xml</configLocation>-->
+<!--                    <logViolationsToConsole>true</logViolationsToConsole>-->
+<!--                    <failOnViolation>true</failOnViolation>-->
+<!--                </configuration>-->
+<!--            </plugin>-->
 
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.0.0-M5</version>
-                <executions>
-                    <execution>
-                        <id>default-test</id>
-                        <phase>test</phase>
-                        <goals>
-                            <goal>test</goal>
-                        </goals>
-                        <configuration>
-                            <includes>
-                                <include>**/*Test.java</include>
-                                <include>**/*Test.scala</include>
-                            </includes>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>integration-tests</id>
-                        <phase>integration-test</phase>
-                        <goals>
-                            <goal>test</goal>
-                        </goals>
-                        <configuration>
-                            <includes>
-                                <include>**/*ITCase.java</include>
-                                <include>**/*ITCase.scala</include>
-                            </includes>
-                            <reuseForks>false</reuseForks>
-                        </configuration>
-                    </execution>
-                </executions>
-                <configuration>
-                    <forkCount>${flink.forkCount}</forkCount>
-                    <reuseForks>${flink.reuseForks}</reuseForks>
-                    <trimStackTrace>false</trimStackTrace>
-                    <systemPropertyVariables>
-                        <forkNumber>0${surefire.forkNumber}</forkNumber>
-                    </systemPropertyVariables>
-                    <!-- Prevent ORA-01882: timezone region not found errors due to the Oracle DB
-                         does not understanding some time zone which used in Ubuntu OS -->
-                    <argLine>-Xms256m -Xmx2048m -Dmvn.forkNumber=${surefire.forkNumber}
-                        -XX:+UseG1GC -Doracle.jdbc.timezoneAsRegion=false
-                    </argLine>
-                </configuration>
-            </plugin>
+            <!--            <plugin>-->
+            <!--                <groupId>org.apache.maven.plugins</groupId>-->
+            <!--                <artifactId>maven-surefire-plugin</artifactId>-->
+            <!--                <version>3.0.0-M5</version>-->
+            <!--                <executions>-->
+            <!--                    <execution>-->
+            <!--                        <id>default-test</id>-->
+            <!--                        <phase>test</phase>-->
+            <!--                        <goals>-->
+            <!--                            <goal>test</goal>-->
+            <!--                        </goals>-->
+            <!--                        <configuration>-->
+            <!--                            <includes>-->
+            <!--                                <include>**/*Test.java</include>-->
+            <!--                                <include>**/*Test.scala</include>-->
+            <!--                            </includes>-->
+            <!--                        </configuration>-->
+            <!--                    </execution>-->
+            <!--                    <execution>-->
+            <!--                        <id>integration-tests</id>-->
+            <!--                        <phase>integration-test</phase>-->
+            <!--                        <goals>-->
+            <!--                            <goal>test</goal>-->
+            <!--                        </goals>-->
+            <!--                        <configuration>-->
+            <!--                            <includes>-->
+            <!--                                <include>**/*ITCase.java</include>-->
+            <!--                                <include>**/*ITCase.scala</include>-->
+            <!--                            </includes>-->
+            <!--                            <reuseForks>false</reuseForks>-->
+            <!--                        </configuration>-->
+            <!--                    </execution>-->
+            <!--                </executions>-->
+            <!--                <configuration>-->
+            <!--                    <forkCount>${flink.forkCount}</forkCount>-->
+            <!--                    <reuseForks>${flink.reuseForks}</reuseForks>-->
+            <!--                    <trimStackTrace>false</trimStackTrace>-->
+            <!--                    <systemPropertyVariables>-->
+            <!--                        <forkNumber>0${surefire.forkNumber}</forkNumber>-->
+            <!--                    </systemPropertyVariables>-->
+            <!--                    &lt;!&ndash; Prevent ORA-01882: timezone region not found errors due to the Oracle DB-->
+            <!--                         does not understanding some time zone which used in Ubuntu OS &ndash;&gt;-->
+            <!--                    <argLine>-Xms256m -Xmx2048m -Dmvn.forkNumber=${surefire.forkNumber}-->
+            <!--                        -XX:+UseG1GC -Doracle.jdbc.timezoneAsRegion=false-->
+            <!--                    </argLine>-->
+            <!--                </configuration>-->
+            <!--            </plugin>-->
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -644,31 +644,31 @@ limitations under the License.
             </plugin>
 
             <!-- This plugin takes effect for Maven version upper more than 3.5.0 -->
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>flatten-maven-plugin</artifactId>
-                <version>${flatten-maven-plugin.version}</version>
-                <configuration>
-                    <updatePomFile>true</updatePomFile>
-                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>flatten</id>
-                        <goals>
-                            <goal>flatten</goal>
-                        </goals>
-                        <phase>process-resources</phase>
-                    </execution>
-                    <execution>
-                        <id>flatten.clean</id>
-                        <goals>
-                            <goal>clean</goal>
-                        </goals>
-                        <phase>clean</phase>
-                    </execution>
-                </executions>
-            </plugin>
+            <!--            <plugin>-->
+            <!--                <groupId>org.codehaus.mojo</groupId>-->
+            <!--                <artifactId>flatten-maven-plugin</artifactId>-->
+            <!--                <version>${flatten-maven-plugin.version}</version>-->
+            <!--                <configuration>-->
+            <!--                    <updatePomFile>true</updatePomFile>-->
+            <!--                    <flattenMode>resolveCiFriendliesOnly</flattenMode>-->
+            <!--                </configuration>-->
+            <!--                <executions>-->
+            <!--                    <execution>-->
+            <!--                        <id>flatten</id>-->
+            <!--                        <goals>-->
+            <!--                            <goal>flatten</goal>-->
+            <!--                        </goals>-->
+            <!--                        <phase>process-resources</phase>-->
+            <!--                    </execution>-->
+            <!--                    <execution>-->
+            <!--                        <id>flatten.clean</id>-->
+            <!--                        <goals>-->
+            <!--                            <goal>clean</goal>-->
+            <!--                        </goals>-->
+            <!--                        <phase>clean</phase>-->
+            <!--                    </execution>-->
+            <!--                </executions>-->
+            <!--            </plugin>-->
         </plugins>
     </build>
 

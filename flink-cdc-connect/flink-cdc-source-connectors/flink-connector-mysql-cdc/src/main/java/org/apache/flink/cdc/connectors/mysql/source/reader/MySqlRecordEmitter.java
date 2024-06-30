@@ -17,7 +17,9 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
+import io.debezium.relational.TableId;
 import org.apache.flink.api.connector.source.SourceOutput;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogNewAddedTableEvent;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
@@ -31,11 +33,13 @@ import org.apache.flink.util.Collector;
 import io.debezium.document.Array;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Iterator;
+import java.util.Map;
 
 /**
  * The {@link RecordEmitter} implementation for {@link MySqlSourceReader}.
@@ -50,14 +54,17 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             new FlinkJsonTableChangeSerializer();
 
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
+    private final MySqlSourceReaderContext context;
     private final MySqlSourceReaderMetrics sourceReaderMetrics;
     private final boolean includeSchemaChanges;
     private final OutputCollector<T> outputCollector;
 
     public MySqlRecordEmitter(
+            MySqlSourceReaderContext context,
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
             boolean includeSchemaChanges) {
+        this.context = context;
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceReaderMetrics = sourceReaderMetrics;
         this.includeSchemaChanges = includeSchemaChanges;
@@ -93,7 +100,10 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             if (includeSchemaChanges) {
                 BinlogOffset position = RecordUtils.getBinlogPosition(element);
                 splitState.asBinlogSplitState().setStartingOffset(position);
-                emitElement(element, output);
+                TableId tableId = extractTableId(element);
+                LOG.info("sending table add to enumerator from subtask");
+                context.getSourceReaderContext().sendSourceEventToCoordinator(new BinlogNewAddedTableEvent(tableId.catalog(), tableId.schema(), tableId.table()));
+//                emitElement(element, output);
             }
         } else if (RecordUtils.isDataChangeRecord(element)) {
             updateStartingOffsetForSplit(splitState, element);
@@ -107,6 +117,27 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         }
     }
 
+    public static TableId extractTableId(SourceRecord sourceRecord) {
+        // 获取 SourceRecord 的 sourcePartition
+        Map<String, ?> sourcePartition = sourceRecord.sourcePartition();
+
+        // 获取 SourceRecord 的 key，通常是 Struct 类型
+        Struct value = ((Struct) sourceRecord.value()).getStruct("source");
+
+        // 获取 sourceOffset
+        Map<String, ?> sourceOffset = sourceRecord.sourceOffset();
+
+        // 从 keyStruct 中提取 TableId
+        String databaseName = value.getString("db");
+//        String schemaName = value.getString("schema");
+        String tableName = value.getString("table");
+
+        // 创建 TableId 对象
+        TableId tableId = new TableId(null, databaseName, tableName);
+
+        return tableId;
+    }
+
     private void updateStartingOffsetForSplit(MySqlSplitState splitState, SourceRecord element) {
         if (splitState.isBinlogSplitState()) {
             BinlogOffset position = RecordUtils.getBinlogPosition(element);
@@ -116,7 +147,6 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
 
     private void emitElement(SourceRecord element, SourceOutput<T> output) throws Exception {
         outputCollector.output = output;
-        outputCollector.currentMessageTimestamp = RecordUtils.getMessageTimestamp(element);
         debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
 
@@ -136,21 +166,10 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
 
     private static class OutputCollector<T> implements Collector<T> {
         private SourceOutput<T> output;
-        private Long currentMessageTimestamp;
 
         @Override
         public void collect(T record) {
-            if (currentMessageTimestamp != null && currentMessageTimestamp > 0) {
-                // Only binlog event contains a valid timestamp. We use the output with timestamp to
-                // report the event time and let the source operator to report
-                // "currentEmitEventTimeLag" correctly.
-                output.collect(record, currentMessageTimestamp);
-            } else {
-                // Records in snapshot mode have a zero timestamp in the message. We use the output
-                // without timestamp to collect the record. Metric "currentEmitEventTimeLag" will
-                // not be updated in the source operator in this case.
-                output.collect(record);
-            }
+            output.collect(record);
         }
 
         @Override
