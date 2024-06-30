@@ -106,9 +106,7 @@ public class SqlServerSchemaUtils {
         final List<String> schemaNames = new ArrayList<>();
 
         String querySql =
-                String.format(
-                        "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = %s",
-                        quote(namespace));
+                String.format("SELECT NAME FROM %s.SYS.SCHEMAS WHERE SCHEMA_ID < 16384", namespace);
 
         jdbc.query(
                 querySql,
@@ -125,7 +123,7 @@ public class SqlServerSchemaUtils {
         LOG.info("Read list of available namespaces");
         final List<String> namespaceNames = new ArrayList<>();
         jdbc.query(
-                "SELECT DATNAME FROM PG_DATABASE",
+                "SELECT NAME FROM SYS.DATABASES WHERE NAME NOT IN ('MASTER', 'TEMPDB', 'MODEL', 'MSDB')",
                 rs -> {
                     while (rs.next()) {
                         namespaceNames.add(rs.getString(1));
@@ -133,10 +131,6 @@ public class SqlServerSchemaUtils {
                 });
         LOG.info("\t list of available namespaces are: {}", namespaceNames);
         return namespaceNames;
-    }
-
-    public static String quote(String dbOrTableName) {
-        return "\"" + dbOrTableName + "\"";
     }
 
     public static Schema getTableSchema(
