@@ -76,7 +76,6 @@ public class SqlServerSchemaUtils {
                             : Collections.singletonList(sourceConfig.getDatabaseList().get(0));
 
             List<TableId> tableIds = new ArrayList<>();
-            //            for (String database : databases) {
             List<TableId> tableIdList =
                     SqlServerConnectionUtils.listTables(
                                     jdbc, sourceConfig.getTableFilters(), databases)
@@ -84,7 +83,6 @@ public class SqlServerSchemaUtils {
                             .map(SqlServerSchemaUtils::toCdcTableId)
                             .collect(Collectors.toList());
             tableIds.addAll(tableIdList);
-            //            }
             return tableIds;
         } catch (SQLException e) {
             throw new RuntimeException("Error to list databases: " + e.getMessage(), e);

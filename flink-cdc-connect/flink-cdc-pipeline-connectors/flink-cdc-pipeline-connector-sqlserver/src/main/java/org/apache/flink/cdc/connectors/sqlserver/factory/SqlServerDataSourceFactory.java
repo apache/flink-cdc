@@ -94,7 +94,6 @@ public class SqlServerDataSourceFactory implements DataSourceFactory {
         String chunkKeyColumn = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         String tables = config.get(TABLES);
         String tablesExclude = config.get(TABLES_EXCLUDE);
-        //        Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
         StartupOptions startupOptions = getStartupOptions(config);
 
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
@@ -110,7 +109,7 @@ public class SqlServerDataSourceFactory implements DataSourceFactory {
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
-        ZoneId serverTimeZone = ZoneId.of(config.get(SERVER_TIME_ZONE));
+        ZoneId serverTimeZone = getServerTimeZone(config);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -129,12 +128,9 @@ public class SqlServerDataSourceFactory implements DataSourceFactory {
                         .hostname(hostname)
                         .port(port)
                         .databaseList(tableId.getNamespace())
-                        //                        .schemaList(".*")
                         .tableList(".*")
                         .username(username)
                         .password(password)
-                        //                        .decodingPluginName(pluginName)
-                        //                        .slotName(slotName)
                         .debeziumProperties(getDebeziumProperties(configMap))
                         .splitSize(splitSize)
                         .splitMetaGroupSize(splitMetaGroupSize)
@@ -146,7 +142,6 @@ public class SqlServerDataSourceFactory implements DataSourceFactory {
                         .connectionPoolSize(connectionPoolSize)
                         .startupOptions(startupOptions)
                         .chunkKeyColumn(chunkKeyColumn)
-                        //                        .heartbeatInterval(heartbeatInterval)
                         .closeIdleReaders(closeIdleReaders)
                         .skipSnapshotBackfill(skipSnapshotBackfill)
                         .serverTimeZone(serverTimeZone.toString())
@@ -277,5 +272,18 @@ public class SqlServerDataSourceFactory implements DataSourceFactory {
                         0.0d,
                         1.0d,
                         distributionFactorLower));
+    }
+
+    /** Replaces the default timezone placeholder with session timezone, if applicable. */
+    private static ZoneId getServerTimeZone(Configuration config) {
+        final String serverTimeZone = config.get(SERVER_TIME_ZONE);
+        if (serverTimeZone != null) {
+            return ZoneId.of(serverTimeZone);
+        } else {
+            LOG.warn(
+                    "{} is not set, which might cause data inconsistencies for time-related fields.",
+                    SERVER_TIME_ZONE.key());
+            return ZoneId.systemDefault();
+        }
     }
 }
