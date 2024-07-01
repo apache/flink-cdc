@@ -168,6 +168,11 @@ public final class TimestampData implements Comparable<TimestampData> {
      * Returns whether the timestamp data is small enough to be stored in a long of milliseconds.
      */
     public static boolean isCompact(int precision) {
-        return precision <= 3;
+        // We don't use compact mode to store any timestamps for now since currently MySQL source
+        // could not correctly infer timestamp precision from Debezium records, and precision
+        // mismatch could cause downstream deserialization failure.
+        // By enforcing the non-compaction mode, we could ensure timestamp data with any precision
+        // could be correctly parsed.
+        return false;
     }
 }

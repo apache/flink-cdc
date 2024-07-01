@@ -24,6 +24,8 @@ import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
+import static org.apache.flink.cdc.common.data.ZonedTimestampData.isCompact;
+
 /** A test for the {@link ZonedTimestampDataSerializer}. */
 abstract class ZonedTimestampDataSerializerTest extends SerializerTestBase<ZonedTimestampData> {
     @Override
@@ -33,7 +35,7 @@ abstract class ZonedTimestampDataSerializerTest extends SerializerTestBase<Zoned
 
     @Override
     protected int getLength() {
-        return (getPrecision() <= 3) ? 8 : 12;
+        return isCompact(getPrecision()) ? 8 : 12;
     }
 
     @Override

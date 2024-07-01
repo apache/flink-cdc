@@ -21,6 +21,8 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 
+import static org.apache.flink.cdc.common.data.TimestampData.isCompact;
+
 /** A test for the {@link TimestampDataSerializer}. */
 abstract class TimestampDataSerializerTest extends SerializerTestBase<TimestampData> {
     @Override
@@ -30,7 +32,7 @@ abstract class TimestampDataSerializerTest extends SerializerTestBase<TimestampD
 
     @Override
     protected int getLength() {
-        return (getPrecision() <= 3) ? 8 : 12;
+        return isCompact(getPrecision()) ? 8 : 12;
     }
 
     @Override

@@ -203,6 +203,8 @@ public final class ZonedTimestampData implements Comparable<ZonedTimestampData> 
      * Returns whether the date-time part is small enough to be stored in a long of milliseconds.
      */
     public static boolean isCompact(int precision) {
-        return precision <= 3;
+        // We don't use compact mode to store any timestamps for now. See TimestampData#isCompact
+        // for more details.
+        return false;
     }
 }
