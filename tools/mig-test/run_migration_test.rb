@@ -28,7 +28,7 @@ DATABASE_NAME = 'fallen'
 TABLES = ['girl'].freeze
 
 def exec_sql_source(sql)
-  `mysql -h 127.0.0.1 -P#{SOURCE_PORT} -uroot --skip-password -e "USE #{DATABASE_NAME}; #{sql}" 2>/dev/null`
+  `mysql -h 127.0.0.1 -P#{SOURCE_PORT} -uroot --skip-password -e "USE #{DATABASE_NAME}; #{sql}"`
 end
 
 def put_mystery_data(mystery)

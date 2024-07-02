@@ -8,12 +8,12 @@
 
 ### Compile snapshot CDC versions
 3. Set `CDC_SOURCE_HOME` to the root directory of the Flink CDC git repository
-4. Run `ruby prepare_libs.rb` to download released / compile snapshot CDC versions
+4. Go to `tools/mig-test` and run `ruby prepare_libs.rb` to download released / compile snapshot CDC versions
 
 ### Run migration tests
 5. Enter `conf/` and run `docker compose up -d` to start up test containers
 6. Set `FLINK_HOME` to the home directory of Flink
-7. Run `ruby run_migration_test.rb` to start testing
+7. Go back to `tools/mig-test` and run `ruby run_migration_test.rb` to start testing
 
 ### Result
 The migration result will be displayed in the console like this:
