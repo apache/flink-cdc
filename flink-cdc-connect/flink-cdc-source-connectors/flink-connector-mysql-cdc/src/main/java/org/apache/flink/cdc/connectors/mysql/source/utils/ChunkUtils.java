@@ -68,7 +68,8 @@ public class ChunkUtils {
             throw new ValidationException(
                     "'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
         }
-        List<Column> searchColumns = primaryKeys.isEmpty() ? table.columns() : primaryKeys;
+
+        List<Column> searchColumns = table.columns();
         if (chunkKeyColumn != null) {
             Optional<Column> targetColumn =
                     searchColumns.stream()
@@ -79,9 +80,8 @@ public class ChunkUtils {
             }
             throw new ValidationException(
                     String.format(
-                            "Chunk key column '%s' doesn't exist in the %s [%s] of the table %s.",
+                            "Chunk key column '%s' doesn't exist in the columns [%s] of the table %s.",
                             chunkKeyColumn,
-                            primaryKeys.isEmpty() ? "user specified columns" : "primary keys",
                             searchColumns.stream()
                                     .map(Column::name)
                                     .collect(Collectors.joining(",")),

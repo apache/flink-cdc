@@ -82,12 +82,7 @@ public class RecordUtils {
     }
 
     public static Struct getStructContainsChunkKey(SourceRecord record) {
-        // If the table has primary keys, chunk key is in the record key struct
-        if (record.key() != null) {
-            return (Struct) record.key();
-        }
-
-        // If the table doesn't have primary keys, chunk key is in the after struct for insert or
+        // Use chunk key in the after struct for insert or
         // the before struct for delete/update
         Envelope.Operation op = Envelope.operationFor(record);
         Struct value = (Struct) record.value();
