@@ -22,6 +22,7 @@ import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogNewAddedTableEvent;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
@@ -40,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Iterator;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * The {@link RecordEmitter} implementation for {@link MySqlSourceReader}.
@@ -94,15 +96,27 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             Array tableChanges =
                     historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
             TableChanges changes = TABLE_CHANGE_SERIALIZER.deserialize(tableChanges, true);
+            MySqlBinlogSplitState mySqlBinlogSplitState = splitState.asBinlogSplitState();
             for (TableChanges.TableChange tableChange : changes) {
-                splitState.asBinlogSplitState().recordSchema(tableChange.getId(), tableChange);
+                mySqlBinlogSplitState.recordSchema(tableChange.getId(), tableChange);
             }
             if (includeSchemaChanges) {
                 BinlogOffset position = RecordUtils.getBinlogPosition(element);
                 splitState.asBinlogSplitState().setStartingOffset(position);
                 TableId tableId = extractTableId(element);
-                LOG.info("sending table add to enumerator from subtask");
-                context.getSourceReaderContext().sendSourceEventToCoordinator(new BinlogNewAddedTableEvent(tableId.catalog(), tableId.schema(), tableId.table()));
+                TableId newAddedTableId = mySqlBinlogSplitState.getTableSchemas()
+                        .keySet()
+                        .stream()
+                        .filter(tId -> tId.equals(tableId))
+                        .collect(Collectors.toList())
+                        .get(0);
+                TableChanges.TableChange tableChange = mySqlBinlogSplitState.getTableSchemas().get(newAddedTableId);
+                if (tableChange.getType().equals(TableChanges.TableChangeType.CREATE)){
+                    LOG.info("sending table add to enumerator from subtask");
+                    mySqlBinlogSplitState.addUnNotifiedTableId(tableId);
+                    context.getSourceReaderContext().sendSourceEventToCoordinator(new BinlogNewAddedTableEvent(tableId.catalog()
+                            , tableId.schema(), tableId.table()));
+                }
 //                emitElement(element, output);
             }
         } else if (RecordUtils.isDataChangeRecord(element)) {

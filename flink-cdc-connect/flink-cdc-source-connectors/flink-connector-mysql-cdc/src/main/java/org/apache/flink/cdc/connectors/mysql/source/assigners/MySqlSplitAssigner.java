@@ -60,7 +60,7 @@ public interface MySqlSplitAssigner {
      * Gets the finished splits' information. This is useful metadata to generate a binlog split
      * that considering finished snapshot splits.
      */
-    List<FinishedSnapshotSplitInfo> getFinishedSplitInfos();
+    List<FinishedSnapshotSplitInfo> getFinishedSplitInfos(boolean isScanNewlyAddedTableEnabled);
 
     /**
      * Callback to handle the finished splits with finished binlog offset. This is useful for

@@ -135,8 +135,8 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
-    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos() {
-        return snapshotSplitAssigner.getFinishedSplitInfos();
+    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos(boolean isScanNewlyAddedTableEnabled) {
+        return snapshotSplitAssigner.getFinishedSplitInfos(isScanNewlyAddedTableEnabled);
     }
 
     @Override

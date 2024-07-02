@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.split;
 
+import io.debezium.relational.history.TableChanges;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 
 import io.debezium.relational.TableId;
@@ -24,13 +25,20 @@ import io.debezium.relational.history.TableChanges.TableChange;
 
 import javax.annotation.Nullable;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-/** The state of split to describe the binlog of MySql table(s). */
+/**
+ * The state of split to describe the binlog of MySql table(s).
+ */
 public class MySqlBinlogSplitState extends MySqlSplitState {
 
-    @Nullable private BinlogOffset startingOffset;
-    @Nullable private BinlogOffset endingOffset;
+    @Nullable
+    private BinlogOffset startingOffset;
+    @Nullable
+    private BinlogOffset endingOffset;
     private final Map<TableId, TableChange> tableSchemas;
 
     public MySqlBinlogSplitState(MySqlBinlogSplit split) {
@@ -66,6 +74,11 @@ public class MySqlBinlogSplitState extends MySqlSplitState {
         this.tableSchemas.put(tableId, latestTableChange);
     }
 
+    public void addUnNotifiedTableId(TableId tableId) {
+        ((MySqlBinlogSplit) this.split).getTableNotified().add(tableId);
+    }
+
+    @Override
     public MySqlBinlogSplit toMySqlSplit() {
         final MySqlBinlogSplit binlogSplit = split.asBinlogSplit();
         return new MySqlBinlogSplit(

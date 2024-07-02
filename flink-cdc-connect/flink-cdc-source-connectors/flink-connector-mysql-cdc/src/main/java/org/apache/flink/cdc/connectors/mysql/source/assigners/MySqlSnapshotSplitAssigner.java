@@ -71,6 +71,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     private final List<TableId> alreadyProcessedTables;
     private final List<MySqlSchemalessSnapshotSplit> remainingSplits;
+    private final List<MySqlSchemalessSnapshotSplit> newAddedTableRemainingSplits;
     private final Map<String, MySqlSchemalessSnapshotSplit> assignedSplits;
     private final Map<TableId, TableChanges.TableChange> tableSchemas;
     private final Map<String, BinlogOffset> splitFinishedOffsets;
@@ -146,6 +147,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = new CopyOnWriteArrayList<>(remainingSplits);
+        this.newAddedTableRemainingSplits = new CopyOnWriteArrayList<>();
         // When job restore from savepoint, sort the existing tables and newly added tables
         // to let enumerator only send newly added tables' BinlogSplitMetaEvent
         this.assignedSplits =
@@ -324,6 +326,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                                 .collect(Collectors.toList());
                 chunkNum += splits.size();
                 remainingSplits.addAll(schemaLessSnapshotSplits);
+                newAddedTableRemainingSplits.addAll(schemaLessSnapshotSplits);
                 if (!chunkSplitter.hasNextChunk()) {
                     remainingTables.remove(nextTable);
                 }
@@ -374,15 +377,22 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
-    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos() {
+    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos(boolean isScanNewlyAddedTableEnabled) {
         if (waitingForFinishedSplits()) {
             LOG.error(
                     "The assigner is not ready to offer finished split information, this should not be called");
             throw new FlinkRuntimeException(
                     "The assigner is not ready to offer finished split information, this should not be called");
         }
+        Collection<MySqlSchemalessSnapshotSplit> snapshotSplit;
+        if (isScanNewlyAddedTableEnabled) {
+            snapshotSplit = this.newAddedTableRemainingSplits;
+        } else {
+            snapshotSplit = assignedSplits.values();
+        }
+
         final List<MySqlSchemalessSnapshotSplit> assignedSnapshotSplit =
-                new ArrayList<>(assignedSplits.values());
+                new ArrayList<>(snapshotSplit);
         List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
         for (MySqlSchemalessSnapshotSplit split : assignedSnapshotSplit) {
             BinlogOffset binlogOffset = splitFinishedOffsets.get(split.splitId());

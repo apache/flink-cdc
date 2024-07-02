@@ -71,6 +71,8 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     private List<List<FinishedSnapshotSplitInfo>> binlogSplitMeta;
 
     @Nullable private Integer binlogSplitTaskId;
+    private boolean isRuntimeTableAdded = true;
+
 
     public MySqlSourceEnumerator(
             SplitEnumeratorContext<MySqlSplit> context,
@@ -87,7 +89,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     @Override
     public void start() {
         splitAssigner.open();
-        requestBinlogSplitUpdateIfNeed();
+//        requestBinlogSplitUpdateIfNeed();
         this.context.callAsync(
                 this::getRegisteredReader,
                 this::syncWithReaders,
@@ -159,7 +161,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             Map<String, BinlogOffset> finishedOffsets = reportEvent.getFinishedOffsets();
 
             splitAssigner.onFinishedSplits(finishedOffsets);
-            requestBinlogSplitUpdateIfNeed();
+//            requestBinlogSplitUpdateIfNeed();
 
             // send acknowledge event
             FinishedSnapshotSplitsAckEvent ackEvent =
@@ -187,7 +189,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             binlogSplitTaskId = subtaskId;
         }else if (sourceEvent instanceof BinlogSplitSuspendEvent) {
             LOG.info(
-                    "The enumerator receives notice from subtask {} for the binlog split assignment. ",
+                    "The enumerator receives notice from subtask {} for the binlog split suspend. ",
                     subtaskId);
             binlogSplitTaskId = subtaskId;
         } else if (sourceEvent instanceof BinlogNewAddedTableEvent) {
@@ -197,7 +199,8 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                     "The enumerator receives binlog side new added table from subtask {}, table name: {}. ",
                     subtaskId, tableId.table());
             splitAssigner.addAlreadyProcessedTables(tableId);
-            context.sendEventToSourceReader(subtaskId, new FinishedBinlogNewTableAddRequestEvent());
+            isRuntimeTableAdded = false;
+            binlogSplitTaskId = subtaskId;
         }
     }
 
@@ -209,6 +212,9 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     @Override
     public void notifyCheckpointComplete(long checkpointId) {
         splitAssigner.notifyCheckpointComplete(checkpointId);
+        if (!isRuntimeTableAdded){
+            context.sendEventToSourceReader(binlogSplitTaskId, new FinishedBinlogNewTableAddRequestEvent());
+        }
         // binlog split may be available after checkpoint complete
         assignSplits();
     }
@@ -292,21 +298,21 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             }
         }
 
-        requestBinlogSplitUpdateIfNeed();
+        notifyBinlogSplitStart();
     }
 
     private void notifyBinlogSplitStart() {
         if (isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())) {
             for (int subtaskId : getRegisteredReader()) {
                 LOG.info(
-                        "The enumerator requests subtask {} to update the binlog split after newly added table.",
+                        "The enumerator requests subtask {} to start the binlog split after newly added table.",
                         subtaskId);
                 final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos =
-                        splitAssigner.getFinishedSplitInfos();
+                        splitAssigner.getFinishedSplitInfos(sourceConfig.isScanNewlyAddedTableEnabled());
                 context.sendEventToSourceReader(
                         subtaskId,
                         new BinlogSplitStartEvent(
-                                splitAssigner.getFinishedSplitInfos().size(), finishedSnapshotSplitInfos.stream()
+                                finishedSnapshotSplitInfos.size(), finishedSnapshotSplitInfos.stream()
                                 .map(FinishedSnapshotSplitInfo::serialize)
                                 .collect(Collectors.toList())));
             }
@@ -328,7 +334,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         // initialize once
         if (binlogSplitMeta == null) {
             final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos =
-                    splitAssigner.getFinishedSplitInfos();
+                    splitAssigner.getFinishedSplitInfos(sourceConfig.isScanNewlyAddedTableEnabled());
             if (finishedSnapshotSplitInfos.isEmpty()) {
                 LOG.error(
                         "The assigner offers empty finished split information, this should not happen");
@@ -341,7 +347,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         }
         final int requestMetaGroupId = requestEvent.getRequestMetaGroupId();
         final int totalFinishedSplitSizeOfReader = requestEvent.getTotalFinishedSplitSize();
-        final int totalFinishedSplitSizeOfEnumerator = splitAssigner.getFinishedSplitInfos().size();
+        final int totalFinishedSplitSizeOfEnumerator = splitAssigner.getFinishedSplitInfos(sourceConfig.isScanNewlyAddedTableEnabled()).size();
         if (totalFinishedSplitSizeOfReader > totalFinishedSplitSizeOfEnumerator) {
             LOG.warn(
                     "Total finished split size of subtask {} is {}, while total finished split size of Enumerator is only {}. Try to truncate it",
@@ -382,7 +388,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
             context.sendEventToSourceReader(
                     subTask,
                     new LatestFinishedSplitsNumberEvent(
-                            splitAssigner.getFinishedSplitInfos().size()));
+                            splitAssigner.getFinishedSplitInfos(sourceConfig.isScanNewlyAddedTableEnabled()).size()));
         }
     }
 }

@@ -34,7 +34,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** The split to describe the binlog of MySql table(s). */
+/**
+ * The split to describe the binlog of MySql table(s).
+ */
 public class MySqlBinlogSplit extends MySqlSplit {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplit.class);
 
@@ -44,7 +46,9 @@ public class MySqlBinlogSplit extends MySqlSplit {
     private final Map<TableId, TableChange> tableSchemas;
     private final int totalFinishedSplitSize;
     private final boolean isSuspended;
-    @Nullable transient byte[] serializedFormCache;
+    private List<TableId> tableNotified;
+    @Nullable
+    transient byte[] serializedFormCache;
 
     public MySqlBinlogSplit(
             String splitId,
@@ -61,6 +65,21 @@ public class MySqlBinlogSplit extends MySqlSplit {
         this.tableSchemas = tableSchemas;
         this.totalFinishedSplitSize = totalFinishedSplitSize;
         this.isSuspended = isSuspended;
+        this.tableNotified = new ArrayList<>();
+    }
+
+    public MySqlBinlogSplit(
+            String splitId,
+            BinlogOffset startingOffset,
+            BinlogOffset endingOffset,
+            List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos,
+            Map<TableId, TableChange> tableSchemas,
+            int totalFinishedSplitSize,
+            boolean isSuspended,
+            List<TableId> tableNotified) {
+        this(splitId, startingOffset, endingOffset, finishedSnapshotSplitInfos,
+                tableSchemas, totalFinishedSplitSize, isSuspended);
+        this.tableNotified = tableNotified;
     }
 
     public MySqlBinlogSplit(
@@ -77,6 +96,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
         this.tableSchemas = tableSchemas;
         this.totalFinishedSplitSize = totalFinishedSplitSize;
         this.isSuspended = false;
+        this.tableNotified = new ArrayList<>();
     }
 
     public BinlogOffset getStartingOffset() {
@@ -85,6 +105,10 @@ public class MySqlBinlogSplit extends MySqlSplit {
 
     public BinlogOffset getEndingOffset() {
         return endingOffset;
+    }
+
+    public List<TableId> getTableNotified() {
+        return tableNotified;
     }
 
     public List<FinishedSnapshotSplitInfo> getFinishedSnapshotSplitInfos() {
@@ -186,7 +210,8 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 binlogSplit.getEndingOffset(),
                 splitInfos,
                 binlogSplit.getTableSchemas(),
-                splitInfos.size(),
+                binlogSplit.getFinishedSnapshotSplitInfos().size()
+                        + splitInfos.size(),
                 false);
     }
 
@@ -206,14 +231,6 @@ public class MySqlBinlogSplit extends MySqlSplit {
                         .collect(Collectors.toSet());
         if (tablesToRemove.isEmpty()) {
             return binlogSplit;
-//            return new MySqlBinlogSplit(
-//                    binlogSplit.splitId,
-//                    binlogSplit.getStartingOffset(),
-//                    binlogSplit.getEndingOffset(),
-//                    binlogSplit.getFinishedSnapshotSplitInfos(),
-//                    binlogSplit.getTableSchemas(),
-//                    binlogSplit.totalFinishedSplitSize,
-//                    true);
         }
 
         LOG.info("Reader remove tables after restart: {}", tablesToRemove);
@@ -231,6 +248,17 @@ public class MySqlBinlogSplit extends MySqlSplit {
                         - (binlogSplit.getFinishedSnapshotSplitInfos().size()
                         - allFinishedSnapshotSplitInfos.size()),
                 false);
+    }
+
+    public static MySqlBinlogSplit toSuspendSplit(MySqlBinlogSplit binlogSplit) {
+        return new MySqlBinlogSplit(
+                binlogSplit.splitId(),
+                binlogSplit.getStartingOffset(),
+                binlogSplit.getEndingOffset(),
+                binlogSplit.getFinishedSnapshotSplitInfos(),
+                binlogSplit.getTableSchemas(),
+                binlogSplit.getTotalFinishedSplitSize(),
+                true);
     }
 
     public static MySqlBinlogSplit fillTableSchemas(
