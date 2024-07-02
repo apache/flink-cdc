@@ -431,7 +431,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                 4,
                 CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                 CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                new String[] {tableWithoutPrimaryKey});
+                new String[] {tableWithoutPrimaryKey},
+                "id");
         assertEquals(expected, splits);
     }
 
