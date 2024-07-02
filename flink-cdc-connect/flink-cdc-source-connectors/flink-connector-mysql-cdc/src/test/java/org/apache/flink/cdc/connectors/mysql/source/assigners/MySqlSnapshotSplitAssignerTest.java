@@ -166,7 +166,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
                                     t,
-                                    "Chunk key column 'errorCol' doesn't exist in the primary keys [card_no,level] of the table")
+                                    "Chunk key column 'errorCol' doesn't exist in the columns [card_no,level,name,note] of the table")
                             .isPresent());
         }
     }
