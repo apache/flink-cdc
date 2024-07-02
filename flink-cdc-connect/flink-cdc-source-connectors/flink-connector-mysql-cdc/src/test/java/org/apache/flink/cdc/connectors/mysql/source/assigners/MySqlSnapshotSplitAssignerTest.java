@@ -427,12 +427,14 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         "customers_no_pk [1012] [1016]",
                         "customers_no_pk [1016] [2000]",
                         "customers_no_pk [2000] null");
-        List<String> splits = getTestAssignSnapshotSplits(
-                4,
-                CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
-                CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                new String[] {tableWithoutPrimaryKey},
-                "id");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        customerDatabase,
+                        4,
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {tableWithoutPrimaryKey},
+                        "id");
         assertEquals(expected, splits);
     }
 
