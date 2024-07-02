@@ -417,6 +417,25 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testAssignTableWithoutPrimaryKeyWithChunkKeyColumn() {
+        String tableWithoutPrimaryKey = "customers_no_pk";
+        List<String> expected =
+                Arrays.asList(
+                        "customers_no_pk null [110]",
+                        "customers_no_pk [110] [123]",
+                        "customers_no_pk [123] [1012]",
+                        "customers_no_pk [1012] [1016]",
+                        "customers_no_pk [1016] [2000]",
+                        "customers_no_pk [2000] null");
+        List<String> splits = getTestAssignSnapshotSplits(
+                4,
+                CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                new String[] {tableWithoutPrimaryKey});
+        assertEquals(expected, splits);
+    }
+
+    @Test
     public void testEnumerateTablesLazily() {
         final MySqlSourceConfig configuration =
                 getConfig(
