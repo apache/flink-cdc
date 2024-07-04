@@ -385,8 +385,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                     "The assigner is not ready to offer finished split information, this should not be called");
         }
         Collection<MySqlSchemalessSnapshotSplit> snapshotSplit;
-        if (isScanNewlyAddedTableEnabled) {
-            snapshotSplit = this.newAddedTableRemainingSplits;
+        if (isScanNewlyAddedTableEnabled && !newAddedTableRemainingSplits.isEmpty()) {
+            snapshotSplit = newAddedTableRemainingSplits;
         } else {
             snapshotSplit = assignedSplits.values();
         }

@@ -273,7 +273,7 @@ public class MySqlSourceReader<T>
                     // Try to discovery table schema once for newly added tables when source reader
                     // start or restore
                     boolean checkNewlyAddedTableSchema =
-                            !mySqlSourceReaderContext.isHasAssignedBinlogSplit()
+                            mySqlSourceReaderContext.isHasAssignedBinlogSplit()
                                     && sourceConfig.isScanNewlyAddedTableEnabled();
                     // check if contains new added tables
                     if (checkNewlyAddedTableSchema) {
@@ -292,7 +292,6 @@ public class MySqlSourceReader<T>
                     }
                 }
 
-                mySqlSourceReaderContext.setHasAssignedBinlogSplit(true);
                 // the binlog split is suspended
                 if (binlogSplit.isSuspended()) {
                     suspendedBinlogSplit = binlogSplit;
@@ -304,6 +303,7 @@ public class MySqlSourceReader<T>
                     MySqlBinlogSplit mySqlBinlogSplit =
                             discoverTableSchemasForBinlogSplit(binlogSplit, sourceConfig);
                     unfinishedSplits.add(mySqlBinlogSplit);
+                    mySqlSourceReaderContext.setHasAssignedBinlogSplit(true);
                 }
                 LOG.info(
                         "Source reader {} received the binlog split : {}.", subtaskId, binlogSplit);

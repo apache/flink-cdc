@@ -191,6 +191,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 startingOffset = splitInfo.getHighWatermark();
             }
         }
+        splitInfos.addAll(binlogSplit.getFinishedSnapshotSplitInfos());
         return new MySqlBinlogSplit(
                 binlogSplit.splitId,
                 startingOffset,

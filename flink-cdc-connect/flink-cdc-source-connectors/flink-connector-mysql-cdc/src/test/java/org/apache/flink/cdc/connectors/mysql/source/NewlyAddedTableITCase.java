@@ -135,7 +135,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
         testNewlyAddedTableDynamicTables(
                 1,
                 "address_wenzhou_1",
-                "address_wenzhou_2");
+                "address_wenzhou_2",
+                "address_wenzhou_3");
     }
 
     @Test
@@ -143,7 +144,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
         testNewlyAddedTableDynamicTables(
                 2,
                 "address_wenzhou_1",
-                "address_wenzhou_2");
+                "address_wenzhou_2",
+                "address_wenzhou_3");
     }
 
     @Test
@@ -756,13 +758,15 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     private void testNewlyAddedTableDynamicTables(
             int parallelism,
             String firstAddressTables,
-            String secondAddressTables)
+            String secondAddressTables,
+            String thirdAddressTables)
             throws Exception {
         testNewlyAddedTableDynamicTables(
                 parallelism,
                 new HashMap<>(),
                 firstAddressTables,
-                secondAddressTables);
+                secondAddressTables,
+                thirdAddressTables);
     }
 
     private void testNewlyAddedTableDynamicTables2(
@@ -897,7 +901,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             int parallelism,
             Map<String, String> sourceOptions,
             String firstAddressTables,
-            String secondAddressTables)
+            String secondAddressTables,
+            String thirdAddressTables)
             throws Exception {
 
 
@@ -907,6 +912,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
 
         // step 1: create mysql tables with initial data
         initialAddressTables(getConnection(), Arrays.asList(firstAddressTables).toArray(new String[0]),true);
+        initialAddressTables(getConnection(), Arrays.asList(thirdAddressTables).toArray(new String[0]),true);
 
         List<String> fetchedDataList = new ArrayList<>();
 
@@ -924,7 +930,17 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                                 firstAddressTables, cityName, cityName),
                         format(
                                 "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
+                                firstAddressTables, cityName, cityName),
+                        format(
+                                "+I[%s, 416874195632735147, China, %s, %s West Town address 1]",
+                                firstAddressTables, cityName, cityName),
+                        format(
+                                "+I[%s, 416927583791428523, China, %s, %s West Town address 2]",
+                                firstAddressTables, cityName, cityName),
+                        format(
+                                "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
                                 firstAddressTables, cityName, cityName));
+
 
         fetchedDataList.addAll(expectedSnapshotDataThisRound);
         waitForUpsertSinkSize("sink", fetchedDataList.size());
