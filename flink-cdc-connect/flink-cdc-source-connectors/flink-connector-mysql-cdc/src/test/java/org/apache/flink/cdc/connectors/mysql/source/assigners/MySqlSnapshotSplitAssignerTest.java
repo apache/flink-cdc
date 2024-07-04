@@ -421,12 +421,12 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         String tableWithoutPrimaryKey = "customers_no_pk";
         List<String> expected =
                 Arrays.asList(
-                        "customers_no_pk null [110]",
-                        "customers_no_pk [110] [123]",
-                        "customers_no_pk [123] [1012]",
-                        "customers_no_pk [1012] [1016]",
-                        "customers_no_pk [1016] [2000]",
-                        "customers_no_pk [2000] null");
+                        "customers_no_pk null [462]",
+                        "customers_no_pk [462] [823]",
+                        "customers_no_pk [823] [1184]",
+                        "customers_no_pk [1184] [1545]",
+                        "customers_no_pk [1545] [1906]",
+                        "customers_no_pk [1906] null");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         customerDatabase,
