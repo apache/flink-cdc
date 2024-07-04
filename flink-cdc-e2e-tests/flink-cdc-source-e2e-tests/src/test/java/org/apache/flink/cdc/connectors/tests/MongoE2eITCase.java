@@ -194,14 +194,14 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
                 productDocOf(
                         "100000000000000000000110",
                         "jacket",
-                        "water resistent white wind breaker",
+                        "water resistant white wind breaker",
                         0.2));
         products.insertOne(
                 productDocOf("100000000000000000000111", "scooter", "Big 2-wheel scooter", 5.18));
         products.updateOne(
                 Filters.eq("_id", new ObjectId("100000000000000000000110")),
                 Updates.combine(
-                        Updates.set("description", "new water resistent white wind breaker"),
+                        Updates.set("description", "new water resistant white wind breaker"),
                         Updates.set("weight", 0.5)));
         products.updateOne(
                 Filters.eq("_id", new ObjectId("100000000000000000000111")),
@@ -226,9 +226,9 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
                         "100000000000000000000105,hammer,14oz carpenter's hammer,0.875",
                         "100000000000000000000106,hammer,18oz carpenter hammer,1.0",
                         "100000000000000000000107,rocks,box of assorted rocks,5.1",
-                        "100000000000000000000108,jacket,water resistent black wind breaker,0.1",
+                        "100000000000000000000108,jacket,water resistant black wind breaker,0.1",
                         "100000000000000000000109,spare tire,24 inch spare tire,22.2",
-                        "100000000000000000000110,jacket,new water resistent white wind breaker,0.5");
+                        "100000000000000000000110,jacket,new water resistant white wind breaker,0.5");
         proxy.checkResultWithTimeout(
                 expectResult,
                 "mongodb_products_sink",

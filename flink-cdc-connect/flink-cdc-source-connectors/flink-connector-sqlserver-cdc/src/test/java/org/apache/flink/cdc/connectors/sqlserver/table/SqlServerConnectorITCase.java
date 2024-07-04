@@ -138,11 +138,11 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                     "UPDATE inventory.dbo.products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE inventory.dbo.products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO inventory.dbo.products (name,description,weight) VALUES ('jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO inventory.dbo.products (name,description,weight) VALUES ('jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO inventory.dbo.products (name,description,weight) VALUES ('scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE inventory.dbo.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE inventory.dbo.products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE inventory.dbo.products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM inventory.dbo.products WHERE id=111;");
 
@@ -182,9 +182,9 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
          * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |   null |
          * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |   null |
          * | 107 | rocks              | box of assorted rocks                                   |    5.1 |   null |
-         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |   null |
+         * | 108 | jacket             | water resistant black wind breaker                      |    0.1 |   null |
          * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |   null |
-         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |   1.2  |
+         * | 110 | jacket             | new water resistant white wind breaker                  |    0.5 |   1.2  |
          * +-----+--------------------+---------------------------------------------------------+--------+--------+
          * </pre>
          */
@@ -214,7 +214,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
 
         // The following two change records will be discarded in the 'latest-offset' mode
         statement.execute(
-                "INSERT INTO inventory.dbo.products (name,description,weight) VALUES ('jacket','water resistent white wind breaker',0.2);"); // 110
+                "INSERT INTO inventory.dbo.products (name,description,weight) VALUES ('jacket','water resistant white wind breaker',0.2);"); // 110
         statement.execute(
                 "INSERT INTO inventory.dbo.products (name,description,weight) VALUES ('scooter','Big 2-wheel scooter ',5.18);");
         Thread.sleep(5000L);
@@ -453,11 +453,11 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                     "UPDATE inventory.dbo.products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE inventory.dbo.products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO inventory.dbo.products VALUES ('jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO inventory.dbo.products VALUES ('jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO inventory.dbo.products VALUES ('scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE inventory.dbo.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE inventory.dbo.products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE inventory.dbo.products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM inventory.dbo.products WHERE id=111;");
         }
@@ -474,13 +474,13 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         "+I(inventory,dbo,products,105,hammer,14oz carpenter's hammer,0.875)",
                         "+I(inventory,dbo,products,106,hammer,16oz carpenter's hammer,1.000)",
                         "+I(inventory,dbo,products,107,rocks,box of assorted rocks,5.300)",
-                        "+I(inventory,dbo,products,108,jacket,water resistent black wind breaker,0.100)",
+                        "+I(inventory,dbo,products,108,jacket,water resistant black wind breaker,0.100)",
                         "+I(inventory,dbo,products,109,spare tire,24 inch spare tire,22.200)",
-                        "+I(inventory,dbo,products,110,jacket,water resistent white wind breaker,0.200)",
+                        "+I(inventory,dbo,products,110,jacket,water resistant white wind breaker,0.200)",
                         "+I(inventory,dbo,products,111,scooter,Big 2-wheel scooter ,5.180)",
                         "+U(inventory,dbo,products,106,hammer,18oz carpenter hammer,1.000)",
                         "+U(inventory,dbo,products,107,rocks,box of assorted rocks,5.100)",
-                        "+U(inventory,dbo,products,110,jacket,new water resistent white wind breaker,0.500)",
+                        "+U(inventory,dbo,products,110,jacket,new water resistant white wind breaker,0.500)",
                         "+U(inventory,dbo,products,111,scooter,Big 2-wheel scooter ,5.170)",
                         "-D(inventory,dbo,products,111,scooter,Big 2-wheel scooter ,5.170)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");

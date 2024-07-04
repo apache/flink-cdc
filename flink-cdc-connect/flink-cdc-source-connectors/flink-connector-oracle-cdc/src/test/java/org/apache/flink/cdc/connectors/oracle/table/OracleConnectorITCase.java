@@ -174,11 +174,11 @@ public class OracleConnectorITCase {
                     "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
             statement.execute(
-                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2, 1.2)"); // 110
+                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistant white wind breaker',0.2, 1.2)"); // 110
             statement.execute(
                     "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18, 2.2)");
             statement.execute(
-                    "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
+                    "UPDATE debezium.products SET DESCRIPTION='new water resistant white wind breaker', WEIGHT=0.5 WHERE ID=111");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
         }
@@ -200,9 +200,9 @@ public class OracleConnectorITCase {
          * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |   null |
          * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |   null |
          * | 107 | rocks              | box of assorted rocks                                   |    5.1 |   null |
-         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |   null |
+         * | 108 | jacket             | water resistant black wind breaker                      |    0.1 |   null |
          * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |   null |
-         * | 111 | jacket             | new water resistent white wind breaker                  |    0.5 |    1.2 |
+         * | 111 | jacket             | new water resistant white wind breaker                  |    0.5 |    1.2 |
          * +-----+--------------------+---------------------------------------------------------+--------+--------+
          * </pre>
          */
@@ -306,11 +306,11 @@ public class OracleConnectorITCase {
                     "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
             statement.execute(
-                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)"); // 110
+                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistant white wind breaker',0.2)"); // 110
             statement.execute(
                     "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
             statement.execute(
-                    "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
+                    "UPDATE debezium.products SET DESCRIPTION='new water resistant white wind breaker', WEIGHT=0.5 WHERE ID=111");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
         }
@@ -332,9 +332,9 @@ public class OracleConnectorITCase {
          * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
          * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
          * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
-         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 108 | jacket             | water resistant black wind breaker                      |    0.1 |
          * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
-         * | 111 | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * | 111 | jacket             | new water resistant white wind breaker                  |    0.5 |
          * +-----+--------------------+---------------------------------------------------------+--------+
          * </pre>
          */
@@ -423,11 +423,11 @@ public class OracleConnectorITCase {
                     "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
             statement.execute(
-                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)"); // 110
+                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistant white wind breaker',0.2)"); // 110
             statement.execute(
                     "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
             statement.execute(
-                    "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
+                    "UPDATE debezium.products SET DESCRIPTION='new water resistant white wind breaker', WEIGHT=0.5 WHERE ID=111");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
         }
@@ -519,11 +519,11 @@ public class OracleConnectorITCase {
                     "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
             statement.execute(
-                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)");
+                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistant white wind breaker',0.2)");
             statement.execute(
                     "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
             statement.execute(
-                    "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
+                    "UPDATE debezium.products SET DESCRIPTION='new water resistant white wind breaker', WEIGHT=0.5 WHERE ID=111");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
         }
@@ -537,13 +537,13 @@ public class OracleConnectorITCase {
                         "+I[ORCLCDB, DEBEZIUM, PRODUCTS, 105, hammer, 14oz carpenters hammer, 0.875]",
                         "+I[ORCLCDB, DEBEZIUM, PRODUCTS, 106, hammer, 16oz carpenters hammer, 1.000]",
                         "+I[ORCLCDB, DEBEZIUM, PRODUCTS, 107, rocks, box of assorted rocks, 5.300]",
-                        "+I[ORCLCDB, DEBEZIUM, PRODUCTS, 108, jacket, water resistent black wind breaker, 0.100]",
+                        "+I[ORCLCDB, DEBEZIUM, PRODUCTS, 108, jacket, water resistant black wind breaker, 0.100]",
                         "+I[ORCLCDB, DEBEZIUM, PRODUCTS, 109, spare tire, 24 inch spare tire, 22.200]",
-                        "+I[ORCLCDB, DEBEZIUM, PRODUCTS, 111, jacket, water resistent white wind breaker, 0.200]",
+                        "+I[ORCLCDB, DEBEZIUM, PRODUCTS, 111, jacket, water resistant white wind breaker, 0.200]",
                         "+I[ORCLCDB, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.180]",
                         "+U[ORCLCDB, DEBEZIUM, PRODUCTS, 106, hammer, 18oz carpenter hammer, 1.000]",
                         "+U[ORCLCDB, DEBEZIUM, PRODUCTS, 107, rocks, box of assorted rocks, 5.100]",
-                        "+U[ORCLCDB, DEBEZIUM, PRODUCTS, 111, jacket, new water resistent white wind breaker, 0.500]",
+                        "+U[ORCLCDB, DEBEZIUM, PRODUCTS, 111, jacket, new water resistant white wind breaker, 0.500]",
                         "+U[ORCLCDB, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]",
                         "-D[ORCLCDB, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]");
 
@@ -604,11 +604,11 @@ public class OracleConnectorITCase {
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
-                    "INSERT INTO debezium.products VALUES (110,'jacket','water resistent white wind breaker',0.2)"); // 110
+                    "INSERT INTO debezium.products VALUES (110,'jacket','water resistant white wind breaker',0.2)"); // 110
             statement.execute(
                     "INSERT INTO debezium.products VALUES (111,'scooter','Big 2-wheel scooter ',5.18)");
             statement.execute(
-                    "UPDATE debezium.products SET description='new water resistent white wind breaker', weight=0.5 WHERE id=110");
+                    "UPDATE debezium.products SET description='new water resistant white wind breaker', weight=0.5 WHERE id=110");
             statement.execute("UPDATE debezium.products SET weight=5.17 WHERE id=111");
             statement.execute("DELETE FROM debezium.products WHERE id=111");
         }
@@ -616,7 +616,7 @@ public class OracleConnectorITCase {
         waitForSinkSize("sink", 7);
 
         String[] expected =
-                new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
+                new String[] {"+I[110, jacket, new water resistant white wind breaker, 0.500]"};
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
         assertThat(actual, containsInAnyOrder(expected));

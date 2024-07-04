@@ -152,7 +152,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                 productDocOf(
                         "100000000000000000000110",
                         "jacket",
-                        "water resistent white wind breaker",
+                        "water resistant white wind breaker",
                         0.2));
 
         products.insertOne(
@@ -161,7 +161,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
         products.updateOne(
                 Filters.eq("_id", new ObjectId("100000000000000000000110")),
                 Updates.combine(
-                        Updates.set("description", "new water resistent white wind breaker"),
+                        Updates.set("description", "new water resistant white wind breaker"),
                         Updates.set("weight", 0.5)));
 
         products.updateOne(
@@ -196,11 +196,11 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
         //   1 |
         // | 107 | rocks              | box of assorted rocks                                   |
         // 5.1 |
-        // | 108 | jacket             | water resistent black wind breaker                      |
+        // | 108 | jacket             | water resistant black wind breaker                      |
         // 0.1 |
         // | 109 | spare tire         | 24 inch spare tire                                      |
         // 22.2 |
-        // | 110 | jacket             | new water resistent white wind breaker                  |
+        // | 110 | jacket             | new water resistant white wind breaker                  |
         // 0.5 |
         // +-----+--------------------+---------------------------------------------------------+--------+
 
@@ -284,7 +284,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                 productDocOf(
                         "100000000000000000000110",
                         "jacket",
-                        "water resistent white wind breaker",
+                        "water resistant white wind breaker",
                         0.2));
 
         products.insertOne(
@@ -531,7 +531,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                 productDocOf(
                         "100000000000000000000110",
                         "jacket",
-                        "water resistent white wind breaker",
+                        "water resistant white wind breaker",
                         0.2));
 
         products.insertOne(
@@ -540,7 +540,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
         products.updateOne(
                 Filters.eq("_id", new ObjectId("100000000000000000000110")),
                 Updates.combine(
-                        Updates.set("description", "new water resistent white wind breaker"),
+                        Updates.set("description", "new water resistant white wind breaker"),
                         Updates.set("weight", 0.5)));
 
         products.updateOne(
@@ -563,13 +563,13 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                                 "+I(100000000000000000000105,hammer,12oz carpenter''s hammer,0.875,%s,products)",
                                 "+I(100000000000000000000106,hammer,12oz carpenter''s hammer,1.000,%s,products)",
                                 "+I(100000000000000000000107,rocks,box of assorted rocks,5.300,%s,products)",
-                                "+I(100000000000000000000108,jacket,water resistent black wind breaker,0.100,%s,products)",
+                                "+I(100000000000000000000108,jacket,water resistant black wind breaker,0.100,%s,products)",
                                 "+I(100000000000000000000109,spare tire,24 inch spare tire,22.200,%s,products)",
-                                "+I(100000000000000000000110,jacket,water resistent white wind breaker,0.200,%s,products)",
+                                "+I(100000000000000000000110,jacket,water resistant white wind breaker,0.200,%s,products)",
                                 "+I(100000000000000000000111,scooter,Big 2-wheel scooter,5.180,%s,products)",
                                 "+U(100000000000000000000106,hammer,18oz carpenter hammer,1.000,%s,products)",
                                 "+U(100000000000000000000107,rocks,box of assorted rocks,5.100,%s,products)",
-                                "+U(100000000000000000000110,jacket,new water resistent white wind breaker,0.500,%s,products)",
+                                "+U(100000000000000000000110,jacket,new water resistant white wind breaker,0.500,%s,products)",
                                 "+U(100000000000000000000111,scooter,Big 2-wheel scooter,5.170,%s,products)",
                                 "-D(100000000000000000000111,scooter,Big 2-wheel scooter,5.170,%s,products)")
                         .map(s -> String.format(s, database))

@@ -811,17 +811,17 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         try (Connection connection = inventoryDatabase8.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);");
+                    "INSERT INTO products VALUES (default,'jacket','water resistant white wind breaker',0.2);");
             statement.execute(
                     "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
             statement.execute("FLUSH LOGS;");
             Thread.sleep(3000);
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);");
+                    "INSERT INTO products VALUES (default,'jacket','water resistant white wind breaker',0.2);");
             statement.execute(
                     "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute("FLUSH LOGS;");

@@ -109,11 +109,11 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                     "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
         }
@@ -135,9 +135,9 @@ public class TiDBConnectorITCase extends TiDBTestBase {
          * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
          * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
          * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
-         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 108 | jacket             | water resistant black wind breaker                      |    0.1 |
          * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
-         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * | 110 | jacket             | new water resistant white wind breaker                  |    0.5 |
          * +-----+--------------------+---------------------------------------------------------+--------+
          * </pre>
          */
@@ -151,13 +151,13 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "+I(105,hammer,14oz carpenter's hammer,0.8750000000)",
                         "+I(106,hammer,16oz carpenter's hammer,1.0000000000)",
                         "+I(107,rocks,box of assorted rocks,5.3000000000)",
-                        "+I(108,jacket,water resistent black wind breaker,0.1000000000)",
+                        "+I(108,jacket,water resistant black wind breaker,0.1000000000)",
                         "+I(109,spare tire,24 inch spare tire,22.2000000000)",
                         "+U(106,hammer,18oz carpenter hammer,1.0000000000)",
                         "+U(107,rocks,box of assorted rocks,5.1000000000)",
-                        "+I(110,jacket,water resistent white wind breaker,0.2000000000)",
+                        "+I(110,jacket,water resistant white wind breaker,0.2000000000)",
                         "+I(111,scooter,Big 2-wheel scooter ,5.1800000000)",
-                        "+U(110,jacket,new water resistent white wind breaker,0.5000000000)",
+                        "+U(110,jacket,new water resistant white wind breaker,0.5000000000)",
                         "+U(111,scooter,Big 2-wheel scooter ,5.1700000000)",
                         "-D(111,scooter,Big 2-wheel scooter ,5.1700000000)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
@@ -231,7 +231,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "+I(105,hammer,14oz carpenter's hammer,0.8750000000)",
                         "+I(106,hammer,16oz carpenter's hammer,1.0000000000)",
                         "+I(107,rocks,box of assorted rocks,5.3000000000)",
-                        "+I(108,jacket,water resistent black wind breaker,0.1000000000)",
+                        "+I(108,jacket,water resistant black wind breaker,0.1000000000)",
                         "+I(109,spare tire,24 inch spare tire,22.2000000000)",
                         "+U(107,rocks,null,5.1000000000)",
                         "+I(110,jacket,null,0.2000000000)",
@@ -295,11 +295,11 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                     "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2,null);"); // 110
+                    "INSERT INTO products VALUES (default,'jacket','water resistant white wind breaker',0.2,null);"); // 110
             statement.execute(
                     "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18,1);");
             statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
         }
@@ -315,13 +315,13 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "+I(105,hammer,14oz carpenter's hammer,0.8750000000)",
                         "+I(106,hammer,16oz carpenter's hammer,1.0000000000)",
                         "+I(107,rocks,box of assorted rocks,5.3000000000)",
-                        "+I(108,jacket,water resistent black wind breaker,0.1000000000)",
+                        "+I(108,jacket,water resistant black wind breaker,0.1000000000)",
                         "+I(109,spare tire,24 inch spare tire,22.2000000000)",
                         "+U(106,hammer,18oz carpenter hammer,1.0000000000)",
                         "+U(107,rocks,box of assorted rocks,5.1000000000)",
-                        "+I(110,jacket,water resistent white wind breaker,0.2000000000)",
+                        "+I(110,jacket,water resistant white wind breaker,0.2000000000)",
                         "+I(111,scooter,Big 2-wheel scooter ,5.1800000000)",
-                        "+U(110,jacket,new water resistent white wind breaker,0.5000000000)",
+                        "+U(110,jacket,new water resistant white wind breaker,0.5000000000)",
                         "+U(111,scooter,Big 2-wheel scooter ,5.1700000000)",
                         "-D(111,scooter,Big 2-wheel scooter ,5.1700000000)");
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
@@ -393,7 +393,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "+I(inventory,products,105,hammer,14oz carpenter's hammer,0.8750000000)",
                         "+I(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
                         "+I(inventory,products,107,rocks,box of assorted rocks,5.3000000000)",
-                        "+I(inventory,products,108,jacket,water resistent black wind breaker,0.1000000000)",
+                        "+I(inventory,products,108,jacket,water resistant black wind breaker,0.1000000000)",
                         "+I(inventory,products,109,spare tire,24 inch spare tire,22.2000000000)",
                         "+U(inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)",
                         "-U(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)");

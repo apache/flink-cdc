@@ -148,9 +148,9 @@ public class CollectionDiscoveryUtils {
     }
 
     public static List<Pattern> includeListAsPatterns(
-            List<String> includeList, Function<String, Pattern> convertion) {
+            List<String> includeList, Function<String, Pattern> conversion) {
         if (includeList != null && !includeList.isEmpty()) {
-            return includeList.stream().map(convertion).collect(Collectors.toList());
+            return includeList.stream().map(conversion).collect(Collectors.toList());
         } else {
             return Collections.emptyList();
         }

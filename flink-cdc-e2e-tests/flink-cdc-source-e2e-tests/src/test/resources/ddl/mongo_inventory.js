@@ -57,7 +57,7 @@ db.getCollection('products').insertMany([
     {
         "_id": ObjectId("100000000000000000000108"),
         "name": "jacket",
-        "description": "water resistent black wind breaker",
+        "description": "water resistant black wind breaker",
         "weight": 0.1
     },
     {

@@ -145,17 +145,17 @@ public class VitessE2eITCase extends FlinkContainerTestEnvironment {
                             + "       (default,'hammer','14oz carpenter hammer',0.875),\n"
                             + "       (default,'hammer','16oz carpenter hammer',1.0),\n"
                             + "       (default,'rocks','box of assorted rocks',5.3),\n"
-                            + "       (default,'jacket','water resistent black wind breaker',0.1),\n"
+                            + "       (default,'jacket','water resistant black wind breaker',0.1),\n"
                             + "       (default,'spare tire','24 inch spare tire',22.2);");
             statement.execute(
                     "UPDATE test.products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE test.products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO test.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO test.products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO test.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE test.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE test.products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE test.products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM test.products WHERE id=111;");
         }
@@ -177,9 +177,9 @@ public class VitessE2eITCase extends FlinkContainerTestEnvironment {
                         "105,hammer,14oz carpenter hammer,0.875",
                         "106,hammer,18oz carpenter hammer,1.0",
                         "107,rocks,box of assorted rocks,5.1",
-                        "108,jacket,water resistent black wind breaker,0.1",
+                        "108,jacket,water resistant black wind breaker,0.1",
                         "109,spare tire,24 inch spare tire,22.2",
-                        "110,jacket,new water resistent white wind breaker,0.5");
+                        "110,jacket,new water resistant white wind breaker,0.5");
         proxy.checkResultWithTimeout(
                 expectResult,
                 "products_sink",

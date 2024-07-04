@@ -145,11 +145,11 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                     "UPDATE debezium.products SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.1 WHERE ID=107");
             statement.execute(
-                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistent white wind breaker',0.2)");
+                    "INSERT INTO debezium.products VALUES (111,'jacket','water resistant white wind breaker',0.2)");
             statement.execute(
                     "INSERT INTO debezium.products VALUES (112,'scooter','Big 2-wheel scooter ',5.18)");
             statement.execute(
-                    "UPDATE debezium.products SET DESCRIPTION='new water resistent white wind breaker', WEIGHT=0.5 WHERE ID=111");
+                    "UPDATE debezium.products SET DESCRIPTION='new water resistant white wind breaker', WEIGHT=0.5 WHERE ID=111");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
         } catch (SQLException e) {
@@ -175,9 +175,9 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         "105,hammer,14oz carpenters hammer,0.875",
                         "106,hammer,18oz carpenter hammer,1.0",
                         "107,rocks,box of assorted rocks,5.1",
-                        "108,jacket,water resistent black wind breaker,0.1",
+                        "108,jacket,water resistant black wind breaker,0.1",
                         "109,spare tire,24 inch spare tire,22.2",
-                        "111,jacket,new water resistent white wind breaker,0.5");
+                        "111,jacket,new water resistant white wind breaker,0.5");
         // Oracle cdc's backfill task will cost much time, increase the timeout here
         proxy.checkResultWithTimeout(
                 expectResult,

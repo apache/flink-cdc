@@ -152,7 +152,7 @@ db2
 ```sql
 UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106;
 
-INSERT INTO DB2INST1.PRODUCTS VALUES (default,'jacket','water resistent white wind breaker',0.2);
+INSERT INTO DB2INST1.PRODUCTS VALUES (default,'jacket','water resistant white wind breaker',0.2);
 
 INSERT INTO DB2INST1.PRODUCTS VALUES (default,'scooter','Big 2-wheel scooter ',5.18);
 

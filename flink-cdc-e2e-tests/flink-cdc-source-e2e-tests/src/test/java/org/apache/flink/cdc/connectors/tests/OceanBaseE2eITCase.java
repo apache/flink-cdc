@@ -174,11 +174,11 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
                     "UPDATE products_source SET description='18oz carpenter hammer' WHERE id=106;");
             stat.execute("UPDATE products_source SET weight='5.1' WHERE id=107;");
             stat.execute(
-                    "INSERT INTO products_source VALUES (default,'jacket','water resistent white wind breaker',0.2, null, null);");
+                    "INSERT INTO products_source VALUES (default,'jacket','water resistant white wind breaker',0.2, null, null);");
             stat.execute(
                     "INSERT INTO products_source VALUES (default,'scooter','Big 2-wheel scooter ',5.18, null, null);");
             stat.execute(
-                    "UPDATE products_source SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE products_source SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             stat.execute("UPDATE products_source SET weight='5.17' WHERE id=111;");
             stat.execute("DELETE FROM products_source WHERE id=111;");
         } catch (SQLException e) {
@@ -202,9 +202,9 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
                         "105,hammer,14oz carpenter's hammer,0.875,red,{\"k1\": \"v1\", \"k2\": \"v2\"}",
                         "106,hammer,18oz carpenter hammer,1.0,null,null",
                         "107,rocks,box of assorted rocks,5.1,null,null",
-                        "108,jacket,water resistent black wind breaker,0.1,null,null",
+                        "108,jacket,water resistant black wind breaker,0.1,null,null",
                         "109,spare tire,24 inch spare tire,22.2,null,null",
-                        "110,jacket,new water resistent white wind breaker,0.5,null,null");
+                        "110,jacket,new water resistant white wind breaker,0.5,null,null");
         proxy.checkResultWithTimeout(
                 expectResult,
                 "ob_products_sink",

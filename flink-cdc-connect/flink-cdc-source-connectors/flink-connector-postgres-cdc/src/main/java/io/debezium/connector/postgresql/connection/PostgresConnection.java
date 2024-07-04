@@ -356,7 +356,7 @@ public class PostgresConnection extends JdbcConnection {
      * @param pluginName the name of the plugin
      * @return the {@link ServerInfo.ReplicationSlot} object or a {@link
      *     ServerInfo.ReplicationSlot#INVALID} if the slot is not valid
-     * @throws SQLException is thrown by the underyling jdbc driver
+     * @throws SQLException is thrown by the underlying jdbc driver
      * @throws InterruptedException is thrown if we don't return an answer within the set number of
      *     retries
      */

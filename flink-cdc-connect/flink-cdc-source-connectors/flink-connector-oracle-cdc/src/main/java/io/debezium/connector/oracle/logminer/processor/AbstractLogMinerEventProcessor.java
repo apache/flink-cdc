@@ -980,7 +980,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
     /**
      * Add a transaction to the transaction map if allowed.
      *
-     * @param transactionId the unqiue transaction id
+     * @param transactionId the unique transaction id
      * @param row the LogMiner event row
      * @param eventSupplier the supplier of the event to create if the event is allowed to be added
      */
@@ -1154,7 +1154,7 @@ public abstract class AbstractLogMinerEventProcessor<T extends AbstractTransacti
      *
      * <ol>
      *   <li>Undo segment number
-     *   <li>Slot numbber of the transaction that generated the change
+     *   <li>Slot number of the transaction that generated the change
      *   <li>Sequence number of the transaction that generated the change
      * </ol>
      *

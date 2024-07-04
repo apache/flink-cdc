@@ -181,7 +181,7 @@ public class MySqlCompatibilityITCase {
                     "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
                     "+I[106, hammer, 16oz carpenter's hammer, 1.000]",
                     "+I[107, rocks, box of assorted rocks, 5.300]",
-                    "+I[108, jacket, water resistent black wind breaker, 0.100]",
+                    "+I[108, jacket, water resistant black wind breaker, 0.100]",
                     "+I[109, spare tire, 24 inch spare tire, 22.200]"
                 };
         assertEqualsInAnyOrder(
@@ -193,11 +193,11 @@ public class MySqlCompatibilityITCase {
                     "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
         }
@@ -208,10 +208,10 @@ public class MySqlCompatibilityITCase {
                     "+U[106, hammer, 18oz carpenter hammer, 1.000]",
                     "-U[107, rocks, box of assorted rocks, 5.300]",
                     "+U[107, rocks, box of assorted rocks, 5.100]",
-                    "+I[110, jacket, water resistent white wind breaker, 0.200]",
+                    "+I[110, jacket, water resistant white wind breaker, 0.200]",
                     "+I[111, scooter, Big 2-wheel scooter , 5.180]",
-                    "-U[110, jacket, water resistent white wind breaker, 0.200]",
-                    "+U[110, jacket, new water resistent white wind breaker, 0.500]",
+                    "-U[110, jacket, water resistant white wind breaker, 0.200]",
+                    "+U[110, jacket, new water resistant white wind breaker, 0.500]",
                     "-U[111, scooter, Big 2-wheel scooter , 5.180]",
                     "+U[111, scooter, Big 2-wheel scooter , 5.170]",
                     "-D[111, scooter, Big 2-wheel scooter , 5.170]"
