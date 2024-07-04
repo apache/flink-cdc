@@ -24,9 +24,7 @@ import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.event.DebeziumSchemaDataTypeInference;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.debezium.data.Envelope;
-import io.debezium.relational.Tables;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -40,15 +38,7 @@ import java.util.Map;
 public class PostgresEventDeserializer extends DebeziumEventDeserializationSchema {
 
     private static final long serialVersionUID = 1L;
-
-    public static final String SCHEMA_CHANGE_EVENT_KEY_NAME =
-            "io.debezium.connector.postgres.SchemaChangeKey";
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
     private final boolean includeSchemaChanges;
-
-    private transient Tables tables;
 
     public PostgresEventDeserializer(
             DebeziumChangelogMode changelogMode, boolean includeSchemaChanges) {
@@ -73,8 +63,7 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
 
     @Override
     protected boolean isSchemaChangeRecord(SourceRecord record) {
-        Schema keySchema = record.keySchema();
-        return keySchema != null && SCHEMA_CHANGE_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name());
+        return false;
     }
 
     @Override
