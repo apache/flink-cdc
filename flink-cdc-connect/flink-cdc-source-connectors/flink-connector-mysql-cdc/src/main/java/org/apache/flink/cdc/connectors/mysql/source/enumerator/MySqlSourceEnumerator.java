@@ -214,6 +214,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         splitAssigner.notifyCheckpointComplete(checkpointId);
         if (!isRuntimeTableAdded){
             context.sendEventToSourceReader(binlogSplitTaskId, new FinishedBinlogNewTableAddRequestEvent());
+            isRuntimeTableAdded = true;
         }
         // binlog split may be available after checkpoint complete
         assignSplits();

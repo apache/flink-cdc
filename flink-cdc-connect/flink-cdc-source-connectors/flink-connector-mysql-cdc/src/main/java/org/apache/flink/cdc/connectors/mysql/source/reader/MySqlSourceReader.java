@@ -79,6 +79,7 @@ public class MySqlSourceReader<T>
     private final MySqlSourceReaderContext mySqlSourceReaderContext;
     private final MySqlPartition partition;
     private volatile MySqlBinlogSplit suspendedBinlogSplit;
+    private List<TableId> tableNotified;
 
     public MySqlSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
@@ -101,6 +102,7 @@ public class MySqlSourceReader<T>
         this.suspendedBinlogSplit = null;
         this.partition =
                 new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
+        this.tableNotified = new ArrayList<>();
     }
 
     @Override
@@ -238,18 +240,20 @@ public class MySqlSourceReader<T>
             LOG.info("Source reader {} adds split {}", subtaskId, split);
             if (split.isSnapshotSplit()) {
                 MySqlSnapshotSplit snapshotSplit = split.asSnapshotSplit();
-                if (snapshotSplit.isSnapshotReadFinished()) {
-                    finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
-                } else if (sourceConfig
-                        .getTableFilters()
-                        .dataCollectionFilter()
-                        .isIncluded(split.asSnapshotSplit().getTableId())) {
-                    unfinishedSplits.add(split);
-                } else {
-                    LOG.debug(
-                            "The subtask {} is skipping split {} because it does not match new table filter.",
-                            subtaskId,
-                            split.splitId());
+                if(!tableNotified.contains(snapshotSplit.getTableId())){
+                    if (snapshotSplit.isSnapshotReadFinished()) {
+                        finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
+                    } else if (sourceConfig
+                            .getTableFilters()
+                            .dataCollectionFilter()
+                            .isIncluded(split.asSnapshotSplit().getTableId())) {
+                        unfinishedSplits.add(split);
+                    } else {
+                        LOG.debug(
+                                "The subtask {} is skipping split {} because it does not match new table filter.",
+                                subtaskId,
+                                split.splitId());
+                    }
                 }
             } else {
                 MySqlBinlogSplit binlogSplit = split.asBinlogSplit();
@@ -275,6 +279,13 @@ public class MySqlSourceReader<T>
                     if (checkNewlyAddedTableSchema) {
                         boolean newTablesAdded = isNewTablesAdded(binlogSplit);
                         if (newTablesAdded) {
+                            if (!binlogSplit.getTableNotified().isEmpty()){
+                                tableNotified = binlogSplit.getTableNotified();
+                                for (TableId tableId : tableNotified) {
+                                    context.sendSourceEventToCoordinator(new BinlogNewAddedTableEvent(tableId.catalog()
+                                            , tableId.schema(), tableId.table()));
+                                }
+                            }
                             binlogSplit = MySqlBinlogSplit.toSuspendSplit(binlogSplit);
                             context.sendSourceEventToCoordinator(new BinlogSplitSuspendEvent());
                         }
