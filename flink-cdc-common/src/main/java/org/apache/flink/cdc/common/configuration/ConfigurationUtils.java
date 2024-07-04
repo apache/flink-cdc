@@ -222,7 +222,7 @@ public class ConfigurationUtils {
             } else {
                 throw new IllegalArgumentException(
                         String.format(
-                                "Configuration value %s overflows/underflow's the float type.",
+                                "Configuration value %s overflows/underflows the float type.",
                                 value));
             }
         }
