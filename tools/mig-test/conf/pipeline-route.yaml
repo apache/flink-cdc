@@ -32,6 +32,10 @@ pipeline:
   name: ${PIPELINE_NAME}
   parallelism: 1
 
+transform:
+  - source-table: fallen.\.*
+    projection: \*, 'extras' AS EXTRAS
+
 route:
   - source-table: fallen.\.*
     sink-table: fallen.terminus
