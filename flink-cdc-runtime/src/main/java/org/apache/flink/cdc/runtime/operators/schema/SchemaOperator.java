@@ -71,6 +71,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
@@ -100,6 +101,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private transient TaskOperatorEventGateway toCoordinator;
     private transient SchemaEvolutionClient schemaEvolutionClient;
     private transient LoadingCache<TableId, Schema> cachedSchemas;
+    private transient LoadingCache<TableId, List<TableId>> tableIdMappingCache;
 
     private final long rpcTimeOutInMillis;
 
@@ -146,6 +148,16 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                         return getLatestSchema(tableId);
                                     }
                                 });
+        tableIdMappingCache =
+                CacheBuilder.newBuilder()
+                        .expireAfterAccess(CACHE_EXPIRE_DURATION)
+                        .build(
+                                new CacheLoader<TableId, List<TableId>>() {
+                                    @Override
+                                    public List<TableId> load(TableId tableId) {
+                                        return getRoutedTables(tableId);
+                                    }
+                                });
     }
 
     @Override
@@ -164,7 +176,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
      */
     @Override
     public void processElement(StreamRecord<Event> streamRecord)
-            throws InterruptedException, TimeoutException {
+            throws InterruptedException, TimeoutException, ExecutionException {
         Event event = streamRecord.getValue();
         // Schema changes
         if (event instanceof SchemaChangeEvent) {
@@ -175,15 +187,15 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             handleSchemaChangeEvent(tableId, (SchemaChangeEvent) event);
             // Update caches
             cachedSchemas.put(tableId, getLatestSchema(tableId));
-            getRoutedTables(tableId)
+            tableIdMappingCache
+                    .get(tableId)
                     .forEach(routed -> cachedSchemas.put(routed, getLatestSchema(routed)));
             return;
         }
 
         // Data changes
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
-        TableId tableId = dataChangeEvent.tableId();
-        List<TableId> optionalRoutedTable = getRoutedTables(tableId);
+        List<TableId> optionalRoutedTable = tableIdMappingCache.get(dataChangeEvent.tableId());
         if (optionalRoutedTable.isEmpty()) {
             output.collect(streamRecord);
         } else {
