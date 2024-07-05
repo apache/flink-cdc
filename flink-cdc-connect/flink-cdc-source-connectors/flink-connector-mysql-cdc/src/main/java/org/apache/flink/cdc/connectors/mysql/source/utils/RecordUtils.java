@@ -104,9 +104,9 @@ public class RecordUtils {
         if (isDataChangeRecord(binlogRecord)) {
             Struct value = (Struct) binlogRecord.value();
             if (value != null) {
-                Struct keyStruct = getStructContainsChunkKey(binlogRecord);
+                Struct chunkKeyStruct = getStructContainsChunkKey(binlogRecord);
                 if (splitKeyRangeContains(
-                        getSplitKey(splitBoundaryType, nameAdjuster, keyStruct),
+                        getSplitKey(splitBoundaryType, nameAdjuster, chunkKeyStruct),
                         splitStart,
                         splitEnd)) {
                     boolean hasPrimaryKey = binlogRecord.key() != null;
@@ -119,7 +119,7 @@ public class RecordUtils {
                                     snapshotRecords,
                                     binlogRecord,
                                     hasPrimaryKey
-                                            ? keyStruct
+                                            ? (Struct) binlogRecord.key()
                                             : createReadOpValue(
                                                     binlogRecord, Envelope.FieldName.AFTER),
                                     false);
@@ -147,7 +147,7 @@ public class RecordUtils {
                             upsertBinlog(
                                     snapshotRecords,
                                     binlogRecord,
-                                    hasPrimaryKey ? keyStruct : structFromAfter,
+                                    hasPrimaryKey ? (Struct) binlogRecord.key() : structFromAfter,
                                     false);
                             break;
                         case DELETE:
@@ -155,7 +155,7 @@ public class RecordUtils {
                                     snapshotRecords,
                                     binlogRecord,
                                     hasPrimaryKey
-                                            ? keyStruct
+                                            ? (Struct) binlogRecord.key()
                                             : createReadOpValue(
                                                     binlogRecord, Envelope.FieldName.BEFORE),
                                     true);
