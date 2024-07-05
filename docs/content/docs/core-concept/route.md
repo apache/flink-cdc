@@ -33,7 +33,7 @@ To describe a route, the follows are required:
 | parameter      | meaning                                                                                     | optional/required |
 |----------------|---------------------------------------------------------------------------------------------|-------------------|
 | source-table   | Source table id, supports regular expressions                                               | required          |
-| sink-table     | Sink table id, supports regular expressions                                                 | required          |
+| sink-table     | Sink table id, supports symbol replacement                                                  | required          |
 | replace-symbol | Special symbol in sink-table for pattern replacing, will be replaced by original table name | optional          |
 | description    | Routing rule description(a default value provided)                                          | optional          |
 
