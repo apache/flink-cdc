@@ -51,6 +51,9 @@ public class TableId implements Serializable {
     @Nullable private final String schemaName;
     private final String tableName;
 
+    // Cache immutable objects' hash code for optimization.
+    private transient volatile int hashCode;
+
     private TableId(@Nullable String namespace, @Nullable String schemaName, String tableName) {
         this.namespace = namespace;
         this.schemaName = schemaName;
@@ -125,7 +128,10 @@ public class TableId implements Serializable {
 
     @Override
     public int hashCode() {
-        return Objects.hash(namespace, schemaName, tableName);
+        if (hashCode == 0) {
+            hashCode = Objects.hash(namespace, schemaName, tableName);
+        }
+        return hashCode;
     }
 
     @Override
