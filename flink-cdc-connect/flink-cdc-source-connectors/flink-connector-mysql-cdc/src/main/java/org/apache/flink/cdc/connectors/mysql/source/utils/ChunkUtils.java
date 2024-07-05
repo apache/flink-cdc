@@ -57,8 +57,7 @@ public class ChunkUtils {
 
     /**
      * Get the chunk key column. This column could be set by `chunkKeyColumn`. If the table doesn't
-     * have primary keys, `chunkKeyColumn` must be set. If the table has primary keys,
-     * `chunkKeyColumn` must be a column of them or else null. When the parameter `chunkKeyColumn`
+     * have primary keys, `chunkKeyColumn` must be set. When the parameter `chunkKeyColumn`
      * is not set and the table has primary keys, return the first column of primary keys.
      */
     public static Column getChunkKeyColumn(Table table, Map<ObjectPath, String> chunkKeyColumns) {
