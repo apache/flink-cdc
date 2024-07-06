@@ -193,6 +193,7 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
         Schema newSchema =
                 SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getTransformedSchema(), event);
         tableChangeInfoMap.put(tableId, TableChangeInfo.of(tableId, originalSchema, newSchema));
+        transformSchemaChange(tableId, originalSchema, newSchema);
         return event;
     }
 
@@ -227,6 +228,24 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
             }
         }
         return createTableEvent;
+    }
+
+    private void transformSchemaChange(TableId tableId, Schema originalSchema, Schema schema) {
+        for (Tuple2<Selectors, Optional<TransformProjection>> transform : transforms) {
+            Selectors selectors = transform.f0;
+            if (selectors.isMatch(tableId) && transform.f1.isPresent()) {
+                TransformProjection transformProjection = transform.f1.get();
+                if (transformProjection.isValid()) {
+                    if (processorMap.containsKey(tableId)) {
+                        processorMap.put(
+                                tableId,
+                                TransformProjectionProcessor.of(
+                                        TableChangeInfo.of(tableId, originalSchema, schema),
+                                        transformProjection));
+                    }
+                }
+            }
+        }
     }
 
     private Schema transformSchemaMetaData(

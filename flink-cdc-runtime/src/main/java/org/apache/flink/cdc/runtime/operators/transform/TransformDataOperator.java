@@ -234,13 +234,13 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                             Tuple2.of(tableId, transformProjection))) {
                         transformProjectionProcessorMap.put(
                                 Tuple2.of(tableId, transformProjection),
-                                TransformProjectionProcessor.of(transformProjection));
+                                TransformProjectionProcessor.of(transformProjection, timezone));
                     }
                     TransformProjectionProcessor transformProjectionProcessor =
                             transformProjectionProcessorMap.get(
                                     Tuple2.of(tableId, transformProjection));
                     // update the columns of projection and add the column of projection into Schema
-                    transformProjectionProcessor.processSchemaChangeEvent(schema);
+                    transformProjectionProcessor.processSchemaChangeEvent(tableId, schema);
                 }
             }
         }

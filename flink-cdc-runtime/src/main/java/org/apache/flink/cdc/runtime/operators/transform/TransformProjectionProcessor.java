@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
@@ -83,6 +84,11 @@ public class TransformProjectionProcessor {
         return new TransformProjectionProcessor(null, tableChangeInfo, transformProjection, null);
     }
 
+    public static TransformProjectionProcessor of(
+            TransformProjection transformProjection, String timezone) {
+        return new TransformProjectionProcessor(null, null, transformProjection, timezone);
+    }
+
     public static TransformProjectionProcessor of(TransformProjection transformProjection) {
         return new TransformProjectionProcessor(null, null, transformProjection, null);
     }
@@ -99,7 +105,8 @@ public class TransformProjectionProcessor {
         return new CreateTableEvent(createTableEvent.tableId(), schema);
     }
 
-    public void processSchemaChangeEvent(Schema schema) {
+    public void processSchemaChangeEvent(TableId tableId, Schema schema) {
+        tableInfo = TableInfo.of(tableId, schema);
         List<ProjectionColumn> projectionColumns =
                 TransformParser.generateProjectionColumns(
                         transformProjection.getProjection(), schema.getColumns());
