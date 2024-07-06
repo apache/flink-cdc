@@ -28,9 +28,12 @@ import org.apache.flink.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
 
+import io.debezium.data.Envelope;
 import io.debezium.document.Array;
+import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,7 +100,7 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             }
         } else if (RecordUtils.isDataChangeRecord(element)) {
             updateStartingOffsetForSplit(splitState, element);
-            reportMetrics(element);
+            reportMetrics(element, splitState);
             emitElement(element, output);
         } else if (RecordUtils.isHeartbeatEvent(element)) {
             updateStartingOffsetForSplit(splitState, element);
@@ -120,7 +123,31 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
 
-    private void reportMetrics(SourceRecord element) {
+    private void reportMetrics(SourceRecord element, MySqlSplitState splitState) {
+        TableId tableId = RecordUtils.getTableId(element);
+        if (splitState.isSnapshotSplitState()) {
+            sourceReaderMetrics.numRecordsOutSnapshotIncrease(tableId);
+        } else if (splitState.isBinlogSplitState()) {
+            if (RecordUtils.isDataChangeRecord(element)) {
+                Struct value = (Struct) element.value();
+                if (value != null) {
+                    Envelope.Operation operation =
+                            Envelope.Operation.forCode(
+                                    value.getString(Envelope.FieldName.OPERATION));
+                    switch (operation) {
+                        case CREATE:
+                            sourceReaderMetrics.numRecordsOutInsertIncrease(tableId);
+                            break;
+                        case UPDATE:
+                            sourceReaderMetrics.numRecordsOutUpdateIncrease(tableId);
+                            break;
+                        case DELETE:
+                            sourceReaderMetrics.numRecordsOutDeleteIncrease(tableId);
+                            break;
+                    }
+                }
+            }
+        }
 
         Long messageTimestamp = RecordUtils.getMessageTimestamp(element);
 
