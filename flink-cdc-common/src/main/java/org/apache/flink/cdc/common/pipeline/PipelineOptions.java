@@ -42,7 +42,7 @@ public class PipelineOptions {
     public static final ConfigOption<Integer> PIPELINE_PARALLELISM =
             ConfigOptions.key("parallelism")
                     .intType()
-                    .noDefaultValue()
+                    .defaultValue(1)
                     .withDescription("Parallelism of the pipeline");
 
     public static final ConfigOption<SchemaChangeBehavior> PIPELINE_SCHEMA_CHANGE_BEHAVIOR =
