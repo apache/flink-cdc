@@ -84,7 +84,8 @@ import static org.apache.flink.util.Preconditions.checkState;
 /**
  * IT tests to cover various newly added tables during capture process.
  */
-public class NewlyAddedTableITCase extends MySqlSourceTestBase {
+public class
+NewlyAddedTableITCase extends MySqlSourceTestBase {
 
     @Rule
     public final Timeout timeoutPerTest = Timeout.seconds(300);

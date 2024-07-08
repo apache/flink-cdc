@@ -247,7 +247,7 @@ public class MySqlSourceReader<T>
                             && sourceConfig.isScanNewlyAddedTableEnabled();
                     // check if contains new added tables
                     if (checkNewlyAddedTableSchema) {
-                        Map<TableId, TableChanges.TableChange> tableIdTableChangeMap = discoverTableSchemasForBinlogSplit(binlogSplit, sourceConfig);
+                        Map<TableId, TableChanges.TableChange> tableIdTableChangeMap = discoverSchemaForNewAddedTables(binlogSplit);
                         if (!tableIdTableChangeMap.keySet().isEmpty()) {
                             // suspend binlog split at the start.rerun after new added table snapshot finished.
                             binlogSplit = MySqlBinlogSplit.toSuspendSplit(MySqlBinlogSplit.fillTableSchemas(binlogSplit, tableIdTableChangeMap));
@@ -265,8 +265,7 @@ public class MySqlSourceReader<T>
                 } else {
                     uncompletedBinlogSplits.remove(binlogSplit.splitId());
                     if (!checkNewlyAddedTableSchema){
-                        Map<TableId, TableChanges.TableChange> tableIdTableChangeMap = discoverTableSchemasForBinlogSplit(binlogSplit, sourceConfig);
-                        binlogSplit = MySqlBinlogSplit.fillTableSchemas(binlogSplit, tableIdTableChangeMap);
+                        binlogSplit = discoverTableSchemasForBinlogSplit(binlogSplit, sourceConfig);
                     }
                     unfinishedSplits.add(binlogSplit);
                 }
@@ -441,9 +440,10 @@ public class MySqlSourceReader<T>
         }
     }
 
-    private Map<TableId, TableChanges.TableChange> discoverTableSchemasForBinlogSplit(
+    private MySqlBinlogSplit discoverTableSchemasForBinlogSplit(
             MySqlBinlogSplit split,
             MySqlSourceConfig sourceConfig) {
+        if (split.getTableSchemas().isEmpty()) {
             try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
                 Map<TableId, TableChanges.TableChange> tableSchemas;
                 tableSchemas =
@@ -454,7 +454,7 @@ public class MySqlSourceReader<T>
                         subtaskId,
                         split.splitId());
 
-                return tableSchemas;
+                return MySqlBinlogSplit.fillTableSchemas(split, tableSchemas);
             } catch (SQLException e) {
                 LOG.error(
                         "Source reader {} failed to obtains table schemas due to {}",
@@ -462,7 +462,32 @@ public class MySqlSourceReader<T>
                         e.getMessage());
                 throw new FlinkRuntimeException(e);
             }
+        } else {
+            LOG.warn(
+                    "Source reader {} skip the table schema discovery, the binlog split {} has table schemas yet.",
+                    subtaskId,
+                    split);
+            return split;
+        }
+    }
 
+    public Map<TableId, TableChanges.TableChange> discoverSchemaForNewAddedTables(MySqlBinlogSplit split) {
+        try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
+            List<TableId> existedTables = new ArrayList<>(split.getTableSchemas().keySet());
+            Map<TableId, TableChanges.TableChange> tableSchemas = TableDiscoveryUtils.discoverSchemaForNewAddedTables(
+                    partition, existedTables, sourceConfig, jdbc);
+            LOG.info(
+                    "Source reader {} discovers table schema for binlog split {} success",
+                    subtaskId,
+                    split.splitId());
+            return tableSchemas;
+        } catch (SQLException e) {
+            LOG.error(
+                    "Source reader {} failed to obtains table schemas due to {}",
+                    subtaskId,
+                    e.getMessage());
+            throw new FlinkRuntimeException(e);
+        }
     }
 
     private Set<String> getExistedSplitsOfLastGroup(
