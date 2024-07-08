@@ -104,20 +104,14 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
                 BinlogOffset position = RecordUtils.getBinlogPosition(element);
                 splitState.asBinlogSplitState().setStartingOffset(position);
                 TableId tableId = extractTableId(element);
-                TableId newAddedTableId = mySqlBinlogSplitState.getTableSchemas()
-                        .keySet()
-                        .stream()
-                        .filter(tId -> tId.equals(tableId))
-                        .collect(Collectors.toList())
-                        .get(0);
-                TableChanges.TableChange tableChange = mySqlBinlogSplitState.getTableSchemas().get(newAddedTableId);
-                if (tableChange.getType().equals(TableChanges.TableChangeType.CREATE)){
-                    LOG.info("sending table add to enumerator from subtask");
+                TableChanges.TableChange tableChange = mySqlBinlogSplitState.getTableSchemas().get(tableId);
+                if (tableChange.getType().equals(TableChanges.TableChangeType.CREATE)) {
+                    LOG.info("sending table added to enumerator from subtask");
                     mySqlBinlogSplitState.addUnNotifiedTableId(tableId);
                     context.getSourceReaderContext().sendSourceEventToCoordinator(new BinlogNewAddedTableEvent(tableId.catalog()
                             , tableId.schema(), tableId.table()));
                 }
-//                emitElement(element, output);
+                emitElement(element, output);
             }
         } else if (RecordUtils.isDataChangeRecord(element)) {
             updateStartingOffsetForSplit(splitState, element);
@@ -131,24 +125,11 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         }
     }
 
-    public static TableId extractTableId(SourceRecord sourceRecord) {
-        // 获取 SourceRecord 的 sourcePartition
-        Map<String, ?> sourcePartition = sourceRecord.sourcePartition();
-
-        // 获取 SourceRecord 的 key，通常是 Struct 类型
+    public TableId extractTableId(SourceRecord sourceRecord) {
         Struct value = ((Struct) sourceRecord.value()).getStruct("source");
-
-        // 获取 sourceOffset
-        Map<String, ?> sourceOffset = sourceRecord.sourceOffset();
-
-        // 从 keyStruct 中提取 TableId
         String databaseName = value.getString("db");
-//        String schemaName = value.getString("schema");
         String tableName = value.getString("table");
-
-        // 创建 TableId 对象
-        TableId tableId = new TableId(null, databaseName, tableName);
-
+        TableId tableId = new TableId(databaseName, null, tableName);
         return tableId;
     }
 

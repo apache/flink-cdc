@@ -6,22 +6,22 @@ public class BinlogNewAddedTableEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
+    private String catalog;
     private String schema;
-    private String db;
     private String table;
 
-    public BinlogNewAddedTableEvent(String schema, String db, String table) {
+    public BinlogNewAddedTableEvent(String catalog, String schema, String table) {
+        this.catalog = catalog;
         this.schema = schema;
-        this.db = db;
         this.table = table;
+    }
+
+    public String getCatalog() {
+        return catalog;
     }
 
     public String getSchema() {
         return schema;
-    }
-
-    public String getDb() {
-        return db;
     }
 
     public String getTable() {

@@ -205,14 +205,14 @@ public class MySqlBinlogSplit extends MySqlSplit {
 
     public static MySqlBinlogSplit adjustFinishedSplitInfos(
             MySqlBinlogSplit binlogSplit, List<FinishedSnapshotSplitInfo> splitInfos) {
+        splitInfos.addAll(binlogSplit.getFinishedSnapshotSplitInfos());
         return new MySqlBinlogSplit(
                 binlogSplit.splitId,
                 binlogSplit.startingOffset,
                 binlogSplit.getEndingOffset(),
                 splitInfos,
                 binlogSplit.getTableSchemas(),
-                binlogSplit.getFinishedSnapshotSplitInfos().size()
-                        + splitInfos.size(),
+                splitInfos.size(),
                 false);
     }
 

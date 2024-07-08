@@ -131,8 +131,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForDynamicTableAddedSingle() throws Exception {
-        testNewlyAddedTableDynamicTables(
+    public void testNewlyAddedTableForRuntimeAddTableSingleParallelism() throws Exception {
+        testNewlyAddedTableRuntimeAddTable(
                 1,
                 "address_wenzhou_1",
                 "address_wenzhou_2",
@@ -140,16 +140,16 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForDynamicTableAdded() throws Exception {
-        testNewlyAddedTableDynamicTables(
-                2,
+    public void testNewlyAddedTableForRuntimeAddTable() throws Exception {
+        testNewlyAddedTableRuntimeAddTable(
+                DEFAULT_PARALLELISM,
                 "address_wenzhou_1",
                 "address_wenzhou_2",
                 "address_wenzhou_3");
     }
 
     @Test
-    public void testNewlyAddedTableForDynamicTableAdded2Single() throws Exception {
+    public void testNewlyAddedTableForDataDuplicateSingleParallelism() throws Exception {
         testNewlyAddedTableDynamicTables2(
                 1,
                 "address_wenzhou_1",
@@ -157,9 +157,9 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForDynamicTableAdded2() throws Exception {
+    public void testNewlyAddedTableForDataDuplicate() throws Exception {
         testNewlyAddedTableDynamicTables2(
-                4,
+                DEFAULT_PARALLELISM,
                 "address_wenzhou_1",
                 "address_wenzhou_2");
     }
@@ -755,13 +755,13 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
         }
     }
 
-    private void testNewlyAddedTableDynamicTables(
+    private void testNewlyAddedTableRuntimeAddTable(
             int parallelism,
             String firstAddressTables,
             String secondAddressTables,
             String thirdAddressTables)
             throws Exception {
-        testNewlyAddedTableDynamicTables(
+        testNewlyAddedTableRuntimeAddTable(
                 parallelism,
                 new HashMap<>(),
                 firstAddressTables,
@@ -897,15 +897,13 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
      * 结论:
      * 会snapshot, 表没有注册到enumerator
      */
-    private void testNewlyAddedTableDynamicTables(
+    private void testNewlyAddedTableRuntimeAddTable(
             int parallelism,
             Map<String, String> sourceOptions,
             String firstAddressTables,
             String secondAddressTables,
             String thirdAddressTables)
             throws Exception {
-
-
         final TemporaryFolder temporaryFolder = new TemporaryFolder();
         temporaryFolder.create();
         final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();

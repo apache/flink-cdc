@@ -233,15 +233,10 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 // Get the removed tables with the new table filter
                 Set<TableId> tablesToRemove = new HashSet<>(previousCapturedTables);
                 tablesToRemove.removeAll(currentCapturedTables);
-                System.out.println(currentCapturedTables);
-                System.out.println(alreadyProcessedTables);
-                System.out.println(previousCapturedTables);
-                System.out.println(tablesToRemove);
 
                 // Get the newly added tables
                 currentCapturedTables.removeAll(previousCapturedTables);
                 List<TableId> newlyAddedTables = currentCapturedTables;
-                System.out.println(newlyAddedTables);
 
                 // case 1: there are old tables to remove from state
                 if (!tablesToRemove.isEmpty()) {
