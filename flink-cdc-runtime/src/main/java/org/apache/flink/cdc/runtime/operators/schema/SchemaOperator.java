@@ -101,6 +101,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private transient TaskOperatorEventGateway toCoordinator;
     private transient SchemaEvolutionClient schemaEvolutionClient;
     private transient LoadingCache<TableId, Schema> cachedSchemas;
+
+    /**
+     * Storing mapping relations between upstream tableId (source table) mapping to downstream
+     * tableIds (sink tables).
+     */
     private transient LoadingCache<TableId, List<TableId>> tableIdMappingCache;
 
     private final long rpcTimeOutInMillis;
