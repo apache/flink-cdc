@@ -152,6 +152,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                     "UPDATE debezium.products SET DESCRIPTION='new water resistant white wind breaker', WEIGHT=0.5 WHERE ID=111");
             statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
+            statement.execute("DELETE FROM debezium.products WHERE ID=108");
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
             throw e;
@@ -175,7 +176,6 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         "105,hammer,14oz carpenters hammer,0.875",
                         "106,hammer,18oz carpenter hammer,1.0",
                         "107,rocks,box of assorted rocks,5.1",
-                        "108,jacket,water resistant black wind breaker,0.1",
                         "109,spare tire,24 inch spare tire,22.2",
                         "111,jacket,new water resistant white wind breaker,0.5");
         // Oracle cdc's backfill task will cost much time, increase the timeout here
