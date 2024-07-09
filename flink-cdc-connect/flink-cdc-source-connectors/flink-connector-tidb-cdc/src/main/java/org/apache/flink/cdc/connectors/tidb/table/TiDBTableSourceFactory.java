@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.tidb.TDBSourceOptions.DATABASE_NAME;
+import static org.apache.flink.cdc.connectors.tidb.TDBSourceOptions.HOST_MAPPING;
 import static org.apache.flink.cdc.connectors.tidb.TDBSourceOptions.PD_ADDRESSES;
 import static org.apache.flink.cdc.connectors.tidb.TDBSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.tidb.TDBSourceOptions.TABLE_NAME;
@@ -56,6 +57,7 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
         String databaseName = config.get(DATABASE_NAME);
         String tableName = config.get(TABLE_NAME);
         String pdAddresses = config.get(PD_ADDRESSES);
+        String hostMapping = config.get(HOST_MAPPING);
         StartupOptions startupOptions = getStartupOptions(config);
         ResolvedSchema physicalSchema =
                 getPhysicalSchema(context.getCatalogTable().getResolvedSchema());
@@ -67,6 +69,7 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
                 databaseName,
                 tableName,
                 pdAddresses,
+                hostMapping,
                 startupOptions,
                 TiKVOptions.getTiKVOptions(context.getCatalogTable().getOptions()));
     }
@@ -89,6 +92,7 @@ public class TiDBTableSourceFactory implements DynamicTableSourceFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(SCAN_STARTUP_MODE);
+        options.add(HOST_MAPPING);
         options.add(TIKV_GRPC_TIMEOUT);
         options.add(TIKV_GRPC_SCAN_TIMEOUT);
         options.add(TIKV_BATCH_GET_CONCURRENCY);
