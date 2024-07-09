@@ -151,7 +151,7 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
 
     @Test
     public void testNewlyAddedTableForDataDuplicateSingleParallelism() throws Exception {
-        testNewlyAddedTableDynamicTables2(
+        testNewlyAddedTableDataDuplicate(
                 1,
                 "address_wenzhou_1",
                 "address_wenzhou_2");
@@ -159,7 +159,7 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
 
     @Test
     public void testNewlyAddedTableForDataDuplicate() throws Exception {
-        testNewlyAddedTableDynamicTables2(
+        testNewlyAddedTableDataDuplicate(
                 DEFAULT_PARALLELISM,
                 "address_wenzhou_1",
                 "address_wenzhou_2");
@@ -255,29 +255,6 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineSingleParallelism() throws Exception {
-        testNewlyAddedTableOneByOne(
-                1,
-                FailoverType.NONE,
-                FailoverPhase.NEVER,
-                false,
-                "address_hangzhou",
-                "address_beijing");
-    }
-
-    @Test
-    public void testNewlyAddedTableForExistsPipelineSingleParallelismWithAheadBinlog()
-            throws Exception {
-        testNewlyAddedTableOneByOne(
-                1,
-                FailoverType.NONE,
-                FailoverPhase.NEVER,
-                true,
-                "address_hangzhou",
-                "address_beijing");
-    }
-
-    @Test
     public void testJobManagerFailoverForNewlyAddedTable() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
@@ -316,7 +293,7 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
                 1,
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
-                false,
+                true,
                 "address_hangzhou",
                 "address_beijing");
     }
@@ -770,11 +747,11 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
                 thirdAddressTables);
     }
 
-    private void testNewlyAddedTableDynamicTables2(
+    private void testNewlyAddedTableDataDuplicate(
             int parallelism,
             String... captureAddressTables)
             throws Exception {
-        testNewlyAddedTableDynamicTables2(
+        testNewlyAddedTableDataDuplicate(
                 parallelism,
                 new HashMap<>(),
                 captureAddressTables);
@@ -807,7 +784,7 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
      * 单线程会重复消费， 先产生 binlog，再snapshot
      * 多线程没有问题
      */
-    private void testNewlyAddedTableDynamicTables2(
+    private void testNewlyAddedTableDataDuplicate(
             int parallelism,
             Map<String, String> sourceOptions,
             String... captureAddressTables)

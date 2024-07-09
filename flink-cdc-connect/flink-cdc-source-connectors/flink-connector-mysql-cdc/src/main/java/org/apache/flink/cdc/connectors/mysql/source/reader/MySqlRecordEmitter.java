@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mysql.source.reader;
 
 import io.debezium.relational.TableId;
 import org.apache.flink.api.connector.source.SourceOutput;
+import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogNewAddedTableEvent;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -56,13 +57,13 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             new FlinkJsonTableChangeSerializer();
 
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
-    private final MySqlSourceReaderContext context;
+    private final SourceReaderContext context;
     private final MySqlSourceReaderMetrics sourceReaderMetrics;
     private final boolean includeSchemaChanges;
     private final OutputCollector<T> outputCollector;
 
     public MySqlRecordEmitter(
-            MySqlSourceReaderContext context,
+            SourceReaderContext context,
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
             boolean includeSchemaChanges) {
@@ -108,7 +109,7 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
                 if (tableChange.getType().equals(TableChanges.TableChangeType.CREATE)) {
                     LOG.info("sending table added to enumerator from subtask");
                     mySqlBinlogSplitState.addUnNotifiedTableId(tableId);
-                    context.getSourceReaderContext().sendSourceEventToCoordinator(new BinlogNewAddedTableEvent(tableId.catalog()
+                    context.sendSourceEventToCoordinator(new BinlogNewAddedTableEvent(tableId.catalog()
                             , tableId.schema(), tableId.table()));
                 }
                 emitElement(element, output);

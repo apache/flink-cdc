@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceOutput;
+import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -71,7 +72,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     private final List<CreateTableEvent> createTableEventCache;
 
     public MySqlPipelineRecordEmitter(
-            MySqlSourceReaderContext context,
+            SourceReaderContext context,
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
             MySqlSourceConfig sourceConfig) {
