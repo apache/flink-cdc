@@ -94,7 +94,7 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
     @Override
     public void open(InitializationContext context) {
         this.context = context;
-        reuseGenericRowData = new GenericRowData(3);
+        reuseGenericRowData = new GenericRowData(6);
     }
 
     @Override
@@ -132,6 +132,17 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
         }
 
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
+        reuseGenericRowData.setField(
+                3, StringData.fromString(dataChangeEvent.tableId().getSchemaName()));
+        reuseGenericRowData.setField(
+                4, StringData.fromString(dataChangeEvent.tableId().getTableName()));
+        reuseGenericRowData.setField(
+                5,
+                new GenericArrayData(
+                        jsonSerializers.get(dataChangeEvent.tableId()).getSchema().primaryKeys()
+                                .stream()
+                                .map(StringData::fromString)
+                                .toArray()));
         try {
             switch (dataChangeEvent.op()) {
                 case INSERT:
@@ -200,14 +211,19 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
         }
     }
 
+    /**
+     * Refer to <a
+     * href="https://github.com/alibaba/canal/blob/9373429015c0f25318b703833a1d7913676f2aa3/protocol/src/main/java/com/alibaba/otter/canal/protocol/FlatMessage.java#L74">...</a>.
+     */
     private static RowType createJsonRowType(DataType databaseSchema) {
-        // Canal JSON contains other information, e.g. "database", "ts"
-        // but we don't need them
         return (RowType)
                 DataTypes.ROW(
                                 DataTypes.FIELD("old", DataTypes.ARRAY(databaseSchema)),
                                 DataTypes.FIELD("data", DataTypes.ARRAY(databaseSchema)),
-                                DataTypes.FIELD("type", DataTypes.STRING()))
+                                DataTypes.FIELD("type", DataTypes.STRING()),
+                                DataTypes.FIELD("database", DataTypes.STRING()),
+                                DataTypes.FIELD("table", DataTypes.STRING()),
+                                DataTypes.FIELD("pkNames", DataTypes.ARRAY(DataTypes.STRING())))
                         .getLogicalType();
     }
 }
