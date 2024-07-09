@@ -26,13 +26,15 @@ import org.apache.flink.runtime.metrics.MetricNames;
 /** A collection class for handling metrics in {@link IncrementalSourceReader}. */
 public class SourceReaderMetrics {
 
+    public static final long UNDEFINED = -1;
+
     private final SourceReaderMetricGroup metricGroup;
 
     /**
      * currentFetchEventTimeLag = FetchTime - messageTimestamp, where the FetchTime is the time the
      * record fetched into the source operator.
      */
-    private volatile long fetchDelay = 0L;
+    private volatile long fetchDelay = UNDEFINED;
 
     /** The total number of record that failed to consume, process or emit. */
     private final Counter numRecordsInErrorsCounter;

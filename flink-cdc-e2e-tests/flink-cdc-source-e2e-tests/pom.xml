@@ -28,13 +28,13 @@ limitations under the License.
     <artifactId>flink-cdc-source-e2e-tests</artifactId>
 
     <properties>
-        <flink-1.14>1.14.6</flink-1.14>
-        <flink-1.15>1.15.4</flink-1.15>
-        <flink-1.16>1.16.2</flink-1.16>
-        <flink-1.17>1.17.1</flink-1.17>
-        <flink-1.18>1.18.0</flink-1.18>
+        <flink-1.16>1.16.3</flink-1.16>
+        <flink-1.17>1.17.2</flink-1.17>
+        <flink-1.18>1.18.1</flink-1.18>
+        <flink-1.19>1.19.0</flink-1.19>
         <jdbc.version-1.17>3.1.1-1.17</jdbc.version-1.17>
-        <jdbc.version-1.18>3.1.1-1.17</jdbc.version-1.18>
+        <jdbc.version-1.18>3.1.2-1.18</jdbc.version-1.18>
+        <jdbc.version-1.19>3.1.2-1.18</jdbc.version-1.19>
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <postgresql.driver.version>42.5.1</postgresql.driver.version>
     </properties>
@@ -239,26 +239,6 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-connector-jdbc_2.11</artifactId>
-                            <version>${flink-1.14}</version>
-                            <destFileName>jdbc-connector_${flink-1.14}.jar</destFileName>
-                            <type>jar</type>
-                            <outputDirectory>${project.build.directory}/dependencies
-                            </outputDirectory>
-                        </artifactItem>
-
-                        <artifactItem>
-                            <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-connector-jdbc</artifactId>
-                            <version>${flink-1.15}</version>
-                            <destFileName>jdbc-connector_${flink-1.15}.jar</destFileName>
-                            <type>jar</type>
-                            <outputDirectory>${project.build.directory}/dependencies
-                            </outputDirectory>
-                        </artifactItem>
-
-                        <artifactItem>
-                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-connector-jdbc</artifactId>
                             <version>${flink-1.16}</version>
                             <destFileName>jdbc-connector_${flink-1.16}.jar</destFileName>
@@ -282,6 +262,16 @@ limitations under the License.
                             <artifactId>flink-connector-jdbc</artifactId>
                             <version>${jdbc.version-1.18}</version>
                             <destFileName>jdbc-connector_${flink-1.18}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-connector-jdbc</artifactId>
+                            <version>${jdbc.version-1.19}</version>
+                            <destFileName>jdbc-connector_${flink-1.19}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

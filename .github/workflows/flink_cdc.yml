@@ -55,7 +55,8 @@ env:
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-kafka"
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-kafka,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-paimon"
 
   MODULES_MYSQL: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\
@@ -113,6 +114,18 @@ jobs:
         run: mvn --no-snapshot-updates -B package -DskipTests
       - name: Run license check
         run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
+
+  migration_test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Compile snapshot CDC version
+        run: mvn --no-snapshot-updates -B install -DskipTests
+      - name: Run migration tests
+        run: cd flink-cdc-migration-tests && mvn clean verify
 
   compile_and_test:
     # Only run the CI pipeline for the flink-cdc-connectors repository

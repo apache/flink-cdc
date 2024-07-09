@@ -77,7 +77,6 @@ class YamlPipelineDefinitionParserTest {
                         Configuration.fromMap(
                                 ImmutableMap.<String, String>builder()
                                         .put("parallelism", "1")
-                                        .put("foo", "bar")
                                         .build()));
         assertThat(pipelineDef).isEqualTo(fullDefWithGlobalConf);
     }
@@ -224,7 +223,7 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
-                                    .put("enable-schema-evolution", "false")
+                                    .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
                                     .build()));
 
@@ -285,9 +284,8 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
-                                    .put("enable-schema-evolution", "false")
+                                    .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
-                                    .put("foo", "bar")
                                     .build()));
 
     private final PipelineDef defWithOptional =
@@ -327,5 +325,5 @@ class YamlPipelineDefinitionParserTest {
                     new SinkDef("kafka", null, new Configuration()),
                     Collections.emptyList(),
                     Collections.emptyList(),
-                    new Configuration());
+                    Configuration.fromMap(Collections.singletonMap("parallelism", "1")));
 }

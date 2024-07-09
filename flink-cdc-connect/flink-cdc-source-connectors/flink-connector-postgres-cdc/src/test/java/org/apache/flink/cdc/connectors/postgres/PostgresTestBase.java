@@ -220,6 +220,7 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         postgresSourceConfigFactory.tableList(schemaName + "." + tableName);
         postgresSourceConfigFactory.splitSize(splitSize);
         postgresSourceConfigFactory.skipSnapshotBackfill(skipSnapshotBackfill);
+        postgresSourceConfigFactory.setLsnCommitCheckpointsDelay(1);
         return postgresSourceConfigFactory;
     }
 

@@ -169,22 +169,24 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             handleSchemaChangeEvent(tableId, (SchemaChangeEvent) event);
             // Update caches
             cachedSchemas.put(tableId, getLatestSchema(tableId));
-            getRoutedTable(tableId)
-                    .ifPresent(routed -> cachedSchemas.put(routed, getLatestSchema(routed)));
+            getRoutedTables(tableId)
+                    .forEach(routed -> cachedSchemas.put(routed, getLatestSchema(routed)));
             return;
         }
 
         // Data changes
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
         TableId tableId = dataChangeEvent.tableId();
-        Optional<TableId> optionalRoutedTable = getRoutedTable(tableId);
-        if (optionalRoutedTable.isPresent()) {
-            output.collect(
-                    new StreamRecord<>(
-                            maybeFillInNullForEmptyColumns(
-                                    dataChangeEvent, optionalRoutedTable.get())));
-        } else {
+        List<TableId> optionalRoutedTable = getRoutedTables(tableId);
+        if (optionalRoutedTable.isEmpty()) {
             output.collect(streamRecord);
+        } else {
+            optionalRoutedTable.forEach(
+                    route ->
+                            output.collect(
+                                    new StreamRecord<>(
+                                            maybeFillInNullForEmptyColumns(
+                                                    dataChangeEvent, route))));
         }
     }
 
@@ -265,13 +267,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                         .toArray());
     }
 
-    private Optional<TableId> getRoutedTable(TableId originalTableId) {
-        for (Tuple2<Selectors, TableId> route : routes) {
-            if (route.f0.isMatch(originalTableId)) {
-                return Optional.of(route.f1);
-            }
-        }
-        return Optional.empty();
+    private List<TableId> getRoutedTables(TableId originalTableId) {
+        return routes.stream()
+                .filter(route -> route.f0.isMatch(originalTableId))
+                .map(route -> route.f1)
+                .collect(Collectors.toList());
     }
 
     private void handleSchemaChangeEvent(TableId tableId, SchemaChangeEvent schemaChangeEvent)

@@ -195,7 +195,9 @@ class SchemaManagerTest {
         schemaManager.applySchemaChange(new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
         schemaManager.applySchemaChange(new CreateTableEvent(PRODUCTS, PRODUCTS_SCHEMA));
         byte[] serialized = SchemaManager.SERIALIZER.serialize(schemaManager);
-        SchemaManager deserialized = SchemaManager.SERIALIZER.deserialize(0, serialized);
+        SchemaManager deserialized =
+                SchemaManager.SERIALIZER.deserialize(
+                        SchemaManager.Serializer.CURRENT_VERSION, serialized);
         assertThat(deserialized).isEqualTo(schemaManager);
     }
 }

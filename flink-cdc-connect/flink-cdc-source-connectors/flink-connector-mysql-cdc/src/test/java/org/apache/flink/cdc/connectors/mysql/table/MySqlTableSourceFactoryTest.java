@@ -590,6 +590,22 @@ public class MySqlTableSourceFactoryTest {
                             .isPresent());
         }
 
+        // validate illegal connect.timeout
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.incremental.snapshot.enabled", "true");
+            properties.put("connect.timeout", "240ms");
+
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    "The value of option 'connect.timeout' cannot be less than PT0.25S, but actual is PT0.24S")
+                            .isPresent());
+        }
+
         // validate illegal split size
         try {
             Map<String, String> properties = getAllOptions();

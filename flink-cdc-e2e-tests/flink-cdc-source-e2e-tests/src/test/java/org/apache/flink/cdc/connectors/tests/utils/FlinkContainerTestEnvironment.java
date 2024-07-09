@@ -31,6 +31,7 @@ import org.apache.flink.runtime.client.JobStatusMessage;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.TestLogger;
 
+import com.fasterxml.jackson.core.Version;
 import com.github.dockerjava.api.DockerClient;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -62,6 +63,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkState;
@@ -80,17 +82,6 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     private static final String FLINK_BIN = "bin";
     private static final String INTER_CONTAINER_JM_ALIAS = "jobmanager";
     private static final String INTER_CONTAINER_TM_ALIAS = "taskmanager";
-    private static final String FLINK_PROPERTIES =
-            String.join(
-                    "\n",
-                    Arrays.asList(
-                            "jobmanager.rpc.address: jobmanager",
-                            "taskmanager.numberOfTaskSlots: 10",
-                            "parallelism.default: 4",
-                            "execution.checkpointing.interval: 10000",
-                            // this is needed for oracle-cdc tests.
-                            // see https://stackoverflow.com/a/47062742/4915129
-                            "env.java.opts: -Doracle.jdbc.timezoneAsRegion=false"));
 
     // ------------------------------------------------------------------------------------------
     // MySQL Variables (we always use MySQL as the sink for easier verifying)
@@ -129,16 +120,18 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
 
     @Parameterized.Parameters(name = "flinkVersion: {0}")
     public static List<String> getFlinkVersion() {
-        return Arrays.asList("1.14.6", "1.15.4", "1.16.2", "1.17.1", "1.18.0");
+        return Arrays.asList("1.16.3", "1.17.2", "1.18.1", "1.19.0");
     }
 
     private static final List<String> FLINK_VERSION_WITH_SCALA_212 =
-            Arrays.asList("1.15.4", "1.16.2", "1.17.1", "1.18.0");
+            Arrays.asList("1.16.3", "1.17.2", "1.18.1", "1.19.0");
 
     @Before
     public void before() {
         mysqlInventoryDatabase.createAndInitialize();
         jdbcJar = TestUtils.getResource(getJdbcConnectorResourceName());
+
+        String flinkProperties = getFlinkProperties(flinkVersion);
 
         LOG.info("Starting containers...");
         jobManager =
@@ -148,7 +141,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
                         .withExtraHost("host.docker.internal", "host-gateway")
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
-                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                        .withEnv("FLINK_PROPERTIES", flinkProperties)
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
         taskManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
@@ -156,7 +149,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
                         .withExtraHost("host.docker.internal", "host-gateway")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
-                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                        .withEnv("FLINK_PROPERTIES", flinkProperties)
                         .dependsOn(jobManager)
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
 
@@ -324,5 +317,38 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
 
     protected String getJdbcConnectorResourceName() {
         return String.format("jdbc-connector_%s.jar", flinkVersion);
+    }
+
+    private static Version parseVersion(String version) {
+        List<Integer> versionParts =
+                Arrays.stream(version.split("\\."))
+                        .map(Integer::valueOf)
+                        .limit(3)
+                        .collect(Collectors.toList());
+        return new Version(
+                versionParts.get(0), versionParts.get(1), versionParts.get(2), null, null, null);
+    }
+
+    private static String getFlinkProperties(String flinkVersion) {
+        // this is needed for oracle-cdc tests.
+        // see https://stackoverflow.com/a/47062742/4915129
+        String javaOptsConfig;
+        Version version = parseVersion(flinkVersion);
+        if (version.compareTo(parseVersion("1.17.0")) >= 0) {
+            // Flink 1.17 renames `env.java.opts` to `env.java.opts.all`
+            javaOptsConfig = "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false";
+        } else {
+            // Legacy Flink version, might drop their support in near future
+            javaOptsConfig = "env.java.opts: -Doracle.jdbc.timezoneAsRegion=false";
+        }
+
+        return String.join(
+                "\n",
+                Arrays.asList(
+                        "jobmanager.rpc.address: jobmanager",
+                        "taskmanager.numberOfTaskSlots: 10",
+                        "parallelism.default: 4",
+                        "execution.checkpointing.interval: 300",
+                        javaOptsConfig));
     }
 }

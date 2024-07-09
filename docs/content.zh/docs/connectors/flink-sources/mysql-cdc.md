@@ -54,9 +54,9 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
-下载 [flink-sql-connector-mysql-cdc-3.0.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/3.0.1/flink-sql-connector-mysql-cdc-3.0.1.jar) 到 `<FLINK_HOME>/lib/` 目录下。
+下载 [flink-sql-connector-mysql-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.1.0/flink-sql-connector-mysql-cdc-3.1.0.jar) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意:** 参考 [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意:** 参考 [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 由于 MySQL Connector 采用的 GPLv2 协议与 Flink CDC 项目不兼容，我们无法在 jar 包中提供 MySQL 连接器。
 您可能需要手动配置以下依赖：
@@ -324,7 +324,7 @@ Flink SQL> SELECT * FROM orders;
           <td>optional</td>
           <td style="word-wrap: break-word;">30s</td>
           <td>Duration</td>
-          <td>连接器在尝试连接到 MySQL 数据库服务器后超时前应等待的最长时间。</td>
+          <td>连接器在尝试连接到 MySQL 数据库服务器后超时前应等待的最长时间。该时长不能少于250毫秒。</td>
     </tr>    
     <tr>
           <td>connect.max-retries</td>

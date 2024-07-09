@@ -108,9 +108,9 @@ In order to set up the OceanBase CDC connector, the following table provides dep
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-oceanbase-cdc-3.0.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oceanbase-cdc/3.0.1/flink-sql-connector-oceanbase-cdc-3.0.1.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-oceanbase-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oceanbase-cdc/3.1.0/flink-sql-connector-oceanbase-cdc-3.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** Refer to [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oceanbase-cdc), more released versions will be available in the Maven central warehouse.
+**Note:** Refer to [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc), more released versions will be available in the Maven central warehouse.
 
 Since the licenses of MySQL Driver and OceanBase Driver are incompatible with Flink CDC project, we can't provide them in prebuilt connector jar packages. You may need to configure the following dependencies manually.
 

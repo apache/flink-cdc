@@ -48,9 +48,9 @@ In order to setup the MySQL CDC connector, the following table provides dependen
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-mysql-cdc-3.0.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/3.0.1/flink-sql-connector-mysql-cdc-3.0.1.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-mysql-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.1.0/flink-sql-connector-mysql-cdc-3.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** Refer to [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mysql-cdc), more released versions will be available in the Maven central warehouse.
+**Note:** Refer to [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc), more released versions will be available in the Maven central warehouse.
 
 Since MySQL Connector's GPLv2 license is incompatible with Flink CDC project, we can't provide MySQL connector in prebuilt connector jar packages.
 You may need to configure the following dependencies manually.
@@ -322,7 +322,8 @@ During a snapshot operation, the connector will query each included table to pro
           <td>optional</td>
           <td style="word-wrap: break-word;">30s</td>
           <td>Duration</td>
-          <td>The maximum time that the connector should wait after trying to connect to the MySQL database server before timing out.</td>
+          <td>The maximum time that the connector should wait after trying to connect to the MySQL database server before timing out.
+              This value cannot be less than 250ms.</td>
     </tr>    
     <tr>
           <td>connect.max-retries</td>

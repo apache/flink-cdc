@@ -83,7 +83,8 @@ class CliFrontendTest {
                         "--global-config",
                         globalPipelineConfig());
         assertThat(executor.getGlobalPipelineConfig().toMap().get("parallelism")).isEqualTo("1");
-        assertThat(executor.getGlobalPipelineConfig().toMap().get("foo")).isEqualTo("bar");
+        assertThat(executor.getGlobalPipelineConfig().toMap().get("schema.change.behavior"))
+                .isEqualTo("ignore");
     }
 
     @Test
