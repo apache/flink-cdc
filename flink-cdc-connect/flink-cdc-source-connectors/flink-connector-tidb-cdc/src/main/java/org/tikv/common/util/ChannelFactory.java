@@ -159,28 +159,30 @@ public class ChannelFactory implements AutoCloseable {
                     // So a coarse grain lock is ok here
                     NettyChannelBuilder builder =
                             NettyChannelBuilder.forAddress(
-                                            mappedAddr.getHost(), mappedAddr.getPort())
-                                    .maxInboundMessageSize(maxFrameSize)
-                                    .keepAliveTime(keepaliveTime, TimeUnit.SECONDS)
-                                    .keepAliveTimeout(keepaliveTimeout, TimeUnit.SECONDS)
-                                    .keepAliveWithoutCalls(true)
-                                    .idleTimeout(idleTimeout, TimeUnit.SECONDS);
+                                    mappedAddr.getHost(), mappedAddr.getPort());
 
-                    if (sslContextBuilder == null) {
-                        return builder.usePlaintext().build();
-                    } else {
-                        SslContext sslContext = null;
-                        try {
-                            sslContext = sslContextBuilder.build();
-                        } catch (SSLException e) {
-                            logger.error("create ssl context failed!", e);
-                            return null;
+                    builder.maxInboundMessageSize(maxFrameSize)
+                            //                            .negotiationType(NegotiationType.TLS)
+                            .enableRetry()
+                            .keepAliveTime(keepaliveTime, TimeUnit.SECONDS)
+                            .keepAliveTimeout(keepaliveTimeout, TimeUnit.SECONDS)
+                            .keepAliveWithoutCalls(true)
+                            .idleTimeout(idleTimeout, TimeUnit.SECONDS);
+                    try {
+                        if (sslContextBuilder == null) {
+                            return builder.usePlaintext().build();
+                        } else {
+                            SslContext sslContext = sslContextBuilder.build();
+                            return builder.sslContext(sslContext).build();
                         }
-                        return builder.sslContext(sslContext).build();
+                    } catch (SSLException e) {
+                        logger.error("create ssl context failed!", e);
+                        return null;
                     }
                 });
     }
 
+    @Override
     public void close() {
         for (ManagedChannel ch : connPool.values()) {
             ch.shutdown();

@@ -207,12 +207,12 @@ public class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeData
 
     private void onError(final Throwable error, long resolvedTs) {
         LOGGER.error(
-                "region CDC error: region: {}, resolvedTs:{}, error: {}",
+                "RegionCDC on error: region: {}, resolvedTs:{}, error: {}",
                 region.getId(),
                 resolvedTs,
                 error);
-        running.set(false);
-        eventConsumer.accept(CDCEvent.error(region.getId(), error, resolvedTs));
+        //    running.set(false);
+        //    eventConsumer.accept(CDCEvent.error(region.getId(), error, resolvedTs));
     }
 
     @Override
@@ -231,12 +231,13 @@ public class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeData
                 if (event.hasResolvedTs()) {
                     final ResolvedTs resolvedTs = event.getResolvedTs();
                     this.resolvedTs = resolvedTs.getTs();
-                    if (resolvedTs.getRegionsList().indexOf(region.getId()) >= 0) {
+                    if (resolvedTs.getRegionsList().contains(region.getId())) {
                         submitEvent(CDCEvent.resolvedTsEvent(region.getId(), resolvedTs.getTs()));
                     }
                 }
             }
         } catch (final Exception e) {
+            LOGGER.error("Region CDC Client error:", e);
             onError(e, resolvedTs);
         }
     }
@@ -248,9 +249,14 @@ public class RegionCDCClient implements AutoCloseable, StreamObserver<ChangeData
                         .filter(errEvent -> errEvent.hasError())
                         .collect(Collectors.toList());
         if (errorEvents != null && errorEvents.size() > 0) {
+            errorEvents.forEach(
+                    e -> {
+                        LOGGER.error("RegionCDC on error event handle :{}.", e);
+                    });
             onError(
                     new RuntimeException(
-                            "regionCDC error:" + errorEvents.get(0).getError().toString()),
+                            "RegionCDC on error event handle:"
+                                    + errorEvents.get(0).getError().toString()),
                     this.resolvedTs);
         }
     }

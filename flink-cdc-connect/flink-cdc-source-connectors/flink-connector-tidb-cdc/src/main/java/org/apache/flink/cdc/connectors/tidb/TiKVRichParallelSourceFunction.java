@@ -242,7 +242,7 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                             // use startTs of row as messageTs, use commitTs of row as fetchTs
                             reportMetrics(committedRow.getStartTs(), committedRow.getCommitTs());
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            LOG.error("read change event error.", e);
                         }
                     }
                 });

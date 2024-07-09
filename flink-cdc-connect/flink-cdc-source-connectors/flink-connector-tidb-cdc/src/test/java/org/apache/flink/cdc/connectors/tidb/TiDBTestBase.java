@@ -20,7 +20,6 @@ package org.apache.flink.cdc.connectors.tidb;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import com.alibaba.dcm.DnsCacheManipulator;
-import org.apache.commons.lang3.RandomUtils;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.junit.AfterClass;
@@ -67,13 +66,13 @@ public class TiDBTestBase extends AbstractTestBase {
     public static final int TIDB_PORT = 4000;
     public static final int TIKV_PORT_ORIGIN = 20160;
     public static final int PD_PORT_ORIGIN = 2379;
-    public static int pdPort = PD_PORT_ORIGIN + RandomUtils.nextInt(0, 1000);
+    public static int pdPort = PD_PORT_ORIGIN + 10;
 
     @ClassRule public static final Network NETWORK = Network.newNetwork();
 
     @ClassRule
     public static final GenericContainer<?> PD =
-            new FixedHostPortGenericContainer<>("pingcap/pd:v6.1.0")
+            new FixedHostPortGenericContainer<>("pingcap/pd:v6.5.3")
                     .withFileSystemBind("src/test/resources/config/pd.toml", "/pd.toml")
                     .withFixedExposedPort(pdPort, PD_PORT_ORIGIN)
                     .withCommand(
@@ -93,7 +92,7 @@ public class TiDBTestBase extends AbstractTestBase {
 
     @ClassRule
     public static final GenericContainer<?> TIKV =
-            new FixedHostPortGenericContainer<>("pingcap/tikv:v6.1.0")
+            new FixedHostPortGenericContainer<>("pingcap/tikv:v6.5.3")
                     .withFixedExposedPort(TIKV_PORT_ORIGIN, TIKV_PORT_ORIGIN)
                     .withFileSystemBind("src/test/resources/config/tikv.toml", "/tikv.toml")
                     .withCommand(
@@ -111,7 +110,7 @@ public class TiDBTestBase extends AbstractTestBase {
 
     @ClassRule
     public static final GenericContainer<?> TIDB =
-            new GenericContainer<>("pingcap/tidb:v6.1.0")
+            new GenericContainer<>("pingcap/tidb:v6.5.3")
                     .withExposedPorts(TIDB_PORT)
                     .withFileSystemBind("src/test/resources/config/tidb.toml", "/tidb.toml")
                     .withCommand(
@@ -137,9 +136,9 @@ public class TiDBTestBase extends AbstractTestBase {
 
     @AfterClass
     public static void stopContainers() {
-        DnsCacheManipulator.removeDnsCache(PD_SERVICE_NAME);
-        DnsCacheManipulator.removeDnsCache(TIKV_SERVICE_NAME);
-        Stream.of(TIKV, PD, TIDB).forEach(GenericContainer::stop);
+        //        DnsCacheManipulator.removeDnsCache(PD_SERVICE_NAME);
+        //        DnsCacheManipulator.removeDnsCache(TIKV_SERVICE_NAME);
+        //        Stream.of(TIKV, PD, TIDB).forEach(GenericContainer::stop);
     }
 
     public String getJdbcUrl(String databaseName) {

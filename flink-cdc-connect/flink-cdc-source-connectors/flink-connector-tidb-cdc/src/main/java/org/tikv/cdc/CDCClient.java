@@ -89,7 +89,7 @@ public class CDCClient implements AutoCloseable {
                     try {
                         eventsBuffer.put(event);
                     } catch (InterruptedException e) {
-                        e.printStackTrace();
+                        LOGGER.error("Events buffer put error!", e);
                     }
                 };
     }
