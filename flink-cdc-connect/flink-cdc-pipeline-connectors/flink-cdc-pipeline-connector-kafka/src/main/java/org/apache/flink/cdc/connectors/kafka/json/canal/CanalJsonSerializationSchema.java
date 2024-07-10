@@ -213,7 +213,8 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
 
     /**
      * Refer to <a
-     * href="https://github.com/alibaba/canal/blob/9373429015c0f25318b703833a1d7913676f2aa3/protocol/src/main/java/com/alibaba/otter/canal/protocol/FlatMessage.java#L74">...</a>.
+     * href="https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/canal/#available-metadata">Canal
+     * | Apache Flink</a> for more details.
      */
     private static RowType createJsonRowType(DataType databaseSchema) {
         return (RowType)
