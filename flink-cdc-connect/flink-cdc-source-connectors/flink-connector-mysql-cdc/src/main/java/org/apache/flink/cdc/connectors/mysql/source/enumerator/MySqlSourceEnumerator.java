@@ -37,7 +37,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.source.assigners.AssignerStatus.isNewlyAddedAssigningSnapshotFinished;
@@ -81,32 +86,12 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     @Override
     public void start() {
         splitAssigner.open();
-//        requestBinlogSplitUpdateIfNeed();
         this.context.callAsync(
                 this::getRegisteredReader,
                 this::syncWithReaders,
                 CHECK_EVENT_INTERVAL,
                 CHECK_EVENT_INTERVAL);
     }
-
-    /**
-     * recover:
-     * 1、 sourceReader 检查是否有新增表，如果有，则通知 sourceEnumerator， 并suspend binlog split
-     * 2、 如果有 未完成通知的 表schema， 则通知 sourceEnumerator， 并过滤掉后来的含有该表schema的 snapshot splits
-     * 3、 sourceEnumerator 收到通知，记录 subtaskId
-     * 4、 等待 sourceEnumerator new binlog splits 执行完成
-     * 5、 通知 sourceReader 执行完成，并分批发送新增的 finishedSnapshotSplitInfos
-     * 6、 开始执行 binlog splits， 并通知 sourceEnumerator 完成
-     * <p>
-     * runtime:
-     * 1、 sourceReader 获取到新增表 create table， 通知 sourceEnumerator 表schema，该记录标记为 未通知完成
-     * 2、 sourceEnumerator 获取表 schema 并注册到元数据中， checkpoint 后保存
-     * 3、 notifyCheckpointComplete 后通知 sourceReader 保存成功
-     * 4、 sourceReader 收后通知将该表标记为 已通知完成
-     *
-     * @param subtaskId
-     * @param requesterHostname
-     */
 
     @Override
     public void handleSplitRequest(int subtaskId, @Nullable String requesterHostname) {

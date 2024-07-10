@@ -23,8 +23,7 @@ import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
 /**
  * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
- * notify reader should report its finished snapshot splits, i.e. sending {@link
- * FinishedSnapshotSplitsReportEvent}.
+ * notify reader that enumerator received new create tables during binlog phase.
  */
 public class FinishedBinlogNewTableAddRequestEvent implements SourceEvent {
 

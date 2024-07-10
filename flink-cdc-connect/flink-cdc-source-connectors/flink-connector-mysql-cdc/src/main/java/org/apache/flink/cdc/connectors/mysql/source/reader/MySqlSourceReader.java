@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
-import com.ibm.icu.impl.Pair;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.relational.TableId;
@@ -28,7 +27,14 @@ import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.events.*;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
-import org.apache.flink.cdc.connectors.mysql.source.split.*;
+import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplitState;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplitState;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
+import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.ChunkUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import org.apache.flink.configuration.Configuration;
@@ -43,7 +49,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -53,7 +65,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlog
  * The source reader for MySQL source splits.
  */
 public class MySqlSourceReader<T>
-        extends SingleThreadMultiplexSourceReaderBase<
+                extends SingleThreadMultiplexSourceReaderBase<
         SourceRecords, T, MySqlSplit, MySqlSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceReader.class);
@@ -64,7 +76,7 @@ public class MySqlSourceReader<T>
     private final MySqlSourceReaderContext mySqlSourceReaderContext;
     private final MySqlPartition partition;
     private volatile MySqlBinlogSplit suspendedBinlogSplit;
-    private List<TableId> tableNotified;
+    private List<TableId> tableUnNotified;
 
     public MySqlSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
@@ -87,7 +99,7 @@ public class MySqlSourceReader<T>
         this.suspendedBinlogSplit = null;
         this.partition =
                 new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
-        this.tableNotified = new ArrayList<>();
+        this.tableUnNotified = new ArrayList<>();
     }
 
     @Override
@@ -117,7 +129,7 @@ public class MySqlSourceReader<T>
                         .map(split -> {
                             if (split instanceof MySqlBinlogSplit) {
                                 MySqlBinlogSplit mySqlBinlogSplit = (MySqlBinlogSplit) split;
-                                mySqlBinlogSplit.getTableNotified().clear();
+                                mySqlBinlogSplit.getTableUnNotified().clear();
                             }
                             return split;
                         })
@@ -185,16 +197,15 @@ public class MySqlSourceReader<T>
 
     @Override
     public void addSplits(List<MySqlSplit> splits) {
-        System.out.println(splits);
         addSplits(splits, true);
     }
 
     /**
      * Adds a list of splits for this reader to read.
      *
-     * @param splits                         the splits to add.
+     * @param splits the splits to add.
      * @param checkTableChangeForBinlogSplit to check the captured table list change or not, it
-     *                                       should be true for reader which is during restoration from a checkpoint or savepoint.
+     *     should be true for reader which is during restoration from a checkpoint or savepoint.
      */
     private void addSplits(List<MySqlSplit> splits, boolean checkTableChangeForBinlogSplit) {
         // restore for finished Unacked Splits
@@ -204,7 +215,7 @@ public class MySqlSourceReader<T>
             if (split.isSnapshotSplit()) {
                 MySqlSnapshotSplit snapshotSplit = split.asSnapshotSplit();
                 // filter snapshot splits data that has been consumed during binlog phase, so we can avoid duplicate data
-                if (!tableNotified.contains(snapshotSplit.getTableId())) {
+                if (!tableUnNotified.contains(snapshotSplit.getTableId())) {
                     if (snapshotSplit.isSnapshotReadFinished()) {
                         finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
                     } else if (sourceConfig
@@ -213,7 +224,7 @@ public class MySqlSourceReader<T>
                             .isIncluded(split.asSnapshotSplit().getTableId())) {
                         unfinishedSplits.add(split);
                     } else {
-                        LOG.debug(
+                        LOG.info(
                                 "The subtask {} is skipping split {} because it does not match new table filter.",
                                 subtaskId,
                                 split.splitId());
@@ -234,9 +245,9 @@ public class MySqlSourceReader<T>
                                             .getMySqlConnectorConfig()
                                             .getTableFilters()
                                             .dataCollectionFilter());
-                    if (!binlogSplit.getTableNotified().isEmpty()) {
-                        tableNotified = binlogSplit.getTableNotified();
-                        for (TableId tableId : tableNotified) {
+                    if (!binlogSplit.getTableUnNotified().isEmpty()) {
+                        tableUnNotified = binlogSplit.getTableUnNotified();
+                        for (TableId tableId : tableUnNotified) {
                             context.sendSourceEventToCoordinator(new BinlogNewAddedTableEvent(tableId.catalog()
                                     , tableId.schema(), tableId.table()));
                         }
@@ -280,7 +291,10 @@ public class MySqlSourceReader<T>
         if (!unfinishedSplits.isEmpty()) {
             super.addSplits(unfinishedSplits);
         } else if (suspendedBinlogSplit
-                != null) { // only request new snapshot split if the binlog split is suspended
+                        != null // request new snapshot split if the binlog split is suspended
+                || getNumberOfCurrentlyAssignedSplits()
+                        <= 1 // request when all splits are in removed tables
+        ) {
             context.sendSplitRequest();
         }
     }

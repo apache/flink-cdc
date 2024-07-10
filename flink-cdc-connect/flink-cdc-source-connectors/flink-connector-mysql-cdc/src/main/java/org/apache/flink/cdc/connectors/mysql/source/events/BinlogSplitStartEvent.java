@@ -26,8 +26,8 @@ import javax.annotation.Nullable;
 import java.util.List;
 
 /**
- * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
- * notify the {@link MySqlBinlogSplit} assigned to itself.
+ * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
+ * notify the {@link MySqlBinlogSplit} update FinishedSnapshotSplitInfo.
  */
 public class BinlogSplitStartEvent implements SourceEvent {
 

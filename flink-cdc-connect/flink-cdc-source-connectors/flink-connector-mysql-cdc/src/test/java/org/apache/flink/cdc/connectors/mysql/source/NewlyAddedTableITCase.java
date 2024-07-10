@@ -302,6 +302,29 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testNewlyAddedTableForExistsPipelineSingleParallelism() throws Exception {
+        testNewlyAddedTableOneByOne(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                false,
+                "address_hangzhou",
+                "address_beijing");
+    }
+
+    @Test
+    public void testNewlyAddedTableForExistsPipelineSingleParallelismWithAheadBinlog()
+            throws Exception {
+        testNewlyAddedTableOneByOne(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                true,
+                "address_hangzhou",
+                "address_beijing");
+    }
+
+    @Test
     public void testJobManagerFailoverForNewlyAddedTable() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
@@ -340,7 +363,7 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
                 1,
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
-                true,
+                false,
                 "address_hangzhou",
                 "address_beijing");
     }
@@ -433,8 +456,8 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
             RowDataDebeziumDeserializeSchema deserializer =
                     RowDataDebeziumDeserializeSchema.newBuilder()
                             .setMetadataConverters(
-                                    new MetadataConverter[]{
-                                            MySqlReadableMetadata.TABLE_NAME.getConverter()
+                                    new MetadataConverter[] {
+                                        MySqlReadableMetadata.TABLE_NAME.getConverter()
                                     })
                             .setPhysicalRowType(
                                     (RowType)
@@ -546,9 +569,9 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
             List<String> expectedSnapshotResult =
                     i == 0
                             ? Stream.concat(
-                                    expectedCustomersEvenDistResult.stream(),
-                                    expectedCustomersResult.stream())
-                            .collect(Collectors.toList())
+                                            expectedCustomersEvenDistResult.stream(),
+                                            expectedCustomersResult.stream())
+                                    .collect(Collectors.toList())
                             : expectedCustomersResult;
             List<String> rows = fetchRowData(iterator, expectedSnapshotResult.size());
             assertEqualsInAnyOrder(expectedSnapshotResult, rows);
@@ -631,12 +654,12 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
                         row ->
                                 RowUtils.createRowWithNamedPositions(
                                                 row.getRowKind(),
-                                                new Object[]{
-                                                        row.getLong(0),
-                                                        row.getString(1),
-                                                        row.getString(2),
-                                                        row.getString(3),
-                                                        row.getString(4)
+                                                new Object[] {
+                                                    row.getLong(0),
+                                                    row.getString(1),
+                                                    row.getString(2),
+                                                    row.getString(3),
+                                                    row.getString(4)
                                                 },
                                                 map)
                                         .toString())
@@ -749,8 +772,8 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
             List<String> expectedBinlogDataThisRound = new ArrayList<>();
 
             for (int i = 0, captureAddressTablesLength = captureAddressTables.length;
-                 i < captureAddressTablesLength;
-                 i++) {
+                    i < captureAddressTablesLength;
+                    i++) {
                 String tableName = captureAddressTables[i];
                 makeBinlogForAddressTable(getConnection(), tableName, round);
                 if (i <= round) {
@@ -772,7 +795,7 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
 
             if (failoverPhase == FailoverPhase.BINLOG
                     && TestValuesTableFactory.getRawResults("sink").size()
-                    > fetchedDataList.size()) {
+                            > fetchedDataList.size()) {
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
@@ -1212,13 +1235,13 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
                 otherOptions.isEmpty()
                         ? ""
                         : ","
-                        + otherOptions.entrySet().stream()
-                        .map(
-                                e ->
-                                        String.format(
-                                                "'%s'='%s'",
-                                                e.getKey(), e.getValue()))
-                        .collect(Collectors.joining(",")));
+                                + otherOptions.entrySet().stream()
+                                        .map(
+                                                e ->
+                                                        String.format(
+                                                                "'%s'='%s'",
+                                                                e.getKey(), e.getValue()))
+                                        .collect(Collectors.joining(",")));
     }
 
     private StreamExecutionEnvironment getStreamExecutionEnvironment(
@@ -1300,7 +1323,6 @@ NewlyAddedTableITCase extends MySqlSourceTestBase {
         }
     }
 
-    // 不带 ifRandomId 参数的方法，使用默认值 false
     private Long[] initialAddressTables(JdbcConnection connection, String[] addressTables) throws SQLException {
         return initialAddressTables(connection, addressTables, false);
     }

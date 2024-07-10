@@ -24,7 +24,7 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 
 /**
  * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
- * notify the {@link MySqlBinlogSplit} assigned to itself.
+ * notify that suspend binlog split when find new table added recover from savepoint .
  */
 public class BinlogSplitSuspendEvent implements SourceEvent {
 

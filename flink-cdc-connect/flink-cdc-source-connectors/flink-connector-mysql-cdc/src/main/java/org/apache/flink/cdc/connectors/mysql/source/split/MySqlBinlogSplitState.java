@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.split;
 
-import io.debezium.relational.history.TableChanges;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 
 import io.debezium.relational.TableId;
@@ -25,9 +24,6 @@ import io.debezium.relational.history.TableChanges.TableChange;
 
 import javax.annotation.Nullable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -75,7 +71,7 @@ public class MySqlBinlogSplitState extends MySqlSplitState {
     }
 
     public void addUnNotifiedTableId(TableId tableId) {
-        ((MySqlBinlogSplit) this.split).getTableNotified().add(tableId);
+        ((MySqlBinlogSplit) this.split).getTableUnNotified().add(tableId);
     }
 
     @Override

@@ -46,7 +46,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
     private final Map<TableId, TableChange> tableSchemas;
     private final int totalFinishedSplitSize;
     private final boolean isSuspended;
-    private List<TableId> tableNotified;
+    private List<TableId> tableUnNotified;
     @Nullable
     transient byte[] serializedFormCache;
 
@@ -65,7 +65,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
         this.tableSchemas = tableSchemas;
         this.totalFinishedSplitSize = totalFinishedSplitSize;
         this.isSuspended = isSuspended;
-        this.tableNotified = new ArrayList<>();
+        this.tableUnNotified = new ArrayList<>();
     }
 
     public MySqlBinlogSplit(
@@ -76,10 +76,10 @@ public class MySqlBinlogSplit extends MySqlSplit {
             Map<TableId, TableChange> tableSchemas,
             int totalFinishedSplitSize,
             boolean isSuspended,
-            List<TableId> tableNotified) {
+            List<TableId> tableUnNotified) {
         this(splitId, startingOffset, endingOffset, finishedSnapshotSplitInfos,
                 tableSchemas, totalFinishedSplitSize, isSuspended);
-        this.tableNotified = tableNotified;
+        this.tableUnNotified = tableUnNotified;
     }
 
     public MySqlBinlogSplit(
@@ -96,7 +96,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
         this.tableSchemas = tableSchemas;
         this.totalFinishedSplitSize = totalFinishedSplitSize;
         this.isSuspended = false;
-        this.tableNotified = new ArrayList<>();
+        this.tableUnNotified = new ArrayList<>();
     }
 
     public BinlogOffset getStartingOffset() {
@@ -107,8 +107,8 @@ public class MySqlBinlogSplit extends MySqlSplit {
         return endingOffset;
     }
 
-    public List<TableId> getTableNotified() {
-        return tableNotified;
+    public List<TableId> getTableUnNotified() {
+        return tableUnNotified;
     }
 
     public List<FinishedSnapshotSplitInfo> getFinishedSnapshotSplitInfos() {

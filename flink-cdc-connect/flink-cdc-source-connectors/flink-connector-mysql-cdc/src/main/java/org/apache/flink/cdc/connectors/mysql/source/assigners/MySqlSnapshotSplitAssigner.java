@@ -434,7 +434,6 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public SnapshotPendingSplitsState snapshotState(long checkpointId) {
-        LOG.info("trigger checkpoint 手动， {}", alreadyProcessedTables);
         SnapshotPendingSplitsState state =
                 new SnapshotPendingSplitsState(
                         alreadyProcessedTables,
