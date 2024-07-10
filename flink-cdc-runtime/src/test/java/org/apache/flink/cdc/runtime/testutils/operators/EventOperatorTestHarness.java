@@ -67,7 +67,7 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
 
     public static final OperatorID SINK_OPERATOR_ID = new OperatorID(15214L, 15514L);
 
-    private final OP operator;
+    private OP operator;
     private final int numOutputs;
     private final SchemaRegistry schemaRegistry;
     private final TestingSchemaRegistryGateway schemaRegistryGateway;
@@ -102,6 +102,10 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
     public void open() throws Exception {
         initializeOperator();
         operator.open();
+    }
+
+    public void setOperator(OP operator) {
+        this.operator = operator;
     }
 
     public LinkedList<StreamRecord<E>> getOutputRecords() {

@@ -46,7 +46,6 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
-import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
@@ -140,16 +139,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                         return getLatestSchema(tableId);
                                     }
                                 });
-    }
 
-    @Override
-    public void initializeState(StateInitializationContext context) throws Exception {
-        if (context.isRestored()) {
-            // Multiple operators may appear during a restart process,
-            // only clear the pendingSchemaChanges when the first operator starts.
-            if (getRuntimeContext().getIndexOfThisSubtask() == 0) {
-                sendRequestToCoordinator(new RefreshPendingListsRequest());
-            }
+        // Multiple operators may appear during a restart process,
+        // only clear the pendingSchemaChanges when the first operator starts.
+        if (getRuntimeContext().getIndexOfThisSubtask() == 0) {
+            sendRequestToCoordinator(new RefreshPendingListsRequest());
         }
     }
 
