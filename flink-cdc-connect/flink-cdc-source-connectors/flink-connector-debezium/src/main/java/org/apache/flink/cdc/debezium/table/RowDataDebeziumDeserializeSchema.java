@@ -132,7 +132,7 @@ public final class RowDataDebeziumDeserializeSchema
     @Override
     public void deserialize(SourceRecord record, Collector<RowData> out) throws Exception {
         Envelope.Operation op = Envelope.operationFor(record);
-        // filter ddl statement
+        // filter ddl statement to avoid NPE
         if (op == null) return;
         Struct value = (Struct) record.value();
         Schema valueSchema = record.valueSchema();

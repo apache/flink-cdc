@@ -42,6 +42,16 @@ public class TestTableSchemas {
                     new ArrayList<>(),
                     UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
 
+    public static final ResolvedSchema ADDRESS =
+            new ResolvedSchema(
+                    Arrays.asList(
+                            physical("id", BIGINT().notNull()),
+                            physical("country", STRING().notNull()),
+                            physical("city", STRING().notNull()),
+                            physical("detail_address", STRING())),
+                    new ArrayList<>(),
+                    UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
+
     public static final ResolvedSchema PRODUCTS =
             new ResolvedSchema(
                     Arrays.asList(
