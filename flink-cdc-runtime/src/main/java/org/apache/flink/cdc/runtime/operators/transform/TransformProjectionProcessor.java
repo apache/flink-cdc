@@ -132,7 +132,7 @@ public class TransformProjectionProcessor {
                 .generate(valueList.toArray(new Object[valueList.size()]));
     }
 
-    public BinaryRecordData processData(BinaryRecordData after, long epochTime) {
+    public BinaryRecordData processData(BinaryRecordData data, long epochTime, String opType) {
         List<Object> valueList = new ArrayList<>();
         for (Column column : tableInfo.getSchema().getColumns()) {
             boolean isProjectionColumn = false;
@@ -150,7 +150,7 @@ public class TransformProjectionProcessor {
                             projectionColumnProcessorMap.get(projectionColumn.getColumnName());
                     valueList.add(
                             DataTypeConverter.convert(
-                                    projectionColumnProcessor.evaluate(after, epochTime),
+                                    projectionColumnProcessor.evaluate(data, epochTime, opType),
                                     projectionColumn.getDataType()));
                     isProjectionColumn = true;
                     break;
@@ -160,7 +160,7 @@ public class TransformProjectionProcessor {
                 valueList.add(
                         getValueFromBinaryRecordData(
                                 column.getName(),
-                                after,
+                                data,
                                 tableInfo.getSchema().getColumns(),
                                 tableInfo.getFieldGetters()));
             }

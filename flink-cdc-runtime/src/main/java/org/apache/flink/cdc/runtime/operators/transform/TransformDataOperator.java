@@ -355,13 +355,15 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         // insert and update event only process afterData, delete only process beforeData
         if (after != null) {
-            if (transformFilterProcessor.process(after, epochTime)) {
+            if (transformFilterProcessor.process(
+                    after, epochTime, dataChangeEvent.op().toString())) {
                 return Optional.of(dataChangeEvent);
             } else {
                 return Optional.empty();
             }
         } else if (before != null) {
-            if (transformFilterProcessor.process(before, epochTime)) {
+            if (transformFilterProcessor.process(
+                    before, epochTime, dataChangeEvent.op().toString())) {
                 return Optional.of(dataChangeEvent);
             } else {
                 return Optional.empty();
@@ -379,12 +381,14 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         if (before != null) {
             BinaryRecordData projectedBefore =
-                    transformProjectionProcessor.processData(before, epochTime);
+                    transformProjectionProcessor.processData(
+                            before, epochTime, dataChangeEvent.op().toString());
             dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
         }
         if (after != null) {
             BinaryRecordData projectedAfter =
-                    transformProjectionProcessor.processData(after, epochTime);
+                    transformProjectionProcessor.processData(
+                            after, epochTime, dataChangeEvent.op().toString());
             dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
         }
         return Optional.of(dataChangeEvent);

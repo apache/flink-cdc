@@ -53,11 +53,11 @@ public class TransformFilterProcessor {
         return new TransformFilterProcessor(tableInfo, transformFilter, timezone);
     }
 
-    public boolean process(BinaryRecordData after, long epochTime) {
+    public boolean process(BinaryRecordData data, long epochTime, String opType) {
         ExpressionEvaluator expressionEvaluator =
                 TransformExpressionCompiler.compileExpression(transformExpressionKey);
         try {
-            return (Boolean) expressionEvaluator.evaluate(generateParams(after, epochTime));
+            return (Boolean) expressionEvaluator.evaluate(generateParams(data, epochTime, opType));
         } catch (InvocationTargetException e) {
             LOG.error(
                     "Table:{} filter:{} execute failed. {}",
@@ -68,7 +68,7 @@ public class TransformFilterProcessor {
         }
     }
 
-    private Object[] generateParams(BinaryRecordData after, long epochTime) {
+    private Object[] generateParams(BinaryRecordData data, long epochTime, String opType) {
         List<Object> params = new ArrayList<>();
         List<Column> columns = tableInfo.getSchema().getColumns();
         RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
@@ -85,12 +85,16 @@ public class TransformFilterProcessor {
                 params.add(tableInfo.getTableName());
                 continue;
             }
+            if (columnName.equals(TransformParser.DEFAULT_OP_TYPE)) {
+                params.add(opType);
+                continue;
+            }
             for (int i = 0; i < columns.size(); i++) {
                 Column column = columns.get(i);
                 if (column.getName().equals(columnName)) {
                     params.add(
                             DataTypeConverter.convertToOriginal(
-                                    fieldGetters[i].getFieldOrNull(after), column.getType()));
+                                    fieldGetters[i].getFieldOrNull(data), column.getType()));
                     break;
                 }
             }
@@ -131,6 +135,12 @@ public class TransformFilterProcessor {
         if (scriptExpression.contains(TransformParser.DEFAULT_TABLE_NAME)
                 && !argumentNames.contains(TransformParser.DEFAULT_TABLE_NAME)) {
             argumentNames.add(TransformParser.DEFAULT_TABLE_NAME);
+            paramTypes.add(String.class);
+        }
+
+        if (scriptExpression.contains(TransformParser.DEFAULT_OP_TYPE)
+                && !argumentNames.contains(TransformParser.DEFAULT_OP_TYPE)) {
+            argumentNames.add(TransformParser.DEFAULT_OP_TYPE);
             paramTypes.add(String.class);
         }
 
