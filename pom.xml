@@ -374,197 +374,197 @@ limitations under the License.
                 </executions>
             </plugin>
 
-<!--            <plugin>-->
-<!--                <groupId>org.apache.rat</groupId>-->
-<!--                <artifactId>apache-rat-plugin</artifactId>-->
-<!--                <version>0.12</version>&lt;!&ndash;$NO-MVN-MAN-VER$&ndash;&gt;-->
-<!--                <inherited>false</inherited>-->
-<!--                <executions>-->
-<!--                    <execution>-->
-<!--                        <phase>verify</phase>-->
-<!--                        <goals>-->
-<!--                            <goal>check</goal>-->
-<!--                        </goals>-->
-<!--                    </execution>-->
-<!--                </executions>-->
-<!--                <configuration>-->
-<!--                    <excludeSubProjects>false</excludeSubProjects>-->
-<!--                    <numUnapprovedLicenses>0</numUnapprovedLicenses>-->
-<!--                    <licenses>-->
-<!--                        &lt;!&ndash; Enforce this license:-->
-<!--                            Licensed to the Apache Software Foundation (ASF) under one or more-->
-<!--                            contributor license agreements.  See the NOTICE file distributed with-->
-<!--                            this work for additional information regarding copyright ownership.-->
-<!--                            The ASF licenses this file to You under the Apache License, Version 2.0-->
-<!--                            (the "License"); you may not use this file except in compliance with-->
-<!--                            the License.  You may obtain a copy of the License at-->
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <version>0.12</version><!--$NO-MVN-MAN-VER$-->
+                <inherited>false</inherited>
+                <executions>
+                    <execution>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <excludeSubProjects>false</excludeSubProjects>
+                    <numUnapprovedLicenses>0</numUnapprovedLicenses>
+                    <licenses>
+                        <!-- Enforce this license:
+                            Licensed to the Apache Software Foundation (ASF) under one or more
+                            contributor license agreements.  See the NOTICE file distributed with
+                            this work for additional information regarding copyright ownership.
+                            The ASF licenses this file to You under the Apache License, Version 2.0
+                            (the "License"); you may not use this file except in compliance with
+                            the License.  You may obtain a copy of the License at
 
-<!--                                 http://www.apache.org/licenses/LICENSE-2.0-->
+                                 http://www.apache.org/licenses/LICENSE-2.0
 
-<!--                            Unless required by applicable law or agreed to in writing, software-->
-<!--                            distributed under the License is distributed on an "AS IS" BASIS,-->
-<!--                            WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.-->
-<!--                            See the License for the specific language governing permissions and-->
-<!--                            limitations under the License.-->
-<!--                        &ndash;&gt;-->
-<!--                        <license-->
-<!--                                implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">-->
-<!--                            <licenseFamilyCategory>AL2</licenseFamilyCategory>-->
-<!--                            <licenseFamilyName>Apache License 2.0</licenseFamilyName>-->
-<!--                            <patterns>-->
-<!--                                <pattern>Licensed to the Apache Software Foundation (ASF)-->
-<!--                                </pattern>-->
-<!--                                <pattern>The ASF licenses this file to You under the Apache License, Version 2.0-->
-<!--                                </pattern>-->
-<!--                            </patterns>-->
-<!--                        </license>-->
-<!--                    </licenses>-->
-<!--                    <licenseFamilies>-->
-<!--                        <licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">-->
-<!--                            <familyName>Apache License 2.0</familyName>-->
-<!--                        </licenseFamily>-->
-<!--                    </licenseFamilies>-->
-<!--                    <excludes>-->
-<!--                        &lt;!&ndash; Additional files like .gitignore etc.&ndash;&gt;-->
-<!--                        <exclude>**/README.md</exclude>-->
-<!--                        <exclude>**/.*/**</exclude>-->
-<!--                        &lt;!&ndash; Generated content &ndash;&gt;-->
-<!--                        <exclude>**/target/**</exclude>-->
-<!--                        &lt;!&ndash; Build files &ndash;&gt;-->
-<!--                        <exclude>**/*.iml</exclude>-->
-<!--                        &lt;!&ndash; Docs &ndash;&gt;-->
-<!--                        <exclude>docs/themes/book/**</exclude>-->
-<!--                        <exclude>docs/static/**</exclude>-->
-<!--                        <exclude>docs/assets/github.css</exclude>-->
-<!--                        <exclude>docs/Makefile</exclude>-->
-<!--                        <exclude>docs/Dockerfile</exclude>-->
-<!--                        <exclude>docs/make.bat</exclude>-->
-<!--                        <exclude>docs/_templates/version.html</exclude>-->
-<!--                        <exclude>docs/_static/button.js</exclude>-->
-<!--                        <exclude>docs/_build/**</exclude>-->
-<!--                        &lt;!&ndash; Site &ndash;&gt;-->
-<!--                        <exclude>docs/site/**</exclude>-->
-<!--                        &lt;!&ndash; Tests &ndash;&gt;-->
-<!--                        <exclude>**/*.txt</exclude>-->
-<!--                        <exclude>-->
-<!--                            flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc/src/test/resources/file/*.json-->
-<!--                        </exclude>-->
-<!--                        <exclude>-->
-<!--                            flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc/src/test/resources/db2_server/Dockerfile-->
-<!--                        </exclude>-->
-<!--                    </excludes>-->
-<!--                </configuration>-->
-<!--            </plugin>-->
+                            Unless required by applicable law or agreed to in writing, software
+                            distributed under the License is distributed on an "AS IS" BASIS,
+                            WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+                            See the License for the specific language governing permissions and
+                            limitations under the License.
+                        -->
+                        <license
+                                implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+                            <licenseFamilyCategory>AL2</licenseFamilyCategory>
+                            <licenseFamilyName>Apache License 2.0</licenseFamilyName>
+                            <patterns>
+                                <pattern>Licensed to the Apache Software Foundation (ASF)
+                                </pattern>
+                                <pattern>The ASF licenses this file to You under the Apache License, Version 2.0
+                                </pattern>
+                            </patterns>
+                        </license>
+                    </licenses>
+                    <licenseFamilies>
+                        <licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">
+                            <familyName>Apache License 2.0</familyName>
+                        </licenseFamily>
+                    </licenseFamilies>
+                    <excludes>
+                        <!-- Additional files like .gitignore etc.-->
+                        <exclude>**/README.md</exclude>
+                        <exclude>**/.*/**</exclude>
+                        <!-- Generated content -->
+                        <exclude>**/target/**</exclude>
+                        <!-- Build files -->
+                        <exclude>**/*.iml</exclude>
+                        <!-- Docs -->
+                        <exclude>docs/themes/book/**</exclude>
+                        <exclude>docs/static/**</exclude>
+                        <exclude>docs/assets/github.css</exclude>
+                        <exclude>docs/Makefile</exclude>
+                        <exclude>docs/Dockerfile</exclude>
+                        <exclude>docs/make.bat</exclude>
+                        <exclude>docs/_templates/version.html</exclude>
+                        <exclude>docs/_static/button.js</exclude>
+                        <exclude>docs/_build/**</exclude>
+                        <!-- Site -->
+                        <exclude>docs/site/**</exclude>
+                        <!-- Tests -->
+                        <exclude>**/*.txt</exclude>
+                        <exclude>
+                            flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc/src/test/resources/file/*.json
+                        </exclude>
+                        <exclude>
+                            flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc/src/test/resources/db2_server/Dockerfile
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
 
             <!-- Due to the Flink build setup, "mvn spotless:apply" and "mvn spotless:check"
 				don't work. You have to use the fully qualified name, i.e.
 				"mvn com.diffplug.spotless:spotless-maven-plugin:apply" -->
-            <!--            <plugin>-->
-            <!--                <groupId>com.diffplug.spotless</groupId>-->
-            <!--                <artifactId>spotless-maven-plugin</artifactId>-->
-            <!--                <version>${spotless.version}</version>-->
-            <!--                <configuration>-->
-            <!--                    <java>-->
-            <!--                        <googleJavaFormat>-->
-            <!--                            <version>1.7</version>-->
-            <!--                            <style>AOSP</style>-->
-            <!--                        </googleJavaFormat>-->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>${spotless.version}</version>
+                <configuration>
+                    <java>
+                        <googleJavaFormat>
+                            <version>1.7</version>
+                            <style>AOSP</style>
+                        </googleJavaFormat>
 
-            <!--                        &lt;!&ndash; \# refers to the static imports &ndash;&gt;-->
-            <!--                        <importOrder>-->
-            <!--                            <order>org.apache.flink,org.apache.flink.shaded,,javax,java,scala,\#-->
-            <!--                            </order>-->
-            <!--                        </importOrder>-->
+                        <!-- \# refers to the static imports -->
+                        <importOrder>
+                            <order>org.apache.flink,org.apache.flink.shaded,,javax,java,scala,\#
+                            </order>
+                        </importOrder>
 
-            <!--                        <removeUnusedImports/>-->
-            <!--                    </java>-->
-            <!--                </configuration>-->
-            <!--                <executions>-->
-            <!--                    <execution>-->
-            <!--                        <id>spotless-check</id>-->
-            <!--                        <phase>validate</phase>-->
-            <!--                        <goals>-->
-            <!--                            <goal>check</goal>-->
-            <!--                        </goals>-->
-            <!--                    </execution>-->
-            <!--                </executions>-->
-            <!--            </plugin>-->
-<!--            <plugin>-->
-<!--                <groupId>org.apache.maven.plugins</groupId>-->
-<!--                <artifactId>maven-checkstyle-plugin</artifactId>-->
-<!--                <version>2.17</version>-->
-<!--                <dependencies>-->
-<!--                    <dependency>-->
-<!--                        <groupId>com.puppycrawl.tools</groupId>-->
-<!--                        <artifactId>checkstyle</artifactId>-->
-<!--                        <version>8.14</version>-->
-<!--                    </dependency>-->
-<!--                </dependencies>-->
-<!--                <executions>-->
-<!--                    <execution>-->
-<!--                        <id>validate</id>-->
-<!--                        <phase>validate</phase>-->
-<!--                        <goals>-->
-<!--                            <goal>check</goal>-->
-<!--                        </goals>-->
-<!--                    </execution>-->
-<!--                </executions>-->
-<!--                <configuration>-->
-<!--                    <suppressionsLocation>/tools/maven/suppressions.xml</suppressionsLocation>-->
-<!--                    <includeTestSourceDirectory>true</includeTestSourceDirectory>-->
-<!--                    <configLocation>/tools/maven/checkstyle.xml</configLocation>-->
-<!--                    <logViolationsToConsole>true</logViolationsToConsole>-->
-<!--                    <failOnViolation>true</failOnViolation>-->
-<!--                </configuration>-->
-<!--            </plugin>-->
+                        <removeUnusedImports/>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotless-check</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>2.17</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>8.14</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <id>validate</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <suppressionsLocation>/tools/maven/suppressions.xml</suppressionsLocation>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                    <configLocation>/tools/maven/checkstyle.xml</configLocation>
+                    <logViolationsToConsole>true</logViolationsToConsole>
+                    <failOnViolation>true</failOnViolation>
+                </configuration>
+            </plugin>
 
-            <!--            <plugin>-->
-            <!--                <groupId>org.apache.maven.plugins</groupId>-->
-            <!--                <artifactId>maven-surefire-plugin</artifactId>-->
-            <!--                <version>3.0.0-M5</version>-->
-            <!--                <executions>-->
-            <!--                    <execution>-->
-            <!--                        <id>default-test</id>-->
-            <!--                        <phase>test</phase>-->
-            <!--                        <goals>-->
-            <!--                            <goal>test</goal>-->
-            <!--                        </goals>-->
-            <!--                        <configuration>-->
-            <!--                            <includes>-->
-            <!--                                <include>**/*Test.java</include>-->
-            <!--                                <include>**/*Test.scala</include>-->
-            <!--                            </includes>-->
-            <!--                        </configuration>-->
-            <!--                    </execution>-->
-            <!--                    <execution>-->
-            <!--                        <id>integration-tests</id>-->
-            <!--                        <phase>integration-test</phase>-->
-            <!--                        <goals>-->
-            <!--                            <goal>test</goal>-->
-            <!--                        </goals>-->
-            <!--                        <configuration>-->
-            <!--                            <includes>-->
-            <!--                                <include>**/*ITCase.java</include>-->
-            <!--                                <include>**/*ITCase.scala</include>-->
-            <!--                            </includes>-->
-            <!--                            <reuseForks>false</reuseForks>-->
-            <!--                        </configuration>-->
-            <!--                    </execution>-->
-            <!--                </executions>-->
-            <!--                <configuration>-->
-            <!--                    <forkCount>${flink.forkCount}</forkCount>-->
-            <!--                    <reuseForks>${flink.reuseForks}</reuseForks>-->
-            <!--                    <trimStackTrace>false</trimStackTrace>-->
-            <!--                    <systemPropertyVariables>-->
-            <!--                        <forkNumber>0${surefire.forkNumber}</forkNumber>-->
-            <!--                    </systemPropertyVariables>-->
-            <!--                    &lt;!&ndash; Prevent ORA-01882: timezone region not found errors due to the Oracle DB-->
-            <!--                         does not understanding some time zone which used in Ubuntu OS &ndash;&gt;-->
-            <!--                    <argLine>-Xms256m -Xmx2048m -Dmvn.forkNumber=${surefire.forkNumber}-->
-            <!--                        -XX:+UseG1GC -Doracle.jdbc.timezoneAsRegion=false-->
-            <!--                    </argLine>-->
-            <!--                </configuration>-->
-            <!--            </plugin>-->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.0.0-M5</version>
+                <executions>
+                    <execution>
+                        <id>default-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>**/*Test.java</include>
+                                <include>**/*Test.scala</include>
+                            </includes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>integration-tests</id>
+                        <phase>integration-test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>**/*ITCase.java</include>
+                                <include>**/*ITCase.scala</include>
+                            </includes>
+                            <reuseForks>false</reuseForks>
+                        </configuration>
+                    </execution>
+                </executions>
+                <configuration>
+                    <forkCount>${flink.forkCount}</forkCount>
+                    <reuseForks>${flink.reuseForks}</reuseForks>
+                    <trimStackTrace>false</trimStackTrace>
+                    <systemPropertyVariables>
+                        <forkNumber>0${surefire.forkNumber}</forkNumber>
+                    </systemPropertyVariables>
+                    <!-- Prevent ORA-01882: timezone region not found errors due to the Oracle DB
+                         does not understanding some time zone which used in Ubuntu OS -->
+                    <argLine>-Xms256m -Xmx2048m -Dmvn.forkNumber=${surefire.forkNumber}
+                        -XX:+UseG1GC -Doracle.jdbc.timezoneAsRegion=false
+                    </argLine>
+                </configuration>
+            </plugin>
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -644,31 +644,31 @@ limitations under the License.
             </plugin>
 
             <!-- This plugin takes effect for Maven version upper more than 3.5.0 -->
-            <!--            <plugin>-->
-            <!--                <groupId>org.codehaus.mojo</groupId>-->
-            <!--                <artifactId>flatten-maven-plugin</artifactId>-->
-            <!--                <version>${flatten-maven-plugin.version}</version>-->
-            <!--                <configuration>-->
-            <!--                    <updatePomFile>true</updatePomFile>-->
-            <!--                    <flattenMode>resolveCiFriendliesOnly</flattenMode>-->
-            <!--                </configuration>-->
-            <!--                <executions>-->
-            <!--                    <execution>-->
-            <!--                        <id>flatten</id>-->
-            <!--                        <goals>-->
-            <!--                            <goal>flatten</goal>-->
-            <!--                        </goals>-->
-            <!--                        <phase>process-resources</phase>-->
-            <!--                    </execution>-->
-            <!--                    <execution>-->
-            <!--                        <id>flatten.clean</id>-->
-            <!--                        <goals>-->
-            <!--                            <goal>clean</goal>-->
-            <!--                        </goals>-->
-            <!--                        <phase>clean</phase>-->
-            <!--                    </execution>-->
-            <!--                </executions>-->
-            <!--            </plugin>-->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>${flatten-maven-plugin.version}</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                        <phase>process-resources</phase>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                        <phase>clean</phase>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 

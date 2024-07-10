@@ -241,9 +241,9 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
         // the assigner.
         return splitAssigner.noMoreSplits()
                 && (boundedness == Boundedness.BOUNDED
-                || (sourceConfig.isCloseIdleReaders()
-                && (binlogSplitTaskId != null
-                && !binlogSplitTaskId.equals(nextAwaiting))));
+                        || (sourceConfig.isCloseIdleReaders()
+                                && (binlogSplitTaskId != null
+                                        && !binlogSplitTaskId.equals(nextAwaiting))));
     }
 
     private int[] getRegisteredReader() {
