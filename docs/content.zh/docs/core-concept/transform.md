@@ -47,11 +47,12 @@ Multiple rules can be declared in one single pipeline YAML file.
 ## Fields definition
 There are some hidden columns used to access metadata information. They will only take effect when explicitly referenced in the transform rules.
 
-| Field               | Data Type | Description                                  |
+| Field              | Data Type | Description                                  |
 |--------------------|-----------|----------------------------------------------|
 | __namespace_name__ | String    | Name of the namespace that contains the row. |
 | __schema_name__    | String    | Name of the schema that contains the row.    |
 | __table_name__     | String    | Name of the table that contains the row.     |
+| __op_type__        | String    | Operation type of data change event.         |
 
 ## Metadata relationship
 
