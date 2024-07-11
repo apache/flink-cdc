@@ -385,13 +385,13 @@ class FlinkPipelineComposerITCase {
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`__row_kind__` STRING NOT NULL,`col12` STRING,`rk` STRING}, primaryKeys=col1, partitionKeys=col12, options=({key1=value1})}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, I+, 10, I+], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, I+, 20, I+], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, +I, 10, +I], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, +I, 20, +I], op=INSERT, meta=()}",
                         "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=LAST, existedColumnName=null}]}",
                         "RenameColumnEvent{tableId=default_namespace.default_schema.table1, nameMapping={col2=newCol2, col3=newCol3}}",
                         "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[newCol2]}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, 1, D-, 10, D-], after=[], op=DELETE, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, , U-, 20, U-], after=[2, x, U+, 20, U+], op=UPDATE, meta=()}");
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, 1, -D, 10, -D], after=[], op=DELETE, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, , -U, 20, -U], after=[2, x, +U, 20, +U], op=UPDATE, meta=()}");
     }
 
     @ParameterizedTest

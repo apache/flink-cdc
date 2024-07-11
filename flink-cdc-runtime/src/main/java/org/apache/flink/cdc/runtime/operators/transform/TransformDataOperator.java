@@ -419,6 +419,6 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
     }
 
     private String opTypeToRowKind(OperationType opType, boolean isBefore) {
-        return String.format("%c%c", opType.name().charAt(0), (isBefore ? '-' : '+'));
+        return String.format("%c%c", (isBefore ? '-' : '+'), opType.name().charAt(0));
     }
 }
