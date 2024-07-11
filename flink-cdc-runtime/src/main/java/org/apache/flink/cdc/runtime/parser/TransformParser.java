@@ -77,7 +77,7 @@ public class TransformParser {
     public static final String DEFAULT_NAMESPACE_NAME = "__namespace_name__";
     public static final String DEFAULT_SCHEMA_NAME = "__schema_name__";
     public static final String DEFAULT_TABLE_NAME = "__table_name__";
-    public static final String DEFAULT_OP_TYPE = "__op_type__";
+    public static final String DEFAULT_ROW_KIND = "__row_kind__";
 
     private static SqlParser getCalciteParser(String sql) {
         return SqlParser.create(
@@ -368,9 +368,9 @@ public class TransformParser {
                 && !containsMetadataColumn(columnsWithMetadata, DEFAULT_TABLE_NAME)) {
             columnsWithMetadata.add(Column.physicalColumn(DEFAULT_TABLE_NAME, DataTypes.STRING()));
         }
-        if (transformStatement.contains(DEFAULT_OP_TYPE)
-                && !containsMetadataColumn(columnsWithMetadata, DEFAULT_OP_TYPE)) {
-            columnsWithMetadata.add(Column.physicalColumn(DEFAULT_OP_TYPE, DataTypes.STRING()));
+        if (transformStatement.contains(DEFAULT_ROW_KIND)
+                && !containsMetadataColumn(columnsWithMetadata, DEFAULT_ROW_KIND)) {
+            columnsWithMetadata.add(Column.physicalColumn(DEFAULT_ROW_KIND, DataTypes.STRING()));
         }
         return columnsWithMetadata;
     }
@@ -383,7 +383,7 @@ public class TransformParser {
         return DEFAULT_TABLE_NAME.equals(columnName)
                 || DEFAULT_SCHEMA_NAME.equals(columnName)
                 || DEFAULT_NAMESPACE_NAME.equals(columnName)
-                || DEFAULT_OP_TYPE.equals(columnName);
+                || DEFAULT_ROW_KIND.equals(columnName);
     }
 
     public static SqlSelect parseFilterExpression(String filterExpression) {

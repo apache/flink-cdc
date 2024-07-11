@@ -52,7 +52,7 @@ There are some hidden columns used to access metadata information. They will onl
 | __namespace_name__ | String    | Name of the namespace that contains the row. |
 | __schema_name__    | String    | Name of the schema that contains the row.    |
 | __table_name__     | String    | Name of the table that contains the row.     |
-| __op_type__        | String    | Operation type of data change event.         |
+| __row_kind__       | String    | Operation type of data change event.         |
 
 ## Metadata relationship
 

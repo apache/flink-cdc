@@ -85,7 +85,7 @@ public class TransformFilterProcessor {
                 params.add(tableInfo.getTableName());
                 continue;
             }
-            if (columnName.equals(TransformParser.DEFAULT_OP_TYPE)) {
+            if (columnName.equals(TransformParser.DEFAULT_ROW_KIND)) {
                 params.add(opType);
                 continue;
             }
@@ -138,9 +138,9 @@ public class TransformFilterProcessor {
             paramTypes.add(String.class);
         }
 
-        if (scriptExpression.contains(TransformParser.DEFAULT_OP_TYPE)
-                && !argumentNames.contains(TransformParser.DEFAULT_OP_TYPE)) {
-            argumentNames.add(TransformParser.DEFAULT_OP_TYPE);
+        if (scriptExpression.contains(TransformParser.DEFAULT_ROW_KIND)
+                && !argumentNames.contains(TransformParser.DEFAULT_ROW_KIND)) {
+            argumentNames.add(TransformParser.DEFAULT_ROW_KIND);
             paramTypes.add(String.class);
         }
 
