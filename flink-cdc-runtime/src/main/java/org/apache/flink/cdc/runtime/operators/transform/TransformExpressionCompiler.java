@@ -35,9 +35,9 @@ public class TransformExpressionCompiler {
     static final Cache<TransformExpressionKey, ExpressionEvaluator> COMPILED_EXPRESSION_CACHE =
             CacheBuilder.newBuilder().softValues().build();
 
-    /** Triggers internal garbage collection of expired cache entries. */
+    /** Clean up all expression evaluators to avoid classloader leakage. */
     public static void cleanUp() {
-        COMPILED_EXPRESSION_CACHE.cleanUp();
+        COMPILED_EXPRESSION_CACHE.invalidateAll();
     }
 
     /** Compiles an expression code to a janino {@link ExpressionEvaluator}. */

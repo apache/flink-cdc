@@ -64,7 +64,6 @@ import java.util.List;
 import static org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_1;
 import static org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_2;
 import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
-import static org.apache.flink.configuration.CoreOptions.CHECK_LEAKED_CLASSLOADER;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration test for {@link FlinkPipelineComposer}. */
@@ -81,7 +80,6 @@ class FlinkPipelineComposerITCase {
         MINI_CLUSTER_CONFIG.set(
                 ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL,
                 Collections.singletonList("org.apache.flink.cdc"));
-        MINI_CLUSTER_CONFIG.set(CHECK_LEAKED_CLASSLOADER, false);
     }
 
     /**
