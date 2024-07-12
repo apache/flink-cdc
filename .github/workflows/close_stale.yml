@@ -41,11 +41,11 @@ jobs:
           close-issue-message: >
             This issue has been closed because Flink CDC doesn't use GitHub issue trackers.
           # Stale PRs
-          days-before-pr-stale: 120
-          days-before-pr-close: 7
+          days-before-pr-stale: 60
+          days-before-pr-close: 30
           stale-pr-message: >
             This pull request has been automatically marked as stale because it has not had recent
-            activity for 120 days. It will be closed in 7 days if no further activity occurs.
+            activity for 60 days. It will be closed in 30 days if no further activity occurs.
           close-pr-message: >
             This pull request has been closed because it has not had recent activity. You could reopen it
             if you try to continue your work, and anyone who are interested in it are encouraged to continue

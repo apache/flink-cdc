@@ -7,6 +7,3 @@
 [submodule ".github/actions/label-when-approved-action"]
 	path = .github/actions/label-when-approved-action
 	url = https://github.com/TobKed/label-when-approved-action
-[submodule ".github/actions/auto-assign"]
-	path = .github/actions/auto-assign
-	url = https://github.com/wow-actions/auto-assign
