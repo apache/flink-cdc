@@ -36,11 +36,17 @@ import java.util.Optional;
 public class RouteDef {
     private final String sourceTable;
     private final String sinkTable;
+    private final String replaceSymbol;
     @Nullable private final String description;
 
-    public RouteDef(String sourceTable, String sinkTable, @Nullable String description) {
+    public RouteDef(
+            String sourceTable,
+            String sinkTable,
+            @Nullable String replaceSymbol,
+            @Nullable String description) {
         this.sourceTable = sourceTable;
         this.sinkTable = sinkTable;
+        this.replaceSymbol = replaceSymbol;
         this.description = description;
     }
 
@@ -50,6 +56,10 @@ public class RouteDef {
 
     public String getSinkTable() {
         return sinkTable;
+    }
+
+    public Optional<String> getReplaceSymbol() {
+        return Optional.ofNullable(replaceSymbol);
     }
 
     public Optional<String> getDescription() {
@@ -63,6 +73,8 @@ public class RouteDef {
                 + sourceTable
                 + ", sinkTable="
                 + sinkTable
+                + ", replaceSymbol="
+                + replaceSymbol
                 + ", description='"
                 + description
                 + '\''
@@ -80,11 +92,12 @@ public class RouteDef {
         RouteDef routeDef = (RouteDef) o;
         return Objects.equals(sourceTable, routeDef.sourceTable)
                 && Objects.equals(sinkTable, routeDef.sinkTable)
+                && Objects.equals(replaceSymbol, routeDef.replaceSymbol)
                 && Objects.equals(description, routeDef.description);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(sourceTable, sinkTable, description);
+        return Objects.hash(sourceTable, sinkTable, replaceSymbol, description);
     }
 }

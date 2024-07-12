@@ -30,11 +30,12 @@ under the License.
 # Parameters
 To describe a route, the follows are required:  
 
-| parameter    | meaning                                            | optional/required |
-|--------------|----------------------------------------------------|-------------------|
-| source-table | Source table id, supports regular expressions      | required          |
-| sink-table   | Sink table id, supports regular expressions        | required          |
-| description  | Routing rule description(a default value provided) | optional          |
+| parameter      | meaning                                                                                     | optional/required |
+|----------------|---------------------------------------------------------------------------------------------|-------------------|
+| source-table   | Source table id, supports regular expressions                                               | required          |
+| sink-table     | Sink table id, supports symbol replacement                                                  | required          |
+| replace-symbol | Special symbol in sink-table for pattern replacing, will be replaced by original table name | optional          |
+| description    | Routing rule description(a default value provided)                                          | optional          |
 
 A route module can contain a list of source-table/sink-table rules.
 
@@ -72,3 +73,17 @@ route:
     sink-table: ods_db.ods_products
     description: sync products table to ods_products
 ```
+
+## Pattern Replacement in routing rules
+
+If you'd like to route source tables and rename them to sink tables with specific patterns, `replace-symbol` could be used to resemble source table names like this:
+
+```yaml
+route:
+  - source-table: source_db.\.*
+    sink-table: sink_db.<>
+    replace-symbol: <>
+    description: route all tables in source_db to sink_db
+```
+
+Then, all tables including `source_db.XXX` will be routed to `sink_db.XXX` without hassle.
