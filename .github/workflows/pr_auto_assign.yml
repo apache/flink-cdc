@@ -30,6 +30,8 @@ jobs:
       - uses: ./.github/actions/auto-assign
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          addReviewers: true
+          addAssignees: false
           numberOfReviewers: 1
           # Only repository collaborators could be assigned as reviewers.
           reviewers: |
