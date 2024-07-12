@@ -29,6 +29,7 @@ jobs:
     steps:
       - uses: actions/stale@v9
         with:
+          operations-per-run: 1000
           # Stale Issues
           days-before-issue-stale: 0
           days-before-issue-close: 0
@@ -37,7 +38,6 @@ jobs:
             under the project Flink using component tag Flink CDC. You must have a JIRA account in order to log cases and issues.
             If you don’t have an ASF JIRA account, you can request one at the ASF Self-serve portal,
             account creation requires review by the PMC member of the application project, which normally takes one to two working days to be approved.
-
           close-issue-message: >
             This issue has been closed because Flink CDC doesn't use GitHub issue trackers.
           # Stale PRs
