@@ -37,14 +37,14 @@ public class MySqlSourceReaderMetrics {
 
     public static final String IO_NUM_RECORDS_OUT_SNAPSHOT = ".numRecordsOutBySnapshot";
 
-    public static final String IO_NUM_RECORDS_OUT_INCREMENTAL_INSERT =
-            ".numRecordsOutByIncrementalInsert";
+    public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_INSERT =
+            ".numRecordsOutByDataChangeEventInsert";
 
-    public static final String IO_NUM_RECORDS_OUT_INCREMENTAL_DELETE =
-            ".numRecordsOutByIncrementalDelete";
+    public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_DELETE =
+            ".numRecordsOutByDataChangeEventDelete";
 
-    public static final String IO_NUM_RECORDS_OUT_INCREMENTAL_UPDATE =
-            ".numRecordsOutByIncrementalUpdate";
+    public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_UPDATE =
+            ".numRecordsOutByDataChangeEventUpdate";
 
     private final ConcurrentHashMap<String, Counter> numRecordsOutMap = new ConcurrentHashMap();
 
@@ -80,7 +80,7 @@ public class MySqlSourceReaderMetrics {
                         k ->
                                 metricGroup.counter(
                                         tableId.identifier()
-                                                + IO_NUM_RECORDS_OUT_INCREMENTAL_INSERT));
+                                                + IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_INSERT));
         counter.inc();
     }
 
@@ -91,7 +91,7 @@ public class MySqlSourceReaderMetrics {
                         k ->
                                 metricGroup.counter(
                                         tableId.identifier()
-                                                + IO_NUM_RECORDS_OUT_INCREMENTAL_UPDATE));
+                                                + IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_UPDATE));
         counter.inc();
     }
 
@@ -102,7 +102,7 @@ public class MySqlSourceReaderMetrics {
                         k ->
                                 metricGroup.counter(
                                         tableId.identifier()
-                                                + IO_NUM_RECORDS_OUT_INCREMENTAL_DELETE));
+                                                + IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_DELETE));
         counter.inc();
     }
 

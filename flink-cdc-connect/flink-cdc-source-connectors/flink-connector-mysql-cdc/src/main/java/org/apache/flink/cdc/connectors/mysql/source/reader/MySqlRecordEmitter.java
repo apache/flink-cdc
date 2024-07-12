@@ -128,23 +128,20 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         if (splitState.isSnapshotSplitState()) {
             sourceReaderMetrics.numRecordsOutSnapshotIncrease(tableId);
         } else if (splitState.isBinlogSplitState()) {
-            if (RecordUtils.isDataChangeRecord(element)) {
-                Struct value = (Struct) element.value();
-                if (value != null) {
-                    Envelope.Operation operation =
-                            Envelope.Operation.forCode(
-                                    value.getString(Envelope.FieldName.OPERATION));
-                    switch (operation) {
-                        case CREATE:
-                            sourceReaderMetrics.numRecordsOutInsertIncrease(tableId);
-                            break;
-                        case UPDATE:
-                            sourceReaderMetrics.numRecordsOutUpdateIncrease(tableId);
-                            break;
-                        case DELETE:
-                            sourceReaderMetrics.numRecordsOutDeleteIncrease(tableId);
-                            break;
-                    }
+            Struct value = (Struct) element.value();
+            if (value != null) {
+                Envelope.Operation operation =
+                        Envelope.Operation.forCode(value.getString(Envelope.FieldName.OPERATION));
+                switch (operation) {
+                    case CREATE:
+                        sourceReaderMetrics.numRecordsOutInsertIncrease(tableId);
+                        break;
+                    case UPDATE:
+                        sourceReaderMetrics.numRecordsOutUpdateIncrease(tableId);
+                        break;
+                    case DELETE:
+                        sourceReaderMetrics.numRecordsOutDeleteIncrease(tableId);
+                        break;
                 }
             }
         }
