@@ -98,5 +98,5 @@ The following config options of Data Pipeline level are supported:
 | parameter       | meaning                                                                                 | optional/required |
 |-----------------|-----------------------------------------------------------------------------------------|-------------------|
 | name            | The name of the pipeline, which will be submitted to the Flink cluster as the job name. | optional          |
-| parallelism     | The global parallelism of the pipeline.                                                 | required          |
+| parallelism     | The global parallelism of the pipeline. Defaults to 1.                                  | optional          |
 | local-time-zone | The local time zone defines current session time zone id.                               | optional          |
