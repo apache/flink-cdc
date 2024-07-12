@@ -58,6 +58,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
@@ -112,7 +113,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         double distributionFactorLower = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
 
         boolean closeIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
-
+        boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
@@ -143,6 +144,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .fetchSize(fetchSize)
                         .splitSize(splitSize)
                         .splitMetaGroupSize(splitMetaGroupSize)
+                        .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                         .distributionFactorLower(distributionFactorLower)
                         .distributionFactorUpper(distributionFactorUpper)
                         .heartbeatInterval(heartbeatInterval)

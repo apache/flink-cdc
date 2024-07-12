@@ -243,4 +243,14 @@ public class MySqlDataSourceOptions {
                                     + "If there is a need to use a dot (.) in a regular expression to match any character, "
                                     + "it is necessary to escape the dot with a backslash."
                                     + "eg. db0.\\.*, db1.user_table_[0-9]+, db[1-2].[app|web]_order_\\.*");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_NEWLY_ADDED_TABLE_ENABLED =
+            ConfigOptions.key("scan.newly-added-table.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether capture the newly added tables when restoring from a savepoint/checkpoint or not, by default is false.");
+
+
 }
