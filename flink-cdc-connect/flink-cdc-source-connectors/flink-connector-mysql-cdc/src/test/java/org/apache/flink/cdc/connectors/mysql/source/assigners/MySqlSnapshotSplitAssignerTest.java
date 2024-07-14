@@ -438,6 +438,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         assertEquals(expected, splits);
     }
 
+    @Test
     public void testAssignTableWithPrimaryKeyWithChunkKeyColumnNotInPrimaryKey() {
         String tableWithoutPrimaryKey = "customers";
         List<String> expected =
