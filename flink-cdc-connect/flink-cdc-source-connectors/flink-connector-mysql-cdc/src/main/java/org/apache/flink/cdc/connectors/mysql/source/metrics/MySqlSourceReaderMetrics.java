@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.metrics;
 
-import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
@@ -26,6 +25,7 @@ import org.apache.flink.runtime.metrics.MetricNames;
 
 import io.debezium.relational.TableId;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** A collection class for handling metrics in {@link MySqlSourceReader}. */
@@ -46,7 +46,13 @@ public class MySqlSourceReaderMetrics {
     public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_UPDATE =
             ".numRecordsOutByDataChangeEventUpdate";
 
-    private final ConcurrentHashMap<String, Counter> numRecordsOutMap = new ConcurrentHashMap();
+    private final Map<TableId, Counter> snapshotNumRecordsOutMap = new ConcurrentHashMap();
+
+    private final Map<TableId, Counter> insertNumRecordsOutMap = new ConcurrentHashMap();
+
+    private final Map<TableId, Counter> updateNumRecordsOutMap = new ConcurrentHashMap();
+
+    private final Map<TableId, Counter> deleteNumRecordsOutMap = new ConcurrentHashMap();
 
     /**
      * currentFetchEventTimeLag = FetchTime - messageTimestamp, where the FetchTime is the time the
@@ -65,8 +71,8 @@ public class MySqlSourceReaderMetrics {
 
     public void numRecordsOutSnapshotIncrease(TableId tableId) {
         Counter counter =
-                numRecordsOutMap.computeIfAbsent(
-                        tableId.identifier(),
+                snapshotNumRecordsOutMap.computeIfAbsent(
+                        tableId,
                         k ->
                                 metricGroup.counter(
                                         tableId.identifier() + IO_NUM_RECORDS_OUT_SNAPSHOT));
@@ -75,8 +81,8 @@ public class MySqlSourceReaderMetrics {
 
     public void numRecordsOutInsertIncrease(TableId tableId) {
         Counter counter =
-                numRecordsOutMap.computeIfAbsent(
-                        tableId.identifier() + OperationType.INSERT,
+                insertNumRecordsOutMap.computeIfAbsent(
+                        tableId,
                         k ->
                                 metricGroup.counter(
                                         tableId.identifier()
@@ -86,8 +92,8 @@ public class MySqlSourceReaderMetrics {
 
     public void numRecordsOutUpdateIncrease(TableId tableId) {
         Counter counter =
-                numRecordsOutMap.computeIfAbsent(
-                        tableId.identifier() + OperationType.UPDATE,
+                updateNumRecordsOutMap.computeIfAbsent(
+                        tableId,
                         k ->
                                 metricGroup.counter(
                                         tableId.identifier()
@@ -97,8 +103,8 @@ public class MySqlSourceReaderMetrics {
 
     public void numRecordsOutDeleteIncrease(TableId tableId) {
         Counter counter =
-                numRecordsOutMap.computeIfAbsent(
-                        tableId.identifier() + OperationType.DELETE,
+                deleteNumRecordsOutMap.computeIfAbsent(
+                        tableId,
                         k ->
                                 metricGroup.counter(
                                         tableId.identifier()
