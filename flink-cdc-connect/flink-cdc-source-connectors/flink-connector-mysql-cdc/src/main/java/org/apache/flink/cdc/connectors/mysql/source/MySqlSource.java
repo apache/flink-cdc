@@ -273,6 +273,8 @@ public class MySqlSource<T>
     interface RecordEmitterSupplier<T> extends Serializable {
 
         RecordEmitter<SourceRecords, T, MySqlSplitState> get(
-                SourceReaderContext sourceReaderContext, MySqlSourceReaderMetrics metrics, MySqlSourceConfig sourceConfig);
+                SourceReaderContext sourceReaderContext,
+                MySqlSourceReaderMetrics metrics,
+                MySqlSourceConfig sourceConfig);
     }
 }

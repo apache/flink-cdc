@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
-import io.debezium.relational.TableId;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.cdc.connectors.mysql.source.events.BinlogNewAddedTableEvent;
@@ -33,6 +32,7 @@ import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
 
 import io.debezium.document.Array;
+import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.data.Struct;
@@ -41,8 +41,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Iterator;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * The {@link RecordEmitter} implementation for {@link MySqlSourceReader}.
@@ -105,12 +103,14 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
                 BinlogOffset position = RecordUtils.getBinlogPosition(element);
                 splitState.asBinlogSplitState().setStartingOffset(position);
                 TableId tableId = extractTableId(element);
-                TableChanges.TableChange tableChange = mySqlBinlogSplitState.getTableSchemas().get(tableId);
+                TableChanges.TableChange tableChange =
+                        mySqlBinlogSplitState.getTableSchemas().get(tableId);
                 if (tableChange.getType().equals(TableChanges.TableChangeType.CREATE)) {
                     LOG.info("sending table added to enumerator from subtask");
                     mySqlBinlogSplitState.addUnNotifiedTableId(tableId);
-                    context.sendSourceEventToCoordinator(new BinlogNewAddedTableEvent(tableId.catalog()
-                            , tableId.schema(), tableId.table()));
+                    context.sendSourceEventToCoordinator(
+                            new BinlogNewAddedTableEvent(
+                                    tableId.catalog(), tableId.schema(), tableId.table()));
                 }
                 emitElement(element, output);
             }

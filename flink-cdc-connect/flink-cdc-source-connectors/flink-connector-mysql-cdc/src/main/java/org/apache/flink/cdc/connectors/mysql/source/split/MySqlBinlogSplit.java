@@ -34,9 +34,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * The split to describe the binlog of MySql table(s).
- */
+/** The split to describe the binlog of MySql table(s). */
 public class MySqlBinlogSplit extends MySqlSplit {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplit.class);
 
@@ -47,8 +45,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
     private final int totalFinishedSplitSize;
     private final boolean isSuspended;
     private List<TableId> tableUnNotified;
-    @Nullable
-    transient byte[] serializedFormCache;
+    @Nullable transient byte[] serializedFormCache;
 
     public MySqlBinlogSplit(
             String splitId,
@@ -77,8 +74,14 @@ public class MySqlBinlogSplit extends MySqlSplit {
             int totalFinishedSplitSize,
             boolean isSuspended,
             List<TableId> tableUnNotified) {
-        this(splitId, startingOffset, endingOffset, finishedSnapshotSplitInfos,
-                tableSchemas, totalFinishedSplitSize, isSuspended);
+        this(
+                splitId,
+                startingOffset,
+                endingOffset,
+                finishedSnapshotSplitInfos,
+                tableSchemas,
+                totalFinishedSplitSize,
+                isSuspended);
         this.tableUnNotified = tableUnNotified;
     }
 
@@ -202,7 +205,6 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 binlogSplit.isSuspended());
     }
 
-
     public static MySqlBinlogSplit adjustFinishedSplitInfos(
             MySqlBinlogSplit binlogSplit, List<FinishedSnapshotSplitInfo> splitInfos) {
         splitInfos.addAll(binlogSplit.getFinishedSnapshotSplitInfos());
@@ -247,7 +249,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 binlogSplit.getTableSchemas(),
                 binlogSplit.getTotalFinishedSplitSize()
                         - (binlogSplit.getFinishedSnapshotSplitInfos().size()
-                        - allFinishedSnapshotSplitInfos.size()),
+                                - allFinishedSnapshotSplitInfos.size()),
                 false);
     }
 

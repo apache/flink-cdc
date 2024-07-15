@@ -17,15 +17,21 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
-import io.debezium.connector.mysql.MySqlConnection;
-import io.debezium.connector.mysql.MySqlPartition;
-import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
-import org.apache.flink.cdc.connectors.mysql.source.events.*;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogNewAddedTableEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitAssignedEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitMetaRequestEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitStartEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitSuspendEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogSplitUpdateAckEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.FinishedBinlogNewTableAddRequestEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsAckEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsReportEvent;
+import org.apache.flink.cdc.connectors.mysql.source.events.FinishedSnapshotSplitsRequestEvent;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
@@ -45,6 +51,11 @@ import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcher
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
+
+import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlPartition;
+import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,12 +72,10 @@ import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner.BINLOG_SPLIT_ID;
 
-/**
- * The source reader for MySQL source splits.
- */
+/** The source reader for MySQL source splits. */
 public class MySqlSourceReader<T>
-                extends SingleThreadMultiplexSourceReaderBase<
-        SourceRecords, T, MySqlSplit, MySqlSplitState> {
+        extends SingleThreadMultiplexSourceReaderBase<
+                SourceRecords, T, MySqlSplit, MySqlSplitState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceReader.class);
     private final MySqlSourceConfig sourceConfig;
@@ -126,13 +135,15 @@ public class MySqlSourceReader<T>
         List<MySqlSplit> unfinishedSplits =
                 stateSplits.stream()
                         .filter(split -> !finishedUnackedSplits.containsKey(split.splitId()))
-                        .map(split -> {
-                            if (split instanceof MySqlBinlogSplit) {
-                                MySqlBinlogSplit mySqlBinlogSplit = (MySqlBinlogSplit) split;
-                                mySqlBinlogSplit.getTableUnNotified().clear();
-                            }
-                            return split;
-                        })
+                        .map(
+                                split -> {
+                                    if (split instanceof MySqlBinlogSplit) {
+                                        MySqlBinlogSplit mySqlBinlogSplit =
+                                                (MySqlBinlogSplit) split;
+                                        mySqlBinlogSplit.getTableUnNotified().clear();
+                                    }
+                                    return split;
+                                })
                         .collect(Collectors.toList());
 
         // add finished snapshot splits that did not receive ack yet
@@ -214,7 +225,8 @@ public class MySqlSourceReader<T>
             LOG.info("Source reader {} adds split {}", subtaskId, split);
             if (split.isSnapshotSplit()) {
                 MySqlSnapshotSplit snapshotSplit = split.asSnapshotSplit();
-                // filter snapshot splits data that has been consumed during binlog phase, so we can avoid duplicate data
+                // filter snapshot splits data that has been consumed during binlog phase, so we can
+                // avoid duplicate data
                 if (!tableUnNotified.contains(snapshotSplit.getTableId())) {
                     if (snapshotSplit.isSnapshotReadFinished()) {
                         finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
@@ -248,20 +260,27 @@ public class MySqlSourceReader<T>
                     if (!binlogSplit.getTableUnNotified().isEmpty()) {
                         tableUnNotified = binlogSplit.getTableUnNotified();
                         for (TableId tableId : tableUnNotified) {
-                            context.sendSourceEventToCoordinator(new BinlogNewAddedTableEvent(tableId.catalog()
-                                    , tableId.schema(), tableId.table()));
+                            context.sendSourceEventToCoordinator(
+                                    new BinlogNewAddedTableEvent(
+                                            tableId.catalog(), tableId.schema(), tableId.table()));
                         }
                     }
                     // Try to discovery table schema once for newly added tables when source reader
                     // start or restore
-                    checkNewlyAddedTableSchema = !binlogSplit.getTableSchemas().isEmpty()
-                            && sourceConfig.isScanNewlyAddedTableEnabled();
+                    checkNewlyAddedTableSchema =
+                            !binlogSplit.getTableSchemas().isEmpty()
+                                    && sourceConfig.isScanNewlyAddedTableEnabled();
                     // check if contains new added tables
                     if (checkNewlyAddedTableSchema) {
-                        Map<TableId, TableChanges.TableChange> tableIdTableChangeMap = discoverSchemaForNewAddedTables(binlogSplit);
+                        Map<TableId, TableChanges.TableChange> tableIdTableChangeMap =
+                                discoverSchemaForNewAddedTables(binlogSplit);
                         if (!tableIdTableChangeMap.keySet().isEmpty()) {
-                            // suspend binlog split at the start.rerun after new added table snapshot finished.
-                            binlogSplit = MySqlBinlogSplit.toSuspendSplit(MySqlBinlogSplit.fillTableSchemas(binlogSplit, tableIdTableChangeMap));
+                            // suspend binlog split at the start.rerun after new added table
+                            // snapshot finished.
+                            binlogSplit =
+                                    MySqlBinlogSplit.toSuspendSplit(
+                                            MySqlBinlogSplit.fillTableSchemas(
+                                                    binlogSplit, tableIdTableChangeMap));
                             context.sendSourceEventToCoordinator(new BinlogSplitSuspendEvent());
                         }
                     }
@@ -275,7 +294,7 @@ public class MySqlSourceReader<T>
                     requestBinlogSplitMetaIfNeeded(binlogSplit);
                 } else {
                     uncompletedBinlogSplits.remove(binlogSplit.splitId());
-                    if (!checkNewlyAddedTableSchema){
+                    if (!checkNewlyAddedTableSchema) {
                         binlogSplit = discoverTableSchemasForBinlogSplit(binlogSplit, sourceConfig);
                     }
                     unfinishedSplits.add(binlogSplit);
@@ -323,7 +342,9 @@ public class MySqlSourceReader<T>
                     ((BinlogSplitMetaEvent) sourceEvent).getMetaGroupId());
             fillMetadataForBinlogSplit((BinlogSplitMetaEvent) sourceEvent);
         } else if (sourceEvent instanceof FinishedBinlogNewTableAddRequestEvent) {
-            LOG.info("Source reader {} receives notification that runtime new tables added.", subtaskId);
+            LOG.info(
+                    "Source reader {} receives notification that runtime new tables added.",
+                    subtaskId);
         } else if (sourceEvent instanceof BinlogSplitStartEvent) {
             updateBinlogSplitAndStart((BinlogSplitStartEvent) sourceEvent);
             LOG.info("Source reader {} receives binlog table add update event.", subtaskId);
@@ -345,8 +366,9 @@ public class MySqlSourceReader<T>
                             .filter(r -> !existedSplits.contains(r.getSplitId()))
                             .collect(Collectors.toList());
 
-            MySqlBinlogSplit mySqlBinlogSplit = MySqlBinlogSplit.adjustFinishedSplitInfos(
-                    suspendedBinlogSplit, newAddedMetadataGroup);
+            MySqlBinlogSplit mySqlBinlogSplit =
+                    MySqlBinlogSplit.adjustFinishedSplitInfos(
+                            suspendedBinlogSplit, newAddedMetadataGroup);
 
             suspendedBinlogSplit = null;
             this.addSplits(Collections.singletonList(mySqlBinlogSplit), false);
@@ -455,8 +477,7 @@ public class MySqlSourceReader<T>
     }
 
     private MySqlBinlogSplit discoverTableSchemasForBinlogSplit(
-            MySqlBinlogSplit split,
-            MySqlSourceConfig sourceConfig) {
+            MySqlBinlogSplit split, MySqlSourceConfig sourceConfig) {
         if (split.getTableSchemas().isEmpty()) {
             try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
                 Map<TableId, TableChanges.TableChange> tableSchemas;
@@ -485,11 +506,13 @@ public class MySqlSourceReader<T>
         }
     }
 
-    public Map<TableId, TableChanges.TableChange> discoverSchemaForNewAddedTables(MySqlBinlogSplit split) {
+    public Map<TableId, TableChanges.TableChange> discoverSchemaForNewAddedTables(
+            MySqlBinlogSplit split) {
         try (MySqlConnection jdbc = DebeziumUtils.createMySqlConnection(sourceConfig)) {
             List<TableId> existedTables = new ArrayList<>(split.getTableSchemas().keySet());
-            Map<TableId, TableChanges.TableChange> tableSchemas = TableDiscoveryUtils.discoverSchemaForNewAddedTables(
-                    partition, existedTables, sourceConfig, jdbc);
+            Map<TableId, TableChanges.TableChange> tableSchemas =
+                    TableDiscoveryUtils.discoverSchemaForNewAddedTables(
+                            partition, existedTables, sourceConfig, jdbc);
             LOG.info(
                     "Source reader {} discovers table schema for binlog split {} success",
                     subtaskId,

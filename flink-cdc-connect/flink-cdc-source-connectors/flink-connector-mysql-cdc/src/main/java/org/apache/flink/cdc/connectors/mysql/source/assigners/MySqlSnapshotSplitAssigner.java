@@ -372,7 +372,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
-    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos(boolean isScanNewlyAddedTableEnabled) {
+    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos(
+            boolean isScanNewlyAddedTableEnabled) {
         if (waitingForFinishedSplits()) {
             LOG.error(
                     "The assigner is not ready to offer finished split information, this should not be called");

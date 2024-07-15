@@ -17,13 +17,14 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.assigners;
 
-import io.debezium.relational.TableId;
 import org.apache.flink.api.common.state.CheckpointListener;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
+
+import io.debezium.relational.TableId;
 
 import java.util.Collection;
 import java.util.List;

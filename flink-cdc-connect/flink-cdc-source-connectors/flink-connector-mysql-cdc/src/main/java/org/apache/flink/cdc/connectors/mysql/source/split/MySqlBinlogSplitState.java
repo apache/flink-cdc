@@ -26,15 +26,11 @@ import javax.annotation.Nullable;
 
 import java.util.Map;
 
-/**
- * The state of split to describe the binlog of MySql table(s).
- */
+/** The state of split to describe the binlog of MySql table(s). */
 public class MySqlBinlogSplitState extends MySqlSplitState {
 
-    @Nullable
-    private BinlogOffset startingOffset;
-    @Nullable
-    private BinlogOffset endingOffset;
+    @Nullable private BinlogOffset startingOffset;
+    @Nullable private BinlogOffset endingOffset;
     private final Map<TableId, TableChange> tableSchemas;
 
     public MySqlBinlogSplitState(MySqlBinlogSplit split) {

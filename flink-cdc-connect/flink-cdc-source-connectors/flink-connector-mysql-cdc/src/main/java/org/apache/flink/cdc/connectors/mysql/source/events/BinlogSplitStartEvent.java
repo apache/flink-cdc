@@ -23,6 +23,7 @@ import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 
 import javax.annotation.Nullable;
+
 import java.util.List;
 
 /**

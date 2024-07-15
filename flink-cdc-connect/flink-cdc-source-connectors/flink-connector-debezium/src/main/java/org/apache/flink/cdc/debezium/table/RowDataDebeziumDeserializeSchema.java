@@ -64,16 +64,12 @@ public final class RowDataDebeziumDeserializeSchema
         implements DebeziumDeserializationSchema<RowData> {
     private static final long serialVersionUID = 2L;
 
-    /**
-     * Custom validator to validate the row value.
-     */
+    /** Custom validator to validate the row value. */
     public interface ValueValidator extends Serializable {
         void validate(RowData rowData, RowKind rowKind) throws Exception;
     }
 
-    /**
-     * TypeInformation of the produced {@link RowData}. *
-     */
+    /** TypeInformation of the produced {@link RowData}. * */
     private final TypeInformation<RowData> resultTypeInfo;
 
     /**
@@ -82,9 +78,7 @@ public final class RowDataDebeziumDeserializeSchema
      */
     private final DeserializationRuntimeConverter physicalConverter;
 
-    /**
-     * Whether the deserializer needs to handle metadata columns.
-     */
+    /** Whether the deserializer needs to handle metadata columns. */
     private final boolean hasMetadata;
 
     /**
@@ -92,19 +86,13 @@ public final class RowDataDebeziumDeserializeSchema
      */
     private final AppendMetadataCollector appendMetadataCollector;
 
-    /**
-     * Validator to validate the row value.
-     */
+    /** Validator to validate the row value. */
     private final ValueValidator validator;
 
-    /**
-     * Changelog Mode to use for encoding changes in Flink internal data structure.
-     */
+    /** Changelog Mode to use for encoding changes in Flink internal data structure. */
     private final DebeziumChangelogMode changelogMode;
 
-    /**
-     * Returns a builder to build {@link RowDataDebeziumDeserializeSchema}.
-     */
+    /** Returns a builder to build {@link RowDataDebeziumDeserializeSchema}. */
     public static Builder newBuilder() {
         return new Builder();
     }
@@ -133,7 +121,9 @@ public final class RowDataDebeziumDeserializeSchema
     public void deserialize(SourceRecord record, Collector<RowData> out) throws Exception {
         Envelope.Operation op = Envelope.operationFor(record);
         // filter ddl statement to avoid NPE
-        if (op == null) return;
+        if (op == null) {
+            return;
+        }
         Struct value = (Struct) record.value();
         Schema valueSchema = record.valueSchema();
         if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
@@ -193,9 +183,7 @@ public final class RowDataDebeziumDeserializeSchema
     // Builder
     // -------------------------------------------------------------------------------------
 
-    /**
-     * Builder of {@link RowDataDebeziumDeserializeSchema}.
-     */
+    /** Builder of {@link RowDataDebeziumDeserializeSchema}. */
     public static class Builder {
         private RowType physicalRowType;
         private TypeInformation<RowData> resultTypeInfo;
@@ -258,9 +246,7 @@ public final class RowDataDebeziumDeserializeSchema
     // Runtime Converters
     // -------------------------------------------------------------------------------------
 
-    /**
-     * Creates a runtime converter which is null safe.
-     */
+    /** Creates a runtime converter which is null safe. */
     private static DeserializationRuntimeConverter createConverter(
             LogicalType type,
             ZoneId serverTimeZone,
@@ -275,9 +261,7 @@ public final class RowDataDebeziumDeserializeSchema
     // SerializedLambdas (MSHADE-260).
     // --------------------------------------------------------------------------------
 
-    /**
-     * Creates a runtime converter which assuming input object is not null.
-     */
+    /** Creates a runtime converter which assuming input object is not null. */
     public static DeserializationRuntimeConverter createNotNullConverter(
             LogicalType type,
             ZoneId serverTimeZone,

@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.assigners;
 
-import io.debezium.relational.TableId;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -26,6 +25,8 @@ import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitI
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.util.CollectionUtil;
+
+import io.debezium.relational.TableId;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -78,7 +79,8 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
-    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos(boolean isScanNewlyAddedTableEnabled) {
+    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos(
+            boolean isScanNewlyAddedTableEnabled) {
         return Collections.emptyList();
     }
 
