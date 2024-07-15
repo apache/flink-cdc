@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.kafka.sink;
 
-import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.MetricGroup;
@@ -39,7 +38,11 @@ public class KafkaSinkWriteMetrics {
     public static final String IO_NUM_RECORDS_OUT_INCREMENTAL_UPDATE =
             ".numRecordsOutByIncrementalUpdate";
 
-    private final Map<String, Counter> numRecordsOutMap = new ConcurrentHashMap();
+    private final Map<TableId, Counter> insertNumRecordsOutMap = new ConcurrentHashMap();
+
+    private final Map<TableId, Counter> updateNumRecordsOutMap = new ConcurrentHashMap();
+
+    private final Map<TableId, Counter> deleteNumRecordsOutMap = new ConcurrentHashMap();
 
     public KafkaSinkWriteMetrics(MetricGroup metricGroup) {
         this.metricGroup = metricGroup;
@@ -47,8 +50,8 @@ public class KafkaSinkWriteMetrics {
 
     public void numRecordsOutInsertIncrease(TableId tableId) {
         Counter counter =
-                numRecordsOutMap.computeIfAbsent(
-                        tableId.identifier() + OperationType.INSERT,
+                insertNumRecordsOutMap.computeIfAbsent(
+                        tableId,
                         k ->
                                 metricGroup.counter(
                                         tableId.identifier()
@@ -58,8 +61,8 @@ public class KafkaSinkWriteMetrics {
 
     public void numRecordsOutUpdateIncrease(TableId tableId) {
         Counter counter =
-                numRecordsOutMap.computeIfAbsent(
-                        tableId.identifier() + OperationType.UPDATE,
+                updateNumRecordsOutMap.computeIfAbsent(
+                        tableId,
                         k ->
                                 metricGroup.counter(
                                         tableId.identifier()
@@ -69,8 +72,8 @@ public class KafkaSinkWriteMetrics {
 
     public void numRecordsOutDeleteIncrease(TableId tableId) {
         Counter counter =
-                numRecordsOutMap.computeIfAbsent(
-                        tableId.identifier() + OperationType.DELETE,
+                deleteNumRecordsOutMap.computeIfAbsent(
+                        tableId,
                         k ->
                                 metricGroup.counter(
                                         tableId.identifier()
