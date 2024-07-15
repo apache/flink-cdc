@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeChecks;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.TimestampType;
@@ -79,6 +80,8 @@ public class DorisMetadataApplier implements MetadataApplier {
                 applyDropColumnEvent((DropColumnEvent) event);
             } else if (event instanceof RenameColumnEvent) {
                 applyRenameColumnEvent((RenameColumnEvent) event);
+            } else if (event instanceof AlterColumnTypeEvent) {
+                applyAlterColumnTypeEvent((AlterColumnTypeEvent) event);
             } else if (event instanceof AlterColumnTypeEvent) {
                 throw new RuntimeException("Unsupported schema change event, " + event);
             }
@@ -146,26 +149,28 @@ public class DorisMetadataApplier implements MetadataApplier {
         return new ArrayList<>();
     }
 
+    private String buildTypeString(DataType dataType) {
+        if (dataType instanceof LocalZonedTimestampType
+                || dataType instanceof TimestampType
+                || dataType instanceof ZonedTimestampType) {
+            int precision = DataTypeChecks.getPrecision(dataType);
+            return String.format("%s(%s)", "DATETIMEV2", Math.min(Math.max(precision, 0), 6));
+        } else {
+            return DorisTypeMapper.toDorisType(DataTypeUtils.toFlinkDataType(dataType));
+        }
+    }
+
     private void applyAddColumnEvent(AddColumnEvent event)
             throws IOException, IllegalArgumentException {
         TableId tableId = event.tableId();
         List<AddColumnEvent.ColumnWithPosition> addedColumns = event.getAddedColumns();
         for (AddColumnEvent.ColumnWithPosition col : addedColumns) {
             Column column = col.getAddColumn();
-            String typeString;
-            if (column.getType() instanceof LocalZonedTimestampType
-                    || column.getType() instanceof TimestampType
-                    || column.getType() instanceof ZonedTimestampType) {
-                int precision = DataTypeChecks.getPrecision(column.getType());
-                typeString =
-                        String.format("%s(%s)", "DATETIMEV2", Math.min(Math.max(precision, 0), 6));
-            } else {
-                typeString =
-                        DorisTypeMapper.toDorisType(
-                                DataTypeUtils.toFlinkDataType(column.getType()));
-            }
             FieldSchema addFieldSchema =
-                    new FieldSchema(column.getName(), typeString, column.getComment());
+                    new FieldSchema(
+                            column.getName(),
+                            buildTypeString(column.getType()),
+                            column.getComment());
             schemaChangeManager.addColumn(
                     tableId.getSchemaName(), tableId.getTableName(), addFieldSchema);
         }
@@ -190,6 +195,23 @@ public class DorisMetadataApplier implements MetadataApplier {
                     tableId.getTableName(),
                     entry.getKey(),
                     entry.getValue());
+        }
+    }
+
+    private void applyAlterColumnTypeEvent(AlterColumnTypeEvent event)
+            throws IOException, IllegalArgumentException {
+        TableId tableId = event.tableId();
+        Map<String, DataType> typeMapping = event.getTypeMapping();
+
+        for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
+            schemaChangeManager.modifyColumnDataType(
+                    tableId.getSchemaName(),
+                    tableId.getTableName(),
+                    new FieldSchema(
+                            entry.getKey(),
+                            buildTypeString(entry.getValue()),
+                            null)); // Currently, AlterColumnTypeEvent carries no comment info. This
+            // will be fixed after FLINK-35243 got merged.
         }
     }
 }
