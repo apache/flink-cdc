@@ -240,12 +240,15 @@ public class DebeziumUtils {
         return variables;
     }
 
-    public static BinlogOffset findBinlogOffset(long targetMs, MySqlConnection connection) {
+    public static BinlogOffset findBinlogOffset(
+            long targetMs, MySqlConnection connection, MySqlSourceConfig mySqlSourceConfig) {
         MySqlConnection.MySqlConnectionConfiguration config = connection.connectionConfig();
         BinaryLogClient client =
                 new BinaryLogClient(
                         config.hostname(), config.port(), config.username(), config.password());
-
+        if (mySqlSourceConfig.getServerIdRange() != null) {
+            client.setServerId(mySqlSourceConfig.getServerIdRange().getStartServerId());
+        }
         List<String> binlogFiles = new ArrayList<>();
         JdbcConnection.ResultSetConsumer rsc =
                 rs -> {
@@ -324,21 +327,10 @@ public class DebeziumUtils {
             client.setBinlogFilename(binlogFile);
             client.setBinlogPosition(0);
 
-            LOG.info("Begin parse binlog: {}", binlogFile);
+            LOG.info("begin parse binlog: {}", binlogFile);
             client.connect();
         } finally {
             client.unregisterEventListener(eventListener);
-        }
-        if (binlogTimestamps.isEmpty()) {
-            try {
-                if (client.isConnected()) {
-                    client.disconnect();
-                }
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            LOG.warn("Failed to register eventListener and try to register it again");
-            return getBinlogTimestamp(client, binlogFile);
         }
         return binlogTimestamps.take();
     }
