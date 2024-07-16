@@ -42,7 +42,7 @@ public class OracleSchema {
         this.schemasByTableId = new HashMap<>();
     }
 
-    /** Gets table schema for the given table path. It will request to Oracle server by running */
+    /** Gets table schema for the given table path. */
     public TableChange getTableSchema(JdbcConnection jdbc, TableId tableId) {
         // read schema from cache first
         TableChange schema = schemasByTableId.get(tableId);
