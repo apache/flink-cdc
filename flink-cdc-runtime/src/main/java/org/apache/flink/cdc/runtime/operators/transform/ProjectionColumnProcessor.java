@@ -90,7 +90,7 @@ public class ProjectionColumnProcessor {
                 params.add(tableInfo.getTableName());
                 continue;
             }
-            if (originalColumnName.equals(TransformParser.DEFAULT_ROW_KIND)) {
+            if (originalColumnName.equals(TransformParser.DEFAULT_DATA_EVENT_TYPE)) {
                 params.add(opType);
                 continue;
             }
@@ -143,9 +143,9 @@ public class ProjectionColumnProcessor {
             paramTypes.add(String.class);
         }
 
-        if (scriptExpression.contains(TransformParser.DEFAULT_ROW_KIND)
-                && !argumentNames.contains(TransformParser.DEFAULT_ROW_KIND)) {
-            argumentNames.add(TransformParser.DEFAULT_ROW_KIND);
+        if (scriptExpression.contains(TransformParser.DEFAULT_DATA_EVENT_TYPE)
+                && !argumentNames.contains(TransformParser.DEFAULT_DATA_EVENT_TYPE)) {
+            argumentNames.add(TransformParser.DEFAULT_DATA_EVENT_TYPE);
             paramTypes.add(String.class);
         }
 

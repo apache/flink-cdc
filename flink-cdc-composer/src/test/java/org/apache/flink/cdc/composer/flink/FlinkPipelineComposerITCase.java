@@ -358,7 +358,7 @@ class FlinkPipelineComposerITCase {
         TransformDef transformDef =
                 new TransformDef(
                         "default_namespace.default_schema.table1",
-                        "*,concat(col1,'0') as col12,__row_kind__ as rk",
+                        "*,concat(col1,'0') as col12,__data_event_type__ as rk",
                         "col1 <> '3'",
                         "col1",
                         "col12",
@@ -384,7 +384,7 @@ class FlinkPipelineComposerITCase {
         String[] outputEvents = outCaptor.toString().trim().split("\n");
         assertThat(outputEvents)
                 .containsExactly(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`__row_kind__` STRING NOT NULL,`col12` STRING,`rk` STRING}, primaryKeys=col1, partitionKeys=col12, options=({key1=value1})}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`__data_event_type__` STRING NOT NULL,`col12` STRING,`rk` STRING}, primaryKeys=col1, partitionKeys=col12, options=({key1=value1})}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, +I, 10, +I], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, +I, 20, +I], op=INSERT, meta=()}",
                         "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=LAST, existedColumnName=null}]}",
