@@ -61,10 +61,10 @@ public class MysqlDebeziumTimeConverter
     private static boolean loggedUnknownTimeClass = false;
     private static boolean loggedUnknownTimestampWithTimeZoneClass = false;
 
-    private static final String DATE = "DATE";
-    private static final String DATETIME = "DATETIME";
-    private static final String TIME = "TIME";
-    private static final String TIMESTAMP = "TIMESTAMP";
+    private final String DATE = "DATE";
+    private final String DATETIME = "DATETIME";
+    private final String TIME = "TIME";
+    private final String TIMESTAMP = "TIMESTAMP";
     private final String[] DATE_TYPES = {DATE, DATETIME, TIME, TIMESTAMP};
 
     protected static final String DATE_FORMAT = "yyyy-MM-dd";
