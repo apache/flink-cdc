@@ -47,11 +47,10 @@ public interface JdbcSourceChunkSplitter extends ChunkSplitter {
      *
      * @param jdbc JDBC connection.
      * @param tableId table identity.
-     * @param columnName column name.
+     * @param column column.
      * @return maximum and minimum value.
      */
-    Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)
-            throws SQLException;
+    Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, Column column) throws SQLException;
 
     /**
      * Query the minimum value of the column in the table, and the minimum value must greater than
@@ -60,12 +59,11 @@ public interface JdbcSourceChunkSplitter extends ChunkSplitter {
      *
      * @param jdbc JDBC connection.
      * @param tableId table identity.
-     * @param columnName column name.
+     * @param column column.
      * @param excludedLowerBound the minimum value should be greater than this value.
      * @return minimum value.
      */
-    Object queryMin(
-            JdbcConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
+    Object queryMin(JdbcConnection jdbc, TableId tableId, Column column, Object excludedLowerBound)
             throws SQLException;
 
     /**
@@ -75,7 +73,7 @@ public interface JdbcSourceChunkSplitter extends ChunkSplitter {
      *
      * @param jdbc JDBC connection.
      * @param tableId table identity.
-     * @param columnName column name.
+     * @param column column.
      * @param chunkSize chunk size.
      * @param includedLowerBound the previous chunk end value.
      * @return next chunk end value.
@@ -83,7 +81,7 @@ public interface JdbcSourceChunkSplitter extends ChunkSplitter {
     Object queryNextChunkMax(
             JdbcConnection jdbc,
             TableId tableId,
-            String columnName,
+            Column column,
             int chunkSize,
             Object includedLowerBound)
             throws SQLException;

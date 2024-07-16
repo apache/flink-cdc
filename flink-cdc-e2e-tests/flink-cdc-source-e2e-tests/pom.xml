@@ -36,7 +36,7 @@ limitations under the License.
         <jdbc.version-1.18>3.1.2-1.18</jdbc.version-1.18>
         <jdbc.version-1.19>3.1.2-1.18</jdbc.version-1.19>
         <mysql.driver.version>8.0.27</mysql.driver.version>
-        <postgresql.driver.version>42.5.1</postgresql.driver.version>
+        <postgresql.driver.version>42.7.3</postgresql.driver.version>
     </properties>
 
     <dependencies>
