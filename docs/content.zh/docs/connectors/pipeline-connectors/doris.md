@@ -281,4 +281,17 @@ pipeline:
 </table>
 </div>
 
+## 支持的表结构变更事件
+
+目前，Doris Pipeline 连接器支持应用以下表结构变更事件：
+
+| 类型                   | 是否支持 | 附注                   |
+|----------------------|------|----------------------|
+| AddColumnEvent       | ✅    |                      |
+| AlterColumnTypeEvent | ✅    | 只支持部分列类型转换。可能造成精度损失。 |
+| CreateTableEvent     | ✅    |                      |
+| DropColumnEvent      | ✅    | 不可以删除分区列。            |
+| RenameColumnEvent    | ✅    |                      |
+
+
 {{< top >}}

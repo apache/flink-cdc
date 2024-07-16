@@ -221,4 +221,8 @@ Pipeline 连接器配置项
 </table>
 </div>
 
+## 支持的表结构变更事件
+
+Kafka Pipeline 连接器不维护任何表结构信息。
+
 {{< top >}}

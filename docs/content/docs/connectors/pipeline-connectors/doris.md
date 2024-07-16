@@ -281,4 +281,16 @@ pipeline:
 </table>
 </div>
 
+## Supported Schema Evolution Types
+
+Currently, Doris pipeline connector supports the following schema evolution types.
+
+| Type                 | Supported | Notes                                                                                         |
+|----------------------|-----------|-----------------------------------------------------------------------------------------------|
+| AddColumnEvent       | ✅         |                                                                                               |
+| AlterColumnTypeEvent | ✅         | Limited type conversions are supported. User is responsible for any potential precision loss. |
+| CreateTableEvent     | ✅         |                                                                                               |
+| DropColumnEvent      | ✅         | Partition columns cannot be dropped.                                                          |
+| RenameColumnEvent    | ✅         |                                                                                               |
+
 {{< top >}}
