@@ -286,6 +286,13 @@ Flink SQL> SELECT * FROM orders;
       <td>在 "specific-offset" 启动模式下，启动位点的 GTID 集合。</td>
     </tr>
     <tr>
+      <td>scan.startup.timestamp-millis</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>Long</td>
+      <td>在 "timestamp" 启动模式下，启动位点的毫秒时间戳。</td>
+    </tr>
+    <tr>
       <td>scan.startup.specific-offset.skip-events</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>

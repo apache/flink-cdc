@@ -284,6 +284,13 @@ Connector Options
       <td>Optional GTID set used in case of "specific-offset" startup mode</td>
     </tr>
     <tr>
+      <td>scan.startup.timestamp-millis</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>Long</td>
+      <td>Optional millisecond timestamp used in case of "timestamp" startup mode.</td>
+    </tr>
+    <tr>
       <td>scan.startup.specific-offset.skip-events</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>

@@ -175,8 +175,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for MySQL CDC consumer, valid enumerations are "initial", "earliest-offset", "latest-offset", "specific-offset" and "timestamp".
-           Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
+      <td>Optional startup mode for MySQL CDC consumer, valid enumerations are "initial", "earliest-offset", "latest-offset", "specific-offset" and "timestamp".</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.file</td>
@@ -198,6 +197,13 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Optional GTID set used in case of "specific-offset" startup mode</td>
+    </tr>
+    <tr>
+      <td>scan.startup.timestamp-millis</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>Long</td>
+      <td>Optional millisecond timestamp used in case of "timestamp" startup mode.</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.skip-events</td>
