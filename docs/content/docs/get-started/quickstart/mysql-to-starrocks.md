@@ -150,13 +150,14 @@ This command automatically starts all the containers defined in the Docker Compo
 
 2. Download the connector package listed below and move it to the `lib` directory  
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
+   **Please note that the lib here refers to the lib of flink-cdc, not the lib of flink. Do not put pipeline-related packages under the lib of flink, otherwise it will cause class loading related problems**
    - [MySQL pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-mysql/3.1.0/flink-cdc-pipeline-connector-mysql-3.1.0.jar)
    - [StarRocks pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-starrocks/3.1.0/flink-cdc-pipeline-connector-starrocks-3.1.0.jar)
 
    You also need to place MySQL connector into Flink `lib` folder or pass it with `--jar` argument, since they're no longer packaged with CDC connectors:
    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 
-3. Write task configuration yaml file.
+4. Write task configuration yaml file.
    Here is an example file for synchronizing the entire database `mysql-to-starrocks.yaml`：
 
    ```yaml
