@@ -147,13 +147,14 @@ under the License.
 
 2. 下载下面列出的 connector 包，并且移动到 lib 目录下；
    **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译。**
+   **请注意这里的lib指的是flink-cdc的lib，而不是flink的lib，pipeline相关的包不要放到flink的lib下，否则会引发类加载相关问题**
    - [MySQL pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-mysql/3.1.0/flink-cdc-pipeline-connector-mysql-3.1.0.jar)
    - [StarRocks pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-starrocks/3.1.0/flink-cdc-pipeline-connector-starrocks-3.1.0.jar)
 
    您还需要将下面的 Driver 包放在 Flink `lib` 目录下，或通过 `--jar` 参数将其传入 Flink CDC CLI，因为 CDC Connectors 不再包含这些 Drivers：
    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
 
-3. 编写任务配置 yaml 文件。
+4. 编写任务配置 yaml 文件。
    下面给出了一个整库同步的示例文件 mysql-to-starrocks.yaml：
 
    ```yaml
