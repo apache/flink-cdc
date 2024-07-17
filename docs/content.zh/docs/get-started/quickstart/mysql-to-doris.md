@@ -186,6 +186,7 @@ MacOS 由于内部实现容器的方式不同，在部署时宿主机直接修�
 
 2. 下载下面列出的 connector 包，并且移动到 `lib` 目录下；
    **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译.**
+   **请注意这里的lib指的是flink-cdc的lib，而不是flink的lib，pipeline相关的包不要放到flink的lib下，否则会引发类加载相关问题**
    - [MySQL pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-mysql/3.1.0/flink-cdc-pipeline-connector-mysql-3.1.0.jar)
    - [Apache Doris pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-doris/3.1.0/flink-cdc-pipeline-connector-doris-3.1.0.jar)
 
