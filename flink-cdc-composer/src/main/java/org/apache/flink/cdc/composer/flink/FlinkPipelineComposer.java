@@ -93,6 +93,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
     @Override
     public PipelineExecution compose(PipelineDef pipelineDef) {
         int parallelism = pipelineDef.getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
+        int sinkParallelism = pipelineDef.getConfig().get(PipelineOptions.SINK_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
 
         // Build Source Operator
@@ -136,7 +137,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
         PartitioningTranslator partitioningTranslator = new PartitioningTranslator();
         stream =
                 partitioningTranslator.translate(
-                        stream, parallelism, parallelism, schemaOperatorIDGenerator.generate());
+                        stream, parallelism, sinkParallelism, schemaOperatorIDGenerator.generate());
 
         // Build Sink Operator
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
