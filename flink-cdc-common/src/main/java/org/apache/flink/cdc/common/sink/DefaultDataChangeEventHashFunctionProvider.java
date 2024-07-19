@@ -18,34 +18,43 @@
 package org.apache.flink.cdc.common.sink;
 
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.RecordData.FieldGetter;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.function.HashFunction;
+import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.schema.Schema;
+
+import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** the default implementation of hash function. */
-public class DefaultHashFunctionProvider implements HashFunctionProvider {
+/** The default {@link HashFunctionProvider} implementation for data change event. */
+public class DefaultDataChangeEventHashFunctionProvider
+        implements HashFunctionProvider<DataChangeEvent> {
+
     private static final long serialVersionUID = 1L;
 
     @Override
-    public HashFunction getHashFunction(TableId tableId, Schema schema) {
-        return new DefaultHashFunction(schema);
+    public HashFunction<DataChangeEvent> getHashFunction(@Nullable TableId tableId, Schema schema) {
+        return new DefaultDataChangeEventHashFunction(schema);
     }
 
-    static class DefaultHashFunction implements HashFunction {
-        private final List<RecordData.FieldGetter> primaryKeyGetters;
+    /** The default {@link HashFunction} implementation for data change event. */
+    static class DefaultDataChangeEventHashFunction implements HashFunction<DataChangeEvent> {
 
-        public DefaultHashFunction(Schema schema) {
+        private final List<FieldGetter> primaryKeyGetters;
+
+        public DefaultDataChangeEventHashFunction(Schema schema) {
             primaryKeyGetters = createFieldGetters(schema);
         }
 
         @Override
-        public Integer apply(DataChangeEvent event) {
+        public int hashcode(DataChangeEvent event) {
             List<Object> objectsToHash = new ArrayList<>();
             // Table ID
             TableId tableId = event.tableId();
@@ -56,7 +65,7 @@ public class DefaultHashFunctionProvider implements HashFunctionProvider {
             // Primary key
             RecordData data =
                     event.op().equals(OperationType.DELETE) ? event.before() : event.after();
-            for (RecordData.FieldGetter primaryKeyGetter : primaryKeyGetters) {
+            for (FieldGetter primaryKeyGetter : primaryKeyGetters) {
                 objectsToHash.add(primaryKeyGetter.getFieldOrNull(data));
             }
 
@@ -64,9 +73,8 @@ public class DefaultHashFunctionProvider implements HashFunctionProvider {
             return (Objects.hash(objectsToHash.toArray()) * 31) & 0x7FFFFFFF;
         }
 
-        private List<RecordData.FieldGetter> createFieldGetters(Schema schema) {
-            List<RecordData.FieldGetter> fieldGetters =
-                    new ArrayList<>(schema.primaryKeys().size());
+        private List<FieldGetter> createFieldGetters(Schema schema) {
+            List<FieldGetter> fieldGetters = new ArrayList<>(schema.primaryKeys().size());
             schema.primaryKeys().stream()
                     .mapToInt(
                             pk -> {

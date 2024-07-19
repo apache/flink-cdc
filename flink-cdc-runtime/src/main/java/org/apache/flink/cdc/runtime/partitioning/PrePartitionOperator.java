@@ -23,9 +23,9 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.function.HashFunction;
+import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.sink.HashFunction;
-import org.apache.flink.cdc.common.sink.HashFunctionProvider;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -47,19 +47,20 @@ import java.util.Optional;
 public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEvent>
         implements OneInputStreamOperator<Event, PartitioningEvent> {
 
+    private static final long serialVersionUID = 1L;
     private static final Duration CACHE_EXPIRE_DURATION = Duration.ofDays(1);
 
     private final OperatorID schemaOperatorId;
     private final int downstreamParallelism;
-    private final HashFunctionProvider hashFunctionProvider;
+    private final HashFunctionProvider<DataChangeEvent> hashFunctionProvider;
 
     private transient SchemaEvolutionClient schemaEvolutionClient;
-    private transient LoadingCache<TableId, HashFunction> cachedHashFunctions;
+    private transient LoadingCache<TableId, HashFunction<DataChangeEvent>> cachedHashFunctions;
 
     public PrePartitionOperator(
             OperatorID schemaOperatorId,
             int downstreamParallelism,
-            HashFunctionProvider hashFunctionProvider) {
+            HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.schemaOperatorId = schemaOperatorId;
         this.downstreamParallelism = downstreamParallelism;
@@ -100,7 +101,7 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
                                 dataChangeEvent,
                                 cachedHashFunctions
                                                 .get(dataChangeEvent.tableId())
-                                                .apply(dataChangeEvent)
+                                                .hashcode(dataChangeEvent)
                                         % downstreamParallelism)));
     }
 
@@ -126,17 +127,17 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
         return schema.get();
     }
 
-    private HashFunction recreateHashFunction(TableId tableId) {
+    private HashFunction<DataChangeEvent> recreateHashFunction(TableId tableId) {
         return hashFunctionProvider.getHashFunction(tableId, loadLatestSchemaFromRegistry(tableId));
     }
 
-    private LoadingCache<TableId, HashFunction> createCache() {
+    private LoadingCache<TableId, HashFunction<DataChangeEvent>> createCache() {
         return CacheBuilder.newBuilder()
                 .expireAfterAccess(CACHE_EXPIRE_DURATION)
                 .build(
-                        new CacheLoader<TableId, HashFunction>() {
+                        new CacheLoader<TableId, HashFunction<DataChangeEvent>>() {
                             @Override
-                            public HashFunction load(TableId key) {
+                            public HashFunction<DataChangeEvent> load(TableId key) {
                                 return recreateHashFunction(key);
                             }
                         });
