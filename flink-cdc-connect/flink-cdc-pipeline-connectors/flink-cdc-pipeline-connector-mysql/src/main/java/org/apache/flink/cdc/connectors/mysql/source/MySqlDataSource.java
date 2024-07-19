@@ -29,6 +29,8 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFact
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEmitter;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
+
 /** A {@link DataSource} for mysql cdc connector. */
 @Internal
 public class MySqlDataSource implements DataSource {
@@ -43,9 +45,18 @@ public class MySqlDataSource implements DataSource {
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
+        boolean includeComments =
+                sourceConfig
+                        .getDbzConfiguration()
+                        .getBoolean(
+                                RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS.name(),
+                                false);
+
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
-                        DebeziumChangelogMode.ALL, sourceConfig.isIncludeSchemaChanges());
+                        DebeziumChangelogMode.ALL,
+                        sourceConfig.isIncludeSchemaChanges(),
+                        includeComments);
 
         MySqlSource<Event> source =
                 new MySqlSource<>(

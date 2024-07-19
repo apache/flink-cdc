@@ -35,8 +35,10 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetBuilder;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 import org.apache.flink.cdc.connectors.mysql.utils.OptionUtils;
+import org.apache.flink.cdc.debezium.table.DebeziumOptions;
 import org.apache.flink.table.api.ValidationException;
 
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +59,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.CONNECT_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.INCLUDE_COMMENTS_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
@@ -118,6 +121,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         double distributionFactorLower = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
 
         boolean closeIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        boolean includeComments = config.get(INCLUDE_COMMENTS_ENABLED);
 
         Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
@@ -134,6 +138,13 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
         Map<String, String> configMap = config.toMap();
         OptionUtils.printOptions(IDENTIFIER, config.toMap());
+        if (includeComments) {
+            // set debezium config 'include.schema.comments' to true
+            configMap.put(
+                    DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX
+                            + RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS.name(),
+                    "true");
+        }
 
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
@@ -220,6 +231,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(CHUNK_META_GROUP_SIZE);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        options.add(INCLUDE_COMMENTS_ENABLED);
         return options;
     }
 

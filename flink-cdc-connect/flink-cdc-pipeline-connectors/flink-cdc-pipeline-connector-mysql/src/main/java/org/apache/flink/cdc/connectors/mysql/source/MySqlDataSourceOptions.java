@@ -243,4 +243,13 @@ public class MySqlDataSourceOptions {
                                     + "If there is a need to use a dot (.) in a regular expression to match any character, "
                                     + "it is necessary to escape the dot with a backslash."
                                     + "eg. db0.\\.*, db1.user_table_[0-9]+, db[1-2].[app|web]_order_\\.*");
+
+    @Experimental
+    public static final ConfigOption<Boolean> INCLUDE_COMMENTS_ENABLED =
+            ConfigOptions.key("include-comments.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether enable include table and column comments, by default is false, if set to true, table and column comments will be sent. "
+                                    + "Note: Enable this option will bring the implications on memory usage.");
 }

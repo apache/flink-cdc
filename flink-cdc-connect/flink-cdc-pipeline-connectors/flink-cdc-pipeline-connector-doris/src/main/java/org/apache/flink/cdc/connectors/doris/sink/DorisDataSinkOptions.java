@@ -61,6 +61,12 @@ public class DorisDataSinkOptions {
                     .withDescription(
                             "Use automatic redirection of fe without explicitly obtaining the be list");
 
+    public static final ConfigOption<String> CHARSET_ENCODING =
+            ConfigOptions.key("charset-encoding")
+                    .stringType()
+                    .defaultValue("UTF-8")
+                    .withDescription("Charset encoding for doris http client, default UTF-8.");
+
     // Streaming Sink options
     public static final ConfigOption<Boolean> SINK_ENABLE_2PC =
             ConfigOptions.key("sink.enable-2pc")

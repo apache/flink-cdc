@@ -52,6 +52,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.CHARSET_ENCODING;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_PROPERTIES_PREFIX;
 
 /** Supports {@link DorisDataSink} to schema evolution. */
@@ -63,7 +64,8 @@ public class DorisMetadataApplier implements MetadataApplier {
 
     public DorisMetadataApplier(DorisOptions dorisOptions, Configuration config) {
         this.dorisOptions = dorisOptions;
-        this.schemaChangeManager = new SchemaChangeManager(dorisOptions);
+        this.schemaChangeManager =
+                new SchemaChangeManager(dorisOptions, config.get(CHARSET_ENCODING));
         this.config = config;
     }
 
@@ -97,6 +99,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         tableSchema.setDatabase(tableId.getSchemaName());
         tableSchema.setFields(buildFields(schema));
         tableSchema.setDistributeKeys(buildDistributeKeys(schema));
+        tableSchema.setTableComment(schema.comment());
 
         if (CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
             tableSchema.setModel(DataModel.DUPLICATE);

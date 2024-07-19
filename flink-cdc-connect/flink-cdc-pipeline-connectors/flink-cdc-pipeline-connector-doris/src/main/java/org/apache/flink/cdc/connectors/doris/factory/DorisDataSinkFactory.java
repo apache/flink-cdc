@@ -39,6 +39,7 @@ import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.AUTO_REDIRECT;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.BENODES;
+import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.CHARSET_ENCODING;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.FENODES;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.JDBC_URL;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.PASSWORD;
@@ -143,6 +144,7 @@ public class DorisDataSinkFactory implements DataSinkFactory {
         options.add(JDBC_URL);
         options.add(PASSWORD);
         options.add(AUTO_REDIRECT);
+        options.add(CHARSET_ENCODING);
 
         options.add(SINK_CHECK_INTERVAL);
         options.add(SINK_ENABLE_2PC);

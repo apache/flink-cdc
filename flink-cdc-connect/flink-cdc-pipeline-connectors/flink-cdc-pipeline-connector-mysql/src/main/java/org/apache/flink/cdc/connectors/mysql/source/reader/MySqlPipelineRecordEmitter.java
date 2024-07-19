@@ -35,6 +35,7 @@ import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -207,6 +208,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
             }
             tableBuilder.physicalColumn(colName, dataType, column.comment());
         }
+        tableBuilder.comment(table.comment());
 
         List<String> primaryKey = table.primaryKeyColumnNames();
         if (Objects.nonNull(primaryKey) && !primaryKey.isEmpty()) {
@@ -225,7 +227,16 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
     private synchronized MySqlAntlrDdlParser getParser() {
         if (mySqlAntlrDdlParser == null) {
-            mySqlAntlrDdlParser = new MySqlAntlrDdlParser();
+            boolean includeComments =
+                    sourceConfig
+                            .getDbzConfiguration()
+                            .getBoolean(
+                                    RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS
+                                            .name(),
+                                    false);
+            mySqlAntlrDdlParser =
+                    new MySqlAntlrDdlParser(
+                            true, false, includeComments, null, Tables.TableFilter.includeAll());
         }
         return mySqlAntlrDdlParser;
     }
