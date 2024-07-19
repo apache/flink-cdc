@@ -23,7 +23,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.sink.DefaultHashFunctionProvider;
+import org.apache.flink.cdc.common.sink.DefaultDataChangeEventHashFunctionProvider;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
@@ -128,9 +128,9 @@ class PrePartitionOperatorTest {
     }
 
     private int getPartitioningTarget(Schema schema, DataChangeEvent dataChangeEvent) {
-        return new DefaultHashFunctionProvider()
+        return new DefaultDataChangeEventHashFunctionProvider()
                         .getHashFunction(null, schema)
-                        .apply(dataChangeEvent)
+                        .hashcode(dataChangeEvent)
                 % DOWNSTREAM_PARALLELISM;
     }
 
@@ -139,7 +139,7 @@ class PrePartitionOperatorTest {
                 new PrePartitionOperator(
                         TestingSchemaRegistryGateway.SCHEMA_OPERATOR_ID,
                         DOWNSTREAM_PARALLELISM,
-                        new DefaultHashFunctionProvider());
+                        new DefaultDataChangeEventHashFunctionProvider());
         return new EventOperatorTestHarness<>(operator, DOWNSTREAM_PARALLELISM);
     }
 }

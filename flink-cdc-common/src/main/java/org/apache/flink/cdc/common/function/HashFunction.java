@@ -15,14 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.sink;
+package org.apache.flink.cdc.common.function;
 
-import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.annotation.Internal;
 
-import java.util.function.Function;
+/**
+ * The hash function used to calculate the hash code from a given event.
+ *
+ * @param <T> the type of given event.
+ */
+@Internal
+public interface HashFunction<T> {
 
-/** use for {@code PrePartitionOperator} when calculating hash code of primary key. */
-public interface HashFunction extends Function<DataChangeEvent, Integer> {
-    @Override
-    Integer apply(DataChangeEvent event);
+    int hashcode(T event);
 }

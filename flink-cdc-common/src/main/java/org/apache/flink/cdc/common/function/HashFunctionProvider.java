@@ -15,21 +15,27 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.sink;
+package org.apache.flink.cdc.common.function;
 
+import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.DataSink;
+
+import javax.annotation.Nullable;
 
 import java.io.Serializable;
 
 /**
- * Provide {@link HashFunction} to help {@code PrePartitionOperator} to shuffle {@link
- * DataChangeEvent} to designated subtask. This is usually beneficial for load balancing, when
- * writing to different partitions/buckets in {@link DataSink}, add custom implementation to further
- * improve efficiency.
+ * Provider that provides {@link HashFunction} to help {@code PrePartitionOperator} to shuffle event
+ * to designated subtask. This is usually beneficial for load balancing, when writing to different
+ * partitions/buckets in {@link DataSink}, add custom implementation to further improve efficiency.
+ *
+ * @param <T> the type of given element
  */
-public interface HashFunctionProvider extends Serializable {
+@Internal
+public interface HashFunctionProvider<T> extends Serializable {
 
     /**
      * Gets a hash function based on the given table ID and schema, to help {@code
@@ -39,5 +45,5 @@ public interface HashFunctionProvider extends Serializable {
      * @param schema flink table schema
      * @return hash function based on the given table ID and schema
      */
-    HashFunction getHashFunction(TableId tableId, Schema schema);
+    HashFunction<T> getHashFunction(@Nullable TableId tableId, Schema schema);
 }

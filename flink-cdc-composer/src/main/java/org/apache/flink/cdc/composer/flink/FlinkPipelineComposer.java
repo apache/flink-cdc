@@ -140,7 +140,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         parallelism,
                         parallelism,
                         schemaOperatorIDGenerator.generate(),
-                        dataSink.getHashFunctionProvider());
+                        dataSink.getDataChangeEventHashFunctionProvider());
 
         // Build Sink Operator
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
