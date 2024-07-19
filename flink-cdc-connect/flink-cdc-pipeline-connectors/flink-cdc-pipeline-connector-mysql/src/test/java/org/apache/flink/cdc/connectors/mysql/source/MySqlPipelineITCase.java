@@ -365,40 +365,19 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
     @Test
     public void testIncludeComments() throws Exception {
         inventoryDatabase.createAndInitialize();
-        List<Event> expected = new ArrayList<>();
         TableId tableId =
                 TableId.tableId(inventoryDatabase.getDatabaseName(), "products_with_comments");
-        try (Connection connection = inventoryDatabase.getJdbcConnection();
-                Statement statement = connection.createStatement()) {
-            String createTableSql =
-                    String.format(
-                            "CREATE TABLE IF NOT EXISTS `%s`.`%s` (\n"
-                                    + "  id INTEGER NOT NULL AUTO_INCREMENT COMMENT 'column comment of id' PRIMARY KEY,\n"
-                                    + "  name VARCHAR(255) NOT NULL DEFAULT 'flink' COMMENT 'column comment of name',\n"
-                                    + "  weight FLOAT(6) COMMENT 'column comment of weight'\n"
-                                    + ")\n"
-                                    + "COMMENT 'table comment of products';",
-                            inventoryDatabase.getDatabaseName(), "products_with_comments");
 
-            statement.execute(createTableSql);
-            expected.add(getProductsWithCommentsCreateTableEvent(tableId));
-
-            // add some column
-            statement.execute(
-                    String.format(
-                            "ALTER TABLE `%s`.`products_with_comments` ADD COLUMN `description` VARCHAR(512) comment 'column comment of description';",
-                            inventoryDatabase.getDatabaseName()));
-
-            expected.add(
-                    new AddColumnEvent(
-                            tableId,
-                            Collections.singletonList(
-                                    new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn(
-                                                    "description",
-                                                    DataTypes.VARCHAR(512),
-                                                    "column comment of description")))));
-        }
+        String createTableSql =
+                String.format(
+                        "CREATE TABLE IF NOT EXISTS `%s`.`%s` (\n"
+                                + "  id INTEGER NOT NULL AUTO_INCREMENT COMMENT 'column comment of id' PRIMARY KEY,\n"
+                                + "  name VARCHAR(255) NOT NULL DEFAULT 'flink' COMMENT 'column comment of name',\n"
+                                + "  weight FLOAT(6) COMMENT 'column comment of weight'\n"
+                                + ")\n"
+                                + "COMMENT 'table comment of products';",
+                        inventoryDatabase.getDatabaseName(), "products_with_comments");
+        executeSql(inventoryDatabase, createTableSql);
 
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL8_CONTAINER.getHost());
@@ -425,8 +404,24 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                 new EventTypeInfo())
                         .executeAndCollect();
 
-        List<Event> actual = fetchResults(events, expected.size());
-        assertThat(actual).containsExactly(expected.toArray(new Event[0]));
+        List<Event> actual = fetchResults(events, 1);
+        assertThat(actual.get(0)).isEqualTo(getProductsWithCommentsCreateTableEvent(tableId));
+
+        // add some column
+        String addColumnSql =
+                String.format(
+                        "ALTER TABLE `%s`.`products_with_comments` ADD COLUMN `description` VARCHAR(512) comment 'column comment of description';",
+                        inventoryDatabase.getDatabaseName());
+        executeSql(inventoryDatabase, addColumnSql);
+        actual = fetchResults(events, 1);
+        assertThat(actual.get(0)).isEqualTo(getProductsWithCommentsAddColumnEvent(tableId));
+    }
+
+    private void executeSql(UniqueDatabase database, String sql) throws SQLException {
+        try (Connection connection = database.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(sql);
+        }
     }
 
     private CreateTableEvent getProductsCreateTableEvent(TableId tableId) {
@@ -452,6 +447,17 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .primaryKey(Collections.singletonList("id"))
                         .comment("table comment of products")
                         .build());
+    }
+
+    private AddColumnEvent getProductsWithCommentsAddColumnEvent(TableId tableId) {
+        return new AddColumnEvent(
+                tableId,
+                Collections.singletonList(
+                        new AddColumnEvent.ColumnWithPosition(
+                                Column.physicalColumn(
+                                        "description",
+                                        DataTypes.VARCHAR(512),
+                                        "column comment of description"))));
     }
 
     private List<Event> getSnapshotExpected(TableId tableId) {
