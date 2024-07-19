@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.Factory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.types.DataType;
@@ -446,8 +447,10 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         options.put(SERVER_ID.key(), getServerId(parallelism));
         options.put(SCAN_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
         Factory.Context context =
-                new MySqlDataSourceFactoryTest.MockContext(
-                        org.apache.flink.cdc.common.configuration.Configuration.fromMap(options));
+                new FactoryHelper.DefaultContext(
+                        org.apache.flink.cdc.common.configuration.Configuration.fromMap(options),
+                        null,
+                        this.getClass().getClassLoader());
 
         MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
         MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);

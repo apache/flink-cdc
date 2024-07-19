@@ -239,7 +239,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                 .isEqualTo(Arrays.asList(inventoryDatabase.getDatabaseName() + ".products"));
     }
 
-    static class MockContext implements Factory.Context {
+    class MockContext implements Factory.Context {
 
         Configuration factoryConfiguration;
 
