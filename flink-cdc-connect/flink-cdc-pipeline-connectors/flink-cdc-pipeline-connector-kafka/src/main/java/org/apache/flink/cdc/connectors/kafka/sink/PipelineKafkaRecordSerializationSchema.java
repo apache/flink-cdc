@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.kafka.sink;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.cdc.common.event.ChangeEvent;
-import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
@@ -51,8 +50,6 @@ public class PipelineKafkaRecordSerializationSchema
     private final SerializationSchema<Event> valueSerialization;
 
     private final String unifiedTopic;
-
-    private KafkaSinkWriteMetrics kafkaSinkWriteMetrics;
 
     private final boolean addTableToHeaderEnabled;
 
@@ -123,27 +120,6 @@ public class PipelineKafkaRecordSerializationSchema
                         new RecordHeader(entry.getKey(), entry.getValue().getBytes(UTF_8)));
             }
         }
-
-        if (changeEvent instanceof DataChangeEvent) {
-            DataChangeEvent dataChangeEvent = (DataChangeEvent) changeEvent;
-            if (kafkaSinkWriteMetrics != null) {
-                switch (dataChangeEvent.op()) {
-                    case INSERT:
-                        kafkaSinkWriteMetrics.numRecordsOutInsertIncrease(
-                                dataChangeEvent.tableId());
-                        break;
-                    case UPDATE:
-                        kafkaSinkWriteMetrics.numRecordsOutUpdateIncrease(
-                                dataChangeEvent.tableId());
-                        break;
-                    case DELETE:
-                        kafkaSinkWriteMetrics.numRecordsOutDeleteIncrease(
-                                dataChangeEvent.tableId());
-                        break;
-                }
-            }
-        }
-
         return new ProducerRecord<>(
                 topic,
                 extractPartition(
@@ -163,7 +139,6 @@ public class PipelineKafkaRecordSerializationSchema
                     sinkContext.getParallelInstanceId(),
                     sinkContext.getNumberOfParallelInstances());
         }
-        kafkaSinkWriteMetrics = new KafkaSinkWriteMetrics(context.getMetricGroup());
         valueSerialization.open(context);
     }
 

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.kafka.sink;
+package org.apache.flink.cdc.runtime.operators.sink;
 
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.metrics.Counter;
@@ -24,19 +24,16 @@ import org.apache.flink.metrics.MetricGroup;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** A collection class for handling metrics in {@link PipelineKafkaRecordSerializationSchema}. */
-public class KafkaSinkWriteMetrics {
+/** A collection class for handling metrics in {@link DataSinkWriterOperator}. */
+public class DataSinkWriteMetrics {
 
     private final MetricGroup metricGroup;
 
-    public static final String IO_NUM_RECORDS_OUT_INCREMENTAL_INSERT =
-            ".numRecordsOutByIncrementalInsert";
+    public static final String IO_NUM_RECORDS_OUT_INSERT = "numRecordsOutByInsert";
 
-    public static final String IO_NUM_RECORDS_OUT_INCREMENTAL_DELETE =
-            ".numRecordsOutByIncrementalDelete";
+    public static final String IO_NUM_RECORDS_OUT_DELETE = "numRecordsOutByDelete";
 
-    public static final String IO_NUM_RECORDS_OUT_INCREMENTAL_UPDATE =
-            ".numRecordsOutByIncrementalUpdate";
+    public static final String IO_NUM_RECORDS_OUT_UPDATE = "numRecordsOutByUpdate";
 
     private final Map<TableId, Counter> insertNumRecordsOutMap = new ConcurrentHashMap();
 
@@ -44,7 +41,7 @@ public class KafkaSinkWriteMetrics {
 
     private final Map<TableId, Counter> deleteNumRecordsOutMap = new ConcurrentHashMap();
 
-    public KafkaSinkWriteMetrics(MetricGroup metricGroup) {
+    public DataSinkWriteMetrics(MetricGroup metricGroup) {
         this.metricGroup = metricGroup;
     }
 
@@ -54,8 +51,9 @@ public class KafkaSinkWriteMetrics {
                         tableId,
                         k ->
                                 metricGroup.counter(
-                                        tableId.identifier()
-                                                + IO_NUM_RECORDS_OUT_INCREMENTAL_INSERT));
+                                        String.format(
+                                                "%s_%s",
+                                                tableId.identifier(), IO_NUM_RECORDS_OUT_INSERT)));
         counter.inc();
     }
 
@@ -65,8 +63,9 @@ public class KafkaSinkWriteMetrics {
                         tableId,
                         k ->
                                 metricGroup.counter(
-                                        tableId.identifier()
-                                                + IO_NUM_RECORDS_OUT_INCREMENTAL_UPDATE));
+                                        String.format(
+                                                "%s_%s",
+                                                tableId.identifier(), IO_NUM_RECORDS_OUT_UPDATE)));
         counter.inc();
     }
 
@@ -76,8 +75,9 @@ public class KafkaSinkWriteMetrics {
                         tableId,
                         k ->
                                 metricGroup.counter(
-                                        tableId.identifier()
-                                                + IO_NUM_RECORDS_OUT_INCREMENTAL_DELETE));
+                                        String.format(
+                                                "%s_%s",
+                                                tableId.identifier(), IO_NUM_RECORDS_OUT_DELETE)));
         counter.inc();
     }
 }
