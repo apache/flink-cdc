@@ -172,7 +172,6 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
             emitLatestSchema(changeEvent.tableId());
             processedTableIds.add(changeEvent.tableId());
         }
-        processedTableIds.add(changeEvent.tableId());
         this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
                 .processElement(element);
     }
