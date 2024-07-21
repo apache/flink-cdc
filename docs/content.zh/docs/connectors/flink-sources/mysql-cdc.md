@@ -261,7 +261,7 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td> MySQL CDC 消费者可选的启动模式，
-         合法的模式为 "initial"，"earliest-offset"，"latest-offset"，"specific-offset" 和 "timestamp"。
+         合法的模式为 "initial"，"earliest-offset"，"latest-offset"，"specific-offset"，"timestamp" 和 "snapshot"。
            请查阅 <a href="#a-name-id-002-a">启动模式</a> 章节了解更多详细信息。</td>
     </tr>
     <tr>
@@ -629,6 +629,7 @@ MySQLSource.builder()
     .startupOptions(StartupOptions.specificOffset("mysql-bin.000003", 4L) // 从指定 binlog 文件名和位置启动
     .startupOptions(StartupOptions.specificOffset("24DA167-0C0C-11E8-8442-00059A3C7B00:1-19")) // 从 GTID 集合启动
     .startupOptions(StartupOptions.timestamp(1667232000000L) // 从时间戳启动
+    .startupOptions(StartupOptions.snapshot()) // 仅读取快照
     ...
     .build()
 ```
@@ -642,6 +643,7 @@ CREATE TABLE mysql_source (...) WITH (
     'scan.startup.mode' = 'latest-offset', -- 从最晚位点启动
     'scan.startup.mode' = 'specific-offset', -- 从特定位点启动
     'scan.startup.mode' = 'timestamp', -- 从特定位点启动
+    'scan.startup.mode' = 'snapshot', -- 仅读取快照
     'scan.startup.specific-offset.file' = 'mysql-bin.000003', -- 在特定位点启动模式下指定 binlog 文件名
     'scan.startup.specific-offset.pos' = '4', -- 在特定位点启动模式下指定 binlog 位置
     'scan.startup.specific-offset.gtid-set' = '24DA167-0C0C-11E8-8442-00059A3C7B00:1-19', -- 在特定位点启动模式下指定 GTID 集合
