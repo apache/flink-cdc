@@ -104,7 +104,8 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
             }
         }
         PaimonRecordSerializer<Event> serializer = new PaimonRecordEventSerializer(zoneId);
-        return new PaimonDataSink(options, tableOptions, commitUser, partitionMaps, serializer);
+        return new PaimonDataSink(
+                options, tableOptions, commitUser, partitionMaps, serializer, zoneId);
     }
 
     @Override
