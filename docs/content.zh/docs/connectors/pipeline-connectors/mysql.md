@@ -172,7 +172,7 @@ pipeline:
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td> MySQL CDC 消费者可选的启动模式，
-         合法的模式为 "initial"，"earliest-offset"，"latest-offset"，"specific-offset" 和 "timestamp"。</td>
+         合法的模式为 "initial"，"earliest-offset"，"latest-offset"，"specific-offset"，"timestamp" 和 ""snapshot"。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.file</td>
@@ -280,6 +280,7 @@ pipeline:
 - `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从 binlog 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
 - `specific-offset`：跳过快照阶段，从指定的 binlog 位点开始读取。位点可通过 binlog 文件名和位置指定，或者在 GTID 在集群上启用时通过 GTID 集合指定。
 - `timestamp`：跳过快照阶段，从指定的时间戳开始读取 binlog 事件。
+- `snapshot`: 只进行快照阶段，跳过增量阶段，快照阶段读取结束后退出。
 
 例如，可以在 YAML 配置文件中这样指定启动模式：
 
@@ -290,6 +291,7 @@ source:
   scan.startup.mode: latest-offset                      # Start from latest offset
   scan.startup.mode: specific-offset                    # Start from specific offset
   scan.startup.mode: timestamp                          # Start from timestamp
+  scan.startup.mode: snapshot                          # Read snapshot only
   scan.startup.specific-offset.file: 'mysql-bin.000003' # Binlog filename under specific offset startup mode
   scan.startup.specific-offset.pos: 4                   # Binlog position under specific offset mode
   scan.startup.specific-offset.gtid-set: 24DA167-...    # GTID set under specific offset startup mode
