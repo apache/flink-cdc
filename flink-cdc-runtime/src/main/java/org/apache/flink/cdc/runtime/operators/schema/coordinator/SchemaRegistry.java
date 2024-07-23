@@ -119,7 +119,6 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     public void start() throws Exception {
         LOG.info("Starting SchemaRegistry for {}.", operatorName);
         this.failedReasons.clear();
-        LOG.info("Started SchemaRegistry for {}.", operatorName);
     }
 
     @Override
