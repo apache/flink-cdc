@@ -36,7 +36,10 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.List;
 
-/** The TableInfo applies to cache schema change and fieldGetters. */
+/**
+ * PreTransformChangeInfo caches source / pre-transformed schema, source schema field getters, and
+ * binary record data generator for pre-transform schema.
+ */
 public class PreTransformChangeInfo {
     private TableId tableId;
     private Schema sourceSchema;

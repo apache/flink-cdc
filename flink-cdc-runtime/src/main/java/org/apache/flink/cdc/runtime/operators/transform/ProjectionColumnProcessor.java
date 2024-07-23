@@ -79,7 +79,7 @@ public class ProjectionColumnProcessor {
 
     private Object[] generateParams(BinaryRecordData after, long epochTime) {
         List<Object> params = new ArrayList<>();
-        List<Column> columns = tableInfo.getInputSchema().getColumns();
+        List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
         RecordData.FieldGetter[] fieldGetters = tableInfo.getPreTransformedFieldGetters();
         for (String originalColumnName : projectionColumn.getOriginalColumnNames()) {
             switch (originalColumnName) {
@@ -118,7 +118,7 @@ public class ProjectionColumnProcessor {
     private TransformExpressionKey generateTransformExpressionKey() {
         List<String> argumentNames = new ArrayList<>();
         List<Class<?>> paramTypes = new ArrayList<>();
-        List<Column> columns = tableInfo.getInputSchema().getColumns();
+        List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
         String scriptExpression = projectionColumn.getScriptExpression();
         List<String> originalColumnNames = projectionColumn.getOriginalColumnNames();
         for (String originalColumnName : originalColumnNames) {

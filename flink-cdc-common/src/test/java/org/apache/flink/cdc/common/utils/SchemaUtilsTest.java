@@ -180,140 +180,143 @@ public class SchemaUtilsTest {
     }
 
     @Test
-    public void testMergeDataType() {
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.BINARY(17), DataTypes.BINARY(17)))
+    public void testInferWiderType() {
+        Assertions.assertThat(
+                        SchemaUtils.inferWiderType(DataTypes.BINARY(17), DataTypes.BINARY(17)))
                 .isEqualTo(DataTypes.BINARY(17));
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(DataTypes.VARBINARY(17), DataTypes.VARBINARY(17)))
+                        SchemaUtils.inferWiderType(
+                                DataTypes.VARBINARY(17), DataTypes.VARBINARY(17)))
                 .isEqualTo(DataTypes.VARBINARY(17));
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.BYTES(), DataTypes.BYTES()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.BYTES(), DataTypes.BYTES()))
                 .isEqualTo(DataTypes.BYTES());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.BOOLEAN(), DataTypes.BOOLEAN()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.BOOLEAN(), DataTypes.BOOLEAN()))
                 .isEqualTo(DataTypes.BOOLEAN());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.INT(), DataTypes.INT()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.INT(), DataTypes.INT()))
                 .isEqualTo(DataTypes.INT());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.TINYINT(), DataTypes.TINYINT()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.TINYINT(), DataTypes.TINYINT()))
                 .isEqualTo(DataTypes.TINYINT());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.SMALLINT(), DataTypes.SMALLINT()))
+        Assertions.assertThat(
+                        SchemaUtils.inferWiderType(DataTypes.SMALLINT(), DataTypes.SMALLINT()))
                 .isEqualTo(DataTypes.SMALLINT());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.BIGINT(), DataTypes.BIGINT()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.BIGINT(), DataTypes.BIGINT()))
                 .isEqualTo(DataTypes.BIGINT());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.FLOAT(), DataTypes.FLOAT()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.FLOAT(), DataTypes.FLOAT()))
                 .isEqualTo(DataTypes.FLOAT());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.DOUBLE(), DataTypes.DOUBLE()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.DOUBLE(), DataTypes.DOUBLE()))
                 .isEqualTo(DataTypes.DOUBLE());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.CHAR(17), DataTypes.CHAR(17)))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.CHAR(17), DataTypes.CHAR(17)))
                 .isEqualTo(DataTypes.CHAR(17));
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(DataTypes.VARCHAR(17), DataTypes.VARCHAR(17)))
+                        SchemaUtils.inferWiderType(DataTypes.VARCHAR(17), DataTypes.VARCHAR(17)))
                 .isEqualTo(DataTypes.VARCHAR(17));
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.STRING(), DataTypes.STRING()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.STRING(), DataTypes.STRING()))
                 .isEqualTo(DataTypes.STRING());
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(
+                        SchemaUtils.inferWiderType(
                                 DataTypes.DECIMAL(17, 7), DataTypes.DECIMAL(17, 7)))
                 .isEqualTo(DataTypes.DECIMAL(17, 7));
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.DATE(), DataTypes.DATE()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.DATE(), DataTypes.DATE()))
                 .isEqualTo(DataTypes.DATE());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.TIME(), DataTypes.TIME()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.TIME(), DataTypes.TIME()))
                 .isEqualTo(DataTypes.TIME());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.TIME(6), DataTypes.TIME(6)))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.TIME(6), DataTypes.TIME(6)))
                 .isEqualTo(DataTypes.TIME(6));
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(DataTypes.TIMESTAMP(), DataTypes.TIMESTAMP()))
+                        SchemaUtils.inferWiderType(DataTypes.TIMESTAMP(), DataTypes.TIMESTAMP()))
                 .isEqualTo(DataTypes.TIMESTAMP());
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(DataTypes.TIMESTAMP(3), DataTypes.TIMESTAMP(3)))
+                        SchemaUtils.inferWiderType(DataTypes.TIMESTAMP(3), DataTypes.TIMESTAMP(3)))
                 .isEqualTo(DataTypes.TIMESTAMP(3));
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(
+                        SchemaUtils.inferWiderType(
                                 DataTypes.TIMESTAMP_TZ(), DataTypes.TIMESTAMP_TZ()))
                 .isEqualTo(DataTypes.TIMESTAMP_TZ());
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(
+                        SchemaUtils.inferWiderType(
                                 DataTypes.TIMESTAMP_TZ(3), DataTypes.TIMESTAMP_TZ(3)))
                 .isEqualTo(DataTypes.TIMESTAMP_TZ(3));
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(
+                        SchemaUtils.inferWiderType(
                                 DataTypes.TIMESTAMP_LTZ(), DataTypes.TIMESTAMP_LTZ()))
                 .isEqualTo(DataTypes.TIMESTAMP_LTZ());
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(
+                        SchemaUtils.inferWiderType(
                                 DataTypes.TIMESTAMP_LTZ(3), DataTypes.TIMESTAMP_LTZ(3)))
                 .isEqualTo(DataTypes.TIMESTAMP_LTZ(3));
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(
+                        SchemaUtils.inferWiderType(
                                 DataTypes.ARRAY(DataTypes.INT()), DataTypes.ARRAY(DataTypes.INT())))
                 .isEqualTo(DataTypes.ARRAY(DataTypes.INT()));
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(
+                        SchemaUtils.inferWiderType(
                                 DataTypes.MAP(DataTypes.INT(), DataTypes.STRING()),
                                 DataTypes.MAP(DataTypes.INT(), DataTypes.STRING())))
                 .isEqualTo(DataTypes.MAP(DataTypes.INT(), DataTypes.STRING()));
 
         // Test compatible widening cast
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.INT(), DataTypes.BIGINT()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.INT(), DataTypes.BIGINT()))
                 .isEqualTo(DataTypes.BIGINT());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.VARCHAR(17), DataTypes.STRING()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.VARCHAR(17), DataTypes.STRING()))
                 .isEqualTo(DataTypes.STRING());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.FLOAT(), DataTypes.DOUBLE()))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.FLOAT(), DataTypes.DOUBLE()))
                 .isEqualTo(DataTypes.DOUBLE());
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.INT(), DataTypes.DECIMAL(4, 0)))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.INT(), DataTypes.DECIMAL(4, 0)))
                 .isEqualTo(DataTypes.DECIMAL(10, 0));
-        Assertions.assertThat(SchemaUtils.mergeDataType(DataTypes.INT(), DataTypes.DECIMAL(10, 5)))
+        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.INT(), DataTypes.DECIMAL(10, 5)))
                 .isEqualTo(DataTypes.DECIMAL(15, 5));
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(DataTypes.BIGINT(), DataTypes.DECIMAL(10, 5)))
+                        SchemaUtils.inferWiderType(DataTypes.BIGINT(), DataTypes.DECIMAL(10, 5)))
                 .isEqualTo(DataTypes.DECIMAL(24, 5));
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(
+                        SchemaUtils.inferWiderType(
                                 DataTypes.DECIMAL(5, 4), DataTypes.DECIMAL(10, 2)))
                 .isEqualTo(DataTypes.DECIMAL(12, 4));
 
         // Test merging with nullability
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(
+                        SchemaUtils.inferWiderType(
                                 DataTypes.INT().notNull(), DataTypes.INT().notNull()))
                 .isEqualTo(DataTypes.INT().notNull());
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(
+                        SchemaUtils.inferWiderType(
                                 DataTypes.INT().nullable(), DataTypes.INT().notNull()))
                 .isEqualTo(DataTypes.INT().nullable());
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(
+                        SchemaUtils.inferWiderType(
                                 DataTypes.INT().notNull(), DataTypes.INT().nullable()))
                 .isEqualTo(DataTypes.INT().nullable());
         Assertions.assertThat(
-                        SchemaUtils.mergeDataType(
+                        SchemaUtils.inferWiderType(
                                 DataTypes.INT().nullable(), DataTypes.INT().nullable()))
                 .isEqualTo(DataTypes.INT().nullable());
 
         // incompatible type merges test
         Assertions.assertThatThrownBy(
-                        () -> SchemaUtils.mergeDataType(DataTypes.INT(), DataTypes.DOUBLE()))
+                        () -> SchemaUtils.inferWiderType(DataTypes.INT(), DataTypes.DOUBLE()))
                 .isExactlyInstanceOf(IllegalStateException.class);
 
         Assertions.assertThatThrownBy(
                         () ->
-                                SchemaUtils.mergeDataType(
+                                SchemaUtils.inferWiderType(
                                         DataTypes.DECIMAL(17, 0), DataTypes.DOUBLE()))
                 .isExactlyInstanceOf(IllegalStateException.class);
         Assertions.assertThatThrownBy(
-                        () -> SchemaUtils.mergeDataType(DataTypes.INT(), DataTypes.STRING()))
+                        () -> SchemaUtils.inferWiderType(DataTypes.INT(), DataTypes.STRING()))
                 .isExactlyInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    public void testMergeColumn() {
+    public void testInferWiderColumn() {
         // Test normal merges
         Assertions.assertThat(
-                        SchemaUtils.mergeColumn(
+                        SchemaUtils.inferWiderColumn(
                                 Column.physicalColumn("Column1", DataTypes.INT()),
                                 Column.physicalColumn("Column1", DataTypes.BIGINT())))
                 .isEqualTo(Column.physicalColumn("Column1", DataTypes.BIGINT()));
 
         Assertions.assertThat(
-                        SchemaUtils.mergeColumn(
+                        SchemaUtils.inferWiderColumn(
                                 Column.physicalColumn("Column2", DataTypes.FLOAT()),
                                 Column.physicalColumn("Column2", DataTypes.DOUBLE())))
                 .isEqualTo(Column.physicalColumn("Column2", DataTypes.DOUBLE()));
@@ -321,7 +324,7 @@ public class SchemaUtilsTest {
         // Test merging columns with incompatible types
         Assertions.assertThatThrownBy(
                         () ->
-                                SchemaUtils.mergeColumn(
+                                SchemaUtils.inferWiderColumn(
                                         Column.physicalColumn("Column3", DataTypes.INT()),
                                         Column.physicalColumn("Column3", DataTypes.STRING())))
                 .isExactlyInstanceOf(IllegalStateException.class);
@@ -329,17 +332,17 @@ public class SchemaUtilsTest {
         // Test merging with incompatible names
         Assertions.assertThatThrownBy(
                         () ->
-                                SchemaUtils.mergeColumn(
+                                SchemaUtils.inferWiderColumn(
                                         Column.physicalColumn("Column4", DataTypes.INT()),
                                         Column.physicalColumn("AnotherColumn4", DataTypes.INT())))
                 .isExactlyInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    public void testMergeSchema() {
+    public void testInferWiderSchema() {
         // Test normal merges
         Assertions.assertThat(
-                        SchemaUtils.mergeSchema(
+                        SchemaUtils.inferWiderSchema(
                                 Schema.newBuilder()
                                         .physicalColumn("Column1", DataTypes.INT())
                                         .physicalColumn("Column2", DataTypes.DOUBLE())
@@ -363,7 +366,7 @@ public class SchemaUtilsTest {
         // Test merging with incompatible types
         Assertions.assertThatThrownBy(
                         () ->
-                                SchemaUtils.mergeSchema(
+                                SchemaUtils.inferWiderSchema(
                                         Schema.newBuilder()
                                                 .physicalColumn("Column1", DataTypes.INT())
                                                 .physicalColumn("Column2", DataTypes.DOUBLE())
@@ -381,7 +384,7 @@ public class SchemaUtilsTest {
         // Test merging with incompatible column names
         Assertions.assertThatThrownBy(
                         () ->
-                                SchemaUtils.mergeSchema(
+                                SchemaUtils.inferWiderSchema(
                                         Schema.newBuilder()
                                                 .physicalColumn("Column1", DataTypes.INT())
                                                 .physicalColumn("Column2", DataTypes.DOUBLE())
@@ -399,7 +402,7 @@ public class SchemaUtilsTest {
         // Test merging with different column counts
         Assertions.assertThatThrownBy(
                         () ->
-                                SchemaUtils.mergeSchema(
+                                SchemaUtils.inferWiderSchema(
                                         Schema.newBuilder()
                                                 .physicalColumn("Column1", DataTypes.INT())
                                                 .physicalColumn("Column2", DataTypes.DOUBLE())
@@ -418,7 +421,7 @@ public class SchemaUtilsTest {
         // Test merging with incompatible schema metadata
         Assertions.assertThatThrownBy(
                         () ->
-                                SchemaUtils.mergeSchema(
+                                SchemaUtils.inferWiderSchema(
                                         Schema.newBuilder()
                                                 .physicalColumn("Column1", DataTypes.INT())
                                                 .physicalColumn("Column2", DataTypes.DOUBLE())

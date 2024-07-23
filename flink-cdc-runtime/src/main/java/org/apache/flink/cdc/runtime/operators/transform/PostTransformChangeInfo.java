@@ -26,13 +26,16 @@ import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
 import java.util.List;
 
-/** The TableInfo applies to cache schema and fieldGetters. */
+/**
+ * PostTransformChangeInfo caches pre-transformed / pre-transformed schema, schema field getters,
+ * and binary record data generator for post-transform schema.
+ */
 public class PostTransformChangeInfo {
     private TableId tableId;
+    private Schema preTransformedSchema;
     private Schema postTransformedSchema;
-    private RecordData.FieldGetter[] postTransformedFieldGetters;
-    private Schema inputSchema;
     private RecordData.FieldGetter[] preTransformedFieldGetters;
+    private RecordData.FieldGetter[] postTransformedFieldGetters;
     private BinaryRecordDataGenerator recordDataGenerator;
 
     public PostTransformChangeInfo(
@@ -45,7 +48,7 @@ public class PostTransformChangeInfo {
         this.tableId = tableId;
         this.postTransformedSchema = postTransformedSchema;
         this.postTransformedFieldGetters = postTransformedFieldGetters;
-        this.inputSchema = preTransformedSchema;
+        this.preTransformedSchema = preTransformedSchema;
         this.preTransformedFieldGetters = preTransformedFieldGetters;
         this.recordDataGenerator = recordDataGenerator;
     }
@@ -74,8 +77,8 @@ public class PostTransformChangeInfo {
         return postTransformedSchema;
     }
 
-    public Schema getInputSchema() {
-        return inputSchema;
+    public Schema getPreTransformedSchema() {
+        return preTransformedSchema;
     }
 
     public RecordData.FieldGetter[] getPostTransformedFieldGetters() {

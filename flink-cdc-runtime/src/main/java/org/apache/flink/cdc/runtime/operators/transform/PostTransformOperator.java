@@ -36,6 +36,7 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,11 +51,13 @@ import java.util.stream.Collectors;
  * projection.
  */
 public class PostTransformOperator extends AbstractStreamOperator<Event>
-        implements OneInputStreamOperator<Event, Event> {
+        implements OneInputStreamOperator<Event, Event>, Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private final String timezone;
     private final List<TransformRule> transformRules;
-    private transient List<PostTransformers> transforms;
+    private transient List<PostTransformer> transforms;
 
     /** keep the relationship of TableId and table information. */
     private final Map<TableId, PostTransformChangeInfo> postTransformChangeInfoMap;
@@ -140,7 +143,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                             new Selectors.SelectorsBuilder()
                                                     .includeTables(tableInclusions)
                                                     .build();
-                                    return new PostTransformers(
+                                    return new PostTransformer(
                                             selectors,
                                             TransformProjection.of(projection).orElse(null),
                                             TransformFilter.of(filterExpression).orElse(null));
@@ -190,7 +193,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         } else {
             schema =
                     SchemaUtils.applySchemaChangeEvent(
-                            getPostTransformChangeInfo(tableId).getInputSchema(), event);
+                            getPostTransformChangeInfo(tableId).getPreTransformedSchema(), event);
         }
 
         Schema projectedSchema = transformSchema(tableId, schema);
@@ -214,7 +217,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
 
     private Schema transformSchema(TableId tableId, Schema schema) throws Exception {
         List<Schema> newSchemas = new ArrayList<>();
-        for (PostTransformers transform : transforms) {
+        for (PostTransformer transform : transforms) {
             Selectors selectors = transform.getSelectors();
             if (selectors.isMatch(tableId) && transform.getProjection().isPresent()) {
                 TransformProjection transformProjection = transform.getProjection().get();
@@ -237,7 +240,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             return schema;
         }
 
-        return SchemaUtils.mergeCompatibleSchemas(newSchemas);
+        return SchemaUtils.inferWiderSchema(newSchemas);
     }
 
     private Optional<DataChangeEvent> processDataChangeEvent(DataChangeEvent dataChangeEvent)
@@ -246,7 +249,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         PostTransformChangeInfo tableInfo = getPostTransformChangeInfo(tableId);
         List<Optional<DataChangeEvent>> transformedDataChangeEventOptionalList = new ArrayList<>();
         long epochTime = System.currentTimeMillis();
-        for (PostTransformers transform : transforms) {
+        for (PostTransformer transform : transforms) {
             Selectors selectors = transform.getSelectors();
 
             if (selectors.isMatch(tableId)) {

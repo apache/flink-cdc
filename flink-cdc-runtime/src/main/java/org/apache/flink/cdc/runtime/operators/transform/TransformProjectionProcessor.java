@@ -114,7 +114,7 @@ public class TransformProjectionProcessor {
                                 column.getName(),
                                 column.getType(),
                                 payload,
-                                postTransformChangeInfo.getInputSchema().getColumns(),
+                                postTransformChangeInfo.getPreTransformedSchema().getColumns(),
                                 postTransformChangeInfo.getPreTransformedFieldGetters()));
             }
         }

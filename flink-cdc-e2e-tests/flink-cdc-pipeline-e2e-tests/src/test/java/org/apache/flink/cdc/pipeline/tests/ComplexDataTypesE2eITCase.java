@@ -46,6 +46,7 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -159,7 +160,7 @@ public class ComplexDataTypesE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testSyncWholeDatabase() throws Exception {
+    public void testComplexDataTypes() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -183,6 +184,7 @@ public class ComplexDataTypesE2eITCase extends PipelineTestEnvironment {
                                 + "transform:\n"
                                 + "  - source-table: %s.DATA_TYPES_TABLE\n"
                                 + "    projection: \\*, 'fine' AS FINE\n"
+                                + "    filter: id <> 3 AND id <> 4\n"
                                 + "pipeline:\n"
                                 + "  parallelism: 1",
                         MYSQL_TEST_USER,
@@ -200,11 +202,9 @@ public class ComplexDataTypesE2eITCase extends PipelineTestEnvironment {
         validateSinkResult(
                 complexDataTypesDatabase.getDatabaseName(),
                 "DATA_TYPES_TABLE",
-                4,
-                Arrays.asList(
-                        "1001 | 2012-12-21 17:00:02 | 100.00 | fine",
-                        "1002 | 2012-12-21 17:00:03 | 100.10 | fine",
-                        "1003 | 2012-12-21 17:00:05 | 100.86 | fine"));
+                52,
+                Collections.singletonList(
+                        "1 | 127 | 255 | 255 | 32767 | 65535 | 65535 | 8388607 | 16777215 | 16777215 | 2147483647 | 4294967295 | 4294967295 | 2147483647 | 9223372036854775807 | Hello World | abc | 123.102 | 123.102 | 123.103 | 123.104 | 404.4443 | 404.4444 | 404.4445 | 123.4567 | 123.4568 | 123.4569 | 346 | 34567892.1 | 0 | 1 | 1 | 2020-07-17 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22 | text | EA== | EA== | EA== | EA== | 2021 | red | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0} | {\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0} | {\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0} | fine"));
 
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
@@ -219,18 +219,37 @@ public class ComplexDataTypesE2eITCase extends PipelineTestEnvironment {
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stat = conn.createStatement()) {
 
-            stat.execute(
-                    "INSERT INTO DATA_TYPES_TABLE VALUES (1004, '2012-12-21 17:00:07', 110.37);");
+            // Insert id = 2, 3, 4, 5
+            for (int i = 2; i < 6; i++) {
+                stat.execute(
+                        "INSERT INTO DATA_TYPES_TABLE\n"
+                                + "VALUES ("
+                                + i
+                                + ", 127, 255, 255, 32767, 65535, 65535, 8388607, 16777215, 16777215, 2147483647,\n"
+                                + "        4294967295, 4294967295, 2147483647, 9223372036854775807,\n"
+                                + "        'Hello World', 'abc', 123.102, 123.102, 123.103, 123.104, 404.4443, 404.4444, 404.4445,\n"
+                                + "        123.4567, 123.4568, 123.4569, 345.6, 34567892.1, 0, 1, true,\n"
+                                + "        '2020-07-17',  '2020-07-17 18:00:22.123', '2020-07-17 18:00:22.123456', '2020-07-17 18:00:22',\n"
+                                + "        'text', UNHEX(HEX(16)), UNHEX(HEX(16)), UNHEX(HEX(16)), UNHEX(HEX(16)), 2021,\n"
+                                + "        'red',\n"
+                                + "        ST_GeomFromText('POINT(1 1)'),\n"
+                                + "        ST_GeomFromText('POLYGON((1 1, 2 1, 2 2,  1 2, 1 1))'),\n"
+                                + "        ST_GeomFromText('LINESTRING(3 0, 3 3, 3 5)'),\n"
+                                + "        ST_GeomFromText('POLYGON((1 1, 2 1, 2 2,  1 2, 1 1))'),\n"
+                                + "        ST_GeomFromText('MULTIPOINT((1 1),(2 2))'),\n"
+                                + "        ST_GeomFromText('MultiLineString((1 1,2 2,3 3),(4 4,5 5))'),\n"
+                                + "        ST_GeomFromText('MULTIPOLYGON(((0 0, 10 0, 10 10, 0 10, 0 0)), ((5 5, 7 5, 7 7, 5 7, 5 5)))'),\n"
+                                + "        ST_GeomFromText('GEOMETRYCOLLECTION(POINT(10 10), POINT(30 30), LINESTRING(15 15, 20 20))'));");
+            }
 
             validateSinkResult(
                     complexDataTypesDatabase.getDatabaseName(),
                     "DATA_TYPES_TABLE",
-                    4,
+                    52,
                     Arrays.asList(
-                            "1001 | 2012-12-21 17:00:02 | 100.00 | fine",
-                            "1002 | 2012-12-21 17:00:03 | 100.10 | fine",
-                            "1003 | 2012-12-21 17:00:05 | 100.86 | fine",
-                            "1004 | 2012-12-21 17:00:07 | 110.37 | fine"));
+                            "1 | 127 | 255 | 255 | 32767 | 65535 | 65535 | 8388607 | 16777215 | 16777215 | 2147483647 | 4294967295 | 4294967295 | 2147483647 | 9223372036854775807 | Hello World | abc | 123.102 | 123.102 | 123.103 | 123.104 | 404.4443 | 404.4444 | 404.4445 | 123.4567 | 123.4568 | 123.4569 | 346 | 34567892.1 | 0 | 1 | 1 | 2020-07-17 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22 | text | EA== | EA== | EA== | EA== | 2021 | red | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0} | {\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0} | {\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0} | fine",
+                            "2 | 127 | 255 | 255 | 32767 | 65535 | 65535 | 8388607 | 16777215 | 16777215 | 2147483647 | 4294967295 | 4294967295 | 2147483647 | 9223372036854775807 | Hello World | abc | 123.102 | 123.102 | 123.103 | 123.104 | 404.4443 | 404.4444 | 404.4445 | 123.4567 | 123.4568 | 123.4569 | 346 | 34567892.1 | 0 | 1 | 1 | 2020-07-17 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22 | text | EA== | EA== | EA== | EA== | 2021 | red | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0} | {\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0} | {\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0} | fine",
+                            "5 | 127 | 255 | 255 | 32767 | 65535 | 65535 | 8388607 | 16777215 | 16777215 | 2147483647 | 4294967295 | 4294967295 | 2147483647 | 9223372036854775807 | Hello World | abc | 123.102 | 123.102 | 123.103 | 123.104 | 404.4443 | 404.4444 | 404.4445 | 123.4567 | 123.4568 | 123.4569 | 346 | 34567892.1 | 0 | 1 | 1 | 2020-07-17 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22 | text | EA== | EA== | EA== | EA== | 2021 | red | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0} | {\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0} | {\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0} | fine"));
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
             throw e;
@@ -279,12 +298,17 @@ public class ComplexDataTypesE2eITCase extends PipelineTestEnvironment {
             String databaseName, String tableName, int columnCount, List<String> expected)
             throws Exception {
         long startWaitingTimestamp = System.currentTimeMillis();
+        List<String> results = new ArrayList<>();
         while (true) {
             if (System.currentTimeMillis() - startWaitingTimestamp
                     > TESTCASE_TIMEOUT_SECONDS * 1000) {
-                throw new RuntimeException("Doris backend startup timed out.");
+                LOG.error(
+                        "Failed to retrieve enough {} entries before timeout.\nResults for now: {}",
+                        expected.size(),
+                        results);
+                throw new RuntimeException("Failed to retrieve enough entries before timeout.");
             }
-            List<String> results = new ArrayList<>();
+            results.clear();
             try (Connection conn =
                             DriverManager.getConnection(
                                     DORIS.getJdbcUrl(databaseName, DORIS.getUsername()));

@@ -81,7 +81,7 @@ public class SchemaUtils {
     }
 
     /** Merge compatible upstream schemas. */
-    public static Schema mergeCompatibleSchemas(List<Schema> schemas) {
+    public static Schema inferWiderSchema(List<Schema> schemas) {
         if (schemas.isEmpty()) {
             return null;
         } else if (schemas.size() == 1) {
@@ -89,7 +89,7 @@ public class SchemaUtils {
         } else {
             Schema outputSchema = null;
             for (Schema schema : schemas) {
-                outputSchema = mergeSchema(outputSchema, schema);
+                outputSchema = inferWiderSchema(outputSchema, schema);
             }
             return outputSchema;
         }
@@ -97,7 +97,7 @@ public class SchemaUtils {
 
     /** Try to combine two schemas with potential incompatible type. */
     @VisibleForTesting
-    public static Schema mergeSchema(@Nullable Schema lSchema, Schema rSchema) {
+    public static Schema inferWiderSchema(@Nullable Schema lSchema, Schema rSchema) {
         if (lSchema == null) {
             return rSchema;
         }
@@ -137,7 +137,7 @@ public class SchemaUtils {
 
         List<Column> mergedColumns =
                 IntStream.range(0, lSchema.getColumnCount())
-                        .mapToObj(i -> mergeColumn(leftColumns.get(i), rightColumns.get(i)))
+                        .mapToObj(i -> inferWiderColumn(leftColumns.get(i), rightColumns.get(i)))
                         .collect(Collectors.toList());
 
         return lSchema.copy(mergedColumns);
@@ -145,7 +145,7 @@ public class SchemaUtils {
 
     /** Try to combine two columns with potential incompatible type. */
     @VisibleForTesting
-    public static Column mergeColumn(Column lColumn, Column rColumn) {
+    public static Column inferWiderColumn(Column lColumn, Column rColumn) {
         if (!Objects.equals(lColumn.getName(), rColumn.getName())) {
             throw new IllegalStateException(
                     String.format(
@@ -158,12 +158,12 @@ public class SchemaUtils {
                             "Unable to merge column %s and %s with different comments.",
                             lColumn, rColumn));
         }
-        return lColumn.copy(mergeDataType(lColumn.getType(), rColumn.getType()));
+        return lColumn.copy(inferWiderType(lColumn.getType(), rColumn.getType()));
     }
 
     /** Try to combine given data types to a compatible wider data type. */
     @VisibleForTesting
-    public static DataType mergeDataType(DataType lType, DataType rType) {
+    public static DataType inferWiderType(DataType lType, DataType rType) {
         // Ignore nullability during data type merge
         boolean nullable = lType.isNullable() || rType.isNullable();
         lType = lType.notNull();

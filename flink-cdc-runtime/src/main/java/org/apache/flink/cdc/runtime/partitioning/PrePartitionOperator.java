@@ -39,13 +39,14 @@ import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
 import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
 
+import java.io.Serializable;
 import java.time.Duration;
 import java.util.Optional;
 
 /** Operator for processing events from {@link SchemaOperator} before {@link EventPartitioner}. */
 @Internal
 public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEvent>
-        implements OneInputStreamOperator<Event, PartitioningEvent> {
+        implements OneInputStreamOperator<Event, PartitioningEvent>, Serializable {
 
     private static final long serialVersionUID = 1L;
     private static final Duration CACHE_EXPIRE_DURATION = Duration.ofDays(1);

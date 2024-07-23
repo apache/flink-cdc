@@ -360,7 +360,7 @@ class FlinkPipelineComposerITCase {
                 new TransformDef(
                         "default_namespace.default_schema.table1",
                         "*,concat(col1,'1') as col12",
-                        "col1 = '1'",
+                        "col1 = '1' OR col1 = '999'",
                         "col1",
                         "col12",
                         "key1=value1",

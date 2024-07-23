@@ -23,14 +23,14 @@ import javax.annotation.Nullable;
 
 import java.util.Optional;
 
-/** Transformation rules used by {@link PostTransformOperator}. */
-public class PostTransformers {
+/** Pre-Transformation rule used by {@link PreTransformOperator}. */
+public class PreTransformer {
     private final Selectors selectors;
 
     private final Optional<TransformProjection> projection;
     private final Optional<TransformFilter> filter;
 
-    public PostTransformers(
+    public PreTransformer(
             Selectors selectors,
             @Nullable TransformProjection projection,
             @Nullable TransformFilter filter) {

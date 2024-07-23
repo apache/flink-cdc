@@ -41,6 +41,7 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,10 +53,12 @@ import java.util.stream.Collectors;
  * A data process function that filters out columns which aren't (directly & indirectly) referenced.
  */
 public class PreTransformOperator extends AbstractStreamOperator<Event>
-        implements OneInputStreamOperator<Event, Event> {
+        implements OneInputStreamOperator<Event, Event>, Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private final List<TransformRule> transformRules;
-    private transient List<PreTransformers> transforms;
+    private transient List<PreTransformer> transforms;
     private final Map<TableId, PreTransformChangeInfo> preTransformChangeInfoMap;
     private final List<Tuple2<Selectors, SchemaMetadataTransform>> schemaMetadataTransformers;
     private transient ListState<byte[]> state;
@@ -120,7 +123,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             Selectors selectors =
                     new Selectors.SelectorsBuilder().includeTables(tableInclusions).build();
             transforms.add(
-                    new PreTransformers(
+                    new PreTransformer(
                             selectors,
                             TransformProjection.of(projection).orElse(null),
                             TransformFilter.of(filter).orElse(null)));
@@ -246,7 +249,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             }
         }
 
-        for (PreTransformers transform : transforms) {
+        for (PreTransformer transform : transforms) {
             Selectors selectors = transform.getSelectors();
             if (selectors.isMatch(tableId) && transform.getProjection().isPresent()) {
                 TransformProjection transformProjection = transform.getProjection().get();
@@ -292,7 +295,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private DataChangeEvent processDataChangeEvent(DataChangeEvent dataChangeEvent)
             throws Exception {
         TableId tableId = dataChangeEvent.tableId();
-        for (PreTransformers transform : transforms) {
+        for (PreTransformer transform : transforms) {
             Selectors selectors = transform.getSelectors();
 
             if (selectors.isMatch(tableId) && transform.getProjection().isPresent()) {
