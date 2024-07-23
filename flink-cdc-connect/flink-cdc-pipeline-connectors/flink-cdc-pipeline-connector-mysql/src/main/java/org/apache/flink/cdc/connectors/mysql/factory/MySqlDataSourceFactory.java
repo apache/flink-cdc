@@ -36,6 +36,7 @@ import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 import org.apache.flink.cdc.connectors.mysql.utils.OptionUtils;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.ObjectPath;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +61,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_MODE;
@@ -181,6 +183,25 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         }
         configFactory.tableList(capturedTables.toArray(new String[0]));
 
+        String chunkKeyColumns = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
+        for (String chunkKeyColumn : chunkKeyColumns.split(";")) {
+            String[] splits = chunkKeyColumn.split(":");
+            if (splits.length == 2) {
+                Selectors chunkKeySelector =
+                        new Selectors.SelectorsBuilder().includeTables(splits[0]).build();
+                List<ObjectPath> tableList =
+                        getChunkKeyColumnTableList(configFactory.createConfig(0), chunkKeySelector);
+                for (ObjectPath table : tableList) {
+                    LOG.info("Add chunkKeyColumn {} {}.", table, splits[1]);
+                    configFactory.chunkKeyColumn(table, splits[1]);
+                }
+            } else {
+                throw new IllegalArgumentException(
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key()
+                                + " is malformed, please refer to the documents");
+            }
+        }
+
         return new MySqlDataSource(configFactory);
     }
 
@@ -216,6 +237,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(CONNECTION_POOL_SIZE);
         options.add(HEARTBEAT_INTERVAL);
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
 
         options.add(CHUNK_META_GROUP_SIZE);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
@@ -240,6 +262,14 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         return MySqlSchemaUtils.listTables(sourceConfig, null).stream()
                 .filter(selectors::isMatch)
                 .map(TableId::toString)
+                .collect(Collectors.toList());
+    }
+
+    private static List<ObjectPath> getChunkKeyColumnTableList(
+            MySqlSourceConfig sourceConfig, Selectors selectors) {
+        return MySqlSchemaUtils.listTables(sourceConfig, null).stream()
+                .filter(selectors::isMatch)
+                .map(tableId -> new ObjectPath(tableId.getSchemaName(), tableId.getTableName()))
                 .collect(Collectors.toList());
     }
 
