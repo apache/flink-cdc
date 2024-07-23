@@ -40,6 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -49,7 +50,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static java.math.BigDecimal.ROUND_CEILING;
 import static org.apache.flink.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 
 /**
@@ -351,7 +351,9 @@ public class OracleChunkSplitter implements JdbcSourceChunkSplitter {
         // factor = (max - min + 1) / rowCount
         final BigDecimal subRowCnt = difference.add(BigDecimal.valueOf(1));
         double distributionFactor =
-                subRowCnt.divide(new BigDecimal(approximateRowCnt), 4, ROUND_CEILING).doubleValue();
+                subRowCnt
+                        .divide(new BigDecimal(approximateRowCnt), 4, RoundingMode.CEILING)
+                        .doubleValue();
         LOG.info(
                 "The distribution factor of table {} is {} according to the min split key {}, max split key {} and approximate row count {}",
                 tableId,
