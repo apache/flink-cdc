@@ -106,6 +106,9 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
                         .withEnv("FLINK_PROPERTIES", flinkProperties)
+                        .withFileSystemBind(
+                                temporaryFolder.getRoot().getPath(),
+                                temporaryFolder.getRoot().getPath())
                         .withLogConsumer(jobManagerConsumer);
         taskManagerConsumer = new ToStringConsumer();
         taskManager =
@@ -115,6 +118,9 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
                         .withEnv("FLINK_PROPERTIES", flinkProperties)
+                        .withFileSystemBind(
+                                temporaryFolder.getRoot().getPath(),
+                                temporaryFolder.getRoot().getPath())
                         .dependsOn(jobManager)
                         .withLogConsumer(taskManagerConsumer);
 

@@ -315,9 +315,9 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                     tableId,
                     getRuntimeContext().getIndexOfThisSubtask());
             output.collect(new StreamRecord<>(new FlushEvent(tableId)));
-            response.getSchemaChangeEvents().forEach(e -> output.collect(new StreamRecord<>(e)));
             // The request will block until flushing finished in each sink writer
             requestReleaseUpstream();
+            response.getSchemaChangeEvents().forEach(e -> output.collect(new StreamRecord<>(e)));
         }
     }
 
