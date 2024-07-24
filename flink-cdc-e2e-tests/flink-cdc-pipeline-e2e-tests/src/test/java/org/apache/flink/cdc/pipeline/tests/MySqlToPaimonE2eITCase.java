@@ -28,7 +28,6 @@ import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
@@ -40,7 +39,6 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -49,9 +47,7 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -63,7 +59,7 @@ import static org.junit.Assert.assertTrue;
 public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToPaimonE2eITCase.class);
 
-    public static final int TESTCASE_TIMEOUT_SECONDS = 60;
+    public static final int TESTCASE_TIMEOUT_MILLIS_SECONDS = 60_000;
 
     private TableEnvironment tEnv;
 
@@ -89,8 +85,6 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
 
     protected final UniqueDatabase mysqlInventoryDatabase =
             new UniqueDatabase(MYSQL, "mysql_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-
-    public MySqlToPaimonE2eITCase() throws IOException {}
 
     @BeforeClass
     public static void initializeContainers() {
@@ -153,7 +147,7 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
         LOG.info("Pipeline job is running");
         String query =
                 String.format(
-                        "SELECT * FROM %s.%s",
+                        "SELECT * FROM %s.%s ORDER BY id",
                         mysqlInventoryDatabase.getDatabaseName(), "products");
         validateSinkResult(
                 query,
@@ -212,7 +206,7 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
 
         query =
                 String.format(
-                        "SELECT * FROM %s.%s",
+                        "SELECT * FROM %s.%s ORDER BY id",
                         mysqlInventoryDatabase.getDatabaseName(), "customers");
         validateSinkResult(
                 query,
@@ -254,7 +248,7 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
         }
         query =
                 String.format(
-                        "SELECT * FROM %s.%s",
+                        "SELECT * FROM %s.%s ORDER BY id",
                         mysqlInventoryDatabase.getDatabaseName(), "products");
         validateSinkResult(
                 query,
@@ -349,23 +343,22 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
             try {
                 List<Row> results = new ArrayList<>();
                 tEnv.executeSql(query).collect().forEachRemaining(results::add);
-                assertEqualsInAnyOrder(expected, results);
+                assertEqualsInSameOrder(expected, results);
                 validateSucceed = true;
             } catch (Throwable e) {
                 if (System.currentTimeMillis() - startWaitingTimestamp
-                        > TESTCASE_TIMEOUT_SECONDS * 1000_1000L) {
+                        > TESTCASE_TIMEOUT_MILLIS_SECONDS) {
                     throw new RuntimeException("Failed to check result with given query.");
                 }
             }
         }
     }
 
-    private static void assertEqualsInAnyOrder(List<Row> expected, List<Row> actual) {
+    private static void assertEqualsInSameOrder(List<Row> expected, List<Row> actual) {
         assertTrue(expected != null && actual != null);
         assertEquals(expected.size(), actual.size());
-        Set<Row> expectedSet = new HashSet<>(expected);
-        for (Row row : actual) {
-            Assert.assertTrue(expectedSet.contains(row));
+        for (int i = 0; i < expected.size(); i++) {
+            assertEquals(expected.get(i), actual.get(i));
         }
     }
 }
