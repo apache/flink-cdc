@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -184,22 +185,24 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         configFactory.tableList(capturedTables.toArray(new String[0]));
 
         String chunkKeyColumns = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
-        for (String chunkKeyColumn : chunkKeyColumns.split(";")) {
-            String[] splits = chunkKeyColumn.split(":");
-            if (splits.length == 2) {
-                Selectors chunkKeySelector =
-                        new Selectors.SelectorsBuilder().includeTables(splits[0]).build();
-                List<ObjectPath> tableList =
-                        getChunkKeyColumnTableList(configFactory.createConfig(0), chunkKeySelector);
-                for (ObjectPath table : tableList) {
-                    LOG.info("Add chunkKeyColumn {} {}.", table, splits[1]);
-                    configFactory.chunkKeyColumn(table, splits[1]);
+        if (chunkKeyColumns != null) {
+            Map<ObjectPath, String> chunkKeyColumnMap = new HashMap<>();
+            for (String chunkKeyColumn : chunkKeyColumns.split(";")) {
+                String[] splits = chunkKeyColumn.split(":");
+                if (splits.length == 2) {
+                    Selectors chunkKeySelector =
+                            new Selectors.SelectorsBuilder().includeTables(splits[0]).build();
+                    List<ObjectPath> tableList =
+                            getChunkKeyColumnTableList(configFactory.createConfig(0), chunkKeySelector);
+                    for (ObjectPath table : tableList) {
+                        chunkKeyColumnMap.put(table, splits[1]);
+                    }
+                } else {
+                    throw new IllegalArgumentException(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key() + " is malformed, please refer to the documents");
                 }
-            } else {
-                throw new IllegalArgumentException(
-                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key()
-                                + " is malformed, please refer to the documents");
             }
+            LOG.info("Add chunkKeyColumn {}.", chunkKeyColumnMap);
+            configFactory.chunkKeyColumn(chunkKeyColumnMap);
         }
 
         return new MySqlDataSource(configFactory);
