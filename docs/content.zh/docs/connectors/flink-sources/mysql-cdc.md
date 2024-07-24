@@ -500,7 +500,7 @@ CREATE TABLE products (
 * （3）在快照读取之前，Source 不需要数据库锁权限。
 
 如果希望 source 并行运行，则每个并行 reader 都应该具有唯一的 server id，因此`server id`的范围必须类似于 `5400-6400`，
-且范围必须大于并行度。在增量快照读取过程中，MySQL CDC Source 首先通过表的主键将表划分成多个块（chunk），
+且范围必须大于并行度。在增量快照读取过程中，MySQL CDC Source 源首先会根据您指定的表块键将表分块(chunk）
 然后 MySQL CDC Source 将多个块分配给多个 reader 以并行读取表的数据。
 
 #### 并发读取
@@ -550,7 +550,7 @@ MySQL 集群中你监控的服务器出现故障后, 你只需将受监视的服
 
 当 MySQL CDC Source 启动时，它并行读取表的快照，然后以单并行度的方式读取表的 binlog。
 
-在快照阶段，根据表的主键和表行的大小将快照切割成多个快照块。
+在快照阶段，快照会根据表的分块键和表行的大小切割成多个快照块。
 快照块被分配给多个快照读取器。每个快照读取器使用 [区块读取算法](#snapshot-chunk-reading) 并将读取的数据发送到下游。
 Source 会管理块的进程状态（完成或未完成），因此快照阶段的 Source 可以支持块级别的 checkpoint。
 如果发生故障，可以恢复 Source 并继续从最后完成的块中读取块。
@@ -565,7 +565,9 @@ Flink 定期为 Source 执行 checkpoint，在故障转移的情况下，作业�
 
 在执行增量快照读取时，MySQL CDC source 需要一个用于分片的的算法。
 MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认情况下，MySQL CDC source 会识别表的主键列，并使用主键中的第一列作为用作分片列。
-如果表中没有主键， 增量快照读取将失败，你可以禁用 `scan.incremental.snapshot.enabled` 来回退到旧的快照读取机制。
+如果表中没有主键，用户必须指定 `scan.incremental.snapshot.chunk.key-column`、
+否则增量快照读取将失败，你可以禁用 `scan.incremental.snapshot.enabled` 恢复到旧的快照读取机制。
+请注意，使用不在主键中的列作为分块键可能会降低表的查询性能。
 
 对于数值和自动增量拆分列，MySQL CDC Source 按固定步长高效地拆分块。
 例如，如果你有一个主键列为`id`的表，它是自动增量 BIGINT 类型，最小值为`0`，最大值为`100`，
