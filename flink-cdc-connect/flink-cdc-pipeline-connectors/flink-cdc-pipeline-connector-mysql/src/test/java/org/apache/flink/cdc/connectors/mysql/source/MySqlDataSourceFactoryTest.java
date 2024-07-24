@@ -109,6 +109,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                 .isEqualTo(
                         Arrays.asList(
                                 inventoryDatabase.getDatabaseName() + ".customers",
+                                inventoryDatabase.getDatabaseName() + ".multi_max_table",
                                 inventoryDatabase.getDatabaseName() + ".products"));
     }
 
