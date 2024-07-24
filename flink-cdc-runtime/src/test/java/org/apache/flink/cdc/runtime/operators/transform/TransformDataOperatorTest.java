@@ -115,6 +115,25 @@ public class TransformDataOperatorTest {
                     .primaryKey("col1")
                     .build();
 
+    private static final TableId NULL_TABLEID =
+            TableId.tableId("my_company", "my_branch", "data_null");
+    private static final Schema NULL_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("colString", DataTypes.STRING())
+                    .physicalColumn("nullString", DataTypes.STRING())
+                    .physicalColumn("nullBoolean", DataTypes.BOOLEAN())
+                    .physicalColumn("nullTinyint", DataTypes.TINYINT())
+                    .physicalColumn("nullSmallint", DataTypes.SMALLINT())
+                    .physicalColumn("nullBigint", DataTypes.BIGINT())
+                    .physicalColumn("nullFloat", DataTypes.FLOAT())
+                    .physicalColumn("nullDouble", DataTypes.DOUBLE())
+                    .physicalColumn("nullChar", DataTypes.CHAR(1))
+                    .physicalColumn("nullVarchar", DataTypes.VARCHAR(1))
+                    .physicalColumn("nullDecimal", DataTypes.DECIMAL(4, 2))
+                    .primaryKey("col1")
+                    .build();
+
     private static final TableId CONDITION_TABLEID =
             TableId.tableId("my_company", "my_branch", "condition_table");
     private static final Schema CONDITION_SCHEMA =
@@ -556,6 +575,64 @@ public class TransformDataOperatorTest {
     }
 
     @Test
+    void testNullCastTransform() throws Exception {
+        TransformDataOperator transform =
+                TransformDataOperator.newBuilder()
+                        .addTransform(
+                                NULL_TABLEID.identifier(),
+                                "col1"
+                                        + ",colString"
+                                        + ",cast(colString as int) as nullString"
+                                        + ",cast(colString as boolean) as nullBoolean"
+                                        + ",cast(colString as tinyint) as nullTinyint"
+                                        + ",cast(colString as smallint) as nullSmallint"
+                                        + ",cast(colString as bigint) as nullBigint"
+                                        + ",cast(colString as float) as nullFloat"
+                                        + ",cast(colString as double) as nullDouble"
+                                        + ",cast(colString as char) as nullChar"
+                                        + ",cast(colString as varchar) as nullVarchar"
+                                        + ",cast(colString as DECIMAL(4,2)) as nullDecimal",
+                                null)
+                        .build();
+        EventOperatorTestHarness<TransformDataOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(NULL_TABLEID, NULL_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) NULL_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        NULL_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                }));
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(new CreateTableEvent(NULL_TABLEID, NULL_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEvent));
+    }
+
+    @Test
     void testBuildInFunctionTransform() throws Exception {
         testExpressionConditionTransform(
                 "TO_TIMESTAMP('1970-01-01 00:00:00') = TO_TIMESTAMP('1970-01-01', 'yyyy-MM-dd')");
@@ -602,6 +679,16 @@ public class TransformDataOperatorTest {
         testExpressionConditionTransform("cast('1' as char) = '1'");
         testExpressionConditionTransform("cast(col1 as varchar) = '1'");
         testExpressionConditionTransform("cast(col1 as DECIMAL(4,2)) = cast(1.0 as DECIMAL(4,2))");
+        testExpressionConditionTransform("cast(null as int) is null");
+        testExpressionConditionTransform("cast(null as boolean) is null");
+        testExpressionConditionTransform("cast(null as tinyint) is null");
+        testExpressionConditionTransform("cast(null as smallint) is null");
+        testExpressionConditionTransform("cast(null as bigint) is null");
+        testExpressionConditionTransform("cast(null as float) is null");
+        testExpressionConditionTransform("cast(null as double) is null");
+        testExpressionConditionTransform("cast(null as char) is null");
+        testExpressionConditionTransform("cast(null as varchar) is null");
+        testExpressionConditionTransform("cast(null as DECIMAL(4,2)) is null");
     }
 
     private void testExpressionConditionTransform(String expression) throws Exception {

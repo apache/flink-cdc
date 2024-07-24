@@ -281,6 +281,17 @@ public class TransformParserTest {
         testFilterExpression("cast(1 as decimal)", "castToBigDecimal(1)");
         testFilterExpression("cast(1 as char)", "castToString(1)");
         testFilterExpression("cast(1 as varchar)", "castToString(1)");
+        testFilterExpression("cast(null as int)", "castToInteger(null)");
+        testFilterExpression("cast(null as string)", "castToString(null)");
+        testFilterExpression("cast(null as boolean)", "castToBoolean(null)");
+        testFilterExpression("cast(null as tinyint)", "castToByte(null)");
+        testFilterExpression("cast(null as smallint)", "castToShort(null)");
+        testFilterExpression("cast(null as bigint)", "castToLong(null)");
+        testFilterExpression("cast(null as float)", "castToFloat(null)");
+        testFilterExpression("cast(null as double)", "castToDouble(null)");
+        testFilterExpression("cast(null as decimal)", "castToBigDecimal(null)");
+        testFilterExpression("cast(null as char)", "castToString(null)");
+        testFilterExpression("cast(null as varchar)", "castToString(null)");
     }
 
     private void testFilterExpression(String expression, String expressionExpect) {
