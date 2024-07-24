@@ -193,12 +193,15 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                     Selectors chunkKeySelector =
                             new Selectors.SelectorsBuilder().includeTables(splits[0]).build();
                     List<ObjectPath> tableList =
-                            getChunkKeyColumnTableList(configFactory.createConfig(0), chunkKeySelector);
+                            getChunkKeyColumnTableList(
+                                    configFactory.createConfig(0), chunkKeySelector);
                     for (ObjectPath table : tableList) {
                         chunkKeyColumnMap.put(table, splits[1]);
                     }
                 } else {
-                    throw new IllegalArgumentException(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key() + " is malformed, please refer to the documents");
+                    throw new IllegalArgumentException(
+                            SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key()
+                                    + " is malformed, please refer to the documents");
                 }
             }
             LOG.info("Add chunkKeyColumn {}.", chunkKeyColumnMap);
