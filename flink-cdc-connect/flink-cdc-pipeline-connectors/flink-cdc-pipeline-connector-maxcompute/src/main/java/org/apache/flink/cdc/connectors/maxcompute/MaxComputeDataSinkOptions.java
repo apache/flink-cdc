@@ -105,19 +105,4 @@ public class MaxComputeDataSinkOptions {
                     .intType()
                     .defaultValue(4)
                     .withDescription("The number of concurrent with flush bucket data.");
-
-    // extend options.
-
-    public static final ConfigOption<Integer> RETRY_TIMES =
-            ConfigOptions.key("retryTimes")
-                    .intType()
-                    .defaultValue(3)
-                    .withDescription(
-                            "Request the maximum number of retries from the MaxCompute server.");
-
-    public static final ConfigOption<Long> SLEEP_MILLIS =
-            ConfigOptions.key("sleepMillis")
-                    .longType()
-                    .defaultValue(1000L)
-                    .withDescription("Retry interval.");
 }

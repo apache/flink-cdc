@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.maxcompute.common.Constant;
 import org.apache.flink.cdc.connectors.maxcompute.common.SessionIdentifier;
 import org.apache.flink.cdc.connectors.maxcompute.common.UncheckedOdpsException;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
+import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 
 import com.aliyun.odps.Column;
 import com.aliyun.odps.Odps;
@@ -33,7 +34,7 @@ import com.aliyun.odps.TableSchema;
 import com.aliyun.odps.account.Account;
 import com.aliyun.odps.account.AliyunAccount;
 import com.aliyun.odps.account.StsAccount;
-import com.aliyun.odps.data.ArrayRecord;
+import com.aliyun.odps.tunnel.Configuration;
 import com.aliyun.odps.tunnel.TableTunnel;
 import com.aliyun.odps.tunnel.io.CompressOption;
 import org.slf4j.Logger;
@@ -67,10 +68,22 @@ public class MaxComputeUtils {
         return odps;
     }
 
-    public static TableTunnel getTunnel(MaxComputeOptions maxComputeOptions) {
+    public static TableTunnel getTunnel(
+            MaxComputeOptions maxComputeOptions, MaxComputeWriteOptions writeOptions) {
         Odps odps = getOdps(maxComputeOptions);
-        TableTunnel tunnel = new TableTunnel(odps);
-        tunnel.getConfig().setQuotaName(maxComputeOptions.getQuotaName());
+        Configuration configuration =
+                Configuration.builder(odps)
+                        .withRetryLogger(RetryUtils.getRetryLogger())
+                        .withRetryPolicy(new RetryUtils.FlinkDefaultRetryPolicy())
+                        .withCompressOptions(
+                                MaxComputeUtils.compressOptionOf(
+                                        writeOptions.getCompressAlgorithm()))
+                        .withQuotaName(maxComputeOptions.getQuotaName())
+                        .build();
+        TableTunnel tunnel = new TableTunnel(odps, configuration);
+        if (!StringUtils.isNullOrWhitespaceOnly(maxComputeOptions.getTunnelEndpoint())) {
+            tunnel.setEndpoint(maxComputeOptions.getTunnelEndpoint());
+        }
         return tunnel;
     }
 
@@ -120,24 +133,6 @@ public class MaxComputeUtils {
                                 + " , only support raw, zlib, lz4, snappy");
         }
         return new CompressOption(compressAlgorithm, 1, 0);
-    }
-
-    public static String debugString(ArrayRecord arrayRecord) {
-        if (arrayRecord == null) {
-            return "NULL";
-        }
-        StringBuilder sb = new StringBuilder();
-        for (Object o : arrayRecord.toArray()) {
-            if (o == null) {
-                sb.append("NULL").append(",");
-            } else if (o instanceof byte[]) {
-                sb.append(new String((byte[]) o)).append(o.getClass().getName()).append(",");
-            } else {
-                sb.append(o).append(o.getClass().getName()).append(",");
-            }
-        }
-        sb.setLength(sb.length() - 1);
-        return sb.toString();
     }
 
     public static boolean isTableExist(MaxComputeOptions maxComputeOptions, TableId tableId) {

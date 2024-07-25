@@ -35,50 +35,7 @@ public class MaxComputeOptions implements Serializable {
     private final String quotaName;
     private final String stsToken;
     private final int bucketSize;
-
-    /** builder for maxcompute options. */
-    public static class Builder {
-
-        private final String accessId;
-        private final String accessKey;
-        private final String endpoint;
-        private final String project;
-        private String tunnelEndpoint;
-        private String quotaName;
-        private String stsToken;
-        private int bucketSize = 16;
-
-        public Builder(String accessId, String accessKey, String endpoint, String project) {
-            this.accessId = accessId;
-            this.accessKey = accessKey;
-            this.endpoint = endpoint;
-            this.project = project;
-        }
-
-        public Builder withTunnelEndpoint(String tunnelEndpoint) {
-            this.tunnelEndpoint = tunnelEndpoint;
-            return this;
-        }
-
-        public Builder withQuotaName(String quotaName) {
-            this.quotaName = quotaName;
-            return this;
-        }
-
-        public Builder withStsToken(String stsToken) {
-            this.stsToken = stsToken;
-            return this;
-        }
-
-        public Builder withBucketSize(int bucketSize) {
-            this.bucketSize = bucketSize;
-            return this;
-        }
-
-        public MaxComputeOptions build() {
-            return new MaxComputeOptions(this);
-        }
-    }
+    private final String schemaOperatorUid;
 
     private MaxComputeOptions(Builder builder) {
         this.accessId = builder.accessId;
@@ -90,6 +47,12 @@ public class MaxComputeOptions implements Serializable {
         this.stsToken = builder.stsToken;
         this.bucketSize = builder.bucketSize;
         this.supportSchema = MaxComputeUtils.supportSchema(this);
+        this.schemaOperatorUid = builder.schemaOperatorUid;
+    }
+
+    public static Builder builder(
+            String accessId, String accessKey, String endpoint, String project) {
+        return new Builder(accessId, accessKey, endpoint, project);
     }
 
     public String getTunnelEndpoint() {
@@ -128,8 +91,57 @@ public class MaxComputeOptions implements Serializable {
         return bucketSize;
     }
 
-    public static Builder builder(
-            String accessId, String accessKey, String endpoint, String project) {
-        return new Builder(accessId, accessKey, endpoint, project);
+    public String getSchemaOperatorUid() {
+        return schemaOperatorUid;
+    }
+
+    /** builder for maxcompute options. */
+    public static class Builder {
+
+        private final String accessId;
+        private final String accessKey;
+        private final String endpoint;
+        private final String project;
+        private String tunnelEndpoint;
+        private String quotaName;
+        private String stsToken;
+        private String schemaOperatorUid;
+        private int bucketSize = 16;
+
+        public Builder(String accessId, String accessKey, String endpoint, String project) {
+            this.accessId = accessId;
+            this.accessKey = accessKey;
+            this.endpoint = endpoint;
+            this.project = project;
+        }
+
+        public Builder withTunnelEndpoint(String tunnelEndpoint) {
+            this.tunnelEndpoint = tunnelEndpoint;
+            return this;
+        }
+
+        public Builder withQuotaName(String quotaName) {
+            this.quotaName = quotaName;
+            return this;
+        }
+
+        public Builder withStsToken(String stsToken) {
+            this.stsToken = stsToken;
+            return this;
+        }
+
+        public Builder withBucketSize(int bucketSize) {
+            this.bucketSize = bucketSize;
+            return this;
+        }
+
+        public Builder withSchemaOperatorUid(String schemaOperatorUid) {
+            this.schemaOperatorUid = schemaOperatorUid;
+            return this;
+        }
+
+        public MaxComputeOptions build() {
+            return new MaxComputeOptions(this);
+        }
     }
 }

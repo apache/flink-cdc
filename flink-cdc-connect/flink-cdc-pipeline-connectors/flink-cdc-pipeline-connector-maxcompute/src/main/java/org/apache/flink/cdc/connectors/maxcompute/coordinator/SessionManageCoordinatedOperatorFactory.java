@@ -20,7 +20,6 @@ package org.apache.flink.cdc.connectors.maxcompute.coordinator;
 
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
-import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -38,22 +37,21 @@ public class SessionManageCoordinatedOperatorFactory extends AbstractStreamOpera
     private static final long serialVersionUID = 1L;
     private final MaxComputeOptions options;
     private final MaxComputeWriteOptions writeOptions;
-    private final MaxComputeExecutionOptions executionOptions;
+    private final String schemaOperatorUid;
 
     public SessionManageCoordinatedOperatorFactory(
             MaxComputeOptions options,
             MaxComputeWriteOptions writeOptions,
-            MaxComputeExecutionOptions executionOptions) {
+            String schemaOperatorUid) {
         this.options = options;
         this.writeOptions = writeOptions;
-        this.executionOptions = executionOptions;
+        this.schemaOperatorUid = schemaOperatorUid;
     }
 
     @Override
     public <T extends StreamOperator<Event>> T createStreamOperator(
             StreamOperatorParameters<Event> parameters) {
-        OperatorIDGenerator schemaOperatorIdGenerator =
-                new OperatorIDGenerator(executionOptions.getSchemaOperatorUid());
+        OperatorIDGenerator schemaOperatorIdGenerator = new OperatorIDGenerator(schemaOperatorUid);
         SessionManageOperator operator =
                 new SessionManageOperator(options, schemaOperatorIdGenerator.generate());
         TaskOperatorEventGateway taskOperatorEventGateway =
@@ -80,6 +78,6 @@ public class SessionManageCoordinatedOperatorFactory extends AbstractStreamOpera
     @Override
     public Provider getCoordinatorProvider(String operatorName, OperatorID operatorID) {
         return new SessionManageCoordinator.SessionManageCoordinatorProvider(
-                operatorName, operatorID, options, writeOptions, executionOptions);
+                operatorName, operatorID, options, writeOptions);
     }
 }

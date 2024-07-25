@@ -20,9 +20,46 @@ package org.apache.flink.cdc.connectors.maxcompute.options;
 
 import java.io.Serializable;
 
-/** write options for maxcompute. */
+/** extended options for maxcompute. */
 public class MaxComputeWriteOptions implements Serializable {
     private static final long serialVersionUID = 1L;
+    private final int flushConcurrent;
+    private final long maxBufferSize;
+    private final long slotBufferSize;
+    private final int numCommitThread;
+    private final String compressAlgorithm;
+
+    private MaxComputeWriteOptions(Builder builder) {
+        this.flushConcurrent = builder.flushConcurrent;
+        this.maxBufferSize = builder.maxBufferSize;
+        this.slotBufferSize = builder.slotBufferSize;
+        this.numCommitThread = builder.numCommitThread;
+        this.compressAlgorithm = builder.compressAlgorithm;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public int getFlushConcurrent() {
+        return flushConcurrent;
+    }
+
+    public long getMaxBufferSize() {
+        return maxBufferSize;
+    }
+
+    public long getSlotBufferSize() {
+        return slotBufferSize;
+    }
+
+    public int getNumCommitThread() {
+        return numCommitThread;
+    }
+
+    public String getCompressAlgorithm() {
+        return compressAlgorithm;
+    }
 
     /** builder for maxcompute write options. */
     public static class Builder {
@@ -60,43 +97,5 @@ public class MaxComputeWriteOptions implements Serializable {
         public MaxComputeWriteOptions build() {
             return new MaxComputeWriteOptions(this);
         }
-    }
-
-    private final int flushConcurrent;
-    private final long maxBufferSize;
-    private final long slotBufferSize;
-    private final int numCommitThread;
-    private final String compressAlgorithm;
-
-    private MaxComputeWriteOptions(Builder builder) {
-        this.flushConcurrent = builder.flushConcurrent;
-        this.maxBufferSize = builder.maxBufferSize;
-        this.slotBufferSize = builder.slotBufferSize;
-        this.numCommitThread = builder.numCommitThread;
-        this.compressAlgorithm = builder.compressAlgorithm;
-    }
-
-    public int getFlushConcurrent() {
-        return flushConcurrent;
-    }
-
-    public long getMaxBufferSize() {
-        return maxBufferSize;
-    }
-
-    public long getSlotBufferSize() {
-        return slotBufferSize;
-    }
-
-    public int getNumCommitThread() {
-        return numCommitThread;
-    }
-
-    public String getCompressAlgorithm() {
-        return compressAlgorithm;
-    }
-
-    public static Builder builder() {
-        return new Builder();
     }
 }

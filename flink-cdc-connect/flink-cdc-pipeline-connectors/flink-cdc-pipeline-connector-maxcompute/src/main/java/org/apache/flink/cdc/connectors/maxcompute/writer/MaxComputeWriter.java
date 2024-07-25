@@ -19,7 +19,6 @@
 package org.apache.flink.cdc.connectors.maxcompute.writer;
 
 import org.apache.flink.cdc.connectors.maxcompute.common.SessionIdentifier;
-import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
@@ -30,6 +29,18 @@ import java.io.IOException;
 
 /** the interface of all writer to write {@link ArrayRecord} to maxcompute. */
 public interface MaxComputeWriter {
+
+    static MaxComputeWriter batchWriter(
+            MaxComputeOptions options,
+            MaxComputeWriteOptions writeOptions,
+            SessionIdentifier sessionIdentifier)
+            throws IOException {
+        if (MaxComputeUtils.isTransactionalTable(options, sessionIdentifier)) {
+            return new BatchUpsertWriter(options, writeOptions, sessionIdentifier);
+        } else {
+            return new BatchAppendWriter(options, writeOptions, sessionIdentifier);
+        }
+    }
 
     SessionIdentifier getSessionIdentifier();
 
@@ -44,19 +55,4 @@ public interface MaxComputeWriter {
     void commit() throws IOException;
 
     String getId();
-
-    static MaxComputeWriter batchWriter(
-            MaxComputeOptions options,
-            MaxComputeWriteOptions writeOptions,
-            MaxComputeExecutionOptions executionOptions,
-            SessionIdentifier sessionIdentifier)
-            throws IOException {
-        if (MaxComputeUtils.isTransactionalTable(options, sessionIdentifier)) {
-            return new BatchUpsertWriter(
-                    options, writeOptions, executionOptions, sessionIdentifier);
-        } else {
-            return new BatchAppendWriter(
-                    options, writeOptions, executionOptions, sessionIdentifier);
-        }
-    }
 }
