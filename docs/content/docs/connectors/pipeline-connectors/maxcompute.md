@@ -186,20 +186,6 @@ pipeline:
       <td>Integer</td>
       <td>The number of buckets that can be written to MaxCompute simultaneously. This is effective only when writing to Delta tables.</td>
     </tr>
-    <tr>
-      <td>retryTimes</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">3</td>
-      <td>Integer</td>
-      <td>The number of retries in case of a network connection error.</td>
-    </tr>
-    <tr>
-      <td>sleepMillis</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Long</td>
-      <td>The waiting time for each retry in case of a network connection error, in milliseconds. </td>
-    </tr>
     </tbody>
 </table>    
 </div>
