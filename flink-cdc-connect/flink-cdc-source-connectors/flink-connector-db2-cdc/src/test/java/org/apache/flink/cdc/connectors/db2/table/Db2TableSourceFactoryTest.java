@@ -23,6 +23,7 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -45,7 +46,6 @@ import java.util.Map;
 import java.util.Properties;
 
 import static org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
-import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -271,7 +271,7 @@ public class Db2TableSourceFactoryTest {
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
                         CatalogTable.of(
-                                fromResolvedSchema(schema).toSchema(),
+                                Schema.newBuilder().fromResolvedSchema(schema).build(),
                                 "mock source",
                                 new ArrayList<>(),
                                 options),
