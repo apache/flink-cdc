@@ -190,20 +190,6 @@ pipeline:
       <td>Integer</td>
       <td>写入数据到MaxCompute时，能够同时写入的桶数量。仅写入 Delta 表时生效。</td>
     </tr>
-    <tr>
-      <td>retryTimes</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">3</td>
-      <td>Integer</td>
-      <td>当网络链接发生错误时，进行重试的次数。</td>
-    </tr>
-    <tr>
-      <td>sleepMillis</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Long</td>
-      <td>当网络链接发生错误时，每次重试等待的时间，单位毫秒。</td>
-    </tr>
     </tbody>
 </table>    
 </div>
