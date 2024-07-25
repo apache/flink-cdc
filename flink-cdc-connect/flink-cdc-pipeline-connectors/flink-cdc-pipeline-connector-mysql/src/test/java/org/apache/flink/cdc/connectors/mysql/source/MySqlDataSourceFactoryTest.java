@@ -253,13 +253,17 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
         options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".\\.*");
         options.put(
                 SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key(),
-                inventoryDatabase.getDatabaseName() + ".multi_max_\\.*:order_id");
+                inventoryDatabase.getDatabaseName()
+                        + ".multi_max_\\.*:order_id;"
+                        + inventoryDatabase.getDatabaseName()
+                        + ".products:id;");
         Factory.Context context = new MockContext(Configuration.fromMap(options));
 
         MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
         MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
         ObjectPath multiMaxTable =
                 new ObjectPath(inventoryDatabase.getDatabaseName(), "multi_max_table");
+        ObjectPath productsTable = new ObjectPath(inventoryDatabase.getDatabaseName(), "products");
 
         assertThat(dataSource.getSourceConfig().getChunkKeyColumns())
                 .isNotEmpty()
@@ -267,6 +271,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                         new HashMap<ObjectPath, String>() {
                             {
                                 put(multiMaxTable, "order_id");
+                                put(productsTable, "id");
                             }
                         });
     }
