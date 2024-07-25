@@ -253,7 +253,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
         options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".\\.*");
         options.put(
                 SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key(),
-                inventoryDatabase.getDatabaseName() + ".multi_max_table:order_id");
+                inventoryDatabase.getDatabaseName() + ".multi_max_\\.*:order_id");
         Factory.Context context = new MockContext(Configuration.fromMap(options));
 
         MySqlDataSourceFactory factory = new MySqlDataSourceFactory();

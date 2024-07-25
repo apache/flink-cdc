@@ -222,8 +222,7 @@ public class MySqlDataSourceOptions {
                     .withDescription(
                             "The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table."
                                     + "By default, the chunk key is the first column of the primary key."
-                                    + "This column must be a column of the primary key."
-                                    + "eg. db0.table1:col1;db0.table2:col2;");
+                                    + "eg. db1.user_table_[0-9]+:col1;db[1-2].[app|web]_order_\\.*:col2;");
 
     @Experimental
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED =
