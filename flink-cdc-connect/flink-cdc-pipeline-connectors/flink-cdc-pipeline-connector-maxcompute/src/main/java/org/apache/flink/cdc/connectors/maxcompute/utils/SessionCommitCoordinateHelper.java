@@ -69,8 +69,6 @@ public class SessionCommitCoordinateHelper {
     private static final Logger LOG = LoggerFactory.getLogger(SessionCommitCoordinateHelper.class);
     private final Queue<String>[] toCommitSessionIds;
     private final Map<String, CompletableFuture<CoordinationResponse>> toCommitFutures;
-    private boolean isCommitting;
-
     /**
      * If any string is {@link Constant#END_OF_SESSION}, it should be considered larger than any
      * other non-{@link Constant#END_OF_SESSION} string.
@@ -88,6 +86,8 @@ public class SessionCommitCoordinateHelper {
                 }
                 return a.compareTo(b);
             };
+
+    private boolean isCommitting;
 
     public SessionCommitCoordinateHelper(int parallelism) {
         Preconditions.checkArgument(parallelism > 0);

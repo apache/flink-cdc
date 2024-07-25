@@ -18,38 +18,39 @@
 
 package org.apache.flink.cdc.connectors.maxcompute;
 
+import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
-import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 import org.apache.flink.cdc.connectors.maxcompute.sink.MaxComputeEventSink;
+import org.apache.flink.cdc.connectors.maxcompute.sink.MaxComputeHashFunctionProvider;
 
 /** A {@link DataSink} for "MaxCompute" connector. */
 public class MaxComputeDataSink implements DataSink {
     private final MaxComputeOptions options;
     private final MaxComputeWriteOptions writeOptions;
-    private final MaxComputeExecutionOptions executionOptions;
 
-    public MaxComputeDataSink(
-            MaxComputeOptions options,
-            MaxComputeWriteOptions writeOptions,
-            MaxComputeExecutionOptions executionOptions) {
+    public MaxComputeDataSink(MaxComputeOptions options, MaxComputeWriteOptions writeOptions) {
         this.options = options;
         this.writeOptions = writeOptions;
-        this.executionOptions = executionOptions;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        return FlinkSinkProvider.of(
-                new MaxComputeEventSink(options, writeOptions, executionOptions));
+        return FlinkSinkProvider.of(new MaxComputeEventSink(options, writeOptions));
     }
 
     @Override
     public MetadataApplier getMetadataApplier() {
         return new MaxComputeMetadataApplier(options);
+    }
+
+    @Override
+    public HashFunctionProvider<DataChangeEvent> getDataChangeEventHashFunctionProvider() {
+        return new MaxComputeHashFunctionProvider(options);
     }
 }

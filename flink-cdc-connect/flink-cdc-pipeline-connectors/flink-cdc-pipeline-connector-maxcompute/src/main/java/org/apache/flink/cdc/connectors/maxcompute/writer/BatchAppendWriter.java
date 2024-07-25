@@ -20,12 +20,12 @@ package org.apache.flink.cdc.connectors.maxcompute.writer;
 
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.maxcompute.common.SessionIdentifier;
-import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
+import org.apache.flink.cdc.connectors.maxcompute.common.UncheckedOdpsException;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
-import org.apache.flink.cdc.connectors.maxcompute.utils.RetryUtils;
 
+import com.aliyun.odps.OdpsException;
 import com.aliyun.odps.PartitionSpec;
 import com.aliyun.odps.data.ArrayRecord;
 import com.aliyun.odps.data.RecordWriter;
@@ -49,7 +49,6 @@ public class BatchAppendWriter implements MaxComputeWriter {
 
     private final MaxComputeOptions options;
     private final MaxComputeWriteOptions writeOptions;
-    private final MaxComputeExecutionOptions executionOptions;
     private final SessionIdentifier sessionIdentifier;
     private final TableTunnel tunnel;
     private TableTunnel.UploadSession uploadSession;
@@ -58,52 +57,45 @@ public class BatchAppendWriter implements MaxComputeWriter {
     public BatchAppendWriter(
             MaxComputeOptions options,
             MaxComputeWriteOptions writeOptions,
-            MaxComputeExecutionOptions executionOptions,
-            SessionIdentifier sessionIdentifier)
-            throws IOException {
+            SessionIdentifier sessionIdentifier) {
         this.options = options;
         this.writeOptions = writeOptions;
-        this.executionOptions = executionOptions;
 
-        this.tunnel = MaxComputeUtils.getTunnel(options);
+        this.tunnel = MaxComputeUtils.getTunnel(options, writeOptions);
         this.sessionIdentifier = sessionIdentifier;
 
         LOG.info("sink writer reload session: {}", sessionIdentifier);
         initOrReloadSession(sessionIdentifier);
     }
 
-    private void initOrReloadSession(SessionIdentifier identifier) throws IOException {
+    private void initOrReloadSession(SessionIdentifier identifier) {
         String partitionSpec = identifier.getPartitionName();
         String sessionId = identifier.getSessionId();
 
-        RetryUtils.execute(
-                () -> {
-                    if (StringUtils.isNullOrWhitespaceOnly(identifier.getSessionId())) {
-                        this.uploadSession =
-                                tunnel.createUploadSession(
-                                        identifier.getProject(),
-                                        identifier.getSchema(),
-                                        identifier.getTable(),
-                                        new PartitionSpec(partitionSpec),
-                                        false);
-                    } else {
-                        this.uploadSession =
-                                tunnel.getUploadSession(
-                                        identifier.getProject(),
-                                        identifier.getSchema(),
-                                        identifier.getTable(),
-                                        new PartitionSpec(partitionSpec),
-                                        sessionId,
-                                        false);
-                    }
-                    this.recordWriter =
-                            uploadSession.openBufferedWriter(
-                                    MaxComputeUtils.compressOptionOf(
-                                            writeOptions.getCompressAlgorithm()));
-                    return null;
-                },
-                executionOptions.getMaxRetries(),
-                executionOptions.getRetryIntervalMillis());
+        try {
+            if (StringUtils.isNullOrWhitespaceOnly(identifier.getSessionId())) {
+                this.uploadSession =
+                        tunnel.createUploadSession(
+                                identifier.getProject(),
+                                identifier.getSchema(),
+                                identifier.getTable(),
+                                new PartitionSpec(partitionSpec),
+                                false);
+            } else {
+                this.uploadSession =
+                        tunnel.getUploadSession(
+                                identifier.getProject(),
+                                identifier.getSchema(),
+                                identifier.getTable(),
+                                new PartitionSpec(partitionSpec),
+                                sessionId);
+            }
+            this.recordWriter =
+                    uploadSession.openBufferedWriter(
+                            MaxComputeUtils.compressOptionOf(writeOptions.getCompressAlgorithm()));
+        } catch (OdpsException e) {
+            throw new UncheckedOdpsException(e);
+        }
     }
 
     @Override

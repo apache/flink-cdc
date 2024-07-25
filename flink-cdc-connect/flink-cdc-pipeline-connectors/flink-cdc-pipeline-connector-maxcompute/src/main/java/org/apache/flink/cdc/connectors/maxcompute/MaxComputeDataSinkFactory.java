@@ -23,7 +23,6 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
-import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 import org.apache.flink.configuration.MemorySize;
@@ -38,16 +37,16 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
 
     @Override
     public DataSink createDataSink(Context context) {
-        MaxComputeOptions options = extractMaxComputeOptions(context.getFactoryConfiguration());
+        MaxComputeOptions options =
+                extractMaxComputeOptions(
+                        context.getFactoryConfiguration(), context.getPipelineConfiguration());
         MaxComputeWriteOptions writeOptions =
                 extractMaxComputeWriteOptions(context.getFactoryConfiguration());
-        MaxComputeExecutionOptions executionOptions =
-                extractMaxComputeExecutionOptions(
-                        context.getFactoryConfiguration(), context.getPipelineConfiguration());
-        return new MaxComputeDataSink(options, writeOptions, executionOptions);
+        return new MaxComputeDataSink(options, writeOptions);
     }
 
-    private MaxComputeOptions extractMaxComputeOptions(Configuration factoryConfiguration) {
+    private MaxComputeOptions extractMaxComputeOptions(
+            Configuration factoryConfiguration, Configuration pipelineConfiguration) {
         String accessId = factoryConfiguration.get(MaxComputeDataSinkOptions.ACCESS_ID);
         String accessKey = factoryConfiguration.get(MaxComputeDataSinkOptions.ACCESS_KEY);
         String endpoint = factoryConfiguration.get(MaxComputeDataSinkOptions.ENDPOINT);
@@ -56,11 +55,15 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
         String quotaName = factoryConfiguration.get(MaxComputeDataSinkOptions.QUOTA_NAME);
         String stsToken = factoryConfiguration.get(MaxComputeDataSinkOptions.STS_TOKEN);
         int bucketSize = factoryConfiguration.get(MaxComputeDataSinkOptions.BUCKETS_NUM);
+
+        String schemaOperatorUid =
+                pipelineConfiguration.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
         return MaxComputeOptions.builder(accessId, accessKey, endpoint, project)
                 .withTunnelEndpoint(tunnelEndpoint)
                 .withQuotaName(quotaName)
                 .withStsToken(stsToken)
                 .withBucketSize(bucketSize)
+                .withSchemaOperatorUid(schemaOperatorUid)
                 .build();
     }
 
@@ -89,19 +92,6 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
                 .withFlushConcurrent(flushConcurrent)
                 .withMaxBufferSize(maxBufferSize)
                 .withSlotBufferSize(maxSlotSize)
-                .build();
-    }
-
-    private MaxComputeExecutionOptions extractMaxComputeExecutionOptions(
-            Configuration factoryConfiguration, Configuration pipelineConfiguration) {
-        int maxRetries = factoryConfiguration.get(MaxComputeDataSinkOptions.RETRY_TIMES);
-        long retryIntervalMillis = factoryConfiguration.get(MaxComputeDataSinkOptions.SLEEP_MILLIS);
-        String schemaOperatorUid =
-                pipelineConfiguration.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
-        return MaxComputeExecutionOptions.builder()
-                .withMaxRetries(maxRetries)
-                .withRetryIntervalMillis(retryIntervalMillis)
-                .withPipelineSchemaOperatorUid(schemaOperatorUid)
                 .build();
     }
 
@@ -134,9 +124,7 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(MaxComputeDataSinkOptions.NUM_FLUSH_CONCURRENT);
         optionalOptions.add(MaxComputeDataSinkOptions.TOTAL_BATCH_SIZE);
         optionalOptions.add(MaxComputeDataSinkOptions.BUCKET_BATCH_SIZE);
-        // execute options
-        optionalOptions.add(MaxComputeDataSinkOptions.RETRY_TIMES);
-        optionalOptions.add(MaxComputeDataSinkOptions.SLEEP_MILLIS);
+
         return optionalOptions;
     }
 }
