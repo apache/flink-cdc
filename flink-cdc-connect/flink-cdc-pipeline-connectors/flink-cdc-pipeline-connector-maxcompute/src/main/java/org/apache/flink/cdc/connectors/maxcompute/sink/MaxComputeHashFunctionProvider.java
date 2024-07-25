@@ -96,7 +96,7 @@ public class MaxComputeHashFunctionProvider implements HashFunctionProvider<Data
                     .forEach(
                             primaryKeyPosition ->
                                     fieldGetters.add(
-                                            RecordData.createFieldGetter(
+                                            TypeConvertUtils.createFieldGetter(
                                                     schema.getColumns()
                                                             .get(primaryKeyPosition)
                                                             .getType(),
