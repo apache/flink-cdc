@@ -51,7 +51,6 @@ import org.apache.flink.cdc.connectors.maxcompute.common.SessionIdentifier;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.SessionManageOperator;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CommitSessionRequest;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CommitSessionResponse;
-import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
@@ -79,19 +78,16 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
     private final Sink.InitContext context;
     private final MaxComputeOptions options;
     private final MaxComputeWriteOptions writeOptions;
-    private final MaxComputeExecutionOptions executionOptions;
     private final Map<String, MaxComputeWriter> writerMap;
     private final Map<TableId, Schema> schemaCache;
 
     public MaxComputeEventWriter(
             MaxComputeOptions options,
             MaxComputeWriteOptions writeOptions,
-            MaxComputeExecutionOptions executionOptions,
             Sink.InitContext context) {
         this.context = context;
         this.options = options;
         this.writeOptions = writeOptions;
-        this.executionOptions = executionOptions;
 
         this.writerMap = new HashMap<>();
         this.schemaCache = new HashMap<>();
@@ -117,8 +113,7 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
                                 sessionId);
                 writerMap.put(
                         sessionId,
-                        MaxComputeWriter.batchWriter(
-                                options, writeOptions, executionOptions, sessionIdentifier));
+                        MaxComputeWriter.batchWriter(options, writeOptions, sessionIdentifier));
             }
             MaxComputeWriter writer = writerMap.get(sessionId);
             ArrayRecord record = writer.newElement();

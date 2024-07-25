@@ -26,7 +26,6 @@ import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CommitSess
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CreateSessionRequest;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.CreateSessionResponse;
 import org.apache.flink.cdc.connectors.maxcompute.coordinator.message.WaitForFlushSuccessRequest;
-import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
@@ -69,7 +68,6 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
     private final String operatorName;
     private final MaxComputeOptions options;
     private final MaxComputeWriteOptions writeOptions;
-    private final MaxComputeExecutionOptions executionOptions;
     private final int parallelism;
     private SessionCommitCoordinateHelper sessionCommitCoordinateHelper;
     private Map<SessionIdentifier, MaxComputeWriter> sessionCache;
@@ -81,13 +79,11 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
             String operatorName,
             Context context,
             MaxComputeOptions options,
-            MaxComputeWriteOptions writeOptions,
-            MaxComputeExecutionOptions executionOptions) {
+            MaxComputeWriteOptions writeOptions) {
         this.operatorName = operatorName;
         this.parallelism = context.currentParallelism();
         this.options = options;
         this.writeOptions = writeOptions;
-        this.executionOptions = executionOptions;
     }
 
     @Override
@@ -126,14 +122,11 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
                                 identifier.getTable(),
                                 partitionName);
                         return null;
-                    },
-                    executionOptions.getMaxRetries(),
-                    executionOptions.getRetryIntervalMillis());
+                    });
         }
         try {
             MaxComputeWriter writer =
-                    MaxComputeWriter.batchWriter(
-                            options, writeOptions, executionOptions, identifier);
+                    MaxComputeWriter.batchWriter(options, writeOptions, identifier);
             LOG.info("Create session for table {}, sessionId {}.", identifier, writer.getId());
             return writer;
         } catch (IOException e) {
@@ -217,13 +210,7 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
                     executor.submit(
                             () -> {
                                 try {
-                                    RetryUtils.execute(
-                                            () -> {
-                                                writer.commit();
-                                                return null;
-                                            },
-                                            executionOptions.getMaxRetries(),
-                                            executionOptions.getRetryIntervalMillis());
+                                    writer.commit();
                                 } catch (Throwable throwable) {
                                     ExceptionUtils.rethrowIfFatalErrorOrOOM(throwable);
                                     LOG.warn(
@@ -283,20 +270,17 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
         private final String operatorName;
         private final MaxComputeOptions options;
         private final MaxComputeWriteOptions writeOptions;
-        private final MaxComputeExecutionOptions executionOptions;
 
         public SessionManageCoordinatorProvider(
                 String operatorName,
                 OperatorID operatorID,
                 MaxComputeOptions options,
-                MaxComputeWriteOptions writeOptions,
-                MaxComputeExecutionOptions executionOptions) {
+                MaxComputeWriteOptions writeOptions) {
             this.operatorName = operatorName;
             this.operatorID = operatorID;
 
             this.options = options;
             this.writeOptions = writeOptions;
-            this.executionOptions = executionOptions;
         }
 
         /** Gets the ID of the operator to which the coordinator belongs. */
@@ -312,8 +296,7 @@ public class SessionManageCoordinator implements OperatorCoordinator, Coordinati
          */
         @Override
         public OperatorCoordinator create(Context context) throws Exception {
-            return new SessionManageCoordinator(
-                    operatorName, context, options, writeOptions, executionOptions);
+            return new SessionManageCoordinator(operatorName, context, options, writeOptions);
         }
     }
 }

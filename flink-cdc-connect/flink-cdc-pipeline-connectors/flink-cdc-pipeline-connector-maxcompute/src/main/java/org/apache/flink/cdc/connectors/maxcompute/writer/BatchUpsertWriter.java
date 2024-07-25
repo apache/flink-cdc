@@ -19,26 +19,22 @@
 package org.apache.flink.cdc.connectors.maxcompute.writer;
 
 import org.apache.flink.cdc.connectors.maxcompute.common.SessionIdentifier;
-import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeExecutionOptions;
+import org.apache.flink.cdc.connectors.maxcompute.common.UncheckedOdpsException;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
-import org.apache.flink.cdc.connectors.maxcompute.utils.RetryUtils;
 
 import com.aliyun.odps.OdpsException;
 import com.aliyun.odps.data.ArrayRecord;
 import com.aliyun.odps.tunnel.TableTunnel;
-import com.aliyun.odps.tunnel.impl.ConfigurationImpl;
+import com.aliyun.odps.tunnel.TunnelException;
 import com.aliyun.odps.tunnel.impl.UpsertSessionImpl;
 import com.aliyun.odps.tunnel.impl.UpsertSessionImpl.Builder;
 import com.aliyun.odps.tunnel.streams.UpsertStream;
-import com.aliyun.odps.tunnel.streams.UpsertStream.FlushResult;
-import com.aliyun.odps.tunnel.streams.UpsertStream.Listener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * MaxCompute upsert writer, use {@link UpsertSessionImpl} and {@link UpsertStream} to write data.
@@ -50,7 +46,6 @@ public class BatchUpsertWriter implements MaxComputeWriter {
 
     private final MaxComputeOptions options;
     private final MaxComputeWriteOptions writeOptions;
-    private final MaxComputeExecutionOptions executionOptions;
     private final SessionIdentifier sessionIdentifier;
     private final TableTunnel tunnel;
     private UpsertSessionImpl upsertSession;
@@ -59,14 +54,12 @@ public class BatchUpsertWriter implements MaxComputeWriter {
     public BatchUpsertWriter(
             MaxComputeOptions options,
             MaxComputeWriteOptions writeOptions,
-            MaxComputeExecutionOptions executionOptions,
             SessionIdentifier sessionIdentifier)
             throws IOException {
         this.options = options;
         this.writeOptions = writeOptions;
-        this.executionOptions = executionOptions;
 
-        this.tunnel = MaxComputeUtils.getTunnel(options);
+        this.tunnel = MaxComputeUtils.getTunnel(options, writeOptions);
         this.sessionIdentifier = sessionIdentifier;
 
         initOrReloadSession(sessionIdentifier);
@@ -75,62 +68,30 @@ public class BatchUpsertWriter implements MaxComputeWriter {
     private void initOrReloadSession(SessionIdentifier identifier) throws IOException {
         String partitionSpec = identifier.getPartitionName();
         String sessionId = identifier.getSessionId();
-        Listener listener =
-                new Listener() {
-                    @Override
-                    public void onFlush(FlushResult result) {
-                        // metrics here
-                    }
-
-                    @Override
-                    public boolean onFlushFail(String error, int retry) {
-                        LOG.error("Flush failed error: {}", error);
-                        if (retry > executionOptions.getMaxRetries()) {
-                            return false;
-                        }
-
-                        try {
-                            if (error.contains("Quota Exceeded")
-                                    || error.contains("SlotExceeded")) {
-                                Thread.sleep(ThreadLocalRandom.current().nextLong(5000));
-                            } else {
-                                Thread.sleep(1000);
-                            }
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                            return false;
-                        }
-                        LOG.warn("Start to retry, retryCount: {}", retry);
-                        return true;
-                    }
-                };
-
-        RetryUtils.execute(
-                () -> {
-                    this.upsertSession =
-                            ((Builder)
-                                            tunnel.buildUpsertSession(
-                                                    identifier.getProject(), identifier.getTable()))
-                                    .setConfig((ConfigurationImpl) tunnel.getConfig())
-                                    .setSchemaName(identifier.getSchema())
-                                    .setPartitionSpec(partitionSpec)
-                                    .setUpsertId(sessionId)
-                                    .setConcurrentNum(writeOptions.getFlushConcurrent())
-                                    .build();
-                    this.upsertStream =
-                            upsertSession
-                                    .buildUpsertStream()
-                                    .setListener(listener)
-                                    .setMaxBufferSize(writeOptions.getMaxBufferSize())
-                                    .setSlotBufferSize(writeOptions.getSlotBufferSize())
-                                    .setCompressOption(
-                                            MaxComputeUtils.compressOptionOf(
-                                                    writeOptions.getCompressAlgorithm()))
-                                    .build();
-                    return null;
-                },
-                executionOptions.getMaxRetries(),
-                executionOptions.getRetryIntervalMillis());
+        try {
+            this.upsertSession =
+                    ((Builder)
+                                    tunnel.buildUpsertSession(
+                                            identifier.getProject(), identifier.getTable()))
+                            .setConfig(tunnel.getConfig())
+                            .setSchemaName(identifier.getSchema())
+                            .setPartitionSpec(partitionSpec)
+                            .setUpsertId(sessionId)
+                            .setConcurrentNum(writeOptions.getFlushConcurrent())
+                            .build();
+            this.upsertStream =
+                    upsertSession
+                            .buildUpsertStream()
+                            .setListener(new UpsertStreamListener(upsertSession))
+                            .setMaxBufferSize(writeOptions.getMaxBufferSize())
+                            .setSlotBufferSize(writeOptions.getSlotBufferSize())
+                            .setCompressOption(
+                                    MaxComputeUtils.compressOptionOf(
+                                            writeOptions.getCompressAlgorithm()))
+                            .build();
+        } catch (OdpsException e) {
+            throw new UncheckedOdpsException(e);
+        }
     }
 
     @Override
@@ -182,6 +143,34 @@ public class BatchUpsertWriter implements MaxComputeWriter {
             upsertSession.close();
         } catch (OdpsException e) {
             throw new IOException(e.getMessage() + "RequestId: " + e.getRequestId(), e);
+        }
+    }
+
+    static class UpsertStreamListener extends UpsertSessionImpl.DefaultUpsertSteamListener {
+
+        public UpsertStreamListener(UpsertSessionImpl session) {
+            super(session);
+        }
+
+        @Override
+        public void onFlush(UpsertStream.FlushResult result) {
+            // metrics here
+            LOG.info(
+                    "Flush success, trace id: {}, time: {}, record: {}",
+                    result.traceId,
+                    result.flushTime,
+                    result.recordCount);
+        }
+
+        @Override
+        public boolean onFlushFail(Exception error, int retry) {
+            LOG.error(
+                    "Flush failed error {}, requestId {}",
+                    error.getMessage(),
+                    error instanceof TunnelException
+                            ? ((TunnelException) error).getRequestId()
+                            : "");
+            return super.onFlushFail(error, retry);
         }
     }
 }
