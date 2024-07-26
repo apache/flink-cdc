@@ -31,6 +31,8 @@ The migration result will be displayed in the console like this:
 +--------------+-------+-------+-------+--------------+--------------+
 ```
 
+> ✅ - Compatible, ❌ - Not compatible, ❓ - Target version doesn't support `--from-savepoint`
+
 ## DataStream Jobs
 
 See `datastream/README.md`.

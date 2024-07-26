@@ -154,6 +154,7 @@ begin
 rescue LoadError
   puts 'Test summary: ', printable_result
 end
+puts "✅ - Compatible, ❌ - Not compatible, ❓ - Target version doesn't support `--from-savepoint`"
 
 if @failures.filter { |old_version, new_version| new_version == version_list.last && old_version != '3.1.0' }.any?
   abort 'Some migration to snapshot version tests failed.'
