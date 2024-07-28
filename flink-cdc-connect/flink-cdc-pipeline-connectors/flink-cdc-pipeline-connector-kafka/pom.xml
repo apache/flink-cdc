@@ -99,6 +99,15 @@ limitations under the License.
                                     <shadedPattern>org.apache.flink.cdc.connectors.kafka.shaded.org.apache.flink.connector.kafka</shadedPattern>
                                 </relocation>
                             </relocations>
+                            <filters>
+                                <filter>
+                                    <artifact>org.apache.kafka:*</artifact>
+                                    <excludes>
+                                        <exclude>LICENSE</exclude>
+                                        <exclude>NOTICE</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>

@@ -49,6 +49,18 @@ limitations under the License.
                             <goal>shade</goal>
                         </goals>
                         <configuration>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <!--
+                                            These licenses are bundled in tikv-client-java. We exclude them
+                                            and re-bundle under META-INF/licenses
+                                        -->
+                                        <exclude>io/perfmark/traceviewer/third_party/**/LICENSE</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
