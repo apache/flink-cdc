@@ -134,7 +134,7 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
         reuseGenericRowData.setField(
                 3,
                 GenericRowData.of(
-                        StringData.fromString(dataChangeEvent.tableId().getNamespace()),
+                        StringData.fromString(dataChangeEvent.tableId().getSchemaName()),
                         StringData.fromString(dataChangeEvent.tableId().getTableName())));
         try {
             switch (dataChangeEvent.op()) {
