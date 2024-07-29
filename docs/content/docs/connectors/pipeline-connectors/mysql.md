@@ -175,7 +175,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for MySQL CDC consumer, valid enumerations are "initial", "earliest-offset", "latest-offset", "specific-offset" and "timestamp".</td>
+      <td>Optional startup mode for MySQL CDC consumer, valid enumerations are "initial", "earliest-offset", "latest-offset", "specific-offset", "timestamp" and "snapshot".</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.file</td>
@@ -290,6 +290,7 @@ The config option `scan.startup.mode` specifies the startup mode for MySQL CDC c
 - `specific-offset`: Skip snapshot phase and start reading binlog events from a specific offset. The offset could be
   specified with binlog filename and position, or a GTID set if GTID is enabled on server.
 - `timestamp`: Skip snapshot phase and start reading binlog events from a specific timestamp.
+- `snapshot`: Only the snapshot phase is performed and exits after the snapshot phase reading is completed.
 
 For example in YAML definition:
 
@@ -300,6 +301,7 @@ source:
   scan.startup.mode: latest-offset                      # Start from latest offset
   scan.startup.mode: specific-offset                    # Start from specific offset
   scan.startup.mode: timestamp                          # Start from timestamp
+  scan.startup.mode: snapshot                          # Read snapshot only
   scan.startup.specific-offset.file: 'mysql-bin.000003' # Binlog filename under specific offset startup mode
   scan.startup.specific-offset.pos: 4                   # Binlog position under specific offset mode
   scan.startup.specific-offset.gtid-set: 24DA167-...    # GTID set under specific offset startup mode
