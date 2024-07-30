@@ -79,6 +79,17 @@ We could use following yaml file to define a complicated Data Pipeline describin
      fenodes: 127.0.0.1:8030
      username: root
      password: ""
+  
+   transform:
+     - source-table: adb.web_order01
+       projection: \*, UPPER(product_name) as product_name
+       filter: id > 10 AND order_id > 100
+       description: project fields and filter
+     - source-table: adb.web_order02
+       projection: \*, UPPER(product_name) as product_name
+       filter: id > 20 AND order_id > 200
+       description: project fields and filter
+
    route:
      - source-table: app_db.orders
        sink-table: ods_db.ods_orders
