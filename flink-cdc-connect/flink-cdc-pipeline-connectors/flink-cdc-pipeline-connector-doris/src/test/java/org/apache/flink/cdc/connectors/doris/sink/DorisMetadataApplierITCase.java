@@ -45,7 +45,6 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -367,7 +366,6 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
     }
 
     @Test
-    @Ignore("AlterColumnType is yet to be supported until we close FLINK-35072.")
     public void testDorisAlterColumnType() throws Exception {
         TableId tableId =
                 TableId.tableId(

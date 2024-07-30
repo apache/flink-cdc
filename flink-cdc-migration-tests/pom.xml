@@ -33,6 +33,7 @@ limitations under the License.
         <module>flink-cdc-release-3.0.0</module>
         <module>flink-cdc-release-3.0.1</module>
         <module>flink-cdc-release-3.1.0</module>
+        <module>flink-cdc-release-3.1.1</module>
         <module>flink-cdc-release-snapshot</module>
         <module>flink-cdc-migration-testcases</module>
     </modules>
