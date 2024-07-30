@@ -115,19 +115,8 @@ jobs:
       - name: Run license check
         run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
 
-  migration_test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-      - name: Compile snapshot CDC version
-        run: mvn --no-snapshot-updates -B install -DskipTests
-      - name: Run migration tests
-        run: cd flink-cdc-migration-tests && mvn clean verify
-
   compile_and_test:
+    needs: license_check
     # Only run the CI pipeline for the flink-cdc-connectors repository
 #    if: github.repository == 'apache/flink-cdc-connectors'
     runs-on: ubuntu-latest
@@ -263,3 +252,100 @@ jobs:
             done
           fi
           exit 0
+
+
+  migration_test_ut:
+    needs: license_check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Compile snapshot CDC version
+        run: mvn --no-snapshot-updates -B install -DskipTests
+      - name: Run migration tests
+        run: cd flink-cdc-migration-tests && mvn clean verify
+
+  pipeline_migration_test:
+    needs: migration_test_ut
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: [ '8', '11' ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.0
+          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: temurin
+          cache: maven
+      - name: Install dependencies
+        run: gem install terminal-table
+      - name: Prepare CDC versions
+        run: CDC_SOURCE_HOME=$PWD ruby tools/mig-test/prepare_libs.rb
+      - name: Prepare Flink distro
+        run: wget https://dlcdn.apache.org/flink/flink-1.18.1/flink-1.18.1-bin-scala_2.12.tgz && tar -xzvf flink-1.18.1-bin-scala_2.12.tgz
+        working-directory: ./tools/mig-test
+      - name: Patch Flink configs
+        run: FLINK_HOME=./flink-1.18.1/ ruby misc/patch_flink_conf.rb
+        working-directory: ./tools/mig-test
+      - name: Start containers
+        run: cd conf && docker-compose up -d
+        working-directory: ./tools/mig-test
+      - name: Run migration tests
+        run: FLINK_HOME=./flink-1.18.1/ ruby run_migration_test.rb
+        working-directory: ./tools/mig-test
+      - name: Stop containers
+        if: always()
+        run: cd conf && docker-compose down
+        working-directory: ./tools/mig-test
+
+  data_stream_migration_test:
+    needs: migration_test_ut
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: [ '8', '11' ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.0
+          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: temurin
+          cache: maven
+      - name: Install dependencies
+        run: gem install terminal-table
+      - name: Prepare CDC versions
+        run: CDC_SOURCE_HOME=$PWD ruby tools/mig-test/prepare_libs.rb
+      - name: Prepare Flink distro
+        run: wget https://dlcdn.apache.org/flink/flink-1.18.1/flink-1.18.1-bin-scala_2.12.tgz && tar -xzvf flink-1.18.1-bin-scala_2.12.tgz
+        working-directory: ./tools/mig-test
+      - name: Patch Flink configs
+        run: FLINK_HOME=./flink-1.18.1/ ruby misc/patch_flink_conf.rb
+        working-directory: ./tools/mig-test
+      - name: Compile Dummy DataStream Jobs
+        run: cd datastream && ruby compile_jobs.rb
+        working-directory: ./tools/mig-test
+      - name: Start containers
+        run: cd conf && docker-compose up -d
+        working-directory: ./tools/mig-test
+      - name: Run migration tests
+        run: cd datastream && FLINK_HOME=../flink-1.18.1/ ruby run_migration_test.rb
+        working-directory: ./tools/mig-test
+      - name: Stop containers
+        if: always()
+        run: cd conf && docker-compose down
+        working-directory: ./tools/mig-test
