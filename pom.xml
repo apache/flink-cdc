@@ -461,36 +461,6 @@ limitations under the License.
 				don't work. You have to use the fully qualified name, i.e.
 				"mvn com.diffplug.spotless:spotless-maven-plugin:apply" -->
             <plugin>
-                <groupId>com.diffplug.spotless</groupId>
-                <artifactId>spotless-maven-plugin</artifactId>
-                <version>${spotless.version}</version>
-                <configuration>
-                    <java>
-                        <googleJavaFormat>
-                            <version>1.7</version>
-                            <style>AOSP</style>
-                        </googleJavaFormat>
-
-                        <!-- \# refers to the static imports -->
-                        <importOrder>
-                            <order>org.apache.flink,org.apache.flink.shaded,,javax,java,scala,\#
-                            </order>
-                        </importOrder>
-
-                        <removeUnusedImports/>
-                    </java>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>spotless-check</id>
-                        <phase>validate</phase>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
                 <version>2.17</version>
@@ -516,54 +486,6 @@ limitations under the License.
                     <configLocation>/tools/maven/checkstyle.xml</configLocation>
                     <logViolationsToConsole>true</logViolationsToConsole>
                     <failOnViolation>true</failOnViolation>
-                </configuration>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.0.0-M5</version>
-                <executions>
-                    <execution>
-                        <id>default-test</id>
-                        <phase>test</phase>
-                        <goals>
-                            <goal>test</goal>
-                        </goals>
-                        <configuration>
-                            <includes>
-                                <include>**/*Test.java</include>
-                                <include>**/*Test.scala</include>
-                            </includes>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>integration-tests</id>
-                        <phase>integration-test</phase>
-                        <goals>
-                            <goal>test</goal>
-                        </goals>
-                        <configuration>
-                            <includes>
-                                <include>**/*ITCase.java</include>
-                                <include>**/*ITCase.scala</include>
-                            </includes>
-                            <reuseForks>false</reuseForks>
-                        </configuration>
-                    </execution>
-                </executions>
-                <configuration>
-                    <forkCount>${flink.forkCount}</forkCount>
-                    <reuseForks>${flink.reuseForks}</reuseForks>
-                    <trimStackTrace>false</trimStackTrace>
-                    <systemPropertyVariables>
-                        <forkNumber>0${surefire.forkNumber}</forkNumber>
-                    </systemPropertyVariables>
-                    <!-- Prevent ORA-01882: timezone region not found errors due to the Oracle DB
-                         does not understanding some time zone which used in Ubuntu OS -->
-                    <argLine>-Xms256m -Xmx2048m -Dmvn.forkNumber=${surefire.forkNumber}
-                        -XX:+UseG1GC -Doracle.jdbc.timezoneAsRegion=false
-                    </argLine>
                 </configuration>
             </plugin>
 

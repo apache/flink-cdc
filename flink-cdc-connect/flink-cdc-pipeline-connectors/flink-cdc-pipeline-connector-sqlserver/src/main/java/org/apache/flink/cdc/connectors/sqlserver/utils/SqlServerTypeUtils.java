@@ -67,10 +67,9 @@ public class SqlServerTypeUtils {
             case Types.DATE:
                 return DataTypes.DATE();
             case Types.TIMESTAMP:
+                return DataTypes.TIMESTAMP(3);
             case Types.TIMESTAMP_WITH_TIMEZONE:
-                return column.length() >= 0
-                        ? DataTypes.TIMESTAMP(column.length())
-                        : DataTypes.TIMESTAMP();
+                return DataTypes.TIMESTAMP_LTZ(3);
             case Types.BOOLEAN:
                 return DataTypes.BOOLEAN();
             default:
