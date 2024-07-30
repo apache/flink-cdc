@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -567,10 +568,13 @@ public class SystemFunctionUtils {
         return Double.valueOf(castToString(object));
     }
 
-    public static BigDecimal castToBigDecimal(Object object) {
+    public static BigDecimal castToBigDecimal(Object object, int precision, int scale) {
         if (object == null) {
             return null;
         }
-        return BigDecimal.valueOf(castToDouble(object));
+        MathContext mathContext = new MathContext(precision);
+        BigDecimal bigDecimal = new BigDecimal(castToString(object), mathContext);
+        bigDecimal = bigDecimal.setScale(scale, BigDecimal.ROUND_HALF_UP);
+        return bigDecimal;
     }
 }
