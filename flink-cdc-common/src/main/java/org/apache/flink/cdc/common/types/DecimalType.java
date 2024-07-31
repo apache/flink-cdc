@@ -39,7 +39,7 @@ public final class DecimalType extends DataType {
 
     public static final int DEFAULT_SCALE = 0;
 
-	private static final boolean ALLOW_LOSS = true;
+    private static final boolean ALLOW_LOSS = false;
 
     private static final String FORMAT = "DECIMAL(%d, %d)";
 
