@@ -50,14 +50,14 @@ public final class DecimalType extends DataType {
         if (precision < MIN_PRECISION || precision > MAX_PRECISION) {
             throw new IllegalArgumentException(
                     String.format(
-                            "Decimal precision must be between %d and %d (both inclusive).",
-                            MIN_PRECISION, MAX_PRECISION));
+                            "Requested precision %d is not supported. Decimal precision must be between %d and %d (both inclusive).",
+                            precision, MIN_PRECISION, MAX_PRECISION));
         }
         if (scale < MIN_SCALE || scale > precision) {
             throw new IllegalArgumentException(
                     String.format(
-                            "Decimal scale must be between %d and the precision %d (both inclusive).",
-                            MIN_SCALE, precision));
+                            "Requested scale %d is not supported. Decimal scale must be between %d and the precision %d (both inclusive).",
+                            scale, MIN_SCALE, precision));
         }
         this.precision = precision;
         this.scale = scale;
