@@ -183,9 +183,10 @@ public class PaimonMetadataApplier implements MetadataApplier {
 
         String referenceColumnName = null;
         for (int i = 0; i < newColumns.size(); i++) {
-            String columnName = newColumns.get(i).getName();
-            DataType columnType = newColumns.get(i).getType();
-            String columnComment = newColumns.get(i).getComment();
+            Column newColumn = newColumns.get(i);
+            String columnName = newColumn.getName();
+            DataType columnType = newColumn.getType();
+            String columnComment = newColumn.getComment();
 
             DataField oldColumn = oldColumns.get(columnName);
 
