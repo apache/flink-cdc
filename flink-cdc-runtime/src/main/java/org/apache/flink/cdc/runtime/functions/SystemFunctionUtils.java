@@ -523,12 +523,21 @@ public class SystemFunctionUtils {
         if (object == null) {
             return null;
         }
-        return Byte.valueOf(castToString(object));
+        return Byte.valueOf(castObjectIntoString(object));
     }
 
     public static Boolean castToBoolean(Object object) {
         if (object == null) {
             return null;
+        }
+        if (object instanceof Byte
+                || object instanceof Short
+                || object instanceof Integer
+                || object instanceof Long
+                || object instanceof Float
+                || object instanceof Double
+                || object instanceof BigDecimal) {
+            return !object.equals(0);
         }
         return Boolean.valueOf(castToString(object));
     }
@@ -537,44 +546,51 @@ public class SystemFunctionUtils {
         if (object == null) {
             return null;
         }
-        return Short.valueOf(castToString(object));
+        return Short.valueOf(castObjectIntoString(object));
     }
 
     public static Integer castToInteger(Object object) {
         if (object == null) {
             return null;
         }
-        return Integer.valueOf(castToString(object));
+        return Integer.valueOf(castObjectIntoString(object));
     }
 
     public static Long castToLong(Object object) {
         if (object == null) {
             return null;
         }
-        return Long.valueOf(castToString(object));
+        return Long.valueOf(castObjectIntoString(object));
     }
 
     public static Float castToFloat(Object object) {
         if (object == null) {
             return null;
         }
-        return Float.valueOf(castToString(object));
+        return Float.valueOf(castObjectIntoString(object));
     }
 
     public static Double castToDouble(Object object) {
         if (object == null) {
             return null;
         }
-        return Double.valueOf(castToString(object));
+        return Double.valueOf(castObjectIntoString(object));
     }
 
     public static BigDecimal castToBigDecimal(Object object, int precision, int scale) {
         if (object == null) {
             return null;
         }
-        MathContext mathContext = new MathContext(precision);
-        BigDecimal bigDecimal = new BigDecimal(castToString(object), mathContext);
+        BigDecimal bigDecimal =
+                new BigDecimal(castObjectIntoString(object), new MathContext(precision));
         bigDecimal = bigDecimal.setScale(scale, BigDecimal.ROUND_HALF_UP);
         return bigDecimal;
+    }
+
+    private static String castObjectIntoString(Object object) {
+        if (object instanceof Boolean) {
+            return Boolean.valueOf(castToString(object)) ? "1" : "0";
+        }
+        return String.valueOf(object);
     }
 }
