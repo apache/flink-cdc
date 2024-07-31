@@ -336,8 +336,12 @@ public class JaninoCompiler {
                 if (sqlDataTypeSpec.getTypeNameSpec() instanceof SqlBasicTypeNameSpec) {
                     SqlBasicTypeNameSpec typeNameSpec =
                             (SqlBasicTypeNameSpec) sqlDataTypeSpec.getTypeNameSpec();
-                    precision = typeNameSpec.getPrecision();
-                    scale = typeNameSpec.getScale();
+                    if (typeNameSpec.getPrecision() > -1) {
+                        precision = typeNameSpec.getPrecision();
+                    }
+                    if (typeNameSpec.getScale() > -1) {
+                        scale = typeNameSpec.getScale();
+                    }
                 }
                 List<Java.Rvalue> newAtoms = new ArrayList<>(Arrays.asList(atoms));
                 newAtoms.add(
