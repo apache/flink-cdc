@@ -59,8 +59,10 @@ public class SqlServerTypeUtils {
             case Types.BIGINT:
                 return DataTypes.BIGINT();
             case Types.FLOAT:
+                return DataTypes.FLOAT();
             case Types.REAL:
             case Types.DOUBLE:
+                return DataTypes.DOUBLE();
             case Types.NUMERIC:
             case Types.DECIMAL:
                 return DataTypes.DECIMAL(column.length(), column.scale().orElse(0));
