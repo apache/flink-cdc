@@ -65,7 +65,7 @@ public final class TimestampType extends DataType {
 			}
 			else
 			{
-				this.precision = MAX_PRECISION;
+				this.precision = DEFAULT_PRECISION;
 			}
         }
 		else
