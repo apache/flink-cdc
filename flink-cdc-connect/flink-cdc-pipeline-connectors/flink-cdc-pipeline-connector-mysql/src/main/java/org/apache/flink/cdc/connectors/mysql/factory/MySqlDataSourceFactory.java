@@ -199,7 +199,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         chunkKeyColumnMap.put(table, splits[1]);
                     }
                 } else {
-                    throw new IllegalArgumentException(
+                    throw new IllegalArgumentException(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key() + " = " + chunkKeyColumns + " failed to be parsed in this part '" + chunkKeyColumn + "'.");
                             SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key()
                                     + " is malformed, please refer to the documents");
                 }
