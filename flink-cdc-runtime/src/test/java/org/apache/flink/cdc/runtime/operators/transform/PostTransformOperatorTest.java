@@ -132,8 +132,8 @@ public class PostTransformOperatorTest {
                     .physicalColumn("nullBigint", DataTypes.BIGINT())
                     .physicalColumn("nullFloat", DataTypes.FLOAT())
                     .physicalColumn("nullDouble", DataTypes.DOUBLE())
-                    .physicalColumn("nullChar", DataTypes.CHAR(1))
-                    .physicalColumn("nullVarchar", DataTypes.VARCHAR(1))
+                    .physicalColumn("nullChar", DataTypes.STRING())
+                    .physicalColumn("nullVarchar", DataTypes.STRING())
                     .physicalColumn("nullDecimal", DataTypes.DECIMAL(4, 2))
                     .physicalColumn("nullTimestamp", DataTypes.TIMESTAMP(3))
                     .primaryKey("col1")
@@ -151,8 +151,8 @@ public class PostTransformOperatorTest {
                     .physicalColumn("castBigint", DataTypes.BIGINT())
                     .physicalColumn("castFloat", DataTypes.FLOAT())
                     .physicalColumn("castDouble", DataTypes.DOUBLE())
-                    .physicalColumn("castChar", DataTypes.CHAR(1))
-                    .physicalColumn("castVarchar", DataTypes.VARCHAR(1))
+                    .physicalColumn("castChar", DataTypes.STRING())
+                    .physicalColumn("castVarchar", DataTypes.STRING())
                     .physicalColumn("castDecimal", DataTypes.DECIMAL(4, 2))
                     .physicalColumn("castTimestamp", DataTypes.TIMESTAMP(3))
                     .primaryKey("col1")
@@ -721,8 +721,8 @@ public class PostTransformOperatorTest {
 
     @Test
     void testNullCastTransform() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 NULL_TABLEID.identifier(),
                                 "col1"
@@ -740,7 +740,7 @@ public class PostTransformOperatorTest {
                                         + ",cast(colString as TIMESTAMP(3)) as nullTimestamp",
                                 null)
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -781,8 +781,8 @@ public class PostTransformOperatorTest {
 
     @Test
     void testCastTransform() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 CAST_TABLEID.identifier(),
                                 "col1"
@@ -934,7 +934,7 @@ public class PostTransformOperatorTest {
                                         + ",cast('1970-01-01T00:00:01.234' as TIMESTAMP(3)) as castTimestamp",
                                 "col1 = '10'")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -1353,8 +1353,8 @@ public class PostTransformOperatorTest {
 
     @Test
     void testCastErrorTransform() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 CAST_TABLEID.identifier(),
                                 "col1"
@@ -1371,7 +1371,7 @@ public class PostTransformOperatorTest {
                                         + ",cast(castFloat as TIMESTAMP) as castTimestamp",
                                 "col1 = '1'")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization

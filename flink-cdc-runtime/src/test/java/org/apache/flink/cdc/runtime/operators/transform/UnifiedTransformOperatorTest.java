@@ -916,4 +916,70 @@ public class UnifiedTransformOperatorTest {
                 .runTests()
                 .destroyHarness();
     }
+
+    @Test
+    public void testTransformWithCast() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "transform_with_cast");
+        UnifiedTransformTestCase.of(
+                        tableId,
+                        "id, age + 1 as newage, CAST(CAST(id AS INT) + age AS BIGINT) as longevity, CAST(age AS VARCHAR) as string_age",
+                        "newage > 17 and ref2 > 17",
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.STRING().notNull())
+                                .physicalColumn("name", DataTypes.STRING().notNull())
+                                .physicalColumn("age", DataTypes.INT().notNull())
+                                .physicalColumn("ref1", DataTypes.STRING())
+                                .physicalColumn("ref2", DataTypes.INT())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.STRING().notNull())
+                                .physicalColumn("age", DataTypes.INT().notNull())
+                                .physicalColumn("ref2", DataTypes.INT())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.STRING().notNull())
+                                .physicalColumn("newage", DataTypes.INT())
+                                .physicalColumn("longevity", DataTypes.BIGINT())
+                                .physicalColumn("string_age", DataTypes.STRING())
+                                .primaryKey("id")
+                                .build())
+                .initializeHarness()
+                .insertSource("1001", "Alice", 17, "Reference001", 2021)
+                .insertPreTransformed("1001", 17, 2021)
+                .insertPostTransformed("1001", 18, 1018L, "17")
+                // this data record is filtered out since newage <= 17
+                .insertSource("1002", "Bob", 15, "Reference002", 2017)
+                .insertPreTransformed("1002", 15, 2017)
+                .insertPostTransformed()
+                // this data record is filtered out since ref2 <= 17
+                .insertSource("1003", "Bill", 18, "Reference003", 0)
+                .insertPreTransformed("1003", 18, 0)
+                .insertPostTransformed()
+                .insertSource("1004", "Carol", 18, "Reference004", 2018)
+                .insertPreTransformed("1004", 18, 2018)
+                .insertPostTransformed("1004", 19, 1022L, "18")
+                // test update event transform
+                .updateSource(
+                        new Object[] {"1004", "Carol", 18, "Reference004", 2018},
+                        new Object[] {"1004", "Colin", 19, "NeoReference004", 2018})
+                .updatePreTransformed(
+                        new Object[] {"1004", 18, 2018}, new Object[] {"1004", 19, 2018})
+                .updatePostTransformed(
+                        new Object[] {"1004", 19, 1022L, "18"},
+                        new Object[] {"1004", 20, 1023L, "19"})
+                // updated value to a filtered out condition
+                .updateSource(
+                        new Object[] {"1004", "Colin", 19, "NeoReference004", 2018},
+                        new Object[] {"1004", "Colin", 10, "NeoReference004", 2018})
+                .updatePreTransformed(
+                        new Object[] {"1004", 19, 2018}, new Object[] {"1004", 10, 2018})
+                .updatePostTransformed()
+                .deleteSource("1001", "Alice", 17, "Reference001", 2021)
+                .deletePreTransformed("1001", 17, 2021)
+                .deletePostTransformed("1001", 18, 1018L, "17")
+                .runTests()
+                .destroyHarness();
+    }
 }
