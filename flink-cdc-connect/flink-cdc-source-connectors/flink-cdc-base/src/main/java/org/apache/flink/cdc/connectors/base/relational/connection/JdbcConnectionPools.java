@@ -86,12 +86,10 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
     }
 
     public void clear() throws IOException {
-        if (instance != null) {
-            synchronized (instance.pools) {
-                instance.pools.values().stream().forEach(HikariDataSource::close);
-                instance.pools.clear();
-                POOL_FACTORY_MAP.clear();
-            }
+        synchronized (pools) {
+            pools.values().stream().forEach(HikariDataSource::close);
+            pools.clear();
+            POOL_FACTORY_MAP.clear();
         }
     }
 }

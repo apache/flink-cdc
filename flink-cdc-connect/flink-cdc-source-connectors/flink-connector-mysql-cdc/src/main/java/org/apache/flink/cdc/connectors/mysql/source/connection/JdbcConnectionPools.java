@@ -53,10 +53,10 @@ public class JdbcConnectionPools implements ConnectionPools {
         }
     }
 
-    public synchronized void clear() throws IOException {
-        synchronized (INSTANCE.pools) {
-            INSTANCE.pools.values().stream().forEach(HikariDataSource::close);
-            INSTANCE.pools.clear();
+    public void clear() throws IOException {
+        synchronized (pools) {
+            pools.values().stream().forEach(HikariDataSource::close);
+            pools.clear();
         }
     }
 }
