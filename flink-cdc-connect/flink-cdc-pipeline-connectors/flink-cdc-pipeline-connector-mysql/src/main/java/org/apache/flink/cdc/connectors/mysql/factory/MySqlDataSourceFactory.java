@@ -187,21 +187,26 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         String chunkKeyColumns = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         if (chunkKeyColumns != null) {
             Map<ObjectPath, String> chunkKeyColumnMap = new HashMap<>();
+            List<TableId> tableIds =
+                    MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
             for (String chunkKeyColumn : chunkKeyColumns.split(";")) {
                 String[] splits = chunkKeyColumn.split(":");
                 if (splits.length == 2) {
                     Selectors chunkKeySelector =
                             new Selectors.SelectorsBuilder().includeTables(splits[0]).build();
                     List<ObjectPath> tableList =
-                            getChunkKeyColumnTableList(
-                                    configFactory.createConfig(0), chunkKeySelector);
+                            getChunkKeyColumnTableList(tableIds, chunkKeySelector);
                     for (ObjectPath table : tableList) {
                         chunkKeyColumnMap.put(table, splits[1]);
                     }
                 } else {
-                    throw new IllegalArgumentException(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key() + " = " + chunkKeyColumns + " failed to be parsed in this part '" + chunkKeyColumn + "'.");
+                    throw new IllegalArgumentException(
                             SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key()
-                                    + " is malformed, please refer to the documents");
+                                    + " = "
+                                    + chunkKeyColumns
+                                    + " failed to be parsed in this part '"
+                                    + chunkKeyColumn
+                                    + "'.");
                 }
             }
             LOG.info("Add chunkKeyColumn {}.", chunkKeyColumnMap);
@@ -272,8 +277,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     }
 
     private static List<ObjectPath> getChunkKeyColumnTableList(
-            MySqlSourceConfig sourceConfig, Selectors selectors) {
-        return MySqlSchemaUtils.listTables(sourceConfig, null).stream()
+            List<TableId> tableIds, Selectors selectors) {
+        return tableIds.stream()
                 .filter(selectors::isMatch)
                 .map(tableId -> new ObjectPath(tableId.getSchemaName(), tableId.getTableName()))
                 .collect(Collectors.toList());
