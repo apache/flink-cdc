@@ -25,6 +25,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -82,5 +83,15 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
                             dataSourcePoolFactoryIdentifier));
         }
         return jdbcConnectionPoolFactory.getJdbcUrl(sourceConfig);
+    }
+
+    public void clear() throws IOException {
+        if (instance != null) {
+            synchronized (instance.pools) {
+                instance.pools.values().stream().forEach(HikariDataSource::close);
+                instance.pools.clear();
+                POOL_FACTORY_MAP.clear();
+            }
+        }
     }
 }
