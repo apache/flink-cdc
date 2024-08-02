@@ -1,5 +1,4 @@
 /*
- *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,7 +15,6 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
- *
  */
 
 package org.apache.flink.cdc.connectors.elasticsearch.v2;
@@ -26,16 +24,29 @@ import co.elastic.clients.elasticsearch.core.bulk.BulkOperationVariant;
 import java.io.Serializable;
 import java.util.Objects;
 
-/** A single stream element which contains a BulkOperationVariant. */
+/**
+ * A single stream element which contains a {@link BulkOperationVariant}. This class represents an
+ * operation that will be performed in an Elasticsearch bulk request.
+ */
 public class Operation implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private final BulkOperationVariant bulkOperationVariant;
 
+    /**
+     * Constructs an Operation with the specified {@link BulkOperationVariant}.
+     *
+     * @param bulkOperation the BulkOperationVariant to be wrapped by this Operation.
+     */
     public Operation(BulkOperationVariant bulkOperation) {
         this.bulkOperationVariant = bulkOperation;
     }
 
+    /**
+     * Returns the {@link BulkOperationVariant} contained in this Operation.
+     *
+     * @return the BulkOperationVariant instance.
+     */
     public BulkOperationVariant getBulkOperationVariant() {
         return bulkOperationVariant;
     }

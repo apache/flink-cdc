@@ -77,12 +77,12 @@ public class ElasticsearchDataSinkOptions {
                     .defaultValue(10L * 1024L * 1024L)
                     .withDescription("The maximum size of a single record in bytes.");
 
-    /** The Elasticsearch index name to write to. */
-    public static final ConfigOption<String> INDEX =
-            ConfigOptions.key("index")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("The Elasticsearch index name to write to.");
+    /** The version of Elasticsearch to connect to. */
+    public static final ConfigOption<Integer> VERSION =
+            ConfigOptions.key("version")
+                    .intType()
+                    .defaultValue(7)
+                    .withDescription("The version of Elasticsearch to connect to (6, 7, or 8).");
 
     /** The username for Elasticsearch authentication. */
     public static final ConfigOption<String> USERNAME =
