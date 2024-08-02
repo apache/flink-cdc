@@ -34,6 +34,9 @@ public class ElasticsearchSinkOptions implements Serializable {
     private final long maxTimeInBufferMS;
     private final long maxRecordSizeInBytes;
     private final NetworkConfig networkConfig;
+    private final int version;
+    private final String username;
+    private final String password;
 
     /** Constructor for ElasticsearchSinkOptions. */
     public ElasticsearchSinkOptions(
@@ -43,7 +46,10 @@ public class ElasticsearchSinkOptions implements Serializable {
             long maxBatchSizeInBytes,
             long maxTimeInBufferMS,
             long maxRecordSizeInBytes,
-            NetworkConfig networkConfig) {
+            NetworkConfig networkConfig,
+            int version,
+            String username,
+            String password) {
         this.maxBatchSize = maxBatchSize;
         this.maxInFlightRequests = maxInFlightRequests;
         this.maxBufferedRequests = maxBufferedRequests;
@@ -51,6 +57,9 @@ public class ElasticsearchSinkOptions implements Serializable {
         this.maxTimeInBufferMS = maxTimeInBufferMS;
         this.maxRecordSizeInBytes = maxRecordSizeInBytes;
         this.networkConfig = networkConfig;
+        this.version = version;
+        this.username = username;
+        this.password = password;
     }
 
     /** @return the maximum batch size */
@@ -91,5 +100,17 @@ public class ElasticsearchSinkOptions implements Serializable {
     /** @return the list of Elasticsearch hosts */
     public List<HttpHost> getHosts() {
         return networkConfig.getHosts();
+    }
+
+    public int getVersion() {
+        return version;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public String getPassword() {
+        return password;
     }
 }

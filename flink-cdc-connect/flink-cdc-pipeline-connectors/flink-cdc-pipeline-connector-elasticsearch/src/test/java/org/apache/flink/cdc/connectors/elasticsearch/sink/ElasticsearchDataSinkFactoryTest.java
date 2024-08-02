@@ -1,7 +1,7 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one or more
+ * Licensed to the Apache Software Foundation (ASF) under one或多个
  * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
+ * this work for additional信息 regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
@@ -10,7 +10,7 @@
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express或 implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
@@ -35,8 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.*;
-
 /** Tests for {@link ElasticsearchDataSinkFactory}. */
 public class ElasticsearchDataSinkFactoryTest {
 
@@ -57,16 +55,20 @@ public class ElasticsearchDataSinkFactoryTest {
     @Test
     void testLackRequiredOption() {
         DataSinkFactory sinkFactory = getElasticsearchDataSinkFactory();
-
-        Map<String, String> options = createValidOptions();
-
         List<String> requiredKeys = getRequiredKeys(sinkFactory);
         for (String requiredKey : requiredKeys) {
-            Map<String, String> remainingOptions = new HashMap<>(options);
-            remainingOptions.remove(requiredKey);
-            Configuration conf = Configuration.fromMap(remainingOptions);
+            // 创建一个新的配置 Map，包含所有必需选项
+            Map<String, String> options = new HashMap<>(createValidOptions());
+            // 移除当前正在测试的必需选项
+            options.remove(requiredKey);
+            Configuration conf = Configuration.fromMap(options);
+            // 打印日志以确保我们在测试缺少必需选项的情况
+            System.out.println("Testing missing required option: " + requiredKey);
 
+            // 添加创建 DataSink 对象的代码
             Assertions.assertThatThrownBy(() -> createDataSink(sinkFactory, conf))
+
+                    // Assertions to check for missing required option
                     .isInstanceOf(ValidationException.class)
                     .hasMessageContaining(
                             String.format(
@@ -86,10 +88,14 @@ public class ElasticsearchDataSinkFactoryTest {
                 Configuration.fromMap(
                         ImmutableMap.<String, String>builder()
                                 .put("hosts", "localhost:9200")
-                                .put("index", "test-index")
+                                .put("version", "7")
                                 .put("unsupported_key", "unsupported_value")
                                 .build());
 
+        // 打印日志以确保我们在测试不受支持的选项
+        System.out.println("Testing unsupported option");
+
+        // Assertions to check for unsupported options
         Assertions.assertThatThrownBy(() -> createDataSink(sinkFactory, conf))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining(
@@ -110,14 +116,18 @@ public class ElasticsearchDataSinkFactoryTest {
                 Configuration.fromMap(
                         ImmutableMap.<String, String>builder()
                                 .put("hosts", "localhost:9200")
-                                .put("index", "test-index")
                                 .put("batch.size.max", "500")
                                 .put("inflight.requests.max", "5")
+                                .put("version", "7") // Added version to the test configuration
                                 .build());
+
+        // 打印日志以确保我们在测试带前缀的必需选项
+        System.out.println("Testing prefixed required option");
 
         DataSink dataSink = createDataSink(sinkFactory, conf);
         Assertions.assertThat(dataSink).isInstanceOf(ElasticsearchDataSink.class);
     }
+
     // Helper methods
 
     private DataSinkFactory getElasticsearchDataSinkFactory() {
@@ -132,14 +142,14 @@ public class ElasticsearchDataSinkFactoryTest {
         return Configuration.fromMap(
                 ImmutableMap.<String, String>builder()
                         .put("hosts", "localhost:9200")
-                        .put("index", "test-index")
+                        .put("version", "7") // Added version to the valid configuration
                         .build());
     }
 
     private Map<String, String> createValidOptions() {
         Map<String, String> options = new HashMap<>();
         options.put("hosts", "localhost:9200");
-        options.put("index", "test-index");
+        options.put("version", "7"); // Added version to the valid options
         return options;
     }
 

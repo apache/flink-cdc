@@ -23,22 +23,27 @@ import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.connectors.elasticsearch.config.ElasticsearchSinkOptions;
+import org.apache.flink.cdc.connectors.elasticsearch.serializer.Elasticsearch6RequestCreator;
 import org.apache.flink.cdc.connectors.elasticsearch.serializer.ElasticsearchEventSerializer;
 import org.apache.flink.cdc.connectors.elasticsearch.v2.Elasticsearch8AsyncSinkBuilder;
+import org.apache.flink.connector.elasticsearch.sink.Elasticsearch6SinkBuilder;
 
-import org.apache.http.HttpHost;
+import co.elastic.clients.elasticsearch.core.bulk.BulkOperationVariant;
+import co.elastic.clients.elasticsearch.core.bulk.DeleteOperation;
+import co.elastic.clients.elasticsearch.core.bulk.IndexOperation;
 
 import java.io.Serializable;
 import java.time.ZoneId;
 
 /**
- * A {@link DataSink} implementation for Elasticsearch connector.
+ * An implementation of {@link DataSink} for writing events to Elasticsearch.
  *
- * @param <InputT> The input type of the sink.
+ * <p>This class is responsible for configuring and managing the lifecycle of an Elasticsearch sink,
+ * including handling different versions of Elasticsearch (6, 7, 8).
+ *
+ * @param <InputT> The type of input elements that this sink can process.
  */
 public class ElasticsearchDataSink<InputT> implements DataSink, Serializable {
-
-    private static final long serialVersionUID = 1L;
 
     /** The Elasticsearch sink options. */
     private final ElasticsearchSinkOptions elasticsearchOptions;
@@ -59,11 +64,101 @@ public class ElasticsearchDataSink<InputT> implements DataSink, Serializable {
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
+        switch (elasticsearchOptions.getVersion()) {
+            case 6:
+                return getElasticsearch6SinkProvider();
+            case 7:
+                return getElasticsearch7SinkProvider();
+            case 8:
+                return getElasticsearch8SinkProvider();
+            default:
+                throw new IllegalArgumentException(
+                        "Unsupported Elasticsearch version: " + elasticsearchOptions.getVersion());
+        }
+    }
+
+    private EventSinkProvider getElasticsearch6SinkProvider() {
+        ElasticsearchEventSerializer serializer = new ElasticsearchEventSerializer(zoneId);
+        org.apache.flink.elasticsearch6.shaded.org.apache.http.HttpHost[] hosts =
+                elasticsearchOptions.getHosts().stream()
+                        .map(
+                                host ->
+                                        new org.apache.flink.elasticsearch6.shaded.org.apache.http
+                                                .HttpHost(
+                                                host.getHostName(),
+                                                host.getPort(),
+                                                host.getSchemeName()))
+                        .toArray(
+                                org.apache.flink.elasticsearch6.shaded.org.apache.http.HttpHost[]
+                                        ::new);
+
+        return FlinkSinkProvider.of(
+                new Elasticsearch6SinkBuilder<Event>()
+                        .setHosts(hosts)
+                        .setEmitter(
+                                (element, context, indexer) -> {
+                                    BulkOperationVariant operation =
+                                            serializer.apply(element, context);
+                                    if (operation instanceof IndexOperation) {
+                                        indexer.add(
+                                                Elasticsearch6RequestCreator.createIndexRequest(
+                                                        (IndexOperation<?>) operation));
+                                    } else if (operation instanceof DeleteOperation) {
+                                        indexer.add(
+                                                Elasticsearch6RequestCreator.createDeleteRequest(
+                                                        (DeleteOperation) operation));
+                                    }
+                                })
+                        .setBulkFlushMaxActions(elasticsearchOptions.getMaxBatchSize())
+                        .setBulkFlushInterval(elasticsearchOptions.getMaxTimeInBufferMS())
+                        .build());
+    }
+
+    private EventSinkProvider getElasticsearch7SinkProvider() {
+        ElasticsearchEventSerializer serializer = new ElasticsearchEventSerializer(zoneId);
+        org.apache.flink.elasticsearch6.shaded.org.apache.http.HttpHost[] hosts =
+                elasticsearchOptions.getHosts().stream()
+                        .map(
+                                host ->
+                                        new org.apache.flink.elasticsearch6.shaded.org.apache.http
+                                                .HttpHost(
+                                                host.getHostName(),
+                                                host.getPort(),
+                                                host.getSchemeName()))
+                        .toArray(
+                                org.apache.flink.elasticsearch6.shaded.org.apache.http.HttpHost[]
+                                        ::new);
+
+        return FlinkSinkProvider.of(
+                new Elasticsearch6SinkBuilder<Event>()
+                        .setHosts(hosts)
+                        .setEmitter(
+                                (element, context, indexer) -> {
+                                    BulkOperationVariant operation =
+                                            serializer.apply(element, context);
+                                    if (operation instanceof IndexOperation) {
+                                        indexer.add(
+                                                Elasticsearch6RequestCreator.createIndexRequest(
+                                                        (IndexOperation<?>) operation));
+                                    } else if (operation instanceof DeleteOperation) {
+                                        indexer.add(
+                                                Elasticsearch6RequestCreator.createDeleteRequest(
+                                                        (DeleteOperation) operation));
+                                    }
+                                })
+                        .setBulkFlushMaxActions(elasticsearchOptions.getMaxBatchSize())
+                        .setBulkFlushInterval(elasticsearchOptions.getMaxTimeInBufferMS())
+                        .build());
+    }
+
+    private EventSinkProvider getElasticsearch8SinkProvider() {
         return FlinkSinkProvider.of(
                 new Elasticsearch8AsyncSinkBuilder<Event>()
-                        .setHosts(elasticsearchOptions.getHosts().toArray(new HttpHost[0]))
-                        .setElementConverter(
-                                new ElasticsearchEventSerializer(ZoneId.systemDefault()))
+                        .setHosts(
+                                elasticsearchOptions
+                                        .getHosts()
+                                        .toArray(new org.apache.http.HttpHost[0]))
+                        .setElementConverter(new ElasticsearchEventSerializer(zoneId))
                         .setMaxBatchSize(elasticsearchOptions.getMaxBatchSize())
                         .setMaxInFlightRequests(elasticsearchOptions.getMaxInFlightRequests())
                         .setMaxBufferedRequests(elasticsearchOptions.getMaxBufferedRequests())

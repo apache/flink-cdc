@@ -64,7 +64,7 @@ QUESTIONABLE_STATEMENTS = [
 ].freeze
 
 # These file extensions are binary-formatted. No check needed.
-BINARY_FILE_EXTENSIONS = %w[.class .dylib .so .dll .gif .ico].freeze
+BINARY_FILE_EXTENSIONS = %w[.class .dylib .so .dll .gif .ico .SF .DSA .RSA].freeze
 
 # These packages are licensed under "Weak Copyleft" licenses.
 # According to Apache official guidelines, such software could be
@@ -72,10 +72,13 @@ BINARY_FILE_EXTENSIONS = %w[.class .dylib .so .dll .gif .ico].freeze
 # See https://www.apache.org/legal/resolved.html for more details.
 EXCEPTION_PACKAGES = [
   'org/glassfish/jersey/', # dual-licensed under GPL 2 and EPL 2.0
-  'org.glassfish.jersey', # dual-licensed under GPL 2 and EPL 2.0
-  'org.glassfish.hk2', # dual-licensed under GPL 2 and EPL 2.0
-  'javax.ws.rs-api', # dual-licensed under GPL 2 and EPL 2.0
-  'jakarta.ws.rs' # dual-licensed under GPL 2 and EPL 2.0
+  'org.glassfish.jersey',  # dual-licensed under GPL 2 and EPL 2.0
+  'org.glassfish.hk2',     # dual-licensed under GPL 2 and EPL 2.0
+  'javax.ws.rs-api',       # dual-licensed under GPL 2 and EPL 2.0
+  'jakarta.ws.rs',         # dual-licensed under GPL 2 and EPL 2.0
+  'jakarta.json-api',      # dual-licensed under GPL 2 and EPL 2.0
+  'org.eclipse.parsson',   # EPL 2.0
+  'org/eclipse/parsson/'   # EPL 2.0
 ].freeze
 
 puts 'Start license check...'
@@ -110,7 +113,7 @@ def check_jar_license(jar_file)
   Zip::File.open(jar_file) do |jar|
     jar.filter { |e| e.ftype == :file }
        .filter { |e| !File.basename(e.name).downcase.end_with?(*BINARY_FILE_EXTENSIONS) }
-       .filter { |e| !File.basename(e.name).downcase.start_with? 'license', 'dependencies' }
+       .filter { |e| !File.basename(e.name).downcase.start_with? 'license', 'dependencies', 'notice' }
        .filter { |e| EXCEPTION_PACKAGES.none? { |ex| e.name.include? ex } }
        .map do |e|
          content = e.get_input_stream.read.force_encoding('UTF-8')

@@ -20,10 +20,17 @@ package org.apache.flink.cdc.connectors.elasticsearch.serializer;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.cdc.common.data.RecordData;
-import org.apache.flink.cdc.common.event.*;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.OperationType;
+import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.types.*;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.connector.base.sink.writer.ElementConverter;
@@ -37,11 +44,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-
-import static org.apache.flink.cdc.common.types.DataTypeChecks.*;
 
 /** A serializer for Event to BulkOperationVariant. */
 public class ElasticsearchEventSerializer implements ElementConverter<Event, BulkOperationVariant> {
@@ -69,7 +78,7 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
     public BulkOperationVariant apply(Event event, SinkWriter.Context context) {
         try {
             if (event instanceof DataChangeEvent) {
-                return applyDataChangeEvent((DataChangeEvent) event);
+                return createBulkOperationVariant((DataChangeEvent) event);
             } else if (event instanceof SchemaChangeEvent) {
                 IndexOperation<Map<String, Object>> indexOperation =
                         applySchemaChangeEvent((SchemaChangeEvent) event);
@@ -86,11 +95,11 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
     private IndexOperation<Map<String, Object>> applySchemaChangeEvent(
             SchemaChangeEvent schemaChangeEvent) throws IOException {
         TableId tableId = schemaChangeEvent.tableId();
-
         if (schemaChangeEvent instanceof CreateTableEvent) {
             Schema schema = ((CreateTableEvent) schemaChangeEvent).getSchema();
             schemaMaps.put(tableId, schema);
-            return createSchemaIndexOperation(tableId, schema);
+            // Cache new converters
+            getOrCreateConverters(tableId, schema);
         } else if (schemaChangeEvent instanceof AddColumnEvent
                 || schemaChangeEvent instanceof DropColumnEvent
                 || schemaChangeEvent instanceof RenameColumnEvent) {
@@ -100,7 +109,8 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
             Schema updatedSchema =
                     SchemaUtils.applySchemaChangeEvent(schemaMaps.get(tableId), schemaChangeEvent);
             schemaMaps.put(tableId, updatedSchema);
-            return createSchemaIndexOperation(tableId, updatedSchema);
+            // Update cached converters
+            getOrCreateConverters(tableId, updatedSchema);
         } else {
             if (!schemaMaps.containsKey(tableId)) {
                 throw new RuntimeException("Schema of " + tableId + " does not exist.");
@@ -108,41 +118,27 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
             Schema updatedSchema =
                     SchemaUtils.applySchemaChangeEvent(schemaMaps.get(tableId), schemaChangeEvent);
             schemaMaps.put(tableId, updatedSchema);
+            // Update cached converters
+            getOrCreateConverters(tableId, updatedSchema);
         }
         return null;
     }
 
-    private IndexOperation<Map<String, Object>> createSchemaIndexOperation(
-            TableId tableId, Schema schema) {
-        Map<String, Object> schemaMap = new HashMap<>();
-        schemaMap.put(
-                "columns",
-                schema.getColumns().stream()
-                        .map(Column::asSummaryString)
-                        .collect(Collectors.toList()));
-        schemaMap.put("primaryKeys", schema.primaryKeys());
-        schemaMap.put("options", schema.options());
-
-        return new IndexOperation.Builder<Map<String, Object>>()
-                .index(tableId.toString())
-                .id(tableId.getTableName())
-                .document(schemaMap)
-                .build();
-    }
-
-    private BulkOperationVariant applyDataChangeEvent(DataChangeEvent event)
+    private BulkOperationVariant createBulkOperationVariant(DataChangeEvent event)
             throws JsonProcessingException {
         TableId tableId = event.tableId();
         Schema schema = schemaMaps.get(tableId);
         Preconditions.checkNotNull(schema, event.tableId() + " does not exist.");
+        // Ensure converters are cached
+        getOrCreateConverters(tableId, schema);
         Map<String, Object> valueMap;
         OperationType op = event.op();
-
         Object[] uniqueId =
                 generateUniqueId(
-                        op == OperationType.DELETE ? event.before() : event.after(), schema);
+                        op == OperationType.DELETE ? event.before() : event.after(),
+                        schema,
+                        tableId);
         String id = Arrays.stream(uniqueId).map(Object::toString).collect(Collectors.joining("_"));
-
         switch (op) {
             case INSERT:
             case REPLACE:
@@ -160,67 +156,37 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
         }
     }
 
-    private Object[] generateUniqueId(RecordData recordData, Schema schema) {
+    private Object[] generateUniqueId(RecordData recordData, Schema schema, TableId tableId) {
         List<String> primaryKeys = schema.primaryKeys();
-        return primaryKeys.stream()
-                .map(
-                        primaryKey -> {
-                            Column column =
-                                    schema.getColumns().stream()
-                                            .filter(col -> col.getName().equals(primaryKey))
-                                            .findFirst()
-                                            .orElseThrow(
-                                                    () ->
-                                                            new IllegalStateException(
-                                                                    "Primary key column not found: "
-                                                                            + primaryKey));
-                            int index = schema.getColumns().indexOf(column);
-                            return getFieldValue(recordData, column.getType(), index);
-                        })
-                .toArray();
-    }
+        List<ElasticsearchRowConverter.SerializationConverter> converters =
+                converterCache.get(tableId);
+        Preconditions.checkNotNull(converters, "No converters found for table: " + tableId);
 
-    private Object getFieldValue(RecordData recordData, DataType dataType, int index) {
-        switch (dataType.getTypeRoot()) {
-            case BOOLEAN:
-                return recordData.getBoolean(index);
-            case TINYINT:
-                return recordData.getByte(index);
-            case SMALLINT:
-                return recordData.getShort(index);
-            case INTEGER:
-            case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
-                return recordData.getInt(index);
-            case BIGINT:
-                return recordData.getLong(index);
-            case FLOAT:
-                return recordData.getFloat(index);
-            case DOUBLE:
-                return recordData.getDouble(index);
-            case CHAR:
-            case VARCHAR:
-                return recordData.getString(index);
-            case DECIMAL:
-                return recordData.getDecimal(index, getPrecision(dataType), getScale(dataType));
-            case TIMESTAMP_WITHOUT_TIME_ZONE:
-                return recordData.getTimestamp(index, getPrecision(dataType));
-            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return recordData.getLocalZonedTimestampData(index, getPrecision(dataType));
-            case TIMESTAMP_WITH_TIME_ZONE:
-                return recordData.getZonedTimestamp(index, getPrecision(dataType));
-            case BINARY:
-            case VARBINARY:
-                return recordData.getBinary(index);
-            case ARRAY:
-                return recordData.getArray(index);
-            case MAP:
-                return recordData.getMap(index);
-            case ROW:
-                return recordData.getRow(index, getFieldCount(dataType));
-            default:
-                throw new IllegalArgumentException("Unsupported type: " + dataType);
+        Object[] uniqueId = new Object[primaryKeys.size()];
+        List<Column> columns = schema.getColumns();
+
+        for (int i = 0; i < primaryKeys.size(); i++) {
+            String primaryKey = primaryKeys.get(i);
+            Column column = null;
+            int index = -1;
+
+            for (int j = 0; j < columns.size(); j++) {
+                if (columns.get(j).getName().equals(primaryKey)) {
+                    column = columns.get(j);
+                    index = j;
+                    break;
+                }
+            }
+
+            if (column == null) {
+                throw new IllegalStateException("Primary key column not found: " + primaryKey);
+            }
+
+            checkIndex(index, converters.size());
+            uniqueId[i] = converters.get(index).serialize(index, recordData);
         }
+
+        return uniqueId;
     }
 
     public Map<String, Object> serializeRecord(
@@ -230,35 +196,37 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
         Preconditions.checkState(
                 columns.size() == recordData.getArity(),
                 "Column size does not match the data size.");
-
         List<ElasticsearchRowConverter.SerializationConverter> converters =
                 getOrCreateConverters(tableId, schema);
-
         for (int i = 0; i < recordData.getArity(); i++) {
             Column column = columns.get(i);
+            checkIndex(i, converters.size());
             Object field = converters.get(i).serialize(i, recordData);
             record.put(column.getName(), field);
         }
-
         return record;
     }
 
     private List<ElasticsearchRowConverter.SerializationConverter> getOrCreateConverters(
             TableId tableId, Schema schema) {
-        return converterCache.computeIfAbsent(
+        return converterCache.compute(
                 tableId,
-                id -> {
+                (id, existingConverters) -> {
                     List<ElasticsearchRowConverter.SerializationConverter> converters =
                             new ArrayList<>();
                     for (Column column : schema.getColumns()) {
-                        ColumnType columnType =
-                                ColumnType.valueOf(column.getType().getTypeRoot().name());
                         converters.add(
                                 ElasticsearchRowConverter.createNullableExternalConverter(
-                                        columnType, pipelineZoneId));
+                                        column.getType(), pipelineZoneId));
                     }
                     return converters;
                 });
+    }
+
+    private void checkIndex(int index, int size) {
+        if (index < 0 || index >= size) {
+            throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + size);
+        }
     }
 
     @Override

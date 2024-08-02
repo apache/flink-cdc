@@ -17,15 +17,31 @@
 
 package org.apache.flink.cdc.connectors.elasticsearch.serializer;
 
-import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.GenericMapData;
+import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
-import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.types.DataField;
+import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypeChecks;
+import org.apache.flink.cdc.common.types.DecimalType;
+import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.elasticsearch6.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.time.*;
+import java.io.IOException;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /** Converter class for serializing row data to Elasticsearch compatible formats. */
 public class ElasticsearchRowConverter {
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     // Date and time formatters for various temporal types
     private static final DateTimeFormatter DATE_FORMATTER =
@@ -43,7 +59,7 @@ public class ElasticsearchRowConverter {
      * @return A SerializationConverter that can handle null values.
      */
     public static SerializationConverter createNullableExternalConverter(
-            ColumnType columnType, java.time.ZoneId zoneId) {
+            DataType columnType, java.time.ZoneId zoneId) {
         return wrapIntoNullableExternalConverter(createExternalConverter(columnType, zoneId));
     }
 
@@ -71,123 +87,111 @@ public class ElasticsearchRowConverter {
      * @param zoneId The time zone to use for temporal conversions.
      * @return A SerializationConverter for the specified column type.
      */
-    static SerializationConverter createExternalConverter(
-            ColumnType columnType, java.time.ZoneId zoneId) {
-        switch (columnType) {
-                // Basic types
+    static ElasticsearchRowConverter.SerializationConverter createExternalConverter(
+            DataType columnType, ZoneId zoneId) {
+        switch (columnType.getTypeRoot()) {
+            case CHAR:
+            case VARCHAR:
+                return (pos, data) -> data.getString(pos).toString();
             case BOOLEAN:
                 return (pos, data) -> data.getBoolean(pos);
-            case INTEGER:
-                return (pos, data) -> data.getInt(pos);
-            case DOUBLE:
-                return (pos, data) -> data.getDouble(pos);
-            case VARCHAR:
-            case CHAR:
-                return (pos, data) -> data.getString(pos).toString();
-            case FLOAT:
-                return (pos, data) -> data.getFloat(pos);
-            case BIGINT:
-                return (pos, data) -> data.getLong(pos);
+            case BINARY:
+            case VARBINARY:
+                return (pos, data) -> data.getBinary(pos);
+            case DECIMAL:
+                final int decimalPrecision = ((DecimalType) columnType).getPrecision();
+                final int decimalScale = ((DecimalType) columnType).getScale();
+                return (pos, data) ->
+                        data.getDecimal(pos, decimalPrecision, decimalScale)
+                                .toBigDecimal()
+                                .toString();
             case TINYINT:
                 return (pos, data) -> data.getByte(pos);
             case SMALLINT:
                 return (pos, data) -> data.getShort(pos);
-            case BINARY:
-            case VARBINARY:
-                return (pos, data) -> data.getBinary(pos);
-
-                // Decimal type
-            case DECIMAL:
-                return (pos, data) -> {
-                    DecimalData decimalData = data.getDecimal(pos, 17, 2);
-                    return decimalData != null ? decimalData.toBigDecimal().toString() : null;
-                };
-
-                // Date and time types
+            case INTEGER:
+                return (pos, data) -> data.getInt(pos);
+            case BIGINT:
+                return (pos, data) -> data.getLong(pos);
+            case FLOAT:
+                return (pos, data) -> data.getFloat(pos);
+            case DOUBLE:
+                return (pos, data) -> data.getDouble(pos);
             case DATE:
-                return (pos, data) -> {
-                    int days = data.getInt(pos);
-                    LocalDate date = LocalDate.ofEpochDay(days);
-                    return date.format(DATE_FORMATTER);
-                };
-            case TIME_WITHOUT_TIME_ZONE:
-                return (pos, data) -> {
-                    int milliseconds = data.getInt(pos);
-                    LocalTime time = LocalTime.ofNanoOfDay(milliseconds * 1_000_000L);
-                    return time.format(TIME_FORMATTER);
-                };
+                return (pos, data) -> LocalDate.ofEpochDay(data.getInt(pos)).format(DATE_FORMATTER);
             case TIMESTAMP_WITHOUT_TIME_ZONE:
-                return (pos, data) -> {
-                    long milliseconds = data.getTimestamp(pos, 6).getMillisecond();
-                    LocalDateTime dateTime =
-                            LocalDateTime.ofEpochSecond(
-                                    milliseconds / 1000,
-                                    (int) (milliseconds % 1000) * 1_000_000,
-                                    java.time.ZoneOffset.UTC);
-                    return dateTime.format(DATE_TIME_FORMATTER);
-                };
+                return (pos, data) ->
+                        data.getTimestamp(pos, DataTypeChecks.getPrecision(columnType))
+                                .toLocalDateTime()
+                                .format(DATE_TIME_FORMATTER);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return (pos, data) -> {
-                    try {
-                        if (data.isNullAt(pos)) {
-                            return null;
-                        }
-
-                        // Debug logging
-                        System.out.println(
-                                "Processing TIMESTAMP_WITH_LOCAL_TIME_ZONE at position: " + pos);
-                        System.out.println("Data type: " + data.getClass().getName());
-
-                        // Attempt to retrieve timestamp data
-                        long milliseconds;
-                        int nanos = 0;
-
-                        try {
-                            // Try using getTimestamp method
-                            TimestampData timestampData = data.getTimestamp(pos, 6);
-                            milliseconds = timestampData.getMillisecond();
-                            nanos = timestampData.getNanoOfMillisecond();
-                        } catch (Exception e) {
-                            // Fallback to getLong if getTimestamp fails
-                            milliseconds = data.getLong(pos);
-                        }
-
-                        // Create Instant object
-                        Instant instant =
-                                Instant.ofEpochSecond(
-                                        milliseconds / 1000,
-                                        (milliseconds % 1000) * 1_000_000L + nanos);
-
-                        // Format timestamp using UTC timezone
-                        return DateTimeFormatter.ISO_INSTANT.format(instant);
-
-                    } catch (Exception e) {
-                        return "ERROR_PROCESSING_TIMESTAMP";
-                    }
-                };
+                return (pos, data) ->
+                        data.getTimestamp(pos, DataTypeChecks.getPrecision(columnType))
+                                .toLocalDateTime()
+                                .atZone(zoneId)
+                                .format(DATE_TIME_FORMATTER);
             case TIMESTAMP_WITH_TIME_ZONE:
-                return (pos, data) -> {
-                    long milliseconds = data.getTimestamp(pos, 6).getMillisecond();
-                    LocalDateTime dateTime =
-                            LocalDateTime.ofEpochSecond(
-                                    milliseconds / 1000,
-                                    (int) (milliseconds % 1000) * 1_000_000,
-                                    zoneId.getRules().getOffset(java.time.Instant.now()));
-                    return dateTime.atZone(zoneId).format(DATE_TIME_FORMATTER);
-                };
-
-                // Complex types
+                final int zonedP = ((ZonedTimestampType) columnType).getPrecision();
+                return (pos, data) ->
+                        data.getTimestamp(pos, zonedP)
+                                .toTimestamp()
+                                .toInstant()
+                                .atZone(zoneId)
+                                .format(DATE_TIME_FORMATTER);
             case ARRAY:
-                return (pos, data) -> data.getArray(pos);
+                return (pos, data) -> convertArrayData(data.getArray(pos), columnType);
             case MAP:
-                return (pos, data) -> data.getMap(pos);
+                return (pos, data) ->
+                        writeValueAsString(convertMapData(data.getMap(pos), columnType));
             case ROW:
-                return (pos, data) -> {
-                    RecordData rowData = data.getRow(pos, 5); // Assuming 5 fields, adjust as needed
-                    return rowData != null ? rowData.toString() : null;
-                };
+                return (pos, data) ->
+                        writeValueAsString(convertRowData(data, pos, columnType, zoneId));
             default:
-                throw new IllegalArgumentException("Unsupported column type: " + columnType);
+                throw new UnsupportedOperationException("Unsupported type: " + columnType);
+        }
+    }
+
+    private static List<Object> convertArrayData(ArrayData array, DataType type) {
+        if (array instanceof GenericArrayData) {
+            return Arrays.asList(((GenericArrayData) array).toObjectArray());
+        }
+        throw new UnsupportedOperationException("Unsupported array data: " + array.getClass());
+    }
+
+    private static Object convertMapData(MapData map, DataType type) {
+        Map<Object, Object> result = new HashMap<>();
+        if (map instanceof GenericMapData) {
+            GenericMapData gMap = (GenericMapData) map;
+            for (Object key : ((GenericArrayData) gMap.keyArray()).toObjectArray()) {
+                result.put(key, gMap.get(key));
+            }
+            return result;
+        }
+        throw new UnsupportedOperationException("Unsupported map data: " + map.getClass());
+    }
+
+    private static Object convertRowData(
+            RecordData val, int index, DataType type, ZoneId pipelineZoneId) {
+        RowType rowType = (RowType) type;
+        Map<String, Object> value = new HashMap<>();
+        RecordData row = val.getRow(index, rowType.getFieldCount());
+
+        List<DataField> fields = rowType.getFields();
+        for (int i = 0; i < fields.size(); i++) {
+            DataField rowField = fields.get(i);
+            SerializationConverter converter =
+                    createNullableExternalConverter(rowField.getType(), pipelineZoneId);
+            Object valTmp = converter.serialize(i, row);
+            value.put(rowField.getName(), valTmp.toString());
+        }
+        return value;
+    }
+
+    private static String writeValueAsString(Object object) {
+        try {
+            return objectMapper.writeValueAsString(object);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 

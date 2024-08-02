@@ -1,3 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -20,31 +37,21 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <elasticsearch.version>8.12.1</elasticsearch.version>
         <flink.version>1.18.0</flink.version>
-        <scala.binary.version>2.12</scala.binary.version>
+        <scala.binary.version>4.0</scala.binary.version>
         <jackson.version>2.13.2</jackson.version>
         <surefire.module.config>--add-opens=java.base/java.util=ALL-UNNAMED</surefire.module.config>
         <testcontainers.version>1.16.0</testcontainers.version>
+        <flink.connector.elasticsearch.version>4.0-SNAPSHOT</flink.connector.elasticsearch.version>
         <httpclient.version>4.5.13</httpclient.version>
         <junit.jupiter.version>5.7.1</junit.jupiter.version>
         <assertj.version>3.18.1</assertj.version>
         <junit.version>4.13.2</junit.version>
         <slf4j.version>1.7.32</slf4j.version>
         <junit.platform.version>1.10.2</junit.platform.version>
-        <paimon.version>0.7.0-incubating</paimon.version>
-        <hadoop.version>2.8.5</hadoop.version>
-        <hive.version>2.3.9</hive.version>
-        <mockito.version>3.4.6</mockito.version>
         <jakarta.json.version>2.0.2</jakarta.json.version>
     </properties>
 
     <dependencies>
-        <!-- Flink Dependencies -->
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-core</artifactId>
-            <version>${flink.version}</version>
-            <scope>provided</scope>
-        </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-streaming-java</artifactId>
@@ -108,7 +115,27 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Elasticsearch Clients -->
+        <!-- Elasticsearch 6 -->
+        <dependency>
+            <groupId>org.elasticsearch.client</groupId>
+            <artifactId>elasticsearch-rest-client</artifactId>
+            <version>${elasticsearch.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-sql-connector-elasticsearch6</artifactId>
+            <version>${flink.connector.elasticsearch.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-sql-connector-elasticsearch7</artifactId>
+            <version>${flink.connector.elasticsearch.version}</version>
+        </dependency>
+
+
+        <!-- Elasticsearch 8 Client -->
         <dependency>
             <groupId>co.elastic.clients</groupId>
             <artifactId>elasticsearch-java</artifactId>
@@ -204,6 +231,16 @@
                         </goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>
