@@ -149,10 +149,10 @@ Unpack the precompiled binary jar package and check if the `Build-Jdk` entry in 
 4. Run migration tests.
 
 Flink CDC tries to ensure backward compatibility of state, that is, the job state (Checkpoint/Savepoint) saved with previous CDC version should be usable in the new version.
-You can run CDC migration verification locally with [Flink CDC Migration Test Utils](https://github.com/yuxiqian/migration-test) script.
+You can run CDC migration verification locally with [Flink CDC Migration Test Utils](https://github.com/apache/flink-cdc/tree/master/tools/mig-test) script.
 
-* [Pipeline Job Migration Test Guide](https://github.com/yuxiqian/migration-test/blob/main/README.md)
-* [DataStream Job Migration Test Guide](https://github.com/yuxiqian/migration-test/blob/main/datastream/README.md)
+* [Pipeline Job Migration Test Guide](https://github.com/apache/flink-cdc/blob/master/tools/mig-test/README.md)
+* [DataStream Job Migration Test Guide](https://github.com/apache/flink-cdc/blob/master/tools/mig-test/datastream/README.md)
 
 5. Run end-to-end tests.
 

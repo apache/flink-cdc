@@ -145,10 +145,10 @@ gpg --verify flink-cdc-3.1.0-src.tgz.asc flink-cdc-3.1.0-src.tgz
 4. 执行迁移测试。
 
 Flink CDC 尽力确保状态向后兼容性，即使用旧版本 CDC 保存的作业状态（Checkpoint / Savepoint）能够用于新版本的作业恢复。
-您可以通过 [Flink CDC Migration Test Utils](https://github.com/yuxiqian/migration-test) 脚本执行 CDC 迁移验证。
+您可以通过 [Flink CDC Migration Test Utils](https://github.com/apache/flink-cdc/tree/master/tools/mig-test) 脚本执行 CDC 迁移验证。
 
-* [Pipeline 作业迁移测试指南](https://github.com/yuxiqian/migration-test/blob/main/README.md)
-* [DataStream 作业迁移测试指南](https://github.com/yuxiqian/migration-test/blob/main/datastream/README.md)
+* [Pipeline 作业迁移测试指南](https://github.com/apache/flink-cdc/blob/master/tools/mig-test/README.md)
+* [DataStream 作业迁移测试指南](https://github.com/apache/flink-cdc/blob/master/tools/mig-test/datastream/README.md)
 
 5. 执行端到端测试。
 
