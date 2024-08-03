@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -144,12 +143,6 @@ public class PostgresQueryUtils {
                     }
                     return rs.getObject(1);
                 });
-    }
-
-    public static String buildSplitScanQuery(
-            TableId tableId, RowType pkRowType, boolean isFirstSplit, boolean isLastSplit) {
-        return buildSplitScanQuery(
-                tableId, pkRowType, isFirstSplit, isLastSplit, new ArrayList<>());
     }
 
     public static String buildSplitScanQuery(
@@ -276,7 +269,7 @@ public class PostgresQueryUtils {
         return String.format("(%s)::text", value);
     }
 
-    private static boolean isUUID(Column column) {
+    public static boolean isUUID(Column column) {
         return column.typeName().equals("uuid");
     }
 
