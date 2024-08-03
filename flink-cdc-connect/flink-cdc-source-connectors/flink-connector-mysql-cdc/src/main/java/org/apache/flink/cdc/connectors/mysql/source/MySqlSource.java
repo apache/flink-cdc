@@ -127,8 +127,9 @@ public class MySqlSource<T>
         this(
                 configFactory,
                 deserializationSchema,
-                (sourceReaderMetrics, sourceConfig) ->
+                (sourceReaderContext, sourceReaderMetrics, sourceConfig) ->
                         new MySqlRecordEmitter<>(
+                                sourceReaderContext,
                                 deserializationSchema,
                                 sourceReaderMetrics,
                                 sourceConfig.isIncludeSchemaChanges()));
@@ -185,7 +186,7 @@ public class MySqlSource<T>
         return new MySqlSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,
-                recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig),
+                recordEmitterSupplier.get(readerContext, sourceReaderMetrics, sourceConfig),
                 readerContext.getConfiguration(),
                 mySqlSourceReaderContext,
                 sourceConfig);
@@ -272,6 +273,8 @@ public class MySqlSource<T>
     interface RecordEmitterSupplier<T> extends Serializable {
 
         RecordEmitter<SourceRecords, T, MySqlSplitState> get(
-                MySqlSourceReaderMetrics metrics, MySqlSourceConfig sourceConfig);
+                SourceReaderContext sourceReaderContext,
+                MySqlSourceReaderMetrics metrics,
+                MySqlSourceConfig sourceConfig);
     }
 }

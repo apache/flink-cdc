@@ -23,11 +23,31 @@ import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 
 /**
  * The {@link SourceEvent} that {@link MySqlSourceReader} sends to {@link MySqlSourceEnumerator} to
- * ask the latest finished snapshot splits number.
+ * notify enumerator that sourceReader received new create table.
  */
-public class LatestFinishedSplitsNumberRequestEvent implements SourceEvent {
+public class BinlogNewAddedTableEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
-    public LatestFinishedSplitsNumberRequestEvent() {}
+    private String catalog;
+    private String schema;
+    private String table;
+
+    public BinlogNewAddedTableEvent(String catalog, String schema, String table) {
+        this.catalog = catalog;
+        this.schema = schema;
+        this.table = table;
+    }
+
+    public String getCatalog() {
+        return catalog;
+    }
+
+    public String getSchema() {
+        return schema;
+    }
+
+    public String getTable() {
+        return table;
+    }
 }

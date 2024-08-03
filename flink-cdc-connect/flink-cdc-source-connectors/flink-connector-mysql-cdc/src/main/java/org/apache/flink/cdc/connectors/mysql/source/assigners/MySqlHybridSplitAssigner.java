@@ -135,8 +135,9 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     }
 
     @Override
-    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos() {
-        return snapshotSplitAssigner.getFinishedSplitInfos();
+    public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos(
+            boolean isScanNewlyAddedTableEnabled) {
+        return snapshotSplitAssigner.getFinishedSplitInfos(isScanNewlyAddedTableEnabled);
     }
 
     @Override
@@ -156,6 +157,11 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
             }
         }
         snapshotSplitAssigner.addSplits(snapshotSplits);
+    }
+
+    @Override
+    public void addAlreadyProcessedTables(TableId tableId) {
+        snapshotSplitAssigner.addAlreadyProcessedTables(tableId);
     }
 
     @Override

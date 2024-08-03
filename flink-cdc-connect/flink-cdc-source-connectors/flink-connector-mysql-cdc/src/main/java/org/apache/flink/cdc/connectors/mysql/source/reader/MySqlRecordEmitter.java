@@ -18,8 +18,11 @@
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceOutput;
+import org.apache.flink.api.connector.source.SourceReaderContext;
+import org.apache.flink.cdc.connectors.mysql.source.events.BinlogNewAddedTableEvent;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
@@ -29,8 +32,10 @@ import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
 
 import io.debezium.document.Array;
+import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,14 +55,17 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             new FlinkJsonTableChangeSerializer();
 
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
+    private final SourceReaderContext context;
     private final MySqlSourceReaderMetrics sourceReaderMetrics;
     private final boolean includeSchemaChanges;
     private final OutputCollector<T> outputCollector;
 
     public MySqlRecordEmitter(
+            SourceReaderContext context,
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
             boolean includeSchemaChanges) {
+        this.context = context;
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceReaderMetrics = sourceReaderMetrics;
         this.includeSchemaChanges = includeSchemaChanges;
@@ -87,12 +95,23 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             Array tableChanges =
                     historyRecord.document().getArray(HistoryRecord.Fields.TABLE_CHANGES);
             TableChanges changes = TABLE_CHANGE_SERIALIZER.deserialize(tableChanges, true);
+            MySqlBinlogSplitState mySqlBinlogSplitState = splitState.asBinlogSplitState();
             for (TableChanges.TableChange tableChange : changes) {
-                splitState.asBinlogSplitState().recordSchema(tableChange.getId(), tableChange);
+                mySqlBinlogSplitState.recordSchema(tableChange.getId(), tableChange);
             }
             if (includeSchemaChanges) {
                 BinlogOffset position = RecordUtils.getBinlogPosition(element);
                 splitState.asBinlogSplitState().setStartingOffset(position);
+                TableId tableId = extractTableId(element);
+                TableChanges.TableChange tableChange =
+                        mySqlBinlogSplitState.getTableSchemas().get(tableId);
+                if (tableChange.getType().equals(TableChanges.TableChangeType.CREATE)) {
+                    LOG.info("sending table added to enumerator from subtask");
+                    mySqlBinlogSplitState.addUnNotifiedTableId(tableId);
+                    context.sendSourceEventToCoordinator(
+                            new BinlogNewAddedTableEvent(
+                                    tableId.catalog(), tableId.schema(), tableId.table()));
+                }
                 emitElement(element, output);
             }
         } else if (RecordUtils.isDataChangeRecord(element)) {
@@ -105,6 +124,14 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);
         }
+    }
+
+    public TableId extractTableId(SourceRecord sourceRecord) {
+        Struct value = ((Struct) sourceRecord.value()).getStruct("source");
+        String databaseName = value.getString("db");
+        String tableName = value.getString("table");
+        TableId tableId = new TableId(databaseName, null, tableName);
+        return tableId;
     }
 
     private void updateStartingOffsetForSplit(MySqlSplitState splitState, SourceRecord element) {

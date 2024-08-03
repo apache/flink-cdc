@@ -20,15 +20,34 @@ package org.apache.flink.cdc.connectors.mysql.source.events;
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReader;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
+
+import javax.annotation.Nullable;
+
+import java.util.List;
 
 /**
- * The {@link SourceEvent} that {@link MySqlSourceEnumerator} broadcasts to {@link
- * MySqlSourceReader} to tell the source reader to update the binlog split after newly added table
- * snapshot splits finished.
+ * The {@link SourceEvent} that {@link MySqlSourceEnumerator} sends to {@link MySqlSourceReader} to
+ * notify the {@link MySqlBinlogSplit} update FinishedSnapshotSplitInfo.
  */
-public class BinlogSplitUpdateRequestEvent implements SourceEvent {
+public class BinlogSplitStartEvent implements SourceEvent {
 
     private static final long serialVersionUID = 1L;
 
-    public BinlogSplitUpdateRequestEvent() {}
+    private final List<byte[]> metaGroup;
+
+    private final int totalFinishedSplitSize;
+
+    public BinlogSplitStartEvent(int totalFinishedSplitSize, @Nullable List<byte[]> metaGroup) {
+        this.metaGroup = metaGroup;
+        this.totalFinishedSplitSize = totalFinishedSplitSize;
+    }
+
+    public List<byte[]> getMetaGroup() {
+        return metaGroup;
+    }
+
+    public int getTotalFinishedSplitSize() {
+        return totalFinishedSplitSize;
+    }
 }

@@ -24,6 +24,8 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 
+import io.debezium.relational.TableId;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -59,7 +61,7 @@ public interface MySqlSplitAssigner {
      * Gets the finished splits' information. This is useful metadata to generate a binlog split
      * that considering finished snapshot splits.
      */
-    List<FinishedSnapshotSplitInfo> getFinishedSplitInfos();
+    List<FinishedSnapshotSplitInfo> getFinishedSplitInfos(boolean isScanNewlyAddedTableEnabled);
 
     /**
      * Callback to handle the finished splits with finished binlog offset. This is useful for
@@ -115,6 +117,8 @@ public interface MySqlSplitAssigner {
      * is useful to check the newly added tables has been finished or not.
      */
     void onBinlogSplitUpdated();
+
+    void addAlreadyProcessedTables(TableId tableId);
 
     /**
      * Called to close the assigner, in case it holds on to any resources, like threads or network

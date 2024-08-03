@@ -66,6 +66,11 @@ public class MySqlBinlogSplitState extends MySqlSplitState {
         this.tableSchemas.put(tableId, latestTableChange);
     }
 
+    public void addUnNotifiedTableId(TableId tableId) {
+        ((MySqlBinlogSplit) this.split).getTableUnNotified().add(tableId);
+    }
+
+    @Override
     public MySqlBinlogSplit toMySqlSplit() {
         final MySqlBinlogSplit binlogSplit = split.asBinlogSplit();
         return new MySqlBinlogSplit(
