@@ -232,6 +232,10 @@ public class Db2SourceBuilder<T> {
         return this;
     }
 
+    public Db2SourceConfigFactory getConfigFactory() {
+        return configFactory;
+    }
+
     /**
      * Build the {@link Db2IncrementalSource}.
      *
