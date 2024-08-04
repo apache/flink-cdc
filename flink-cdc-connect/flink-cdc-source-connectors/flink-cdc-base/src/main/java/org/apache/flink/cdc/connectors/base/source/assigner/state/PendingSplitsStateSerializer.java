@@ -390,7 +390,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         for (TableId tableId : tableIds) {
             boolean useCatalogBeforeSchema = SerializerUtils.shouldUseCatalogBeforeSchema(tableId);
             out.writeBoolean(useCatalogBeforeSchema);
-            out.writeUTF(tableId.toString());
+            out.writeUTF(tableId.toDoubleQuotedString());
         }
     }
 
