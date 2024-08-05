@@ -38,7 +38,6 @@ import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
-import io.debezium.text.ParsingException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -134,7 +133,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
         String ddlStatement = showCreateTable(jdbc, tableId);
         try {
             return parseDDL(ddlStatement, tableId);
-        } catch (ParsingException pe) {
+        } catch (Exception pe) {
             LOG.warn(
                     "Failed to parse DDL: \n{}\nWill try parsing by describing table.",
                     ddlStatement,
