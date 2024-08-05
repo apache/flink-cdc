@@ -470,7 +470,6 @@ public class PostgresParallelSourceExample {
                         .slotName("flink")
                         .decodingPluginName("decoderbufs") // use pgoutput for PostgreSQL 10+
                         .deserializer(deserializer)
-                        .includeSchemaChanges(true) // output the schema changes as well
                         .splitSize(2) // the split size of each snapshot split
                         .build();
 

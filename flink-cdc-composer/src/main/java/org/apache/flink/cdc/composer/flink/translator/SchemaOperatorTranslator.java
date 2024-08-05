@@ -17,12 +17,11 @@
 
 package org.apache.flink.cdc.composer.flink.translator;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
-import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
@@ -80,10 +79,13 @@ public class SchemaOperatorTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes) {
-        List<Tuple2<String, TableId>> routingRules = new ArrayList<>();
+        List<RouteRule> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
             routingRules.add(
-                    Tuple2.of(route.getSourceTable(), TableId.parse(route.getSinkTable())));
+                    new RouteRule(
+                            route.getSourceTable(),
+                            route.getSinkTable(),
+                            route.getReplaceSymbol().orElse(null)));
         }
         SingleOutputStreamOperator<Event> stream =
                 input.transform(

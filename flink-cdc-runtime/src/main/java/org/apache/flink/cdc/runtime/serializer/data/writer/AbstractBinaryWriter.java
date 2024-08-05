@@ -138,7 +138,7 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
 
     @Override
     public void writeDecimal(int pos, DecimalData value, int precision) {
-        assert value == null || (value.precision() == precision);
+        assert value == null || (value.precision() <= precision);
 
         if (DecimalData.isCompact(precision)) {
             assert value != null;

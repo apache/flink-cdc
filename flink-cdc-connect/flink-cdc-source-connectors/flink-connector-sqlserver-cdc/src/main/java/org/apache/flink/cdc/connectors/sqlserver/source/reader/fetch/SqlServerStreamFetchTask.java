@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import org.apache.flink.cdc.connectors.sqlserver.source.offset.LsnOffset;
+import org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch.SqlServerScanFetchTask.SqlServerSnapshotSplitChangeEventSourceContext;
 
 import io.debezium.DebeziumException;
 import io.debezium.connector.sqlserver.Lsn;
@@ -142,9 +143,7 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                                 new DebeziumException("Error processing binlog signal event", e));
                     }
                     // tell fetcher the streaming task finished
-                    ((SqlServerScanFetchTask.SqlserverSnapshotSplitChangeEventSourceContext)
-                                    context)
-                            .finished();
+                    ((SqlServerSnapshotSplitChangeEventSourceContext) context).finished();
                 }
             }
         }

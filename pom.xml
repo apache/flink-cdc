@@ -430,6 +430,7 @@ limitations under the License.
                         <exclude>**/.*/**</exclude>
                         <!-- Generated content -->
                         <exclude>**/target/**</exclude>
+                        <exclude>**/*.log</exclude>
                         <!-- Build files -->
                         <exclude>**/*.iml</exclude>
                         <!-- Docs -->
