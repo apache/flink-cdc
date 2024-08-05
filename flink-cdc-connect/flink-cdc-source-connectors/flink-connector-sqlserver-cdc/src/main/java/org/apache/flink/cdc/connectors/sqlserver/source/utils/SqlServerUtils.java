@@ -301,8 +301,7 @@ public class SqlServerUtils {
             return buildSelectWithRowLimits(
                     tableId, limitSize, "*", Optional.ofNullable(condition), Optional.empty());
         } else {
-            final String orderBy =
-                    pkRowType.getFieldNames().stream().collect(Collectors.joining(", "));
+            final String orderBy = String.join(", ", pkRowType.getFieldNames());
             return buildSelectWithBoundaryRowLimits(
                     tableId,
                     limitSize,
@@ -326,7 +325,7 @@ public class SqlServerUtils {
         StringBuilder sql = new StringBuilder();
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append("MAX(" + fieldNamesIt.next() + ")");
+            sql.append("MAX(").append(fieldNamesIt.next()).append(")");
             if (fieldNamesIt.hasNext()) {
                 sql.append(" , ");
             }
@@ -346,12 +345,8 @@ public class SqlServerUtils {
         }
         sql.append(projection).append(" FROM ");
         sql.append(quoteSchemaAndTable(tableId));
-        if (condition.isPresent()) {
-            sql.append(" WHERE ").append(condition.get());
-        }
-        if (orderBy.isPresent()) {
-            sql.append(" ORDER BY ").append(orderBy.get());
-        }
+        condition.ifPresent(s -> sql.append(" WHERE ").append(s));
+        orderBy.ifPresent(s -> sql.append(" ORDER BY ").append(s));
         return sql.toString();
     }
 
@@ -400,9 +395,7 @@ public class SqlServerUtils {
         sql.append(projection);
         sql.append(" FROM ");
         sql.append(quoteSchemaAndTable(tableId));
-        if (condition.isPresent()) {
-            sql.append(" WHERE ").append(condition.get());
-        }
+        condition.ifPresent(s -> sql.append(" WHERE ").append(s));
         sql.append(" ORDER BY ").append(orderBy);
         sql.append(") T");
         return sql.toString();
