@@ -188,10 +188,10 @@ class YamlPipelineDefinitionParserTest {
                                             .put("password", "pass")
                                             .put(
                                                     "tables",
-                                                    "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
+                                                    "adb\\.*, bdb.user_table_[0-9]+, [app|web]_order_\\.*")
                                             .put(
                                                     "chunk-column",
-                                                    "app_order_.*:id,web_order:product_id")
+                                                    "app_order_\\.*:id,web_order:product_id")
                                             .put("capture-new-tables", "true")
                                             .build())),
                     new SinkDef(
@@ -204,7 +204,7 @@ class YamlPipelineDefinitionParserTest {
                                             .build())),
                     Arrays.asList(
                             new RouteDef(
-                                    "mydb.default.app_order_.*",
+                                    "mydb.default.app_order_\\.*",
                                     "odsdb.default.app_order",
                                     null,
                                     "sync all sharding tables to one"),
@@ -215,15 +215,15 @@ class YamlPipelineDefinitionParserTest {
                                     "sync table to with given prefix ods_")),
                     Arrays.asList(
                             new TransformDef(
-                                    "mydb.app_order_.*",
-                                    "id, order_id, TO_UPPER(product_name)",
+                                    "mydb.app_order_\\.*",
+                                    "id, order_id, TO_UPPER(product_name) AS name",
                                     "id > 10 AND order_id > 100",
                                     "id",
                                     "product_name",
                                     "comment=app order",
                                     "project fields from source table"),
                             new TransformDef(
-                                    "mydb.web_order_.*",
+                                    "mydb.web_order_\\.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
                                     "uniq_id > 10",
                                     null,
@@ -251,10 +251,10 @@ class YamlPipelineDefinitionParserTest {
                                             .put("password", "pass")
                                             .put(
                                                     "tables",
-                                                    "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
+                                                    "adb\\.*, bdb.user_table_[0-9]+, [app|web]_order_\\.*")
                                             .put(
                                                     "chunk-column",
-                                                    "app_order_.*:id,web_order:product_id")
+                                                    "app_order_\\.*:id,web_order:product_id")
                                             .put("capture-new-tables", "true")
                                             .build())),
                     new SinkDef(
@@ -267,7 +267,7 @@ class YamlPipelineDefinitionParserTest {
                                             .build())),
                     Arrays.asList(
                             new RouteDef(
-                                    "mydb.default.app_order_.*",
+                                    "mydb.default.app_order_\\.*",
                                     "odsdb.default.app_order",
                                     null,
                                     "sync all sharding tables to one"),
@@ -278,15 +278,15 @@ class YamlPipelineDefinitionParserTest {
                                     "sync table to with given prefix ods_")),
                     Arrays.asList(
                             new TransformDef(
-                                    "mydb.app_order_.*",
-                                    "id, order_id, TO_UPPER(product_name)",
+                                    "mydb.app_order_\\.*",
+                                    "id, order_id, TO_UPPER(product_name) AS name",
                                     "id > 10 AND order_id > 100",
                                     "id",
                                     "product_name",
                                     "comment=app order",
                                     "project fields from source table"),
                             new TransformDef(
-                                    "mydb.web_order_.*",
+                                    "mydb.web_order_\\.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
                                     "uniq_id > 10",
                                     null,
@@ -314,7 +314,7 @@ class YamlPipelineDefinitionParserTest {
                                             .put("password", "pass")
                                             .put(
                                                     "tables",
-                                                    "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
+                                                    "adb\\.*, bdb.user_table_[0-9]+, [app|web]_order_\\.*")
                                             .build())),
                     new SinkDef(
                             "kafka",
@@ -325,7 +325,7 @@ class YamlPipelineDefinitionParserTest {
                                             .build())),
                     Collections.singletonList(
                             new RouteDef(
-                                    "mydb.default.app_order_.*",
+                                    "mydb.default.app_order_\\.*",
                                     "odsdb.default.app_order",
                                     null,
                                     null)),
@@ -356,10 +356,10 @@ class YamlPipelineDefinitionParserTest {
                                             .put("password", "pass")
                                             .put(
                                                     "tables",
-                                                    "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
+                                                    "adb\\.*, bdb.user_table_[0-9]+, [app|web]_order_\\.*")
                                             .put(
                                                     "chunk-column",
-                                                    "app_order_.*:id,web_order:product_id")
+                                                    "app_order_\\.*:id,web_order:product_id")
                                             .put("capture-new-tables", "true")
                                             .build())),
                     new SinkDef(
@@ -372,7 +372,7 @@ class YamlPipelineDefinitionParserTest {
                                             .build())),
                     Arrays.asList(
                             new RouteDef(
-                                    "mydb.default.app_order_.*",
+                                    "mydb.default.app_order_\\.*",
                                     "odsdb.default.app_order_<>",
                                     "<>",
                                     "sync all sharding tables to one"),
@@ -383,15 +383,15 @@ class YamlPipelineDefinitionParserTest {
                                     "sync table to with given prefix ods_")),
                     Arrays.asList(
                             new TransformDef(
-                                    "mydb.app_order_.*",
-                                    "id, order_id, TO_UPPER(product_name)",
+                                    "mydb.app_order_\\.*",
+                                    "id, order_id, TO_UPPER(product_name) AS name",
                                     "id > 10 AND order_id > 100",
                                     "id",
                                     "product_name",
                                     "comment=app order",
                                     "project fields from source table"),
                             new TransformDef(
-                                    "mydb.web_order_.*",
+                                    "mydb.web_order_\\.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
                                     "uniq_id > 10",
                                     null,

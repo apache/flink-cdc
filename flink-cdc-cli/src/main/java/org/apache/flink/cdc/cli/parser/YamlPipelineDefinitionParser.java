@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.cli.parser;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.exceptions.GuardVerificationException;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
@@ -95,6 +96,15 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 SINK_KEY));
 
         // Transforms are optional
+        Optional.ofNullable(root.get(TRANSFORM_KEY))
+                .ifPresent(
+                        node -> {
+                            if (!node.isArray()) {
+                                throw new GuardVerificationException(
+                                        node,
+                                        "Transform rules should be an array. Maybe missed a hyphen in YAML?");
+                            }
+                        });
         List<TransformDef> transformDefs = new ArrayList<>();
         Optional.ofNullable(root.get(TRANSFORM_KEY))
                 .ifPresent(
@@ -103,7 +113,18 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                         transform -> transformDefs.add(toTransformDef(transform))));
 
         // Routes are optional
+        Optional.ofNullable(root.get(ROUTE_KEY))
+                .ifPresent(
+                        node -> {
+                            if (!node.isArray()) {
+                                throw new GuardVerificationException(
+                                        node,
+                                        "Route rules should be an array. Maybe missed a hyphen in YAML?");
+                            }
+                        });
+
         List<RouteDef> routeDefs = new ArrayList<>();
+
         Optional.ofNullable(root.get(ROUTE_KEY))
                 .ifPresent(node -> node.forEach(route -> routeDefs.add(toRouteDef(route))));
 

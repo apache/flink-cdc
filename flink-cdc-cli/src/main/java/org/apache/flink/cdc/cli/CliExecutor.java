@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.cli;
 
+import org.apache.flink.cdc.cli.guard.PipelineDefGuard;
 import org.apache.flink.cdc.cli.parser.PipelineDefinitionParser;
 import org.apache.flink.cdc.cli.parser.YamlPipelineDefinitionParser;
 import org.apache.flink.cdc.cli.utils.FlinkEnvironmentUtils;
@@ -63,6 +64,9 @@ public class CliExecutor {
         PipelineDefinitionParser pipelineDefinitionParser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef =
                 pipelineDefinitionParser.parse(pipelineDefPath, globalPipelineConfig);
+
+        // Verify pipeline definitions
+        PipelineDefGuard.verify(pipelineDef);
 
         // Create composer
         PipelineComposer composer = getComposer();
