@@ -50,6 +50,8 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
 import java.util.Locale;
 
+import static org.apache.flink.cdc.connectors.oceanbase.utils.OceanBaseTypeUtils.isUnsignedColumn;
+
 /** JdbcValueConverters for OceanBase. */
 public class OceanBaseValueConverters extends JdbcValueConverters {
 
@@ -88,8 +90,8 @@ public class OceanBaseValueConverters extends JdbcValueConverters {
                 x -> x,
                 BigIntUnsignedMode.PRECISE,
                 connectorConfig.binaryHandlingMode());
-        this.compatibleMode = connectorConfig.getCompatibleMode();
-        this.serverTimezone = connectorConfig.getServerTimeZone();
+        this.compatibleMode = connectorConfig.getSourceConfig().getCompatibleMode();
+        this.serverTimezone = connectorConfig.getSourceConfig().getServerTimeZone();
     }
 
     @Override
@@ -98,10 +100,6 @@ public class OceanBaseValueConverters extends JdbcValueConverters {
             return super.getTimePrecision(column);
         }
         return column.scale().orElse(0);
-    }
-
-    protected boolean isUnsignedColumn(Column column) {
-        return column.typeName().toUpperCase().contains("UNSIGNED");
     }
 
     @Override

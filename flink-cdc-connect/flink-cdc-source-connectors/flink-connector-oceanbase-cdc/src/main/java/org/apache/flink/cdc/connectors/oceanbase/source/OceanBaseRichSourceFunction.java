@@ -171,8 +171,9 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         super.open(config);
         this.outputCollector = new OutputCollector<>();
         this.connectorConfig =
-                new OceanBaseConnectorConfig(compatibleMode, serverTimeZone, debeziumProperties);
-        this.sourceInfo = new OceanBaseSourceInfo(connectorConfig, tenantName);
+                new OceanBaseConnectorConfig(
+                        compatibleMode, serverTimeZone, tenantName, debeziumProperties);
+        this.sourceInfo = new OceanBaseSourceInfo(connectorConfig);
     }
 
     @Override

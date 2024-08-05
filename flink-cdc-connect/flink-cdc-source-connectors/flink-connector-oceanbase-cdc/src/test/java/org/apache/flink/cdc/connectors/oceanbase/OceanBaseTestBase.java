@@ -17,15 +17,8 @@
 
 package org.apache.flink.cdc.connectors.oceanbase;
 
-import org.apache.flink.runtime.minicluster.RpcServiceSharing;
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.table.utils.LegacyRowResource;
-import org.apache.flink.test.util.MiniClusterWithClientResource;
-import org.apache.flink.util.TestLogger;
-
-import org.junit.ClassRule;
-import org.junit.Rule;
+import org.apache.flink.test.util.AbstractTestBase;
 
 import java.net.URL;
 import java.nio.file.Files;
@@ -43,94 +36,23 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /** Basic class for testing OceanBase source. */
-public abstract class OceanBaseTestBase extends TestLogger {
+public abstract class OceanBaseTestBase extends AbstractTestBase {
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
-    protected static final int DEFAULT_PARALLELISM = 4;
-
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .build());
-
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
-
-    protected final String compatibleMode;
-    protected final String username;
-    protected final String password;
-    protected final String hostname;
-    protected final int port;
-    protected final String logProxyHost;
-    protected final int logProxyPort;
-    protected final String tenant;
-
-    public OceanBaseTestBase(
-            String compatibleMode,
-            String username,
-            String password,
-            String hostname,
-            int port,
-            String logProxyHost,
-            int logProxyPort,
-            String tenant) {
-        this.compatibleMode = compatibleMode;
-        this.username = username;
-        this.password = password;
-        this.hostname = hostname;
-        this.port = port;
-        this.logProxyHost = logProxyHost;
-        this.logProxyPort = logProxyPort;
-        this.tenant = tenant;
-    }
-
-    protected String commonOptionsString() {
-        return String.format(
-                " 'connector' = 'oceanbase-cdc', "
-                        + " 'username' = '%s', "
-                        + " 'password' = '%s', "
-                        + " 'hostname' = '%s', "
-                        + " 'port' = '%s', "
-                        + " 'compatible-mode' = '%s'",
-                username, password, hostname, port, compatibleMode);
-    }
-
-    protected String logProxyOptionsString() {
-        return String.format(
-                " 'working-mode' = 'memory',"
-                        + " 'tenant-name' = '%s',"
-                        + " 'logproxy.host' = '%s',"
-                        + " 'logproxy.port' = '%s'",
-                tenant, logProxyHost, logProxyPort);
-    }
-
-    protected String initialOptionsString() {
-        return " 'scan.startup.mode' = 'initial', "
-                + commonOptionsString()
-                + ", "
-                + logProxyOptionsString();
-    }
-
-    protected String snapshotOptionsString() {
-        return " 'scan.startup.mode' = 'snapshot', " + commonOptionsString();
-    }
+    protected abstract String getCompatibleMode();
 
     protected abstract Connection getJdbcConnection() throws SQLException;
 
-    protected void setGlobalTimeZone(String serverTimeZone) throws SQLException {
+    public void setGlobalTimeZone(String serverTimeZone) throws SQLException {
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(String.format("SET GLOBAL time_zone = '%s';", serverTimeZone));
         }
     }
 
-    protected void initializeTable(String sqlFile) {
-        final String ddlFile = String.format("ddl/%s/%s.sql", compatibleMode, sqlFile);
+    public void initializeTable(String sqlFile) {
+        final String ddlFile = String.format("ddl/%s/%s.sql", getCompatibleMode(), sqlFile);
         final URL ddlTestFile = getClass().getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
         try (Connection connection = getJdbcConnection();

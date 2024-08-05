@@ -130,6 +130,7 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
                         " primary key (`id`) not enforced",
                         ") WITH (",
                         " 'connector' = 'oceanbase-cdc',",
+                        " 'scan.incremental.snapshot.enabled' = 'false',",
                         " 'scan.startup.mode' = 'initial',",
                         " 'username' = '" + TEST_USER + "',",
                         " 'password' = '" + TEST_PASSWORD + "',",
