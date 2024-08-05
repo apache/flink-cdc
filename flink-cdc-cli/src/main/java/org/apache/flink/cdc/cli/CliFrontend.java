@@ -38,6 +38,7 @@ import java.io.FileNotFoundException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -67,15 +68,17 @@ public class CliFrontend {
             return;
         }
 
-        // Create executor and execute the pipeline
-        PipelineExecution.ExecutionInfo result = createExecutor(commandLine).run();
+        for (CliExecutor executor : createExecutors(commandLine)) {
+            // Create executor and execute the pipeline
+            PipelineExecution.ExecutionInfo result = executor.run();
 
-        // Print execution result
-        printExecutionInfo(result);
+            // Print execution result
+            printExecutionInfo(result);
+        }
     }
 
     @VisibleForTesting
-    static CliExecutor createExecutor(CommandLine commandLine) throws Exception {
+    static List<CliExecutor> createExecutors(CommandLine commandLine) throws Exception {
         // The pipeline definition file would remain unparsed
         List<String> unparsedArgs = commandLine.getArgList();
         if (unparsedArgs.isEmpty()) {
@@ -84,10 +87,16 @@ public class CliFrontend {
         }
 
         // Take the first unparsed argument as the pipeline definition file
-        Path pipelineDefPath = Paths.get(unparsedArgs.get(0));
-        if (!Files.exists(pipelineDefPath)) {
-            throw new FileNotFoundException(
-                    String.format("Cannot find pipeline definition file \"%s\"", pipelineDefPath));
+        List<Path> pipelineDefPaths = new ArrayList<>();
+
+        for (String pipelineDefPath : unparsedArgs) {
+            Path path = Paths.get(pipelineDefPath);
+            if (!Files.exists(path)) {
+                throw new FileNotFoundException(
+                        String.format(
+                                "Cannot find pipeline definition file \"%s\"", pipelineDefPath));
+            }
+            pipelineDefPaths.add(path);
         }
 
         // Global pipeline configuration
@@ -110,13 +119,17 @@ public class CliFrontend {
                         .collect(Collectors.toList());
 
         // Build executor
-        return new CliExecutor(
-                pipelineDefPath,
-                flinkConfig,
-                globalPipelineConfig,
-                commandLine.hasOption(CliFrontendOptions.USE_MINI_CLUSTER),
-                additionalJars,
-                savepointSettings);
+        return pipelineDefPaths.stream()
+                .map(
+                        path ->
+                                new CliExecutor(
+                                        path,
+                                        flinkConfig,
+                                        globalPipelineConfig,
+                                        commandLine.hasOption(CliFrontendOptions.USE_MINI_CLUSTER),
+                                        additionalJars,
+                                        savepointSettings))
+                .collect(Collectors.toList());
     }
 
     private static SavepointRestoreSettings createSavepointRestoreSettings(
