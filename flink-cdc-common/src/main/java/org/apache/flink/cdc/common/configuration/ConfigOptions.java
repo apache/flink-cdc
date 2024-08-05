@@ -140,6 +140,11 @@ public class ConfigOptions {
             return new TypedConfigOptionBuilder<>(key, Duration.class);
         }
 
+        /** Defines that the value of the option should be of {@link MemorySize} type. */
+        public TypedConfigOptionBuilder<MemorySize> memoryType() {
+            return new TypedConfigOptionBuilder<>(key, MemorySize.class);
+        }
+
         /**
          * Defines that the value of the option should be of {@link Enum} type.
          *
