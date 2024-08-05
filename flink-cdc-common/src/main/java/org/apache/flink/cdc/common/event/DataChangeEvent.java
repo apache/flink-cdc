@@ -20,6 +20,8 @@ package org.apache.flink.cdc.common.event;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.data.RecordData;
 
+import javax.annotation.Nullable;
+
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.Map;
@@ -112,7 +114,7 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
 
     /** Creates a {@link DataChangeEvent} instance that describes the update event. */
     public static DataChangeEvent updateEvent(
-            TableId tableId, RecordData before, RecordData after) {
+            TableId tableId, @Nullable RecordData before, RecordData after) {
         return new DataChangeEvent(
                 tableId, before, after, OperationType.UPDATE, Collections.emptyMap());
     }
@@ -121,7 +123,10 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
      * Creates a {@link DataChangeEvent} instance that describes the update event with meta info.
      */
     public static DataChangeEvent updateEvent(
-            TableId tableId, RecordData before, RecordData after, Map<String, String> meta) {
+            TableId tableId,
+            @Nullable RecordData before,
+            RecordData after,
+            Map<String, String> meta) {
         return new DataChangeEvent(tableId, before, after, OperationType.UPDATE, meta);
     }
 

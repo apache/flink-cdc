@@ -39,6 +39,8 @@ public class BinaryRecordDataSerializer extends TypeSerializerSingleton<BinaryRe
 
     private static final long serialVersionUID = 1L;
 
+    private static final int NULL_VALUE_IDENTIFIER = 0;
+
     public static final BinaryRecordDataSerializer INSTANCE = new BinaryRecordDataSerializer();
 
     @Override
@@ -68,6 +70,10 @@ public class BinaryRecordDataSerializer extends TypeSerializerSingleton<BinaryRe
 
     @Override
     public void serialize(BinaryRecordData record, DataOutputView target) throws IOException {
+        if (record == null) {
+            target.writeInt(NULL_VALUE_IDENTIFIER);
+            return;
+        }
         target.writeInt(record.getArity());
         target.writeInt(record.getSizeInBytes());
         if (target instanceof MemorySegmentWritable) {
@@ -80,7 +86,11 @@ public class BinaryRecordDataSerializer extends TypeSerializerSingleton<BinaryRe
 
     @Override
     public BinaryRecordData deserialize(DataInputView source) throws IOException {
-        BinaryRecordData row = new BinaryRecordData(source.readInt());
+        int arity = source.readInt();
+        if (arity == NULL_VALUE_IDENTIFIER) {
+            return null;
+        }
+        BinaryRecordData row = new BinaryRecordData(arity);
         int length = source.readInt();
         byte[] bytes = new byte[length];
         source.readFully(bytes);
