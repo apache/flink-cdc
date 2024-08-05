@@ -32,7 +32,7 @@ import java.util.List;
 /** Docker container for StarRocks. */
 public class StarRocksContainer extends JdbcDatabaseContainer<StarRocksContainer> {
 
-    private static final String DOCKER_IMAGE_NAME = "starrocks/allin1-ubuntu:3.2.6";
+    private static final String DOCKER_IMAGE_NAME = "starrocks/allin1-ubuntu:2.5.21";
 
     // exposed ports
     public static final int FE_HTTP_SERVICE_PORT = 8080;
