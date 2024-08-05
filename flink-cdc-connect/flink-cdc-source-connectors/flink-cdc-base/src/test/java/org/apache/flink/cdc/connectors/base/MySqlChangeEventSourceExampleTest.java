@@ -174,7 +174,7 @@ public class MySqlChangeEventSourceExampleTest {
                     "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
                     "+I[106, hammer, 16oz carpenter's hammer, 1.0]",
                     "+I[107, rocks, box of assorted rocks, 5.3]",
-                    "+I[108, jacket, water resistent black wind breaker, 0.1]",
+                    "+I[108, jacket, water resistant black wind breaker, 0.1]",
                     "+I[109, spare tire, 24 inch spare tire, 22.2]"
                 };
 

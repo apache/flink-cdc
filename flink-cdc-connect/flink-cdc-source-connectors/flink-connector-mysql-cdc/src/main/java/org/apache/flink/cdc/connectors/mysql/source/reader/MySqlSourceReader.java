@@ -445,7 +445,7 @@ public class MySqlSourceReader<T>
                         newAddedMetadataGroup.size());
             } else {
                 LOG.warn(
-                        "Source reader {} receives out of oder binlog meta event for split {}, the received meta group id is {}, but expected is {}, ignore it",
+                        "Source reader {} receives out of order binlog meta event for split {}, the received meta group id is {}, but expected is {}, ignore it",
                         subtaskId,
                         metadataEvent.getSplitId(),
                         receivedMetaGroupId,

@@ -41,5 +41,5 @@ VALUES (default,"scooter","Small 2-wheel scooter",3.14, 'red', '{"key1": "value1
        (default,"hammer","14oz carpenter's hammer",0.875, 'red', '{"k1": "v1", "k2": "v2"}'),
        (default,"hammer","16oz carpenter's hammer",1.0, null, null),
        (default,"rocks","box of assorted rocks",5.3, null, null),
-       (default,"jacket","water resistent black wind breaker",0.1, null, null),
+       (default,"jacket","water resistant black wind breaker",0.1, null, null),
        (default,"spare tire","24 inch spare tire",22.2, null, null);

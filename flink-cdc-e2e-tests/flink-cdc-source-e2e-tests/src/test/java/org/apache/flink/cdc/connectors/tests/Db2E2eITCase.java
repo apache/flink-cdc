@@ -207,11 +207,11 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
                     "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106;");
             statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT='5.1' WHERE ID=107;");
             statement.execute(
-                    "INSERT INTO DB2INST1.PRODUCTS VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO DB2INST1.PRODUCTS VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO DB2INST1.PRODUCTS VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='new water resistent white wind breaker', WEIGHT='0.5' WHERE ID=110;");
+                    "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='new water resistant white wind breaker', WEIGHT='0.5' WHERE ID=110;");
             statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT='5.17' WHERE ID=111;");
             statement.execute("DELETE FROM DB2INST1.PRODUCTS WHERE ID=111;");
         } catch (SQLException e) {
@@ -237,9 +237,9 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
                         "105,hammer,14oz carpenter's hammer,0.875",
                         "106,hammer,18oz carpenter hammer,1.0",
                         "107,rocks,box of assorted rocks,5.1",
-                        "108,jacket,water resistent black wind breaker,0.1",
+                        "108,jacket,water resistant black wind breaker,0.1",
                         "109,spare tire,24 inch spare tire,22.2",
-                        "110,jacket,new water resistent white wind breaker,0.5");
+                        "110,jacket,new water resistant white wind breaker,0.5");
         proxy.checkResultWithTimeout(
                 expectResult,
                 "products_sink",
@@ -316,7 +316,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
     }
 
     /**
-     * Executes a JDBC statement using the default jdbc config without autocommitting the
+     * Executes a JDBC statement using the default jdbc config without auto committing the
      * connection.
      */
     protected void initializeDb2Table(String sqlFile, String tableName) {

@@ -112,11 +112,11 @@ public class PostgreSQLSavepointITCase extends PostgresTestBase {
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO inventory.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE inventory.products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
@@ -133,9 +133,9 @@ public class PostgreSQLSavepointITCase extends PostgresTestBase {
                         "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
                         "+I[106, hammer, 16oz carpenter's hammer, 1.000]",
                         "+I[107, rocks, box of assorted rocks, 5.300]",
-                        "+I[108, jacket, water resistent black wind breaker, 0.100]",
+                        "+I[108, jacket, water resistant black wind breaker, 0.100]",
                         "+I[109, spare tire, 24 inch spare tire, 22.200]",
-                        "+I[110, jacket, new water resistent white wind breaker, 0.500]"));
+                        "+I[110, jacket, new water resistant white wind breaker, 0.500]"));
 
         finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
         jobClient.cancel().get();
@@ -146,11 +146,11 @@ public class PostgreSQLSavepointITCase extends PostgresTestBase {
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 112
+                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 112
             statement.execute(
                     "INSERT INTO inventory.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=112;");
+                    "UPDATE inventory.products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=112;");
             statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=113;");
             statement.execute("DELETE FROM inventory.products WHERE id=113;");
         }
@@ -173,10 +173,10 @@ public class PostgreSQLSavepointITCase extends PostgresTestBase {
                     "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
                     "+I[106, hammer, 16oz carpenter's hammer, 1.000]",
                     "+I[107, rocks, box of assorted rocks, 5.300]",
-                    "+I[108, jacket, water resistent black wind breaker, 0.100]",
+                    "+I[108, jacket, water resistant black wind breaker, 0.100]",
                     "+I[109, spare tire, 24 inch spare tire, 22.200]",
-                    "+I[110, jacket, new water resistent white wind breaker, 0.500]",
-                    "+I[112, jacket, new water resistent white wind breaker, 0.500]"
+                    "+I[110, jacket, new water resistant white wind breaker, 0.500]",
+                    "+I[112, jacket, new water resistant white wind breaker, 0.500]"
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");

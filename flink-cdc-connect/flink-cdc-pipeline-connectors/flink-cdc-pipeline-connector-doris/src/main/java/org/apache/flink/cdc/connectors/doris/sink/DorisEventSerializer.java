@@ -105,7 +105,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                 addDeleteSign(valueMap, true);
                 break;
             default:
-                throw new UnsupportedOperationException("Unsupport Operation " + op);
+                throw new UnsupportedOperationException("Unsupported Operation " + op);
         }
 
         return DorisRecord.of(

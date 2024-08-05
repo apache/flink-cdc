@@ -49,7 +49,7 @@ public class MetadataColumnSerializer extends TypeSerializerSingleton<MetadataCo
 
     @Override
     public MetadataColumn createInstance() {
-        return Column.metadataColumn("unknow", DataTypes.BIGINT());
+        return Column.metadataColumn("unknown", DataTypes.BIGINT());
     }
 
     @Override
