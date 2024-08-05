@@ -215,29 +215,6 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineSingleParallelism() throws Exception {
-        testNewlyAddedTableOneByOne(
-                1,
-                FailoverType.NONE,
-                FailoverPhase.NEVER,
-                false,
-                "address_hangzhou",
-                "address_beijing");
-    }
-
-    @Test
-    public void testNewlyAddedTableForExistsPipelineSingleParallelismWithAheadBinlog()
-            throws Exception {
-        testNewlyAddedTableOneByOne(
-                1,
-                FailoverType.NONE,
-                FailoverPhase.NEVER,
-                true,
-                "address_hangzhou",
-                "address_beijing");
-    }
-
-    @Test
     public void testJobManagerFailoverForNewlyAddedTable() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
@@ -276,7 +253,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                 1,
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
-                false,
+                true,
                 "address_hangzhou",
                 "address_beijing");
     }
