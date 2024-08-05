@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mysql.source.config;
 
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
+import org.apache.flink.cdc.connectors.mysql.source.assigners.AssignStrategy;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
@@ -183,6 +184,14 @@ public class MySqlSourceOptions {
                     .noDefaultValue()
                     .withDescription(
                             "Optional timestamp used in case of \"timestamp\" startup mode");
+
+    public static final ConfigOption<AssignStrategy> SCAN_CHUNK_ASSIGN_STRATEGY =
+            ConfigOptions.key("scan.chunk.assign.strategy")
+                    .enumType(AssignStrategy.class)
+                    .defaultValue(AssignStrategy.DESCENDING_ORDER)
+                    .withDescription(
+                            "Optional assign strategy for MySqlSnapshotSplitAssigner, valid enumerations are "
+                                    + "\"ascending_order\", \"descending_order\"");
 
     public static final ConfigOption<Duration> HEARTBEAT_INTERVAL =
             ConfigOptions.key("heartbeat.interval")

@@ -24,7 +24,9 @@ import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfig
 
 import io.debezium.relational.TableId;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 
 /** The splitter used to split collection into a set of chunks for MongoDB data source. */
 @Experimental
@@ -38,10 +40,15 @@ public class MongoDBChunkSplitter implements ChunkSplitter {
 
     @Override
     public Collection<SnapshotSplit> generateSplits(TableId collectionId) {
+        ArrayList<SnapshotSplit> snapshotSplits = new ArrayList<>();
         SplitContext splitContext = SplitContext.of(sourceConfig, collectionId);
         if (splitContext.isShardedCollection()) {
-            return ShardedSplitStrategy.INSTANCE.split(splitContext);
+            snapshotSplits.addAll(ShardedSplitStrategy.INSTANCE.split(splitContext));
         }
-        return SplitVectorSplitStrategy.INSTANCE.split(splitContext);
+        snapshotSplits.addAll(SplitVectorSplitStrategy.INSTANCE.split(splitContext));
+        if (AssignStrategy.DESCENDING_ORDER.equals(sourceConfig.getScanChunkAssignStrategy())) {
+            Collections.reverse(snapshotSplits);
+        }
+        return snapshotSplits;
     }
 }

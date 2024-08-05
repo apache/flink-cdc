@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mongodb.source.config;
 
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.mongodb.source.MongoDBSource;
+import org.apache.flink.cdc.connectors.mongodb.source.assigners.splitters.AssignStrategy;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
@@ -157,4 +158,27 @@ public class MongoDBSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "MongoDB server normally times out idle cursors after an inactivity period (10 minutes) to prevent excess memory use. Set this option to true to prevent that.");
+
+    public static final ConfigOption<Boolean> SCAN_FLATTEN_NESTED_COLUMNS_ENABLED =
+            ConfigOptions.key("scan.flatten-nested-columns.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Optional flag to recursively flatten the Bson field into columns."
+                                    + "For a better understanding, the name of the flattened column will be composed of the path to get the column. "
+                                    + "For example, the field `col` in the Bson document {\"nested\": {\"col\": true}} is `nested.col` in the flattened schema. ");
+
+    public static final ConfigOption<Boolean> SCAN_PRIMITIVE_AS_STRING =
+            ConfigOptions.key("scan.primitive-as-string")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Optional flag to infer primitive types as string type.");
+
+    public static final ConfigOption<AssignStrategy> SCAN_CHUNK_ASSIGN_STRATEGY =
+            ConfigOptions.key("scan.chunk.assign.strategy")
+                    .enumType(AssignStrategy.class)
+                    .defaultValue(AssignStrategy.DESCENDING_ORDER)
+                    .withDescription(
+                            "Optional assign strategy for MySqlSnapshotSplitAssigner, valid enumerations are "
+                                    + "\"ascending_order\", \"descending_order\"");
 }

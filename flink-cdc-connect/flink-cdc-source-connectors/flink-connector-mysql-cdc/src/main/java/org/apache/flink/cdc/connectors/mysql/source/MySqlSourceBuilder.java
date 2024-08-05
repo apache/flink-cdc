@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.connectors.mysql.source.assigners.AssignStrategy;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -265,6 +266,12 @@ public class MySqlSourceBuilder<T> {
      */
     public MySqlSourceBuilder<T> closeIdleReaders(boolean closeIdleReaders) {
         this.configFactory.closeIdleReaders(closeIdleReaders);
+        return this;
+    }
+
+    /** Set the strategy of how to assign splits to reader. */
+    public MySqlSourceBuilder<T> scanChunkAssignStrategy(AssignStrategy scanChunkAssignStrategy) {
+        this.configFactory.scanChunkAssignStrategy(scanChunkAssignStrategy);
         return this;
     }
 

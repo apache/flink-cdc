@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
+import org.apache.flink.cdc.connectors.mongodb.source.assigners.splitters.AssignStrategy;
 import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfigFactory;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 
@@ -265,6 +266,12 @@ public class MongoDBSourceBuilder<T> {
      */
     public MongoDBSourceBuilder<T> scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
         this.configFactory.scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
+        return this;
+    }
+
+    /** Decide the strategy of how to assign split to reader. */
+    public MongoDBSourceBuilder<T> scanChunkAssignStrategy(AssignStrategy scanChunkAssignStrategy) {
+        this.configFactory.scanChunkAssignStrategy(scanChunkAssignStrategy);
         return this;
     }
 

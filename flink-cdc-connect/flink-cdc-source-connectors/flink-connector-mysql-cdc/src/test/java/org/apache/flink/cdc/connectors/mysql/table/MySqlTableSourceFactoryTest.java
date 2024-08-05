@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.table;
 
+import org.apache.flink.cdc.connectors.mysql.source.assigners.AssignStrategy;
 import org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
@@ -127,7 +128,8 @@ public class MySqlTableSourceFactoryTest {
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        AssignStrategy.DESCENDING_ORDER);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -173,7 +175,8 @@ public class MySqlTableSourceFactoryTest {
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         "testCol",
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        AssignStrategy.DESCENDING_ORDER);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -215,7 +218,8 @@ public class MySqlTableSourceFactoryTest {
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        AssignStrategy.DESCENDING_ORDER);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -255,7 +259,8 @@ public class MySqlTableSourceFactoryTest {
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        AssignStrategy.DESCENDING_ORDER);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -311,7 +316,8 @@ public class MySqlTableSourceFactoryTest {
                         jdbcProperties,
                         Duration.ofMillis(15213),
                         "testCol",
-                        true);
+                        true,
+                        AssignStrategy.DESCENDING_ORDER);
         assertEquals(expectedSource, actualSource);
         assertTrue(actualSource instanceof MySqlTableSource);
         MySqlTableSource actualMySqlTableSource = (MySqlTableSource) actualSource;
@@ -365,7 +371,8 @@ public class MySqlTableSourceFactoryTest {
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        AssignStrategy.DESCENDING_ORDER);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -403,7 +410,8 @@ public class MySqlTableSourceFactoryTest {
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        AssignStrategy.DESCENDING_ORDER);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -442,7 +450,8 @@ public class MySqlTableSourceFactoryTest {
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        AssignStrategy.DESCENDING_ORDER);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -482,7 +491,8 @@ public class MySqlTableSourceFactoryTest {
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        AssignStrategy.DESCENDING_ORDER);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -520,7 +530,8 @@ public class MySqlTableSourceFactoryTest {
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        AssignStrategy.DESCENDING_ORDER);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -563,7 +574,8 @@ public class MySqlTableSourceFactoryTest {
                         new Properties(),
                         HEARTBEAT_INTERVAL.defaultValue(),
                         null,
-                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        AssignStrategy.DESCENDING_ORDER);
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 

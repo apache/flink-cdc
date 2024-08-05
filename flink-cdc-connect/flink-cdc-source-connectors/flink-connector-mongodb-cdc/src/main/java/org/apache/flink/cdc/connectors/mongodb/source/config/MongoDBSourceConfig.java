@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mongodb.source.config;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.mongodb.source.MongoDBSource;
+import org.apache.flink.cdc.connectors.mongodb.source.assigners.splitters.AssignStrategy;
 
 import javax.annotation.Nullable;
 
@@ -54,6 +55,7 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final boolean enableFullDocPrePostImage;
     private final boolean disableCursorTimeout;
     private final boolean skipSnapshotBackfill;
+    private final AssignStrategy scanChunkAssignStrategy;
 
     private final boolean isScanNewlyAddedTableEnabled;
 
@@ -78,7 +80,8 @@ public class MongoDBSourceConfig implements SourceConfig {
             boolean enableFullDocPrePostImage,
             boolean disableCursorTimeout,
             boolean skipSnapshotBackfill,
-            boolean isScanNewlyAddedTableEnabled) {
+            boolean isScanNewlyAddedTableEnabled,
+            AssignStrategy scanChunkAssignStrategy) {
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
         this.username = username;
@@ -101,6 +104,7 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.disableCursorTimeout = disableCursorTimeout;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.isScanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
+        this.scanChunkAssignStrategy = scanChunkAssignStrategy;
     }
 
     public String getScheme() {
@@ -201,6 +205,10 @@ public class MongoDBSourceConfig implements SourceConfig {
         return isScanNewlyAddedTableEnabled;
     }
 
+    public AssignStrategy getScanChunkAssignStrategy() {
+        return scanChunkAssignStrategy;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -228,7 +236,8 @@ public class MongoDBSourceConfig implements SourceConfig {
                 && Objects.equals(collectionList, that.collectionList)
                 && Objects.equals(connectionString, that.connectionString)
                 && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
-                && Objects.equals(isScanNewlyAddedTableEnabled, that.isScanNewlyAddedTableEnabled);
+                && Objects.equals(isScanNewlyAddedTableEnabled, that.isScanNewlyAddedTableEnabled)
+                && Objects.equals(scanChunkAssignStrategy, that.scanChunkAssignStrategy);
     }
 
     @Override
@@ -252,6 +261,7 @@ public class MongoDBSourceConfig implements SourceConfig {
                 samplesPerChunk,
                 closeIdleReaders,
                 skipSnapshotBackfill,
-                isScanNewlyAddedTableEnabled);
+                isScanNewlyAddedTableEnabled,
+                scanChunkAssignStrategy);
     }
 }
