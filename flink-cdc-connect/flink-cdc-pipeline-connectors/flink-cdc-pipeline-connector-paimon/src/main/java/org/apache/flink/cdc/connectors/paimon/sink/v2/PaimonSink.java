@@ -40,11 +40,11 @@ public class PaimonSink<InputT> implements WithPreCommitTopology<InputT, MultiTa
     // provided a default commit user.
     public static final String DEFAULT_COMMIT_USER = "admin";
 
-    private final Options catalogOptions;
+    protected final Options catalogOptions;
 
-    private final String commitUser;
+    protected final String commitUser;
 
-    private final PaimonRecordSerializer<InputT> serializer;
+    protected final PaimonRecordSerializer<InputT> serializer;
 
     public PaimonSink(Options catalogOptions, PaimonRecordSerializer<InputT> serializer) {
         this.catalogOptions = catalogOptions;
