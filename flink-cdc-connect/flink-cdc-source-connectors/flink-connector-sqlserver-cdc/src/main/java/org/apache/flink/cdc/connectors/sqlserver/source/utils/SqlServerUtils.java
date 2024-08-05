@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.sqlserver.source.utils;
 
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
+import org.apache.flink.cdc.connectors.base.utils.ObjectUtils;
 import org.apache.flink.cdc.connectors.sqlserver.source.offset.LsnOffset;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.RowType;
@@ -40,14 +41,17 @@ import org.apache.kafka.connect.source.SourceRecord;
 
 import javax.annotation.Nullable;
 
+import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.table.api.DataTypes.FIELD;
@@ -402,5 +406,50 @@ public class SqlServerUtils {
         sql.append(" ORDER BY ").append(orderBy);
         sql.append(") T");
         return sql.toString();
+    }
+
+    public static int compare(Object obj1, Object obj2, Column splitColumn) {
+        if (splitColumn.typeName().equals(SqlServerTypeUtils.UNIQUEIDENTIFIRER)) {
+            return new SQLServerUUIDComparator()
+                    .compare(UUID.fromString(obj1.toString()), UUID.fromString(obj2.toString()));
+        }
+        return ObjectUtils.compare(obj1, obj2);
+    }
+
+    /**
+     * Comparator for SQL Server UUIDs. SQL Server compares UUIDs in a different order than Java.
+     * Reference code: <a
+     * href="https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/libraries/System.Data.Common/src/System/Data/SQLTypes/SQLGuid.cs#L113">SQLGuid.cs::CompareTo</a>
+     * Reference doc: <a
+     * href="https://learn.microsoft.com/uk-ua/sql/connect/ado-net/sql/compare-guid-uniqueidentifier-values?view=sql-server-ver16">Comparing
+     * GUID and uniqueidentifier values</a>
+     */
+    static class SQLServerUUIDComparator implements Comparator<UUID> {
+
+        private static final int SIZE_OF_GUID = 16;
+        private static final byte[] GUID_ORDER = {
+            10, 11, 12, 13, 14, 15, 8, 9, 6, 7, 4, 5, 0, 1, 2, 3
+        };
+
+        public int compare(UUID uuid1, UUID uuid2) {
+            byte[] bytes1 = uuidToBytes(uuid1);
+            byte[] bytes2 = uuidToBytes(uuid2);
+
+            for (int i = 0; i < SIZE_OF_GUID; i++) {
+                byte b1 = bytes1[GUID_ORDER[i]];
+                byte b2 = bytes2[GUID_ORDER[i]];
+                if (b1 != b2) {
+                    return (b1 & 0xFF) - (b2 & 0xFF); // Unsigned byte comparison
+                }
+            }
+            return 0;
+        }
+
+        private byte[] uuidToBytes(UUID uuid) {
+            ByteBuffer bb = ByteBuffer.wrap(new byte[16]);
+            bb.putLong(uuid.getMostSignificantBits());
+            bb.putLong(uuid.getLeastSignificantBits());
+            return bb.array();
+        }
     }
 }
