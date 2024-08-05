@@ -24,12 +24,12 @@ import org.apache.commons.cli.CommandLine;
 /** Create deployment methods corresponding to different goals. */
 public class ComposeDeploymentFactory {
 
-    public PipelineDeploymentExecutor getFlinkComposeExecutor(CommandLine commandLine)
-            throws Exception {
+    public PipelineDeploymentExecutor getFlinkComposeExecutor(CommandLine commandLine) {
         String target = commandLine.getOptionValue("target");
         if (target.equalsIgnoreCase("kubernetes-application")) {
             return new K8SApplicationDeploymentExecutor();
         }
-        throw new Exception(String.format("target %s is not support", target));
+        throw new IllegalArgumentException(
+                String.format("Deployment target %s is not supported", target));
     }
 }

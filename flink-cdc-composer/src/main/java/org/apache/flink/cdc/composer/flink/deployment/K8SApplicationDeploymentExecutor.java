@@ -52,17 +52,16 @@ public class K8SApplicationDeploymentExecutor implements PipelineDeploymentExecu
         LOG.info("Submitting application in 'Flink K8S Application Mode'.");
         flinkConfig.set(DeploymentOptions.TARGET, KubernetesDeploymentTarget.APPLICATION.getName());
         List<String> jars = new ArrayList<>();
-        if (flinkConfig.get(PipelineOptions.JARS) == null){
+        if (flinkConfig.get(PipelineOptions.JARS) == null) {
             // must be added cdc dist jar by default docker container path
-            jars.add("local:///opt/flink-cdc/lib/flink-cdc-dist-3.1.jar");
+            jars.add("local:///opt/flink-cdc/lib/flink-cdc-dist.jar");
             flinkConfig.set(PipelineOptions.JARS, jars);
         }
         // set the default cdc latest docker image
         flinkConfig.set(KubernetesConfigOptions.CONTAINER_IMAGE, "flink/flink-cdc:latest");
         flinkConfig.set(ApplicationConfiguration.APPLICATION_ARGS, commandLine.getArgList());
         flinkConfig.set(
-                ApplicationConfiguration.APPLICATION_MAIN_CLASS,
-                CliFrontend.class.getName());
+                ApplicationConfiguration.APPLICATION_MAIN_CLASS, CliFrontend.class.getName());
         KubernetesClusterClientFactory kubernetesClusterClientFactory =
                 new KubernetesClusterClientFactory();
         KubernetesClusterDescriptor descriptor =
