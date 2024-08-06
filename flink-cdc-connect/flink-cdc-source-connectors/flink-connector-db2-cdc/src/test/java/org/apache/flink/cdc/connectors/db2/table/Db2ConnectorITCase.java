@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.db2.table;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.api.common.time.Deadline;
 import org.apache.flink.cdc.connectors.db2.Db2TestBase;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
@@ -41,12 +42,14 @@ import org.slf4j.LoggerFactory;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.flink.api.common.JobStatus.RUNNING;
+import static org.apache.flink.cdc.connectors.db2.Db2TestUtils.waitForJobStatus;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -310,6 +313,80 @@ public class Db2ConnectorITCase extends Db2TestBase {
     }
 
     @Test
+    public void testPrimaryKeyQuote() throws Exception {
+        initializeDb2Table("corner_case_test", "QUOTE_PRIMARY_KEY");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE quote_primary_key_source ("
+                                + " `KEY` INT NOT NULL,"
+                                + " NAME STRING,"
+                                + " DESCRIPTION STRING,"
+                                + " WEIGHT DECIMAL(10,3),"
+                                + " PRIMARY KEY (`KEY`) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'db2-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s' ,"
+                                + " 'scan.startup.mode' = 'latest-offset',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s'"
+                                + ")",
+                        DB2_CONTAINER.getHost(),
+                        DB2_CONTAINER.getMappedPort(DB2_PORT),
+                        DB2_CONTAINER.getUsername(),
+                        DB2_CONTAINER.getPassword(),
+                        DB2_CONTAINER.getDatabaseName(),
+                        "DB2INST1.QUOTE_PRIMARY_KEY",
+                        incrementalSnapshot);
+        String sinkDDL =
+                "CREATE TABLE sink "
+                        + " WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ") LIKE quote_primary_key_source (EXCLUDING OPTIONS)";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql("INSERT INTO sink SELECT * FROM quote_primary_key_source");
+
+        waitForJobStatus(
+                result.getJobClient().get(),
+                Collections.singletonList(RUNNING),
+                Deadline.fromNow(Duration.ofSeconds(30)));
+
+        Thread.sleep(30000L);
+        LOG.info("Snapshot should end and start to read binlog.");
+
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO DB2INST1.QUOTE_PRIMARY_KEY VALUES (default,'jacket','water resistent white wind breaker',0.2)"); // 110
+            statement.execute(
+                    "INSERT INTO DB2INST1.QUOTE_PRIMARY_KEY VALUES (default,'scooter','Big 2-wheel scooter ',5.18)");
+            statement.execute(
+                    "UPDATE DB2INST1.QUOTE_PRIMARY_KEY SET DESCRIPTION='new water resistent white wind breaker', WEIGHT='0.5' WHERE \"KEY\"=110");
+            statement.execute(
+                    "UPDATE DB2INST1.QUOTE_PRIMARY_KEY SET WEIGHT='5.17' WHERE \"KEY\"=111");
+            statement.execute("DELETE FROM DB2INST1.QUOTE_PRIMARY_KEY WHERE \"KEY\"=111");
+        }
+
+        waitForSinkSize("sink", 5);
+
+        String[] expected =
+                new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        assertThat(actual, containsInAnyOrder(expected));
+
+        cancelJobIfRunning(result);
+    }
+
+    @Test
     public void testStartupFromLatestOffset() throws Exception {
         initializeDb2Table("inventory", "PRODUCTS");
         String sourceDDL =
@@ -349,10 +426,12 @@ public class Db2ConnectorITCase extends Db2TestBase {
 
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
-        // wait for the source startup, we don't have a better way to wait it, use sleep for now
-        do {
-            Thread.sleep(5000L);
-        } while (result.getJobClient().get().getJobStatus().get() != RUNNING);
+
+        waitForJobStatus(
+                result.getJobClient().get(),
+                Collections.singletonList(RUNNING),
+                Deadline.fromNow(Duration.ofSeconds(30)));
+
         Thread.sleep(30000L);
         LOG.info("Snapshot should end and start to read binlog.");
 

@@ -292,7 +292,7 @@ public class PostgresQueryUtils {
                 fieldNamesIt.hasNext(); ) {
             String fieldName = fieldNamesIt.next();
             boolean isUUID = uuidFields.contains(fieldName);
-            sql.append(fieldName).append(predicate).append(castParam(isUUID));
+            sql.append(quote(fieldName)).append(predicate).append(castParam(isUUID));
             if (fieldNamesIt.hasNext()) {
                 sql.append(" AND ");
             }

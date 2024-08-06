@@ -461,6 +461,83 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
     }
 
     @Test
+    public void testPrimaryKeyQuote() throws Throwable {
+        if (!parallelismSnapshot) {
+            return;
+        }
+
+        initializePostgresTable(POSTGRES_CONTAINER, "corner_case_test");
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE quote_primary_key_source ("
+                                + " `key` INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3),"
+                                + " PRIMARY KEY (`key`) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'slot.name' = '%s',"
+                                + " 'scan.startup.mode' = 'latest-offset'"
+                                + ")",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "quote_primary_key",
+                        parallelismSnapshot,
+                        getSlotName());
+        String sinkDDL =
+                "CREATE TABLE sink "
+                        + " WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ") LIKE quote_primary_key_source (EXCLUDING OPTIONS)";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql("INSERT INTO sink SELECT * FROM quote_primary_key_source");
+        // wait for the source startup, we don't have a better way to wait it, use sleep for now
+        Thread.sleep(10000L);
+
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.quote_primary_key VALUES (110,'jacket','water resistent white wind breaker',0.2);"); // 110
+            statement.execute(
+                    "INSERT INTO inventory.quote_primary_key VALUES (111,'scooter','Big 2-wheel scooter ',5.18);");
+            statement.execute(
+                    "UPDATE inventory.quote_primary_key SET description='new water resistent white wind breaker', weight='0.5' WHERE \"key\"=110;");
+            statement.execute(
+                    "UPDATE inventory.quote_primary_key SET weight='5.17' WHERE \"key\"=111;");
+            statement.execute("DELETE FROM inventory.quote_primary_key WHERE \"key\"=111;");
+        }
+
+        waitForSinkSize("sink", 5);
+
+        String[] expected =
+                new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
+
+        List<String> actual = TestValuesTableFactory.getResults("sink");
+        assertThat(actual, containsInAnyOrder(expected));
+
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
     public void testMetadataColumns() throws Throwable {
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
         String sourceDDL =
