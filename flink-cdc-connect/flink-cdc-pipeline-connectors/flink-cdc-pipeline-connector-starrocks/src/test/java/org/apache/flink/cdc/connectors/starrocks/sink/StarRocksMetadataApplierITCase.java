@@ -357,6 +357,9 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         .set(JDBC_URL, STARROCKS_CONTAINER.getJdbcUrl())
                         .set(USERNAME, StarRocksContainer.STARROCKS_USERNAME)
                         .set(PASSWORD, StarRocksContainer.STARROCKS_PASSWORD);
+        config.addAll(
+                Configuration.fromMap(
+                        Collections.singletonMap("table.create.properties.replication_num", "1")));
 
         DataSink starRocksSink = createStarRocksDataSink(config);
 

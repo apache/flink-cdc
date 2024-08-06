@@ -28,6 +28,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSp
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -133,7 +134,9 @@ public class StreamSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public void close() {}
+    public void close() throws IOException {
+        dialect.close();
+    }
 
     // ------------------------------------------------------------------------------------------
 

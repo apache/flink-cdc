@@ -27,6 +27,9 @@ import java.sql.Types;
 /** Utilities for converting from SqlServer types to Flink types. */
 public class SqlServerTypeUtils {
 
+    /** Microsoft SQL type GUID's type name. */
+    static final String UNIQUEIDENTIFIRER = "uniqueidentifier";
+
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
     public static DataType fromDbzColumn(Column column) {
         DataType dataType = convertFromColumn(column);
