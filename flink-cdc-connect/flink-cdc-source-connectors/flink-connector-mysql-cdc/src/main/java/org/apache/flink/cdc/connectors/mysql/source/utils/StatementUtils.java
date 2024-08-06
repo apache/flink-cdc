@@ -268,7 +268,7 @@ public class StatementUtils {
         StringBuilder sql = new StringBuilder();
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append("MAX(" + quote(fieldNamesIt.next()) + ")");
+            sql.append(String.format("MAX(%s)", quote(fieldNamesIt.next())));
             if (fieldNamesIt.hasNext()) {
                 sql.append(" , ");
             }
