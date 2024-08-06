@@ -32,6 +32,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.source.MetadataAccessor;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSource;
 
@@ -48,6 +49,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -185,7 +187,7 @@ public class ValuesDatabase {
         private final TableId tableId;
 
         // [primaryKeys, [column_name, column_value]]
-        private final Map<String, Map<String, String>> records;
+        private final Map<String, Map<String, RecordData>> records;
 
         private final LinkedList<Column> columns;
 
@@ -210,15 +212,21 @@ public class ValuesDatabase {
         public List<String> getResult() {
             List<String> results = new ArrayList<>();
             synchronized (lock) {
+                List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(columns);
                 records.forEach(
                         (key, record) -> {
                             StringBuilder stringBuilder = new StringBuilder(tableId.toString());
                             stringBuilder.append(":");
-                            for (Column column : columns) {
+                            for (int i = 0; i < columns.size(); i++) {
+                                Column column = columns.get(i);
+                                RecordData.FieldGetter fieldGetter = fieldGetters.get(i);
                                 stringBuilder
                                         .append(column.getName())
                                         .append("=")
-                                        .append(record.getOrDefault(column.getName(), ""))
+                                        .append(
+                                                Optional.ofNullable(record.get(column.getName()))
+                                                        .map(fieldGetter::getFieldOrNull)
+                                                        .orElse(""))
                                         .append(";");
                             }
                             stringBuilder.deleteCharAt(stringBuilder.length() - 1);
@@ -257,9 +265,9 @@ public class ValuesDatabase {
 
         private void insert(RecordData recordData) {
             String primaryKey = buildPrimaryKeyStr(recordData);
-            Map<String, String> record = new HashMap<>();
+            Map<String, RecordData> record = new HashMap<>();
             for (int i = 0; i < recordData.getArity(); i++) {
-                record.put(columns.get(i).getName(), recordData.getString(i).toString());
+                record.put(columns.get(i).getName(), recordData);
             }
             records.put(primaryKey, record);
         }
@@ -393,7 +401,7 @@ public class ValuesDatabase {
                                 records.forEach(
                                         (key, record) -> {
                                             if (record.containsKey(beforeName)) {
-                                                String value = record.get(beforeName);
+                                                RecordData value = record.get(beforeName);
                                                 record.remove(beforeName);
                                                 record.put(afterName, value);
                                             }

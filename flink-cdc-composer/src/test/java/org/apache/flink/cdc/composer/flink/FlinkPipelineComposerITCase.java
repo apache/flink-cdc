@@ -68,6 +68,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration test for {@link FlinkPipelineComposer}. */
 class FlinkPipelineComposerITCase {
+
     private static final int MAX_PARALLELISM = 4;
 
     // Always use parent-first classloader for CDC classes.

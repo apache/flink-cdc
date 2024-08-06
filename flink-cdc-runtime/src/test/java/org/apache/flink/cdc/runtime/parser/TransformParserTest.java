@@ -228,16 +228,16 @@ public class TransformParserTest {
         testFilterExpression(
                 "id = CURRENT_DATE", "valueEquals(id, currentDate(__epoch_time__, __time_zone__))");
         testFilterExpression(
-                "id = CURRENT_TIMESTAMP",
-                "valueEquals(id, currentTimestamp(__epoch_time__, __time_zone__))");
-        testFilterExpression("NOW()", "now(__epoch_time__, __time_zone__)");
+                "id = CURRENT_TIMESTAMP", "valueEquals(id, currentTimestamp(__epoch_time__))");
+        testFilterExpression("NOW()", "now(__epoch_time__)");
         testFilterExpression("YEAR(dt)", "year(dt)");
         testFilterExpression("QUARTER(dt)", "quarter(dt)");
         testFilterExpression("MONTH(dt)", "month(dt)");
         testFilterExpression("WEEK(dt)", "week(dt)");
         testFilterExpression("DATE_FORMAT(dt,'yyyy-MM-dd')", "dateFormat(dt, \"yyyy-MM-dd\")");
-        testFilterExpression("TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\")");
-        testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt)");
+        testFilterExpression(
+                "TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\", __time_zone__)");
+        testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt, __time_zone__)");
         testFilterExpression("TIMESTAMP_DIFF('DAY', dt1, dt2)", "timestampDiff(\"DAY\", dt1, dt2)");
         testFilterExpression("IF(a>b,a,b)", "a > b ? a : b");
         testFilterExpression("NULLIF(a,b)", "nullif(a, b)");
@@ -292,6 +292,10 @@ public class TransformParserTest {
         testFilterExpression("cast(null as decimal)", "castToBigDecimal(null, 10, 0)");
         testFilterExpression("cast(null as char)", "castToString(null)");
         testFilterExpression("cast(null as varchar)", "castToString(null)");
+        testFilterExpression(
+                "cast(CURRENT_TIMESTAMP as TIMESTAMP)",
+                "castToTimestamp(currentTimestamp(__epoch_time__), __time_zone__)");
+        testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
     }
 
     private void testFilterExpression(String expression, String expressionExpect) {
