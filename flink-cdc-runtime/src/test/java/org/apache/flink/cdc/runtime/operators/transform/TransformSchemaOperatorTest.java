@@ -54,7 +54,7 @@ public class TransformSchemaOperatorTest {
                     .physicalColumn("col3", DataTypes.STRING())
                     .primaryKey("col1")
                     .build();
-    private static final Schema EXPECT_SCHEMA =
+    private static final Schema EXPECTED_SCHEMA =
             Schema.newBuilder()
                     .physicalColumn("col1", DataTypes.STRING())
                     .physicalColumn("col2", DataTypes.STRING())
@@ -63,7 +63,7 @@ public class TransformSchemaOperatorTest {
                     .partitionKey("col12")
                     .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
                     .build();
-    private static final Schema EXPECT_LATEST_SCHEMA =
+    private static final Schema EXPECTED_LATEST_SCHEMA =
             Schema.newBuilder()
                     .physicalColumn("col1", DataTypes.STRING())
                     .physicalColumn("col2", DataTypes.STRING())
@@ -123,7 +123,7 @@ public class TransformSchemaOperatorTest {
         BinaryRecordDataGenerator recordDataGenerator =
                 new BinaryRecordDataGenerator(((RowType) CUSTOMERS_LATEST_SCHEMA.toRowDataType()));
         BinaryRecordDataGenerator recordDataGeneratorExpect =
-                new BinaryRecordDataGenerator(((RowType) EXPECT_LATEST_SCHEMA.toRowDataType()));
+                new BinaryRecordDataGenerator(((RowType) EXPECTED_LATEST_SCHEMA.toRowDataType()));
         // Insert
         DataChangeEvent insertEvent =
                 DataChangeEvent.insertEvent(
@@ -161,7 +161,7 @@ public class TransformSchemaOperatorTest {
                                     new BinaryStringData("3"),
                                     new BinaryStringData("3")
                                 }));
-        DataChangeEvent updateEventExpect =
+        DataChangeEvent updateEventExpected =
                 DataChangeEvent.updateEvent(
                         CUSTOMERS_TABLEID,
                         recordDataGeneratorExpect.generate(
@@ -182,7 +182,7 @@ public class TransformSchemaOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(
-                        new StreamRecord<>(new CreateTableEvent(CUSTOMERS_TABLEID, EXPECT_SCHEMA)));
+                        new StreamRecord<>(new CreateTableEvent(CUSTOMERS_TABLEID, EXPECTED_SCHEMA)));
         transform.processElement(new StreamRecord<>(addColumnEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
@@ -194,7 +194,7 @@ public class TransformSchemaOperatorTest {
         transform.processElement(new StreamRecord<>(updateEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
-                .isEqualTo(new StreamRecord<>(updateEventExpect));
+                .isEqualTo(new StreamRecord<>(updateEventExpected));
     }
 
     @Test
