@@ -43,6 +43,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.JDBC_URL;
@@ -162,6 +163,10 @@ public class StarRocksPipelineITCase extends StarRocksSinkTestBase {
                         .set(JDBC_URL, STARROCKS_CONTAINER.getJdbcUrl())
                         .set(USERNAME, StarRocksContainer.STARROCKS_USERNAME)
                         .set(PASSWORD, StarRocksContainer.STARROCKS_PASSWORD);
+
+        config.addAll(
+                Configuration.fromMap(
+                        Collections.singletonMap("table.create.properties.replication_num", "1")));
 
         Sink<Event> starRocksSink =
                 ((FlinkSinkProvider) createStarRocksDataSink(config).getEventSinkProvider())
