@@ -37,14 +37,36 @@ import static org.apache.flink.core.memory.MemoryUtils.UNSAFE;
 /**
  * A binary implementation of {@link ArrayData} which is backed by {@link MemorySegment}s.
  *
- * <p>For fields that hold fixed-length primitive types, such as long, double or int, they are
- * stored compacted in bytes, just like the original java array.
+ * <p>This class provides a way to store array data in a binary format that is compact and
+ * efficient. It uses {@link MemorySegment}s to manage the binary representation of the data,
+ * allowing for efficient storage and access.
  *
- * <p>The binary layout of {@link BinaryArrayData}:
+ * <p>The binary layout of {@link BinaryArrayData} is structured as follows:
  *
  * <pre>
  * [size(int)] + [null bits(4-byte word boundaries)] + [values or offset&length] + [variable length part].
  * </pre>
+ *
+ * <ul>
+ *   <li><b>size:</b> The first 4 bytes store the number of elements in the array.
+ *   <li><b>null bits:</b> A bitmap to track null values, aligned to 4-byte word boundaries. Each
+ *       bit represents whether an element is null.
+ *   <li><b>values or offset&length:</b> The values of the array elements. For fixed-length
+ *       primitive types, the values are stored directly. For variable-length types (e.g., strings,
+ *       maps), this part stores the offset and length of the actual data in the variable length
+ *       part.
+ *   <li><b>variable length part:</b> This part of the memory segment stores the actual data for
+ *       variable-length types (e.g., strings, maps).
+ * </ul>
+ *
+ * <p>The header size is calculated based on the number of elements in the array, ensuring efficient
+ * alignment and access.
+ *
+ * <p>For fields that hold fixed-length primitive types, such as long, double, or int, they are
+ * stored compactly in bytes, just like the original Java array.
+ *
+ * <p>The class also provides methods to convert the binary data back into Java primitive arrays,
+ * handling various types such as boolean, byte, short, int, long, float, and double.
  */
 public final class BinaryArrayData extends BinarySection implements ArrayData {
 
@@ -58,6 +80,35 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
     private static final int FLOAT_ARRAY_OFFSET = UNSAFE.arrayBaseOffset(float[].class);
     private static final int DOUBLE_ARRAY_OFFSET = UNSAFE.arrayBaseOffset(double[].class);
 
+    /**
+     * Calculates the size of the header in bytes for an array with the specified number of fields.
+     *
+     * <p>The header consists of:
+     *
+     * <ul>
+     *   <li>4 bytes to store the size of the array (number of elements).
+     *   <li>A bitmap to track null values, where each bit represents whether an element is null.
+     *       This bitmap is aligned to 4-byte word boundaries for efficient memory access and to
+     *       facilitate the use of bitwise operations.
+     * </ul>
+     *
+     * <p>The size of the bitmap is determined by the number of elements in the array:
+     *
+     * <ul>
+     *   <li>Each element requires 1 bit in the bitmap.
+     *   <li>The total number of bits is rounded up to the nearest multiple of 32 to ensure
+     *       alignment to 4-byte word boundaries (i.e., a 32-bit integer).
+     * </ul>
+     *
+     * <p>The formula for calculating the size of the header is:
+     *
+     * <pre>
+     *   header size = 4 bytes (for array size) + ((numFields + 31) / 32) * 4 bytes (for null bitmap)
+     * </pre>
+     *
+     * @param numFields the number of elements in the array
+     * @return the size of the header in bytes
+     */
     public static int calculateHeaderInBytes(int numFields) {
         return 4 + ((numFields + 31) / 32) * 4;
     }
@@ -110,9 +161,9 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
 
     public BinaryArrayData() {}
 
-    private void assertIndexIsValid(int ordinal) {
-        assert ordinal >= 0 : "ordinal (" + ordinal + ") should >= 0";
-        assert ordinal < size : "ordinal (" + ordinal + ") should < " + size;
+    private void assertIndexIsValid(int index) {
+        assert index >= 0 : "index (" + index + ") should >= 0";
+        assert index < size : "index (" + index + ") should < " + size;
     }
 
     private int getElementOffset(int ordinal, int elementSize) {
@@ -131,9 +182,7 @@ public final class BinaryArrayData extends BinarySection implements ArrayData {
         assert size >= 0 : "size (" + size + ") should >= 0";
 
         this.size = size;
-        this.segments = segments;
-        this.offset = offset;
-        this.sizeInBytes = sizeInBytes;
+        super.pointTo(segments, offset, sizeInBytes);
         this.elementOffset = offset + calculateHeaderInBytes(this.size);
     }
 
