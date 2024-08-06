@@ -32,6 +32,10 @@ import java.util.List;
 /** Docker container for StarRocks. */
 public class StarRocksContainer extends JdbcDatabaseContainer<StarRocksContainer> {
 
+    // NOTE: StarRocks 3.x introduces free space check (> 5GB) during FE node startup
+    // (https://github.com/StarRocks/starrocks/pull/34813), which will fail on a typical GitHub
+    // runner environment. Downgraded to 2.x series for now to avoid blocking CI, and upgrade this
+    // after StarRocks provide a workaround for this.
     private static final String DOCKER_IMAGE_NAME = "starrocks/allin1-ubuntu:2.5.21";
 
     // exposed ports
