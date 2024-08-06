@@ -214,12 +214,12 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
     }
 
     /** ChunkEnd less than or equal to max. */
-    protected boolean isChunkEndLeMax(Object chunkEnd, Object max) {
+    protected boolean isChunkEndLeMax(Object chunkEnd, Object max, Column splitColumn) {
         return ObjectUtils.compare(chunkEnd, max) <= 0;
     }
 
     /** ChunkEnd greater than or equal to max. */
-    protected boolean isChunkEndGeMax(Object chunkEnd, Object max) {
+    protected boolean isChunkEndGeMax(Object chunkEnd, Object max, Column splitColumn) {
         return ObjectUtils.compare(chunkEnd, max) >= 0;
     }
 
@@ -368,7 +368,7 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
         Object chunkStart = null;
         Object chunkEnd = nextChunkEnd(jdbc, min, tableId, splitColumn, max, chunkSize);
         int count = 0;
-        while (chunkEnd != null && isChunkEndLeMax(chunkEnd, max)) {
+        while (chunkEnd != null && isChunkEndLeMax(chunkEnd, max, splitColumn)) {
             // we start from [null, min + chunk_size) and avoid [null, min)
             splits.add(ChunkRange.of(chunkStart, chunkEnd));
             // may sleep a while to avoid DDOS on PostgreSQL server
@@ -397,7 +397,7 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
             // should query the next one larger than chunkEnd
             chunkEnd = queryMin(jdbc, tableId, splitColumn, chunkEnd);
         }
-        if (isChunkEndGeMax(chunkEnd, max)) {
+        if (isChunkEndGeMax(chunkEnd, max, splitColumn)) {
             return null;
         } else {
             return chunkEnd;
