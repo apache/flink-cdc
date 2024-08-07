@@ -42,8 +42,6 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,7 +75,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
 
     // using TreeSet to prefer assigning binlog split to task-0 for easier debug
     private final TreeSet<Integer> readersAwaitingSplit;
-    private List<List<FinishedSnapshotSplitInfo>> binlogSplitMeta;
+    private List<FinishedSnapshotSplitInfo> binlogSplitMeta;
 
     @Nullable private Integer binlogSplitTaskId;
 
@@ -294,9 +292,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                 throw new FlinkRuntimeException(
                         "The assigner offers empty finished split information, this should not happen");
             }
-            binlogSplitMeta =
-                    Lists.partition(
-                            finishedSnapshotSplitInfos, sourceConfig.getSplitMetaGroupSize());
+            binlogSplitMeta = finishedSnapshotSplitInfos;
         }
         final int requestMetaGroupId = requestEvent.getRequestMetaGroupId();
         final int totalFinishedSplitSizeOfReader = requestEvent.getTotalFinishedSplitSize();
@@ -315,7 +311,7 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                             totalFinishedSplitSizeOfEnumerator);
             context.sendEventToSourceReader(subTask, metadataEvent);
         } else if (binlogSplitMeta.size() > requestMetaGroupId) {
-            List<FinishedSnapshotSplitInfo> metaToSend = binlogSplitMeta.get(requestMetaGroupId);
+            List<FinishedSnapshotSplitInfo> metaToSend =  getPartition(requestMetaGroupId, sourceConfig.getSplitMetaGroupSize());
             BinlogSplitMetaEvent metadataEvent =
                     new BinlogSplitMetaEvent(
                             requestEvent.getSplitId(),
@@ -343,5 +339,16 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
                     new LatestFinishedSplitsNumberEvent(
                             splitAssigner.getFinishedSplitInfos().size()));
         }
+    }
+
+    private List<FinishedSnapshotSplitInfo> getPartition(int index, int size) {
+        int start = index * size;
+        int end = Math.min(start + size, binlogSplitMeta.size());
+        return binlogSplitMeta.subList(start, end);
+    }
+
+    private int getPartitionNumber(int partitionSize) {
+        return binlogSplitMeta.size() / partitionSize
+                + (binlogSplitMeta.size() % partitionSize == 0 ? 0 : 1);
     }
 }

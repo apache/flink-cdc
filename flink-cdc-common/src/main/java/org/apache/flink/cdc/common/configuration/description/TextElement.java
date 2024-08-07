@@ -19,8 +19,6 @@ package org.apache.flink.cdc.common.configuration.description;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 
-import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -55,11 +53,6 @@ public class TextElement implements BlockElement, InlineElement {
      */
     public static TextElement text(String text) {
         return new TextElement(text, Collections.emptyList());
-    }
-
-    /** Wraps a list of {@link InlineElement}s into a single {@link TextElement}. */
-    public static InlineElement wrap(InlineElement... elements) {
-        return text(Strings.repeat("%s", elements.length), elements);
     }
 
     /**

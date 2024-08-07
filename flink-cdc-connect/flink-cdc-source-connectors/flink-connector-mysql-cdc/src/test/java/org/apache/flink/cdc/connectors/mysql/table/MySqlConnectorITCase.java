@@ -39,8 +39,6 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.ExceptionUtils;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
-
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -916,8 +914,10 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             expected.add("+I[" + i + ", " + (i + 200000) + "]");
         }
         // binlog result after upsert into the sink
-        expected.addAll(
-                Lists.newArrayList("+U[0, 1024]", "+U[1, 1025]", "+U[2, 2048]", "+U[3, 2049]"));
+        expected.add("+U[0, 1024]");
+        expected.add("+U[1, 1025]");
+        expected.add("+U[2, 2048]");
+        expected.add("+U[3, 2049]");
 
         List<String> actual = TestValuesTableFactory.getRawResults("sink");
         Collections.sort(actual);

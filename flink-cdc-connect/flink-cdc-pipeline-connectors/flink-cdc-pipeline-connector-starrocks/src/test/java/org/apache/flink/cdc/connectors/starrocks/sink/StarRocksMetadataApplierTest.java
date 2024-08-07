@@ -30,8 +30,6 @@ import org.apache.flink.cdc.common.types.IntType;
 import org.apache.flink.cdc.common.types.SmallIntType;
 import org.apache.flink.cdc.common.types.TimestampType;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
-
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
 import com.starrocks.connector.flink.catalog.StarRocksTable;
 import org.junit.Before;
@@ -40,7 +38,9 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.TABLE_CREATE_NUM_BUCKETS;
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.TABLE_SCHEMA_CHANGE_TIMEOUT;
@@ -55,13 +55,11 @@ public class StarRocksMetadataApplierTest {
 
     @Before
     public void setup() {
-        Configuration configuration =
-                Configuration.fromMap(
-                        ImmutableMap.<String, String>builder()
-                                .put(TABLE_SCHEMA_CHANGE_TIMEOUT.key(), "100s")
-                                .put(TABLE_CREATE_NUM_BUCKETS.key(), "10")
-                                .put("table.create.properties.replication_num", "5")
-                                .build());
+        Map configMap = new HashMap<>();
+        configMap.put(TABLE_SCHEMA_CHANGE_TIMEOUT.key(), "100s");
+        configMap.put(TABLE_CREATE_NUM_BUCKETS.key(), "10");
+        configMap.put("table.create.properties.replication_num", "5");
+        Configuration configuration = Configuration.fromMap(configMap);
         SchemaChangeConfig schemaChangeConfig = SchemaChangeConfig.from(configuration);
         TableCreateConfig tableCreateConfig = TableCreateConfig.from(configuration);
         this.catalog = new MockStarRocksCatalog();

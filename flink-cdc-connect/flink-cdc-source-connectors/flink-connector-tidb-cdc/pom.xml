@@ -151,6 +151,12 @@ limitations under the License.
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-shaded-guava</artifactId>
+            <version>31.1-jre-${flink.shaded.version}</version>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -164,6 +170,48 @@ limitations under the License.
                         <goals>
                             <goal>test-jar</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>shade-flink-guava</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Shading test jar have bug in some previous version, so close this configuration here,
+                            see https://issues.apache.org/jira/browse/MSHADE-284 -->
+                            <shadeTestJar>false</shadeTestJar>
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
+                            <filters combine.children="append">
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <artifactSet>
+                                <includes>
+                                    <include>org.apache.flink:flink-shaded-guava</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache.flink.shaded.guava</pattern>
+                                    <shadedPattern>org.apache.cdc.flink.shaded.guava</shadedPattern>
+                                </relocation>
+                            </relocations>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

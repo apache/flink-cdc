@@ -32,8 +32,6 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
@@ -58,7 +56,6 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.stream.Collectors;
 
 /**
@@ -284,9 +281,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private void startAsynchronouslySplit() {
         if (chunkSplitter.hasNextChunk() || !remainingTables.isEmpty()) {
             if (executor == null) {
-                ThreadFactory threadFactory =
-                        new ThreadFactoryBuilder().setNameFormat("snapshot-splitting").build();
-                this.executor = Executors.newSingleThreadExecutor(threadFactory);
+                this.executor = Executors.newSingleThreadExecutor();
             }
             executor.submit(this::splitChunksForRemainingTables);
         }
