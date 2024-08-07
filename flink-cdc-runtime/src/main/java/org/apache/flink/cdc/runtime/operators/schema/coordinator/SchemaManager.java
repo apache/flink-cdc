@@ -263,7 +263,7 @@ public class SchemaManager {
         @Override
         public byte[] serialize(SchemaManager schemaManager) throws IOException {
             try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                 DataOutputStream out = new DataOutputStream(baos)) {
+                    DataOutputStream out = new DataOutputStream(baos)) {
                 serializeSchemaMap(schemaManager.evolvedSchemas, out);
                 serializeSchemaMap(schemaManager.upstreamSchemas, out);
                 out.writeUTF(schemaManager.getBehavior().name());
@@ -278,7 +278,8 @@ public class SchemaManager {
             SchemaSerializer schemaSerializer = SchemaSerializer.INSTANCE;
             // Number of tables
             out.writeInt(schemaMap.size());
-            for (Map.Entry<TableId, SortedMap<Integer, Schema>> tableSchema : schemaMap.entrySet()) {
+            for (Map.Entry<TableId, SortedMap<Integer, Schema>> tableSchema :
+                    schemaMap.entrySet()) {
                 // Table ID
                 TableId tableId = tableSchema.getKey();
                 tableIdSerializer.serialize(tableId, new DataOutputViewStreamWrapper(out));
@@ -300,26 +301,26 @@ public class SchemaManager {
         @Override
         public SchemaManager deserialize(int version, byte[] serialized) throws IOException {
             try (ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
-                 DataInputStream in = new DataInputStream(bais)) {
+                    DataInputStream in = new DataInputStream(bais)) {
                 switch (version) {
                     case 0:
                     case 1:
-                    {
-                        Map<TableId, SortedMap<Integer, Schema>> schemas =
-                                deserializeSchemaMap(version, in);
-                        // In legacy mode, upstream schema and evolved schema never differs
-                        return new SchemaManager(schemas, schemas, SchemaChangeBehavior.EVOLVE);
-                    }
+                        {
+                            Map<TableId, SortedMap<Integer, Schema>> schemas =
+                                    deserializeSchemaMap(version, in);
+                            // In legacy mode, upstream schema and evolved schema never differs
+                            return new SchemaManager(schemas, schemas, SchemaChangeBehavior.EVOLVE);
+                        }
                     case 2:
-                    {
-                        Map<TableId, SortedMap<Integer, Schema>> evolvedSchemas =
-                                deserializeSchemaMap(version, in);
-                        Map<TableId, SortedMap<Integer, Schema>> upstreamSchemas =
-                                deserializeSchemaMap(version, in);
-                        SchemaChangeBehavior behavior =
-                                SchemaChangeBehavior.valueOf(in.readUTF());
-                        return new SchemaManager(upstreamSchemas, evolvedSchemas, behavior);
-                    }
+                        {
+                            Map<TableId, SortedMap<Integer, Schema>> evolvedSchemas =
+                                    deserializeSchemaMap(version, in);
+                            Map<TableId, SortedMap<Integer, Schema>> upstreamSchemas =
+                                    deserializeSchemaMap(version, in);
+                            SchemaChangeBehavior behavior =
+                                    SchemaChangeBehavior.valueOf(in.readUTF());
+                            return new SchemaManager(upstreamSchemas, evolvedSchemas, behavior);
+                        }
                     default:
                         throw new RuntimeException("Unknown serialize version: " + version);
                 }
@@ -343,7 +344,8 @@ public class SchemaManager {
                     // Version
                     int schemaVersion = in.readInt();
                     Schema schema =
-                            schemaSerializer.deserialize(version, new DataInputViewStreamWrapper(in));
+                            schemaSerializer.deserialize(
+                                    version, new DataInputViewStreamWrapper(in));
                     versionedSchemas.put(schemaVersion, schema);
                 }
                 tableSchemas.put(tableId, versionedSchemas);
