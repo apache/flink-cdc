@@ -94,8 +94,10 @@ env:
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-vitess-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-vitess-cdc"
   
-  MODULES_E2E: "\
-  flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests,\
+  MODULES_PIPELINE_E2E: "\
+  flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests"
+
+  MODULES_SOURCE_E2E: "\
   flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 
 jobs:
@@ -134,7 +136,8 @@ jobs:
                   "oceanbase",
                   "db2",
                   "vitess",
-                  "e2e"
+                  "pipeline_e2e",
+                  "source_e2e"
         ]
     timeout-minutes: 120
     env:
@@ -222,13 +225,17 @@ jobs:
               ("vitess")
                modules=${{ env.MODULES_VITESS }}
               ;;
-              ("e2e")
-               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_E2E }}"
-               modules=${{ env.MODULES_E2E }}
+              ("pipeline_e2e")
+               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_PIPELINE_E2E }}"
+               modules=${{ env.MODULES_PIPELINE_E2E }}
+              ;;
+              ("source_e2e")
+               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_SOURCE_E2E }}"
+               modules=${{ env.MODULES_SOURCE_E2E }}
               ;;
           esac
 
-          if [ ${{ matrix.module }} != "e2e" ]; then
+          if [ ${{ matrix.module }} != "pipeline_e2e" ] && [ ${{ matrix.module }} != "source_e2e" ]; then
             compile_modules=$modules
           fi
 
