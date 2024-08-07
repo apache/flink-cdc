@@ -71,6 +71,12 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     /** Map to record splitId and the checkpointId mark the split is finished. */
     private final Map<String, Long> splitFinishedCheckpointIds;
 
+    /**
+     * The data structure to record the state of a {@link
+     * org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter}.
+     */
+    private final ChunkSplitterState chunkSplitterState;
+
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
             List<SchemalessSnapshotSplit> remainingSplits,
@@ -81,7 +87,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed,
-            Map<String, Long> splitFinishedCheckpointIds) {
+            Map<String, Long> splitFinishedCheckpointIds,
+            ChunkSplitterState chunkSplitterState) {
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
@@ -91,6 +98,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.tableSchemas = tableSchemas;
+        this.chunkSplitterState = chunkSplitterState;
         this.splitFinishedCheckpointIds = splitFinishedCheckpointIds;
     }
 
@@ -134,6 +142,10 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return isRemainingTablesCheckpointed;
     }
 
+    public ChunkSplitterState getChunkSplitterState() {
+        return chunkSplitterState;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -151,7 +163,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 && Objects.equals(remainingSplits, that.remainingSplits)
                 && Objects.equals(assignedSplits, that.assignedSplits)
                 && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets)
-                && Objects.equals(splitFinishedCheckpointIds, that.splitFinishedCheckpointIds);
+                && Objects.equals(splitFinishedCheckpointIds, that.splitFinishedCheckpointIds)
+                && Objects.equals(chunkSplitterState, that.chunkSplitterState);
     }
 
     @Override
@@ -165,7 +178,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 assignerStatus,
                 isTableIdCaseSensitive,
                 isRemainingTablesCheckpointed,
-                splitFinishedCheckpointIds);
+                splitFinishedCheckpointIds,
+                chunkSplitterState);
     }
 
     @Override
@@ -189,6 +203,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 + isRemainingTablesCheckpointed
                 + ", splitFinishedCheckpointIds="
                 + splitFinishedCheckpointIds
+                + ", chunkSplitterState="
+                + chunkSplitterState
                 + '}';
     }
 }

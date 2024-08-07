@@ -17,8 +17,11 @@
 
 package org.apache.flink.cdc.connectors.postgres.source.fetch;
 
+import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
-import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.SnapshotSplitAssigner;
+import org.apache.flink.cdc.connectors.base.source.assigner.SplitAssigner;
+import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
@@ -31,6 +34,7 @@ import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
+import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.testutils.RecordsFormatter;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 import org.apache.flink.table.api.DataTypes;
@@ -43,16 +47,16 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link PostgresScanFetchTask}. */
 public class PostgresScanFetchTaskTest extends PostgresTestBase {
-
+    protected static final int DEFAULT_PARALLELISM = 4;
     private static final int USE_POST_LOWWATERMARK_HOOK = 1;
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
 
@@ -237,7 +241,7 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
         PostgresSourceConfig sourceConfig = sourceConfigFactory.create(0);
         PostgresDialect postgresDialect = new PostgresDialect(sourceConfigFactory.create(0));
         SnapshotPhaseHooks hooks = new SnapshotPhaseHooks();
-
+        List<SnapshotSplit> snapshotSplits = getSnapshotSplits(sourceConfig, postgresDialect);
         try (PostgresConnection postgresConnection = postgresDialect.openJdbcConnection()) {
             SnapshotPhaseHook snapshotPhaseHook =
                     (postgresSourceConfig, split) -> {
@@ -262,7 +266,6 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
                             DataTypes.FIELD("name", DataTypes.STRING()),
                             DataTypes.FIELD("address", DataTypes.STRING()),
                             DataTypes.FIELD("phone_number", DataTypes.STRING()));
-            List<SnapshotSplit> snapshotSplits = getSnapshotSplits(sourceConfig, postgresDialect);
 
             PostgresSourceFetchTaskContext postgresSourceFetchTaskContext =
                     new PostgresSourceFetchTaskContext(sourceConfig, postgresDialect);
@@ -314,15 +317,29 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     }
 
     private List<SnapshotSplit> getSnapshotSplits(
-            PostgresSourceConfig sourceConfig, JdbcDataSourceDialect sourceDialect) {
+            PostgresSourceConfig sourceConfig, JdbcDataSourceDialect sourceDialect)
+            throws Exception {
         List<TableId> discoverTables = sourceDialect.discoverDataCollections(sourceConfig);
-        final ChunkSplitter chunkSplitter = sourceDialect.createChunkSplitter(sourceConfig);
-
+        OffsetFactory offsetFactory = new PostgresOffsetFactory();
+        final SplitAssigner snapshotSplitAssigner =
+                new SnapshotSplitAssigner<JdbcSourceConfig>(
+                        sourceConfig,
+                        DEFAULT_PARALLELISM,
+                        discoverTables,
+                        sourceDialect.isDataCollectionIdCaseSensitive(sourceConfig),
+                        sourceDialect,
+                        offsetFactory);
+        snapshotSplitAssigner.open();
         List<SnapshotSplit> snapshotSplitList = new ArrayList<>();
-        for (TableId table : discoverTables) {
-            Collection<SnapshotSplit> snapshotSplits = chunkSplitter.generateSplits(table);
-            snapshotSplitList.addAll(snapshotSplits);
+        while (true) {
+            Optional<SourceSplitBase> split = snapshotSplitAssigner.getNext();
+            if (split.isPresent()) {
+                snapshotSplitList.add(split.get().asSnapshotSplit());
+            } else {
+                break;
+            }
         }
+        snapshotSplitAssigner.close();
         return snapshotSplitList;
     }
 }
