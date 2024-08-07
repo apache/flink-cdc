@@ -57,11 +57,11 @@ public class ProjectionColumnProcessor {
         return new ProjectionColumnProcessor(tableInfo, projectionColumn, timezone);
     }
 
-    public Object evaluate(BinaryRecordData after, long epochTime) {
+    public Object evaluate(BinaryRecordData data, long epochTime, String opType) {
         ExpressionEvaluator expressionEvaluator =
                 TransformExpressionCompiler.compileExpression(transformExpressionKey);
         try {
-            return expressionEvaluator.evaluate(generateParams(after, epochTime));
+            return expressionEvaluator.evaluate(generateParams(data, epochTime, opType));
         } catch (InvocationTargetException e) {
             LOG.error(
                     "Table:{} column:{} projection:{} execute failed. {}",
@@ -73,7 +73,7 @@ public class ProjectionColumnProcessor {
         }
     }
 
-    private Object[] generateParams(BinaryRecordData after, long epochTime) {
+    private Object[] generateParams(BinaryRecordData data, long epochTime, String opType) {
         List<Object> params = new ArrayList<>();
         List<Column> columns = tableInfo.getSchema().getColumns();
         RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
@@ -90,12 +90,16 @@ public class ProjectionColumnProcessor {
                 params.add(tableInfo.getTableName());
                 continue;
             }
+            if (originalColumnName.equals(TransformParser.DEFAULT_DATA_EVENT_TYPE)) {
+                params.add(opType);
+                continue;
+            }
             for (int i = 0; i < columns.size(); i++) {
                 Column column = columns.get(i);
                 if (column.getName().equals(originalColumnName)) {
                     params.add(
                             DataTypeConverter.convertToOriginal(
-                                    fieldGetters[i].getFieldOrNull(after), column.getType()));
+                                    fieldGetters[i].getFieldOrNull(data), column.getType()));
                     break;
                 }
             }
@@ -136,6 +140,12 @@ public class ProjectionColumnProcessor {
         if (scriptExpression.contains(TransformParser.DEFAULT_TABLE_NAME)
                 && !argumentNames.contains(TransformParser.DEFAULT_TABLE_NAME)) {
             argumentNames.add(TransformParser.DEFAULT_TABLE_NAME);
+            paramTypes.add(String.class);
+        }
+
+        if (scriptExpression.contains(TransformParser.DEFAULT_DATA_EVENT_TYPE)
+                && !argumentNames.contains(TransformParser.DEFAULT_DATA_EVENT_TYPE)) {
+            argumentNames.add(TransformParser.DEFAULT_DATA_EVENT_TYPE);
             paramTypes.add(String.class);
         }
 
