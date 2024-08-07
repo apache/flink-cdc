@@ -18,39 +18,31 @@ limitations under the License.
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
     <parent>
-        <artifactId>flink-cdc-connect</artifactId>
         <groupId>org.apache.flink</groupId>
+        <artifactId>flink-cdc-pipeline-connectors</artifactId>
         <version>${revision}</version>
     </parent>
-    <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>flink-cdc-pipeline-connectors</artifactId>
-    <packaging>pom</packaging>
-    <modules>
-        <module>flink-cdc-pipeline-connector-values</module>
-        <module>flink-cdc-pipeline-connector-mysql</module>
-        <module>flink-cdc-pipeline-connector-doris</module>
-        <module>flink-cdc-pipeline-connector-starrocks</module>
-        <module>flink-cdc-pipeline-connector-kafka</module>
-        <module>flink-cdc-pipeline-connector-paimon</module>
-        <module>flink-cdc-pipeline-connector-jdbc</module>
-    </modules>
+    <artifactId>flink-cdc-pipeline-connector-jdbc</artifactId>
+
+    <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-cdc-common</artifactId>
-            <version>${project.version}</version>
-            <scope>provided</scope>
+            <artifactId>flink-connector-jdbc</artifactId>
+            <version>3.2.0-1.18</version>
         </dependency>
-
         <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-cdc-runtime</artifactId>
-            <version>${project.version}</version>
-            <scope>provided</scope>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>4.0.3</version>
         </dependency>
     </dependencies>
-
 </project>
