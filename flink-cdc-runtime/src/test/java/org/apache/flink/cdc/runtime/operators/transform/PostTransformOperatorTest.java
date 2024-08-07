@@ -676,15 +676,15 @@ public class PostTransformOperatorTest {
 
     @Test
     void testTimezoneTransform() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 TIMEZONE_TABLEID.identifier(),
                                 "col1, DATE_FORMAT(TO_TIMESTAMP('2024-08-01 00:00:00'), 'yyyy-MM-dd HH:mm:ss') as datetime",
                                 null)
                         .addTimezone("UTC")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -1368,7 +1368,7 @@ public class PostTransformOperatorTest {
                                         + ",cast(castFloat as char) as castChar"
                                         + ",cast(castFloat as varchar) as castVarchar"
                                         + ",cast(castFloat as DECIMAL(4,2)) as castDecimal"
-                                        + ",cast(castFloat as TIMESTAMP) as castTimestamp",
+                                        + ",cast(castFloat as TIMESTAMP(3)) as castTimestamp",
                                 "col1 = '1'")
                         .build();
         EventOperatorTestHarness<PostTransformOperator, Event>
