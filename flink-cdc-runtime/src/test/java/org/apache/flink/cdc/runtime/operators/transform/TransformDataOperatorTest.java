@@ -550,6 +550,11 @@ public class TransformDataOperatorTest {
                 DataChangeEvent.insertEvent(
                         COLUMN_SQUARE_TABLE, recordDataGenerator.generate(new Object[] {6, 6, 36}));
 
+        DataChangeEvent insertEvent3 =
+                DataChangeEvent.insertEvent(
+                        COLUMN_SQUARE_TABLE,
+                        recordDataGenerator.generate(new Object[] {4, 4, null}));
+
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
@@ -564,6 +569,10 @@ public class TransformDataOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect2));
+        transform.processElement(new StreamRecord<>(insertEvent3));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isNull();
     }
 
     @Test
