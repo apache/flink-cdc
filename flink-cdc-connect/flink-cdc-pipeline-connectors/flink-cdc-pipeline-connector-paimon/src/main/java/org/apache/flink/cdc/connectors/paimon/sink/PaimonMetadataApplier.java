@@ -124,6 +124,7 @@ public class PaimonMetadataApplier implements MetadataApplier {
             builder.partitionKeys(schema.partitionKeys());
         }
         builder.options(tableOptions);
+        builder.options(schema.options());
         catalog.createTable(
                 new Identifier(event.tableId().getSchemaName(), event.tableId().getTableName()),
                 builder.build(),

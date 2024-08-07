@@ -79,6 +79,17 @@ We could use following yaml file to define a complicated Data Pipeline describin
      fenodes: 127.0.0.1:8030
      username: root
      password: ""
+  
+   transform:
+     - source-table: adb.web_order01
+       projection: \*, UPPER(product_name) as product_name
+       filter: id > 10 AND order_id > 100
+       description: project fields and filter
+     - source-table: adb.web_order02
+       projection: \*, UPPER(product_name) as product_name
+       filter: id > 20 AND order_id > 200
+       description: project fields and filter
+
    route:
      - source-table: app_db.orders
        sink-table: ods_db.ods_orders
@@ -98,5 +109,5 @@ The following config options of Data Pipeline level are supported:
 | parameter       | meaning                                                                                 | optional/required |
 |-----------------|-----------------------------------------------------------------------------------------|-------------------|
 | name            | The name of the pipeline, which will be submitted to the Flink cluster as the job name. | optional          |
-| parallelism     | The global parallelism of the pipeline.                                                 | required          |
+| parallelism     | The global parallelism of the pipeline. Defaults to 1.                                  | optional          |
 | local-time-zone | The local time zone defines current session time zone id.                               | optional          |

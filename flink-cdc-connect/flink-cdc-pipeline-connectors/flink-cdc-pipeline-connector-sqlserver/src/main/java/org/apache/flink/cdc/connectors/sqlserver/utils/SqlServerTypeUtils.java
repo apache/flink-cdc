@@ -59,18 +59,19 @@ public class SqlServerTypeUtils {
             case Types.BIGINT:
                 return DataTypes.BIGINT();
             case Types.FLOAT:
+                return DataTypes.FLOAT();
             case Types.REAL:
             case Types.DOUBLE:
+                return DataTypes.DOUBLE();
             case Types.NUMERIC:
             case Types.DECIMAL:
                 return DataTypes.DECIMAL(column.length(), column.scale().orElse(0));
             case Types.DATE:
                 return DataTypes.DATE();
             case Types.TIMESTAMP:
+                return DataTypes.TIMESTAMP(3);
             case Types.TIMESTAMP_WITH_TIMEZONE:
-                return column.length() >= 0
-                        ? DataTypes.TIMESTAMP(column.length())
-                        : DataTypes.TIMESTAMP();
+                return DataTypes.TIMESTAMP_LTZ(3);
             case Types.BOOLEAN:
                 return DataTypes.BOOLEAN();
             default:

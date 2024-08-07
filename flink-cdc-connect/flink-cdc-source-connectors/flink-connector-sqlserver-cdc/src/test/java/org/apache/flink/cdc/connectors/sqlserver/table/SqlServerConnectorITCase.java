@@ -57,7 +57,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
-    // enable the parallelismSnapshot (i.e: The new source OracleParallelSource)
+    // enable the parallelismSnapshot (i.e: The new source JdbcIncrementalSource)
     private final boolean parallelismSnapshot;
 
     public SqlServerConnectorITCase(boolean parallelismSnapshot) {

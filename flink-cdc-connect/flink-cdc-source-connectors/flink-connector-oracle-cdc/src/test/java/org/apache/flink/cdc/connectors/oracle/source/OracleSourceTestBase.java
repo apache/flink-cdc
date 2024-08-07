@@ -174,7 +174,7 @@ public class OracleSourceTestBase extends TestLogger {
     }
 
     // ------------------ utils -----------------------
-    private static List<TableId> listTables(Connection connection) {
+    protected static List<TableId> listTables(Connection connection) {
 
         Set<TableId> tableIdSet = new HashSet<>();
         String queryTablesSql =

@@ -22,7 +22,9 @@ import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.utils.StringUtils;
 
 import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlBasicTypeNameSpec;
 import org.apache.calcite.sql.SqlCharStringLiteral;
+import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
@@ -228,6 +230,8 @@ public class JaninoCompiler {
             case LESS_THAN_OR_EQUAL:
             case GREATER_THAN_OR_EQUAL:
                 return generateBinaryOperation(sqlBasicCall, atoms, sqlBasicCall.getKind().sql);
+            case CAST:
+                return generateCastOperation(sqlBasicCall, atoms);
             case OTHER:
                 return generateOtherOperation(sqlBasicCall, atoms);
             default:
@@ -254,6 +258,16 @@ public class JaninoCompiler {
         }
         return new Java.MethodInvocation(
                 Location.NOWHERE, null, StringUtils.convertToCamelCase("VALUE_EQUALS"), atoms);
+    }
+
+    private static Java.Rvalue generateCastOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (atoms.length != 1) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        List<SqlNode> operandList = sqlBasicCall.getOperandList();
+        SqlDataTypeSpec sqlDataTypeSpec = (SqlDataTypeSpec) operandList.get(1);
+        return generateTypeConvertMethod(sqlDataTypeSpec, atoms);
     }
 
     private static Java.Rvalue generateOtherOperation(
@@ -297,5 +311,57 @@ public class JaninoCompiler {
                 null,
                 StringUtils.convertToCamelCase(operationName),
                 timestampFunctionParam.toArray(new Java.Rvalue[0]));
+    }
+
+    private static Java.Rvalue generateTypeConvertMethod(
+            SqlDataTypeSpec sqlDataTypeSpec, Java.Rvalue[] atoms) {
+        switch (sqlDataTypeSpec.getTypeName().getSimple().toUpperCase()) {
+            case "BOOLEAN":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToBoolean", atoms);
+            case "TINYINT":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToByte", atoms);
+            case "SMALLINT":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToShort", atoms);
+            case "INTEGER":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToInteger", atoms);
+            case "BIGINT":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToLong", atoms);
+            case "FLOAT":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToFloat", atoms);
+            case "DOUBLE":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToDouble", atoms);
+            case "DECIMAL":
+                int precision = 10;
+                int scale = 0;
+                if (sqlDataTypeSpec.getTypeNameSpec() instanceof SqlBasicTypeNameSpec) {
+                    SqlBasicTypeNameSpec typeNameSpec =
+                            (SqlBasicTypeNameSpec) sqlDataTypeSpec.getTypeNameSpec();
+                    if (typeNameSpec.getPrecision() > -1) {
+                        precision = typeNameSpec.getPrecision();
+                    }
+                    if (typeNameSpec.getScale() > -1) {
+                        scale = typeNameSpec.getScale();
+                    }
+                }
+                List<Java.Rvalue> newAtoms = new ArrayList<>(Arrays.asList(atoms));
+                newAtoms.add(
+                        new Java.AmbiguousName(
+                                Location.NOWHERE, new String[] {String.valueOf(precision)}));
+                newAtoms.add(
+                        new Java.AmbiguousName(
+                                Location.NOWHERE, new String[] {String.valueOf(scale)}));
+                return new Java.MethodInvocation(
+                        Location.NOWHERE,
+                        null,
+                        "castToBigDecimal",
+                        newAtoms.toArray(new Java.Rvalue[0]));
+            case "CHAR":
+            case "VARCHAR":
+            case "STRING":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToString", atoms);
+            default:
+                throw new ParseException(
+                        "Unsupported data type cast: " + sqlDataTypeSpec.toString());
+        }
     }
 }

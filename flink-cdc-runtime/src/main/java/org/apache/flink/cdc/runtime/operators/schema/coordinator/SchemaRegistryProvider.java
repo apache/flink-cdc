@@ -17,16 +17,13 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
-import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /** Provider of {@link SchemaRegistry}. */
 @Internal
@@ -36,13 +33,13 @@ public class SchemaRegistryProvider implements OperatorCoordinator.Provider {
     private final OperatorID operatorID;
     private final String operatorName;
     private final MetadataApplier metadataApplier;
-    private final List<Tuple2<String, TableId>> routingRules;
+    private final List<RouteRule> routingRules;
 
     public SchemaRegistryProvider(
             OperatorID operatorID,
             String operatorName,
             MetadataApplier metadataApplier,
-            List<Tuple2<String, TableId>> routingRules) {
+            List<RouteRule> routingRules) {
         this.operatorID = operatorID;
         this.operatorName = operatorName;
         this.metadataApplier = metadataApplier;
@@ -56,19 +53,6 @@ public class SchemaRegistryProvider implements OperatorCoordinator.Provider {
 
     @Override
     public OperatorCoordinator create(OperatorCoordinator.Context context) throws Exception {
-        List<Tuple2<Selectors, TableId>> routes =
-                routingRules.stream()
-                        .map(
-                                tuple2 -> {
-                                    String tableInclusions = tuple2.f0;
-                                    TableId replaceBy = tuple2.f1;
-                                    Selectors selectors =
-                                            new Selectors.SelectorsBuilder()
-                                                    .includeTables(tableInclusions)
-                                                    .build();
-                                    return new Tuple2<>(selectors, replaceBy);
-                                })
-                        .collect(Collectors.toList());
-        return new SchemaRegistry(operatorName, context, metadataApplier, routes);
+        return new SchemaRegistry(operatorName, context, metadataApplier, routingRules);
     }
 }

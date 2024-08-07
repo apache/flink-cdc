@@ -728,6 +728,12 @@ public final class BinarySegmentUtils {
         int segOffset = offset - segIndex * segSize; // equal to %
 
         if (segOffset < segSize - 7) {
+            if (segIndex >= segments.length) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "Requested index position %d is out of range. The offset input was %d and segments size is %d and calculated segment offset is %d.",
+                                segIndex, offset, segSize, segOffset));
+            }
             return segments[segIndex].getLong(segOffset);
         } else {
             return getLongSlowly(segments, segSize, segIndex, segOffset);

@@ -18,21 +18,15 @@
 package org.apache.flink.cdc.composer.definition;
 
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
-import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
-import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
-import org.apache.flink.table.api.ValidationException;
 
 import java.time.ZoneId;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.TimeZone;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 
@@ -73,8 +67,6 @@ public class PipelineDef {
         this.routes = routes;
         this.transforms = transforms;
         this.config = evaluatePipelineTimeZone(config);
-
-        validatePipelineDefinition(this.config);
     }
 
     public SourceDef getSource() {
@@ -137,43 +129,6 @@ public class PipelineDef {
     // ------------------------------------------------------------------------
     //  Utilities
     // ------------------------------------------------------------------------
-
-    @VisibleForTesting
-    public static void validatePipelineDefinition(Configuration configuration)
-            throws ValidationException {
-        List<ConfigOption<?>> options =
-                Arrays.asList(
-                        PipelineOptions.PIPELINE_NAME,
-                        PipelineOptions.PIPELINE_PARALLELISM,
-                        PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR,
-                        PipelineOptions.PIPELINE_LOCAL_TIME_ZONE,
-                        PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID,
-                        PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT);
-
-        Set<String> optionKeys =
-                options.stream().map(ConfigOption::key).collect(Collectors.toSet());
-
-        configuration
-                .getKeys()
-                .forEach(
-                        key -> {
-                            if (!optionKeys.contains(key)) {
-                                throw new ValidationException(
-                                        String.format("Unknown configuration key `%s`", key));
-                            }
-                        });
-
-        options.forEach(
-                option -> {
-                    if (!configuration.getOptional(option).isPresent()
-                            && !option.hasDefaultValue()) {
-                        throw new ValidationException(
-                                String.format(
-                                        "Configuration key `%s` is not specified, and no default value available.",
-                                        option.key()));
-                    }
-                });
-    }
 
     /**
      * Returns the current session time zone id. It is used when converting to/from {@code TIMESTAMP

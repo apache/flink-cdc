@@ -166,7 +166,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
                                     t,
-                                    "Chunk key column 'errorCol' doesn't exist in the primary keys [card_no,level] of the table")
+                                    "Chunk key column 'errorCol' doesn't exist in the columns [card_no,level,name,note] of the table")
                             .isPresent());
         }
     }
@@ -414,6 +414,51 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                                     "'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.")
                             .isPresent());
         }
+    }
+
+    @Test
+    public void testAssignTableWithoutPrimaryKeyWithChunkKeyColumn() {
+        String tableWithoutPrimaryKey = "customers_no_pk";
+        List<String> expected =
+                Arrays.asList(
+                        "customers_no_pk null [462]",
+                        "customers_no_pk [462] [823]",
+                        "customers_no_pk [823] [1184]",
+                        "customers_no_pk [1184] [1545]",
+                        "customers_no_pk [1545] [1906]",
+                        "customers_no_pk [1906] null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        customerDatabase,
+                        4,
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {tableWithoutPrimaryKey},
+                        "id");
+        assertEquals(expected, splits);
+    }
+
+    @Test
+    public void testAssignTableWithPrimaryKeyWithChunkKeyColumnNotInPrimaryKey() {
+        String tableWithoutPrimaryKey = "customers";
+        List<String> expected =
+                Arrays.asList(
+                        "customers null [user_12]",
+                        "customers [user_12] [user_15]",
+                        "customers [user_15] [user_18]",
+                        "customers [user_18] [user_20]",
+                        "customers [user_20] [user_4]",
+                        "customers [user_4] [user_7]",
+                        "customers [user_7] null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        customerDatabase,
+                        4,
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {tableWithoutPrimaryKey},
+                        "name");
+        assertEquals(expected, splits);
     }
 
     @Test

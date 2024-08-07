@@ -78,8 +78,8 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                         sourceFetchContext.getDispatcher(),
                         sourceFetchContext.getSnapshotReceiver(),
                         snapshotSplit);
-        SqlserverSnapshotSplitChangeEventSourceContext changeEventSourceContext =
-                new SqlserverSnapshotSplitChangeEventSourceContext();
+        SqlServerSnapshotSplitChangeEventSourceContext changeEventSourceContext =
+                new SqlServerSnapshotSplitChangeEventSourceContext();
         SnapshotResult<SqlServerOffsetContext> snapshotResult =
                 snapshotSplitReadTask.execute(
                         changeEventSourceContext,
@@ -106,7 +106,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
         final SqlServerStreamFetchTask.StreamSplitReadTask backfillBinlogReadTask =
                 createBackFillLsnSplitReadTask(backfillStreamSplit, sourceFetchContext);
         backfillBinlogReadTask.execute(
-                new SqlserverSnapshotSplitChangeEventSourceContext(),
+                new SqlServerSnapshotSplitChangeEventSourceContext(),
                 sourceFetchContext.getPartition(),
                 streamOffsetContext);
     }
@@ -188,7 +188,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                 SqlServerOffsetContext previousOffset)
                 throws InterruptedException {
             SnapshottingTask snapshottingTask = getSnapshottingTask(partition, previousOffset);
-            final SqlSeverSnapshotContext ctx;
+            final SqlServerSnapshotContext ctx;
             try {
                 ctx = prepare(partition);
             } catch (Exception e) {
@@ -212,7 +212,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                 SnapshotContext<SqlServerPartition, SqlServerOffsetContext> snapshotContext,
                 SnapshottingTask snapshottingTask)
                 throws Exception {
-            final SqlSeverSnapshotContext ctx = (SqlSeverSnapshotContext) snapshotContext;
+            final SqlServerSnapshotContext ctx = (SqlServerSnapshotContext) snapshotContext;
             ctx.offset = offsetContext;
 
             LOG.info("Snapshot step 2 - Snapshotting data");
@@ -228,11 +228,11 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
         }
 
         @Override
-        protected SqlSeverSnapshotContext prepare(SqlServerPartition partition) throws Exception {
-            return new SqlSeverSnapshotContext(partition);
+        protected SqlServerSnapshotContext prepare(SqlServerPartition partition) throws Exception {
+            return new SqlServerSnapshotContext(partition);
         }
 
-        private void createDataEvents(SqlSeverSnapshotContext snapshotContext, TableId tableId)
+        private void createDataEvents(SqlServerSnapshotContext snapshotContext, TableId tableId)
                 throws Exception {
             LOG.debug("Snapshotting table {}", tableId);
             createDataEventsForTable(
@@ -242,7 +242,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
 
         /** Dispatches the data change events for the records of a single table. */
         private void createDataEventsForTable(
-                SqlSeverSnapshotContext snapshotContext,
+                SqlServerSnapshotContext snapshotContext,
                 EventDispatcher.SnapshotReceiver<SqlServerPartition> snapshotReceiver,
                 Table table)
                 throws InterruptedException {
@@ -313,7 +313,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
         }
 
         protected ChangeRecordEmitter<SqlServerPartition> getChangeRecordEmitter(
-                SqlSeverSnapshotContext snapshotContext, TableId tableId, Object[] row) {
+                SqlServerSnapshotContext snapshotContext, TableId tableId, Object[] row) {
             snapshotContext.offset.event(tableId, clock.currentTime());
             return new SnapshotChangeRecordEmitter<>(
                     snapshotContext.partition, snapshotContext.offset, row, clock);
@@ -323,11 +323,11 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
             return Threads.timer(clock, LOG_INTERVAL);
         }
 
-        private static class SqlSeverSnapshotContext
+        private static class SqlServerSnapshotContext
                 extends RelationalSnapshotChangeEventSource.RelationalSnapshotContext<
                         SqlServerPartition, SqlServerOffsetContext> {
 
-            public SqlSeverSnapshotContext(SqlServerPartition partition) throws SQLException {
+            public SqlServerSnapshotContext(SqlServerPartition partition) throws SQLException {
                 super(partition, "");
             }
         }
@@ -337,7 +337,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
      * The {@link ChangeEventSource.ChangeEventSourceContext} implementation for bounded stream task
      * of a snapshot split task.
      */
-    public class SqlserverSnapshotSplitChangeEventSourceContext
+    public class SqlServerSnapshotSplitChangeEventSourceContext
             implements ChangeEventSource.ChangeEventSourceContext {
 
         public void finished() {

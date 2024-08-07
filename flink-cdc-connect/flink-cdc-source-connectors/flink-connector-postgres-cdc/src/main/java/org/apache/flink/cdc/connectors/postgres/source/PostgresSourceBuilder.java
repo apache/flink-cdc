@@ -199,12 +199,6 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
-    /** Whether the {@link PostgresIncrementalSource} should output the schema changes or not. */
-    public PostgresSourceBuilder<T> includeSchemaChanges(boolean includeSchemaChanges) {
-        this.configFactory.includeSchemaChanges(includeSchemaChanges);
-        return this;
-    }
-
     /** Specifies the startup options. */
     public PostgresSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
         this.configFactory.startupOptions(startupOptions);

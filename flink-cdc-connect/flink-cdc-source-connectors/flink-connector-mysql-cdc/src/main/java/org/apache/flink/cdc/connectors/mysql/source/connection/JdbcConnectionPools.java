@@ -23,6 +23,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -49,6 +50,13 @@ public class JdbcConnectionPools implements ConnectionPools {
                 pools.put(poolId, PooledDataSourceFactory.createPooledDataSource(sourceConfig));
             }
             return pools.get(poolId);
+        }
+    }
+
+    public void clear() throws IOException {
+        synchronized (pools) {
+            pools.values().stream().forEach(HikariDataSource::close);
+            pools.clear();
         }
     }
 }
