@@ -18,9 +18,15 @@
 package org.apache.flink.cdc.connectors.mysql.source.metrics;
 
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReader;
+import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.metrics.MetricNames;
+
+import io.debezium.relational.TableId;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** A collection class for handling metrics in {@link MySqlSourceReader}. */
 public class MySqlSourceReaderMetrics {
@@ -28,6 +34,25 @@ public class MySqlSourceReaderMetrics {
     public static final long UNDEFINED = -1;
 
     private final MetricGroup metricGroup;
+
+    public static final String IO_NUM_RECORDS_OUT_SNAPSHOT = ".numRecordsOutBySnapshot";
+
+    public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_INSERT =
+            ".numRecordsOutByDataChangeEventInsert";
+
+    public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_DELETE =
+            ".numRecordsOutByDataChangeEventDelete";
+
+    public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_UPDATE =
+            ".numRecordsOutByDataChangeEventUpdate";
+
+    private final Map<TableId, Counter> snapshotNumRecordsOutMap = new ConcurrentHashMap();
+
+    private final Map<TableId, Counter> insertNumRecordsOutMap = new ConcurrentHashMap();
+
+    private final Map<TableId, Counter> updateNumRecordsOutMap = new ConcurrentHashMap();
+
+    private final Map<TableId, Counter> deleteNumRecordsOutMap = new ConcurrentHashMap();
 
     /**
      * currentFetchEventTimeLag = FetchTime - messageTimestamp, where the FetchTime is the time the
@@ -42,6 +67,49 @@ public class MySqlSourceReaderMetrics {
     public void registerMetrics() {
         metricGroup.gauge(
                 MetricNames.CURRENT_FETCH_EVENT_TIME_LAG, (Gauge<Long>) this::getFetchDelay);
+    }
+
+    public void numRecordsOutSnapshotIncrease(TableId tableId) {
+        Counter counter =
+                snapshotNumRecordsOutMap.computeIfAbsent(
+                        tableId,
+                        k ->
+                                metricGroup.counter(
+                                        tableId.identifier() + IO_NUM_RECORDS_OUT_SNAPSHOT));
+        counter.inc();
+    }
+
+    public void numRecordsOutInsertIncrease(TableId tableId) {
+        Counter counter =
+                insertNumRecordsOutMap.computeIfAbsent(
+                        tableId,
+                        k ->
+                                metricGroup.counter(
+                                        tableId.identifier()
+                                                + IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_INSERT));
+        counter.inc();
+    }
+
+    public void numRecordsOutUpdateIncrease(TableId tableId) {
+        Counter counter =
+                updateNumRecordsOutMap.computeIfAbsent(
+                        tableId,
+                        k ->
+                                metricGroup.counter(
+                                        tableId.identifier()
+                                                + IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_UPDATE));
+        counter.inc();
+    }
+
+    public void numRecordsOutDeleteIncrease(TableId tableId) {
+        Counter counter =
+                deleteNumRecordsOutMap.computeIfAbsent(
+                        tableId,
+                        k ->
+                                metricGroup.counter(
+                                        tableId.identifier()
+                                                + IO_NUM_RECORDS_OUT_DATA_CHANGE_EVENT_DELETE));
+        counter.inc();
     }
 
     public long getFetchDelay() {
