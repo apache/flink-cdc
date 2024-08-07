@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 /** The processor of the transform filter. It processes the data change event of matched table. */
@@ -72,7 +73,8 @@ public class TransformFilterProcessor {
         List<Object> params = new ArrayList<>();
         List<Column> columns = tableInfo.getSchema().getColumns();
         RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
-        for (String columnName : transformFilter.getColumnNames()) {
+        LinkedHashSet<String> columnNames = new LinkedHashSet<>(transformFilter.getColumnNames());
+        for (String columnName : columnNames) {
             if (columnName.equals(TransformParser.DEFAULT_NAMESPACE_NAME)) {
                 params.add(tableInfo.getNamespace());
                 continue;
@@ -105,7 +107,7 @@ public class TransformFilterProcessor {
         List<Class<?>> paramTypes = new ArrayList<>();
         List<Column> columns = tableInfo.getSchema().getColumns();
         String scriptExpression = transformFilter.getScriptExpression();
-        List<String> columnNames = transformFilter.getColumnNames();
+        LinkedHashSet<String> columnNames = new LinkedHashSet<>(transformFilter.getColumnNames());
         for (String columnName : columnNames) {
             for (int i = 0; i < columns.size(); i++) {
                 Column column = columns.get(i);
