@@ -82,7 +82,7 @@ public class K8SApplicationDeploymentExecutor implements PipelineDeploymentExecu
             if (client != null) {
                 client.shutDownCluster();
             }
-            throw new RuntimeException("deploy flink cdc job failed ", e);
+            throw new RuntimeException("Failed to deploy Flink CDC job", e);
         } finally {
             descriptor.close();
             if (client != null) {

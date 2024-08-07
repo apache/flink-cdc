@@ -192,8 +192,8 @@ class CliFrontendTest {
                     + "                                   (for example hdfs:///flink/savepoint-1537\n"
                     + "    -t,--target <arg>              The deployment target for the execution. This\n"
                     + "                                   can take one of the following values\n"
-                    + "                                   local/remote/yarn-session/yarn-application/\n"
-                    + "                                   kubernetes-session/kubernetes-application\n"
+                    + "                                   local/remote/yarn-session/yarn-application/ku\n"
+                    + "                                   bernetes-session/kubernetes-application\n"
                     + "       --use-mini-cluster          Use Flink MiniCluster to run the pipeline\n";
 
     private static class NoOpComposer implements PipelineComposer {
