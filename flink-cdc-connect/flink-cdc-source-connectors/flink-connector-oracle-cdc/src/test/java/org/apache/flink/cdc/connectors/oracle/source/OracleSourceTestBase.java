@@ -70,6 +70,7 @@ public class OracleSourceTestBase extends TestLogger {
     public static final String CONNECTOR_PWD = "dbz";
     public static final String TEST_USER = "debezium";
     public static final String TEST_PWD = "dbz";
+    public static final String TOP_USER = "sys as sysdba";
     public static final String TOP_SECRET = "top_secret";
 
     public static final OracleContainer ORACLE_CONTAINER =
@@ -134,8 +135,7 @@ public class OracleSourceTestBase extends TestLogger {
     }
 
     public static Connection getJdbcConnectionAsDBA() throws SQLException {
-        return DriverManager.getConnection(
-                ORACLE_CONTAINER.getJdbcUrl(), "sys as sysdba", TOP_SECRET);
+        return DriverManager.getConnection(ORACLE_CONTAINER.getJdbcUrl(), TOP_USER, TOP_SECRET);
     }
 
     public static void createAndInitialize(String sqlFile) throws Exception {
