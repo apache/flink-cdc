@@ -51,18 +51,24 @@ public class PendingSplitsStateSerializerTest {
     public void testPendingSplitsStateSerializerAndDeserialize() throws IOException {
         StreamPendingSplitsState streamPendingSplitsStateBefore =
                 new StreamPendingSplitsState(true);
+        ChunkSplitterState chunkSplitterState =
+                new ChunkSplitterState(
+                        TableId.parse("test-table"),
+                        ChunkSplitterState.ChunkBound.middleOf(20),
+                        20);
         PendingSplitsStateSerializer pendingSplitsStateSerializer =
                 new PendingSplitsStateSerializer(constructSourceSplitSerializer());
         PendingSplitsState streamSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        6, pendingSplitsStateSerializer.serialize(streamPendingSplitsStateBefore));
+                        7, pendingSplitsStateSerializer.serialize(streamPendingSplitsStateBefore));
         Assert.assertEquals(streamPendingSplitsStateBefore, streamSplitsStateAfter);
 
         SnapshotPendingSplitsState snapshotPendingSplitsStateBefore =
-                constructSnapshotPendingSplitsState(AssignerStatus.NEWLY_ADDED_ASSIGNING);
+                constructSnapshotPendingSplitsState(
+                        AssignerStatus.NEWLY_ADDED_ASSIGNING, chunkSplitterState);
         PendingSplitsState snapshotPendingSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        6,
+                        7,
                         pendingSplitsStateSerializer.serialize(snapshotPendingSplitsStateBefore));
         Assert.assertEquals(snapshotPendingSplitsStateBefore, snapshotPendingSplitsStateAfter);
 
@@ -70,7 +76,7 @@ public class PendingSplitsStateSerializerTest {
                 new HybridPendingSplitsState(snapshotPendingSplitsStateBefore, false);
         PendingSplitsState hybridPendingSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        6, pendingSplitsStateSerializer.serialize(hybridPendingSplitsStateBefore));
+                        7, pendingSplitsStateSerializer.serialize(hybridPendingSplitsStateBefore));
         Assert.assertEquals(hybridPendingSplitsStateBefore, hybridPendingSplitsStateAfter);
     }
 
@@ -88,25 +94,28 @@ public class PendingSplitsStateSerializerTest {
         Assert.assertEquals(streamPendingSplitsStateBefore, streamSplitsStateAfter);
 
         SnapshotPendingSplitsState expectedSnapshotSplitsState =
-                constructSnapshotPendingSplitsState(AssignerStatus.INITIAL_ASSIGNING);
+                constructSnapshotPendingSplitsState(
+                        AssignerStatus.INITIAL_ASSIGNING,
+                        ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
         PendingSplitsState snapshotPendingSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
                         5,
                         PendingSplitsStateSerializerVersion5.serialize(
-                                constructSnapshotPendingSplitsStateVersion4(false)));
+                                constructSnapshotPendingSplitsStateVersion5(false)));
         Assert.assertEquals(expectedSnapshotSplitsState, snapshotPendingSplitsStateAfter);
 
         HybridPendingSplitsState expectedHybridPendingSplitsState =
                 new HybridPendingSplitsState(
                         constructSnapshotPendingSplitsState(
-                                AssignerStatus.INITIAL_ASSIGNING_FINISHED),
+                                AssignerStatus.INITIAL_ASSIGNING_FINISHED,
+                                ChunkSplitterState.NO_SPLITTING_TABLE_STATE),
                         false);
         PendingSplitsState hybridPendingSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
                         5,
                         PendingSplitsStateSerializerVersion5.serialize(
                                 new HybridPendingSplitsStateVersion5(
-                                        constructSnapshotPendingSplitsStateVersion4(true), false)));
+                                        constructSnapshotPendingSplitsStateVersion5(true), false)));
         Assert.assertEquals(expectedHybridPendingSplitsState, hybridPendingSplitsStateAfter);
     }
 
@@ -161,7 +170,7 @@ public class PendingSplitsStateSerializerTest {
     }
 
     private SnapshotPendingSplitsState constructSnapshotPendingSplitsState(
-            AssignerStatus assignerStatus) {
+            AssignerStatus assignerStatus, ChunkSplitterState chunkSplitterState) {
         SchemalessSnapshotSplit schemalessSnapshotSplit = constuctSchemalessSnapshotSplit();
         Map<String, SchemalessSnapshotSplit> assignedSplits = new HashMap<>();
         assignedSplits.put(tableId.toQuotedString('`'), schemalessSnapshotSplit);
@@ -179,10 +188,11 @@ public class PendingSplitsStateSerializerTest {
                 assignerStatus,
                 Arrays.asList(TableId.parse("catalog2.schema2.table2")),
                 true,
-                true);
+                true,
+                chunkSplitterState);
     }
 
-    private SnapshotPendingSplitsStateVersion5 constructSnapshotPendingSplitsStateVersion4(
+    private SnapshotPendingSplitsStateVersion5 constructSnapshotPendingSplitsStateVersion5(
             boolean isAssignerFinished) {
         SchemalessSnapshotSplit schemalessSnapshotSplit = constuctSchemalessSnapshotSplit();
         Map<String, SchemalessSnapshotSplit> assignedSplits = new HashMap<>();

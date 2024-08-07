@@ -23,6 +23,7 @@ import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.experimental.utils.MySqlTypeUtils;
 import org.apache.flink.cdc.connectors.base.experimental.utils.MySqlUtils;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.JdbcSourceChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.table.types.DataType;
 
 import io.debezium.jdbc.JdbcConnection;
@@ -35,8 +36,11 @@ import java.sql.SQLException;
 @Internal
 public class MySqlChunkSplitter extends JdbcSourceChunkSplitter {
 
-    public MySqlChunkSplitter(JdbcSourceConfig sourceConfig, JdbcDataSourceDialect dialect) {
-        super(sourceConfig, dialect);
+    public MySqlChunkSplitter(
+            JdbcSourceConfig sourceConfig,
+            JdbcDataSourceDialect dialect,
+            ChunkSplitterState chunkSplitterState) {
+        super(sourceConfig, dialect, chunkSplitterState);
     }
 
     @Override
