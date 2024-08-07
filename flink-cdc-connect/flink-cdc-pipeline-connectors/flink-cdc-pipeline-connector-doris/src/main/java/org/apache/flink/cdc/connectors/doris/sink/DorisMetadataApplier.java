@@ -82,7 +82,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                 applyRenameColumnEvent((RenameColumnEvent) event);
             } else if (event instanceof AlterColumnTypeEvent) {
                 applyAlterColumnTypeEvent((AlterColumnTypeEvent) event);
-            } else if (event instanceof AlterColumnTypeEvent) {
+            } else {
                 throw new RuntimeException("Unsupported schema change event, " + event);
             }
         } catch (Exception ex) {
