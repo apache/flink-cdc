@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
@@ -63,15 +64,11 @@ class SchemaManagerTest {
         schemaManager.applySchemaChange(new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
         assertThat(schemaManager.getLatestSchema(CUSTOMERS)).isPresent().contains(CUSTOMERS_SCHEMA);
 
-        // Cannot apply CreateTableEvent multiple times
-        assertThatThrownBy(
-                        () ->
-                                schemaManager.applySchemaChange(
-                                        new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage(
-                        "Unable to apply CreateTableEvent to an existing schema for table \"%s\"",
-                        CUSTOMERS);
+        // Can apply CreateTableEvent multiple times
+        Assertions.assertDoesNotThrow(
+                () ->
+                        schemaManager.applySchemaChange(
+                                new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA)));
     }
 
     @Test
