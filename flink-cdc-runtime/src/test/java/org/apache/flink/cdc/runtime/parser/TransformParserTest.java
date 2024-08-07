@@ -38,9 +38,7 @@ import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
-import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
-import org.apache.calcite.sql.util.SqlOperatorTables;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.sql2rel.RelDecorrelator;
@@ -101,10 +99,9 @@ public class TransformParserTest {
                         factory,
                         new CalciteConnectionConfigImpl(new Properties()));
         TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
-        SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(sqlStdOperatorTable, transformSqlOperatorTable),
+                        transformSqlOperatorTable,
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
@@ -144,10 +141,9 @@ public class TransformParserTest {
                         factory,
                         new CalciteConnectionConfigImpl(new Properties()));
         TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
-        SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(sqlStdOperatorTable, transformSqlOperatorTable),
+                        transformSqlOperatorTable,
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
