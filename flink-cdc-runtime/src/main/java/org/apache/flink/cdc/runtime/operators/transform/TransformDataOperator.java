@@ -285,7 +285,7 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
                 }
                 Optional<TransformFilter> transformFilterOptional = transform.f2;
                 if (transformFilterOptional.isPresent()
-                        && transformFilterOptional.get().isVaild()) {
+                        && transformFilterOptional.get().isValid()) {
                     TransformFilter transformFilter = transformFilterOptional.get();
                     if (!transformFilterProcessorMap.containsKey(
                             Tuple2.of(tableId, transformFilter))) {
