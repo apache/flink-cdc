@@ -39,6 +39,7 @@ import java.sql.DriverManager;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -53,7 +54,6 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
     // ------------------------------------------------------------------------------------------
     protected static final String MYSQL_TEST_USER = "mysqluser";
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
-    protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
     protected static final long EVENT_WAITING_TIMEOUT = 60000L;
 
@@ -86,453 +86,126 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
         schemaEvolveDatabase.dropDatabase();
     }
 
-    private void validateSnapshotData(String tableName) throws Exception {
-        List<String> expected =
-                Stream.of(
-                                "CreateTableEvent{tableId=%s.%s, schema=columns={`id` INT NOT NULL,`name` VARCHAR(17),`age` INT}, primaryKeys=id, options=()}",
-                                "DataChangeEvent{tableId=%s.%s, before=[], after=[1008, Alice, 21], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=%s.%s, before=[], after=[1009, Bob, 20], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=%s.%s, before=[], after=[1010, Carol, 19], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=%s.%s, before=[], after=[1011, Derrida, 18], op=INSERT, meta=()}")
-                        .map(
-                                s ->
-                                        String.format(
-                                                s,
-                                                schemaEvolveDatabase.getDatabaseName(),
-                                                tableName))
-                        .collect(Collectors.toList());
-
-        validateResult(expected, taskManagerConsumer);
-    }
-
-    private void waitForIncrementalStage(String tableName, Statement stmt) throws Exception {
-        stmt.execute("INSERT INTO members VALUES (0, '__fence__', 0);");
-
-        // Ensure we change schema after incremental stage
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.%s, before=[], after=[0, __fence__, 0], op=INSERT, meta=()}",
-                        schemaEvolveDatabase.getDatabaseName(), tableName),
-                taskManagerConsumer);
-    }
-
     @Test
     public void testSchemaEvolve() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.members\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  schema.change.behavior: evolve\n"
-                                + "  parallelism: 1",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        schemaEvolveDatabase.getDatabaseName());
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-        validateSnapshotData("members");
-
-        LOG.info("Starting schema evolution");
-        String mysqlJdbcUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        schemaEvolveDatabase.getDatabaseName());
-
-        try (Connection conn =
-                        DriverManager.getConnection(
-                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-                Statement stmt = conn.createStatement()) {
-
-            waitForIncrementalStage("members", stmt);
-
-            // triggers AddColumnEvent
-            stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
-            stmt.execute("INSERT INTO members VALUES (1012, 'Eve', 17, 0);");
-
-            // triggers AlterColumnTypeEvent and RenameColumnEvent
-            stmt.execute("ALTER TABLE members CHANGE COLUMN age precise_age DOUBLE;");
-
-            // triggers RenameColumnEvent
-            stmt.execute("ALTER TABLE members RENAME COLUMN gender TO biological_sex;");
-
-            // triggers DropColumnEvent
-            stmt.execute("ALTER TABLE members DROP COLUMN biological_sex");
-            stmt.execute("INSERT INTO members VALUES (1013, 'Fiona', 16);");
-        }
-
-        List<String> expected =
-                Stream.of(
-                                "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
-                                "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 0], op=INSERT, meta=()}",
-                                "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
-                                "RenameColumnEvent{tableId=%s.members, nameMapping={age=precise_age}}",
-                                "RenameColumnEvent{tableId=%s.members, nameMapping={gender=biological_sex}}",
-                                "DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]}",
-                                "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, 16.0], op=INSERT, meta=()}")
-                        .map(s -> String.format(s, schemaEvolveDatabase.getDatabaseName()))
-                        .collect(Collectors.toList());
-
-        validateResult(expected, taskManagerConsumer);
+        testGenericSchemaEvolution(
+                "evolve",
+                false,
+                false,
+                false,
+                Arrays.asList(
+                        "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 0], op=INSERT, meta=()}",
+                        "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
+                        "RenameColumnEvent{tableId=%s.members, nameMapping={age=precise_age}}",
+                        "RenameColumnEvent{tableId=%s.members, nameMapping={gender=biological_sex}}",
+                        "DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, 16.0], op=INSERT, meta=()}"));
     }
 
     @Test
     public void testSchemaEvolveWithIncompatibleChanges() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.(members|new_members)\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "route:\n"
-                                + "  - source-table: %s.(members|new_members)\n"
-                                + "    sink-table: %s.merged\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  schema.change.behavior: evolve\n"
-                                + "  parallelism: 1",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        schemaEvolveDatabase.getDatabaseName(),
-                        schemaEvolveDatabase.getDatabaseName(),
-                        schemaEvolveDatabase.getDatabaseName());
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-        validateSnapshotData("merged");
-
-        LOG.info("Starting schema evolution");
-        String mysqlJdbcUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        schemaEvolveDatabase.getDatabaseName());
-
-        try (Connection conn =
-                        DriverManager.getConnection(
-                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-                Statement stmt = conn.createStatement()) {
-            waitForIncrementalStage("merged", stmt);
-
-            // incompatible type INT and VARCHAR cannot be merged
-            stmt.execute("ALTER TABLE members CHANGE COLUMN age age VARCHAR(17);");
-        }
-
-        waitUntilSpecificEvent(
-                "java.lang.IllegalStateException: Incompatible types: \"INT\" and \"VARCHAR(17)\"",
-                taskManagerConsumer);
-
-        // Ensure that job was terminated
-        waitUntilSpecificEvent(
-                "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy",
-                jobManagerConsumer);
+        testGenericSchemaEvolution(
+                "evolve",
+                true,
+                false,
+                false,
+                Collections.singletonList(
+                        "java.lang.IllegalStateException: Incompatible types: \"INT\" and \"DOUBLE\""),
+                Collections.singletonList(
+                        "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
     }
 
     @Test
     public void testSchemaEvolveWithException() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.members\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "  error.on.schema.change: true\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  schema.change.behavior: evolve\n"
-                                + "  parallelism: 1",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        schemaEvolveDatabase.getDatabaseName());
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-        validateSnapshotData("members");
-
-        LOG.info("Starting schema evolution");
-        String mysqlJdbcUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        schemaEvolveDatabase.getDatabaseName());
-
-        try (Connection conn =
-                        DriverManager.getConnection(
-                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-                Statement stmt = conn.createStatement()) {
-            waitForIncrementalStage("members", stmt);
-            stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
-        }
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
-                        schemaEvolveDatabase.getDatabaseName()),
-                taskManagerConsumer);
-
-        validateResult(
+        testGenericSchemaEvolution(
+                "evolve",
+                false,
+                true,
+                false,
+                Collections.singletonList(
+                        "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}"),
                 Arrays.asList(
-                        String.format(
-                                "Failed to apply schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}.",
-                                schemaEvolveDatabase.getDatabaseName()),
-                        String.format(
-                                "SchemaEvolveException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, problem='Rejected schema change event since error.on.schema.change is enabled.', context='null'}",
-                                schemaEvolveDatabase.getDatabaseName()),
-                        "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"),
-                jobManagerConsumer);
+                        "Failed to apply schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}.",
+                        "SchemaEvolveException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
+                        "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
     }
 
     @Test
     public void testSchemaTryEvolveWithException() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.members\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "  error.on.schema.change: true\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  schema.change.behavior: try_evolve\n"
-                                + "  parallelism: 1",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        schemaEvolveDatabase.getDatabaseName());
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-        validateSnapshotData("members");
-        LOG.info("Starting schema evolution");
-        String mysqlJdbcUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        schemaEvolveDatabase.getDatabaseName());
-
-        try (Connection conn =
-                        DriverManager.getConnection(
-                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-                Statement stmt = conn.createStatement()) {
-
-            waitForIncrementalStage("members", stmt);
-
-            stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
-            stmt.execute("INSERT INTO members VALUES (1012, 'Eve', 17, 0);");
-            stmt.execute("UPDATE members SET name = 'Eva' WHERE id = 1012;");
-            stmt.execute("DELETE FROM members WHERE id = 1012;");
-        }
-
-        List<String> expected =
-                Stream.of(
-                                // Add column never succeeded, so age column will not appear.
-                                "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=%s.members, before=[1012, Eve, 17], after=[1012, Eva, 17], op=UPDATE, meta=()}",
-                                "DataChangeEvent{tableId=%s.members, before=[1012, Eva, 17], after=[], op=DELETE, meta=()}")
-                        .map(s -> String.format(s, schemaEvolveDatabase.getDatabaseName()))
-                        .collect(Collectors.toList());
-
-        validateResult(expected, taskManagerConsumer);
-
-        waitUntilSpecificEvent(
-                String.format(
+        testGenericSchemaEvolution(
+                "try_evolve",
+                false,
+                true,
+                false,
+                Arrays.asList(
+                        // Add column never succeeded, so age column will not appear.
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null], op=INSERT, meta=()}"),
+                Arrays.asList(
                         "Failed to apply schema change AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} to table %s.members.",
-                        schemaEvolveDatabase.getDatabaseName(),
-                        schemaEvolveDatabase.getDatabaseName()),
-                jobManagerConsumer);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "SchemaEvolveException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, problem='Rejected schema change event since error.on.schema.change is enabled.', context='null'}",
-                        schemaEvolveDatabase.getDatabaseName()),
-                jobManagerConsumer);
+                        "SchemaEvolveException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}"));
     }
 
     @Test
     public void testSchemaIgnore() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.members\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  schema.change.behavior: ignore\n"
-                                + "  parallelism: 1",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        schemaEvolveDatabase.getDatabaseName());
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
 
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-        validateSnapshotData("members");
-
-        LOG.info("Starting schema evolution");
-        String mysqlJdbcUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        schemaEvolveDatabase.getDatabaseName());
-
-        try (Connection conn =
-                        DriverManager.getConnection(
-                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-                Statement stmt = conn.createStatement()) {
-
-            waitForIncrementalStage("members", stmt);
-
-            // triggers AddColumnEvent
-            stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
-            stmt.execute("INSERT INTO members VALUES (1012, 'Eve', 17, 0);");
-
-            // triggers AlterColumnTypeEvent and RenameColumnEvent
-            stmt.execute("ALTER TABLE members CHANGE COLUMN age precise_age DOUBLE;");
-
-            // triggers RenameColumnEvent
-            stmt.execute("ALTER TABLE members RENAME COLUMN gender TO biological_sex;");
-
-            // triggers DropColumnEvent
-            stmt.execute("ALTER TABLE members DROP COLUMN biological_sex");
-            stmt.execute("INSERT INTO members VALUES (1013, 'Fiona', 16);");
-        }
-
-        List<String> expected =
-                Stream.of(
-                                "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null], op=INSERT, meta=()}")
-                        .map(s -> String.format(s, schemaEvolveDatabase.getDatabaseName()))
-                        .collect(Collectors.toList());
-
-        validateResult(expected, taskManagerConsumer);
+        testGenericSchemaEvolution(
+                "ignore",
+                false,
+                false,
+                false,
+                Arrays.asList(
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null], op=INSERT, meta=()}"));
     }
 
     @Test
     public void testSchemaException() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.members\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  schema.change.behavior: exception\n"
-                                + "  parallelism: 1",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        schemaEvolveDatabase.getDatabaseName());
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        testGenericSchemaEvolution(
+                "exception",
+                false,
+                false,
+                false,
+                Collections.emptyList(),
+                Collections.singletonList(
+                        "java.lang.RuntimeException: Refused to apply schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} in EXCEPTION mode."));
+    }
 
-        waitUntilJobRunning(Duration.ofSeconds(30));
+    @Test
+    public void testLenientSchemaEvolution() throws Exception {
 
-        LOG.info("Pipeline job is running");
-        validateSnapshotData("members");
+        testGenericSchemaEvolution(
+                "lenient",
+                false,
+                false,
+                false,
+                Arrays.asList(
+                        "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 0], op=INSERT, meta=()}",
+                        "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
+                        "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`precise_age` DOUBLE, position=LAST, existedColumnName=null}]}",
+                        "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`biological_sex` TINYINT, position=LAST, existedColumnName=null}]}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null, null, 16.0, null], op=INSERT, meta=()}"));
+    }
 
-        LOG.info("Starting schema evolution");
-        String mysqlJdbcUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        schemaEvolveDatabase.getDatabaseName());
+    @Test
+    public void testFineGrainedSchemaEvolution() throws Exception {
 
-        try (Connection conn =
-                        DriverManager.getConnection(
-                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-                Statement stmt = conn.createStatement()) {
-            waitForIncrementalStage("members", stmt);
-
-            // triggers AddColumnEvent
-            stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
-        }
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "java.lang.RuntimeException: Refused to apply schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} in EXCEPTION mode.",
-                        schemaEvolveDatabase.getDatabaseName()),
-                taskManagerConsumer);
+        testGenericSchemaEvolution(
+                "evolve",
+                false,
+                false,
+                true,
+                Arrays.asList(
+                        "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 0], op=INSERT, meta=()}",
+                        "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
+                        "RenameColumnEvent{tableId=%s.members, nameMapping={age=precise_age}}",
+                        "RenameColumnEvent{tableId=%s.members, nameMapping={gender=biological_sex}}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, 16.0, null], op=INSERT, meta=()}"),
+                Collections.singletonList(
+                        "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]} to table %s.members."));
     }
 
     @Test
@@ -569,92 +242,33 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 () -> submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar));
     }
 
-    @Test
-    public void testFineGrainedSchemaEvolution() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.members\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "  exclude.schema.changes:\n"
-                                + "    - drop\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  schema.change.behavior: evolve\n"
-                                + "  parallelism: 1",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        schemaEvolveDatabase.getDatabaseName());
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-        validateSnapshotData("members");
-
-        LOG.info("Starting schema evolution");
-        String mysqlJdbcUrl =
-                String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        schemaEvolveDatabase.getDatabaseName());
-
-        try (Connection conn =
-                        DriverManager.getConnection(
-                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-                Statement stmt = conn.createStatement()) {
-            waitForIncrementalStage("members", stmt);
-
-            // triggers AddColumnEvent
-            stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
-            stmt.execute("INSERT INTO members VALUES (1012, 'Eve', 17, 0);");
-
-            // triggers AlterColumnTypeEvent and RenameColumnEvent
-            stmt.execute("ALTER TABLE members CHANGE COLUMN age precise_age DOUBLE;");
-
-            // triggers RenameColumnEvent
-            stmt.execute("ALTER TABLE members RENAME COLUMN gender TO biological_sex;");
-
-            // triggers DropColumnEvent
-            stmt.execute("ALTER TABLE members DROP COLUMN biological_sex;");
-            stmt.execute("INSERT INTO members VALUES (1013, 'Fiona', 16);");
-        }
-
-        List<String> expected =
-                Stream.of(
-                                "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
-                                "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 0], op=INSERT, meta=()}",
-                                "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
-                                "RenameColumnEvent{tableId=%s.members, nameMapping={age=precise_age}}",
-                                "RenameColumnEvent{tableId=%s.members, nameMapping={gender=biological_sex}}",
-                                "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, 16.0, null], op=INSERT, meta=()}")
-                        .map(s -> String.format(s, schemaEvolveDatabase.getDatabaseName()))
-                        .collect(Collectors.toList());
-
-        validateResult(expected, taskManagerConsumer);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]} to table %s.members.",
-                        schemaEvolveDatabase.getDatabaseName(),
-                        schemaEvolveDatabase.getDatabaseName()),
-                jobManagerConsumer);
+    private void testGenericSchemaEvolution(
+            String behavior,
+            boolean mergeTable,
+            boolean triggerError,
+            boolean fineGrained,
+            List<String> expectedTaskManagerEvents)
+            throws Exception {
+        testGenericSchemaEvolution(
+                behavior,
+                mergeTable,
+                triggerError,
+                fineGrained,
+                expectedTaskManagerEvents,
+                Collections.emptyList());
     }
 
-    @Test
-    public void testLenientSchemaEvolution() throws Exception {
+    private void testGenericSchemaEvolution(
+            String behavior,
+            boolean mergeTable,
+            boolean triggerError,
+            boolean fineGrained,
+            List<String> expectedTaskManagerEvents,
+            List<String> expectedJobManagerEvents)
+            throws Exception {
+
+        String dbName = schemaEvolveDatabase.getDatabaseName();
+
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -663,42 +277,52 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
-                                + "  tables: %s.members\n"
+                                + "  tables: %s.%s\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"
+                                + (fineGrained
+                                        ? "  exclude.schema.changes:\n" + "    - drop\n"
+                                        : "")
+                                + (triggerError ? "  error.on.schema.change: true" : "")
+                                + (mergeTable
+                                        ? String.format(
+                                                "route:\n"
+                                                        + "  - source-table: %s.(members|new_members)\n"
+                                                        + "    sink-table: %s.merged",
+                                                dbName, dbName)
+                                        : "")
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  schema.change.behavior: lenient\n"
+                                + "  schema.change.behavior: %s\n"
                                 + "  parallelism: 1",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
-                        schemaEvolveDatabase.getDatabaseName());
+                        dbName,
+                        mergeTable ? "(members|new_members)" : "members",
+                        behavior);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
         submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
-        validateSnapshotData("members");
+        validateSnapshotData(dbName, mergeTable ? "merged" : "members");
 
         LOG.info("Starting schema evolution");
         String mysqlJdbcUrl =
                 String.format(
-                        "jdbc:mysql://%s:%s/%s",
-                        MYSQL.getHost(),
-                        MYSQL.getDatabasePort(),
-                        schemaEvolveDatabase.getDatabaseName());
+                        "jdbc:mysql://%s:%s/%s", MYSQL.getHost(), MYSQL.getDatabasePort(), dbName);
 
         try (Connection conn =
                         DriverManager.getConnection(
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stmt = conn.createStatement()) {
 
-            waitForIncrementalStage("members", stmt);
+            waitForIncrementalStage(dbName, mergeTable ? "merged" : "members", stmt);
 
             // triggers AddColumnEvent
             stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
@@ -715,18 +339,45 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
             stmt.execute("INSERT INTO members VALUES (1013, 'Fiona', 16);");
         }
 
+        List<String> expectedTmEvents =
+                expectedTaskManagerEvents.stream()
+                        .map(s -> String.format(s, dbName, dbName))
+                        .collect(Collectors.toList());
+
+        validateResult(expectedTmEvents, taskManagerConsumer);
+
+        List<String> expectedJmEvents =
+                expectedJobManagerEvents.stream()
+                        .map(s -> String.format(s, dbName, dbName))
+                        .collect(Collectors.toList());
+
+        validateResult(expectedJmEvents, jobManagerConsumer);
+    }
+
+    private void validateSnapshotData(String dbName, String tableName) throws Exception {
         List<String> expected =
                 Stream.of(
-                                "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
-                                "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 0], op=INSERT, meta=()}",
-                                "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
-                                "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`precise_age` DOUBLE, position=LAST, existedColumnName=null}]}",
-                                "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`biological_sex` TINYINT, position=LAST, existedColumnName=null}]}",
-                                "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null, null, 16.0, null], op=INSERT, meta=()}")
-                        .map(s -> String.format(s, schemaEvolveDatabase.getDatabaseName()))
+                                "CreateTableEvent{tableId=%s.%s, schema=columns={`id` INT NOT NULL,`name` VARCHAR(17),`age` INT}, primaryKeys=id, options=()}",
+                                "DataChangeEvent{tableId=%s.%s, before=[], after=[1008, Alice, 21], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.%s, before=[], after=[1009, Bob, 20], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.%s, before=[], after=[1010, Carol, 19], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=%s.%s, before=[], after=[1011, Derrida, 18], op=INSERT, meta=()}")
+                        .map(s -> String.format(s, dbName, tableName))
                         .collect(Collectors.toList());
 
         validateResult(expected, taskManagerConsumer);
+    }
+
+    private void waitForIncrementalStage(String dbName, String tableName, Statement stmt)
+            throws Exception {
+        stmt.execute("INSERT INTO members VALUES (0, '__fence__', 0);");
+
+        // Ensure we change schema after incremental stage
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.%s, before=[], after=[0, __fence__, 0], op=INSERT, meta=()}",
+                        dbName, tableName),
+                taskManagerConsumer);
     }
 
     private void validateResult(List<String> expectedEvents, ToStringConsumer consumer)
