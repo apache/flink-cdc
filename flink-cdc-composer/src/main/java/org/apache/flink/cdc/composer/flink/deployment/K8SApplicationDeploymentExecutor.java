@@ -19,7 +19,6 @@ package org.apache.flink.cdc.composer.flink.deployment;
 
 import org.apache.flink.cdc.composer.PipelineDeploymentExecutor;
 import org.apache.flink.cdc.composer.PipelineExecution;
-import org.apache.flink.client.cli.CliFrontend;
 import org.apache.flink.client.deployment.ClusterSpecification;
 import org.apache.flink.client.deployment.application.ApplicationConfiguration;
 import org.apache.flink.client.program.ClusterClient;
@@ -61,7 +60,8 @@ public class K8SApplicationDeploymentExecutor implements PipelineDeploymentExecu
         flinkConfig.set(KubernetesConfigOptions.CONTAINER_IMAGE, "flink/flink-cdc:latest");
         flinkConfig.set(ApplicationConfiguration.APPLICATION_ARGS, commandLine.getArgList());
         flinkConfig.set(
-                ApplicationConfiguration.APPLICATION_MAIN_CLASS, CliFrontend.class.getName());
+                ApplicationConfiguration.APPLICATION_MAIN_CLASS,
+                "org.apache.flink.cdc.cli.CliFrontend");
         KubernetesClusterClientFactory kubernetesClusterClientFactory =
                 new KubernetesClusterClientFactory();
         KubernetesClusterDescriptor descriptor =
