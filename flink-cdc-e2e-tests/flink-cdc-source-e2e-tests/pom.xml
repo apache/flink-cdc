@@ -31,10 +31,12 @@ limitations under the License.
         <flink-1.16>1.16.3</flink-1.16>
         <flink-1.17>1.17.2</flink-1.17>
         <flink-1.18>1.18.1</flink-1.18>
-        <flink-1.19>1.19.0</flink-1.19>
-        <jdbc.version-1.17>3.1.1-1.17</jdbc.version-1.17>
-        <jdbc.version-1.18>3.1.2-1.18</jdbc.version-1.18>
-        <jdbc.version-1.19>3.1.2-1.18</jdbc.version-1.19>
+        <flink-1.19>1.19.1</flink-1.19>
+        <flink-1.20>1.20.0</flink-1.20>
+        <jdbc.version-1.17>3.1.2-1.17</jdbc.version-1.17>
+        <jdbc.version-1.18>3.2.0-1.18</jdbc.version-1.18>
+        <jdbc.version-1.19>3.2.0-1.19</jdbc.version-1.19>
+        <jdbc.version-1.20>3.2.0-1.19</jdbc.version-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <postgresql.driver.version>42.7.3</postgresql.driver.version>
     </properties>
@@ -272,6 +274,16 @@ limitations under the License.
                             <artifactId>flink-connector-jdbc</artifactId>
                             <version>${jdbc.version-1.19}</version>
                             <destFileName>jdbc-connector_${flink-1.19}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-connector-jdbc</artifactId>
+                            <version>${jdbc.version-1.20}</version>
+                            <destFileName>jdbc-connector_${flink-1.20}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
