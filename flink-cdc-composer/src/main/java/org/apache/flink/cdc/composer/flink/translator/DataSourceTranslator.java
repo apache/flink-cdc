@@ -56,7 +56,7 @@ public class DataSourceTranslator {
                                 Thread.currentThread().getContextClassLoader()));
 
         // Add source JAR to environment
-        FactoryDiscoveryUtils.getJarPathByIdentifier(sourceDef.getType(), DataSourceFactory.class)
+        FactoryDiscoveryUtils.getJarPathByIdentifier(sourceFactory)
                 .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
 
         // Get source provider

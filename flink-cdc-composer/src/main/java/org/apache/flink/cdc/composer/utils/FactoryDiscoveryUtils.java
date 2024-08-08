@@ -20,6 +20,7 @@ package org.apache.flink.cdc.composer.utils;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.factories.Factory;
 
+import org.codehaus.commons.nullanalysis.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +43,7 @@ public class FactoryDiscoveryUtils {
     private FactoryDiscoveryUtils() {}
 
     /** Returns the {@link Factory} for the given identifier. */
+    @NotNull
     @SuppressWarnings("unchecked")
     public static <T extends Factory> T getFactoryByIdentifier(
             String identifier, Class<T> factoryClass) {
@@ -88,10 +90,8 @@ public class FactoryDiscoveryUtils {
     /**
      * Return the path of the jar file that contains the {@link Factory} for the given identifier.
      */
-    public static <T extends Factory> Optional<URL> getJarPathByIdentifier(
-            String identifier, Class<T> factoryClass) {
+    public static <T extends Factory> Optional<URL> getJarPathByIdentifier(T factory) {
         try {
-            T factory = getFactoryByIdentifier(identifier, factoryClass);
             URL url = factory.getClass().getProtectionDomain().getCodeSource().getLocation();
             String urlString = url.toString();
             if (urlString.contains("usrlib")) {
