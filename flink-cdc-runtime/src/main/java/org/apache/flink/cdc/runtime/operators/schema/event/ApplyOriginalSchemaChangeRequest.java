@@ -26,8 +26,8 @@ import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import java.util.Objects;
 
 /**
- * The request from {@link SchemaOperator} to {@link SchemaRegistry} to request apply evolved schema
- * changes.
+ * The request from {@link SchemaOperator} to {@link SchemaRegistry} to request apply original
+ * schema changes.
  */
 public class ApplyOriginalSchemaChangeRequest implements CoordinationRequest {
 
