@@ -321,7 +321,15 @@ class FlinkPipelineComposerITCase {
         // Execute the pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
         execution.execute();
-
+        Schema transformedTableSchema = ValuesDatabase.getTableSchema(TABLE_1);
+        assertThat(transformedTableSchema)
+                .isEqualTo(
+                        Schema.newBuilder()
+                                .physicalColumn("col1", DataTypes.STRING())
+                                .physicalColumn("col12", DataTypes.STRING())
+                                .physicalColumn("newCol3", DataTypes.STRING())
+                                .primaryKey("col1")
+                                .build());
         // Check the order and content of all received events
         String[] outputEvents = outCaptor.toString().trim().split("\n");
         assertThat(outputEvents)
@@ -388,7 +396,15 @@ class FlinkPipelineComposerITCase {
         // Execute the pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
         execution.execute();
-
+        Schema transformedTableSchema = ValuesDatabase.getTableSchema(TABLE_1);
+        assertThat(transformedTableSchema)
+                .isEqualTo(
+                        Schema.newBuilder()
+                                .physicalColumn("col1", DataTypes.STRING())
+                                .physicalColumn("col12", DataTypes.STRING())
+                                .physicalColumn("newCol3", DataTypes.STRING())
+                                .primaryKey("col1")
+                                .build());
         // Check the order and content of all received events
         String[] outputEvents = outCaptor.toString().trim().split("\n");
         assertThat(outputEvents)
