@@ -47,7 +47,11 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
 
 import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
 
 import static org.apache.flink.cdc.connectors.sqlserver.source.utils.SqlServerConnectionUtils.createSqlServerConnection;
 import static org.junit.Assert.assertEquals;
