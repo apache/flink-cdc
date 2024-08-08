@@ -25,28 +25,32 @@ import javax.annotation.Nullable;
 /** An exception occurred during schema evolution. */
 public class SchemaEvolveException extends FlinkRuntimeException {
     private final SchemaChangeEvent applyingEvent;
-    private final String problem;
-    private final @Nullable Throwable context;
+    private final String exceptionMessage;
+    private final @Nullable Throwable cause;
+
+    public SchemaEvolveException(SchemaChangeEvent applyingEvent, String exceptionMessage) {
+        this(applyingEvent, exceptionMessage, null);
+    }
 
     public SchemaEvolveException(
-            SchemaChangeEvent applyingEvent, String problem, @Nullable Throwable context) {
-        super(context);
+            SchemaChangeEvent applyingEvent, String exceptionMessage, @Nullable Throwable cause) {
+        super(cause);
         this.applyingEvent = applyingEvent;
-        this.problem = problem;
-        this.context = context;
+        this.exceptionMessage = exceptionMessage;
+        this.cause = cause;
     }
 
     public SchemaChangeEvent getApplyingEvent() {
         return applyingEvent;
     }
 
-    public String getProblem() {
-        return problem;
+    public String getExceptionMessage() {
+        return exceptionMessage;
     }
 
     @Nullable
-    public Throwable getContext() {
-        return context;
+    public Throwable getCause() {
+        return cause;
     }
 
     @Override
@@ -54,11 +58,11 @@ public class SchemaEvolveException extends FlinkRuntimeException {
         return "SchemaEvolveException{"
                 + "applyingEvent="
                 + applyingEvent
-                + ", problem='"
-                + problem
+                + ", exceptionMessage='"
+                + exceptionMessage
                 + '\''
-                + ", context='"
-                + context
+                + ", cause='"
+                + cause
                 + '\''
                 + '}';
     }
