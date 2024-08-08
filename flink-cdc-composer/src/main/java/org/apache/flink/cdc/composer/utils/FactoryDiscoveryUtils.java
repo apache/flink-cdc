@@ -20,9 +20,10 @@ package org.apache.flink.cdc.composer.utils;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.factories.Factory;
 
-import org.codehaus.commons.nullanalysis.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nonnull;
 
 import java.net.URL;
 import java.nio.file.Files;
@@ -43,7 +44,7 @@ public class FactoryDiscoveryUtils {
     private FactoryDiscoveryUtils() {}
 
     /** Returns the {@link Factory} for the given identifier. */
-    @NotNull
+    @Nonnull
     @SuppressWarnings("unchecked")
     public static <T extends Factory> T getFactoryByIdentifier(
             String identifier, Class<T> factoryClass) {
