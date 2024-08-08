@@ -186,7 +186,7 @@ pipeline:
     <thead>
       <tr>
         <th class="text-left" style="width:10%;">CDC type</th>
-        <th class="text-left" style="width:30%;">Doris type<a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-types/Data-Types/BOOLEAN/"></a></th>
+        <th class="text-left" style="width:30%;">Doris type</th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
