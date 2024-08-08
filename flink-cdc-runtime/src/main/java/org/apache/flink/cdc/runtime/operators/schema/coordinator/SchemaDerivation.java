@@ -106,11 +106,11 @@ public class SchemaDerivation {
                 // single source mapping, replace the table ID directly
                 SchemaChangeEvent derivedSchemaChangeEvent =
                         ChangeEventUtils.recreateSchemaChangeEvent(schemaChangeEvent, derivedTable);
-                schemaManager.applySchemaChange(derivedSchemaChangeEvent);
                 events.add(derivedSchemaChangeEvent);
             } else {
                 // multiple source mapping (merging tables)
-                Schema derivedTableSchema = schemaManager.getLatestSchema(derivedTable).get();
+                Schema derivedTableSchema =
+                        schemaManager.getLatestEvolvedSchema(derivedTable).get();
                 if (schemaChangeEvent instanceof CreateTableEvent) {
                     events.addAll(
                             handleCreateTableEvent(
@@ -229,7 +229,6 @@ public class SchemaDerivation {
             AddColumnEvent derivedSchemaChangeEvent = new AddColumnEvent(derivedTable, newColumns);
             schemaChangeEvents.add(derivedSchemaChangeEvent);
         }
-        schemaChangeEvents.forEach(schemaManager::applySchemaChange);
         return schemaChangeEvents;
     }
 
@@ -261,7 +260,6 @@ public class SchemaDerivation {
                     new AlterColumnTypeEvent(derivedTable, typeDifference);
             schemaChangeEvents.add(derivedSchemaChangeEvent);
         }
-        schemaChangeEvents.forEach(schemaManager::applySchemaChange);
         return schemaChangeEvents;
     }
 
@@ -300,7 +298,6 @@ public class SchemaDerivation {
         if (!newTypeMapping.isEmpty()) {
             schemaChangeEvents.add(new AlterColumnTypeEvent(derivedTable, newTypeMapping));
         }
-        schemaChangeEvents.forEach(schemaManager::applySchemaChange);
         return schemaChangeEvents;
     }
 
@@ -336,7 +333,6 @@ public class SchemaDerivation {
         if (!newTypeMapping.isEmpty()) {
             schemaChangeEvents.add(new AlterColumnTypeEvent(derivedTable, newTypeMapping));
         }
-        schemaChangeEvents.forEach(schemaManager::applySchemaChange);
         return schemaChangeEvents;
     }
 

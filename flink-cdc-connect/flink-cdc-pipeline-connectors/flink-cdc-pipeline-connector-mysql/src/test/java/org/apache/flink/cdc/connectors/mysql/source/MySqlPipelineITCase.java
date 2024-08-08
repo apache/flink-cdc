@@ -429,7 +429,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                 tableId,
                 Schema.newBuilder()
                         .physicalColumn("id", DataTypes.INT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
                         .physicalColumn("description", DataTypes.VARCHAR(512))
                         .physicalColumn("weight", DataTypes.FLOAT())
                         .primaryKey(Collections.singletonList("id"))
@@ -651,6 +651,14 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         "ALTER TABLE `%s`.`products` RENAME COLUMN `desc1` TO `desc3`;",
                         inventoryDatabase.getDatabaseName()));
         expected.add(new RenameColumnEvent(tableId, Collections.singletonMap("desc1", "desc3")));
+
+        statement.execute(
+                String.format(
+                        "ALTER TABLE `%s`.`products` MODIFY COLUMN `DESC3` VARCHAR(255) NULL DEFAULT NULL;",
+                        inventoryDatabase.getDatabaseName()));
+        expected.add(
+                new AlterColumnTypeEvent(
+                        tableId, Collections.singletonMap("DESC3", DataTypes.VARCHAR(255))));
 
         statement.execute(
                 String.format(

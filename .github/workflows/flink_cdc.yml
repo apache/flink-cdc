@@ -149,6 +149,23 @@ jobs:
     steps:
       - run: echo "Running CI pipeline for JDK version ${{ matrix.jdk }}"
 
+      - name: Clean up disk space
+        run: |
+          set -euo pipefail
+          
+          echo "Disk space before cleanup"
+          df -h 
+          
+          echo "Cleaning up disk space"
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          
+          echo "Disk space after cleanup"
+          df -h
+
       - name: Check out repository code
         uses: actions/checkout@v4
         with:
@@ -297,14 +314,14 @@ jobs:
         run: FLINK_HOME=./flink-1.18.1/ ruby misc/patch_flink_conf.rb
         working-directory: ./tools/mig-test
       - name: Start containers
-        run: cd conf && docker-compose up -d
+        run: cd conf && docker compose up -d
         working-directory: ./tools/mig-test
       - name: Run migration tests
         run: FLINK_HOME=./flink-1.18.1/ ruby run_migration_test.rb
         working-directory: ./tools/mig-test
       - name: Stop containers
         if: always()
-        run: cd conf && docker-compose down
+        run: cd conf && docker compose down
         working-directory: ./tools/mig-test
 
   data_stream_migration_test:
@@ -340,12 +357,12 @@ jobs:
         run: cd datastream && ruby compile_jobs.rb
         working-directory: ./tools/mig-test
       - name: Start containers
-        run: cd conf && docker-compose up -d
+        run: cd conf && docker compose up -d
         working-directory: ./tools/mig-test
       - name: Run migration tests
         run: cd datastream && FLINK_HOME=../flink-1.18.1/ ruby run_migration_test.rb
         working-directory: ./tools/mig-test
       - name: Stop containers
         if: always()
-        run: cd conf && docker-compose down
+        run: cd conf && docker compose down
         working-directory: ./tools/mig-test

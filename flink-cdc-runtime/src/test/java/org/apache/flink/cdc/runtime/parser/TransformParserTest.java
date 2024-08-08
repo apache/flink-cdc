@@ -228,16 +228,16 @@ public class TransformParserTest {
         testFilterExpression(
                 "id = CURRENT_DATE", "valueEquals(id, currentDate(__epoch_time__, __time_zone__))");
         testFilterExpression(
-                "id = CURRENT_TIMESTAMP",
-                "valueEquals(id, currentTimestamp(__epoch_time__, __time_zone__))");
-        testFilterExpression("NOW()", "now(__epoch_time__, __time_zone__)");
+                "id = CURRENT_TIMESTAMP", "valueEquals(id, currentTimestamp(__epoch_time__))");
+        testFilterExpression("NOW()", "now(__epoch_time__)");
         testFilterExpression("YEAR(dt)", "year(dt)");
         testFilterExpression("QUARTER(dt)", "quarter(dt)");
         testFilterExpression("MONTH(dt)", "month(dt)");
         testFilterExpression("WEEK(dt)", "week(dt)");
         testFilterExpression("DATE_FORMAT(dt,'yyyy-MM-dd')", "dateFormat(dt, \"yyyy-MM-dd\")");
-        testFilterExpression("TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\")");
-        testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt)");
+        testFilterExpression(
+                "TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\", __time_zone__)");
+        testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt, __time_zone__)");
         testFilterExpression("TIMESTAMP_DIFF('DAY', dt1, dt2)", "timestampDiff(\"DAY\", dt1, dt2)");
         testFilterExpression("IF(a>b,a,b)", "a > b ? a : b");
         testFilterExpression("NULLIF(a,b)", "nullif(a, b)");
@@ -264,6 +264,38 @@ public class TransformParserTest {
         testFilterExpression(
                 "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
                 "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+        testFilterExpression(
+                "case id when 1 then 'a' when 2 then 'b' else 'c' end",
+                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+        testFilterExpression(
+                "case when id = 1 then 'a' when id = 2 then 'b' else 'c' end",
+                "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
+        testFilterExpression("cast(id||'0' as int)", "castToInteger(concat(id, \"0\"))");
+        testFilterExpression("cast(1 as string)", "castToString(1)");
+        testFilterExpression("cast(1 as boolean)", "castToBoolean(1)");
+        testFilterExpression("cast(1 as tinyint)", "castToByte(1)");
+        testFilterExpression("cast(1 as smallint)", "castToShort(1)");
+        testFilterExpression("cast(1 as bigint)", "castToLong(1)");
+        testFilterExpression("cast(1 as float)", "castToFloat(1)");
+        testFilterExpression("cast(1 as double)", "castToDouble(1)");
+        testFilterExpression("cast(1 as decimal)", "castToBigDecimal(1, 10, 0)");
+        testFilterExpression("cast(1 as char)", "castToString(1)");
+        testFilterExpression("cast(1 as varchar)", "castToString(1)");
+        testFilterExpression("cast(null as int)", "castToInteger(null)");
+        testFilterExpression("cast(null as string)", "castToString(null)");
+        testFilterExpression("cast(null as boolean)", "castToBoolean(null)");
+        testFilterExpression("cast(null as tinyint)", "castToByte(null)");
+        testFilterExpression("cast(null as smallint)", "castToShort(null)");
+        testFilterExpression("cast(null as bigint)", "castToLong(null)");
+        testFilterExpression("cast(null as float)", "castToFloat(null)");
+        testFilterExpression("cast(null as double)", "castToDouble(null)");
+        testFilterExpression("cast(null as decimal)", "castToBigDecimal(null, 10, 0)");
+        testFilterExpression("cast(null as char)", "castToString(null)");
+        testFilterExpression("cast(null as varchar)", "castToString(null)");
+        testFilterExpression(
+                "cast(CURRENT_TIMESTAMP as TIMESTAMP)",
+                "castToTimestamp(currentTimestamp(__epoch_time__), __time_zone__)");
+        testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
     }
 
     private void testFilterExpression(String expression, String expressionExpect) {

@@ -212,7 +212,8 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
     private TableInfo getTableInfoFromSchemaEvolutionClient(TableId tableId) throws Exception {
         TableInfo tableInfo = tableInfoMap.get(tableId);
         if (tableInfo == null) {
-            Optional<Schema> schemaOptional = schemaEvolutionClient.getLatestSchema(tableId);
+            Optional<Schema> schemaOptional =
+                    schemaEvolutionClient.getLatestOriginalSchema(tableId);
             if (schemaOptional.isPresent()) {
                 tableInfo = TableInfo.of(tableId, schemaOptional.get());
             } else {
