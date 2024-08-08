@@ -42,22 +42,8 @@ public class DataSourceTranslator {
 
     public DataStreamSource<Event> translate(
             SourceDef sourceDef, StreamExecutionEnvironment env, Configuration pipelineConfig) {
-        // Search the data source factory
-        DataSourceFactory sourceFactory =
-                FactoryDiscoveryUtils.getFactoryByIdentifier(
-                        sourceDef.getType(), DataSourceFactory.class);
-
         // Create data source
-        DataSource dataSource =
-                sourceFactory.createDataSource(
-                        new FactoryHelper.DefaultContext(
-                                sourceDef.getConfig(),
-                                pipelineConfig,
-                                Thread.currentThread().getContextClassLoader()));
-
-        // Add source JAR to environment
-        FactoryDiscoveryUtils.getJarPathByIdentifier(sourceFactory)
-                .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
+        DataSource dataSource = createDataSource(sourceDef, env, pipelineConfig);
 
         // Get source provider
         final int sourceParallelism = pipelineConfig.get(PipelineOptions.PIPELINE_PARALLELISM);
@@ -89,6 +75,24 @@ public class DataSourceTranslator {
                             "Unsupported EventSourceProvider type \"%s\"",
                             eventSourceProvider.getClass().getCanonicalName()));
         }
+    }
+
+    private DataSource createDataSource(
+            SourceDef sourceDef, StreamExecutionEnvironment env, Configuration pipelineConfig) {
+        // Search the data source factory
+        DataSourceFactory sourceFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier(
+                        sourceDef.getType(), DataSourceFactory.class);
+        // Add source JAR to environment
+        FactoryDiscoveryUtils.getJarPathByIdentifier(sourceFactory)
+                .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
+        DataSource dataSource =
+                sourceFactory.createDataSource(
+                        new FactoryHelper.DefaultContext(
+                                sourceDef.getConfig(),
+                                pipelineConfig,
+                                Thread.currentThread().getContextClassLoader()));
+        return dataSource;
     }
 
     private String generateDefaultSourceName(SourceDef sourceDef) {
