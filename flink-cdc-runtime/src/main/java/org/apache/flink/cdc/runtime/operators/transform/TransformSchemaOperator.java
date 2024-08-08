@@ -159,6 +159,7 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
     public void close() throws Exception {
         super.close();
         clearOperator();
+        this.state = null;
     }
 
     @Override
@@ -292,6 +293,5 @@ public class TransformSchemaOperator extends AbstractStreamOperator<Event>
     private void clearOperator() {
         this.transforms = null;
         this.processorMap = null;
-        this.state = null;
     }
 }

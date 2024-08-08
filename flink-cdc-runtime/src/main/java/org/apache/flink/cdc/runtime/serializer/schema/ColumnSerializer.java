@@ -46,6 +46,13 @@ public class ColumnSerializer extends TypeSerializerSingleton<Column> {
     private final MetadataColumnSerializer metadataColumnSerializer =
             MetadataColumnSerializer.INSTANCE;
 
+    private static int currentVersion = 2;
+
+    /** Update {@link #currentVersion} as We did not directly include this version in the file. */
+    public static void updateVersion(int version) {
+        currentVersion = version;
+    }
+
     @Override
     public boolean isImmutableType() {
         return false;
@@ -92,12 +99,16 @@ public class ColumnSerializer extends TypeSerializerSingleton<Column> {
 
     @Override
     public Column deserialize(DataInputView source) throws IOException {
+        return deserialize(currentVersion, source);
+    }
+
+    public Column deserialize(int version, DataInputView source) throws IOException {
         ColumnType columnType = enumSerializer.deserialize(source);
         switch (columnType) {
             case METADATA:
                 return metadataColumnSerializer.deserialize(source);
             case PHYSICAL:
-                return physicalColumnSerializer.deserialize(source);
+                return physicalColumnSerializer.deserialize(version, source);
             default:
                 throw new IOException("Unknown column type: " + columnType);
         }

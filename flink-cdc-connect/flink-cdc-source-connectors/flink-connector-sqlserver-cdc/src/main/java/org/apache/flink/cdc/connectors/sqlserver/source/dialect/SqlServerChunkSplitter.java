@@ -64,4 +64,13 @@ public class SqlServerChunkSplitter extends JdbcSourceChunkSplitter {
             throws SQLException {
         return SqlServerUtils.queryApproximateRowCnt(jdbc, tableId);
     }
+
+    protected boolean isChunkEndLeMax(Object chunkEnd, Object max, Column splitColumn) {
+        return SqlServerUtils.compare(chunkEnd, max, splitColumn) <= 0;
+    }
+
+    /** ChunkEnd greater than or equal to max. */
+    protected boolean isChunkEndGeMax(Object chunkEnd, Object max, Column splitColumn) {
+        return SqlServerUtils.compare(chunkEnd, max, splitColumn) >= 0;
+    }
 }

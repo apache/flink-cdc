@@ -25,6 +25,7 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.cdc.runtime.operators.transform.TransformSchemaOperator;
 
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -40,9 +41,14 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 
 /** E2e tests for the {@link TransformSchemaOperator}. */
 @RunWith(Parameterized.class)
@@ -56,6 +62,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
+    protected static final long EVENT_WAITING_TIMEOUT = 60000L;
 
     @ClassRule
     public static final MySqlContainer MYSQL =
@@ -131,14 +138,12 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[], after=[1011, 11], op=INSERT, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                60000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[], after=[2014, 14], op=INSERT, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                60000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         List<String> expectedEvents =
                 Arrays.asList(
@@ -187,20 +192,17 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[], after=[3007, 7], op=INSERT, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                20000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[1009, 8.1], after=[1009, 100], op=UPDATE, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                20000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.terminus, before=[2011, 11], after=[], op=DELETE, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                20000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         String stdout = taskManagerConsumer.toUtf8String();
         System.out.println(stdout);
@@ -240,6 +242,10 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
+        waitUntilSpecificEvent(
+                String.format(
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`PRICEALPHA` INT,`UID` INT,`NEWVERSION` STRING}, primaryKeys=ID, options=()}",
+                        transformRenameDatabase.getDatabaseName()));
         List<String> expectedEvents =
                 Arrays.asList(
                         String.format(
@@ -296,34 +302,66 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, 8.1, 0, 2009, 8.1], after=[1009, 100, 0, 2009, 100], op=UPDATE, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                6000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7, 79, 4007, 7], op=INSERT, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                6000L);
+                        transformRenameDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Big Sur, 3011, 11], after=[], op=DELETE, meta=()}",
-                        transformRenameDatabase.getDatabaseName()),
-                6000L);
+                        transformRenameDatabase.getDatabaseName()));
+    }
 
-        String stdout = taskManagerConsumer.toUtf8String();
-        System.out.println(stdout);
+    @Test
+    public void testTemporalFunctions() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.\\.*\n"
+                                + "    projection: ID, LOCALTIME as lcl_t, CURRENT_TIME as cur_t, CAST(CURRENT_TIMESTAMP AS TIMESTAMP) as cur_ts, CAST(NOW() AS TIMESTAMP) as now_ts, LOCALTIMESTAMP as lcl_ts, CURRENT_DATE as cur_dt\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: 1\n"
+                                + "  local-time-zone: America/Los_Angeles",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName());
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        waitForTemporaryRecords(8, 60000L);
     }
 
     private void validateResult(List<String> expectedEvents) throws Exception {
         for (String event : expectedEvents) {
-            waitUntilSpecificEvent(event, 6000L);
+            waitUntilSpecificEvent(event);
         }
     }
 
-    private void waitUntilSpecificEvent(String event, long timeout) throws Exception {
+    private void waitUntilSpecificEvent(String event) throws Exception {
         boolean result = false;
-        long endTimeout = System.currentTimeMillis() + timeout;
+        long endTimeout = System.currentTimeMillis() + TransformE2eITCase.EVENT_WAITING_TIMEOUT;
         while (System.currentTimeMillis() < endTimeout) {
             String stdout = taskManagerConsumer.toUtf8String();
             if (stdout.contains(event)) {
@@ -339,5 +377,84 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                             + " from stdout: "
                             + taskManagerConsumer.toUtf8String());
         }
+    }
+
+    private int validateTemporaryRecords() {
+        int validRecordCount = 0;
+        for (String line : taskManagerConsumer.toUtf8String().split("\n")) {
+            if (extractDataLines(line)) {
+                validRecordCount++;
+            }
+        }
+        return validRecordCount;
+    }
+
+    private void waitForTemporaryRecords(int expectedRecords, long timeout) throws Exception {
+        boolean result = false;
+        long endTimeout = System.currentTimeMillis() + timeout;
+        while (System.currentTimeMillis() < endTimeout) {
+            if (validateTemporaryRecords() >= expectedRecords) {
+                result = true;
+                break;
+            }
+            Thread.sleep(1000);
+        }
+        if (!result) {
+            throw new TimeoutException(
+                    "failed to get enough temporary records: "
+                            + expectedRecords
+                            + " from stdout: "
+                            + taskManagerConsumer.toUtf8String());
+        }
+    }
+
+    boolean extractDataLines(String line) {
+        if (!line.startsWith("DataChangeEvent{")) {
+            return false;
+        }
+        Stream.of("before", "after")
+                .forEach(
+                        tag -> {
+                            String[] arr = line.split(tag + "=\\[", 2);
+                            String dataRecord = arr[arr.length - 1].split("]", 2)[0];
+                            if (!dataRecord.isEmpty()) {
+                                verifyDataRecord(dataRecord);
+                            }
+                        });
+        return true;
+    }
+
+    void verifyDataRecord(String recordLine) {
+        LOG.info("Verifying data line {}", recordLine);
+        List<String> tokens = Arrays.asList(recordLine.split(", "));
+        Assert.assertTrue(tokens.size() >= 6);
+
+        tokens = tokens.subList(tokens.size() - 6, tokens.size());
+
+        String localTime = tokens.get(0);
+        String currentTime = tokens.get(1);
+        Assert.assertEquals(localTime, currentTime);
+
+        String currentTimestamp = tokens.get(2);
+        String nowTimestamp = tokens.get(3);
+        String localTimestamp = tokens.get(4);
+        Assert.assertEquals(currentTimestamp, nowTimestamp);
+        Assert.assertEquals(currentTimestamp, localTimestamp);
+
+        Instant instant =
+                LocalDateTime.parse(
+                                currentTimestamp,
+                                DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS"))
+                        .toInstant(ZoneOffset.UTC);
+
+        long milliSecondsInOneDay = 24 * 60 * 60 * 1000;
+
+        Assert.assertEquals(
+                instant.toEpochMilli() % milliSecondsInOneDay, Long.parseLong(localTime));
+
+        String currentDate = tokens.get(5);
+
+        Assert.assertEquals(
+                instant.toEpochMilli() / milliSecondsInOneDay, Long.parseLong(currentDate));
     }
 }

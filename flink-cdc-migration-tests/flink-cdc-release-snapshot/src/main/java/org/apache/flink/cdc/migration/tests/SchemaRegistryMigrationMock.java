@@ -18,9 +18,14 @@
 package org.apache.flink.cdc.migration.tests;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaDerivation;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaManager;
@@ -28,11 +33,14 @@ import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 /** Dummy classes for migration test. Called via reflection. */
 public class SchemaRegistryMigrationMock implements MigrationMockBase {
@@ -51,11 +59,36 @@ public class SchemaRegistryMigrationMock implements MigrationMockBase {
         schemaVersions.put(1, DUMMY_SCHEMA);
         schemaVersions.put(2, DUMMY_SCHEMA);
         schemaVersions.put(3, DUMMY_SCHEMA);
-        return new SchemaManager(Collections.singletonMap(DUMMY_TABLE_ID, schemaVersions));
+        return new SchemaManager(
+                Collections.singletonMap(DUMMY_TABLE_ID, schemaVersions),
+                Collections.singletonMap(DUMMY_TABLE_ID, schemaVersions),
+                SchemaChangeBehavior.EVOLVE);
     }
 
     public SchemaRegistry generateSchemaRegistry() {
-        return new SchemaRegistry("Dummy Name", null, e -> {}, new ArrayList<>());
+        return new SchemaRegistry(
+                "Dummy Name",
+                null,
+                new MetadataApplier() {
+                    @Override
+                    public boolean acceptsSchemaEvolutionType(
+                            SchemaChangeEventType schemaChangeEventType) {
+                        return true;
+                    }
+
+                    @Override
+                    public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+                        return Arrays.stream(SchemaChangeEventTypeFamily.ALL)
+                                .collect(Collectors.toSet());
+                    }
+
+                    @Override
+                    public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+                        // Do nothing
+                    }
+                },
+                new ArrayList<>(),
+                SchemaChangeBehavior.EVOLVE);
     }
 
     private SchemaManager getSchemaManager(SchemaRegistry schemaRegistry) throws Exception {

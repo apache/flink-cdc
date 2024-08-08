@@ -149,6 +149,23 @@ jobs:
     steps:
       - run: echo "Running CI pipeline for JDK version ${{ matrix.jdk }}"
 
+      - name: Clean up disk space
+        run: |
+          set -euo pipefail
+          
+          echo "Disk space before cleanup"
+          df -h 
+          
+          echo "Cleaning up disk space"
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          
+          echo "Disk space after cleanup"
+          df -h
+
       - name: Check out repository code
         uses: actions/checkout@v4
         with:

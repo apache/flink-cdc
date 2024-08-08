@@ -102,7 +102,7 @@ public class OracleChunkSplitter extends JdbcSourceChunkSplitter {
 
     /** ChunkEnd less than or equal to max. */
     @Override
-    protected boolean isChunkEndLeMax(Object chunkEnd, Object max) {
+    protected boolean isChunkEndLeMax(Object chunkEnd, Object max, Column splitColumn) {
         boolean chunkEndMaxCompare;
         if (chunkEnd instanceof ROWID && max instanceof ROWID) {
             chunkEndMaxCompare =
@@ -116,7 +116,7 @@ public class OracleChunkSplitter extends JdbcSourceChunkSplitter {
 
     /** ChunkEnd greater than or equal to max. */
     @Override
-    protected boolean isChunkEndGeMax(Object chunkEnd, Object max) {
+    protected boolean isChunkEndGeMax(Object chunkEnd, Object max, Column splitColumn) {
         boolean chunkEndMaxCompare;
         if (chunkEnd instanceof ROWID && max instanceof ROWID) {
             chunkEndMaxCompare =
