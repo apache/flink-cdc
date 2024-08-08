@@ -147,8 +147,9 @@ class SchemaDerivationTest {
 
     @Test
     void testMergingTablesWithExactSameSchema() {
+        SchemaManager schemaManager = new SchemaManager();
         SchemaDerivation schemaDerivation =
-                new SchemaDerivation(new SchemaManager(), ROUTES, new HashMap<>());
+                new SchemaDerivation(schemaManager, ROUTES, new HashMap<>());
 
         // Create table 1
         List<SchemaChangeEvent> derivedChangesAfterCreateTable =
@@ -158,6 +159,8 @@ class SchemaDerivationTest {
                 .asCreateTableEvent()
                 .hasTableId(MERGED_TABLE)
                 .hasSchema(SCHEMA);
+        derivedChangesAfterCreateTable.forEach(schemaManager::applyEvolvedSchemaChange);
+
         // Create table 2
         assertThat(schemaDerivation.applySchemaChange(new CreateTableEvent(TABLE_2, SCHEMA)))
                 .isEmpty();
@@ -177,6 +180,8 @@ class SchemaDerivationTest {
                 .asAddColumnEvent()
                 .hasTableId(MERGED_TABLE)
                 .containsAddedColumns(newCol1, newCol2);
+        derivedChangesAfterAddColumn.forEach(schemaManager::applyEvolvedSchemaChange);
+
         // Add column for table 2
         assertThat(schemaDerivation.applySchemaChange(new AddColumnEvent(TABLE_2, newColumns)))
                 .isEmpty();
@@ -190,6 +195,8 @@ class SchemaDerivationTest {
                 .asAlterColumnTypeEvent()
                 .hasTableId(MERGED_TABLE)
                 .containsTypeMapping(typeMapping);
+        derivedChangesAfterAlterColumnType.forEach(schemaManager::applyEvolvedSchemaChange);
+
         // Alter column type for table 2
         assertThat(
                         schemaDerivation.applySchemaChange(
@@ -215,6 +222,8 @@ class SchemaDerivationTest {
                 .containsAddedColumns(
                         new AddColumnEvent.ColumnWithPosition(
                                 new PhysicalColumn("last_name", DataTypes.STRING(), null)));
+        derivedChangesAfterRenameColumn.forEach(schemaManager::applyEvolvedSchemaChange);
+
         // Rename column for table 2
         assertThat(
                         schemaDerivation.applySchemaChange(
@@ -235,6 +244,8 @@ class SchemaDerivationTest {
                 .asCreateTableEvent()
                 .hasTableId(MERGED_TABLE)
                 .hasSchema(SCHEMA);
+        derivedChangesAfterCreateTable.forEach(schemaManager::applyEvolvedSchemaChange);
+
         // Create table 2
         List<SchemaChangeEvent> derivedChangesAfterCreateTable2 =
                 schemaDerivation.applySchemaChange(
@@ -250,6 +261,7 @@ class SchemaDerivationTest {
                                                         "gender", DataTypes.STRING(), null)))),
                         new AlterColumnTypeEvent(
                                 MERGED_TABLE, ImmutableMap.of("age", DataTypes.BIGINT())));
+        derivedChangesAfterCreateTable2.forEach(schemaManager::applyEvolvedSchemaChange);
 
         // Add column for table 1
         AddColumnEvent.ColumnWithPosition newCol1 =
@@ -266,6 +278,8 @@ class SchemaDerivationTest {
                 .asAddColumnEvent()
                 .hasTableId(MERGED_TABLE)
                 .containsAddedColumns(newCol1, newCol2);
+        derivedChangesAfterAddColumn.forEach(schemaManager::applyEvolvedSchemaChange);
+
         // Add column for table 2
         List<SchemaChangeEvent> derivedChangesAfterAddColumnForTable2 =
                 schemaDerivation.applySchemaChange(
@@ -284,6 +298,7 @@ class SchemaDerivationTest {
                 .containsTypeMapping(
                         ImmutableMap.of(
                                 "new_col1", DataTypes.STRING(), "new_col2", DataTypes.STRING()));
+        derivedChangesAfterAddColumnForTable2.forEach(schemaManager::applyEvolvedSchemaChange);
 
         // Alter column type for table 1
         ImmutableMap<String, DataType> typeMapping = ImmutableMap.of("age", DataTypes.BIGINT());
@@ -316,6 +331,8 @@ class SchemaDerivationTest {
                 .containsAddedColumns(
                         new AddColumnEvent.ColumnWithPosition(
                                 new PhysicalColumn("last_name", DataTypes.STRING(), null)));
+        derivedChangesAfterRenameColumn.forEach(schemaManager::applyEvolvedSchemaChange);
+
         // Rename column for table 2
         List<SchemaChangeEvent> derivedChangesAfterRenameColumnForTable2 =
                 schemaDerivation.applySchemaChange(
@@ -327,8 +344,9 @@ class SchemaDerivationTest {
                 .containsAddedColumns(
                         new AddColumnEvent.ColumnWithPosition(
                                 new PhysicalColumn("first_name", DataTypes.STRING(), null)));
+        derivedChangesAfterRenameColumnForTable2.forEach(schemaManager::applyEvolvedSchemaChange);
 
-        assertThat(schemaManager.getLatestSchema(MERGED_TABLE))
+        assertThat(schemaManager.getLatestEvolvedSchema(MERGED_TABLE))
                 .contains(
                         Schema.newBuilder()
                                 .column(Column.physicalColumn("id", DataTypes.BIGINT()))
@@ -344,8 +362,9 @@ class SchemaDerivationTest {
 
     @Test
     void testIncompatibleTypes() {
+        SchemaManager schemaManager = new SchemaManager();
         SchemaDerivation schemaDerivation =
-                new SchemaDerivation(new SchemaManager(), ROUTES, new HashMap<>());
+                new SchemaDerivation(schemaManager, ROUTES, new HashMap<>());
         // Create table 1
         List<SchemaChangeEvent> derivedChangesAfterCreateTable =
                 schemaDerivation.applySchemaChange(new CreateTableEvent(TABLE_1, SCHEMA));
@@ -354,6 +373,7 @@ class SchemaDerivationTest {
                 .asCreateTableEvent()
                 .hasTableId(MERGED_TABLE)
                 .hasSchema(SCHEMA);
+        derivedChangesAfterCreateTable.forEach(schemaManager::applyEvolvedSchemaChange);
 
         // Create table 2
         assertThatThrownBy(

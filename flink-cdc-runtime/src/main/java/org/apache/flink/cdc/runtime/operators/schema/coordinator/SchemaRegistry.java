@@ -18,12 +18,19 @@
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
+import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
@@ -95,24 +102,37 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     private SchemaRegistryRequestHandler requestHandler;
 
     /** Schema manager for tracking schemas of all tables. */
-    private SchemaManager schemaManager = new SchemaManager();
+    private SchemaManager schemaManager;
 
     private SchemaDerivation schemaDerivation;
+
+    private SchemaChangeBehavior schemaChangeBehavior;
 
     public SchemaRegistry(
             String operatorName,
             OperatorCoordinator.Context context,
             MetadataApplier metadataApplier,
             List<RouteRule> routes) {
+        this(operatorName, context, metadataApplier, routes, SchemaChangeBehavior.EVOLVE);
+    }
+
+    public SchemaRegistry(
+            String operatorName,
+            OperatorCoordinator.Context context,
+            MetadataApplier metadataApplier,
+            List<RouteRule> routes,
+            SchemaChangeBehavior schemaChangeBehavior) {
         this.context = context;
         this.operatorName = operatorName;
         this.failedReasons = new HashMap<>();
         this.metadataApplier = metadataApplier;
         this.routes = routes;
-        schemaManager = new SchemaManager();
-        schemaDerivation = new SchemaDerivation(schemaManager, routes, new HashMap<>());
-        requestHandler =
-                new SchemaRegistryRequestHandler(metadataApplier, schemaManager, schemaDerivation);
+        this.schemaManager = new SchemaManager(schemaChangeBehavior);
+        this.schemaDerivation = new SchemaDerivation(schemaManager, routes, new HashMap<>());
+        this.requestHandler =
+                new SchemaRegistryRequestHandler(
+                        metadataApplier, schemaManager, schemaDerivation, schemaChangeBehavior);
+        this.schemaChangeBehavior = schemaChangeBehavior;
     }
 
     @Override
@@ -176,9 +196,22 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             return requestHandler.handleSchemaChangeRequest(schemaChangeRequest);
         } else if (request instanceof ReleaseUpstreamRequest) {
             return requestHandler.handleReleaseUpstreamRequest();
-        } else if (request instanceof GetSchemaRequest) {
+        } else if (request instanceof GetEvolvedSchemaRequest) {
             return CompletableFuture.completedFuture(
-                    wrap(handleGetSchemaRequest(((GetSchemaRequest) request))));
+                    wrap(handleGetEvolvedSchemaRequest(((GetEvolvedSchemaRequest) request))));
+        } else if (request instanceof GetOriginalSchemaRequest) {
+            return CompletableFuture.completedFuture(
+                    wrap(handleGetOriginalSchemaRequest((GetOriginalSchemaRequest) request)));
+        } else if (request instanceof ApplyOriginalSchemaChangeRequest) {
+            return CompletableFuture.completedFuture(
+                    wrap(
+                            handleApplyOriginalSchemaChangeRequest(
+                                    (ApplyOriginalSchemaChangeRequest) request)));
+        } else if (request instanceof ApplyEvolvedSchemaChangeRequest) {
+            return CompletableFuture.completedFuture(
+                    wrap(
+                            handleApplyEvolvedSchemaChangeRequest(
+                                    (ApplyEvolvedSchemaChangeRequest) request)));
         } else if (request instanceof SchemaChangeResultRequest) {
             return requestHandler.getSchemaChangeResult();
         } else if (request instanceof RefreshPendingListsRequest) {
@@ -197,6 +230,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
         try (ByteArrayInputStream bais = new ByteArrayInputStream(checkpointData);
                 DataInputStream in = new DataInputStream(bais)) {
             int schemaManagerSerializerVersion = in.readInt();
+
             switch (schemaManagerSerializerVersion) {
                 case 0:
                     {
@@ -210,7 +244,10 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                                 new SchemaDerivation(schemaManager, routes, Collections.emptyMap());
                         requestHandler =
                                 new SchemaRegistryRequestHandler(
-                                        metadataApplier, schemaManager, schemaDerivation);
+                                        metadataApplier,
+                                        schemaManager,
+                                        schemaDerivation,
+                                        schemaManager.getBehavior());
                         break;
                     }
                 case 1:
@@ -228,7 +265,10 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                                 new SchemaDerivation(schemaManager, routes, derivationMapping);
                         requestHandler =
                                 new SchemaRegistryRequestHandler(
-                                        metadataApplier, schemaManager, schemaDerivation);
+                                        metadataApplier,
+                                        schemaManager,
+                                        schemaDerivation,
+                                        schemaChangeBehavior);
                         break;
                     }
                 default:
@@ -258,22 +298,62 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
         // do nothing
     }
 
-    private GetSchemaResponse handleGetSchemaRequest(GetSchemaRequest getSchemaRequest) {
-        LOG.info("Handling schema request: {}", getSchemaRequest);
-        int schemaVersion = getSchemaRequest.getSchemaVersion();
-        TableId tableId = getSchemaRequest.getTableId();
-        if (schemaVersion == GetSchemaRequest.LATEST_SCHEMA_VERSION) {
-            return new GetSchemaResponse(schemaManager.getLatestSchema(tableId).orElse(null));
+    private GetEvolvedSchemaResponse handleGetEvolvedSchemaRequest(
+            GetEvolvedSchemaRequest getEvolvedSchemaRequest) {
+        LOG.info("Handling evolved schema request: {}", getEvolvedSchemaRequest);
+        int schemaVersion = getEvolvedSchemaRequest.getSchemaVersion();
+        TableId tableId = getEvolvedSchemaRequest.getTableId();
+        if (schemaVersion == GetEvolvedSchemaRequest.LATEST_SCHEMA_VERSION) {
+            return new GetEvolvedSchemaResponse(
+                    schemaManager.getLatestEvolvedSchema(tableId).orElse(null));
         } else {
             try {
-                return new GetSchemaResponse(schemaManager.getSchema(tableId, schemaVersion));
+                return new GetEvolvedSchemaResponse(
+                        schemaManager.getEvolvedSchema(tableId, schemaVersion));
             } catch (IllegalArgumentException iae) {
                 LOG.warn(
-                        "Some client is requesting an non-existed schema for table {} with version {}",
+                        "Some client is requesting an non-existed evolved schema for table {} with version {}",
                         tableId,
                         schemaVersion);
-                return new GetSchemaResponse(null);
+                return new GetEvolvedSchemaResponse(null);
             }
         }
+    }
+
+    private GetOriginalSchemaResponse handleGetOriginalSchemaRequest(
+            GetOriginalSchemaRequest getOriginalSchemaRequest) {
+        LOG.info("Handling original schema request: {}", getOriginalSchemaRequest);
+        int schemaVersion = getOriginalSchemaRequest.getSchemaVersion();
+        TableId tableId = getOriginalSchemaRequest.getTableId();
+        if (schemaVersion == GetOriginalSchemaRequest.LATEST_SCHEMA_VERSION) {
+            return new GetOriginalSchemaResponse(
+                    schemaManager.getLatestOriginalSchema(tableId).orElse(null));
+        } else {
+            try {
+                return new GetOriginalSchemaResponse(
+                        schemaManager.getOriginalSchema(tableId, schemaVersion));
+            } catch (IllegalArgumentException iae) {
+                LOG.warn(
+                        "Some client is requesting an non-existed original schema for table {} with version {}",
+                        tableId,
+                        schemaVersion);
+                return new GetOriginalSchemaResponse(null);
+            }
+        }
+    }
+
+    private ApplyOriginalSchemaChangeResponse handleApplyOriginalSchemaChangeRequest(
+            ApplyOriginalSchemaChangeRequest applyOriginalSchemaChangeRequest) {
+        schemaManager.applyOriginalSchemaChange(
+                applyOriginalSchemaChangeRequest.getSchemaChangeEvent());
+        return new ApplyOriginalSchemaChangeResponse();
+    }
+
+    private ApplyEvolvedSchemaChangeResponse handleApplyEvolvedSchemaChangeRequest(
+            ApplyEvolvedSchemaChangeRequest applyEvolvedSchemaChangeRequest) {
+        applyEvolvedSchemaChangeRequest
+                .getSchemaChangeEvent()
+                .forEach(schemaManager::applyEvolvedSchemaChange);
+        return new ApplyEvolvedSchemaChangeResponse();
     }
 }

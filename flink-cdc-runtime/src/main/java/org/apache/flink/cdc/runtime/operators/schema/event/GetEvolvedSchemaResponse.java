@@ -15,19 +15,27 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.pipeline;
+package org.apache.flink.cdc.runtime.operators.schema.event;
 
-import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
+import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
-/**
- * Behavior for handling schema changes. Enums are sorted from the most tolerant strategy (IGNORE)
- * to the most aggressive one (EXCEPTION).
- */
-@PublicEvolving
-public enum SchemaChangeBehavior {
-    IGNORE,
-    LENIENT,
-    TRY_EVOLVE,
-    EVOLVE,
-    EXCEPTION
+import javax.annotation.Nullable;
+
+import java.util.Optional;
+
+/** Coordination response from {@link SchemaRegistry} for {@link GetEvolvedSchemaRequest}. */
+@Internal
+public class GetEvolvedSchemaResponse implements CoordinationResponse {
+    @Nullable private final Schema schema;
+
+    public GetEvolvedSchemaResponse(@Nullable Schema schema) {
+        this.schema = schema;
+    }
+
+    public Optional<Schema> getSchema() {
+        return Optional.ofNullable(schema);
+    }
 }

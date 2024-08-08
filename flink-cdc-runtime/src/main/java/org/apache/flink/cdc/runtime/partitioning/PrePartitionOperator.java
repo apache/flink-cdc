@@ -114,7 +114,7 @@ public class PrePartitionOperator extends AbstractStreamOperator<PartitioningEve
     private Schema loadLatestSchemaFromRegistry(TableId tableId) {
         Optional<Schema> schema;
         try {
-            schema = schemaEvolutionClient.getLatestSchema(tableId);
+            schema = schemaEvolutionClient.getLatestEvolvedSchema(tableId);
         } catch (Exception e) {
             throw new RuntimeException(
                     String.format("Failed to request latest schema for table \"%s\"", tableId), e);

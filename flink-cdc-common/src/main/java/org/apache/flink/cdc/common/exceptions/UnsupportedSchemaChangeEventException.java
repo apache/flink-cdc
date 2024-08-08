@@ -15,19 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.pipeline;
+package org.apache.flink.cdc.common.exceptions;
 
-import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 
-/**
- * Behavior for handling schema changes. Enums are sorted from the most tolerant strategy (IGNORE)
- * to the most aggressive one (EXCEPTION).
- */
-@PublicEvolving
-public enum SchemaChangeBehavior {
-    IGNORE,
-    LENIENT,
-    TRY_EVOLVE,
-    EVOLVE,
-    EXCEPTION
+/** A special kind of {@link SchemaEvolveException} that sink doesn't support such event type. */
+public class UnsupportedSchemaChangeEventException extends SchemaEvolveException {
+
+    public UnsupportedSchemaChangeEventException(SchemaChangeEvent applyingEvent) {
+        super(applyingEvent, "Sink doesn't support such schema change event.", null);
+    }
 }

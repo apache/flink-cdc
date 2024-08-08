@@ -55,9 +55,13 @@ public class PipelineOptions {
                                     .linebreak()
                                     .add(
                                             ListElement.list(
+                                                    text("IGNORE: Drop all schema change events."),
+                                                    text(
+                                                            "LENIENT: Apply schema changes to downstream tolerantly, and keeps executing if applying fails."),
+                                                    text(
+                                                            "TRY_EVOLVE: Apply schema changes to downstream, but keeps executing if applying fails."),
                                                     text(
                                                             "EVOLVE: Apply schema changes to downstream. This requires sink to support handling schema changes."),
-                                                    text("IGNORE: Drop all schema change events."),
                                                     text(
                                                             "EXCEPTION: Throw an exception to terminate the sync pipeline.")))
                                     .build());

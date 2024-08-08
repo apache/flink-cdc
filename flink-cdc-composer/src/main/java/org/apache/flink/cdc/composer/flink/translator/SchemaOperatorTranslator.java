@@ -56,18 +56,7 @@ public class SchemaOperatorTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes) {
-        switch (schemaChangeBehavior) {
-            case EVOLVE:
-                return addSchemaOperator(input, parallelism, metadataApplier, routes);
-            case IGNORE:
-                return dropSchemaChangeEvent(input, parallelism);
-            case EXCEPTION:
-                return exceptionOnSchemaChange(input, parallelism);
-            default:
-                throw new IllegalArgumentException(
-                        String.format(
-                                "Unrecognized schema change behavior: %s", schemaChangeBehavior));
-        }
+        return addSchemaOperator(input, parallelism, metadataApplier, routes, schemaChangeBehavior);
     }
 
     public String getSchemaOperatorUid() {
@@ -78,7 +67,8 @@ public class SchemaOperatorTranslator {
             DataStream<Event> input,
             int parallelism,
             MetadataApplier metadataApplier,
-            List<RouteDef> routes) {
+            List<RouteDef> routes,
+            SchemaChangeBehavior schemaChangeBehavior) {
         List<RouteRule> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
             routingRules.add(
@@ -91,7 +81,8 @@ public class SchemaOperatorTranslator {
                 input.transform(
                         "SchemaOperator",
                         new EventTypeInfo(),
-                        new SchemaOperatorFactory(metadataApplier, routingRules, rpcTimeOut));
+                        new SchemaOperatorFactory(
+                                metadataApplier, routingRules, rpcTimeOut, schemaChangeBehavior));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
     }

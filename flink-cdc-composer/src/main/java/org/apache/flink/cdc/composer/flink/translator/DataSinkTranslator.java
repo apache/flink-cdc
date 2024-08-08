@@ -82,7 +82,7 @@ public class DataSinkTranslator {
             String sinkName,
             OperatorID schemaOperatorID) {
         DataStream<Event> stream = input;
-        // Pre write topology
+        // Pre-write topology
         if (sink instanceof WithPreWriteTopology) {
             stream = ((WithPreWriteTopology<Event>) sink).addPreWriteTopology(stream);
         }
