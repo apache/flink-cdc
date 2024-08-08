@@ -224,7 +224,16 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testMysql57PrecisionTypes() throws Throwable {
+        testMysqlPrecisionTypes(fullTypesMySql57Database);
+    }
+
+    @Test
     public void testMysql8PrecisionTypes() throws Throwable {
+        testMysqlPrecisionTypes(fullTypesMySql8Database);
+    }
+
+    public void testMysqlPrecisionTypes(UniqueDatabase database) throws Throwable {
         RowType recordType =
                 RowType.of(
                         DataTypes.DECIMAL(20, 0).notNull(),
@@ -273,12 +282,10 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22"))
                 };
 
-        fullTypesMySql8Database.createAndInitialize();
+        database.createAndInitialize();
         CloseableIterator<Event> iterator =
                 env.fromSource(
-                                getFlinkSourceProvider(
-                                                new String[] {"precision_types"},
-                                                fullTypesMySql8Database)
+                                getFlinkSourceProvider(new String[] {"precision_types"}, database)
                                         .getSource(),
                                 WatermarkStrategy.noWatermarks(),
                                 "Event-Source")
@@ -291,7 +298,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, recordType))
                 .isEqualTo(expectedSnapshot);
 
-        try (Connection connection = fullTypesMySql8Database.getJdbcConnection();
+        try (Connection connection = database.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute("UPDATE precision_types SET time_6_c = null WHERE id = 1;");
         }
