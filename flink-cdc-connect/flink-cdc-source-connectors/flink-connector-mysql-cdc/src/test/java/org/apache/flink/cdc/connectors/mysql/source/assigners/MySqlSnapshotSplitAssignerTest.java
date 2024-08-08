@@ -484,7 +484,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testScanNewlyAddedTableStartFromCheckpoint() {
+    public void testScanNewlyAddedTableStartFromCheckpoint_INITIAL_ASSIGNING_FINISHED() {
         List<String> expected =
                 Arrays.asList(
                         "customers_sparse_dist [109] null",
@@ -492,7 +492,25 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         "customers_even_dist [10] [18]",
                         "customers_even_dist [18] null",
                         "customer_card_single_line null null");
-        assertEquals(expected, getTestAssignSnapshotSplitsFromCheckpoint());
+        assertEquals(
+                expected,
+                getTestAssignSnapshotSplitsFromCheckpoint(
+                        AssignerStatus.INITIAL_ASSIGNING_FINISHED));
+    }
+
+    @Test
+    public void
+            testScanNewlyAddedTableStartFromCheckpoint_NEWLY_ADDED_ASSIGNING_SNAPSHOT_FINISHED() {
+        List<String> expected =
+                Arrays.asList(
+                        "customers_sparse_dist [109] null",
+                        "customers_even_dist null [10]",
+                        "customers_even_dist [10] [18]",
+                        "customers_even_dist [18] null");
+        assertEquals(
+                expected,
+                getTestAssignSnapshotSplitsFromCheckpoint(
+                        AssignerStatus.NEWLY_ADDED_ASSIGNING_SNAPSHOT_FINISHED));
     }
 
     private List<String> getTestAssignSnapshotSplits(
@@ -536,7 +554,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         return getSplitsFromAssigner(assigner);
     }
 
-    private List<String> getTestAssignSnapshotSplitsFromCheckpoint() {
+    private List<String> getTestAssignSnapshotSplitsFromCheckpoint(AssignerStatus assignerStatus) {
         TableId newTable =
                 TableId.parse(customerDatabase.getDatabaseName() + ".customer_card_single_line");
         TableId processedTable =
@@ -619,7 +637,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         assignedSplits,
                         new HashMap<>(),
                         splitFinishedOffsets,
-                        AssignerStatus.INITIAL_ASSIGNING,
+                        assignerStatus,
                         remainingTables,
                         false,
                         true,
