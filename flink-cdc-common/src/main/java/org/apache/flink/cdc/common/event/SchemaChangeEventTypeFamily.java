@@ -17,10 +17,13 @@
 
 package org.apache.flink.cdc.common.event;
 
+import org.apache.flink.cdc.common.annotation.PublicEvolving;
+
 /**
  * An enumeration of schema change event families for clustering {@link SchemaChangeEvent}s into
  * categories.
  */
+@PublicEvolving
 public class SchemaChangeEventTypeFamily {
 
     public static final SchemaChangeEventType[] ADD = {SchemaChangeEventType.ADD_COLUMN};

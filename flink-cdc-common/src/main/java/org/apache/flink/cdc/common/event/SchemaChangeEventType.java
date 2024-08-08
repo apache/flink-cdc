@@ -17,10 +17,10 @@
 
 package org.apache.flink.cdc.common.event;
 
-import org.apache.flink.cdc.common.annotation.Public;
+import org.apache.flink.cdc.common.annotation.PublicEvolving;
 
 /** An enumeration of schema change event types for {@link SchemaChangeEvent}. */
-@Public
+@PublicEvolving
 public enum SchemaChangeEventType {
     ADD_COLUMN,
     ALTER_COLUMN_TYPE,
@@ -57,7 +57,7 @@ public enum SchemaChangeEventType {
             case "rename.column":
                 return RENAME_COLUMN;
             default:
-                return null;
+                throw new RuntimeException("Unknown schema change event type: " + tag);
         }
     }
 }
