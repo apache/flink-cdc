@@ -252,7 +252,9 @@ transform:
 Tips: The format of table-options is `key1=value1,key2=value2`.
 
 ## Classification mapping
-Multiple transform rules can be defined to classify input data rows and apply different processings. For example, we may define a transform rule as follows:
+Multiple transform rules can be defined to classify input data rows and apply different processing.
+Only the first matched transform rule will apply.
+For example, we may define a transform rule as follows:
 
 ```yaml
 transform:
