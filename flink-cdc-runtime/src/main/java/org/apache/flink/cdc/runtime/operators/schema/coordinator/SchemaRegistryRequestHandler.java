@@ -176,11 +176,11 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     "Received schema change event request from table {}. Start to buffer requests for others.",
                     request.getTableId().toString());
             if (request.getSchemaChangeEvent() instanceof CreateTableEvent
-                    && schemaManager.upstreamSchemaExists(request.getTableId())) {
+                    && schemaManager.originalSchemaExists(request.getTableId())) {
                 return CompletableFuture.completedFuture(
                         wrap(new SchemaChangeResponse(Collections.emptyList())));
             }
-            schemaManager.applyUpstreamSchemaChange(request.getSchemaChangeEvent());
+            schemaManager.applyOriginalSchemaChange(request.getSchemaChangeEvent());
             List<SchemaChangeEvent> derivedSchemaChangeEvents =
                     calculateDerivedSchemaChangeEvents(request.getSchemaChangeEvent());
             CompletableFuture<CoordinationResponse> response =

@@ -63,29 +63,29 @@ public class SchemaManager {
     public static final Serializer SERIALIZER = new Serializer();
 
     // Schema management
-    private final Map<TableId, SortedMap<Integer, Schema>> upstreamSchemas;
+    private final Map<TableId, SortedMap<Integer, Schema>> originalSchemas;
 
     // Schema management
     private final Map<TableId, SortedMap<Integer, Schema>> evolvedSchemas;
 
     public SchemaManager() {
         evolvedSchemas = new HashMap<>();
-        upstreamSchemas = new HashMap<>();
+        originalSchemas = new HashMap<>();
         behavior = SchemaChangeBehavior.EVOLVE;
     }
 
     public SchemaManager(SchemaChangeBehavior behavior) {
         evolvedSchemas = new HashMap<>();
-        upstreamSchemas = new HashMap<>();
+        originalSchemas = new HashMap<>();
         this.behavior = behavior;
     }
 
     public SchemaManager(
-            Map<TableId, SortedMap<Integer, Schema>> upstreamSchemas,
+            Map<TableId, SortedMap<Integer, Schema>> originalSchemas,
             Map<TableId, SortedMap<Integer, Schema>> evolvedSchemas,
             SchemaChangeBehavior behavior) {
         this.evolvedSchemas = evolvedSchemas;
-        this.upstreamSchemas = upstreamSchemas;
+        this.originalSchemas = originalSchemas;
         this.behavior = behavior;
     }
 
@@ -98,8 +98,8 @@ public class SchemaManager {
         return schemaMap.containsKey(tableId) && !schemaMap.get(tableId).isEmpty();
     }
 
-    public final boolean upstreamSchemaExists(TableId tableId) {
-        return schemaExists(upstreamSchemas, tableId);
+    public final boolean originalSchemaExists(TableId tableId) {
+        return schemaExists(originalSchemas, tableId);
     }
 
     public final boolean evolvedSchemaExists(TableId tableId) {
@@ -112,10 +112,10 @@ public class SchemaManager {
                 .map(version -> evolvedSchemas.get(tableId).get(version));
     }
 
-    /** Get the latest upstream schema of the specified table. */
-    public Optional<Schema> getLatestUpstreamSchema(TableId tableId) {
-        return getLatestSchemaVersion(upstreamSchemas, tableId)
-                .map(version -> upstreamSchemas.get(tableId).get(version));
+    /** Get the latest original schema of the specified table. */
+    public Optional<Schema> getLatestOriginalSchema(TableId tableId) {
+        return getLatestSchemaVersion(originalSchemas, tableId)
+                .map(version -> originalSchemas.get(tableId).get(version));
     }
 
     /** Get schema at the specified version of a table. */
@@ -134,12 +134,12 @@ public class SchemaManager {
     }
 
     /** Get schema at the specified version of a table. */
-    public Schema getUpstreamSchema(TableId tableId, int version) {
+    public Schema getOriginalSchema(TableId tableId, int version) {
         checkArgument(
-                upstreamSchemas.containsKey(tableId),
-                "Unable to find upstream schema for table \"%s\"",
+                originalSchemas.containsKey(tableId),
+                "Unable to find original schema for table \"%s\"",
                 tableId);
-        SortedMap<Integer, Schema> versionedSchemas = upstreamSchemas.get(tableId);
+        SortedMap<Integer, Schema> versionedSchemas = originalSchemas.get(tableId);
         checkArgument(
                 versionedSchemas.containsKey(version),
                 "Schema version %s does not exist for table \"%s\"",
@@ -149,19 +149,19 @@ public class SchemaManager {
     }
 
     /** Apply schema change to a table. */
-    public void applyUpstreamSchemaChange(SchemaChangeEvent schemaChangeEvent) {
+    public void applyOriginalSchemaChange(SchemaChangeEvent schemaChangeEvent) {
         if (schemaChangeEvent instanceof CreateTableEvent) {
-            handleCreateTableEvent(upstreamSchemas, ((CreateTableEvent) schemaChangeEvent));
+            handleCreateTableEvent(originalSchemas, ((CreateTableEvent) schemaChangeEvent));
         } else {
-            Optional<Schema> optionalSchema = getLatestUpstreamSchema(schemaChangeEvent.tableId());
+            Optional<Schema> optionalSchema = getLatestOriginalSchema(schemaChangeEvent.tableId());
             checkArgument(
                     optionalSchema.isPresent(),
                     "Unable to apply SchemaChangeEvent for table \"%s\" without existing schema",
                     schemaChangeEvent.tableId());
 
-            LOG.info("Handling upstream schema change event: {}", schemaChangeEvent);
+            LOG.info("Handling original schema change event: {}", schemaChangeEvent);
             registerNewSchema(
-                    upstreamSchemas,
+                    originalSchemas,
                     schemaChangeEvent.tableId(),
                     SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), schemaChangeEvent));
         }
@@ -195,13 +195,13 @@ public class SchemaManager {
             return false;
         }
         SchemaManager that = (SchemaManager) o;
-        return Objects.equals(upstreamSchemas, that.upstreamSchemas)
+        return Objects.equals(originalSchemas, that.originalSchemas)
                 && Objects.equals(evolvedSchemas, that.evolvedSchemas);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(upstreamSchemas, evolvedSchemas);
+        return Objects.hash(originalSchemas, evolvedSchemas);
     }
 
     // -------------------------------- Helper functions -------------------------------------
@@ -265,7 +265,7 @@ public class SchemaManager {
             try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     DataOutputStream out = new DataOutputStream(baos)) {
                 serializeSchemaMap(schemaManager.evolvedSchemas, out);
-                serializeSchemaMap(schemaManager.upstreamSchemas, out);
+                serializeSchemaMap(schemaManager.originalSchemas, out);
                 out.writeUTF(schemaManager.getBehavior().name());
                 return baos.toByteArray();
             }
@@ -308,18 +308,18 @@ public class SchemaManager {
                         {
                             Map<TableId, SortedMap<Integer, Schema>> schemas =
                                     deserializeSchemaMap(version, in);
-                            // In legacy mode, upstream schema and evolved schema never differs
+                            // In legacy mode, original schema and evolved schema never differs
                             return new SchemaManager(schemas, schemas, SchemaChangeBehavior.EVOLVE);
                         }
                     case 2:
                         {
                             Map<TableId, SortedMap<Integer, Schema>> evolvedSchemas =
                                     deserializeSchemaMap(version, in);
-                            Map<TableId, SortedMap<Integer, Schema>> upstreamSchemas =
+                            Map<TableId, SortedMap<Integer, Schema>> originalSchemas =
                                     deserializeSchemaMap(version, in);
                             SchemaChangeBehavior behavior =
                                     SchemaChangeBehavior.valueOf(in.readUTF());
-                            return new SchemaManager(upstreamSchemas, evolvedSchemas, behavior);
+                            return new SchemaManager(originalSchemas, evolvedSchemas, behavior);
                         }
                     default:
                         throw new RuntimeException("Unknown serialize version: " + version);

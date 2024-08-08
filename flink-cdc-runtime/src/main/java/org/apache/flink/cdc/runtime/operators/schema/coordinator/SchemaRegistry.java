@@ -24,13 +24,13 @@ import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeResponse;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyUpstreamSchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyUpstreamSchemaChangeResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetUpstreamSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetUpstreamSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
@@ -199,14 +199,14 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
         } else if (request instanceof GetEvolvedSchemaRequest) {
             return CompletableFuture.completedFuture(
                     wrap(handleGetEvolvedSchemaRequest(((GetEvolvedSchemaRequest) request))));
-        } else if (request instanceof GetUpstreamSchemaRequest) {
+        } else if (request instanceof GetOriginalSchemaRequest) {
             return CompletableFuture.completedFuture(
-                    wrap(handleGetUpstreamSchemaRequest((GetUpstreamSchemaRequest) request)));
-        } else if (request instanceof ApplyUpstreamSchemaChangeRequest) {
+                    wrap(handleGetOriginalSchemaRequest((GetOriginalSchemaRequest) request)));
+        } else if (request instanceof ApplyOriginalSchemaChangeRequest) {
             return CompletableFuture.completedFuture(
                     wrap(
-                            handleApplyUpstreamSchemaChangeRequest(
-                                    (ApplyUpstreamSchemaChangeRequest) request)));
+                            handleApplyOriginalSchemaChangeRequest(
+                                    (ApplyOriginalSchemaChangeRequest) request)));
         } else if (request instanceof ApplyEvolvedSchemaChangeRequest) {
             return CompletableFuture.completedFuture(
                     wrap(
@@ -320,33 +320,33 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
         }
     }
 
-    private GetUpstreamSchemaResponse handleGetUpstreamSchemaRequest(
-            GetUpstreamSchemaRequest getUpstreamSchemaRequest) {
-        LOG.info("Handling upstream schema request: {}", getUpstreamSchemaRequest);
-        int schemaVersion = getUpstreamSchemaRequest.getSchemaVersion();
-        TableId tableId = getUpstreamSchemaRequest.getTableId();
-        if (schemaVersion == GetUpstreamSchemaRequest.LATEST_SCHEMA_VERSION) {
-            return new GetUpstreamSchemaResponse(
-                    schemaManager.getLatestUpstreamSchema(tableId).orElse(null));
+    private GetOriginalSchemaResponse handleGetOriginalSchemaRequest(
+            GetOriginalSchemaRequest getOriginalSchemaRequest) {
+        LOG.info("Handling original schema request: {}", getOriginalSchemaRequest);
+        int schemaVersion = getOriginalSchemaRequest.getSchemaVersion();
+        TableId tableId = getOriginalSchemaRequest.getTableId();
+        if (schemaVersion == GetOriginalSchemaRequest.LATEST_SCHEMA_VERSION) {
+            return new GetOriginalSchemaResponse(
+                    schemaManager.getLatestOriginalSchema(tableId).orElse(null));
         } else {
             try {
-                return new GetUpstreamSchemaResponse(
-                        schemaManager.getUpstreamSchema(tableId, schemaVersion));
+                return new GetOriginalSchemaResponse(
+                        schemaManager.getOriginalSchema(tableId, schemaVersion));
             } catch (IllegalArgumentException iae) {
                 LOG.warn(
-                        "Some client is requesting an non-existed upstream schema for table {} with version {}",
+                        "Some client is requesting an non-existed original schema for table {} with version {}",
                         tableId,
                         schemaVersion);
-                return new GetUpstreamSchemaResponse(null);
+                return new GetOriginalSchemaResponse(null);
             }
         }
     }
 
-    private ApplyUpstreamSchemaChangeResponse handleApplyUpstreamSchemaChangeRequest(
-            ApplyUpstreamSchemaChangeRequest applyUpstreamSchemaChangeRequest) {
-        schemaManager.applyUpstreamSchemaChange(
-                applyUpstreamSchemaChangeRequest.getSchemaChangeEvent());
-        return new ApplyUpstreamSchemaChangeResponse();
+    private ApplyOriginalSchemaChangeResponse handleApplyOriginalSchemaChangeRequest(
+            ApplyOriginalSchemaChangeRequest applyOriginalSchemaChangeRequest) {
+        schemaManager.applyOriginalSchemaChange(
+                applyOriginalSchemaChangeRequest.getSchemaChangeEvent());
+        return new ApplyOriginalSchemaChangeResponse();
     }
 
     private ApplyEvolvedSchemaChangeResponse handleApplyEvolvedSchemaChangeRequest(

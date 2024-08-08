@@ -22,10 +22,10 @@ import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
 /**
- * The response from {@link SchemaOperator} to {@link SchemaRegistry} to request apply evolved
+ * The response from {@link SchemaRegistry} to {@link SchemaOperator} to request apply original
  * schema changes.
  */
-public class ApplyUpstreamSchemaChangeResponse implements CoordinationResponse {
+public class ApplyOriginalSchemaChangeResponse implements CoordinationResponse {
 
     private static final long serialVersionUID = 1L;
 }

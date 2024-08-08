@@ -213,7 +213,7 @@ public class TransformDataOperator extends AbstractStreamOperator<Event>
         TableInfo tableInfo = tableInfoMap.get(tableId);
         if (tableInfo == null) {
             Optional<Schema> schemaOptional =
-                    schemaEvolutionClient.getLatestUpstreamSchema(tableId);
+                    schemaEvolutionClient.getLatestOriginalSchema(tableId);
             if (schemaOptional.isPresent()) {
                 tableInfo = TableInfo.of(tableId, schemaOptional.get());
             } else {

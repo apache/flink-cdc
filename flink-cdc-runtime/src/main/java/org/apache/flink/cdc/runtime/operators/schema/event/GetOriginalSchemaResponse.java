@@ -26,12 +26,12 @@ import javax.annotation.Nullable;
 
 import java.util.Optional;
 
-/** Coordination response from {@link SchemaRegistry} for {@link GetUpstreamSchemaRequest}. */
+/** Coordination response from {@link SchemaRegistry} for {@link GetOriginalSchemaRequest}. */
 @Internal
-public class GetUpstreamSchemaResponse implements CoordinationResponse {
+public class GetOriginalSchemaResponse implements CoordinationResponse {
     @Nullable private final Schema schema;
 
-    public GetUpstreamSchemaResponse(@Nullable Schema schema) {
+    public GetOriginalSchemaResponse(@Nullable Schema schema) {
         this.schema = schema;
     }
 

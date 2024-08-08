@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
@@ -40,7 +41,7 @@ import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyUpstreamSchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
@@ -108,7 +109,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     private transient TaskOperatorEventGateway toCoordinator;
     private transient SchemaEvolutionClient schemaEvolutionClient;
-    private transient LoadingCache<TableId, Schema> upstreamSchema;
+    private transient LoadingCache<TableId, Schema> originalSchema;
     private transient LoadingCache<TableId, Schema> evolvedSchema;
     private transient LoadingCache<TableId, Boolean> schemaDivergesMap;
 
@@ -188,14 +189,14 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                         return getLatestEvolvedSchema(tableId);
                                     }
                                 });
-        upstreamSchema =
+        originalSchema =
                 CacheBuilder.newBuilder()
                         .expireAfterAccess(CACHE_EXPIRE_DURATION)
                         .build(
                                 new CacheLoader<TableId, Schema>() {
                                     @Override
                                     public Schema load(TableId tableId) throws Exception {
-                                        return getLatestUpstreamSchema(tableId);
+                                        return getLatestOriginalSchema(tableId);
                                     }
                                 });
         schemaDivergesMap =
@@ -253,7 +254,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         LOG.info("Table {} received SchemaChangeEvent and start to be blocked.", tableId);
         handleSchemaChangeEvent(tableId, event);
         // Update caches
-        upstreamSchema.put(tableId, getLatestUpstreamSchema(tableId));
+        originalSchema.put(tableId, getLatestOriginalSchema(tableId));
         schemaDivergesMap.put(tableId, checkSchemaDiverges(tableId));
 
         List<TableId> optionalRoutedTable = getRoutedTables(tableId);
@@ -291,7 +292,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private DataChangeEvent normalizeSchemaChangeEvents(
             DataChangeEvent event, TableId renamedTableId, boolean tolerantMode) {
         try {
-            Schema originalSchema = upstreamSchema.get(event.tableId());
+            Schema originalSchema = this.originalSchema.get(event.tableId());
             Schema evolvedTableSchema = evolvedSchema.get(renamedTableId);
             if (originalSchema.equals(evolvedTableSchema)) {
                 return ChangeEventUtils.recreateDataChangeEvent(event, renamedTableId);
@@ -457,7 +458,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                                     e.f1));
                 }
             } else {
-                throw new IllegalStateException(
+                throw new SchemaEvolveException(
+                        schemaChangeEvent,
                         "Unexpected schema change behavior: " + schemaChangeBehavior);
             }
 
@@ -486,9 +488,9 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         return sendRequestToCoordinator(new SchemaChangeRequest(tableId, schemaChangeEvent));
     }
 
-    private void requestApplyUpstreamSchemaChanges(
+    private void requestApplyOriginalSchemaChanges(
             TableId tableId, SchemaChangeEvent schemaChangeEvent) {
-        sendRequestToCoordinator(new ApplyUpstreamSchemaChangeRequest(tableId, schemaChangeEvent));
+        sendRequestToCoordinator(new ApplyOriginalSchemaChangeRequest(tableId, schemaChangeEvent));
     }
 
     private void requestApplyEvolvedSchemaChanges(
@@ -539,10 +541,10 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         }
     }
 
-    private Schema getLatestUpstreamSchema(TableId tableId) {
+    private Schema getLatestOriginalSchema(TableId tableId) {
         try {
             Optional<Schema> optionalSchema =
-                    schemaEvolutionClient.getLatestUpstreamSchema(tableId);
+                    schemaEvolutionClient.getLatestOriginalSchema(tableId);
             if (!optionalSchema.isPresent()) {
                 throw new IllegalStateException(
                         String.format("Schema doesn't exist for table \"%s\"", tableId));
@@ -556,7 +558,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     private Boolean checkSchemaDiverges(TableId tableId) {
         try {
-            return getLatestEvolvedSchema(tableId).equals(getLatestUpstreamSchema(tableId));
+            return getLatestEvolvedSchema(tableId).equals(getLatestOriginalSchema(tableId));
         } catch (IllegalStateException e) {
             // schema fetch failed, regard it as diverged
             return true;

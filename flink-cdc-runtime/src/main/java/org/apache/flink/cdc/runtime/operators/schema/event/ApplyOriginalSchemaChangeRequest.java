@@ -29,7 +29,7 @@ import java.util.Objects;
  * The request from {@link SchemaOperator} to {@link SchemaRegistry} to request apply evolved schema
  * changes.
  */
-public class ApplyUpstreamSchemaChangeRequest implements CoordinationRequest {
+public class ApplyOriginalSchemaChangeRequest implements CoordinationRequest {
 
     private static final long serialVersionUID = 1L;
 
@@ -38,7 +38,7 @@ public class ApplyUpstreamSchemaChangeRequest implements CoordinationRequest {
     /** The schema changes. */
     private final SchemaChangeEvent schemaChangeEvent;
 
-    public ApplyUpstreamSchemaChangeRequest(TableId tableId, SchemaChangeEvent schemaChangeEvent) {
+    public ApplyOriginalSchemaChangeRequest(TableId tableId, SchemaChangeEvent schemaChangeEvent) {
         this.tableId = tableId;
         this.schemaChangeEvent = schemaChangeEvent;
     }
@@ -56,10 +56,10 @@ public class ApplyUpstreamSchemaChangeRequest implements CoordinationRequest {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof ApplyUpstreamSchemaChangeRequest)) {
+        if (!(o instanceof ApplyOriginalSchemaChangeRequest)) {
             return false;
         }
-        ApplyUpstreamSchemaChangeRequest that = (ApplyUpstreamSchemaChangeRequest) o;
+        ApplyOriginalSchemaChangeRequest that = (ApplyOriginalSchemaChangeRequest) o;
         return Objects.equals(tableId, that.tableId)
                 && Objects.equals(schemaChangeEvent, that.schemaChangeEvent);
     }

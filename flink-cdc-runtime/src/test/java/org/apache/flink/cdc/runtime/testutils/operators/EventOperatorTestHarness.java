@@ -26,12 +26,12 @@ import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyUpstreamSchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetUpstreamSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetUpstreamSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
@@ -167,7 +167,7 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
 
     public void registerTableSchema(TableId tableId, Schema schema) {
         schemaRegistry.handleCoordinationRequest(
-                new ApplyUpstreamSchemaChangeRequest(
+                new ApplyOriginalSchemaChangeRequest(
                         tableId, new CreateTableEvent(tableId, schema)));
         schemaRegistry.handleCoordinationRequest(
                 new SchemaChangeRequest(tableId, new CreateTableEvent(tableId, schema)));
@@ -176,14 +176,14 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
                         tableId, Collections.singletonList(new CreateTableEvent(tableId, schema))));
     }
 
-    public Schema getLatestUpstreamSchema(TableId tableId) throws Exception {
-        return ((GetUpstreamSchemaResponse)
+    public Schema getLatestOriginalSchema(TableId tableId) throws Exception {
+        return ((GetOriginalSchemaResponse)
                         unwrap(
                                 schemaRegistry
                                         .handleCoordinationRequest(
-                                                new GetUpstreamSchemaRequest(
+                                                new GetOriginalSchemaRequest(
                                                         tableId,
-                                                        GetUpstreamSchemaRequest
+                                                        GetOriginalSchemaRequest
                                                                 .LATEST_SCHEMA_VERSION))
                                         .get()))
                 .getSchema()

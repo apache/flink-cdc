@@ -24,8 +24,8 @@ import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetUpstreamSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetUpstreamSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
@@ -77,15 +77,15 @@ public class SchemaEvolutionClient {
         return getEvolvedSchemaResponse.getSchema();
     }
 
-    public Optional<Schema> getLatestUpstreamSchema(TableId tableId) throws Exception {
-        GetUpstreamSchemaResponse getUpstreamSchemaResponse =
+    public Optional<Schema> getLatestOriginalSchema(TableId tableId) throws Exception {
+        GetOriginalSchemaResponse getOriginalSchemaResponse =
                 unwrap(
                         toCoordinator
                                 .sendRequestToCoordinator(
                                         schemaOperatorID,
                                         new SerializedValue<>(
-                                                GetUpstreamSchemaRequest.ofLatestSchema(tableId)))
+                                                GetOriginalSchemaRequest.ofLatestSchema(tableId)))
                                 .get());
-        return getUpstreamSchemaResponse.getSchema();
+        return getOriginalSchemaResponse.getSchema();
     }
 }

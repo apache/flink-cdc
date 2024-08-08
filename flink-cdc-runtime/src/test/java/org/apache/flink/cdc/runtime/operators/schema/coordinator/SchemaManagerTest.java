@@ -116,12 +116,12 @@ class SchemaManagerTest {
     void testHandlingAlterColumnTypeEvent() {
         {
             SchemaManager schemaManager = new SchemaManager();
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new AlterColumnTypeEvent(
                             CUSTOMERS, ImmutableMap.of("phone", DataTypes.STRING())));
-            assertThat(schemaManager.getLatestUpstreamSchema(CUSTOMERS))
+            assertThat(schemaManager.getLatestOriginalSchema(CUSTOMERS))
                     .contains(
                             Schema.newBuilder()
                                     .physicalColumn("id", DataTypes.INT())
@@ -153,11 +153,11 @@ class SchemaManagerTest {
     void testHandlingDropColumnEvent() {
         {
             SchemaManager schemaManager = new SchemaManager();
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new DropColumnEvent(CUSTOMERS, Arrays.asList("name", "phone")));
-            assertThat(schemaManager.getLatestUpstreamSchema(CUSTOMERS))
+            assertThat(schemaManager.getLatestOriginalSchema(CUSTOMERS))
                     .contains(
                             Schema.newBuilder()
                                     .physicalColumn("id", DataTypes.INT())
@@ -183,11 +183,11 @@ class SchemaManagerTest {
     void testHandlingRenameColumnEvent() {
         {
             SchemaManager schemaManager = new SchemaManager();
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new RenameColumnEvent(CUSTOMERS, ImmutableMap.of("name", "new_name")));
-            assertThat(schemaManager.getLatestUpstreamSchema(CUSTOMERS))
+            assertThat(schemaManager.getLatestOriginalSchema(CUSTOMERS))
                     .contains(
                             Schema.newBuilder()
                                     .physicalColumn("id", DataTypes.INT())
@@ -217,13 +217,13 @@ class SchemaManagerTest {
     void testGettingHistoricalSchema() {
         {
             SchemaManager schemaManager = new SchemaManager();
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new RenameColumnEvent(CUSTOMERS, ImmutableMap.of("name", "new_name")));
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new RenameColumnEvent(CUSTOMERS, ImmutableMap.of("phone", "new_phone")));
-            assertThat(schemaManager.getUpstreamSchema(CUSTOMERS, 1))
+            assertThat(schemaManager.getOriginalSchema(CUSTOMERS, 1))
                     .isEqualTo(
                             Schema.newBuilder()
                                     .physicalColumn("id", DataTypes.INT())
@@ -255,15 +255,15 @@ class SchemaManagerTest {
     void testVersionCleanup() {
         {
             SchemaManager schemaManager = new SchemaManager();
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new RenameColumnEvent(CUSTOMERS, ImmutableMap.of("name", "new_name")));
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new RenameColumnEvent(CUSTOMERS, ImmutableMap.of("phone", "new_phone")));
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new RenameColumnEvent(CUSTOMERS, ImmutableMap.of("new_phone", "new_phone_2")));
-            assertThatThrownBy(() -> schemaManager.getUpstreamSchema(CUSTOMERS, 0))
+            assertThatThrownBy(() -> schemaManager.getOriginalSchema(CUSTOMERS, 0))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Schema version %s does not exist for table \"%s\"", 0, CUSTOMERS);
         }
@@ -287,9 +287,9 @@ class SchemaManagerTest {
     void testSerde() throws Exception {
         {
             SchemaManager schemaManager = new SchemaManager();
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
-            schemaManager.applyUpstreamSchemaChange(
+            schemaManager.applyOriginalSchemaChange(
                     new CreateTableEvent(PRODUCTS, PRODUCTS_SCHEMA));
             byte[] serialized = SchemaManager.SERIALIZER.serialize(schemaManager);
             SchemaManager deserialized =

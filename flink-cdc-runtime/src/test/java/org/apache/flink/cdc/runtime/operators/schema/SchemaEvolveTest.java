@@ -114,7 +114,7 @@ public class SchemaEvolveTest {
                                     .map(StreamRecord::getValue)
                                     .collect(Collectors.toList()));
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
@@ -179,7 +179,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV2);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
 
             harness.clearOutputRecords();
@@ -238,7 +238,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV3);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3);
 
             harness.clearOutputRecords();
@@ -281,7 +281,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV4);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4);
 
             harness.clearOutputRecords();
@@ -315,7 +315,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("toshi", FLOAT)
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV5);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV5);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV5);
 
             harness.clearOutputRecords();
@@ -369,7 +369,7 @@ public class SchemaEvolveTest {
                                     Collections.singletonList(new FlushEvent(tableId)),
                                     createAndInsertDataEvents));
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
@@ -434,7 +434,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV2);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
 
             harness.clearOutputRecords();
@@ -493,7 +493,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV3);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3);
 
             harness.clearOutputRecords();
@@ -536,7 +536,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV4);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4);
 
             harness.clearOutputRecords();
@@ -570,7 +570,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("toshi", FLOAT)
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV5);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV5);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV5);
 
             harness.clearOutputRecords();
@@ -624,7 +624,7 @@ public class SchemaEvolveTest {
                                     Collections.singletonList(new FlushEvent(tableId)),
                                     createAndInsertDataEvents));
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
@@ -733,7 +733,7 @@ public class SchemaEvolveTest {
                                     Collections.singletonList(new FlushEvent(tableId)),
                                     createAndInsertDataEvents));
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
@@ -807,7 +807,7 @@ public class SchemaEvolveTest {
                             .build();
 
             // Downstream schema should not evolve in IGNORE mode
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV2);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
@@ -872,7 +872,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV3);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
@@ -920,7 +920,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV4);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
@@ -958,7 +958,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("age", FLOAT)
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV5);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV5);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
@@ -1019,7 +1019,7 @@ public class SchemaEvolveTest {
                                 Collections.singletonList(new FlushEvent(tableId)),
                                 createAndInsertDataEvents));
 
-        Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+        Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
         Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
         harness.clearOutputRecords();
@@ -1099,7 +1099,7 @@ public class SchemaEvolveTest {
                                     Collections.singletonList(new FlushEvent(tableId)),
                                     createAndInsertDataEvents));
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
@@ -1167,7 +1167,7 @@ public class SchemaEvolveTest {
                             .build();
 
             // Downstream schema should not evolve in IGNORE mode
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV2);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
 
             harness.clearOutputRecords();
@@ -1227,7 +1227,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV3);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3);
 
             harness.clearOutputRecords();
@@ -1292,7 +1292,7 @@ public class SchemaEvolveTest {
                             .primaryKey("id")
                             .build();
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV4);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4E);
 
             harness.clearOutputRecords();
@@ -1345,7 +1345,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV5);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV5);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV5E);
 
             harness.clearOutputRecords();
@@ -1411,7 +1411,7 @@ public class SchemaEvolveTest {
                                     Collections.singletonList(new FlushEvent(tableId)),
                                     createAndInsertDataEvents));
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
@@ -1479,7 +1479,7 @@ public class SchemaEvolveTest {
                             .build();
 
             // Downstream schema should not evolve in IGNORE mode
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV2);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
 
             harness.clearOutputRecords();
@@ -1539,7 +1539,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV3);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3);
 
             harness.clearOutputRecords();
@@ -1604,7 +1604,7 @@ public class SchemaEvolveTest {
                             .primaryKey("id")
                             .build();
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV4);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4E);
 
             harness.clearOutputRecords();
@@ -1657,7 +1657,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV5);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV5);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV5E);
 
             harness.clearOutputRecords();
@@ -1711,7 +1711,7 @@ public class SchemaEvolveTest {
                                     Collections.singletonList(new FlushEvent(tableId)),
                                     createAndInsertDataEvents));
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
@@ -1776,7 +1776,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("height", DOUBLE, "Height data")
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV2);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2);
 
             harness.clearOutputRecords();
@@ -1895,7 +1895,7 @@ public class SchemaEvolveTest {
                             .primaryKey("id")
                             .build();
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV3);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3E);
 
             harness.clearOutputRecords();
@@ -1965,7 +1965,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("toshi", FLOAT)
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV4);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4E);
 
             harness.clearOutputRecords();
@@ -2021,7 +2021,7 @@ public class SchemaEvolveTest {
                             .physicalColumn("toshi", FLOAT)
                             .primaryKey("id")
                             .build();
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV5);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV5);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV5E);
 
             harness.clearOutputRecords();
@@ -2085,7 +2085,7 @@ public class SchemaEvolveTest {
                                     Collections.singletonList(new FlushEvent(tableId)),
                                     createAndInsertDataEvents));
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
 
             harness.clearOutputRecords();
@@ -2142,7 +2142,7 @@ public class SchemaEvolveTest {
                             .primaryKey("id")
                             .build();
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV2);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV2);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV2E);
 
             harness.clearOutputRecords();
@@ -2261,7 +2261,7 @@ public class SchemaEvolveTest {
                             .primaryKey("id")
                             .build();
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV3);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV3);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV3E);
 
             harness.clearOutputRecords();
@@ -2378,7 +2378,7 @@ public class SchemaEvolveTest {
                             .primaryKey("id")
                             .build();
 
-            Assertions.assertThat(harness.getLatestUpstreamSchema(tableId)).isEqualTo(schemaV4);
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV4);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV4E);
 
             harness.clearOutputRecords();
