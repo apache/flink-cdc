@@ -93,6 +93,12 @@ public class FactoryDiscoveryUtils {
         try {
             T factory = getFactoryByIdentifier(identifier, factoryClass);
             URL url = factory.getClass().getProtectionDomain().getCodeSource().getLocation();
+            String urlString = url.toString();
+            if (urlString.contains("usrlib")) {
+                String flinkHome = System.getenv("FLINK_HOME");
+                urlString = urlString.replace("usrlib", flinkHome + "/usrlib");
+            }
+            url = new URL(urlString);
             if (Files.isDirectory(Paths.get(url.toURI()))) {
                 LOG.warn(
                         "The factory class \"{}\" is contained by directory \"{}\" instead of JAR. "
@@ -104,7 +110,8 @@ public class FactoryDiscoveryUtils {
             return Optional.of(url);
         } catch (Exception e) {
             throw new RuntimeException(
-                    String.format("Failed to search JAR by factory identifier \"%s\"", identifier));
+                    String.format("Failed to search JAR by factory identifier \"%s\"", identifier),
+                    e);
         }
     }
 }
