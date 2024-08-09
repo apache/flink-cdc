@@ -484,7 +484,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testScanNewlyAddedTableStartFromCheckpoint_INITIAL_ASSIGNING_FINISHED() {
+    public void testScanNewlyAddedTableStartFromInitialAssigningFinishedCheckpoint() {
         List<String> expected =
                 Arrays.asList(
                         "customers_sparse_dist [109] null",
@@ -499,8 +499,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void
-            testScanNewlyAddedTableStartFromCheckpoint_NEWLY_ADDED_ASSIGNING_SNAPSHOT_FINISHED() {
+    public void testScanNewlyAddedTableStartFromNewlyAddedAssigningSnapshotFinishedCheckpoint() {
         List<String> expected =
                 Arrays.asList(
                         "customers_sparse_dist [109] null",
