@@ -499,7 +499,7 @@ public class TransformParser {
     }
 
     private static List<Column> copyFillMetadataColumn(List<Column> columns) {
-        // Add meteColumn for SQLValidater.validate
+        // Add metaColumn for SQLValidater.validate
         List<Column> columnsWithMetadata = new ArrayList<>(columns);
         columnsWithMetadata.add(Column.physicalColumn(DEFAULT_NAMESPACE_NAME, DataTypes.STRING()));
         columnsWithMetadata.add(Column.physicalColumn(DEFAULT_SCHEMA_NAME, DataTypes.STRING()));

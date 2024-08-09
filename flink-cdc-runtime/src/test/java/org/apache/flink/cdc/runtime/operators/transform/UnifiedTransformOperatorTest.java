@@ -922,7 +922,8 @@ public class UnifiedTransformOperatorTest {
         TableId tableId = TableId.tableId("my_company", "my_branch", "schema_nullability");
         UnifiedTransformTestCase.of(
                         tableId,
-                        "id, name, age, id + age as computed, __table_name__ as metaCol1, '__table_name__' as metaCol2, '__namespace__name__schema__name__table__name__' as metaCol3, UPPER(__schema_name__) as metaCol4",
+                        "id, name, age, id + age as computed, __namespace_name__ as metaColNameSpaceName,  __schema_name__ as metaColSchemaName, __table_name__ as metaColNameTableName, "
+                                + "UPPER(__schema_name__) as metaColSchemaNameUpper, '__table_name__' as metaColStr1, '__namespace__name__schema__name__table__name__' as metaColStr2",
                         "id > 100",
                         Schema.newBuilder()
                                 .physicalColumn("id", DataTypes.INT())
@@ -941,10 +942,12 @@ public class UnifiedTransformOperatorTest {
                                 .physicalColumn("name", DataTypes.STRING().notNull())
                                 .physicalColumn("age", DataTypes.INT().notNull())
                                 .physicalColumn("computed", DataTypes.INT())
-                                .physicalColumn("metaCol1", DataTypes.STRING())
-                                .physicalColumn("metaCol2", DataTypes.STRING())
-                                .physicalColumn("metaCol3", DataTypes.STRING())
-                                .physicalColumn("metaCol4", DataTypes.STRING())
+                                .physicalColumn("metaColNameSpaceName", DataTypes.STRING())
+                                .physicalColumn("metaColSchemaName", DataTypes.STRING())
+                                .physicalColumn("metaColNameTableName", DataTypes.STRING())
+                                .physicalColumn("metaColSchemaNameUpper", DataTypes.STRING())
+                                .physicalColumn("metaColStr1", DataTypes.STRING())
+                                .physicalColumn("metaColStr2", DataTypes.STRING())
                                 .primaryKey("id")
                                 .build())
                 .initializeHarness()
@@ -955,10 +958,12 @@ public class UnifiedTransformOperatorTest {
                         "Alice",
                         17,
                         1017,
+                        "my_company",
+                        "my_branch",
                         "schema_nullability",
+                        "MY_BRANCH",
                         "__table_name__",
-                        "__namespace__name__schema__name__table__name__",
-                        "MY_BRANCH")
+                        "__namespace__name__schema__name__table__name__")
                 .runTests()
                 .destroyHarness();
     }
