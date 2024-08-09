@@ -23,22 +23,34 @@ import org.apache.flink.cdc.common.annotation.PublicEvolving;
 @PublicEvolving
 public enum SchemaChangeEventType {
     ADD_COLUMN,
+    ALTER_COLUMN_COMMENT,
     ALTER_COLUMN_TYPE,
+    ALTER_TABLE_COMMENT,
     CREATE_TABLE,
     DROP_COLUMN,
-    RENAME_COLUMN;
+    DROP_TABLE,
+    RENAME_COLUMN,
+    TRUNCATE_TABLE;
 
     public static SchemaChangeEventType ofEvent(SchemaChangeEvent event) {
         if (event instanceof AddColumnEvent) {
             return ADD_COLUMN;
+        } else if (event instanceof AlterColumnCommentEvent) {
+            return ALTER_COLUMN_COMMENT;
         } else if (event instanceof AlterColumnTypeEvent) {
             return ALTER_COLUMN_TYPE;
+        } else if (event instanceof AlterTableCommentEvent) {
+            return ALTER_TABLE_COMMENT;
         } else if (event instanceof CreateTableEvent) {
             return CREATE_TABLE;
         } else if (event instanceof DropColumnEvent) {
             return DROP_COLUMN;
+        } else if (event instanceof DropTableEvent) {
+            return DROP_TABLE;
         } else if (event instanceof RenameColumnEvent) {
             return RENAME_COLUMN;
+        } else if (event instanceof TruncateTableEvent) {
+            return TRUNCATE_TABLE;
         } else {
             throw new RuntimeException("Unknown schema change event type: " + event.getClass());
         }
@@ -48,14 +60,22 @@ public enum SchemaChangeEventType {
         switch (tag) {
             case "add.column":
                 return ADD_COLUMN;
+            case "alter.column.comment":
+                return ALTER_COLUMN_COMMENT;
             case "alter.column.type":
                 return ALTER_COLUMN_TYPE;
+            case "alter.table.comment":
+                return ALTER_TABLE_COMMENT;
             case "create.table":
                 return CREATE_TABLE;
             case "drop.column":
                 return DROP_COLUMN;
+            case "drop.table":
+                return DROP_TABLE;
             case "rename.column":
                 return RENAME_COLUMN;
+            case "truncate.table":
+                return TRUNCATE_TABLE;
             default:
                 throw new RuntimeException("Unknown schema change event type: " + tag);
         }

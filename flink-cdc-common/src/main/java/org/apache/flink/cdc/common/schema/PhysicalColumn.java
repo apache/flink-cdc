@@ -51,4 +51,9 @@ public class PhysicalColumn extends Column {
     public Column copy(String newName) {
         return new PhysicalColumn(newName, type, comment, defaultValueExpression);
     }
+
+    @Override
+    public Column copyComment(String newComment) {
+        return new PhysicalColumn(name, type, newComment);
+    }
 }

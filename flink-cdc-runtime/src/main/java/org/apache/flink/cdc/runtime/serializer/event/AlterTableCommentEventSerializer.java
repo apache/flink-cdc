@@ -20,32 +20,27 @@ package org.apache.flink.cdc.runtime.serializer.event;
 import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
-import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.runtime.serializer.MapSerializer;
 import org.apache.flink.cdc.runtime.serializer.StringSerializer;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
 import org.apache.flink.cdc.runtime.serializer.TypeSerializerSingleton;
-import org.apache.flink.cdc.runtime.serializer.schema.DataTypeSerializer;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
 import java.io.IOException;
-import java.util.Collections;
 
-/** A {@link TypeSerializer} for {@link AlterColumnTypeEvent}. */
-public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<AlterColumnTypeEvent> {
+/** A {@link TypeSerializer} for {@link AlterTableCommentEvent}. */
+public class AlterTableCommentEventSerializer
+        extends TypeSerializerSingleton<AlterTableCommentEvent> {
 
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
-    public static final AlterColumnTypeEventSerializer INSTANCE =
-            new AlterColumnTypeEventSerializer();
+    public static final AlterTableCommentEventSerializer INSTANCE =
+            new AlterTableCommentEventSerializer();
 
     private final TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
-    private final MapSerializer<String, DataType> typeMapSerializer =
-            new MapSerializer<>(StringSerializer.INSTANCE, new DataTypeSerializer());
 
     @Override
     public boolean isImmutableType() {
@@ -53,20 +48,17 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
     }
 
     @Override
-    public AlterColumnTypeEvent createInstance() {
-        return new AlterColumnTypeEvent(TableId.tableId("unknown"), Collections.emptyMap());
+    public AlterTableCommentEvent createInstance() {
+        return new AlterTableCommentEvent(TableId.tableId("unknown"), "unknown");
     }
 
     @Override
-    public AlterColumnTypeEvent copy(AlterColumnTypeEvent from) {
-        return new AlterColumnTypeEvent(
-                from.tableId(),
-                typeMapSerializer.copy(from.getTypeMapping()),
-                typeMapSerializer.copy(from.getOldTypeMapping()));
+    public AlterTableCommentEvent copy(AlterTableCommentEvent from) {
+        return new AlterTableCommentEvent(from.tableId(), from.getTableComment());
     }
 
     @Override
-    public AlterColumnTypeEvent copy(AlterColumnTypeEvent from, AlterColumnTypeEvent reuse) {
+    public AlterTableCommentEvent copy(AlterTableCommentEvent from, AlterTableCommentEvent reuse) {
         return copy(from);
     }
 
@@ -76,22 +68,20 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
     }
 
     @Override
-    public void serialize(AlterColumnTypeEvent record, DataOutputView target) throws IOException {
+    public void serialize(AlterTableCommentEvent record, DataOutputView target) throws IOException {
         tableIdSerializer.serialize(record.tableId(), target);
-        typeMapSerializer.serialize(record.getTypeMapping(), target);
-        typeMapSerializer.serialize(record.getOldTypeMapping(), target);
+        StringSerializer.INSTANCE.serialize(record.getTableComment(), target);
     }
 
     @Override
-    public AlterColumnTypeEvent deserialize(DataInputView source) throws IOException {
-        return new AlterColumnTypeEvent(
+    public AlterTableCommentEvent deserialize(DataInputView source) throws IOException {
+        return new AlterTableCommentEvent(
                 tableIdSerializer.deserialize(source),
-                typeMapSerializer.deserialize(source),
-                typeMapSerializer.deserialize(source));
+                StringSerializer.INSTANCE.deserialize(source));
     }
 
     @Override
-    public AlterColumnTypeEvent deserialize(AlterColumnTypeEvent reuse, DataInputView source)
+    public AlterTableCommentEvent deserialize(AlterTableCommentEvent reuse, DataInputView source)
             throws IOException {
         return deserialize(source);
     }
@@ -102,16 +92,16 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
     }
 
     @Override
-    public TypeSerializerSnapshot<AlterColumnTypeEvent> snapshotConfiguration() {
-        return new AlterColumnTypeEventSerializerSnapshot();
+    public TypeSerializerSnapshot<AlterTableCommentEvent> snapshotConfiguration() {
+        return new AlterTableCommentEventSerializer.AlterTableCommentEventSerializerSnapshot();
     }
 
     /** Serializer configuration snapshot for compatibility and format evolution. */
     @SuppressWarnings("WeakerAccess")
-    public static final class AlterColumnTypeEventSerializerSnapshot
-            extends SimpleTypeSerializerSnapshot<AlterColumnTypeEvent> {
+    public static final class AlterTableCommentEventSerializerSnapshot
+            extends SimpleTypeSerializerSnapshot<AlterTableCommentEvent> {
 
-        public AlterColumnTypeEventSerializerSnapshot() {
+        public AlterTableCommentEventSerializerSnapshot() {
             super(() -> INSTANCE);
         }
     }

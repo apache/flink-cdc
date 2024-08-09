@@ -21,13 +21,16 @@ import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnCommentEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
@@ -61,6 +64,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCHEMA_CHANGE_ENABLED;
@@ -350,6 +354,154 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         assertThat(actual).isEqualTo(expected);
     }
 
+    @Test
+    public void testSchemaChangeEvents() throws Exception {
+        env.setParallelism(1);
+        inventoryDatabase.createAndInitialize();
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(MYSQL8_CONTAINER.getHost())
+                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(inventoryDatabase.getDatabaseName() + ".*")
+                        .startupOptions(StartupOptions.latest())
+                        .serverId(getServerId(env.getParallelism()))
+                        .serverTimeZone("UTC")
+                        .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(5_000);
+
+        List<Event> expected =
+                new ArrayList<>(
+                        getInventoryCreateAllTableEvents(inventoryDatabase.getDatabaseName()));
+
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` ADD COLUMN `newcol1` INT NULL;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn("newcol1", DataTypes.INT())))));
+
+            // Test MODIFY COLUMN DDL
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` MODIFY COLUMN `newcol1` DOUBLE;",
+                            inventoryDatabase.getDatabaseName()));
+
+            // MySQL MODIFY COLUMN DDL always emits Comment / Type change event at the same time
+            expected.add(
+                    new AlterColumnCommentEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol1", null)));
+
+            expected.add(
+                    new AlterColumnTypeEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol1", DataTypes.DOUBLE())));
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` MODIFY COLUMN `newcol1` DOUBLE COMMENT 'SomeDescriptiveDescription';",
+                            inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new AlterColumnCommentEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol1", "SomeDescriptiveDescription")));
+
+            expected.add(
+                    new AlterColumnTypeEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol1", DataTypes.DOUBLE())));
+
+            // Test CHANGE COLUMN DDL
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` CHANGE COLUMN `newcol1` `newcol2` INT;",
+                            inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new AlterColumnCommentEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol1", null)));
+
+            expected.add(
+                    new AlterColumnTypeEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol1", DataTypes.INT())));
+
+            expected.add(
+                    new RenameColumnEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol1", "newcol2")));
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` CHANGE COLUMN `newcol2` `newcol1` DOUBLE COMMENT 'SomeDescriptiveDescription';",
+                            inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new AlterColumnCommentEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol2", "SomeDescriptiveDescription")));
+
+            expected.add(
+                    new AlterColumnTypeEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol2", DataTypes.DOUBLE())));
+
+            expected.add(
+                    new RenameColumnEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol2", "newcol1")));
+
+            // Test truncate table DDL
+            statement.execute(
+                    String.format(
+                            "TRUNCATE TABLE `%s`.`orders`;", inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new TruncateTableEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "orders")));
+
+            // Test drop table DDL
+            statement.execute(
+                    String.format(
+                            "DROP TABLE `%s`.`orders`, `%s`.`customers`;",
+                            inventoryDatabase.getDatabaseName(),
+                            inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new DropTableEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "orders")));
+            expected.add(
+                    new DropTableEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers")));
+        }
+        List<Event> actual = fetchResults(events, expected.size());
+        assertEqualsInAnyOrder(
+                expected.stream().map(Object::toString).collect(Collectors.toList()),
+                actual.stream().map(Object::toString).collect(Collectors.toList()));
+    }
+
     private CreateTableEvent getProductsCreateTableEvent(TableId tableId) {
         return new CreateTableEvent(
                 tableId,
@@ -360,6 +512,38 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .physicalColumn("weight", DataTypes.FLOAT())
                         .primaryKey(Collections.singletonList("id"))
                         .build());
+    }
+
+    private List<CreateTableEvent> getInventoryCreateAllTableEvents(String databaseName) {
+        return Arrays.asList(
+                new CreateTableEvent(
+                        TableId.tableId(databaseName, "products"),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), "flink")
+                                .physicalColumn("description", DataTypes.VARCHAR(512))
+                                .physicalColumn("weight", DataTypes.FLOAT())
+                                .primaryKey(Collections.singletonList("id"))
+                                .build()),
+                new CreateTableEvent(
+                        TableId.tableId(databaseName, "customers"),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("first_name", DataTypes.VARCHAR(255).notNull())
+                                .physicalColumn("last_name", DataTypes.VARCHAR(255).notNull())
+                                .physicalColumn("email", DataTypes.VARCHAR(255).notNull())
+                                .primaryKey(Collections.singletonList("id"))
+                                .build()),
+                new CreateTableEvent(
+                        TableId.tableId(databaseName, "orders"),
+                        Schema.newBuilder()
+                                .physicalColumn("order_number", DataTypes.INT().notNull())
+                                .physicalColumn("order_date", DataTypes.DATE().notNull())
+                                .physicalColumn("purchaser", DataTypes.INT().notNull())
+                                .physicalColumn("quantity", DataTypes.INT().notNull())
+                                .physicalColumn("product_id", DataTypes.INT().notNull())
+                                .primaryKey(Collections.singletonList("order_number"))
+                                .build()));
     }
 
     private List<Event> getSnapshotExpected(TableId tableId) {
@@ -493,15 +677,21 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                 new AlterColumnTypeEvent(
                         tableId, Collections.singletonMap("description", DataTypes.VARCHAR(255))));
         expected.add(
+                new AlterColumnCommentEvent(
+                        tableId, Collections.singletonMap("description", null)));
+        expected.add(
                 new RenameColumnEvent(tableId, Collections.singletonMap("description", "desc")));
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` CHANGE COLUMN `desc` `desc2` VARCHAR(400) NULL DEFAULT NULL;",
+                        "ALTER TABLE `%s`.`products` CHANGE COLUMN `desc` `desc2` VARCHAR(400) NULL DEFAULT NULL COMMENT 'JustSomeDesc';",
                         inventoryDatabase.getDatabaseName()));
         expected.add(
                 new AlterColumnTypeEvent(
                         tableId, Collections.singletonMap("desc", DataTypes.VARCHAR(400))));
+        expected.add(
+                new AlterColumnCommentEvent(
+                        tableId, Collections.singletonMap("desc", "JustSomeDesc")));
         expected.add(new RenameColumnEvent(tableId, Collections.singletonMap("desc", "desc2")));
 
         statement.execute(
@@ -540,12 +730,15 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` DROP COLUMN `desc2`, CHANGE COLUMN `desc1` `desc1` VARCHAR(65) NULL DEFAULT NULL;",
+                        "ALTER TABLE `%s`.`products` DROP COLUMN `desc2`, CHANGE COLUMN `desc1` `desc1` VARCHAR(65) NULL DEFAULT NULL COMMENT 'NewDescription';",
                         inventoryDatabase.getDatabaseName()));
         expected.add(new DropColumnEvent(tableId, Collections.singletonList("desc2")));
         expected.add(
                 new AlterColumnTypeEvent(
                         tableId, Collections.singletonMap("desc1", DataTypes.VARCHAR(65))));
+        expected.add(
+                new AlterColumnCommentEvent(
+                        tableId, Collections.singletonMap("desc1", "NewDescription")));
 
         // Only available in mysql 8.0
         statement.execute(
@@ -561,6 +754,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         expected.add(
                 new AlterColumnTypeEvent(
                         tableId, Collections.singletonMap("DESC3", DataTypes.VARCHAR(255))));
+        expected.add(new AlterColumnCommentEvent(tableId, Collections.singletonMap("DESC3", null)));
 
         statement.execute(
                 String.format(
