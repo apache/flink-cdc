@@ -94,9 +94,10 @@ public class FactoryDiscoveryUtils {
             T factory = getFactoryByIdentifier(identifier, factoryClass);
             URL url = factory.getClass().getProtectionDomain().getCodeSource().getLocation();
             String urlString = url.toString();
-            if (urlString.contains("usrlib")) {
-                String flinkHome = System.getenv("FLINK_HOME");
-                urlString = urlString.replace("usrlib", flinkHome + "/usrlib");
+            // if already in usr lib of k8s, the jar has been added into classpath.Thus, no need to
+            // upload jar anymore.
+            if (urlString.startsWith("local:///opt/flink/usrlib/")) {
+                return Optional.empty();
             }
             url = new URL(urlString);
             if (Files.isDirectory(Paths.get(url.toURI()))) {
