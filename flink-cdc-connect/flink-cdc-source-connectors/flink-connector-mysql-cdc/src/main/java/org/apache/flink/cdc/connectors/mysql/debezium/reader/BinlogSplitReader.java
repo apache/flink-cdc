@@ -179,6 +179,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                 statefulTaskContext.getConnection().close();
             }
             if (statefulTaskContext.getBinaryLogClient() != null) {
+                // BinaryLogClient still tries to enqueue records, if this queue is full, it will
+                // lead to deadlock.
+                statefulTaskContext.getQueue().poll();
                 statefulTaskContext.getBinaryLogClient().disconnect();
             }
 
