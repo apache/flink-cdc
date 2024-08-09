@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mongodb.source.dialect;
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.base.dialect.DataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import org.apache.flink.cdc.connectors.mongodb.source.assigners.splitters.MongoDBChunkSplitter;
@@ -169,9 +170,16 @@ public class MongoDBDialect implements DataSourceDialect<MongoDBSourceConfig> {
         return true;
     }
 
+    @Deprecated
     @Override
     public ChunkSplitter createChunkSplitter(MongoDBSourceConfig sourceConfig) {
         return new MongoDBChunkSplitter(sourceConfig);
+    }
+
+    @Override
+    public ChunkSplitter createChunkSplitter(
+            MongoDBSourceConfig sourceConfig, ChunkSplitterState chunkSplitterState) {
+        return createChunkSplitter(sourceConfig);
     }
 
     @Override
