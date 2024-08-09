@@ -522,11 +522,11 @@ class FlinkPipelineComposerITCase {
                         "default_namespace.default_schema.table2:col1=3;col2=3");
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
-                        "CreateTableEvent{tableId=default_namespace.default_schema.table2, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, comment=null, options=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table2, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, comment=null, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[3, 3], op=INSERT, meta=()}",
@@ -911,10 +911,10 @@ class FlinkPipelineComposerITCase {
                                 .physicalColumn("gender", DataTypes.STRING())
                                 .primaryKey("id")
                                 .build());
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.merged, schema=columns={`id` INT,`name` STRING,`age` INT,`last_name` STRING}, primaryKeys=id, options=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.merged, schema=columns={`id` INT,`name` STRING,`age` INT,`last_name` STRING}, primaryKeys=id, comment=null, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[1, Alice, 18, last_name], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[2, Bob, 20, last_name], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[2, Bob, 20, last_name], after=[2, Bob, 30, last_name], op=UPDATE, meta=()}",

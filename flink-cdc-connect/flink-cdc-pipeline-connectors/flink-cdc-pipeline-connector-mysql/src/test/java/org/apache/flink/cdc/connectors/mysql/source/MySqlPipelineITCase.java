@@ -442,7 +442,10 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                 Schema.newBuilder()
                         .physicalColumn("id", DataTypes.INT().notNull(), "column comment of id")
                         .physicalColumn(
-                                "name", DataTypes.VARCHAR(255).notNull(), "column comment of name")
+                                "name",
+                                DataTypes.VARCHAR(255).notNull(),
+                                "column comment of name",
+                                "flink")
                         .physicalColumn("weight", DataTypes.FLOAT(), "column comment of weight")
                         .primaryKey(Collections.singletonList("id"))
                         .comment("table comment of products")

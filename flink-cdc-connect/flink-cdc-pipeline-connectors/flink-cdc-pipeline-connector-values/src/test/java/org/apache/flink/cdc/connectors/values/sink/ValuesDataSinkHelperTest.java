@@ -50,7 +50,7 @@ public class ValuesDataSinkHelperTest {
 
         List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(schema);
         Assert.assertEquals(
-                "CreateTableEvent{tableId=default.default.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
+                "CreateTableEvent{tableId=default.default.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, comment=null, options=()}",
                 ValuesDataSinkHelper.convertEventToStr(
                         new CreateTableEvent(tableId, schema), fieldGetters));
 
