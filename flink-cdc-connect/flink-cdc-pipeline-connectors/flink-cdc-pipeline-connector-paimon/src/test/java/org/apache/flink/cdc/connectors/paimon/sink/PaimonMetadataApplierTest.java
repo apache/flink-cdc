@@ -426,7 +426,8 @@ public class PaimonMetadataApplierTest {
         initialize(metastore);
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
-        MetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions, tableOptions);
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, Collections.emptyMap());
         CreateTableEvent createTableEvent =
                 new CreateTableEvent(
                         TableId.parse("test.table1"),
