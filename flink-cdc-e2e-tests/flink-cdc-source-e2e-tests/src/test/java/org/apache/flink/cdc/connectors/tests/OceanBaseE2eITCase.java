@@ -19,99 +19,68 @@ package org.apache.flink.cdc.connectors.tests;
 
 import org.apache.flink.cdc.common.test.utils.JdbcProxy;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.LogProxyContainer;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseCdcMetadata;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseContainer;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseMySQLCdcMetadata;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.UniqueDatabase;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.utility.MountableFile;
 
-import java.net.URL;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertNotNull;
+import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.createLogProxyContainer;
+import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.createOceanBaseContainerForCDC;
 
 /** End-to-end tests for oceanbase-cdc connector uber jar. */
 public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
 
-    private static final Logger LOG = LoggerFactory.getLogger(OceanBaseE2eITCase.class);
-
-    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
+    private static final String INTER_CONTAINER_OB_SERVER_ALIAS = "oceanbase";
+    private static final String INTER_CONTAINER_LOG_PROXY_ALIAS = "oblogproxy";
 
     private static final Path obCdcJar = TestUtils.getResource("oceanbase-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    // ------------------------------------------------------------------------------------------
-    // OceanBase container variables
-    // ------------------------------------------------------------------------------------------
-    private static final String OB_SERVER_IMAGE = "oceanbase/oceanbase-ce:4.2.0.0";
-    private static final String OB_LOG_PROXY_IMAGE = "whhe/oblogproxy:1.1.3_4x";
-    private static final String NETWORK_MODE = "host";
-    private static final String INTER_CONTAINER_OB_HOST = "host.docker.internal";
-    private static final String SYS_PASSWORD = "1234567";
-    private static final String TEST_TENANT = "test";
-    private static final String TEST_USER = "root@" + TEST_TENANT;
-    private static final String TEST_PASSWORD = "7654321";
+    @ClassRule
+    public static final OceanBaseContainer OB_SERVER =
+            createOceanBaseContainerForCDC()
+                    .withNetwork(NETWORK)
+                    .withNetworkAliases(INTER_CONTAINER_OB_SERVER_ALIAS);
 
     @ClassRule
-    public static final GenericContainer<?> OB_SERVER =
-            new GenericContainer<>(OB_SERVER_IMAGE)
-                    .withNetworkMode(NETWORK_MODE)
-                    .withEnv("MODE", "slim")
-                    .withEnv("OB_DATAFILE_SIZE", "1G")
-                    .withEnv("OB_LOG_DISK_SIZE", "4G")
-                    .withEnv("OB_ROOT_PASSWORD", SYS_PASSWORD)
-                    .withEnv("OB_TENANT_NAME", TEST_TENANT)
-                    .withCopyFileToContainer(
-                            MountableFile.forClasspathResource("docker/oceanbase/setup.sql"),
-                            "/root/boot/init.d/init.sql")
-                    .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
-                    .withStartupTimeout(Duration.ofMinutes(3))
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+    public static final LogProxyContainer LOG_PROXY =
+            createLogProxyContainer()
+                    .withNetwork(NETWORK)
+                    .withNetworkAliases(INTER_CONTAINER_LOG_PROXY_ALIAS);
 
-    @ClassRule
-    public static final GenericContainer<?> LOG_PROXY =
-            new GenericContainer<>(OB_LOG_PROXY_IMAGE)
-                    .withNetworkMode(NETWORK_MODE)
-                    .withEnv("OB_SYS_PASSWORD", SYS_PASSWORD)
-                    .waitingFor(Wait.forLogMessage(".*boot success!.*", 1))
-                    .withStartupTimeout(Duration.ofMinutes(1))
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+    private static final OceanBaseCdcMetadata METADATA =
+            new OceanBaseMySQLCdcMetadata(OB_SERVER, LOG_PROXY);
+
+    protected final UniqueDatabase obInventoryDatabase =
+            new UniqueDatabase(OB_SERVER, "oceanbase_inventory");
 
     @Before
     public void before() {
         super.before();
 
-        initializeTable("oceanbase_inventory");
+        obInventoryDatabase.createAndInitialize();
     }
 
-    private Connection getTestConnection(String databaseName) {
-        try {
-            Class.forName(MYSQL_DRIVER_CLASS);
-            return DriverManager.getConnection(
-                    String.format("jdbc:mysql://127.0.0.1:2881/%s?useSSL=false", databaseName),
-                    TEST_USER,
-                    TEST_PASSWORD);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to get test jdbc connection", e);
-        }
+    @After
+    public void after() {
+        super.after();
+
+        obInventoryDatabase.dropDatabase();
     }
 
     @Test
@@ -131,16 +100,18 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
                         ") WITH (",
                         " 'connector' = 'oceanbase-cdc',",
                         " 'scan.startup.mode' = 'initial',",
-                        " 'username' = '" + TEST_USER + "',",
-                        " 'password' = '" + TEST_PASSWORD + "',",
-                        " 'tenant-name' = '" + TEST_TENANT + "',",
-                        " 'table-list' = 'inventory.products_source',",
-                        " 'hostname' = '" + INTER_CONTAINER_OB_HOST + "',",
+                        " 'username' = '" + METADATA.getUsername() + "',",
+                        " 'password' = '" + METADATA.getPassword() + "',",
+                        " 'tenant-name' = '" + METADATA.getTenantName() + "',",
+                        " 'table-list' = '"
+                                + obInventoryDatabase.qualifiedTableName("products_source")
+                                + "',",
+                        " 'hostname' = '" + INTER_CONTAINER_OB_SERVER_ALIAS + "',",
                         " 'port' = '2881',",
-                        " 'jdbc.driver' = '" + MYSQL_DRIVER_CLASS + "',",
-                        " 'logproxy.host' = '" + INTER_CONTAINER_OB_HOST + "',",
+                        " 'jdbc.driver' = '" + METADATA.getDriverClass() + "',",
+                        " 'logproxy.host' = '" + INTER_CONTAINER_LOG_PROXY_ALIAS + "',",
                         " 'logproxy.port' = '2983',",
-                        " 'rootserver-list' = '127.0.0.1:2882:2881',",
+                        " 'rootserver-list' = '" + METADATA.getRsList() + "',",
                         " 'working-mode' = 'memory',",
                         " 'jdbc.properties.useSSL' = 'false'",
                         ");",
@@ -168,7 +139,7 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
         submitSQLJob(sqlLines, obCdcJar, jdbcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
-        try (Connection conn = getTestConnection("inventory");
+        try (Connection conn = obInventoryDatabase.getJdbcConnection();
                 Statement stat = conn.createStatement()) {
             stat.execute(
                     "UPDATE products_source SET description='18oz carpenter hammer' WHERE id=106;");
@@ -210,33 +181,5 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
                 "ob_products_sink",
                 new String[] {"id", "name", "description", "weight", "enum_c", "json_c"},
                 60000L);
-    }
-
-    protected void initializeTable(String sqlFile) {
-        final String ddlFile = String.format("ddl/%s.sql", sqlFile);
-        final URL ddlTestFile = OceanBaseE2eITCase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
-        try (Connection connection = getTestConnection("");
-                Statement statement = connection.createStatement()) {
-            final List<String> statements =
-                    Arrays.stream(
-                                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
-                                            .map(String::trim)
-                                            .filter(x -> !x.startsWith("--") && !x.isEmpty())
-                                            .map(
-                                                    x -> {
-                                                        final Matcher m =
-                                                                COMMENT_PATTERN.matcher(x);
-                                                        return m.matches() ? m.group(1) : x;
-                                                    })
-                                            .collect(Collectors.joining("\n"))
-                                            .split(";"))
-                            .collect(Collectors.toList());
-            for (String stmt : statements) {
-                statement.execute(stmt);
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 }

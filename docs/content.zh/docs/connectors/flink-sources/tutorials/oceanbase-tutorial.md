@@ -42,16 +42,23 @@ under the License.
 version: '2.1'
 services:
   observer:
-    image: oceanbase/oceanbase-ce:4.0.0.0
+    image: 'oceanbase/oceanbase-ce:4.2.1.6-106000012024042515'
     container_name: observer
-    network_mode: "host"
+    environment:
+      - 'MODE=mini'
+      - 'OB_SYS_PASSWORD=123456'
+      - 'OB_TENANT_PASSWORD=654321'
+    ports:
+      - '2881:2881'
+      - '2882:2882'
   oblogproxy:
-    image: whhe/oblogproxy:1.1.0_4x
+    image: 'oceanbase/oblogproxy-ce:latest'
     container_name: oblogproxy
     environment:
       - 'OB_SYS_USERNAME=root'
-      - 'OB_SYS_PASSWORD=pswd'
-    network_mode: "host"
+      - 'OB_SYS_PASSWORD=123456'
+    ports:
+      - '2983:2983'
   elasticsearch:
     image: 'elastic/elasticsearch:7.6.0'
     container_name: elasticsearch
@@ -85,42 +92,26 @@ services:
 docker-compose up -d
 ```
 
-### 设置密码
-
-OceanBase 中 root 用户默认是没有密码的，但是 oblogproxy 需要配置一个使用非空密码的系统租户用户，因此这里我们需要先为 root@sys 用户设置一个密码。
+### 查询 Root Service List
 
 登陆 sys 租户的 root 用户：
 
 ```shell
-docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@sys
+docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@sys -p123456
 ```
 
-设置密码，注意这里的密码需要与上一步中 oblogproxy 服务的环境变量 'OB_SYS_PASSWORD' 保持一样。
+执行以下 sql 以查询 root service list，将 VALUE 列的值保存下来。
 
 ```mysql
-ALTER USER root IDENTIFIED BY 'pswd';
-```
-
-OceanBase 从社区版 4.0.0.0 开始只支持对非 sys 租户的增量数据拉取，这里我们使用 test 租户的 root 用户作为示例。
-
-登陆 test 租户的 root 用户：
-
-```shell
-docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@test
-```
-
-设置密码:
-
-```mysql
-ALTER USER root IDENTIFIED BY 'test';
+SHOW PARAMETERS LIKE 'rootservice_list';
 ```
 
 ### 准备数据
 
-使用 'root@test' 用户登陆。
+使用测试用的 test 租户的 root 用户登陆。
 
 ```shell
-docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@test -ptest
+docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@test -p654321
 ```
 
 ```sql
@@ -169,6 +160,8 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 
 ### 在 Flink SQL CLI 中使用 Flink DDL 创建表
 
+注意在 OceanBase 源表的 SQL 中替换 root_service_list 为真实值。
+
 ```sql
 -- 设置间隔时间为3秒                       
 Flink SQL> SET execution.checkpointing.interval = 3s;
@@ -189,13 +182,13 @@ Flink SQL> CREATE TABLE orders (
     'connector' = 'oceanbase-cdc',
     'scan.startup.mode' = 'initial',
     'username' = 'root@test',
-    'password' = 'test',
+    'password' = '654321',
     'tenant-name' = 'test',
     'database-name' = '^ob$',
     'table-name' = '^orders$',
     'hostname' = 'localhost',
     'port' = '2881',
-    'rootserver-list' = '127.0.0.1:2882:2881',
+    'rootserver-list' = '${root_service_list}',
     'logproxy.host' = 'localhost',
     'logproxy.port' = '2983',
     'working-mode' = 'memory'
@@ -211,13 +204,13 @@ Flink SQL> CREATE TABLE products (
     'connector' = 'oceanbase-cdc',
     'scan.startup.mode' = 'initial',
     'username' = 'root@test',
-    'password' = 'test',
+    'password' = '654321',
     'tenant-name' = 'test',
     'database-name' = '^ob$',
     'table-name' = '^products$',
     'hostname' = 'localhost',
     'port' = '2881',
-    'rootserver-list' = '127.0.0.1:2882:2881',
+    'rootserver-list' = '${root_service_list}',
     'logproxy.host' = 'localhost',
     'logproxy.port' = '2983',
     'working-mode' = 'memory'

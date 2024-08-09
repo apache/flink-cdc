@@ -93,6 +93,13 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-oceanbase-cdc</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-oracle-cdc</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
