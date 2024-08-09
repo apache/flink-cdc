@@ -274,4 +274,8 @@ Data Type Mapping
 </table>
 </div>
 
+## Supported Schema Evolution Types
+
+Kafka Pipeline connector doesn't maintain any schema information.
+
 {{< top >}}

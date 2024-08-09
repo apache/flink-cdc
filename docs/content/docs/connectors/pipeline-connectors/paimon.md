@@ -229,4 +229,16 @@ Data Type Mapping
 </table>
 </div>
 
+## Supported Schema Evolution Types
+
+Currently, Paimon pipeline connector supports the following schema evolution types.
+
+| Type                 | Supported | Notes |
+|----------------------|-----------|-------|
+| AddColumnEvent       | ✅         |       |
+| AlterColumnTypeEvent | ✅         |       |
+| CreateTableEvent     | ✅         |       |
+| DropColumnEvent      | ✅         |       |
+| RenameColumnEvent    | ✅         |       |
+
 {{< top >}}
