@@ -22,7 +22,9 @@ import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.utils.StringUtils;
 
 import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlBasicTypeNameSpec;
 import org.apache.calcite.sql.SqlCharStringLiteral;
+import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
@@ -47,13 +49,18 @@ import java.util.List;
 public class JaninoCompiler {
 
     private static final List<SqlTypeName> SQL_TYPE_NAME_IGNORE = Arrays.asList(SqlTypeName.SYMBOL);
-    private static final List<String> NO_OPERAND_TIMESTAMP_FUNCTIONS =
-            Arrays.asList(
-                    "LOCALTIME",
-                    "LOCALTIMESTAMP",
-                    "CURRENT_TIME",
-                    "CURRENT_DATE",
-                    "CURRENT_TIMESTAMP");
+    private static final List<String> TIMEZONE_FREE_TEMPORAL_FUNCTIONS =
+            Arrays.asList("CURRENT_TIMESTAMP", "NOW");
+
+    private static final List<String> TIMEZONE_REQUIRED_TEMPORAL_FUNCTIONS =
+            Arrays.asList("LOCALTIME", "LOCALTIMESTAMP", "CURRENT_TIME", "CURRENT_DATE");
+
+    private static final List<String> TIMEZONE_FREE_TEMPORAL_CONVERSION_FUNCTIONS =
+            Arrays.asList("DATE_FORMAT");
+
+    private static final List<String> TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS =
+            Arrays.asList("TO_DATE", "TO_TIMESTAMP");
+
     public static final String DEFAULT_EPOCH_TIME = "__epoch_time__";
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
 
@@ -105,8 +112,14 @@ public class JaninoCompiler {
 
     private static Java.Rvalue translateSqlIdentifier(SqlIdentifier sqlIdentifier) {
         String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
-        if (NO_OPERAND_TIMESTAMP_FUNCTIONS.contains(columnName)) {
-            return generateNoOperandTimestampFunctionOperation(columnName);
+        if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(columnName)) {
+            return generateTimezoneFreeTemporalFunctionOperation(columnName);
+        } else if (TIMEZONE_REQUIRED_TEMPORAL_FUNCTIONS.contains(columnName)) {
+            return generateTimezoneRequiredTemporalFunctionOperation(columnName);
+        } else if (TIMEZONE_FREE_TEMPORAL_CONVERSION_FUNCTIONS.contains(columnName)) {
+            return generateTimezoneFreeTemporalConversionFunctionOperation(columnName);
+        } else if (TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS.contains(columnName)) {
+            return generateTimezoneRequiredTemporalConversionFunctionOperation(columnName);
         } else {
             return new Java.AmbiguousName(Location.NOWHERE, new String[] {columnName});
         }
@@ -133,8 +146,14 @@ public class JaninoCompiler {
         for (SqlNode sqlNode : operandList) {
             translateSqlNodeToAtoms(sqlNode, atoms);
         }
-        if (NO_OPERAND_TIMESTAMP_FUNCTIONS.contains(sqlBasicCall.getOperator().getName())) {
+        if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(sqlBasicCall.getOperator().getName())) {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_EPOCH_TIME}));
+        } else if (TIMEZONE_REQUIRED_TEMPORAL_FUNCTIONS.contains(
+                sqlBasicCall.getOperator().getName())) {
+            atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_EPOCH_TIME}));
+            atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
+        } else if (TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS.contains(
+                sqlBasicCall.getOperator().getName())) {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
         }
         return sqlBasicCallToJaninoRvalue(sqlBasicCall, atoms.toArray(new Java.Rvalue[0]));
@@ -228,6 +247,8 @@ public class JaninoCompiler {
             case LESS_THAN_OR_EQUAL:
             case GREATER_THAN_OR_EQUAL:
                 return generateBinaryOperation(sqlBasicCall, atoms, sqlBasicCall.getKind().sql);
+            case CAST:
+                return generateCastOperation(sqlBasicCall, atoms);
             case OTHER:
                 return generateOtherOperation(sqlBasicCall, atoms);
             default:
@@ -256,6 +277,16 @@ public class JaninoCompiler {
                 Location.NOWHERE, null, StringUtils.convertToCamelCase("VALUE_EQUALS"), atoms);
     }
 
+    private static Java.Rvalue generateCastOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (atoms.length != 1) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        List<SqlNode> operandList = sqlBasicCall.getOperandList();
+        SqlDataTypeSpec sqlDataTypeSpec = (SqlDataTypeSpec) operandList.get(1);
+        return generateTypeConvertMethod(sqlDataTypeSpec, atoms);
+    }
+
     private static Java.Rvalue generateOtherOperation(
             SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         if (sqlBasicCall.getOperator().getName().equals("||")) {
@@ -275,8 +306,6 @@ public class JaninoCompiler {
             } else {
                 throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
             }
-        } else if (operationName.equals("NOW")) {
-            return generateNoOperandTimestampFunctionOperation(operationName);
         } else {
             return new Java.MethodInvocation(
                     Location.NOWHERE,
@@ -286,7 +315,18 @@ public class JaninoCompiler {
         }
     }
 
-    private static Java.Rvalue generateNoOperandTimestampFunctionOperation(String operationName) {
+    private static Java.Rvalue generateTimezoneFreeTemporalFunctionOperation(String operationName) {
+        return new Java.MethodInvocation(
+                Location.NOWHERE,
+                null,
+                StringUtils.convertToCamelCase(operationName),
+                new Java.Rvalue[] {
+                    new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_EPOCH_TIME})
+                });
+    }
+
+    private static Java.Rvalue generateTimezoneRequiredTemporalFunctionOperation(
+            String operationName) {
         List<Java.Rvalue> timestampFunctionParam = new ArrayList<>();
         timestampFunctionParam.add(
                 new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_EPOCH_TIME}));
@@ -297,5 +337,86 @@ public class JaninoCompiler {
                 null,
                 StringUtils.convertToCamelCase(operationName),
                 timestampFunctionParam.toArray(new Java.Rvalue[0]));
+    }
+
+    private static Java.Rvalue generateTimezoneFreeTemporalConversionFunctionOperation(
+            String operationName) {
+        return new Java.MethodInvocation(
+                Location.NOWHERE,
+                null,
+                StringUtils.convertToCamelCase(operationName),
+                new Java.Rvalue[0]);
+    }
+
+    private static Java.Rvalue generateTimezoneRequiredTemporalConversionFunctionOperation(
+            String operationName) {
+        return new Java.MethodInvocation(
+                Location.NOWHERE,
+                null,
+                StringUtils.convertToCamelCase(operationName),
+                new Java.Rvalue[] {
+                    new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE})
+                });
+    }
+
+    private static Java.Rvalue generateTypeConvertMethod(
+            SqlDataTypeSpec sqlDataTypeSpec, Java.Rvalue[] atoms) {
+        switch (sqlDataTypeSpec.getTypeName().getSimple().toUpperCase()) {
+            case "BOOLEAN":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToBoolean", atoms);
+            case "TINYINT":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToByte", atoms);
+            case "SMALLINT":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToShort", atoms);
+            case "INTEGER":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToInteger", atoms);
+            case "BIGINT":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToLong", atoms);
+            case "FLOAT":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToFloat", atoms);
+            case "DOUBLE":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToDouble", atoms);
+            case "DECIMAL":
+                int precision = 10;
+                int scale = 0;
+                if (sqlDataTypeSpec.getTypeNameSpec() instanceof SqlBasicTypeNameSpec) {
+                    SqlBasicTypeNameSpec typeNameSpec =
+                            (SqlBasicTypeNameSpec) sqlDataTypeSpec.getTypeNameSpec();
+                    if (typeNameSpec.getPrecision() > -1) {
+                        precision = typeNameSpec.getPrecision();
+                    }
+                    if (typeNameSpec.getScale() > -1) {
+                        scale = typeNameSpec.getScale();
+                    }
+                }
+                List<Java.Rvalue> newAtoms = new ArrayList<>(Arrays.asList(atoms));
+                newAtoms.add(
+                        new Java.AmbiguousName(
+                                Location.NOWHERE, new String[] {String.valueOf(precision)}));
+                newAtoms.add(
+                        new Java.AmbiguousName(
+                                Location.NOWHERE, new String[] {String.valueOf(scale)}));
+                return new Java.MethodInvocation(
+                        Location.NOWHERE,
+                        null,
+                        "castToBigDecimal",
+                        newAtoms.toArray(new Java.Rvalue[0]));
+            case "CHAR":
+            case "VARCHAR":
+            case "STRING":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToString", atoms);
+            case "TIMESTAMP":
+                List<Java.Rvalue> timestampAtoms = new ArrayList<>(Arrays.asList(atoms));
+                timestampAtoms.add(
+                        new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
+                return new Java.MethodInvocation(
+                        Location.NOWHERE,
+                        null,
+                        "castToTimestamp",
+                        timestampAtoms.toArray(new Java.Rvalue[0]));
+            default:
+                throw new ParseException(
+                        "Unsupported data type cast: " + sqlDataTypeSpec.toString());
+        }
     }
 }

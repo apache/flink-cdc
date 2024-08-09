@@ -26,14 +26,19 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.source.MetadataAccessor;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSource;
+
+import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +46,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,6 +54,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -69,9 +76,85 @@ public class ValuesDatabase {
      */
     public static class ValuesMetadataApplier implements MetadataApplier {
 
+        private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
+
+        public ValuesMetadataApplier() {
+            this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
+        }
+
+        @Override
+        public MetadataApplier setAcceptedSchemaEvolutionTypes(
+                Set<SchemaChangeEventType> schemaEvolutionTypes) {
+            this.enabledSchemaEvolutionTypes = schemaEvolutionTypes;
+            return this;
+        }
+
+        @Override
+        public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+            return enabledSchemaEvolutionTypes.contains(schemaChangeEventType);
+        }
+
+        @Override
+        public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+            return Sets.newHashSet(
+                    SchemaChangeEventType.ADD_COLUMN,
+                    SchemaChangeEventType.ALTER_COLUMN_TYPE,
+                    SchemaChangeEventType.CREATE_TABLE,
+                    SchemaChangeEventType.DROP_COLUMN,
+                    SchemaChangeEventType.RENAME_COLUMN);
+        }
+
         @Override
         public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
             applySchemaChangeEvent(schemaChangeEvent);
+        }
+    }
+
+    /**
+     * apply SchemaChangeEvent to ValuesDatabase and print it out, throw exception if illegal
+     * changes occur.
+     */
+    public static class ErrorOnChangeMetadataApplier implements MetadataApplier {
+        private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
+
+        public ErrorOnChangeMetadataApplier() {
+            enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
+        }
+
+        @Override
+        public MetadataApplier setAcceptedSchemaEvolutionTypes(
+                Set<SchemaChangeEventType> schemaEvolutionTypes) {
+            enabledSchemaEvolutionTypes = schemaEvolutionTypes;
+            return this;
+        }
+
+        @Override
+        public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+            return enabledSchemaEvolutionTypes.contains(schemaChangeEventType);
+        }
+
+        @Override
+        public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+            return Collections.singleton(SchemaChangeEventType.CREATE_TABLE);
+        }
+
+        @Override
+        public void applySchemaChange(SchemaChangeEvent schemaChangeEvent)
+                throws SchemaEvolveException {
+            if (schemaChangeEvent instanceof CreateTableEvent) {
+                TableId tableId = schemaChangeEvent.tableId();
+                if (!globalTables.containsKey(tableId)) {
+                    globalTables.put(
+                            tableId,
+                            new ValuesTable(
+                                    tableId, ((CreateTableEvent) schemaChangeEvent).getSchema()));
+                }
+            } else {
+                throw new SchemaEvolveException(
+                        schemaChangeEvent,
+                        "Rejected schema change event since error.on.schema.change is enabled.",
+                        null);
+            }
         }
     }
 
@@ -185,7 +268,7 @@ public class ValuesDatabase {
         private final TableId tableId;
 
         // [primaryKeys, [column_name, column_value]]
-        private final Map<String, Map<String, String>> records;
+        private final Map<String, Map<String, RecordData>> records;
 
         private final LinkedList<Column> columns;
 
@@ -210,15 +293,21 @@ public class ValuesDatabase {
         public List<String> getResult() {
             List<String> results = new ArrayList<>();
             synchronized (lock) {
+                List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(columns);
                 records.forEach(
                         (key, record) -> {
                             StringBuilder stringBuilder = new StringBuilder(tableId.toString());
                             stringBuilder.append(":");
-                            for (Column column : columns) {
+                            for (int i = 0; i < columns.size(); i++) {
+                                Column column = columns.get(i);
+                                RecordData.FieldGetter fieldGetter = fieldGetters.get(i);
                                 stringBuilder
                                         .append(column.getName())
                                         .append("=")
-                                        .append(record.getOrDefault(column.getName(), ""))
+                                        .append(
+                                                Optional.ofNullable(record.get(column.getName()))
+                                                        .map(fieldGetter::getFieldOrNull)
+                                                        .orElse(""))
                                         .append(";");
                             }
                             stringBuilder.deleteCharAt(stringBuilder.length() - 1);
@@ -257,9 +346,9 @@ public class ValuesDatabase {
 
         private void insert(RecordData recordData) {
             String primaryKey = buildPrimaryKeyStr(recordData);
-            Map<String, String> record = new HashMap<>();
+            Map<String, RecordData> record = new HashMap<>();
             for (int i = 0; i < recordData.getArity(); i++) {
-                record.put(columns.get(i).getName(), recordData.getString(i).toString());
+                record.put(columns.get(i).getName(), recordData);
             }
             records.put(primaryKey, record);
         }
@@ -393,7 +482,7 @@ public class ValuesDatabase {
                                 records.forEach(
                                         (key, record) -> {
                                             if (record.containsKey(beforeName)) {
-                                                String value = record.get(beforeName);
+                                                RecordData value = record.get(beforeName);
                                                 record.remove(beforeName);
                                                 record.put(afterName, value);
                                             }

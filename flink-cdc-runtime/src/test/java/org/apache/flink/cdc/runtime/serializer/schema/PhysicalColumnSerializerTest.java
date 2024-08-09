@@ -44,7 +44,8 @@ public class PhysicalColumnSerializerTest extends SerializerTestBase<PhysicalCol
     protected PhysicalColumn[] getTestData() {
         return new PhysicalColumn[] {
             Column.physicalColumn("col1", DataTypes.BIGINT()),
-            Column.physicalColumn("col1", DataTypes.BIGINT(), "comment")
+            Column.physicalColumn("col1", DataTypes.BIGINT(), "comment"),
+            Column.physicalColumn("col1", DataTypes.BIGINT(), "comment", "default value")
         };
     }
 }

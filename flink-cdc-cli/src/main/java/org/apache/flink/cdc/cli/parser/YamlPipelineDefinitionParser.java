@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.cli.parser;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
@@ -28,6 +29,7 @@ import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import java.nio.file.Path;
@@ -35,7 +37,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
+import static org.apache.flink.cdc.common.utils.ChangeEventUtils.resolveSchemaEvolutionOptions;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
 /** Parser for converting YAML formatted pipeline definition to {@link PipelineDef}. */
@@ -51,6 +55,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     // Source / sink keys
     private static final String TYPE_KEY = "type";
     private static final String NAME_KEY = "name";
+    private static final String INCLUDE_SCHEMA_EVOLUTION_TYPES = "include.schema.changes";
+    private static final String EXCLUDE_SCHEMA_EVOLUTION_TYPES = "exclude.schema.changes";
 
     // Route keys
     private static final String ROUTE_SOURCE_TABLE_KEY = "source-table";
@@ -76,13 +82,22 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     @Override
     public PipelineDef parse(Path pipelineDefPath, Configuration globalPipelineConfig)
             throws Exception {
-        JsonNode root = mapper.readTree(pipelineDefPath.toFile());
+        return parse(mapper.readTree(pipelineDefPath.toFile()), globalPipelineConfig);
+    }
 
+    @Override
+    public PipelineDef parse(String pipelineDefText, Configuration globalPipelineConfig)
+            throws Exception {
+        return parse(mapper.readTree(pipelineDefText), globalPipelineConfig);
+    }
+
+    private PipelineDef parse(JsonNode pipelineDefJsonNode, Configuration globalPipelineConfig)
+            throws Exception {
         // Source is required
         SourceDef sourceDef =
                 toSourceDef(
                         checkNotNull(
-                                root.get(SOURCE_KEY),
+                                pipelineDefJsonNode.get(SOURCE_KEY),
                                 "Missing required field \"%s\" in pipeline definition",
                                 SOURCE_KEY));
 
@@ -90,13 +105,13 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         SinkDef sinkDef =
                 toSinkDef(
                         checkNotNull(
-                                root.get(SINK_KEY),
+                                pipelineDefJsonNode.get(SINK_KEY),
                                 "Missing required field \"%s\" in pipeline definition",
                                 SINK_KEY));
 
         // Transforms are optional
         List<TransformDef> transformDefs = new ArrayList<>();
-        Optional.ofNullable(root.get(TRANSFORM_KEY))
+        Optional.ofNullable(pipelineDefJsonNode.get(TRANSFORM_KEY))
                 .ifPresent(
                         node ->
                                 node.forEach(
@@ -104,11 +119,11 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
         // Routes are optional
         List<RouteDef> routeDefs = new ArrayList<>();
-        Optional.ofNullable(root.get(ROUTE_KEY))
+        Optional.ofNullable(pipelineDefJsonNode.get(ROUTE_KEY))
                 .ifPresent(node -> node.forEach(route -> routeDefs.add(toRouteDef(route))));
 
         // Pipeline configs are optional
-        Configuration userPipelineConfig = toPipelineConfig(root.get(PIPELINE_KEY));
+        Configuration userPipelineConfig = toPipelineConfig(pipelineDefJsonNode.get(PIPELINE_KEY));
 
         // Merge user config into global config
         Configuration pipelineConfig = new Configuration();
@@ -136,6 +151,23 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     }
 
     private SinkDef toSinkDef(JsonNode sinkNode) {
+        List<String> includedSETypes = new ArrayList<>();
+        List<String> excludedSETypes = new ArrayList<>();
+
+        Optional.ofNullable(sinkNode.get(INCLUDE_SCHEMA_EVOLUTION_TYPES))
+                .ifPresent(e -> e.forEach(tag -> includedSETypes.add(tag.asText())));
+
+        Optional.ofNullable(sinkNode.get(EXCLUDE_SCHEMA_EVOLUTION_TYPES))
+                .ifPresent(e -> e.forEach(tag -> excludedSETypes.add(tag.asText())));
+
+        Set<SchemaChangeEventType> declaredSETypes =
+                resolveSchemaEvolutionOptions(includedSETypes, excludedSETypes);
+
+        if (sinkNode instanceof ObjectNode) {
+            ((ObjectNode) sinkNode).remove(INCLUDE_SCHEMA_EVOLUTION_TYPES);
+            ((ObjectNode) sinkNode).remove(EXCLUDE_SCHEMA_EVOLUTION_TYPES);
+        }
+
         Map<String, String> sinkMap =
                 mapper.convertValue(sinkNode, new TypeReference<Map<String, String>>() {});
 
@@ -149,7 +181,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // "name" field is optional
         String name = sinkMap.remove(NAME_KEY);
 
-        return new SinkDef(type, name, Configuration.fromMap(sinkMap));
+        return new SinkDef(type, name, Configuration.fromMap(sinkMap), declaredSETypes);
     }
 
     private RouteDef toRouteDef(JsonNode routeNode) {

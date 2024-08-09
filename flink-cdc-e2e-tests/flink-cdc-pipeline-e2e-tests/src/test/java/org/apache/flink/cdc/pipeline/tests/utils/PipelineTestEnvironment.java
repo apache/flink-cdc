@@ -88,7 +88,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     @Parameterized.Parameters(name = "flinkVersion: {0}")
     public static List<String> getFlinkVersion() {
-        return Arrays.asList("1.17.2", "1.18.1", "1.19.0");
+        return Arrays.asList("1.17.2", "1.18.1", "1.19.1", "1.20.0");
     }
 
     @Before
@@ -267,6 +267,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         return String.join(
                 "\n",
                 Arrays.asList(
+                        "restart-strategy.type: off",
                         "jobmanager.rpc.address: jobmanager",
                         "taskmanager.numberOfTaskSlots: 10",
                         "parallelism.default: 4",

@@ -235,6 +235,32 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     }
 
     @Override
+    public void enterAlterByModifyColumn(MySqlParser.AlterByModifyColumnContext ctx) {
+        String oldColumnName = parser.parseName(ctx.uid(0));
+        ColumnEditor columnEditor = Column.editor().name(oldColumnName);
+        columnEditor.unsetDefaultValueExpression();
+
+        columnDefinitionListener =
+                new CustomColumnDefinitionParserListener(columnEditor, parser, listeners);
+        listeners.add(columnDefinitionListener);
+        super.enterAlterByModifyColumn(ctx);
+    }
+
+    @Override
+    public void exitAlterByModifyColumn(MySqlParser.AlterByModifyColumnContext ctx) {
+        parser.runIfNotNull(
+                () -> {
+                    Column column = columnDefinitionListener.getColumn();
+                    Map<String, DataType> typeMapping = new HashMap<>();
+                    typeMapping.put(column.name(), fromDbzColumn(column));
+                    changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+                    listeners.remove(columnDefinitionListener);
+                },
+                columnDefinitionListener);
+        super.exitAlterByModifyColumn(ctx);
+    }
+
+    @Override
     public void exitAlterByRenameColumn(MySqlParser.AlterByRenameColumnContext ctx) {
         parser.runIfNotNull(
                 () -> {
@@ -253,7 +279,10 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
 
     private org.apache.flink.cdc.common.schema.Column toCdcColumn(Column dbzColumn) {
         return org.apache.flink.cdc.common.schema.Column.physicalColumn(
-                dbzColumn.name(), fromDbzColumn(dbzColumn), dbzColumn.comment());
+                dbzColumn.name(),
+                fromDbzColumn(dbzColumn),
+                dbzColumn.comment(),
+                dbzColumn.defaultValueExpression().orElse(null));
     }
 
     private org.apache.flink.cdc.common.event.TableId toCdcTableId(TableId dbzTableId) {

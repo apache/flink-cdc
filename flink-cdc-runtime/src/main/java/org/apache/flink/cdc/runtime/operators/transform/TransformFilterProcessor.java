@@ -17,11 +17,11 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
-import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
 import org.codehaus.janino.ExpressionEvaluator;
@@ -31,17 +31,22 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
+
+import static org.apache.flink.cdc.runtime.parser.TransformParser.DEFAULT_NAMESPACE_NAME;
+import static org.apache.flink.cdc.runtime.parser.TransformParser.DEFAULT_SCHEMA_NAME;
+import static org.apache.flink.cdc.runtime.parser.TransformParser.DEFAULT_TABLE_NAME;
 
 /** The processor of the transform filter. It processes the data change event of matched table. */
 public class TransformFilterProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(TransformFilterProcessor.class);
-    private TableInfo tableInfo;
+    private PostTransformChangeInfo tableInfo;
     private TransformFilter transformFilter;
     private String timezone;
     private TransformExpressionKey transformExpressionKey;
 
     public TransformFilterProcessor(
-            TableInfo tableInfo, TransformFilter transformFilter, String timezone) {
+            PostTransformChangeInfo tableInfo, TransformFilter transformFilter, String timezone) {
         this.tableInfo = tableInfo;
         this.transformFilter = transformFilter;
         this.timezone = timezone;
@@ -49,7 +54,7 @@ public class TransformFilterProcessor {
     }
 
     public static TransformFilterProcessor of(
-            TableInfo tableInfo, TransformFilter transformFilter, String timezone) {
+            PostTransformChangeInfo tableInfo, TransformFilter transformFilter, String timezone) {
         return new TransformFilterProcessor(tableInfo, transformFilter, timezone);
     }
 
@@ -68,22 +73,52 @@ public class TransformFilterProcessor {
         }
     }
 
+    private Tuple2<List<String>, List<Class<?>>> generateArguments() {
+        List<String> argNames = new ArrayList<>();
+        List<Class<?>> argTypes = new ArrayList<>();
+        String scriptExpression = transformFilter.getScriptExpression();
+        List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
+        List<String> columnNames = transformFilter.getColumnNames();
+        for (String columnName : columnNames) {
+            for (Column column : columns) {
+                if (column.getName().equals(columnName)) {
+                    if (!argNames.contains(columnName)) {
+                        argNames.add(columnName);
+                        argTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
+                    }
+                    break;
+                }
+            }
+        }
+        Stream.of(DEFAULT_NAMESPACE_NAME, DEFAULT_SCHEMA_NAME, DEFAULT_TABLE_NAME)
+                .forEach(
+                        metadataColumn -> {
+                            if (scriptExpression.contains(metadataColumn)
+                                    && !argNames.contains(metadataColumn)) {
+                                argNames.add(metadataColumn);
+                                argTypes.add(String.class);
+                            }
+                        });
+        return Tuple2.of(argNames, argTypes);
+    }
+
     private Object[] generateParams(BinaryRecordData after, long epochTime) {
         List<Object> params = new ArrayList<>();
-        List<Column> columns = tableInfo.getSchema().getColumns();
-        RecordData.FieldGetter[] fieldGetters = tableInfo.getFieldGetters();
-        for (String columnName : transformFilter.getColumnNames()) {
-            if (columnName.equals(TransformParser.DEFAULT_NAMESPACE_NAME)) {
-                params.add(tableInfo.getNamespace());
-                continue;
-            }
-            if (columnName.equals(TransformParser.DEFAULT_SCHEMA_NAME)) {
-                params.add(tableInfo.getSchemaName());
-                continue;
-            }
-            if (columnName.equals(TransformParser.DEFAULT_TABLE_NAME)) {
-                params.add(tableInfo.getTableName());
-                continue;
+        List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
+
+        Tuple2<List<String>, List<Class<?>>> args = generateArguments();
+        RecordData.FieldGetter[] fieldGetters = tableInfo.getPreTransformedFieldGetters();
+        for (String columnName : args.f0) {
+            switch (columnName) {
+                case DEFAULT_NAMESPACE_NAME:
+                    params.add(tableInfo.getNamespace());
+                    continue;
+                case DEFAULT_SCHEMA_NAME:
+                    params.add(tableInfo.getSchemaName());
+                    continue;
+                case DEFAULT_TABLE_NAME:
+                    params.add(tableInfo.getTableName());
+                    continue;
             }
             for (int i = 0; i < columns.size(); i++) {
                 Column column = columns.get(i);
@@ -101,48 +136,17 @@ public class TransformFilterProcessor {
     }
 
     private TransformExpressionKey generateTransformExpressionKey() {
-        List<String> argumentNames = new ArrayList<>();
-        List<Class<?>> paramTypes = new ArrayList<>();
-        List<Column> columns = tableInfo.getSchema().getColumns();
-        String scriptExpression = transformFilter.getScriptExpression();
-        List<String> columnNames = transformFilter.getColumnNames();
-        for (String columnName : columnNames) {
-            for (int i = 0; i < columns.size(); i++) {
-                Column column = columns.get(i);
-                if (column.getName().equals(columnName)) {
-                    argumentNames.add(columnName);
-                    paramTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
-                    break;
-                }
-            }
-        }
-        if (scriptExpression.contains(TransformParser.DEFAULT_NAMESPACE_NAME)
-                && !argumentNames.contains(TransformParser.DEFAULT_NAMESPACE_NAME)) {
-            argumentNames.add(TransformParser.DEFAULT_NAMESPACE_NAME);
-            paramTypes.add(String.class);
-        }
+        Tuple2<List<String>, List<Class<?>>> args = generateArguments();
 
-        if (scriptExpression.contains(TransformParser.DEFAULT_SCHEMA_NAME)
-                && !argumentNames.contains(TransformParser.DEFAULT_SCHEMA_NAME)) {
-            argumentNames.add(TransformParser.DEFAULT_SCHEMA_NAME);
-            paramTypes.add(String.class);
-        }
-
-        if (scriptExpression.contains(TransformParser.DEFAULT_TABLE_NAME)
-                && !argumentNames.contains(TransformParser.DEFAULT_TABLE_NAME)) {
-            argumentNames.add(TransformParser.DEFAULT_TABLE_NAME);
-            paramTypes.add(String.class);
-        }
-
-        argumentNames.add(JaninoCompiler.DEFAULT_TIME_ZONE);
-        paramTypes.add(String.class);
-        argumentNames.add(JaninoCompiler.DEFAULT_EPOCH_TIME);
-        paramTypes.add(Long.class);
+        args.f0.add(JaninoCompiler.DEFAULT_TIME_ZONE);
+        args.f1.add(String.class);
+        args.f0.add(JaninoCompiler.DEFAULT_EPOCH_TIME);
+        args.f1.add(Long.class);
 
         return TransformExpressionKey.of(
-                JaninoCompiler.loadSystemFunction(scriptExpression),
-                argumentNames,
-                paramTypes,
+                JaninoCompiler.loadSystemFunction(transformFilter.getScriptExpression()),
+                args.f0,
+                args.f1,
                 Boolean.class);
     }
 }

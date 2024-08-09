@@ -138,6 +138,47 @@ Usage Notes
 
 * If the written topic of Kafka is not existed, we will create one automatically.
 
+### Output Format
+For different built-in `value.format` options, the output format is different:
+#### debezium-json
+Refer to [Debezium docs](https://debezium.io/documentation/reference/1.9/connectors/mysql.html), debezium-json format will contains `before`,`after`,`op`,`source` elements, but `ts_ms` is not included in `source`.    
+An output example is:
+```json
+{
+  "before": null,
+  "after": {
+    "col1": "1",
+    "col2": "1"
+  },
+  "op": "c",
+  "source": {
+    "db": "default_namespace",
+    "table": "table1"
+  }
+}
+```
+
+#### canal-json
+Refer to [Canal | Apache Flink](https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/canal/#available-metadata), canal-json format will contains `old`,`data`,`type`,`database`,`table`,`pkNames` elements, but `ts` is not included.      
+An output example is:
+```json
+{
+    "old": null,
+    "data": [
+        {
+            "col1": "1",
+            "col2": "1"
+        }
+    ],
+    "type": "INSERT",
+    "database": "default_schema",
+    "table": "table1",
+    "pkNames": [
+        "col1"
+    ]
+}
+```
+
 Data Type Mapping
 ----------------
 <div class="wy-table-responsive">

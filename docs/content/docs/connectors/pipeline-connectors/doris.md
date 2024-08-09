@@ -186,7 +186,7 @@ pipeline:
     <thead>
       <tr>
         <th class="text-left" style="width:10%;">Flink CDC Type</th>
-        <th class="text-left" style="width:30%;"><a href="https://doris.apache.org/docs/dev/sql-manual/sql-types/Data-Types/BOOLEAN/">Doris Type</a></th>
+        <th class="text-left" style="width:30%;">Doris Type</th>
         <th class="text-left" style="width:60%;">Note</th>
       </tr>
     </thead>

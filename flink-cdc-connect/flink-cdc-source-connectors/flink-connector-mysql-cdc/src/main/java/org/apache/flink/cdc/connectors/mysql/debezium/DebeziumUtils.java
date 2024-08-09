@@ -240,12 +240,15 @@ public class DebeziumUtils {
         return variables;
     }
 
-    public static BinlogOffset findBinlogOffset(long targetMs, MySqlConnection connection) {
+    public static BinlogOffset findBinlogOffset(
+            long targetMs, MySqlConnection connection, MySqlSourceConfig mySqlSourceConfig) {
         MySqlConnection.MySqlConnectionConfiguration config = connection.connectionConfig();
         BinaryLogClient client =
                 new BinaryLogClient(
                         config.hostname(), config.port(), config.username(), config.password());
-
+        if (mySqlSourceConfig.getServerIdRange() != null) {
+            client.setServerId(mySqlSourceConfig.getServerIdRange().getStartServerId());
+        }
         List<String> binlogFiles = new ArrayList<>();
         JdbcConnection.ResultSetConsumer rsc =
                 rs -> {

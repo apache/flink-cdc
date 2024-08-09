@@ -26,6 +26,7 @@ import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlSyntax;
+import org.apache.calcite.sql.fun.SqlCurrentDateFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
@@ -86,11 +87,12 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                     .build();
     public static final SqlFunction LOCALTIMESTAMP =
             new BuiltInTimestampFunction("LOCALTIMESTAMP", SqlTypeName.TIMESTAMP, 3);
+    public static final SqlFunction CURRENT_TIME =
+            new BuiltInTimestampFunction("CURRENT_TIME", SqlTypeName.TIME, 0);
     public static final SqlFunction CURRENT_TIMESTAMP =
             new BuiltInTimestampFunction(
                     "CURRENT_TIMESTAMP", SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, 3);
-    public static final SqlFunction CURRENT_DATE =
-            new BuiltInTimestampFunction("CURRENT_DATE", SqlTypeName.DATE, 0);
+    public static final SqlFunction CURRENT_DATE = new SqlCurrentDateFunction();
     public static final SqlFunction NOW =
             new BuiltInTimestampFunction("NOW", SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, 3) {
                 @Override
