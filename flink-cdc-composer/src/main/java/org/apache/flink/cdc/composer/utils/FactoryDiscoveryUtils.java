@@ -111,7 +111,9 @@ public class FactoryDiscoveryUtils {
             return Optional.of(url);
         } catch (Exception e) {
             throw new RuntimeException(
-                    String.format("Failed to search JAR by factory identifier \"%s\"", identifier),
+                    String.format(
+                            "Failed to search JAR by factory identifier \"%s\"",
+                            factory.identifier()),
                     e);
         }
     }
