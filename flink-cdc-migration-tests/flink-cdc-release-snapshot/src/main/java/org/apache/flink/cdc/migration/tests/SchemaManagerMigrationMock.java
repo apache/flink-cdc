@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.migration.tests;
 
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaManager;
@@ -43,7 +44,10 @@ public class SchemaManagerMigrationMock implements MigrationMockBase {
         schemaVersions.put(1, DUMMY_SCHEMA);
         schemaVersions.put(2, DUMMY_SCHEMA);
         schemaVersions.put(3, DUMMY_SCHEMA);
-        return new SchemaManager(Collections.singletonMap(DUMMY_TABLE_ID, schemaVersions));
+        return new SchemaManager(
+                Collections.singletonMap(DUMMY_TABLE_ID, schemaVersions),
+                Collections.singletonMap(DUMMY_TABLE_ID, schemaVersions),
+                SchemaChangeBehavior.EVOLVE);
     }
 
     @Override

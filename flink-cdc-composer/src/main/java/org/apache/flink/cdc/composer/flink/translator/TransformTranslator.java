@@ -19,8 +19,8 @@ package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.composer.definition.TransformDef;
-import org.apache.flink.cdc.runtime.operators.transform.TransformDataOperator;
-import org.apache.flink.cdc.runtime.operators.transform.TransformSchemaOperator;
+import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
+import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -28,34 +28,35 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import java.util.List;
 
 /**
- * Translator used to build {@link TransformSchemaOperator} and {@link TransformDataOperator} for
- * event transform.
+ * Translator used to build {@link PreTransformOperator} and {@link PostTransformOperator} for event
+ * transform.
  */
 public class TransformTranslator {
 
-    public DataStream<Event> translateSchema(
+    public DataStream<Event> translatePreTransform(
             DataStream<Event> input, List<TransformDef> transforms) {
         if (transforms.isEmpty()) {
             return input;
         }
 
-        TransformSchemaOperator.Builder transformSchemaFunctionBuilder =
-                TransformSchemaOperator.newBuilder();
+        PreTransformOperator.Builder preTransformFunctionBuilder =
+                PreTransformOperator.newBuilder();
         for (TransformDef transform : transforms) {
             if (transform.isValidProjection()) {
-                transformSchemaFunctionBuilder.addTransform(
+                preTransformFunctionBuilder.addTransform(
                         transform.getSourceTable(),
-                        transform.getProjection().get(),
+                        transform.getProjection().orElse(null),
+                        transform.getFilter().orElse(null),
                         transform.getPrimaryKeys(),
                         transform.getPartitionKeys(),
                         transform.getTableOptions());
             }
         }
         return input.transform(
-                "Transform:Schema", new EventTypeInfo(), transformSchemaFunctionBuilder.build());
+                "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
     }
 
-    public DataStream<Event> translateData(
+    public DataStream<Event> translatePostTransform(
             DataStream<Event> input,
             List<TransformDef> transforms,
             OperatorID schemaOperatorID,
@@ -64,19 +65,22 @@ public class TransformTranslator {
             return input;
         }
 
-        TransformDataOperator.Builder transformDataFunctionBuilder =
-                TransformDataOperator.newBuilder();
+        PostTransformOperator.Builder postTransformFunctionBuilder =
+                PostTransformOperator.newBuilder();
         for (TransformDef transform : transforms) {
             if (transform.isValidProjection() || transform.isValidFilter()) {
-                transformDataFunctionBuilder.addTransform(
+                postTransformFunctionBuilder.addTransform(
                         transform.getSourceTable(),
                         transform.isValidProjection() ? transform.getProjection().get() : null,
-                        transform.isValidFilter() ? transform.getFilter().get() : null);
+                        transform.isValidFilter() ? transform.getFilter().get() : null,
+                        transform.getPrimaryKeys(),
+                        transform.getPartitionKeys(),
+                        transform.getTableOptions());
             }
         }
-        transformDataFunctionBuilder.addSchemaOperatorID(schemaOperatorID);
-        transformDataFunctionBuilder.addTimezone(timezone);
+        postTransformFunctionBuilder.addSchemaOperatorID(schemaOperatorID);
+        postTransformFunctionBuilder.addTimezone(timezone);
         return input.transform(
-                "Transform:Data", new EventTypeInfo(), transformDataFunctionBuilder.build());
+                "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build());
     }
 }

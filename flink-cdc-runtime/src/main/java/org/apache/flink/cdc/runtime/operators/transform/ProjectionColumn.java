@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.StringUtils;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -57,6 +58,14 @@ public class ProjectionColumn implements Serializable {
         this.expression = expression;
         this.scriptExpression = scriptExpression;
         this.originalColumnNames = originalColumnNames;
+    }
+
+    public ProjectionColumn copy() {
+        return new ProjectionColumn(
+                column.copy(column.getName()),
+                expression,
+                scriptExpression,
+                new ArrayList<>(originalColumnNames));
     }
 
     public Column getColumn() {
@@ -102,5 +111,23 @@ public class ProjectionColumn implements Serializable {
                 expression,
                 scriptExpression,
                 originalColumnNames);
+    }
+
+    @Override
+    public String toString() {
+        return "ProjectionColumn{"
+                + "column="
+                + column
+                + ", expression='"
+                + expression
+                + '\''
+                + ", scriptExpression='"
+                + scriptExpression
+                + '\''
+                + ", originalColumnNames="
+                + originalColumnNames
+                + ", transformExpressionKey="
+                + transformExpressionKey
+                + '}';
     }
 }

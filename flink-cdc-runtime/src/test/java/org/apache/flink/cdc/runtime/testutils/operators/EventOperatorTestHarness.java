@@ -20,10 +20,18 @@ package org.apache.flink.cdc.runtime.testutils.operators;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
+import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
@@ -48,7 +56,11 @@ import org.apache.flink.util.SerializedValue;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
+import java.util.Set;
+
+import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.unwrap;
 
 /**
  * Harness for testing customized operators handling {@link Event}s in CDC pipeline.
@@ -74,19 +86,15 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
     private final LinkedList<StreamRecord<E>> outputRecords = new LinkedList<>();
 
     public EventOperatorTestHarness(OP operator, int numOutputs) {
-        this.operator = operator;
-        this.numOutputs = numOutputs;
-        schemaRegistry =
-                new SchemaRegistry(
-                        "SchemaOperator",
-                        new MockOperatorCoordinatorContext(
-                                SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
-                        new CollectingMetadataApplier(null),
-                        new ArrayList<>());
-        schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
+        this(operator, numOutputs, null, SchemaChangeBehavior.EVOLVE);
     }
 
     public EventOperatorTestHarness(OP operator, int numOutputs, Duration duration) {
+        this(operator, numOutputs, duration, SchemaChangeBehavior.EVOLVE);
+    }
+
+    public EventOperatorTestHarness(
+            OP operator, int numOutputs, Duration duration, SchemaChangeBehavior behavior) {
         this.operator = operator;
         this.numOutputs = numOutputs;
         schemaRegistry =
@@ -95,7 +103,48 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
                         new MockOperatorCoordinatorContext(
                                 SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
                         new CollectingMetadataApplier(duration),
-                        new ArrayList<>());
+                        new ArrayList<>(),
+                        behavior);
+        schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
+    }
+
+    public EventOperatorTestHarness(
+            OP operator,
+            int numOutputs,
+            Duration duration,
+            SchemaChangeBehavior behavior,
+            Set<SchemaChangeEventType> enabledEventTypes) {
+        this.operator = operator;
+        this.numOutputs = numOutputs;
+        schemaRegistry =
+                new SchemaRegistry(
+                        "SchemaOperator",
+                        new MockOperatorCoordinatorContext(
+                                SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
+                        new CollectingMetadataApplier(duration, enabledEventTypes),
+                        new ArrayList<>(),
+                        behavior);
+        schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
+    }
+
+    public EventOperatorTestHarness(
+            OP operator,
+            int numOutputs,
+            Duration duration,
+            SchemaChangeBehavior behavior,
+            Set<SchemaChangeEventType> enabledEventTypes,
+            Set<SchemaChangeEventType> errorsOnEventTypes) {
+        this.operator = operator;
+        this.numOutputs = numOutputs;
+        schemaRegistry =
+                new SchemaRegistry(
+                        "SchemaOperator",
+                        new MockOperatorCoordinatorContext(
+                                SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
+                        new CollectingMetadataApplier(
+                                duration, enabledEventTypes, errorsOnEventTypes),
+                        new ArrayList<>(),
+                        behavior);
         schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);
     }
 
@@ -108,13 +157,51 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
         return outputRecords;
     }
 
+    public void clearOutputRecords() {
+        outputRecords.clear();
+    }
+
     public OP getOperator() {
         return operator;
     }
 
     public void registerTableSchema(TableId tableId, Schema schema) {
         schemaRegistry.handleCoordinationRequest(
+                new ApplyOriginalSchemaChangeRequest(
+                        tableId, new CreateTableEvent(tableId, schema)));
+        schemaRegistry.handleCoordinationRequest(
                 new SchemaChangeRequest(tableId, new CreateTableEvent(tableId, schema)));
+        schemaRegistry.handleCoordinationRequest(
+                new ApplyEvolvedSchemaChangeRequest(
+                        tableId, Collections.singletonList(new CreateTableEvent(tableId, schema))));
+    }
+
+    public Schema getLatestOriginalSchema(TableId tableId) throws Exception {
+        return ((GetOriginalSchemaResponse)
+                        unwrap(
+                                schemaRegistry
+                                        .handleCoordinationRequest(
+                                                new GetOriginalSchemaRequest(
+                                                        tableId,
+                                                        GetOriginalSchemaRequest
+                                                                .LATEST_SCHEMA_VERSION))
+                                        .get()))
+                .getSchema()
+                .orElse(null);
+    }
+
+    public Schema getLatestEvolvedSchema(TableId tableId) throws Exception {
+        return ((GetEvolvedSchemaResponse)
+                        unwrap(
+                                schemaRegistry
+                                        .handleCoordinationRequest(
+                                                new GetEvolvedSchemaRequest(
+                                                        tableId,
+                                                        GetEvolvedSchemaRequest
+                                                                .LATEST_SCHEMA_VERSION))
+                                        .get()))
+                .getSchema()
+                .orElse(null);
     }
 
     @Override

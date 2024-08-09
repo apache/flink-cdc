@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -34,16 +35,19 @@ public class SchemaRegistryProvider implements OperatorCoordinator.Provider {
     private final String operatorName;
     private final MetadataApplier metadataApplier;
     private final List<RouteRule> routingRules;
+    private final SchemaChangeBehavior schemaChangeBehavior;
 
     public SchemaRegistryProvider(
             OperatorID operatorID,
             String operatorName,
             MetadataApplier metadataApplier,
-            List<RouteRule> routingRules) {
+            List<RouteRule> routingRules,
+            SchemaChangeBehavior schemaChangeBehavior) {
         this.operatorID = operatorID;
         this.operatorName = operatorName;
         this.metadataApplier = metadataApplier;
         this.routingRules = routingRules;
+        this.schemaChangeBehavior = schemaChangeBehavior;
     }
 
     @Override
@@ -53,6 +57,7 @@ public class SchemaRegistryProvider implements OperatorCoordinator.Provider {
 
     @Override
     public OperatorCoordinator create(OperatorCoordinator.Context context) throws Exception {
-        return new SchemaRegistry(operatorName, context, metadataApplier, routingRules);
+        return new SchemaRegistry(
+                operatorName, context, metadataApplier, routingRules, schemaChangeBehavior);
     }
 }

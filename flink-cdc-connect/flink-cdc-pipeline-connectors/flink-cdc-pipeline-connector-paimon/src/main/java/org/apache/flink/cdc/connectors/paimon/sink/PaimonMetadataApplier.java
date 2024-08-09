@@ -23,10 +23,15 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
+
+import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
@@ -35,11 +40,14 @@ import org.apache.paimon.flink.LogicalTypeConversion;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.SchemaChange;
 import org.apache.paimon.table.Table;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
@@ -49,6 +57,8 @@ import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
  * only.
  */
 public class PaimonMetadataApplier implements MetadataApplier {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PaimonMetadataApplier.class);
 
     // Catalog is unSerializable.
     private transient Catalog catalog;
@@ -60,10 +70,13 @@ public class PaimonMetadataApplier implements MetadataApplier {
 
     private final Map<TableId, List<String>> partitionMaps;
 
+    private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
+
     public PaimonMetadataApplier(Options catalogOptions) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = new HashMap<>();
         this.partitionMaps = new HashMap<>();
+        this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }
 
     public PaimonMetadataApplier(
@@ -73,10 +86,34 @@ public class PaimonMetadataApplier implements MetadataApplier {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.partitionMaps = partitionMaps;
+        this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }
 
     @Override
-    public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+    public MetadataApplier setAcceptedSchemaEvolutionTypes(
+            Set<SchemaChangeEventType> schemaEvolutionTypes) {
+        this.enabledSchemaEvolutionTypes = schemaEvolutionTypes;
+        return this;
+    }
+
+    @Override
+    public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+        return enabledSchemaEvolutionTypes.contains(schemaChangeEventType);
+    }
+
+    @Override
+    public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+        return Sets.newHashSet(
+                SchemaChangeEventType.CREATE_TABLE,
+                SchemaChangeEventType.ADD_COLUMN,
+                SchemaChangeEventType.DROP_COLUMN,
+                SchemaChangeEventType.RENAME_COLUMN,
+                SchemaChangeEventType.ALTER_COLUMN_TYPE);
+    }
+
+    @Override
+    public void applySchemaChange(SchemaChangeEvent schemaChangeEvent)
+            throws SchemaEvolveException {
         if (catalog == null) {
             catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
         }
@@ -92,11 +129,10 @@ public class PaimonMetadataApplier implements MetadataApplier {
             } else if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
                 applyAlterColumn((AlterColumnTypeEvent) schemaChangeEvent);
             } else {
-                throw new UnsupportedOperationException(
-                        "PaimonDataSink doesn't support schema change event " + schemaChangeEvent);
+                throw new UnsupportedSchemaChangeEventException(schemaChangeEvent);
             }
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new SchemaEvolveException(schemaChangeEvent, "schema change applying failure", e);
         }
     }
 

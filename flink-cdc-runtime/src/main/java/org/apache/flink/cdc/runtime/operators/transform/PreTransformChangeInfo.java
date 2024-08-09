@@ -36,27 +36,31 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.List;
 
-/** The TableInfo applies to cache schema change and fieldGetters. */
-public class TableChangeInfo {
+/**
+ * PreTransformChangeInfo caches source / pre-transformed schema, source schema field getters, and
+ * binary record data generator for pre-transform schema.
+ */
+public class PreTransformChangeInfo {
     private TableId tableId;
-    private Schema originalSchema;
-    private Schema transformedSchema;
-    private RecordData.FieldGetter[] fieldGetters;
-    private BinaryRecordDataGenerator recordDataGenerator;
+    private Schema sourceSchema;
+    private Schema preTransformedSchema;
+    private RecordData.FieldGetter[] sourceFieldGetters;
+    private BinaryRecordDataGenerator preTransformedRecordDataGenerator;
 
-    public static final TableChangeInfo.Serializer SERIALIZER = new TableChangeInfo.Serializer();
+    public static final PreTransformChangeInfo.Serializer SERIALIZER =
+            new PreTransformChangeInfo.Serializer();
 
-    public TableChangeInfo(
+    public PreTransformChangeInfo(
             TableId tableId,
-            Schema originalSchema,
-            Schema transformedSchema,
-            RecordData.FieldGetter[] fieldGetters,
-            BinaryRecordDataGenerator recordDataGenerator) {
+            Schema sourceSchema,
+            Schema preTransformedSchema,
+            RecordData.FieldGetter[] sourceFieldGetters,
+            BinaryRecordDataGenerator preTransformedRecordDataGenerator) {
         this.tableId = tableId;
-        this.originalSchema = originalSchema;
-        this.transformedSchema = transformedSchema;
-        this.fieldGetters = fieldGetters;
-        this.recordDataGenerator = recordDataGenerator;
+        this.sourceSchema = sourceSchema;
+        this.preTransformedSchema = preTransformedSchema;
+        this.sourceFieldGetters = sourceFieldGetters;
+        this.preTransformedRecordDataGenerator = preTransformedRecordDataGenerator;
     }
 
     public String getName() {
@@ -75,39 +79,39 @@ public class TableChangeInfo {
         return tableId;
     }
 
-    public Schema getOriginalSchema() {
-        return originalSchema;
+    public Schema getSourceSchema() {
+        return sourceSchema;
     }
 
-    public Schema getTransformedSchema() {
-        return transformedSchema;
+    public Schema getPreTransformedSchema() {
+        return preTransformedSchema;
     }
 
-    public RecordData.FieldGetter[] getFieldGetters() {
-        return fieldGetters;
+    public RecordData.FieldGetter[] getSourceFieldGetters() {
+        return sourceFieldGetters;
     }
 
-    public BinaryRecordDataGenerator getRecordDataGenerator() {
-        return recordDataGenerator;
+    public BinaryRecordDataGenerator getPreTransformedRecordDataGenerator() {
+        return preTransformedRecordDataGenerator;
     }
 
-    public static TableChangeInfo of(
-            TableId tableId, Schema originalSchema, Schema transformedSchema) {
-        List<RecordData.FieldGetter> fieldGetters =
-                SchemaUtils.createFieldGetters(originalSchema.getColumns());
-        BinaryRecordDataGenerator recordDataGenerator =
+    public static PreTransformChangeInfo of(
+            TableId tableId, Schema sourceSchema, Schema preTransformedSchema) {
+        List<RecordData.FieldGetter> sourceFieldGetters =
+                SchemaUtils.createFieldGetters(sourceSchema.getColumns());
+        BinaryRecordDataGenerator preTransformedDataGenerator =
                 new BinaryRecordDataGenerator(
-                        DataTypeConverter.toRowType(transformedSchema.getColumns()));
-        return new TableChangeInfo(
+                        DataTypeConverter.toRowType(preTransformedSchema.getColumns()));
+        return new PreTransformChangeInfo(
                 tableId,
-                originalSchema,
-                transformedSchema,
-                fieldGetters.toArray(new RecordData.FieldGetter[0]),
-                recordDataGenerator);
+                sourceSchema,
+                preTransformedSchema,
+                sourceFieldGetters.toArray(new RecordData.FieldGetter[0]),
+                preTransformedDataGenerator);
     }
 
-    /** Serializer for {@link TableChangeInfo}. */
-    public static class Serializer implements SimpleVersionedSerializer<TableChangeInfo> {
+    /** Serializer for {@link PreTransformChangeInfo}. */
+    public static class Serializer implements SimpleVersionedSerializer<PreTransformChangeInfo> {
 
         /** The latest version before change of state compatibility. */
         public static final int VERSION_BEFORE_STATE_COMPATIBILITY = 1;
@@ -123,7 +127,7 @@ public class TableChangeInfo {
         }
 
         @Override
-        public byte[] serialize(TableChangeInfo tableChangeInfo) throws IOException {
+        public byte[] serialize(PreTransformChangeInfo tableChangeInfo) throws IOException {
             TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
             SchemaSerializer schemaSerializer = SchemaSerializer.INSTANCE;
             try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -133,15 +137,16 @@ public class TableChangeInfo {
                 tableIdSerializer.serialize(
                         tableChangeInfo.getTableId(), new DataOutputViewStreamWrapper(out));
                 schemaSerializer.serialize(
-                        tableChangeInfo.originalSchema, new DataOutputViewStreamWrapper(out));
+                        tableChangeInfo.sourceSchema, new DataOutputViewStreamWrapper(out));
                 schemaSerializer.serialize(
-                        tableChangeInfo.transformedSchema, new DataOutputViewStreamWrapper(out));
+                        tableChangeInfo.preTransformedSchema, new DataOutputViewStreamWrapper(out));
                 return baos.toByteArray();
             }
         }
 
         @Override
-        public TableChangeInfo deserialize(int version, byte[] serialized) throws IOException {
+        public PreTransformChangeInfo deserialize(int version, byte[] serialized)
+                throws IOException {
             TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
             SchemaSerializer schemaSerializer = SchemaSerializer.INSTANCE;
             try (ByteArrayInputStream bais = new ByteArrayInputStream(serialized);
@@ -157,7 +162,7 @@ public class TableChangeInfo {
                         schemaSerializer.deserialize(version, new DataInputViewStreamWrapper(in));
                 Schema transformedSchema =
                         schemaSerializer.deserialize(version, new DataInputViewStreamWrapper(in));
-                return TableChangeInfo.of(tableId, originalSchema, transformedSchema);
+                return PreTransformChangeInfo.of(tableId, originalSchema, transformedSchema);
             }
         }
     }

@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
@@ -95,21 +96,22 @@ public class FlinkPipelineComposer implements PipelineComposer {
         int parallelism = pipelineDef.getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
 
+        SchemaChangeBehavior schemaChangeBehavior =
+                pipelineDef.getConfig().get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
+
         // Build Source Operator
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
         DataStream<Event> stream =
                 sourceTranslator.translate(pipelineDef.getSource(), env, pipelineDef.getConfig());
 
-        // Build TransformSchemaOperator for processing Schema Event
+        // Build PreTransformOperator for processing Schema Event
         TransformTranslator transformTranslator = new TransformTranslator();
-        stream = transformTranslator.translateSchema(stream, pipelineDef.getTransforms());
+        stream = transformTranslator.translatePreTransform(stream, pipelineDef.getTransforms());
 
         // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
-                        pipelineDef
-                                .getConfig()
-                                .get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR),
+                        schemaChangeBehavior,
                         pipelineDef.getConfig().get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID),
                         pipelineDef
                                 .getConfig()
@@ -117,9 +119,9 @@ public class FlinkPipelineComposer implements PipelineComposer {
         OperatorIDGenerator schemaOperatorIDGenerator =
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
 
-        // Build TransformDataOperator for processing Data Event
+        // Build PostTransformOperator for processing Data Event
         stream =
-                transformTranslator.translateData(
+                transformTranslator.translatePostTransform(
                         stream,
                         pipelineDef.getTransforms(),
                         schemaOperatorIDGenerator.generate(),
@@ -130,7 +132,12 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         stream =
                 schemaOperatorTranslator.translate(
-                        stream, parallelism, dataSink.getMetadataApplier(), pipelineDef.getRoute());
+                        stream,
+                        parallelism,
+                        dataSink.getMetadataApplier()
+                                .setAcceptedSchemaEvolutionTypes(
+                                        pipelineDef.getSink().getIncludedSchemaEvolutionTypes()),
+                        pipelineDef.getRoute());
 
         // Build Partitioner used to shuffle Event
         PartitioningTranslator partitioningTranslator = new PartitioningTranslator();
