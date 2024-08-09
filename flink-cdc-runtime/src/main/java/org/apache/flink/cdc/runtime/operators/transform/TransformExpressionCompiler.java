@@ -37,7 +37,7 @@ public class TransformExpressionCompiler {
 
     /** Triggers internal garbage collection of expired cache entries. */
     public static void cleanUp() {
-        COMPILED_EXPRESSION_CACHE.cleanUp();
+        COMPILED_EXPRESSION_CACHE.invalidateAll();
     }
 
     /** Compiles an expression code to a janino {@link ExpressionEvaluator}. */
