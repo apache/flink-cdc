@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
@@ -98,7 +99,9 @@ public class ProjectionColumnProcessor {
 
         // 1 - Add referenced columns
         RecordData.FieldGetter[] fieldGetters = tableInfo.getPreTransformedFieldGetters();
-        for (String originalColumnName : projectionColumn.getOriginalColumnNames()) {
+        LinkedHashSet<String> originalColumnNames =
+                new LinkedHashSet<>(projectionColumn.getOriginalColumnNames());
+        for (String originalColumnName : originalColumnNames) {
             switch (originalColumnName) {
                 case TransformParser.DEFAULT_NAMESPACE_NAME:
                     params.add(tableInfo.getNamespace());
@@ -142,7 +145,8 @@ public class ProjectionColumnProcessor {
         List<Class<?>> paramTypes = new ArrayList<>();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
         String scriptExpression = projectionColumn.getScriptExpression();
-        List<String> originalColumnNames = projectionColumn.getOriginalColumnNames();
+        LinkedHashSet<String> originalColumnNames =
+                new LinkedHashSet<>(projectionColumn.getOriginalColumnNames());
         for (String originalColumnName : originalColumnNames) {
             for (Column column : columns) {
                 if (column.getName().equals(originalColumnName)) {

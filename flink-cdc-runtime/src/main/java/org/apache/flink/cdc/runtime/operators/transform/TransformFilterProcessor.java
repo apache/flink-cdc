@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -91,14 +92,12 @@ public class TransformFilterProcessor {
         List<Class<?>> argTypes = new ArrayList<>();
         String scriptExpression = transformFilter.getScriptExpression();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
-        List<String> columnNames = transformFilter.getColumnNames();
+        LinkedHashSet<String> columnNames = new LinkedHashSet<>(transformFilter.getColumnNames());
         for (String columnName : columnNames) {
             for (Column column : columns) {
                 if (column.getName().equals(columnName)) {
-                    if (!argNames.contains(columnName)) {
-                        argNames.add(columnName);
-                        argTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
-                    }
+                    argNames.add(columnName);
+                    argTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
                     break;
                 }
             }
