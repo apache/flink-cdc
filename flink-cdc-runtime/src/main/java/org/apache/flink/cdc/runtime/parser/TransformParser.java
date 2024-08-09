@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
+import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSchemaFactory;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
@@ -39,8 +40,13 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.schema.ScalarFunction;
+import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlFunction;
+import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
@@ -50,7 +56,11 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.type.InferTypes;
+import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
+import org.apache.calcite.sql.util.ListSqlOperatorTable;
 import org.apache.calcite.sql.util.SqlOperatorTables;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql.validate.SqlValidator;
@@ -75,6 +85,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.apache.flink.cdc.common.utils.StringUtils.isNullOrWhitespaceOnly;
+import static org.apache.flink.cdc.runtime.typeutils.DataTypeConverter.convertCalciteType;
 
 /** Use Flink's calcite parser to parse the statement of flink cdc pipeline transform. */
 public class TransformParser {
@@ -94,15 +105,49 @@ public class TransformParser {
                         .withLex(Lex.JAVA));
     }
 
-    private static RelNode sqlToRel(List<Column> columns, SqlNode sqlNode) {
+    private static RelNode sqlToRel(
+            List<Column> columns,
+            SqlNode sqlNode,
+            List<UserDefinedFunctionDescriptor> udfDescriptors) {
         List<Column> columnsWithMetadata = copyFillMetadataColumn(sqlNode.toString(), columns);
         CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
+        SchemaPlus schema = rootSchema.plus();
         Map<String, Object> operand = new HashMap<>();
         operand.put("tableName", DEFAULT_TABLE);
         operand.put("columns", columnsWithMetadata);
         rootSchema.add(
                 DEFAULT_SCHEMA,
-                TransformSchemaFactory.INSTANCE.create(rootSchema.plus(), DEFAULT_SCHEMA, operand));
+                TransformSchemaFactory.INSTANCE.create(schema, DEFAULT_SCHEMA, operand));
+        List<SqlFunction> udfFunctions = new ArrayList<>();
+        for (UserDefinedFunctionDescriptor udf : udfDescriptors) {
+            try {
+                Class<?> clazz = Class.forName(udf.getClasspath());
+                SqlReturnTypeInference returnTypeInference;
+                ScalarFunction function = ScalarFunctionImpl.create(clazz, "eval");
+                if (udf.getReturnTypeHint() != null) {
+                    // This UDF has return type hint annotation
+                    returnTypeInference =
+                            o ->
+                                    o.getTypeFactory()
+                                            .createSqlType(
+                                                    convertCalciteType(udf.getReturnTypeHint()));
+                } else {
+                    // Infer it from eval method return type
+                    returnTypeInference = o -> function.getReturnType(o.getTypeFactory());
+                }
+                schema.add(udf.getName(), function);
+                udfFunctions.add(
+                        new SqlFunction(
+                                udf.getName(),
+                                SqlKind.OTHER_FUNCTION,
+                                returnTypeInference,
+                                InferTypes.RETURN_TYPE,
+                                OperandTypes.VARIADIC,
+                                SqlFunctionCategory.USER_DEFINED_FUNCTION));
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Failed to resolve UDF: " + udf, e);
+            }
+        }
         SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
         CalciteCatalogReader calciteCatalogReader =
                 new CalciteCatalogReader(
@@ -112,9 +157,12 @@ public class TransformParser {
                         new CalciteConnectionConfigImpl(new Properties()));
         TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
         SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
+        ListSqlOperatorTable udfOperatorTable = new ListSqlOperatorTable();
+        udfFunctions.forEach(udfOperatorTable::add);
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(sqlStdOperatorTable, transformSqlOperatorTable),
+                        SqlOperatorTables.chain(
+                                sqlStdOperatorTable, transformSqlOperatorTable, udfOperatorTable),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
@@ -219,7 +267,9 @@ public class TransformParser {
     // For example, given projection expression "a, b, c, upper(a) as d, b as e" and columns array
     // [a, b, c, x, y, z], returns projection column array [a, b, c, d, e].
     public static List<ProjectionColumn> generateProjectionColumns(
-            String projectionExpression, List<Column> columns) {
+            String projectionExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors) {
         if (isNullOrWhitespaceOnly(projectionExpression)) {
             return new ArrayList<>();
         }
@@ -228,7 +278,7 @@ public class TransformParser {
             return new ArrayList<>();
         }
         expandWildcard(sqlSelect, columns);
-        RelNode relNode = sqlToRel(columns, sqlSelect);
+        RelNode relNode = sqlToRel(columns, sqlSelect, udfDescriptors);
         Map<String, RelDataType> relDataTypeMap =
                 relNode.getRowType().getFieldList().stream()
                         .collect(
@@ -276,7 +326,7 @@ public class TransformParser {
                                                     relDataTypeMap.get(columnName)),
                                             transformOptional.get().toString(),
                                             JaninoCompiler.translateSqlNodeToJaninoExpression(
-                                                    transformOptional.get()),
+                                                    transformOptional.get(), udfDescriptors),
                                             parseColumnNameList(transformOptional.get()))
                                     : ProjectionColumn.of(
                                             columnName,
@@ -340,7 +390,8 @@ public class TransformParser {
         return projectionColumns;
     }
 
-    public static String translateFilterExpressionToJaninoExpression(String filterExpression) {
+    public static String translateFilterExpressionToJaninoExpression(
+            String filterExpression, List<UserDefinedFunctionDescriptor> udfDescriptors) {
         if (isNullOrWhitespaceOnly(filterExpression)) {
             return "";
         }
@@ -349,7 +400,7 @@ public class TransformParser {
             return "";
         }
         SqlNode where = sqlSelect.getWhere();
-        return JaninoCompiler.translateSqlNodeToJaninoExpression(where);
+        return JaninoCompiler.translateSqlNodeToJaninoExpression(where, udfDescriptors);
     }
 
     public static List<String> parseComputedColumnNames(String projection) {

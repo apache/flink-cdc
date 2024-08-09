@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
+import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSchemaFactory;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
 
@@ -50,6 +51,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -324,7 +326,8 @@ public class TransformParserTest {
         List<ProjectionColumn> result =
                 TransformParser.generateProjectionColumns(
                         "id, upper(name) as name, age + 1 as newage, weight / (height * height) as bmi",
-                        testColumns);
+                        testColumns,
+                        Collections.emptyList());
 
         List<String> expected =
                 Arrays.asList(
@@ -336,7 +339,9 @@ public class TransformParserTest {
 
         List<ProjectionColumn> metadataResult =
                 TransformParser.generateProjectionColumns(
-                        "*, __namespace_name__, __schema_name__, __table_name__", testColumns);
+                        "*, __namespace_name__, __schema_name__, __table_name__",
+                        testColumns,
+                        Collections.emptyList());
 
         List<String> metadataExpected =
                 Arrays.asList(
@@ -354,7 +359,9 @@ public class TransformParserTest {
 
         // calculated columns must use AS to provide an alias name
         Assertions.assertThatThrownBy(
-                        () -> TransformParser.generateProjectionColumns("id, 1 + 1", testColumns))
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "id, 1 + 1", testColumns, Collections.emptyList()))
                 .isExactlyInstanceOf(ParseException.class);
     }
 
@@ -413,9 +420,69 @@ public class TransformParserTest {
                         "`concat`(1 - `x`, `concat`(1 - `y`, `concat`(1 - `z`, `x`), `y`), `z`) <> 10");
     }
 
+    @Test
+    public void testTranslateUdfFilterToJaninoExpression() {
+        testFilterExpressionWithUdf(
+                "format(upper(id))", "__instanceOfFormatFunctionClass.eval(upper(id))");
+        testFilterExpressionWithUdf(
+                "format(lower(id))", "__instanceOfFormatFunctionClass.eval(lower(id))");
+        testFilterExpressionWithUdf(
+                "format(concat(a,b))", "__instanceOfFormatFunctionClass.eval(concat(a, b))");
+        testFilterExpressionWithUdf(
+                "format(SUBSTR(a,1))", "__instanceOfFormatFunctionClass.eval(substr(a, 1))");
+        testFilterExpressionWithUdf(
+                "typeof(id like '^[a-zA-Z]')",
+                "__instanceOfTypeOfFunctionClass.eval(like(id, \"^[a-zA-Z]\"))");
+        testFilterExpressionWithUdf(
+                "typeof(id not like '^[a-zA-Z]')",
+                "__instanceOfTypeOfFunctionClass.eval(notLike(id, \"^[a-zA-Z]\"))");
+        testFilterExpressionWithUdf(
+                "typeof(abs(2))", "__instanceOfTypeOfFunctionClass.eval(abs(2))");
+        testFilterExpressionWithUdf(
+                "typeof(ceil(2))", "__instanceOfTypeOfFunctionClass.eval(ceil(2))");
+        testFilterExpressionWithUdf(
+                "typeof(floor(2))", "__instanceOfTypeOfFunctionClass.eval(floor(2))");
+        testFilterExpressionWithUdf(
+                "typeof(round(2,2))", "__instanceOfTypeOfFunctionClass.eval(round(2, 2))");
+        testFilterExpressionWithUdf(
+                "typeof(id + 2)", "__instanceOfTypeOfFunctionClass.eval(id + 2)");
+        testFilterExpressionWithUdf(
+                "typeof(id - 2)", "__instanceOfTypeOfFunctionClass.eval(id - 2)");
+        testFilterExpressionWithUdf(
+                "typeof(id * 2)", "__instanceOfTypeOfFunctionClass.eval(id * 2)");
+        testFilterExpressionWithUdf(
+                "typeof(id / 2)", "__instanceOfTypeOfFunctionClass.eval(id / 2)");
+        testFilterExpressionWithUdf(
+                "typeof(id % 2)", "__instanceOfTypeOfFunctionClass.eval(id % 2)");
+        testFilterExpressionWithUdf(
+                "addone(addone(id)) > 4 OR typeof(id) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
+                "__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)) > 4 || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+        testFilterExpressionWithUdf(
+                "ADDONE(ADDONE(id)) > 4 OR TYPEOF(id) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
+                "__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)) > 4 || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+    }
+
     private void testFilterExpression(String expression, String expressionExpect) {
         String janinoExpression =
-                TransformParser.translateFilterExpressionToJaninoExpression(expression);
+                TransformParser.translateFilterExpressionToJaninoExpression(
+                        expression, Collections.emptyList());
+        Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
+    }
+
+    private void testFilterExpressionWithUdf(String expression, String expressionExpect) {
+        String janinoExpression =
+                TransformParser.translateFilterExpressionToJaninoExpression(
+                        expression,
+                        Arrays.asList(
+                                new UserDefinedFunctionDescriptor(
+                                        "format",
+                                        "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass"),
+                                new UserDefinedFunctionDescriptor(
+                                        "addone",
+                                        "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
+                                new UserDefinedFunctionDescriptor(
+                                        "typeof",
+                                        "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass")));
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
     }
 }

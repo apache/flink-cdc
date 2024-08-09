@@ -24,6 +24,7 @@ import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
+import org.apache.flink.cdc.composer.definition.UdfDef;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
@@ -175,6 +176,14 @@ class YamlPipelineDefinitionParserTest {
         assertThat(pipelineDef).isEqualTo(fullDefWithRouteRepSym);
     }
 
+    @Test
+    void testUdfDefinition() throws Exception {
+        URL resource = Resources.getResource("definitions/pipeline-definition-with-udf.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(pipelineDefWithUdf);
+    }
+
     private final PipelineDef fullDef =
             new PipelineDef(
                     new SourceDef(
@@ -230,6 +239,7 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     "add new uniq_id for each row")),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -344,6 +354,7 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     "add new uniq_id for each row")),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -381,6 +392,7 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null)),
                     Collections.emptyList(),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("parallelism", "4")
@@ -390,6 +402,7 @@ class YamlPipelineDefinitionParserTest {
             new PipelineDef(
                     new SourceDef("mysql", null, new Configuration()),
                     new SinkDef("kafka", null, new Configuration()),
+                    Collections.emptyList(),
                     Collections.emptyList(),
                     Collections.emptyList(),
                     Configuration.fromMap(Collections.singletonMap("parallelism", "1")));
@@ -449,11 +462,38 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     "add new uniq_id for each row")),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
+                                    .build()));
+
+    private final PipelineDef pipelineDefWithUdf =
+            new PipelineDef(
+                    new SourceDef("values", null, new Configuration()),
+                    new SinkDef("values", null, new Configuration()),
+                    Collections.emptyList(),
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "mydb.web_order",
+                                    "*, inc(inc(inc(id))) as inc_id, format(id, 'id -> %d') as formatted_id",
+                                    "inc(id) < 100",
+                                    null,
+                                    null,
+                                    null,
+                                    null)),
+                    Arrays.asList(
+                            new UdfDef(
+                                    "inc",
+                                    "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
+                            new UdfDef(
+                                    "format",
+                                    "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass")),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("parallelism", "1")
                                     .build()));
 }

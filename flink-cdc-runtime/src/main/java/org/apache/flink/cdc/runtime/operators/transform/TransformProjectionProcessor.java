@@ -51,14 +51,22 @@ public class TransformProjectionProcessor {
     private final TransformProjection transformProjection;
     private final String timezone;
     private final List<ProjectionColumnProcessor> cachedProjectionColumnProcessors;
+    private final List<UserDefinedFunctionDescriptor> udfDescriptors;
+    private final transient List<Object> udfFunctionInstances;
 
     public TransformProjectionProcessor(
             PostTransformChangeInfo postTransformChangeInfo,
             TransformProjection transformProjection,
-            String timezone) {
+            String timezone,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            final List<Object> udfFunctionInstances) {
         this.postTransformChangeInfo = postTransformChangeInfo;
         this.transformProjection = transformProjection;
         this.timezone = timezone;
+        this.udfDescriptors = udfDescriptors;
+        this.udfFunctionInstances = udfFunctionInstances;
+
+        // Create cached projection column processors after setting all other fields.
         this.cachedProjectionColumnProcessors =
                 cacheProjectionColumnProcessors(postTransformChangeInfo, transformProjection);
     }
@@ -70,23 +78,34 @@ public class TransformProjectionProcessor {
     public static TransformProjectionProcessor of(
             PostTransformChangeInfo tableInfo,
             TransformProjection transformProjection,
-            String timezone) {
-        return new TransformProjectionProcessor(tableInfo, transformProjection, timezone);
+            String timezone,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            List<Object> udfFunctionInstances) {
+        return new TransformProjectionProcessor(
+                tableInfo, transformProjection, timezone, udfDescriptors, udfFunctionInstances);
     }
 
     public static TransformProjectionProcessor of(
-            TransformProjection transformProjection, String timezone) {
-        return new TransformProjectionProcessor(null, transformProjection, timezone);
+            TransformProjection transformProjection,
+            String timezone,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            List<Object> udfFunctionInstances) {
+        return new TransformProjectionProcessor(
+                null, transformProjection, timezone, udfDescriptors, udfFunctionInstances);
     }
 
-    public static TransformProjectionProcessor of(TransformProjection transformProjection) {
-        return new TransformProjectionProcessor(null, transformProjection, null);
+    public static TransformProjectionProcessor of(
+            TransformProjection transformProjection,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            List<Object> udfFunctionInstances) {
+        return new TransformProjectionProcessor(
+                null, transformProjection, null, udfDescriptors, udfFunctionInstances);
     }
 
     public Schema processSchemaChangeEvent(Schema schema) {
         List<ProjectionColumn> projectionColumns =
                 TransformParser.generateProjectionColumns(
-                        transformProjection.getProjection(), schema.getColumns());
+                        transformProjection.getProjection(), schema.getColumns(), udfDescriptors);
         transformProjection.setProjectionColumns(projectionColumns);
         return schema.copy(
                 projectionColumns.stream()
@@ -158,7 +177,14 @@ public class TransformProjectionProcessor {
 
             cachedProjectionColumnProcessors.add(
                     Optional.ofNullable(matchedProjectionColumn)
-                            .map(col -> ProjectionColumnProcessor.of(tableInfo, col, timezone))
+                            .map(
+                                    col ->
+                                            ProjectionColumnProcessor.of(
+                                                    tableInfo,
+                                                    col,
+                                                    timezone,
+                                                    udfDescriptors,
+                                                    udfFunctionInstances))
                             .orElse(null));
         }
 
