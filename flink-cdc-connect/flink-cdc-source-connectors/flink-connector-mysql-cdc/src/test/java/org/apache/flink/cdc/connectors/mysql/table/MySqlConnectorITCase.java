@@ -1386,6 +1386,80 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testPrimaryKeyQuote() throws Exception {
+        if (!incrementalSnapshot) {
+            return;
+        }
+        customerDatabase.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE quote_pk_table ("
+                                + " `key` STRING NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number BIGINT,"
+                                + " primary key (`key`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getUsername(),
+                        customerDatabase.getPassword(),
+                        customerDatabase.getDatabaseName(),
+                        "quote_pk_table",
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize());
+        tEnv.executeSql(sourceDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT * FROM quote_pk_table");
+        JobClient jobClient = result.getJobClient().get();
+        waitForJobStatus(
+                jobClient,
+                Collections.singletonList(RUNNING),
+                Deadline.fromNow(Duration.ofSeconds(10)));
+
+        CloseableIterator<Row> iterator = result.collect();
+        waitForSnapshotStarted(iterator);
+
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("DELETE FROM quote_pk_table WHERE `key` = '10010';");
+        }
+
+        String[] expected =
+                new String[] {
+                    "+I[10000, user1, Shanghai, 123567]",
+                    "+I[10001, user2, Shanghai, 123567]",
+                    "+I[10002, user3, Shanghai, 123567]",
+                    "+I[10003, user4, Shanghai, 123567]",
+                    "+I[10004, user5, Shanghai, 123567]",
+                    "+I[10005, user6, Shanghai, 123567]",
+                    "+I[10006, user7, Shanghai, 123567]",
+                    "+I[10007, user8, Shanghai, 123567]",
+                    "+I[10008, user9, Shanghai, 123567]",
+                    "+I[10009, user10, Shanghai, 123567]",
+                    "+I[10010, user11, Shanghai, 123567]",
+                    "+I[10086, user66, Shanghai, 123567]",
+                    "-D[10010, user11, Shanghai, 123567]"
+                };
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        jobClient.cancel().get();
+    }
+
+    @Test
     public void testDdlWithDefaultStringValue() throws Exception {
         if (!incrementalSnapshot) {
             return;

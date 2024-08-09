@@ -325,7 +325,7 @@ public class SqlServerUtils {
         StringBuilder sql = new StringBuilder();
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append("MAX(").append(fieldNamesIt.next()).append(")");
+            sql.append("MAX(").append(quote(fieldNamesIt.next())).append(")");
             if (fieldNamesIt.hasNext()) {
                 sql.append(" , ");
             }
