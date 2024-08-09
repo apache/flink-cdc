@@ -43,18 +43,35 @@ public class ProjectionColumnProcessor {
     private ProjectionColumn projectionColumn;
     private String timezone;
     private TransformExpressionKey transformExpressionKey;
+    private final List<UserDefinedFunctionDescriptor> udfDescriptors;
+    private final transient List<Object> udfFunctionInstances;
+    private transient ExpressionEvaluator expressionEvaluator;
 
     public ProjectionColumnProcessor(
-            PostTransformChangeInfo tableInfo, ProjectionColumn projectionColumn, String timezone) {
+            PostTransformChangeInfo tableInfo,
+            ProjectionColumn projectionColumn,
+            String timezone,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            final List<Object> udfFunctionInstances) {
         this.tableInfo = tableInfo;
         this.projectionColumn = projectionColumn;
         this.timezone = timezone;
+        this.udfDescriptors = udfDescriptors;
         this.transformExpressionKey = generateTransformExpressionKey();
+        this.expressionEvaluator =
+                TransformExpressionCompiler.compileExpression(
+                        transformExpressionKey, udfDescriptors);
+        this.udfFunctionInstances = udfFunctionInstances;
     }
 
     public static ProjectionColumnProcessor of(
-            PostTransformChangeInfo tableInfo, ProjectionColumn projectionColumn, String timezone) {
-        return new ProjectionColumnProcessor(tableInfo, projectionColumn, timezone);
+            PostTransformChangeInfo tableInfo,
+            ProjectionColumn projectionColumn,
+            String timezone,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            List<Object> udfFunctionInstances) {
+        return new ProjectionColumnProcessor(
+                tableInfo, projectionColumn, timezone, udfDescriptors, udfFunctionInstances);
     }
 
     public ProjectionColumn getProjectionColumn() {
@@ -62,8 +79,6 @@ public class ProjectionColumnProcessor {
     }
 
     public Object evaluate(BinaryRecordData after, long epochTime) {
-        ExpressionEvaluator expressionEvaluator =
-                TransformExpressionCompiler.compileExpression(transformExpressionKey);
         try {
             return expressionEvaluator.evaluate(generateParams(after, epochTime));
         } catch (InvocationTargetException e) {
@@ -80,6 +95,8 @@ public class ProjectionColumnProcessor {
     private Object[] generateParams(BinaryRecordData after, long epochTime) {
         List<Object> params = new ArrayList<>();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
+
+        // 1 - Add referenced columns
         RecordData.FieldGetter[] fieldGetters = tableInfo.getPreTransformedFieldGetters();
         for (String originalColumnName : projectionColumn.getOriginalColumnNames()) {
             switch (originalColumnName) {
@@ -110,8 +127,13 @@ public class ProjectionColumnProcessor {
                         "Failed to evaluate argument " + originalColumnName);
             }
         }
+
+        // 2 - Add time-sensitive function arguments
         params.add(timezone);
         params.add(epochTime);
+
+        // 3 - Add UDF function instances
+        params.addAll(udfFunctionInstances);
         return params.toArray();
     }
 
