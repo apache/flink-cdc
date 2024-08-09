@@ -27,12 +27,15 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.FlinkCatalogFactory;
@@ -40,6 +43,7 @@ import org.apache.paimon.flink.LogicalTypeConversion;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.SchemaChange;
 import org.apache.paimon.table.Table;
+import org.apache.paimon.types.DataField;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +51,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
@@ -138,11 +144,14 @@ public class PaimonMetadataApplier implements MetadataApplier {
 
     private void applyCreateTable(CreateTableEvent event)
             throws Catalog.DatabaseAlreadyExistException, Catalog.TableAlreadyExistException,
-                    Catalog.DatabaseNotExistException {
+                    Catalog.DatabaseNotExistException, Catalog.ColumnAlreadyExistException,
+                    Catalog.TableNotExistException, Catalog.ColumnNotExistException {
         if (!catalog.databaseExists(event.tableId().getSchemaName())) {
             catalog.createDatabase(event.tableId().getSchemaName(), true);
         }
         Schema schema = event.getSchema();
+        Identifier identifier =
+                new Identifier(event.tableId().getSchemaName(), event.tableId().getTableName());
         org.apache.paimon.schema.Schema.Builder builder =
                 new org.apache.paimon.schema.Schema.Builder();
         schema.getColumns()
@@ -161,10 +170,91 @@ public class PaimonMetadataApplier implements MetadataApplier {
         }
         builder.options(tableOptions);
         builder.options(schema.options());
-        catalog.createTable(
-                new Identifier(event.tableId().getSchemaName(), event.tableId().getTableName()),
-                builder.build(),
-                true);
+        if (catalog.tableExists(identifier)) {
+            alterTableSchema(event, identifier, tableOptions);
+        } else {
+            catalog.createTable(identifier, builder.build(), true);
+        }
+    }
+
+    private void alterTableSchema(
+            CreateTableEvent event, Identifier identifier, Map<String, String> tableOptions)
+            throws Catalog.TableNotExistException, Catalog.ColumnAlreadyExistException,
+                    Catalog.ColumnNotExistException {
+        Table paimonTable = catalog.getTable(identifier);
+        List<SchemaChange> tableChangeList = new ArrayList<>();
+
+        // doesn't support altering bucket here
+        tableOptions.remove(CoreOptions.BUCKET.key());
+        Map<String, String> oldOptions = paimonTable.options();
+        Set<String> immutableOptionKeys = CoreOptions.getImmutableOptionKeys();
+        tableOptions
+                .entrySet()
+                .removeIf(
+                        entry ->
+                                immutableOptionKeys.contains(entry.getKey())
+                                        || Objects.equals(
+                                                oldOptions.get(entry.getKey()), entry.getValue()));
+        // alter the table dynamic options
+        List<SchemaChange> optionChanges =
+                tableOptions.entrySet().stream()
+                        .map(entry -> SchemaChange.setOption(entry.getKey(), entry.getValue()))
+                        .collect(Collectors.toList());
+
+        tableChangeList.addAll(optionChanges);
+
+        Map<String, DataField> oldColumns = new HashMap<>();
+        for (DataField oldField : paimonTable.rowType().getFields()) {
+            oldColumns.put(oldField.name(), oldField);
+        }
+
+        List<Column> newColumns = event.getSchema().getColumns();
+
+        String referenceColumnName = null;
+        for (int i = 0; i < newColumns.size(); i++) {
+            Column newColumn = newColumns.get(i);
+            String columnName = newColumn.getName();
+            DataType columnType = newColumn.getType();
+            String columnComment = newColumn.getComment();
+
+            DataField oldColumn = oldColumns.get(columnName);
+
+            if (oldColumns.containsKey(columnName)) {
+                // alter column type
+                if (!oldColumn
+                        .type()
+                        .equals(
+                                LogicalTypeConversion.toDataType(
+                                        DataTypeUtils.toFlinkDataType(columnType)
+                                                .getLogicalType()))) {
+                    tableChangeList.add(
+                            SchemaChangeProvider.updateColumnType(columnName, columnType));
+                }
+                // alter column comment
+                if (columnComment != null && !columnComment.equals(oldColumn.description())) {
+                    tableChangeList.add(
+                            SchemaChange.updateColumnComment(
+                                    new String[] {columnName}, columnComment));
+                }
+            } else {
+                // add column
+                AddColumnEvent.ColumnWithPosition columnWithPosition =
+                        new AddColumnEvent.ColumnWithPosition(
+                                Column.physicalColumn(columnName, columnType, columnComment));
+                // i ==0: new column is the first column
+                SchemaChange.Move move =
+                        (i == 0)
+                                ? SchemaChange.Move.first(columnName)
+                                : SchemaChange.Move.after(columnName, referenceColumnName);
+                SchemaChange tableChange = SchemaChangeProvider.add(columnWithPosition, move);
+                tableChangeList.add(tableChange);
+            }
+            referenceColumnName = columnName;
+        }
+
+        if (!tableChangeList.isEmpty()) {
+            catalog.alterTable(identifier, tableChangeList, true);
+        }
     }
 
     private void applyAddColumn(AddColumnEvent event)
