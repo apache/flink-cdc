@@ -41,6 +41,14 @@ definition.
 | [Paimon]({{< ref "docs/connectors/pipeline-connectors/paimon" >}})       | Sink           | <li> [Paimon](https://paimon.apache.org/): 0.6, 0.7, 0.8                                                                                                                                                                                                                                                                                                                                               |
 | [StarRocks]({{< ref "docs/connectors/pipeline-connectors/starrocks" >}}) | Sink           | <li> [StarRocks](https://www.starrocks.io/): 2.x, 3.x                                                                                                                                                                                                                                                                                                                                                  |
 
+## Supported Flink Versions 
+The following table shows the version mapping between Flink<sup>®</sup> CDC Pipeline Connectors and Flink<sup>®</sup>
+
+|    Flink<sup>®</sup> CDC Version    |                                                        Flink<sup>®</sup> Version                                                         |  Pipeline Source  |          Pipeline Sink          |                    Notes                    |
+|:-----------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------:|:-----------------:|:-------------------------------:|:-------------------------------------------:|
+| <font color="DarkCyan">3.0.x</font> |                        <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font>                        |       Mysql       |         StarRocks,Doris         |                                             |
+| <font color="DarkCyan">3.1.x</font> | <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font>, <font color="MediumVioletRed">1.19.\*</font> |       Mysql       |  StarRocks,Doris,Paimon,Kafka   |  only flink-cdc 3.1.1 support flink 1.19.*  |
+
 ## Develop Your Own Connector
 
 If provided connectors cannot fulfill your requirement, you can always develop
