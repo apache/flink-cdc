@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketWrapperChangeEvent;
 
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.GenericRow;
@@ -51,10 +52,12 @@ public class PaimonRecordEventSerializer implements PaimonRecordSerializer<Event
 
     @Override
     public PaimonEvent serialize(Event event) {
-        Identifier tableId =
-                Identifier.create(
-                        ((ChangeEvent) event).tableId().getSchemaName(),
-                        ((ChangeEvent) event).tableId().getTableName());
+        int bucket = 0;
+        if (event instanceof BucketWrapperChangeEvent) {
+            bucket = ((BucketWrapperChangeEvent) event).getBucket();
+            event = ((BucketWrapperChangeEvent) event).getInnerEvent();
+        }
+        Identifier tableId = Identifier.fromString(((ChangeEvent) event).tableId().toString());
         if (event instanceof SchemaChangeEvent) {
             if (event instanceof CreateTableEvent) {
                 CreateTableEvent createTableEvent = (CreateTableEvent) event;
@@ -78,7 +81,7 @@ public class PaimonRecordEventSerializer implements PaimonRecordSerializer<Event
                     PaimonWriterHelper.convertEventToGenericRow(
                             dataChangeEvent,
                             schemaMaps.get(dataChangeEvent.tableId()).getFieldGetters());
-            return new PaimonEvent(tableId, genericRow);
+            return new PaimonEvent(tableId, genericRow, false, bucket);
         } else {
             throw new IllegalArgumentException(
                     "failed to convert Input into PaimonEvent, unsupported event: " + event);
