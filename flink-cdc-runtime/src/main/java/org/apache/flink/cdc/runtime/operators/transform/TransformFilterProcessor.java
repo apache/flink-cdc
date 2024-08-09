@@ -83,10 +83,8 @@ public class TransformFilterProcessor {
         for (String columnName : columnNames) {
             for (Column column : columns) {
                 if (column.getName().equals(columnName)) {
-                    if (!argNames.contains(columnName)) {
-                        argNames.add(columnName);
-                        argTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
-                    }
+                    argNames.add(columnName);
+                    argTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
                     break;
                 }
             }

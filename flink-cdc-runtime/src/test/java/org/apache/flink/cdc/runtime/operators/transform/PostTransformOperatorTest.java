@@ -572,14 +572,14 @@ public class PostTransformOperatorTest {
 
     @Test
     void testDataChangeEventTransformWithDuplicateColumns() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 COLUMN_SQUARE_TABLE.identifier(),
                                 "col1, col2, col2 * col2 as square_col2",
                                 "col2 < 3 OR col2 > 5")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
