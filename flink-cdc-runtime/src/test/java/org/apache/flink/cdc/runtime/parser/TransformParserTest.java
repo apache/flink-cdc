@@ -17,8 +17,11 @@
 
 package org.apache.flink.cdc.runtime.parser;
 
+import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSchemaFactory;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
 
@@ -43,9 +46,10 @@ import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.apache.calcite.tools.RelBuilder;
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,9 +70,11 @@ public class TransformParserTest {
         SqlSelect parse =
                 TransformParser.parseSelect(
                         "select CONCAT(id, order_id) as uniq_id, * from tb where uniq_id > 10 and id is not null");
-        Assert.assertEquals(
-                "`CONCAT`(`id`, `order_id`) AS `uniq_id`, *", parse.getSelectList().toString());
-        Assert.assertEquals("`uniq_id` > 10 AND `id` IS NOT NULL", parse.getWhere().toString());
+        Assertions.assertThat(parse.getSelectList().toString())
+                .isEqualTo("`CONCAT`(`id`, `order_id`) AS `uniq_id`, *");
+
+        Assertions.assertThat(parse.getWhere().toString())
+                .isEqualTo("`uniq_id` > 10 AND `id` IS NOT NULL");
     }
 
     @Test
@@ -101,15 +107,17 @@ public class TransformParserTest {
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
         SqlNode validateSqlNode = validator.validate(parse);
-        Assert.assertEquals(
-                "SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`",
-                parse.getSelectList().toString());
-        Assert.assertEquals("`tb`.`id` IS NOT NULL", parse.getWhere().toString());
-        Assert.assertEquals(
-                "SELECT SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`\n"
-                        + "FROM `default_schema`.`tb` AS `tb`\n"
-                        + "WHERE `tb`.`id` IS NOT NULL",
-                validateSqlNode.toString().replaceAll("\r\n", "\n"));
+
+        Assertions.assertThat(parse.getSelectList().toString())
+                .isEqualTo("SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`");
+
+        Assertions.assertThat(parse.getWhere().toString()).isEqualTo("`tb`.`id` IS NOT NULL");
+
+        Assertions.assertThat(validateSqlNode.toString().replaceAll("\r\n", "\n"))
+                .isEqualTo(
+                        "SELECT SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`\n"
+                                + "FROM `default_schema`.`tb` AS `tb`\n"
+                                + "WHERE `tb`.`id` IS NOT NULL");
     }
 
     @Test
@@ -160,29 +168,33 @@ public class TransformParserTest {
         RelBuilder relBuilder = config.getRelBuilderFactory().create(cluster, null);
         relRoot = relRoot.withRel(RelDecorrelator.decorrelateQuery(relRoot.rel, relBuilder));
         RelNode relNode = relRoot.rel;
-        Assert.assertEquals(
-                "SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`",
-                parse.getSelectList().toString());
-        Assert.assertEquals("`tb`.`id` IS NOT NULL", parse.getWhere().toString());
-        Assert.assertEquals(
-                "SELECT SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`\n"
-                        + "FROM `default_schema`.`tb` AS `tb`\n"
-                        + "WHERE `tb`.`id` IS NOT NULL",
-                validateSqlNode.toString().replaceAll("\r\n", "\n"));
+
+        Assertions.assertThat(parse.getSelectList().toString())
+                .isEqualTo("SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`");
+
+        Assertions.assertThat(parse.getWhere().toString()).isEqualTo("`tb`.`id` IS NOT NULL");
+
+        Assertions.assertThat(validateSqlNode.toString().replaceAll("\r\n", "\n"))
+                .isEqualTo(
+                        "SELECT SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`\n"
+                                + "FROM `default_schema`.`tb` AS `tb`\n"
+                                + "WHERE `tb`.`id` IS NOT NULL");
     }
 
     @Test
     public void testParseComputedColumnNames() {
         List<String> computedColumnNames =
                 TransformParser.parseComputedColumnNames("CONCAT(id, order_id) as uniq_id, *");
-        Assert.assertEquals(new String[] {"uniq_id"}, computedColumnNames.toArray());
+
+        Assertions.assertThat(computedColumnNames.toArray()).isEqualTo(new String[] {"uniq_id"});
     }
 
     @Test
     public void testParseFilterColumnNameList() {
         List<String> computedColumnNames =
                 TransformParser.parseFilterColumnNameList(" uniq_id > 10 and id is not null");
-        Assert.assertEquals(new String[] {"uniq_id", "id"}, computedColumnNames.toArray());
+        Assertions.assertThat(computedColumnNames.toArray())
+                .isEqualTo(new String[] {"uniq_id", "id"});
     }
 
     @Test
@@ -298,9 +310,112 @@ public class TransformParserTest {
         testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
     }
 
+    @Test
+    public void testGenerateProjectionColumns() {
+        List<Column> testColumns =
+                Arrays.asList(
+                        Column.physicalColumn("id", DataTypes.INT(), "id"),
+                        Column.physicalColumn("name", DataTypes.STRING(), "string"),
+                        Column.physicalColumn("age", DataTypes.INT(), "age"),
+                        Column.physicalColumn("address", DataTypes.STRING(), "address"),
+                        Column.physicalColumn("weight", DataTypes.DOUBLE(), "weight"),
+                        Column.physicalColumn("height", DataTypes.DOUBLE(), "height"));
+
+        List<ProjectionColumn> result =
+                TransformParser.generateProjectionColumns(
+                        "id, upper(name) as name, age + 1 as newage, weight / (height * height) as bmi",
+                        testColumns);
+
+        List<String> expected =
+                Arrays.asList(
+                        "ProjectionColumn{column=`id` INT, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
+                        "ProjectionColumn{column=`name` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper(name)', originalColumnNames=[name], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`newage` INT, expression='`TB`.`age` + 1', scriptExpression='age + 1', originalColumnNames=[age], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='weight / height * height', originalColumnNames=[weight, height, height], transformExpressionKey=null}");
+        Assertions.assertThat(result.toString()).isEqualTo("[" + String.join(", ", expected) + "]");
+
+        List<ProjectionColumn> metadataResult =
+                TransformParser.generateProjectionColumns(
+                        "*, __namespace_name__, __schema_name__, __table_name__", testColumns);
+
+        List<String> metadataExpected =
+                Arrays.asList(
+                        "ProjectionColumn{column=`id` INT, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
+                        "ProjectionColumn{column=`name` STRING, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
+                        "ProjectionColumn{column=`age` INT, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
+                        "ProjectionColumn{column=`address` STRING, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
+                        "ProjectionColumn{column=`weight` DOUBLE, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
+                        "ProjectionColumn{column=`height` DOUBLE, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
+                        "ProjectionColumn{column=`__namespace_name__` STRING NOT NULL, expression='__namespace_name__', scriptExpression='__namespace_name__', originalColumnNames=[__namespace_name__], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`__schema_name__` STRING NOT NULL, expression='__schema_name__', scriptExpression='__schema_name__', originalColumnNames=[__schema_name__], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`__table_name__` STRING NOT NULL, expression='__table_name__', scriptExpression='__table_name__', originalColumnNames=[__table_name__], transformExpressionKey=null}");
+        Assertions.assertThat(metadataResult.toString())
+                .isEqualTo("[" + String.join(", ", metadataExpected) + "]");
+
+        // calculated columns must use AS to provide an alias name
+        Assertions.assertThatThrownBy(
+                        () -> TransformParser.generateProjectionColumns("id, 1 + 1", testColumns))
+                .isExactlyInstanceOf(ParseException.class);
+    }
+
+    @Test
+    public void testGenerateReferencedColumns() {
+        List<Column> testColumns =
+                Arrays.asList(
+                        Column.physicalColumn("id", DataTypes.INT(), "id"),
+                        Column.physicalColumn("name", DataTypes.STRING(), "string"),
+                        Column.physicalColumn("age", DataTypes.INT(), "age"),
+                        Column.physicalColumn("address", DataTypes.STRING(), "address"),
+                        Column.physicalColumn("weight", DataTypes.DOUBLE(), "weight"),
+                        Column.physicalColumn("height", DataTypes.DOUBLE(), "height"),
+                        Column.physicalColumn("birthday", DataTypes.DATE(), "birthday"));
+
+        List<Column> result =
+                TransformParser.generateReferencedColumns(
+                        "id, upper(name) as name, age + 1 as newage, weight / (height * height) as bmi",
+                        "bmi > 17 and char_length(address) > 10",
+                        testColumns);
+
+        List<String> expected =
+                Arrays.asList(
+                        "`id` INT 'id'",
+                        "`name` STRING 'string'",
+                        "`age` INT 'age'",
+                        "`address` STRING 'address'",
+                        "`weight` DOUBLE 'weight'",
+                        "`height` DOUBLE 'height'");
+        Assertions.assertThat(result.toString()).isEqualTo("[" + String.join(", ", expected) + "]");
+
+        // calculated columns must use AS to provide an alias name
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.generateReferencedColumns(
+                                        "id, 1 + 1", null, testColumns))
+                .isExactlyInstanceOf(ParseException.class);
+    }
+
+    @Test
+    public void testNormalizeFilter() {
+        Assertions.assertThat(TransformParser.normalizeFilter("a, b, c, d", "a > 0 and b > 0"))
+                .isEqualTo("`a` > 0 AND `b` > 0");
+        Assertions.assertThat(TransformParser.normalizeFilter("a, b, c, d", null)).isEqualTo(null);
+        Assertions.assertThat(
+                        TransformParser.normalizeFilter(
+                                "abs(a) as cal_a, char_length(b) as cal_b, c, d",
+                                "a > 4 and cal_a > 8 and cal_b < 17 and c != d"))
+                .isEqualTo("`a` > 4 AND ABS(`a`) > 8 AND CHAR_LENGTH(`b`) < 17 AND `c` <> `d`");
+
+        Assertions.assertThat(
+                        TransformParser.normalizeFilter(
+                                "x, y, z, 1 - x as u, 1 - y as v, 1 - z as w",
+                                "concat(u, concat(v, concat(w, x), y), z) != 10"))
+                .isEqualTo(
+                        "`concat`(1 - `x`, `concat`(1 - `y`, `concat`(1 - `z`, `x`), `y`), `z`) <> 10");
+    }
+
     private void testFilterExpression(String expression, String expressionExpect) {
         String janinoExpression =
                 TransformParser.translateFilterExpressionToJaninoExpression(expression);
-        Assert.assertEquals(expressionExpect, janinoExpression);
+        Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
     }
 }

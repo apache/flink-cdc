@@ -238,6 +238,57 @@ class YamlPipelineDefinitionParserTest {
                                     .put("schema-operator.rpc-timeout", "1 h")
                                     .build()));
 
+    @Test
+    void testParsingFullDefinitionFromString() throws Exception {
+        String pipelineDefText =
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "  name: source-database\n"
+                        + "  host: localhost\n"
+                        + "  port: 3306\n"
+                        + "  username: admin\n"
+                        + "  password: pass\n"
+                        + "  tables: adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*\n"
+                        + "  chunk-column: app_order_.*:id,web_order:product_id\n"
+                        + "  capture-new-tables: true\n"
+                        + "\n"
+                        + "sink:\n"
+                        + "  type: kafka\n"
+                        + "  name: sink-queue\n"
+                        + "  bootstrap-servers: localhost:9092\n"
+                        + "  auto-create-table: true\n"
+                        + "\n"
+                        + "route:\n"
+                        + "  - source-table: mydb.default.app_order_.*\n"
+                        + "    sink-table: odsdb.default.app_order\n"
+                        + "    description: sync all sharding tables to one\n"
+                        + "  - source-table: mydb.default.web_order\n"
+                        + "    sink-table: odsdb.default.ods_web_order\n"
+                        + "    description: sync table to with given prefix ods_\n"
+                        + "\n"
+                        + "transform:\n"
+                        + "  - source-table: mydb.app_order_.*\n"
+                        + "    projection: id, order_id, TO_UPPER(product_name)\n"
+                        + "    filter: id > 10 AND order_id > 100\n"
+                        + "    primary-keys: id\n"
+                        + "    partition-keys: product_name\n"
+                        + "    table-options: comment=app order\n"
+                        + "    description: project fields from source table\n"
+                        + "  - source-table: mydb.web_order_.*\n"
+                        + "    projection: CONCAT(id, order_id) as uniq_id, *\n"
+                        + "    filter: uniq_id > 10\n"
+                        + "    description: add new uniq_id for each row\n"
+                        + "\n"
+                        + "pipeline:\n"
+                        + "  name: source-database-sync-pipe\n"
+                        + "  parallelism: 4\n"
+                        + "  schema.change.behavior: evolve\n"
+                        + "  schema-operator.rpc-timeout: 1 h";
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(pipelineDefText, new Configuration());
+        assertThat(pipelineDef).isEqualTo(fullDef);
+    }
+
     private final PipelineDef fullDefWithGlobalConf =
             new PipelineDef(
                     new SourceDef(

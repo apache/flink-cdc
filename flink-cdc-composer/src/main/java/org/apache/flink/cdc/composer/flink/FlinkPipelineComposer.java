@@ -104,9 +104,9 @@ public class FlinkPipelineComposer implements PipelineComposer {
         DataStream<Event> stream =
                 sourceTranslator.translate(pipelineDef.getSource(), env, pipelineDef.getConfig());
 
-        // Build TransformSchemaOperator for processing Schema Event
+        // Build PreTransformOperator for processing Schema Event
         TransformTranslator transformTranslator = new TransformTranslator();
-        stream = transformTranslator.translateSchema(stream, pipelineDef.getTransforms());
+        stream = transformTranslator.translatePreTransform(stream, pipelineDef.getTransforms());
 
         // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
@@ -119,9 +119,9 @@ public class FlinkPipelineComposer implements PipelineComposer {
         OperatorIDGenerator schemaOperatorIDGenerator =
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
 
-        // Build TransformDataOperator for processing Data Event
+        // Build PostTransformOperator for processing Data Event
         stream =
-                transformTranslator.translateData(
+                transformTranslator.translatePostTransform(
                         stream,
                         pipelineDef.getTransforms(),
                         schemaOperatorIDGenerator.generate(),
