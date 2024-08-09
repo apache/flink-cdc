@@ -262,6 +262,12 @@ class FlinkPipelineTransformITCase {
         String localTimestamp = tokens.get(4);
         assertThat(currentTimestamp).isEqualTo(nowTimestamp).isEqualTo(localTimestamp);
 
+        // If timestamp millisecond part is .000, it will be truncated to yyyy-MM-dd'T'HH:mm:ss
+        // format. Manually append this for the following checks.
+        if (currentTimestamp.length() == 19) {
+            currentTimestamp += ".000";
+        }
+
         Instant instant =
                 LocalDateTime.parse(
                                 currentTimestamp,

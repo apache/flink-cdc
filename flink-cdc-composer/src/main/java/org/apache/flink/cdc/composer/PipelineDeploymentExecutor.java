@@ -15,25 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.cli.parser;
+package org.apache.flink.cdc.composer;
 
-import org.apache.flink.cdc.common.configuration.Configuration;
-import org.apache.flink.cdc.composer.definition.PipelineDef;
+import org.apache.flink.configuration.Configuration;
+
+import org.apache.commons.cli.CommandLine;
 
 import java.nio.file.Path;
+import java.util.List;
 
-/** Parsing pipeline definition files and generate {@link PipelineDef}. */
-public interface PipelineDefinitionParser {
+/** PipelineDeploymentExecutor to execute flink cdc job from different target. */
+public interface PipelineDeploymentExecutor {
 
-    /**
-     * Parse the specified pipeline definition file path, merge global configurations, then generate
-     * the {@link PipelineDef}.
-     */
-    PipelineDef parse(Path pipelineDefPath, Configuration globalPipelineConfig) throws Exception;
-
-    /**
-     * Parse the specified pipeline definition string, merge global configurations, then generate
-     * the {@link PipelineDef}.
-     */
-    PipelineDef parse(String pipelineDefText, Configuration globalPipelineConfig) throws Exception;
+    PipelineExecution.ExecutionInfo deploy(
+            CommandLine commandLine, Configuration flinkConfig, List<Path> additionalJars)
+            throws Exception;
 }

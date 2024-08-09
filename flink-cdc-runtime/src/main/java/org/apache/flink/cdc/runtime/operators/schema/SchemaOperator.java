@@ -75,6 +75,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -92,7 +93,7 @@ import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEM
  */
 @Internal
 public class SchemaOperator extends AbstractStreamOperator<Event>
-        implements OneInputStreamOperator<Event, Event> {
+        implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
 

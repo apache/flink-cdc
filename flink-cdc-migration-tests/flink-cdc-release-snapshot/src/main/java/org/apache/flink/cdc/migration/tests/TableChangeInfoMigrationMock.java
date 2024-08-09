@@ -20,7 +20,7 @@ package org.apache.flink.cdc.migration.tests;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.runtime.operators.transform.TableChangeInfo;
+import org.apache.flink.cdc.runtime.operators.transform.PreTransformChangeInfo;
 
 /** Dummy classes for migration test. Called via reflection. */
 public class TableChangeInfoMigrationMock implements MigrationMockBase {
@@ -34,27 +34,28 @@ public class TableChangeInfoMigrationMock implements MigrationMockBase {
                     .primaryKey("id", "name")
                     .build();
 
-    public TableChangeInfo generateDummyObject() {
-        return TableChangeInfo.of(DUMMY_TABLE_ID, DUMMY_SCHEMA, DUMMY_SCHEMA);
+    public PreTransformChangeInfo generateDummyObject() {
+        return PreTransformChangeInfo.of(DUMMY_TABLE_ID, DUMMY_SCHEMA, DUMMY_SCHEMA);
     }
 
     @Override
     public int getSerializerVersion() {
-        return TableChangeInfo.SERIALIZER.getVersion();
+        return PreTransformChangeInfo.SERIALIZER.getVersion();
     }
 
     @Override
     public byte[] serializeObject() throws Exception {
-        return TableChangeInfo.SERIALIZER.serialize(generateDummyObject());
+        return PreTransformChangeInfo.SERIALIZER.serialize(generateDummyObject());
     }
 
     @Override
     public boolean deserializeAndCheckObject(int version, byte[] bytes) throws Exception {
-        TableChangeInfo expected = generateDummyObject();
-        TableChangeInfo actual = TableChangeInfo.SERIALIZER.deserialize(version, bytes);
+        PreTransformChangeInfo expected = generateDummyObject();
+        PreTransformChangeInfo actual =
+                PreTransformChangeInfo.SERIALIZER.deserialize(version, bytes);
 
         return expected.getTableId().equals(actual.getTableId())
-                && expected.getOriginalSchema().equals(actual.getOriginalSchema())
-                && expected.getTransformedSchema().equals(actual.getTransformedSchema());
+                && expected.getSourceSchema().equals(actual.getSourceSchema())
+                && expected.getPreTransformedSchema().equals(actual.getPreTransformedSchema());
     }
 }

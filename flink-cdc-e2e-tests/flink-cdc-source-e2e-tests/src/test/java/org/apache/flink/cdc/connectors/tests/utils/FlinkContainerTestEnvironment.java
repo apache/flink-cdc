@@ -120,11 +120,8 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
 
     @Parameterized.Parameters(name = "flinkVersion: {0}")
     public static List<String> getFlinkVersion() {
-        return Arrays.asList("1.16.3", "1.17.2", "1.18.1", "1.19.0");
+        return Arrays.asList("1.16.3", "1.17.2", "1.18.1", "1.19.1", "1.20.0");
     }
-
-    private static final List<String> FLINK_VERSION_WITH_SCALA_212 =
-            Arrays.asList("1.16.3", "1.17.2", "1.18.1", "1.19.0");
 
     @Before
     public void before() {
@@ -309,10 +306,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     }
 
     private String getFlinkDockerImageTag() {
-        if (FLINK_VERSION_WITH_SCALA_212.contains(flinkVersion)) {
-            return String.format("flink:%s-scala_2.12", flinkVersion);
-        }
-        return String.format("flink:%s-scala_2.11", flinkVersion);
+        return String.format("flink:%s-scala_2.12", flinkVersion);
     }
 
     protected String getJdbcConnectorResourceName() {

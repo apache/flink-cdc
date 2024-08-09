@@ -21,7 +21,6 @@ import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSchemaFactory;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
@@ -41,15 +40,16 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.sql.SqlBasicCall;
+import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlSelect;
-import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.util.SqlOperatorTables;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
@@ -60,14 +60,21 @@ import org.apache.calcite.sql2rel.StandardConvertletTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import static org.apache.flink.cdc.common.utils.StringUtils.isNullOrWhitespaceOnly;
 
 /** Use Flink's calcite parser to parse the statement of flink cdc pipeline transform. */
 public class TransformParser {
@@ -141,16 +148,86 @@ public class TransformParser {
         }
     }
 
-    // Parse all columns
+    // Returns referenced columns (directly and indirectly) by projection and filter expression.
+    // For example, given projection expression "a, c, upper(x) as d, y as e", filter expression "z
+    // > 0", and columns array [a, b, c, x, y, z], returns referenced column array [a, c, x, y, z].
+    public static List<Column> generateReferencedColumns(
+            String projectionExpression, @Nullable String filterExpression, List<Column> columns) {
+        if (isNullOrWhitespaceOnly(projectionExpression)) {
+            return new ArrayList<>();
+        }
+
+        Set<String> referencedColumnNames = new HashSet<>();
+
+        SqlSelect sqlProject = parseProjectionExpression(projectionExpression);
+        if (!sqlProject.getSelectList().isEmpty()) {
+            for (SqlNode sqlNode : sqlProject.getSelectList()) {
+                if (sqlNode instanceof SqlBasicCall) {
+                    SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+                    if (SqlKind.AS.equals(sqlBasicCall.getOperator().kind)) {
+                        referencedColumnNames.addAll(
+                                parseColumnNameList(sqlBasicCall.getOperandList().get(0)));
+                    } else {
+                        throw new ParseException(
+                                "Unrecognized projection expression: "
+                                        + sqlBasicCall
+                                        + ". Should be <EXPR> AS <IDENTIFIER>");
+                    }
+                } else if (sqlNode instanceof SqlIdentifier) {
+                    SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
+                    if (sqlIdentifier.isStar()) {
+                        // wildcard star character matches all columns
+                        return columns;
+                    }
+                    referencedColumnNames.add(
+                            sqlIdentifier.names.get(sqlIdentifier.names.size() - 1));
+                }
+            }
+        }
+
+        if (!isNullOrWhitespaceOnly(projectionExpression)) {
+            SqlSelect sqlFilter = parseFilterExpression(filterExpression);
+            referencedColumnNames.addAll(parseColumnNameList(sqlFilter.getWhere()));
+        }
+
+        return columns.stream()
+                .filter(e -> referencedColumnNames.contains(e.getName()))
+                .collect(Collectors.toList());
+    }
+
+    // Expands wildcard character * to full column list.
+    // For example, given projection expression "a AS new_a, *, c as new_c"
+    // and schema [a, b, c], expand it to [a as new_a, a, b, c, c as new_c].
+    // This step is necessary since passing wildcard to sqlToRel will capture
+    // unexpected metadata columns.
+    private static void expandWildcard(SqlSelect sqlSelect, List<Column> columns) {
+        List<SqlNode> expandedNodes = new ArrayList<>();
+        for (SqlNode sqlNode : sqlSelect.getSelectList().getList()) {
+            if (sqlNode instanceof SqlIdentifier && ((SqlIdentifier) sqlNode).isStar()) {
+                expandedNodes.addAll(
+                        columns.stream()
+                                .map(c -> new SqlIdentifier(c.getName(), SqlParserPos.QUOTED_ZERO))
+                                .collect(Collectors.toList()));
+            } else {
+                expandedNodes.add(sqlNode);
+            }
+        }
+        sqlSelect.setSelectList(new SqlNodeList(expandedNodes, SqlParserPos.ZERO));
+    }
+
+    // Returns projected columns based on given projection expression.
+    // For example, given projection expression "a, b, c, upper(a) as d, b as e" and columns array
+    // [a, b, c, x, y, z], returns projection column array [a, b, c, d, e].
     public static List<ProjectionColumn> generateProjectionColumns(
             String projectionExpression, List<Column> columns) {
-        if (StringUtils.isNullOrWhitespaceOnly(projectionExpression)) {
+        if (isNullOrWhitespaceOnly(projectionExpression)) {
             return new ArrayList<>();
         }
         SqlSelect sqlSelect = parseProjectionExpression(projectionExpression);
         if (sqlSelect.getSelectList().isEmpty()) {
             return new ArrayList<>();
         }
+        expandWildcard(sqlSelect, columns);
         RelNode relNode = sqlToRel(columns, sqlSelect);
         Map<String, RelDataType> relDataTypeMap =
                 relNode.getRowType().getFieldList().stream()
@@ -158,18 +235,23 @@ public class TransformParser {
                                 Collectors.toMap(
                                         RelDataTypeField::getName, RelDataTypeField::getType));
 
+        Map<String, DataType> rawDataTypeMap =
+                columns.stream().collect(Collectors.toMap(Column::getName, Column::getType));
+
         Map<String, Boolean> isNotNullMap =
                 columns.stream()
                         .collect(
                                 Collectors.toMap(
                                         Column::getName, column -> !column.getType().isNullable()));
+
         List<ProjectionColumn> projectionColumns = new ArrayList<>();
+
         for (SqlNode sqlNode : sqlSelect.getSelectList()) {
             if (sqlNode instanceof SqlBasicCall) {
                 SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
                 if (SqlKind.AS.equals(sqlBasicCall.getOperator().kind)) {
                     Optional<SqlNode> transformOptional = Optional.empty();
-                    String columnName = null;
+                    String columnName;
                     List<SqlNode> operandList = sqlBasicCall.getOperandList();
                     if (operandList.size() == 2) {
                         transformOptional = Optional.of(operandList.get(0));
@@ -177,7 +259,11 @@ public class TransformParser {
                         if (sqlNode1 instanceof SqlIdentifier) {
                             SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode1;
                             columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
+                        } else {
+                            columnName = null;
                         }
+                    } else {
+                        columnName = null;
                     }
                     if (isMetadataColumn(columnName)) {
                         continue;
@@ -209,14 +295,25 @@ public class TransformParser {
                         projectionColumns.add(projectionColumn);
                     }
                 } else {
-                    throw new ParseException("Unrecognized projection: " + sqlBasicCall.toString());
+                    throw new ParseException(
+                            "Unrecognized projection expression: "
+                                    + sqlBasicCall
+                                    + ". Should be <EXPR> AS <IDENTIFIER>");
                 }
             } else if (sqlNode instanceof SqlIdentifier) {
                 SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
                 String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
-                DataType columnType =
-                        DataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                relDataTypeMap.get(columnName));
+                DataType columnType;
+                if (rawDataTypeMap.containsKey(columnName)) {
+                    columnType = rawDataTypeMap.get(columnName);
+                } else if (relDataTypeMap.containsKey(columnName)) {
+                    columnType =
+                            DataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                    relDataTypeMap.get(columnName));
+                } else {
+                    throw new RuntimeException(
+                            String.format("Failed to deduce column %s type", columnName));
+                }
                 if (isMetadataColumn(columnName)) {
                     projectionColumns.add(
                             ProjectionColumn.of(
@@ -244,7 +341,7 @@ public class TransformParser {
     }
 
     public static String translateFilterExpressionToJaninoExpression(String filterExpression) {
-        if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
+        if (isNullOrWhitespaceOnly(filterExpression)) {
             return "";
         }
         SqlSelect sqlSelect = TransformParser.parseFilterExpression(filterExpression);
@@ -257,7 +354,7 @@ public class TransformParser {
 
     public static List<String> parseComputedColumnNames(String projection) {
         List<String> columnNames = new ArrayList<>();
-        if (StringUtils.isNullOrWhitespaceOnly(projection)) {
+        if (isNullOrWhitespaceOnly(projection)) {
             return columnNames;
         }
         SqlSelect sqlSelect = parseProjectionExpression(projection);
@@ -298,7 +395,7 @@ public class TransformParser {
     }
 
     public static List<String> parseFilterColumnNameList(String filterExpression) {
-        if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
+        if (isNullOrWhitespaceOnly(filterExpression)) {
             return new ArrayList<>();
         }
         SqlSelect sqlSelect = parseFilterExpression(filterExpression);
@@ -315,12 +412,12 @@ public class TransformParser {
             SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
             String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
             columnNameList.add(columnName);
-        } else if (sqlNode instanceof SqlBasicCall) {
-            SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
-            findSqlIdentifier(sqlBasicCall.getOperandList(), columnNameList);
-        } else if (sqlNode instanceof SqlCase) {
-            SqlCase sqlCase = (SqlCase) sqlNode;
-            findSqlIdentifier(sqlCase.getWhenOperands().getList(), columnNameList);
+        } else if (sqlNode instanceof SqlCall) {
+            SqlCall sqlCall = (SqlCall) sqlNode;
+            findSqlIdentifier(sqlCall.getOperandList(), columnNameList);
+        } else if (sqlNode instanceof SqlNodeList) {
+            SqlNodeList sqlNodeList = (SqlNodeList) sqlNode;
+            findSqlIdentifier(sqlNodeList.getList(), columnNameList);
         }
         return columnNameList;
     }
@@ -331,13 +428,12 @@ public class TransformParser {
                 SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
                 String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
                 columnNameList.add(columnName);
-            } else if (sqlNode instanceof SqlBasicCall) {
-                SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
-                findSqlIdentifier(sqlBasicCall.getOperandList(), columnNameList);
-            } else if (sqlNode instanceof SqlCase) {
-                SqlCase sqlCase = (SqlCase) sqlNode;
-                SqlNodeList whenOperands = sqlCase.getWhenOperands();
-                findSqlIdentifier(whenOperands.getList(), columnNameList);
+            } else if (sqlNode instanceof SqlCall) {
+                SqlCall sqlCall = (SqlCall) sqlNode;
+                findSqlIdentifier(sqlCall.getOperandList(), columnNameList);
+            } else if (sqlNode instanceof SqlNodeList) {
+                SqlNodeList sqlNodeList = (SqlNodeList) sqlNode;
+                findSqlIdentifier(sqlNodeList.getList(), columnNameList);
             }
         }
     }
@@ -384,10 +480,81 @@ public class TransformParser {
         StringBuilder statement = new StringBuilder();
         statement.append("SELECT * FROM ");
         statement.append(DEFAULT_TABLE);
-        if (!StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
+        if (!isNullOrWhitespaceOnly(filterExpression)) {
             statement.append(" WHERE ");
             statement.append(filterExpression);
         }
         return parseSelect(statement.toString());
+    }
+
+    public static SqlNode rewriteExpression(SqlNode sqlNode, Map<String, SqlNode> replaceMap) {
+        if (sqlNode instanceof SqlCall) {
+            SqlCall sqlCall = (SqlCall) sqlNode;
+
+            List<SqlNode> operands = sqlCall.getOperandList();
+            IntStream.range(0, sqlCall.operandCount())
+                    .forEach(
+                            i ->
+                                    sqlCall.setOperand(
+                                            i, rewriteExpression(operands.get(i), replaceMap)));
+            return sqlCall;
+        } else if (sqlNode instanceof SqlIdentifier) {
+            SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
+            if (sqlIdentifier.names.size() == 1) {
+                String name = sqlIdentifier.names.get(0);
+                if (replaceMap.containsKey(name)) {
+                    return replaceMap.get(name);
+                }
+            }
+            return sqlIdentifier;
+        } else if (sqlNode instanceof SqlNodeList) {
+            SqlNodeList sqlNodeList = (SqlNodeList) sqlNode;
+            IntStream.range(0, sqlNodeList.size())
+                    .forEach(
+                            i ->
+                                    sqlNodeList.set(
+                                            i, rewriteExpression(sqlNodeList.get(i), replaceMap)));
+            return sqlNodeList;
+        } else {
+            return sqlNode;
+        }
+    }
+
+    // Filter expression might hold reference to a calculated column, which causes confusion about
+    // the sequence of projection and filtering operations. This function rewrites filtering about
+    // calculated columns to circumvent this problem.
+    public static String normalizeFilter(String projection, String filter) {
+        if (isNullOrWhitespaceOnly(projection) || isNullOrWhitespaceOnly(filter)) {
+            return filter;
+        }
+
+        SqlSelect sqlSelect = parseProjectionExpression(projection);
+        if (sqlSelect.getSelectList().isEmpty()) {
+            return filter;
+        }
+
+        Map<String, SqlNode> calculatedExpression = new HashMap<>();
+        for (SqlNode sqlNode : sqlSelect.getSelectList()) {
+            if (sqlNode instanceof SqlBasicCall) {
+                SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+                if (SqlKind.AS.equals(sqlBasicCall.getOperator().kind)) {
+                    List<SqlNode> operandList = sqlBasicCall.getOperandList();
+                    if (operandList.size() == 2) {
+                        SqlIdentifier alias = (SqlIdentifier) operandList.get(1);
+                        String name = alias.names.get(alias.names.size() - 1);
+                        SqlNode expression = operandList.get(0);
+                        calculatedExpression.put(name, expression);
+                    }
+                }
+            }
+        }
+
+        SqlNode sqlFilter = parseFilterExpression(filter).getWhere();
+        sqlFilter = rewriteExpression(sqlFilter, calculatedExpression);
+        if (sqlFilter != null) {
+            return sqlFilter.toString();
+        } else {
+            return filter;
+        }
     }
 }
