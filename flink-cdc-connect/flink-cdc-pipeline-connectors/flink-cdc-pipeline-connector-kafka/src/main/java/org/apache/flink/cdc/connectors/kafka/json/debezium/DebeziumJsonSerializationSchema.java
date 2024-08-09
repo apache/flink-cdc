@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.kafka.json.debezium;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -40,6 +40,7 @@ import org.apache.flink.table.types.logical.RowType;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static java.lang.String.format;
 import static org.apache.flink.table.types.utils.TypeConversions.fromLogicalToDataType;
@@ -99,34 +100,38 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
     @Override
     public byte[] serialize(Event event) {
         if (event instanceof SchemaChangeEvent) {
-            Schema schema;
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
-            if (event instanceof CreateTableEvent) {
-                CreateTableEvent createTableEvent = (CreateTableEvent) event;
-                schema = createTableEvent.getSchema();
+            Tuple2<TableId, Schema> appliedSchema =
+                    SchemaUtils.applySchemaChangeEvent(
+                            schemaChangeEvent,
+                            Optional.ofNullable(
+                                            jsonSerializers.getOrDefault(
+                                                    schemaChangeEvent.tableId(), null))
+                                    .map(TableSchemaInfo::getSchema)
+                                    .orElse(null));
+
+            if (appliedSchema.f1 != null) {
+                LogicalType rowType =
+                        DataTypeUtils.toFlinkDataType(appliedSchema.f1.toRowDataType())
+                                .getLogicalType();
+                JsonRowDataSerializationSchema jsonSerializer =
+                        new JsonRowDataSerializationSchema(
+                                createJsonRowType(fromLogicalToDataType(rowType)),
+                                timestampFormat,
+                                mapNullKeyMode,
+                                mapNullKeyLiteral,
+                                encodeDecimalAsPlainNumber);
+                try {
+                    jsonSerializer.open(context);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+                jsonSerializers.put(
+                        appliedSchema.f0,
+                        new TableSchemaInfo(appliedSchema.f1, jsonSerializer, zoneId));
             } else {
-                schema =
-                        SchemaUtils.applySchemaChangeEvent(
-                                jsonSerializers.get(schemaChangeEvent.tableId()).getSchema(),
-                                schemaChangeEvent);
+                jsonSerializers.remove(appliedSchema.f0, null);
             }
-            LogicalType rowType =
-                    DataTypeUtils.toFlinkDataType(schema.toRowDataType()).getLogicalType();
-            JsonRowDataSerializationSchema jsonSerializer =
-                    new JsonRowDataSerializationSchema(
-                            createJsonRowType(fromLogicalToDataType(rowType)),
-                            timestampFormat,
-                            mapNullKeyMode,
-                            mapNullKeyLiteral,
-                            encodeDecimalAsPlainNumber);
-            try {
-                jsonSerializer.open(context);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-            jsonSerializers.put(
-                    schemaChangeEvent.tableId(),
-                    new TableSchemaInfo(schema, jsonSerializer, zoneId));
             return null;
         }
 

@@ -27,7 +27,6 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.Preconditions;
-import org.apache.flink.cdc.common.utils.SchemaUtils;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
@@ -75,13 +74,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
             if (event instanceof CreateTableEvent) {
                 schemaMaps.put(tableId, ((CreateTableEvent) event).getSchema());
             } else {
-                if (!schemaMaps.containsKey(tableId)) {
-                    throw new RuntimeException("schema of " + tableId + " is not existed.");
-                }
-                schemaMaps.put(
-                        tableId,
-                        SchemaUtils.applySchemaChangeEvent(
-                                schemaMaps.get(tableId), schemaChangeEvent));
+                schemaMaps.remove(tableId);
             }
         }
         return null;

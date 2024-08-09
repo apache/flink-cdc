@@ -18,10 +18,13 @@
 package org.apache.flink.cdc.connectors.mysql.source.parser;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnCommentEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.types.DataType;
 
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
@@ -206,6 +209,10 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     typeMapping.put(column.name(), fromDbzColumn(column));
                     changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
 
+                    Map<String, String> commentMapping = new HashMap<>();
+                    commentMapping.put(column.name(), column.comment());
+                    changes.add(new AlterColumnCommentEvent(currentTable, commentMapping));
+
                     if (newColumnName != null && !column.name().equalsIgnoreCase(newColumnName)) {
                         Map<String, String> renameMap = new HashMap<>();
                         renameMap.put(column.name(), newColumnName);
@@ -251,9 +258,15 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         parser.runIfNotNull(
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
+
                     Map<String, DataType> typeMapping = new HashMap<>();
                     typeMapping.put(column.name(), fromDbzColumn(column));
                     changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+
+                    Map<String, String> commentMapping = new HashMap<>();
+                    commentMapping.put(column.name(), column.comment());
+                    changes.add(new AlterColumnCommentEvent(currentTable, commentMapping));
+
                     listeners.remove(columnDefinitionListener);
                 },
                 columnDefinitionListener);
@@ -275,6 +288,25 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                 },
                 columnDefinitionListener);
         super.exitAlterByRenameColumn(ctx);
+    }
+
+    @Override
+    public void exitTruncateTable(MySqlParser.TruncateTableContext ctx) {
+        TableId tableId = parser.parseQualifiedTableId(ctx.tableName().fullId());
+        changes.add(new TruncateTableEvent(toCdcTableId(tableId)));
+        super.exitTruncateTable(ctx);
+    }
+
+    @Override
+    public void exitDropTable(MySqlParser.DropTableContext ctx) {
+        ctx.tables()
+                .tableName()
+                .forEach(
+                        evt -> {
+                            TableId tableId = parser.parseQualifiedTableId(evt.fullId());
+                            changes.add(new DropTableEvent(toCdcTableId(tableId)));
+                        });
+        super.exitDropTable(ctx);
     }
 
     private org.apache.flink.cdc.common.schema.Column toCdcColumn(Column dbzColumn) {

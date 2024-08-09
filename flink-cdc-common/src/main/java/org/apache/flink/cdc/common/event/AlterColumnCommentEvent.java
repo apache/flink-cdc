@@ -17,9 +17,7 @@
 
 package org.apache.flink.cdc.common.event;
 
-import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.types.DataType;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -29,9 +27,9 @@ import java.util.stream.Collectors;
 
 /**
  * A {@link SchemaChangeEvent} that represents an {@code ALTER COLUMN} DDL, which may contain the
- * lenient column type changes.
+ * comment changes.
  */
-public class AlterColumnTypeEvent
+public class AlterColumnCommentEvent
         implements ColumnSchemaChangeEvent, SchemaChangeEventWithPreSchema {
 
     private static final long serialVersionUID = 1L;
@@ -39,28 +37,32 @@ public class AlterColumnTypeEvent
     private final TableId tableId;
 
     /** key => column name, value => column type after changing. */
-    private final Map<String, DataType> typeMapping;
+    private final Map<String, String> commentMapping;
 
-    private final Map<String, DataType> oldTypeMapping;
+    private final Map<String, String> oldCommentMapping;
 
-    public AlterColumnTypeEvent(TableId tableId, Map<String, DataType> typeMapping) {
+    public AlterColumnCommentEvent(TableId tableId, Map<String, String> commentMapping) {
         this.tableId = tableId;
-        this.typeMapping = typeMapping;
-        this.oldTypeMapping = new HashMap<>();
+        this.commentMapping = commentMapping;
+        this.oldCommentMapping = new HashMap<>();
     }
 
-    public AlterColumnTypeEvent(
+    public AlterColumnCommentEvent(
             TableId tableId,
-            Map<String, DataType> typeMapping,
-            Map<String, DataType> oldTypeMapping) {
+            Map<String, String> commentMapping,
+            Map<String, String> oldCommentMapping) {
         this.tableId = tableId;
-        this.typeMapping = typeMapping;
-        this.oldTypeMapping = oldTypeMapping;
+        this.commentMapping = commentMapping;
+        this.oldCommentMapping = oldCommentMapping;
     }
 
     /** Returns the type mapping. */
-    public Map<String, DataType> getTypeMapping() {
-        return typeMapping;
+    public Map<String, String> getCommentMapping() {
+        return commentMapping;
+    }
+
+    public Map<String, String> getOldCommentMapping() {
+        return oldCommentMapping;
     }
 
     @Override
@@ -68,37 +70,37 @@ public class AlterColumnTypeEvent
         if (this == o) {
             return true;
         }
-        if (!(o instanceof AlterColumnTypeEvent)) {
+        if (!(o instanceof AlterColumnCommentEvent)) {
             return false;
         }
-        AlterColumnTypeEvent that = (AlterColumnTypeEvent) o;
+        AlterColumnCommentEvent that = (AlterColumnCommentEvent) o;
         return Objects.equals(tableId, that.tableId)
-                && Objects.equals(typeMapping, that.typeMapping)
-                && Objects.equals(oldTypeMapping, that.oldTypeMapping);
+                && Objects.equals(commentMapping, that.commentMapping)
+                && Objects.equals(oldCommentMapping, that.oldCommentMapping);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId, typeMapping, oldTypeMapping);
+        return Objects.hash(tableId, commentMapping, oldCommentMapping);
     }
 
     @Override
     public String toString() {
         if (hasPreSchema()) {
-            return "AlterColumnTypeEvent{"
+            return "AlterColumnCommentEvent{"
                     + "tableId="
                     + tableId
-                    + ", typeMapping="
-                    + typeMapping
-                    + ", oldTypeMapping="
-                    + oldTypeMapping
+                    + ", commentMapping="
+                    + commentMapping
+                    + ", oldCommentMapping="
+                    + oldCommentMapping
                     + '}';
         } else {
-            return "AlterColumnTypeEvent{"
+            return "AlterColumnCommentEvent{"
                     + "tableId="
                     + tableId
-                    + ", typeMapping="
-                    + typeMapping
+                    + ", commentMapping="
+                    + commentMapping
                     + '}';
         }
     }
@@ -108,41 +110,40 @@ public class AlterColumnTypeEvent
         return tableId;
     }
 
-    public Map<String, DataType> getOldTypeMapping() {
-        return oldTypeMapping;
-    }
-
     @Override
     public boolean hasPreSchema() {
-        return !oldTypeMapping.isEmpty();
+        return !oldCommentMapping.isEmpty();
     }
 
     @Override
     public void fillPreSchema(Schema oldTypeSchema) {
-        oldTypeMapping.clear();
-        oldTypeMapping.putAll(
-                oldTypeSchema.getColumns().stream()
-                        .filter(e -> typeMapping.containsKey(e.getName()) && e.getType() != null)
-                        .collect(Collectors.toMap(Column::getName, Column::getType)));
+        oldCommentMapping.clear();
+        oldTypeSchema.getColumns().stream()
+                .filter(e -> commentMapping.containsKey(e.getName()))
+                .forEach(e -> oldCommentMapping.put(e.getName(), e.getComment()));
     }
 
     @Override
     public boolean trimRedundantChanges() {
         if (hasPreSchema()) {
             Set<String> redundantlyChangedColumns =
-                    typeMapping.keySet().stream()
-                            .filter(e -> Objects.equals(typeMapping.get(e), oldTypeMapping.get(e)))
+                    commentMapping.keySet().stream()
+                            .filter(
+                                    e ->
+                                            Objects.equals(
+                                                    commentMapping.get(e),
+                                                    oldCommentMapping.get(e)))
                             .collect(Collectors.toSet());
 
             // Remove redundant alter column type records that doesn't really change the type
-            typeMapping.keySet().removeAll(redundantlyChangedColumns);
-            oldTypeMapping.keySet().removeAll(redundantlyChangedColumns);
+            commentMapping.keySet().removeAll(redundantlyChangedColumns);
+            oldCommentMapping.keySet().removeAll(redundantlyChangedColumns);
         }
-        return !typeMapping.isEmpty();
+        return !commentMapping.isEmpty();
     }
 
     @Override
     public SchemaChangeEventType getType() {
-        return SchemaChangeEventType.ALTER_COLUMN_TYPE;
+        return SchemaChangeEventType.ALTER_COLUMN_COMMENT;
     }
 }

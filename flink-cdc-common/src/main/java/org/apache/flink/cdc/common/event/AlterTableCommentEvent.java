@@ -17,31 +17,24 @@
 
 package org.apache.flink.cdc.common.event;
 
-import org.apache.flink.cdc.common.annotation.PublicEvolving;
-
-import java.util.List;
 import java.util.Objects;
 
-/**
- * A {@link SchemaChangeEvent} that represents an {@code DROP COLUMN} DDL, which may contain the
- * lenient column type changes.
- */
-@PublicEvolving
-public class DropColumnEvent implements ColumnSchemaChangeEvent {
-
+/** A {@link SchemaChangeEvent} that represents an {@code ALTER TABLE COMMENT = ...} DDL. */
+public class AlterTableCommentEvent implements TableSchemaChangeEvent {
     private static final long serialVersionUID = 1L;
 
     private final TableId tableId;
 
-    private final List<String> droppedColumnNames;
+    /** key => column name, value => column type after changing. */
+    private final String tableComment;
 
-    public DropColumnEvent(TableId tableId, List<String> droppedColumnNames) {
+    public AlterTableCommentEvent(TableId tableId, String tableComment) {
         this.tableId = tableId;
-        this.droppedColumnNames = droppedColumnNames;
+        this.tableComment = tableComment;
     }
 
-    public List<String> getDroppedColumnNames() {
-        return droppedColumnNames;
+    public String getTableComment() {
+        return tableComment;
     }
 
     @Override
@@ -49,26 +42,26 @@ public class DropColumnEvent implements ColumnSchemaChangeEvent {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof DropColumnEvent)) {
+        if (!(o instanceof AlterTableCommentEvent)) {
             return false;
         }
-        DropColumnEvent that = (DropColumnEvent) o;
+        AlterTableCommentEvent that = (AlterTableCommentEvent) o;
         return Objects.equals(tableId, that.tableId)
-                && Objects.equals(droppedColumnNames, that.droppedColumnNames);
+                && Objects.equals(tableComment, that.tableComment);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId, droppedColumnNames);
+        return Objects.hash(tableId, tableComment);
     }
 
     @Override
     public String toString() {
-        return "DropColumnEvent{"
+        return "AlterTableCommentEvent{"
                 + "tableId="
                 + tableId
-                + ", droppedColumnNames="
-                + droppedColumnNames
+                + ", tableComment="
+                + tableComment
                 + '}';
     }
 
@@ -79,6 +72,6 @@ public class DropColumnEvent implements ColumnSchemaChangeEvent {
 
     @Override
     public SchemaChangeEventType getType() {
-        return SchemaChangeEventType.DROP_COLUMN;
+        return SchemaChangeEventType.ALTER_TABLE_COMMENT;
     }
 }

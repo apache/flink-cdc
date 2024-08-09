@@ -59,6 +59,11 @@ public class MetadataColumn extends Column {
     }
 
     @Override
+    public Column copyComment(String newComment) {
+        return new MetadataColumn(name, type, metadataKey, newComment);
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
