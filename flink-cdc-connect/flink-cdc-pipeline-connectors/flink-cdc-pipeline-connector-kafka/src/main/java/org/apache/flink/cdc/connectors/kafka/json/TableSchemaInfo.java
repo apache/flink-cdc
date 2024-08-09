@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.data.binary.BinaryStringData;
 
@@ -39,26 +40,59 @@ import static org.apache.flink.cdc.common.types.DataTypeChecks.getScale;
 /** maintain the {@link SerializationSchema} of a specific {@link TableId}. */
 public class TableSchemaInfo {
 
+    private final TableId tableId;
+
     private final Schema schema;
+
+    private final List<Integer> primaryKeyColumnIndexes;
 
     private final List<RecordData.FieldGetter> fieldGetters;
 
     private final SerializationSchema<RowData> serializationSchema;
 
     public TableSchemaInfo(
-            Schema schema, SerializationSchema<RowData> serializationSchema, ZoneId zoneId) {
+            TableId tableId,
+            Schema schema,
+            SerializationSchema<RowData> serializationSchema,
+            ZoneId zoneId) {
+        this.tableId = tableId;
         this.schema = schema;
         this.serializationSchema = serializationSchema;
         this.fieldGetters = createFieldGetters(schema, zoneId);
+        primaryKeyColumnIndexes = new ArrayList<>();
+        for (int keyIndex = 0; keyIndex < schema.primaryKeys().size(); keyIndex++) {
+            for (int columnIndex = 0; columnIndex < schema.getColumnCount(); columnIndex++) {
+                if (schema.getColumns()
+                        .get(columnIndex)
+                        .getName()
+                        .equals(schema.primaryKeys().get(keyIndex))) {
+                    primaryKeyColumnIndexes.add(columnIndex);
+                    break;
+                }
+            }
+        }
     }
 
     /** convert to {@link RowData}, which will be pass to serializationSchema. */
-    public RowData getRowDataFromRecordData(RecordData recordData) {
-        GenericRowData genericRowData = new GenericRowData(recordData.getArity());
-        for (int i = 0; i < recordData.getArity(); i++) {
-            genericRowData.setField(i, fieldGetters.get(i).getFieldOrNull(recordData));
+    public RowData getRowDataFromRecordData(RecordData recordData, boolean primaryKeyOnly) {
+        if (primaryKeyOnly) {
+            GenericRowData genericRowData = new GenericRowData(primaryKeyColumnIndexes.size() + 1);
+            genericRowData.setField(0, StringData.fromString(tableId.toString()));
+            for (int i = 0; i < primaryKeyColumnIndexes.size(); i++) {
+                genericRowData.setField(
+                        i + 1,
+                        fieldGetters
+                                .get(primaryKeyColumnIndexes.get(i))
+                                .getFieldOrNull(recordData));
+            }
+            return genericRowData;
+        } else {
+            GenericRowData genericRowData = new GenericRowData(recordData.getArity());
+            for (int i = 0; i < recordData.getArity(); i++) {
+                genericRowData.setField(i, fieldGetters.get(i).getFieldOrNull(recordData));
+            }
+            return genericRowData;
         }
-        return genericRowData;
     }
 
     private static List<RecordData.FieldGetter> createFieldGetters(Schema schema, ZoneId zoneId) {

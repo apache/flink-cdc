@@ -86,6 +86,20 @@ Pipeline Connector Options
       <td>The name of the sink.</td>
     </tr>
     <tr>
+      <td>partition.strategy</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Defines the strategy for sending record to kafka topic, available options are `all-to-zero`(sending all records to 0 partition) and `hash-by-key`(distributing all records by hash of primary keys), default option is `all-to-zero`. </td>
+    </tr>
+    <tr>
+      <td>key.format</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Defines the format identifier for encoding key data, available options are `csv` and `json`, default option is `json`. </td>
+    </tr>
+    <tr>
       <td>value.format</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>

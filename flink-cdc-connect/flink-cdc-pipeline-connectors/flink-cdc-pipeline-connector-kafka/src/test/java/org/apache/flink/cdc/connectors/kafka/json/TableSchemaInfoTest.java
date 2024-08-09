@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
@@ -95,7 +96,9 @@ public class TableSchemaInfoTest {
                                 "null_string", org.apache.flink.cdc.common.types.DataTypes.STRING())
                         .primaryKey("col1")
                         .build();
-        TableSchemaInfo tableSchemaInfo = new TableSchemaInfo(schema, null, ZoneId.of("UTC+8"));
+        TableSchemaInfo tableSchemaInfo =
+                new TableSchemaInfo(
+                        TableId.parse("testDatabase.testTable"), schema, null, ZoneId.of("UTC+8"));
         Object[] testData =
                 new Object[] {
                     BinaryStringData.fromString("pk"),
@@ -159,6 +162,6 @@ public class TableSchemaInfoTest {
                         org.apache.flink.table.data.TimestampData.fromInstant(
                                 Instant.parse("2023-01-01T08:00:00.000Z")),
                         null),
-                tableSchemaInfo.getRowDataFromRecordData(recordData));
+                tableSchemaInfo.getRowDataFromRecordData(recordData, false));
     }
 }
