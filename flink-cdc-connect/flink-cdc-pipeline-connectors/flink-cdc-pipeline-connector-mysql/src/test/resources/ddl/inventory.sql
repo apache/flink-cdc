@@ -69,4 +69,24 @@ VALUES (default, '2016-01-16', 1001, 1, 102),
        (default, '2016-02-19', 1002, 2, 106),
        (default, '16-02-21', 1003, 1, 107);
 
+CREATE TABLE `multi_max_table`
+(
+    `order_id`   varchar(128) NOT NULL,
+    `index`   int(11) NOT NULL,
+    `desc`  varchar(512) NOT NULL,
+    PRIMARY KEY (`order_id`, `index`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+INSERT INTO multi_max_table
+VALUES ('', 0, 'flink'),
+       ('', 1, 'flink'),
+       ('', 2, 'flink'),
+       ('a', 0, 'flink'),
+       ('b', 0, 'flink'),
+       ('c', 0, 'flink'),
+       ('d', 0, 'flink'),
+       ('E', 0, 'flink'),
+       ('E', 1, 'flink'),
+       ('E', 2, 'flink'),
+       ('e', 4, 'flink'),
+       ('E', 3, 'flink');
 

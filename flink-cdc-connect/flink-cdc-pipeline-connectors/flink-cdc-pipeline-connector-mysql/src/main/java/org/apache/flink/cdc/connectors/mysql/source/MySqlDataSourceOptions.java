@@ -215,6 +215,16 @@ public class MySqlDataSourceOptions {
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
 
     @Experimental
+    public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =
+            ConfigOptions.key("scan.incremental.snapshot.chunk.key-column")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table."
+                                    + "By default, the chunk key is the first column of the primary key."
+                                    + "eg. db1.user_table_[0-9]+:col1;db[1-2].[app|web]_order_\\.*:col2;");
+
+    @Experimental
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED =
             ConfigOptions.key("scan.incremental.close-idle-reader.enabled")
                     .booleanType()
