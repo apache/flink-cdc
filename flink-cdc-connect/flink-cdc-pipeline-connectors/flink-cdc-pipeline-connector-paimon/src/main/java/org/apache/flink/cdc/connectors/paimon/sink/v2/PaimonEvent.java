@@ -31,6 +31,7 @@ public class PaimonEvent {
 
     // if true, means that table schema has changed right before this genericRow.
     boolean shouldRefreshSchema;
+    int bucket;
 
     public PaimonEvent(Identifier tableId, GenericRow genericRow) {
         this.tableId = tableId;
@@ -42,6 +43,14 @@ public class PaimonEvent {
         this.tableId = tableId;
         this.genericRow = genericRow;
         this.shouldRefreshSchema = shouldRefreshSchema;
+    }
+
+    public PaimonEvent(
+            Identifier tableId, GenericRow genericRow, boolean shouldRefreshSchema, int bucket) {
+        this.tableId = tableId;
+        this.genericRow = genericRow;
+        this.shouldRefreshSchema = shouldRefreshSchema;
+        this.bucket = bucket;
     }
 
     public Identifier getTableId() {
@@ -66,5 +75,13 @@ public class PaimonEvent {
 
     public void setGenericRow(GenericRow genericRow) {
         this.genericRow = genericRow;
+    }
+
+    public int getBucket() {
+        return bucket;
+    }
+
+    public void setBucket(int bucket) {
+        this.bucket = bucket;
     }
 }
