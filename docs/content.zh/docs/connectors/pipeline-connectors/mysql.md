@@ -269,6 +269,13 @@ pipeline:
           若 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 默认值变更为 true，可以不用显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = true。</td>
     </tr>
     <tr>
+      <td>scan.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否启用动态加表特性，默认关闭。 此配置项只有作业从savepoint/checkpoint启动时才生效。</td>
+    </tr>
+    <tr>
       <td>include-comments.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
