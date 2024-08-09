@@ -225,6 +225,14 @@ public class MySqlDataSourceOptions {
                                     + "greater than or equal to 1.14 when enabling this feature.");
 
     @Experimental
+    public static final ConfigOption<Boolean> SCAN_NEWLY_ADDED_TABLE_ENABLED =
+            ConfigOptions.key("scan.newly-added-table.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to scan the newly added tables or not, by default is false. This option is only useful when we start the job from a savepoint/checkpoint.");
+
+    @Experimental
     public static final ConfigOption<Boolean> SCHEMA_CHANGE_ENABLED =
             ConfigOptions.key("schema-change.enabled")
                     .booleanType()
