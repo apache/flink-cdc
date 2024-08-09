@@ -23,6 +23,8 @@ import org.apache.flink.cdc.common.factories.Factory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
+
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -42,6 +44,7 @@ public class FactoryDiscoveryUtils {
     private FactoryDiscoveryUtils() {}
 
     /** Returns the {@link Factory} for the given identifier. */
+    @Nonnull
     @SuppressWarnings("unchecked")
     public static <T extends Factory> T getFactoryByIdentifier(
             String identifier, Class<T> factoryClass) {
@@ -88,10 +91,8 @@ public class FactoryDiscoveryUtils {
     /**
      * Return the path of the jar file that contains the {@link Factory} for the given identifier.
      */
-    public static <T extends Factory> Optional<URL> getJarPathByIdentifier(
-            String identifier, Class<T> factoryClass) {
+    public static <T extends Factory> Optional<URL> getJarPathByIdentifier(T factory) {
         try {
-            T factory = getFactoryByIdentifier(identifier, factoryClass);
             URL url = factory.getClass().getProtectionDomain().getCodeSource().getLocation();
             String urlString = url.toString();
             if (urlString.contains("usrlib")) {
@@ -110,7 +111,9 @@ public class FactoryDiscoveryUtils {
             return Optional.of(url);
         } catch (Exception e) {
             throw new RuntimeException(
-                    String.format("Failed to search JAR by factory identifier \"%s\"", identifier),
+                    String.format(
+                            "Failed to search JAR by factory identifier \"%s\"",
+                            factory.identifier()),
                     e);
         }
     }
