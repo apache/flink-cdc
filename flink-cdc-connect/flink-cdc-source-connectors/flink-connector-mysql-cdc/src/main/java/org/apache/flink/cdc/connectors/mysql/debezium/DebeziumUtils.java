@@ -48,7 +48,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -242,6 +241,13 @@ public class DebeziumUtils {
 
     public static BinlogOffset findBinlogOffset(
             long targetMs, MySqlConnection connection, MySqlSourceConfig mySqlSourceConfig) {
+        List<String> binlogFiles = connection.availableBinlogFiles();
+        LOG.info("Available binlog files: {}", binlogFiles);
+
+        if (binlogFiles.isEmpty()) {
+            return BinlogOffset.ofBinlogFilePosition("", 0);
+        }
+
         MySqlConnection.MySqlConnectionConfiguration config = connection.connectionConfig();
         BinaryLogClient client =
                 new BinaryLogClient(
@@ -249,26 +255,9 @@ public class DebeziumUtils {
         if (mySqlSourceConfig.getServerIdRange() != null) {
             client.setServerId(mySqlSourceConfig.getServerIdRange().getStartServerId());
         }
-        List<String> binlogFiles = new ArrayList<>();
-        JdbcConnection.ResultSetConsumer rsc =
-                rs -> {
-                    while (rs.next()) {
-                        String fileName = rs.getString(1);
-                        long fileSize = rs.getLong(2);
-                        if (fileSize > 0) {
-                            binlogFiles.add(fileName);
-                        }
-                    }
-                };
 
+        LOG.info("Start querying binlog files for timestamp {}", targetMs);
         try {
-            connection.query("SHOW BINARY LOGS", rsc);
-            LOG.info("Total search binlog: {}", binlogFiles);
-
-            if (binlogFiles.isEmpty()) {
-                return BinlogOffset.ofBinlogFilePosition("", 0);
-            }
-
             String binlogName = searchBinlogName(client, targetMs, binlogFiles);
             return BinlogOffset.ofBinlogFilePosition(binlogName, 0);
         } catch (Exception e) {
@@ -285,6 +274,11 @@ public class DebeziumUtils {
         while (startIdx <= endIdx) {
             int mid = startIdx + (endIdx - startIdx) / 2;
             long midTs = getBinlogTimestamp(client, binlogFiles.get(mid));
+            if (midTs < 0) {
+                binlogFiles.remove(mid);
+                endIdx--;
+                continue;
+            }
             if (midTs < targetMs) {
                 startIdx = mid + 1;
             } else if (targetMs < midTs) {
@@ -322,16 +316,44 @@ public class DebeziumUtils {
                     }
                 };
 
-        try {
-            client.registerEventListener(eventListener);
-            client.setBinlogFilename(binlogFile);
-            client.setBinlogPosition(0);
+        ArrayBlockingQueue<Exception> exceptions = new ArrayBlockingQueue<>(1);
+        BinaryLogClient.LifecycleListener lifecycleListener =
+                new BinaryLogClient.LifecycleListener() {
 
-            LOG.info("begin parse binlog: {}", binlogFile);
+                    @Override
+                    public void onConnect(BinaryLogClient client) {}
+
+                    @Override
+                    public void onCommunicationFailure(BinaryLogClient client, Exception e) {
+                        LOG.error("BinaryLogClient onCommunicationFailure", e);
+                        exceptions.add(e);
+                    }
+
+                    @Override
+                    public void onEventDeserializationFailure(BinaryLogClient client, Exception e) {
+                        LOG.warn("BinaryLogClient onEventDeserializationFailure", e);
+                    }
+
+                    @Override
+                    public void onDisconnect(BinaryLogClient client) {}
+                };
+
+        client.registerEventListener(eventListener);
+        client.registerLifecycleListener(lifecycleListener);
+        client.setBinlogFilename(binlogFile);
+        client.setBinlogPosition(0);
+
+        LOG.info("Start parsing binlog: {}", binlogFile);
+        try {
             client.connect();
         } finally {
+            client.unregisterLifecycleListener(lifecycleListener);
             client.unregisterEventListener(eventListener);
         }
-        return binlogTimestamps.take();
+
+        if (!exceptions.isEmpty()) {
+            throw new RuntimeException(exceptions.peek());
+        }
+        return binlogTimestamps.isEmpty() ? -1L : binlogTimestamps.peek();
     }
 }
