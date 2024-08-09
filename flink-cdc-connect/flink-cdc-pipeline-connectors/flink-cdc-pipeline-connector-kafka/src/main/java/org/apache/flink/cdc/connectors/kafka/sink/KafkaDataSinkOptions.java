@@ -35,6 +35,22 @@ public class KafkaDataSinkOptions {
                     .defaultValue(DeliveryGuarantee.AT_LEAST_ONCE)
                     .withDescription("Optional delivery guarantee when committing.");
 
+    public static final ConfigOption<PartitionStrategy> PARTITION_STRATEGY =
+            key("partition.strategy")
+                    .enumType(PartitionStrategy.class)
+                    .defaultValue(PartitionStrategy.ALL_TO_ZERO)
+                    .withDescription(
+                            "Defines the strategy for sending record to kafka topic, "
+                                    + "available options are `all-to-zero` and `hash-by-key`, default option is `all-to-zero`.");
+
+    public static final ConfigOption<KeyFormat> KEY_FORMAT =
+            key("key.format")
+                    .enumType(KeyFormat.class)
+                    .defaultValue(KeyFormat.JSON)
+                    .withDescription(
+                            "Defines the format identifier for encoding key data, "
+                                    + "available options are `csv` and `json`, default option is `json`.");
+
     public static final ConfigOption<JsonSerializationType> VALUE_FORMAT =
             key("value.format")
                     .enumType(JsonSerializationType.class)

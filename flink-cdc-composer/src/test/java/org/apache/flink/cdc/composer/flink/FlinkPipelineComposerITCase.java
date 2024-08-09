@@ -140,6 +140,7 @@ class FlinkPipelineComposerITCase {
                         sinkDef,
                         Collections.emptyList(),
                         Collections.emptyList(),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -194,6 +195,7 @@ class FlinkPipelineComposerITCase {
                 new PipelineDef(
                         sourceDef,
                         sinkDef,
+                        Collections.emptyList(),
                         Collections.emptyList(),
                         Collections.emptyList(),
                         pipelineConfig);
@@ -262,6 +264,7 @@ class FlinkPipelineComposerITCase {
                         sinkDef,
                         Collections.emptyList(),
                         Collections.emptyList(),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -316,6 +319,7 @@ class FlinkPipelineComposerITCase {
                         sinkDef,
                         Collections.emptyList(),
                         new ArrayList<>(Arrays.asList(transformDef)),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -383,6 +387,7 @@ class FlinkPipelineComposerITCase {
                         sinkDef,
                         Collections.emptyList(),
                         new ArrayList<>(Arrays.asList(transformDef1, transformDef2)),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -433,7 +438,12 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef, sinkDef, routeDef, Collections.emptyList(), pipelineConfig);
+                        sourceDef,
+                        sinkDef,
+                        routeDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
 
         // Execute the pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
@@ -501,7 +511,12 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef, sinkDef, routeDef, Collections.emptyList(), pipelineConfig);
+                        sourceDef,
+                        sinkDef,
+                        routeDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
 
         // Execute the pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
@@ -693,7 +708,12 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef, sinkDef, routeDef, Collections.emptyList(), pipelineConfig);
+                        sourceDef,
+                        sinkDef,
+                        routeDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
 
         // Execute the pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
@@ -893,7 +913,13 @@ class FlinkPipelineComposerITCase {
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         PipelineDef pipelineDef =
-                new PipelineDef(sourceDef, sinkDef, routeDef, transformDef, pipelineConfig);
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        routeDef,
+                        transformDef,
+                        Collections.emptyList(),
+                        pipelineConfig);
 
         // Execute the pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
@@ -959,6 +985,7 @@ class FlinkPipelineComposerITCase {
                                         "replaced_namespace.replaced_schema.__$__",
                                         "__$__",
                                         null)),
+                        Collections.emptyList(),
                         Collections.emptyList(),
                         pipelineConfig);
 

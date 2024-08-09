@@ -468,6 +468,15 @@ public class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                     mongoCollection.updateOne(
                             Filters.eq("cid", 2000L), Updates.set("address", "Pittsburgh"));
                     mongoCollection.deleteOne(Filters.eq("cid", 1019L));
+
+                    // Rarely happens, but if there's no operation or heartbeat events between
+                    // watermark #a (the ChangeStream opLog caused by the last event in this hook)
+                    // and watermark #b (the calculated high watermark that limits the bounded
+                    // back-filling stream fetch task), the last event of hook will be missed since
+                    // back-filling task reads between [loW, hiW) (high watermark not included).
+                    // Workaround: insert a dummy event in another collection to forcefully push
+                    // opLog forward.
+                    database.getCollection("customers_1").insertOne(new Document());
                 };
 
         switch (hookType) {

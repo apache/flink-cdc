@@ -23,13 +23,10 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
-import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner;
 
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.header.internals.RecordHeaders;
-
-import javax.annotation.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -46,7 +43,11 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  */
 public class PipelineKafkaRecordSerializationSchema
         implements KafkaRecordSerializationSchema<Event> {
-    private final FlinkKafkaPartitioner<Event> partitioner;
+
+    private final Integer partition;
+
+    private final SerializationSchema<Event> keySerialization;
+
     private final SerializationSchema<Event> valueSerialization;
 
     private final String unifiedTopic;
@@ -63,12 +64,13 @@ public class PipelineKafkaRecordSerializationSchema
     public static final String TABLE_NAME_HEADER_KEY = "tableName";
 
     PipelineKafkaRecordSerializationSchema(
-            @Nullable FlinkKafkaPartitioner<Event> partitioner,
+            PartitionStrategy partitionStrategy,
+            SerializationSchema<Event> keySerialization,
             SerializationSchema<Event> valueSerialization,
             String unifiedTopic,
             boolean addTableToHeaderEnabled,
             String customHeaderString) {
-        this.partitioner = partitioner;
+        this.keySerialization = keySerialization;
         this.valueSerialization = checkNotNull(valueSerialization);
         this.unifiedTopic = unifiedTopic;
         this.addTableToHeaderEnabled = addTableToHeaderEnabled;
@@ -87,12 +89,14 @@ public class PipelineKafkaRecordSerializationSchema
                 }
             }
         }
+        partition = partitionStrategy.equals(PartitionStrategy.ALL_TO_ZERO) ? 0 : null;
     }
 
     @Override
     public ProducerRecord<byte[], byte[]> serialize(
             Event event, KafkaSinkContext context, Long timestamp) {
         ChangeEvent changeEvent = (ChangeEvent) event;
+        final byte[] keySerialized = keySerialization.serialize(event);
         final byte[] valueSerialized = valueSerialization.serialize(event);
         if (event instanceof SchemaChangeEvent) {
             // skip sending SchemaChangeEvent.
@@ -121,37 +125,13 @@ public class PipelineKafkaRecordSerializationSchema
             }
         }
         return new ProducerRecord<>(
-                topic,
-                extractPartition(
-                        changeEvent, valueSerialized, context.getPartitionsForTopic(topic)),
-                null,
-                null,
-                valueSerialized,
-                recordHeaders);
+                topic, partition, null, keySerialized, valueSerialized, recordHeaders);
     }
 
     @Override
     public void open(
             SerializationSchema.InitializationContext context, KafkaSinkContext sinkContext)
             throws Exception {
-        if (partitioner != null) {
-            partitioner.open(
-                    sinkContext.getParallelInstanceId(),
-                    sinkContext.getNumberOfParallelInstances());
-        }
         valueSerialization.open(context);
-    }
-
-    private Integer extractPartition(
-            ChangeEvent changeEvent, byte[] valueSerialized, int[] partitions) {
-        if (partitioner != null) {
-            return partitioner.partition(
-                    changeEvent,
-                    null,
-                    valueSerialized,
-                    changeEvent.tableId().toString(),
-                    partitions);
-        }
-        return null;
     }
 }
