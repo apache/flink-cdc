@@ -17,10 +17,18 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.metrics;
 
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReader;
+import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.metrics.MetricNames;
+
+import io.debezium.relational.TableId;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** A collection class for handling metrics in {@link MySqlSourceReader}. */
 public class MySqlSourceReaderMetrics {
@@ -34,6 +42,15 @@ public class MySqlSourceReaderMetrics {
      * record fetched into the source operator.
      */
     private volatile long fetchDelay = UNDEFINED;
+
+    private final Map<Tuple2<TableId, OperationType>, Counter> numRecordsOutByDataChangeRecordMap =
+            new ConcurrentHashMap();
+    public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_RECORD_INSERT =
+            "numRecordsOutByDataChangeRecordInsert";
+    public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_RECORD_UPDATE =
+            "numRecordsOutByDataChangeRecordUpdate";
+    public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_RECORD_DELETE =
+            "numRecordsOutByDataChangeRecordDelete";
 
     public MySqlSourceReaderMetrics(MetricGroup metricGroup) {
         this.metricGroup = metricGroup;
@@ -50,5 +67,31 @@ public class MySqlSourceReaderMetrics {
 
     public void recordFetchDelay(long fetchDelay) {
         this.fetchDelay = fetchDelay;
+    }
+
+    public void numRecordsOutByDataChangeRecord(TableId tableId, OperationType op) {
+        Counter counter =
+                numRecordsOutByDataChangeRecordMap.computeIfAbsent(
+                        new Tuple2<>(tableId, op),
+                        k -> {
+                            switch (op) {
+                                case INSERT:
+                                    return metricGroup.counter(
+                                            IO_NUM_RECORDS_OUT_DATA_CHANGE_RECORD_INSERT);
+                                case UPDATE:
+                                    return metricGroup.counter(
+                                            IO_NUM_RECORDS_OUT_DATA_CHANGE_RECORD_UPDATE);
+                                case DELETE:
+                                    return metricGroup.counter(
+                                            IO_NUM_RECORDS_OUT_DATA_CHANGE_RECORD_DELETE);
+                                default:
+                                    throw new UnsupportedOperationException(
+                                            "Unsupported operation type for "
+                                                    + "numRecordsOutByDataChangeRecord Metrics "
+                                                    + op);
+                            }
+                        });
+
+        counter.inc();
     }
 }
