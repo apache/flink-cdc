@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
+import org.apache.flink.metrics.MeterView;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.metrics.MetricNames;
 
@@ -47,10 +48,16 @@ public class MySqlSourceReaderMetrics {
             new ConcurrentHashMap();
     public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_RECORD_INSERT =
             "numRecordsOutByDataChangeRecordInsert";
+    public static final String IO_NUM_RECORDS_OUT_RATE_DATA_CHANGE_RECORD_INSERT =
+            "numRecordsOutByPerSecondDataChangeRecordInsert";
     public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_RECORD_UPDATE =
             "numRecordsOutByDataChangeRecordUpdate";
+    public static final String IO_NUM_RECORDS_OUT_RATE_DATA_CHANGE_RECORD_UPDATE =
+            "numRecordsOutByPerSecondDataChangeRecordUpdate";
     public static final String IO_NUM_RECORDS_OUT_DATA_CHANGE_RECORD_DELETE =
             "numRecordsOutByDataChangeRecordDelete";
+    public static final String IO_NUM_RECORDS_OUT_RATE_DATA_CHANGE_RECORD_DELETE =
+            "numRecordsOutByPerSecondDataChangeRecordDelete";
 
     public MySqlSourceReaderMetrics(MetricGroup metricGroup) {
         this.metricGroup = metricGroup;
@@ -59,6 +66,15 @@ public class MySqlSourceReaderMetrics {
     public void registerMetrics() {
         metricGroup.gauge(
                 MetricNames.CURRENT_FETCH_EVENT_TIME_LAG, (Gauge<Long>) this::getFetchDelay);
+        this.metricGroup.meter(
+                IO_NUM_RECORDS_OUT_RATE_DATA_CHANGE_RECORD_INSERT,
+                new MeterView(metricGroup.counter(IO_NUM_RECORDS_OUT_DATA_CHANGE_RECORD_INSERT)));
+        this.metricGroup.meter(
+                IO_NUM_RECORDS_OUT_RATE_DATA_CHANGE_RECORD_UPDATE,
+                new MeterView(metricGroup.counter(IO_NUM_RECORDS_OUT_DATA_CHANGE_RECORD_UPDATE)));
+        this.metricGroup.meter(
+                IO_NUM_RECORDS_OUT_RATE_DATA_CHANGE_RECORD_DELETE,
+                new MeterView(metricGroup.counter(IO_NUM_RECORDS_OUT_DATA_CHANGE_RECORD_DELETE)));
     }
 
     public long getFetchDelay() {
