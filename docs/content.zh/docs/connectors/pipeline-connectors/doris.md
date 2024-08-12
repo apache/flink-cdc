@@ -162,7 +162,7 @@ pipeline:
       <td>String</td>
       <td>StreamLoad的参数。
         For example: <code> sink.properties.strict_mode: true</code>.
-        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad的Properties 属性</a></td> 
+        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad 的属性</a></td> 
       </td>
     </tr>
     <tr>
@@ -172,7 +172,7 @@ pipeline:
       <td>String</td>
       <td>创建表的Properties配置。
         For example: <code> table.create.properties.replication_num: 1</code>.
-        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table 的  Properties 属性</a></td> 
+        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table 的属性</a></td> 
       </td>
     </tr>
     </tbody>

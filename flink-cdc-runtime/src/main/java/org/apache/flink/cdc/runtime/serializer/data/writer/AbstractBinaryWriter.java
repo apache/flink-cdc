@@ -173,46 +173,38 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
 
     @Override
     public void writeTimestamp(int pos, TimestampData value, int precision) {
-        if (TimestampData.isCompact(precision)) {
-            writeLong(pos, value.getMillisecond());
+        // store the nanoOfMillisecond in fixed-length part as offset and nanoOfMillisecond
+        ensureCapacity(8);
+
+        if (value == null) {
+            setNullBit(pos);
+            // zero-out the bytes
+            segment.putLong(cursor, 0L);
+            setOffsetAndSize(pos, cursor, 0);
         } else {
-            // store the nanoOfMillisecond in fixed-length part as offset and nanoOfMillisecond
-            ensureCapacity(8);
-
-            if (value == null) {
-                setNullBit(pos);
-                // zero-out the bytes
-                segment.putLong(cursor, 0L);
-                setOffsetAndSize(pos, cursor, 0);
-            } else {
-                segment.putLong(cursor, value.getMillisecond());
-                setOffsetAndSize(pos, cursor, value.getNanoOfMillisecond());
-            }
-
-            cursor += 8;
+            segment.putLong(cursor, value.getMillisecond());
+            setOffsetAndSize(pos, cursor, value.getNanoOfMillisecond());
         }
+
+        cursor += 8;
     }
 
     @Override
     public void writeLocalZonedTimestamp(int pos, LocalZonedTimestampData value, int precision) {
-        if (LocalZonedTimestampData.isCompact(precision)) {
-            writeLong(pos, value.getEpochMillisecond());
+        // store the nanoOfMillisecond in fixed-length part as offset and nanoOfMillisecond
+        ensureCapacity(8);
+
+        if (value == null) {
+            setNullBit(pos);
+            // zero-out the bytes
+            segment.putLong(cursor, 0L);
+            setOffsetAndSize(pos, cursor, 0);
         } else {
-            // store the nanoOfMillisecond in fixed-length part as offset and nanoOfMillisecond
-            ensureCapacity(8);
-
-            if (value == null) {
-                setNullBit(pos);
-                // zero-out the bytes
-                segment.putLong(cursor, 0L);
-                setOffsetAndSize(pos, cursor, 0);
-            } else {
-                segment.putLong(cursor, value.getEpochMillisecond());
-                setOffsetAndSize(pos, cursor, value.getEpochNanoOfMillisecond());
-            }
-
-            cursor += 8;
+            segment.putLong(cursor, value.getEpochMillisecond());
+            setOffsetAndSize(pos, cursor, value.getEpochNanoOfMillisecond());
         }
+
+        cursor += 8;
     }
 
     @Override

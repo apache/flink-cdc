@@ -34,6 +34,7 @@ limitations under the License.
         <module>flink-cdc-pipeline-connector-starrocks</module>
         <module>flink-cdc-pipeline-connector-kafka</module>
         <module>flink-cdc-pipeline-connector-paimon</module>
+        <module>flink-cdc-pipeline-connector-elasticsearch</module>
     </modules>
 
     <dependencies>

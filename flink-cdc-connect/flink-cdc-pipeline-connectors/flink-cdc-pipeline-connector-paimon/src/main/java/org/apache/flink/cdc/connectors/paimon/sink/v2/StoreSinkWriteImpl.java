@@ -148,7 +148,7 @@ public class StoreSinkWriteImpl implements StoreSinkWrite {
 
     @Override
     public SinkRecord write(InternalRow internalRow, int i) throws Exception {
-        return write.writeAndReturn(internalRow);
+        return write.writeAndReturn(internalRow, i);
     }
 
     @Override

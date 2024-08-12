@@ -226,6 +226,16 @@ public class PostTransformOperatorTest {
                     .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
                     .build();
 
+    private static final TableId COLUMN_SQUARE_TABLE =
+            TableId.tableId("my_company", "my_branch", "column_square");
+    private static final Schema COLUMN_SQUARE_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("col1", DataTypes.INT())
+                    .physicalColumn("col2", DataTypes.INT())
+                    .physicalColumn("square_col2", DataTypes.INT())
+                    .primaryKey("col1")
+                    .build();
+
     @Test
     void testDataChangeEventTransform() throws Exception {
         PostTransformOperator transform =
@@ -558,6 +568,67 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
+    }
+
+    @Test
+    void testDataChangeEventTransformWithDuplicateColumns() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                COLUMN_SQUARE_TABLE.identifier(),
+                                "col1, col2, col2 * col2 as square_col2",
+                                "col2 < 3 OR col2 > 5")
+                        .build();
+        EventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(COLUMN_SQUARE_TABLE, COLUMN_SQUARE_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) COLUMN_SQUARE_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        COLUMN_SQUARE_TABLE,
+                        recordDataGenerator.generate(new Object[] {1, 1, null}));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        COLUMN_SQUARE_TABLE, recordDataGenerator.generate(new Object[] {1, 1, 1}));
+
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        COLUMN_SQUARE_TABLE,
+                        recordDataGenerator.generate(new Object[] {6, 6, null}));
+        DataChangeEvent insertEventExpect2 =
+                DataChangeEvent.insertEvent(
+                        COLUMN_SQUARE_TABLE, recordDataGenerator.generate(new Object[] {6, 6, 36}));
+
+        DataChangeEvent insertEvent3 =
+                DataChangeEvent.insertEvent(
+                        COLUMN_SQUARE_TABLE,
+                        recordDataGenerator.generate(new Object[] {4, 4, null}));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(COLUMN_SQUARE_TABLE, COLUMN_SQUARE_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transform.processElement(new StreamRecord<>(insertEvent2));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect2));
+        transform.processElement(new StreamRecord<>(insertEvent3));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isNull();
     }
 
     @Test

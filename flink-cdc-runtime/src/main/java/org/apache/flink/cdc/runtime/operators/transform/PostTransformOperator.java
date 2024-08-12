@@ -29,14 +29,17 @@ import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
-import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
+import java.lang.reflect.InvocationTargetException;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,6 +65,10 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     /** keep the relationship of TableId and table information. */
     private final Map<TableId, PostTransformChangeInfo> postTransformChangeInfoMap;
 
+    private final List<Tuple2<String, String>> udfFunctions;
+    private List<UserDefinedFunctionDescriptor> udfDescriptors;
+    private transient Map<String, Object> udfFunctionInstances;
+
     private transient Map<Tuple2<TableId, TransformProjection>, TransformProjectionProcessor>
             transformProjectionProcessorMap;
     private transient Map<Tuple2<TableId, TransformFilter>, TransformFilterProcessor>
@@ -74,8 +81,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     /** Builder of {@link PostTransformOperator}. */
     public static class Builder {
         private final List<TransformRule> transformRules = new ArrayList<>();
-        private OperatorID schemaOperatorID;
         private String timezone;
+        private final List<Tuple2<String, String>> udfFunctions = new ArrayList<>();
 
         public PostTransformOperator.Builder addTransform(
                 String tableInclusions,
@@ -101,11 +108,6 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             return this;
         }
 
-        public PostTransformOperator.Builder addSchemaOperatorID(OperatorID schemaOperatorID) {
-            this.schemaOperatorID = schemaOperatorID;
-            return this;
-        }
-
         public PostTransformOperator.Builder addTimezone(String timezone) {
             if (PipelineOptions.PIPELINE_LOCAL_TIME_ZONE.defaultValue().equals(timezone)) {
                 this.timezone = ZoneId.systemDefault().toString();
@@ -115,17 +117,43 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             return this;
         }
 
+        public PostTransformOperator.Builder addUdfFunctions(
+                List<Tuple2<String, String>> udfFunctions) {
+            this.udfFunctions.addAll(udfFunctions);
+            return this;
+        }
+
         public PostTransformOperator build() {
-            return new PostTransformOperator(transformRules, timezone);
+            return new PostTransformOperator(transformRules, timezone, udfFunctions);
         }
     }
 
-    private PostTransformOperator(List<TransformRule> transformRules, String timezone) {
+    private PostTransformOperator(
+            List<TransformRule> transformRules,
+            String timezone,
+            List<Tuple2<String, String>> udfFunctions) {
         this.transformRules = transformRules;
         this.timezone = timezone;
         this.postTransformChangeInfoMap = new ConcurrentHashMap<>();
         this.transformFilterProcessorMap = new ConcurrentHashMap<>();
         this.transformProjectionProcessorMap = new ConcurrentHashMap<>();
+        this.udfFunctions = udfFunctions;
+        this.udfFunctionInstances = new ConcurrentHashMap<>();
+    }
+
+    @Override
+    public void setup(
+            StreamTask<?, ?> containingTask,
+            StreamConfig config,
+            Output<StreamRecord<Event>> output) {
+        super.setup(containingTask, config, output);
+        udfDescriptors =
+                udfFunctions.stream()
+                        .map(
+                                udf -> {
+                                    return new UserDefinedFunctionDescriptor(udf.f0, udf.f1);
+                                })
+                        .collect(Collectors.toList());
     }
 
     @Override
@@ -146,11 +174,25 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                     return new PostTransformer(
                                             selectors,
                                             TransformProjection.of(projection).orElse(null),
-                                            TransformFilter.of(filterExpression).orElse(null));
+                                            TransformFilter.of(filterExpression, udfDescriptors)
+                                                    .orElse(null));
                                 })
                         .collect(Collectors.toList());
         this.transformProjectionProcessorMap = new ConcurrentHashMap<>();
         this.transformFilterProcessorMap = new ConcurrentHashMap<>();
+        this.udfFunctionInstances = new ConcurrentHashMap<>();
+        udfDescriptors.forEach(
+                udf -> {
+                    try {
+                        Class<?> clazz = Class.forName(udf.getClasspath());
+                        udfFunctionInstances.put(udf.getName(), clazz.newInstance());
+                    } catch (ClassNotFoundException
+                            | InstantiationException
+                            | IllegalAccessException e) {
+                        throw new RuntimeException("Failed to instantiate UDF function " + udf);
+                    }
+                });
+        initializeUdf();
     }
 
     @Override
@@ -163,6 +205,10 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     public void close() throws Exception {
         super.close();
         clearOperator();
+
+        // Clean up UDF instances
+        destroyUdf();
+        udfFunctionInstances.clear();
     }
 
     @Override
@@ -226,7 +272,11 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                             Tuple2.of(tableId, transformProjection))) {
                         transformProjectionProcessorMap.put(
                                 Tuple2.of(tableId, transformProjection),
-                                TransformProjectionProcessor.of(transformProjection, timezone));
+                                TransformProjectionProcessor.of(
+                                        transformProjection,
+                                        timezone,
+                                        udfDescriptors,
+                                        getUdfFunctionInstances()));
                     }
                     TransformProjectionProcessor postTransformProcessor =
                             transformProjectionProcessorMap.get(
@@ -241,6 +291,12 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         }
 
         return SchemaUtils.inferWiderSchema(newSchemas);
+    }
+
+    private List<Object> getUdfFunctionInstances() {
+        return udfDescriptors.stream()
+                .map(e -> udfFunctionInstances.get(e.getName()))
+                .collect(Collectors.toList());
     }
 
     private Optional<DataChangeEvent> processDataChangeEvent(DataChangeEvent dataChangeEvent)
@@ -265,7 +321,12 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                             Tuple2.of(tableId, transformFilter))) {
                         transformFilterProcessorMap.put(
                                 Tuple2.of(tableId, transformFilter),
-                                TransformFilterProcessor.of(tableInfo, transformFilter, timezone));
+                                TransformFilterProcessor.of(
+                                        tableInfo,
+                                        transformFilter,
+                                        timezone,
+                                        udfDescriptors,
+                                        getUdfFunctionInstances()));
                     }
                     TransformFilterProcessor transformFilterProcessor =
                             transformFilterProcessorMap.get(Tuple2.of(tableId, transformFilter));
@@ -287,7 +348,11 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                         transformProjectionProcessorMap.put(
                                 Tuple2.of(tableId, transformProjection),
                                 TransformProjectionProcessor.of(
-                                        tableInfo, transformProjection, timezone));
+                                        tableInfo,
+                                        transformProjection,
+                                        timezone,
+                                        udfDescriptors,
+                                        getUdfFunctionInstances()));
                     }
                     TransformProjectionProcessor postTransformProcessor =
                             transformProjectionProcessorMap.get(
@@ -391,5 +456,47 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         this.transformProjectionProcessorMap = null;
         this.transformFilterProcessorMap = null;
         TransformExpressionCompiler.cleanUp();
+    }
+
+    private void initializeUdf() {
+        udfDescriptors.forEach(
+                udf -> {
+                    try {
+                        if (udf.isCdcPipelineUdf()) {
+                            // We use reflection to invoke UDF methods since we may add more methods
+                            // into UserDefinedFunction interface, thus the provided UDF classes
+                            // might not be compatible with the interface definition in CDC common.
+                            Object udfInstance = udfFunctionInstances.get(udf.getName());
+                            udfInstance.getClass().getMethod("open").invoke(udfInstance);
+                        } else {
+                            // Do nothing, Flink-style UDF lifecycle hooks are not supported
+                        }
+                    } catch (InvocationTargetException
+                            | NoSuchMethodException
+                            | IllegalAccessException ex) {
+                        throw new RuntimeException("Failed to initialize UDF " + udf, ex);
+                    }
+                });
+    }
+
+    private void destroyUdf() {
+        udfDescriptors.forEach(
+                udf -> {
+                    try {
+                        if (udf.isCdcPipelineUdf()) {
+                            // We use reflection to invoke UDF methods since we may add more methods
+                            // into UserDefinedFunction interface, thus the provided UDF classes
+                            // might not be compatible with the interface definition in CDC common.
+                            Object udfInstance = udfFunctionInstances.get(udf.getName());
+                            udfInstance.getClass().getMethod("close").invoke(udfInstance);
+                        } else {
+                            // Do nothing, Flink-style UDF lifecycle hooks are not supported
+                        }
+                    } catch (InvocationTargetException
+                            | NoSuchMethodException
+                            | IllegalAccessException ex) {
+                        throw new RuntimeException("Failed to destroy UDF " + udf, ex);
+                    }
+                });
     }
 }

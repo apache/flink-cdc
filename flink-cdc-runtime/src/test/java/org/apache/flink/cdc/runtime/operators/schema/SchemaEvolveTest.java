@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.runtime.operators.schema;
 
-import org.apache.flink.calcite.shaded.com.google.common.collect.ImmutableMap;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
@@ -41,6 +40,7 @@ import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import org.apache.commons.collections.ListUtils;

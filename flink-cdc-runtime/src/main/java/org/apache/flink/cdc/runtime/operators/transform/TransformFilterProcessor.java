@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -44,23 +45,36 @@ public class TransformFilterProcessor {
     private TransformFilter transformFilter;
     private String timezone;
     private TransformExpressionKey transformExpressionKey;
+    private final transient List<Object> udfFunctionInstances;
+    private transient ExpressionEvaluator expressionEvaluator;
 
     public TransformFilterProcessor(
-            PostTransformChangeInfo tableInfo, TransformFilter transformFilter, String timezone) {
+            PostTransformChangeInfo tableInfo,
+            TransformFilter transformFilter,
+            String timezone,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            List<Object> udfFunctionInstances) {
         this.tableInfo = tableInfo;
         this.transformFilter = transformFilter;
         this.timezone = timezone;
-        transformExpressionKey = generateTransformExpressionKey();
+        this.transformExpressionKey = generateTransformExpressionKey();
+        this.udfFunctionInstances = udfFunctionInstances;
+        this.expressionEvaluator =
+                TransformExpressionCompiler.compileExpression(
+                        transformExpressionKey, udfDescriptors);
     }
 
     public static TransformFilterProcessor of(
-            PostTransformChangeInfo tableInfo, TransformFilter transformFilter, String timezone) {
-        return new TransformFilterProcessor(tableInfo, transformFilter, timezone);
+            PostTransformChangeInfo tableInfo,
+            TransformFilter transformFilter,
+            String timezone,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            List<Object> udfFunctionInstances) {
+        return new TransformFilterProcessor(
+                tableInfo, transformFilter, timezone, udfDescriptors, udfFunctionInstances);
     }
 
     public boolean process(BinaryRecordData after, long epochTime) {
-        ExpressionEvaluator expressionEvaluator =
-                TransformExpressionCompiler.compileExpression(transformExpressionKey);
         try {
             return (Boolean) expressionEvaluator.evaluate(generateParams(after, epochTime));
         } catch (InvocationTargetException e) {
@@ -78,14 +92,12 @@ public class TransformFilterProcessor {
         List<Class<?>> argTypes = new ArrayList<>();
         String scriptExpression = transformFilter.getScriptExpression();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
-        List<String> columnNames = transformFilter.getColumnNames();
+        LinkedHashSet<String> columnNames = new LinkedHashSet<>(transformFilter.getColumnNames());
         for (String columnName : columnNames) {
             for (Column column : columns) {
                 if (column.getName().equals(columnName)) {
-                    if (!argNames.contains(columnName)) {
-                        argNames.add(columnName);
-                        argTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
-                    }
+                    argNames.add(columnName);
+                    argTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
                     break;
                 }
             }
@@ -106,6 +118,7 @@ public class TransformFilterProcessor {
         List<Object> params = new ArrayList<>();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
 
+        // 1 - Add referenced columns
         Tuple2<List<String>, List<Class<?>>> args = generateArguments();
         RecordData.FieldGetter[] fieldGetters = tableInfo.getPreTransformedFieldGetters();
         for (String columnName : args.f0) {
@@ -130,8 +143,13 @@ public class TransformFilterProcessor {
                 }
             }
         }
+
+        // 2 - Add time-sensitive function arguments
         params.add(timezone);
         params.add(epochTime);
+
+        // 3 - Add UDF function instances
+        params.addAll(udfFunctionInstances);
         return params.toArray();
     }
 

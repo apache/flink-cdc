@@ -29,7 +29,6 @@ import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.connector.kafka.sink.KafkaSinkBuilder;
-import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkKafkaPartitioner;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
 
@@ -46,9 +45,11 @@ public class KafkaDataSink implements DataSink {
 
     final DeliveryGuarantee deliveryGuarantee;
 
-    final FlinkKafkaPartitioner<Event> partitioner;
+    private final PartitionStrategy partitionStrategy;
 
     final ZoneId zoneId;
+
+    final SerializationSchema<Event> keySerialization;
 
     final SerializationSchema<Event> valueSerialization;
 
@@ -61,16 +62,18 @@ public class KafkaDataSink implements DataSink {
     public KafkaDataSink(
             DeliveryGuarantee deliveryGuarantee,
             Properties kafkaProperties,
-            FlinkKafkaPartitioner<Event> partitioner,
+            PartitionStrategy partitionStrategy,
             ZoneId zoneId,
+            SerializationSchema<Event> keySerialization,
             SerializationSchema<Event> valueSerialization,
             String topic,
             boolean addTableToHeaderEnabled,
             String customHeaders) {
         this.deliveryGuarantee = deliveryGuarantee;
         this.kafkaProperties = kafkaProperties;
-        this.partitioner = partitioner;
+        this.partitionStrategy = partitionStrategy;
         this.zoneId = zoneId;
+        this.keySerialization = keySerialization;
         this.valueSerialization = valueSerialization;
         this.topic = topic;
         this.addTableToHeaderEnabled = addTableToHeaderEnabled;
@@ -90,7 +93,8 @@ public class KafkaDataSink implements DataSink {
                         .setKafkaProducerConfig(kafkaProperties)
                         .setRecordSerializer(
                                 new PipelineKafkaRecordSerializationSchema(
-                                        partitioner,
+                                        partitionStrategy,
+                                        keySerialization,
                                         valueSerialization,
                                         topic,
                                         addTableToHeaderEnabled,

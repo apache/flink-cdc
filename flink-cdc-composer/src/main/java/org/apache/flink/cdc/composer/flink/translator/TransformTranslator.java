@@ -17,15 +17,17 @@
 
 package org.apache.flink.cdc.composer.flink.translator;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.composer.definition.TransformDef;
+import org.apache.flink.cdc.composer.definition.UdfDef;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
-import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Translator used to build {@link PreTransformOperator} and {@link PostTransformOperator} for event
@@ -34,7 +36,7 @@ import java.util.List;
 public class TransformTranslator {
 
     public DataStream<Event> translatePreTransform(
-            DataStream<Event> input, List<TransformDef> transforms) {
+            DataStream<Event> input, List<TransformDef> transforms, List<UdfDef> udfFunctions) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -52,6 +54,10 @@ public class TransformTranslator {
                         transform.getTableOptions());
             }
         }
+        preTransformFunctionBuilder.addUdfFunctions(
+                udfFunctions.stream()
+                        .map(udf -> Tuple2.of(udf.getName(), udf.getClasspath()))
+                        .collect(Collectors.toList()));
         return input.transform(
                 "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
     }
@@ -59,8 +65,8 @@ public class TransformTranslator {
     public DataStream<Event> translatePostTransform(
             DataStream<Event> input,
             List<TransformDef> transforms,
-            OperatorID schemaOperatorID,
-            String timezone) {
+            String timezone,
+            List<UdfDef> udfFunctions) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -78,8 +84,11 @@ public class TransformTranslator {
                         transform.getTableOptions());
             }
         }
-        postTransformFunctionBuilder.addSchemaOperatorID(schemaOperatorID);
         postTransformFunctionBuilder.addTimezone(timezone);
+        postTransformFunctionBuilder.addUdfFunctions(
+                udfFunctions.stream()
+                        .map(udf -> Tuple2.of(udf.getName(), udf.getClasspath()))
+                        .collect(Collectors.toList()));
         return input.transform(
                 "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build());
     }

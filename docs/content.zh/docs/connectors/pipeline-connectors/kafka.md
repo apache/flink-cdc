@@ -88,6 +88,20 @@ Pipeline 连接器配置项
       <td>Sink 的名称。 </td>
     </tr>
     <tr>
+      <td>partition.strategy</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>定义发送数据到 Kafka 分区的策略， 可以设置的选项有 `all-to-zero`（将所有数据发送到 0 号分区） 以及 `hash-by-key`（所有数据根据主键的哈希值分发），默认值为 `all-to-zero`。 </td>
+    </tr>
+    <tr>
+      <td>key.format</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>用于序列化 Kafka 消息的键部分数据的格式。可以设置的选项有 `csv` 以及 `json`， 默认值为 `json`。 </td>
+    </tr>
+    <tr>
       <td>value.format</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
