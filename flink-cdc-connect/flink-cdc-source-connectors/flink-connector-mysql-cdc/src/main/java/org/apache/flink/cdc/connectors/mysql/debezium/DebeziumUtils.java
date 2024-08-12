@@ -247,11 +247,11 @@ public class DebeziumUtils {
         if (binlogFiles.isEmpty()) {
             return BinlogOffset.ofBinlogFilePosition("", 0);
         }
+        if (binlogFiles.size() == 1) {
+            return BinlogOffset.ofBinlogFilePosition(binlogFiles.get(0), 0);
+        }
 
-        MySqlConnection.MySqlConnectionConfiguration config = connection.connectionConfig();
-        BinaryLogClient client =
-                new BinaryLogClient(
-                        config.hostname(), config.port(), config.username(), config.password());
+        BinaryLogClient client = createBinaryClient(mySqlSourceConfig.getDbzConfiguration());
         if (mySqlSourceConfig.getServerIdRange() != null) {
             client.setServerId(mySqlSourceConfig.getServerIdRange().getStartServerId());
         }
@@ -266,8 +266,7 @@ public class DebeziumUtils {
     }
 
     private static String searchBinlogName(
-            BinaryLogClient client, long targetMs, List<String> binlogFiles)
-            throws IOException, InterruptedException {
+            BinaryLogClient client, long targetMs, List<String> binlogFiles) throws IOException {
         int startIdx = 0;
         int endIdx = binlogFiles.size() - 1;
 
@@ -288,11 +287,13 @@ public class DebeziumUtils {
             }
         }
 
-        return endIdx < 0 ? binlogFiles.get(0) : binlogFiles.get(endIdx);
+        return binlogFiles.isEmpty()
+                ? ""
+                : endIdx < 0 ? binlogFiles.get(0) : binlogFiles.get(endIdx);
     }
 
     private static long getBinlogTimestamp(BinaryLogClient client, String binlogFile)
-            throws IOException, InterruptedException {
+            throws IOException {
 
         ArrayBlockingQueue<Long> binlogTimestamps = new ArrayBlockingQueue<>(1);
         BinaryLogClient.EventListener eventListener =
@@ -318,24 +319,11 @@ public class DebeziumUtils {
 
         ArrayBlockingQueue<Exception> exceptions = new ArrayBlockingQueue<>(1);
         BinaryLogClient.LifecycleListener lifecycleListener =
-                new BinaryLogClient.LifecycleListener() {
-
-                    @Override
-                    public void onConnect(BinaryLogClient client) {}
-
+                new BinaryLogClient.AbstractLifecycleListener() {
                     @Override
                     public void onCommunicationFailure(BinaryLogClient client, Exception e) {
-                        LOG.error("BinaryLogClient onCommunicationFailure", e);
                         exceptions.add(e);
                     }
-
-                    @Override
-                    public void onEventDeserializationFailure(BinaryLogClient client, Exception e) {
-                        LOG.warn("BinaryLogClient onEventDeserializationFailure", e);
-                    }
-
-                    @Override
-                    public void onDisconnect(BinaryLogClient client) {}
                 };
 
         client.registerEventListener(eventListener);
@@ -347,13 +335,16 @@ public class DebeziumUtils {
         try {
             client.connect();
         } finally {
+            client.disconnect();
             client.unregisterLifecycleListener(lifecycleListener);
             client.unregisterEventListener(eventListener);
         }
 
-        if (!exceptions.isEmpty()) {
-            throw new RuntimeException(exceptions.peek());
+        Exception exception = exceptions.peek();
+        if (exception != null) {
+            throw new RuntimeException(exception);
         }
-        return binlogTimestamps.isEmpty() ? -1L : binlogTimestamps.peek();
+        Long ts = binlogTimestamps.peek();
+        return ts == null ? -1L : ts;
     }
 }
