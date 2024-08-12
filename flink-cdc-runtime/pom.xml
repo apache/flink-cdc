@@ -46,34 +46,6 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-table-planner_2.12</artifactId>
-            <version>${flink.version}</version>
-            <scope>provided</scope>
-            <exclusions>
-                <exclusion>
-                    <artifactId>value</artifactId>
-                    <groupId>org.immutables</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>value-annotations</artifactId>
-                    <groupId>org.immutables</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>commons-compiler</artifactId>
-                    <groupId>org.codehaus.janino</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>janino</artifactId>
-                    <groupId>org.codehaus.janino</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>flink-scala_2.12</artifactId>
-                    <groupId>org.apache.flink</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-common</artifactId>
             <version>${project.version}</version>
         </dependency>
