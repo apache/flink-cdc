@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.schema;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistryProvider;
@@ -40,17 +41,23 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
 
     private final MetadataApplier metadataApplier;
     private final List<RouteRule> routingRules;
+    private final SchemaChangeBehavior schemaChangeBehavior;
 
     public SchemaOperatorFactory(
-            MetadataApplier metadataApplier, List<RouteRule> routingRules, Duration rpcTimeOut) {
-        super(new SchemaOperator(routingRules, rpcTimeOut));
+            MetadataApplier metadataApplier,
+            List<RouteRule> routingRules,
+            Duration rpcTimeOut,
+            SchemaChangeBehavior schemaChangeBehavior) {
+        super(new SchemaOperator(routingRules, rpcTimeOut, schemaChangeBehavior));
         this.metadataApplier = metadataApplier;
         this.routingRules = routingRules;
+        this.schemaChangeBehavior = schemaChangeBehavior;
     }
 
     @Override
     public OperatorCoordinator.Provider getCoordinatorProvider(
             String operatorName, OperatorID operatorID) {
-        return new SchemaRegistryProvider(operatorID, operatorName, metadataApplier, routingRules);
+        return new SchemaRegistryProvider(
+                operatorID, operatorName, metadataApplier, routingRules, schemaChangeBehavior);
     }
 }

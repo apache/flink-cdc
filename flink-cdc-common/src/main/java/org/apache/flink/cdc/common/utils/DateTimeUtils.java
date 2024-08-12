@@ -92,6 +92,14 @@ public class DateTimeUtils {
         return ymdToUnixDate(zdt.getYear(), zdt.getMonthValue(), zdt.getDayOfMonth());
     }
 
+    public static int parseDate(String dateStr, String fromFormat, String timezone) {
+        long ts = internalParseTimestampMillis(dateStr, fromFormat, TimeZone.getTimeZone(timezone));
+        ZoneId zoneId = ZoneId.of(timezone);
+        Instant instant = Instant.ofEpochMilli(ts);
+        ZonedDateTime zdt = ZonedDateTime.ofInstant(instant, zoneId);
+        return ymdToUnixDate(zdt.getYear(), zdt.getMonthValue(), zdt.getDayOfMonth());
+    }
+
     private static long internalParseTimestampMillis(String dateStr, String format, TimeZone tz) {
         SimpleDateFormat formatter = FORMATTER_CACHE.get(format);
         formatter.setTimeZone(tz);
@@ -118,5 +126,16 @@ public class DateTimeUtils {
         int y = year + 4800 - a;
         int m = month + 12 * a - 3;
         return day + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045;
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Format
+    // --------------------------------------------------------------------------------------------
+
+    public static String formatTimestampMillis(long ts, String format, TimeZone timeZone) {
+        SimpleDateFormat formatter = FORMATTER_CACHE.get(format);
+        formatter.setTimeZone(timeZone);
+        Date dateTime = new Date(ts);
+        return formatter.format(dateTime);
     }
 }

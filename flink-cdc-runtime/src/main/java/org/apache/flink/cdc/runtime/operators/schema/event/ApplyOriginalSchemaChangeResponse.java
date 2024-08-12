@@ -17,25 +17,15 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.event;
 
-import org.apache.flink.cdc.common.annotation.Internal;
-import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
-import javax.annotation.Nullable;
+/**
+ * The response from {@link SchemaRegistry} to {@link SchemaOperator} to request apply original
+ * schema changes.
+ */
+public class ApplyOriginalSchemaChangeResponse implements CoordinationResponse {
 
-import java.util.Optional;
-
-/** Coordination response from {@link SchemaRegistry} for {@link GetSchemaRequest}. */
-@Internal
-public class GetSchemaResponse implements CoordinationResponse {
-    @Nullable private final Schema schema;
-
-    public GetSchemaResponse(@Nullable Schema schema) {
-        this.schema = schema;
-    }
-
-    public Optional<Schema> getSchema() {
-        return Optional.ofNullable(schema);
-    }
+    private static final long serialVersionUID = 1L;
 }

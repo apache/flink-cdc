@@ -33,11 +33,12 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.math.BigDecimal;
 
-/** Unit tests for the {@link TransformDataOperator}. */
-public class TransformDataOperatorTest {
+/** Unit tests for the {@link PostTransformOperator}. */
+public class PostTransformOperatorTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
     private static final Schema CUSTOMERS_SCHEMA =
@@ -72,10 +73,15 @@ public class TransformDataOperatorTest {
     private static final Schema METADATA_SCHEMA =
             Schema.newBuilder()
                     .physicalColumn("col1", DataTypes.STRING())
+                    .primaryKey("col1")
+                    .build();
+    private static final Schema EXPECTED_METADATA_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("col1", DataTypes.STRING())
                     .physicalColumn("identifier_name", DataTypes.STRING())
-                    .physicalColumn("__namespace_name__", DataTypes.STRING())
-                    .physicalColumn("__schema_name__", DataTypes.STRING())
-                    .physicalColumn("__table_name__", DataTypes.STRING())
+                    .physicalColumn("__namespace_name__", DataTypes.STRING().notNull())
+                    .physicalColumn("__schema_name__", DataTypes.STRING().notNull())
+                    .physicalColumn("__table_name__", DataTypes.STRING().notNull())
                     .primaryKey("col1")
                     .build();
 
@@ -110,8 +116,6 @@ public class TransformDataOperatorTest {
                     .physicalColumn("minute_diff", DataTypes.INT())
                     .physicalColumn("hour_diff", DataTypes.INT())
                     .physicalColumn("day_diff", DataTypes.INT())
-                    .physicalColumn("month_diff", DataTypes.INT())
-                    .physicalColumn("year_diff", DataTypes.INT())
                     .primaryKey("col1")
                     .build();
 
@@ -128,9 +132,10 @@ public class TransformDataOperatorTest {
                     .physicalColumn("nullBigint", DataTypes.BIGINT())
                     .physicalColumn("nullFloat", DataTypes.FLOAT())
                     .physicalColumn("nullDouble", DataTypes.DOUBLE())
-                    .physicalColumn("nullChar", DataTypes.CHAR(1))
-                    .physicalColumn("nullVarchar", DataTypes.VARCHAR(1))
+                    .physicalColumn("nullChar", DataTypes.STRING())
+                    .physicalColumn("nullVarchar", DataTypes.STRING())
                     .physicalColumn("nullDecimal", DataTypes.DECIMAL(4, 2))
+                    .physicalColumn("nullTimestamp", DataTypes.TIMESTAMP(3))
                     .primaryKey("col1")
                     .build();
 
@@ -146,9 +151,19 @@ public class TransformDataOperatorTest {
                     .physicalColumn("castBigint", DataTypes.BIGINT())
                     .physicalColumn("castFloat", DataTypes.FLOAT())
                     .physicalColumn("castDouble", DataTypes.DOUBLE())
-                    .physicalColumn("castChar", DataTypes.CHAR(1))
-                    .physicalColumn("castVarchar", DataTypes.VARCHAR(1))
+                    .physicalColumn("castChar", DataTypes.STRING())
+                    .physicalColumn("castVarchar", DataTypes.STRING())
                     .physicalColumn("castDecimal", DataTypes.DECIMAL(4, 2))
+                    .physicalColumn("castTimestamp", DataTypes.TIMESTAMP(3))
+                    .primaryKey("col1")
+                    .build();
+
+    private static final TableId TIMEZONE_TABLEID =
+            TableId.tableId("my_company", "my_branch", "timezone_table");
+    private static final Schema TIMEZONE_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("datetime", DataTypes.STRING())
                     .primaryKey("col1")
                     .build();
 
@@ -161,16 +176,76 @@ public class TransformDataOperatorTest {
                     .primaryKey("col1")
                     .build();
 
+    private static final TableId REDUCE_TABLEID =
+            TableId.tableId("my_company", "my_branch", "reduce_table");
+
+    private static final Schema REDUCE_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.STRING().notNull())
+                    .physicalColumn("age", DataTypes.INT())
+                    .physicalColumn("ref1", DataTypes.STRING())
+                    .physicalColumn("ref2", DataTypes.INT())
+                    .primaryKey("id")
+                    .partitionKey("id")
+                    .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
+                    .build();
+
+    private static final Schema EXPECTED_REDUCE_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.STRING().notNull())
+                    .physicalColumn("uid", DataTypes.STRING())
+                    .physicalColumn("newage", DataTypes.INT())
+                    .physicalColumn("ref1", DataTypes.STRING())
+                    .physicalColumn("seventeen", DataTypes.INT())
+                    .primaryKey("id")
+                    .partitionKey("id")
+                    .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
+                    .build();
+
+    private static final TableId WILDCARD_TABLEID =
+            TableId.tableId("my_company", "my_branch", "wildcard_table");
+
+    private static final Schema WILDCARD_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.STRING().notNull())
+                    .physicalColumn("age", DataTypes.INT())
+                    .physicalColumn("name", DataTypes.STRING())
+                    .primaryKey("id")
+                    .partitionKey("id")
+                    .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
+                    .build();
+
+    private static final Schema EXPECTED_WILDCARD_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.STRING().notNull())
+                    .physicalColumn("age", DataTypes.INT())
+                    .physicalColumn("name", DataTypes.STRING())
+                    .physicalColumn("newage", DataTypes.INT())
+                    .primaryKey("id")
+                    .partitionKey("id")
+                    .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
+                    .build();
+
+    private static final TableId COLUMN_SQUARE_TABLE =
+            TableId.tableId("my_company", "my_branch", "column_square");
+    private static final Schema COLUMN_SQUARE_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("col1", DataTypes.INT())
+                    .physicalColumn("col2", DataTypes.INT())
+                    .physicalColumn("square_col2", DataTypes.INT())
+                    .primaryKey("col1")
+                    .build();
+
     @Test
     void testDataChangeEventTransform() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
                                 "*, concat(col1,col2) col12",
                                 "col1 = '1'")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -243,7 +318,6 @@ public class TransformDataOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
-        transform.processElement(new StreamRecord<>(insertEventIgnored));
         transform.processElement(new StreamRecord<>(updateEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
@@ -252,8 +326,8 @@ public class TransformDataOperatorTest {
 
     @Test
     void testDataChangeEventTransformTwice() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
                                 "*, concat(col1, '1') col12",
@@ -263,7 +337,7 @@ public class TransformDataOperatorTest {
                                 "*, concat(col1, '2') col12",
                                 "col1 = '2'")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -357,11 +431,11 @@ public class TransformDataOperatorTest {
 
     @Test
     void testDataChangeEventTransformProjectionDataTypeConvert() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
-                        .addTransform(DATATYPE_TABLEID.identifier(), "*", null)
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(DATATYPE_TABLEID.identifier(), "*", null, null, null, null)
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -403,14 +477,14 @@ public class TransformDataOperatorTest {
 
     @Test
     void testMetadataTransform() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 METADATA_TABLEID.identifier(),
                                 "*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ identifier_name, __namespace_name__, __schema_name__, __table_name__",
                                 " __table_name__ = 'metadata_table' ")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -419,16 +493,17 @@ public class TransformDataOperatorTest {
         CreateTableEvent createTableEvent = new CreateTableEvent(METADATA_TABLEID, METADATA_SCHEMA);
         BinaryRecordDataGenerator recordDataGenerator =
                 new BinaryRecordDataGenerator(((RowType) METADATA_SCHEMA.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) EXPECTED_METADATA_SCHEMA.toRowDataType()));
         // Insert
         DataChangeEvent insertEvent =
                 DataChangeEvent.insertEvent(
                         METADATA_TABLEID,
-                        recordDataGenerator.generate(
-                                new Object[] {new BinaryStringData("1"), null, null, null, null}));
+                        recordDataGenerator.generate(new Object[] {new BinaryStringData("1")}));
         DataChangeEvent insertEventExpect =
                 DataChangeEvent.insertEvent(
                         METADATA_TABLEID,
-                        recordDataGenerator.generate(
+                        expectedRecordDataGenerator.generate(
                                 new Object[] {
                                     new BinaryStringData("1"),
                                     new BinaryStringData("my_company.my_branch.metadata_table"),
@@ -441,7 +516,7 @@ public class TransformDataOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(
                         new StreamRecord<>(
-                                new CreateTableEvent(METADATA_TABLEID, METADATA_SCHEMA)));
+                                new CreateTableEvent(METADATA_TABLEID, EXPECTED_METADATA_SCHEMA)));
         transform.processElement(new StreamRecord<>(insertEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
@@ -450,14 +525,14 @@ public class TransformDataOperatorTest {
 
     @Test
     void testMetadataASTransform() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 METADATA_AS_TABLEID.identifier(),
                                 "sid, name, UPPER(name) as name_upper, __table_name__ as tbname",
                                 "sid < 3")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -496,18 +571,79 @@ public class TransformDataOperatorTest {
     }
 
     @Test
+    void testDataChangeEventTransformWithDuplicateColumns() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                COLUMN_SQUARE_TABLE.identifier(),
+                                "col1, col2, col2 * col2 as square_col2",
+                                "col2 < 3 OR col2 > 5")
+                        .build();
+        EventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(COLUMN_SQUARE_TABLE, COLUMN_SQUARE_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) COLUMN_SQUARE_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        COLUMN_SQUARE_TABLE,
+                        recordDataGenerator.generate(new Object[] {1, 1, null}));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        COLUMN_SQUARE_TABLE, recordDataGenerator.generate(new Object[] {1, 1, 1}));
+
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        COLUMN_SQUARE_TABLE,
+                        recordDataGenerator.generate(new Object[] {6, 6, null}));
+        DataChangeEvent insertEventExpect2 =
+                DataChangeEvent.insertEvent(
+                        COLUMN_SQUARE_TABLE, recordDataGenerator.generate(new Object[] {6, 6, 36}));
+
+        DataChangeEvent insertEvent3 =
+                DataChangeEvent.insertEvent(
+                        COLUMN_SQUARE_TABLE,
+                        recordDataGenerator.generate(new Object[] {4, 4, null}));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(COLUMN_SQUARE_TABLE, COLUMN_SQUARE_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transform.processElement(new StreamRecord<>(insertEvent2));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect2));
+        transform.processElement(new StreamRecord<>(insertEvent3));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isNull();
+    }
+
+    @Test
     void testTimestampTransform() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 TIMESTAMP_TABLEID.identifier(),
                                 "col1, IF(LOCALTIME = CURRENT_TIME, 1, 0) as time_equal,"
-                                        + " IF(LOCALTIMESTAMP = CURRENT_TIMESTAMP, 1, 0) as timestamp_equal,"
+                                        + " IF(DATE_FORMAT(CAST(CURRENT_TIMESTAMP AS TIMESTAMP), 'yyyy-MM-dd HH:mm:ss') = DATE_FORMAT(CAST(NOW() AS TIMESTAMP), 'yyyy-MM-dd HH:mm:ss'), 1, 0) as timestamp_equal,"
                                         + " IF(TO_DATE(DATE_FORMAT(LOCALTIMESTAMP, 'yyyy-MM-dd')) = CURRENT_DATE, 1, 0) as date_equal",
-                                "LOCALTIMESTAMP = CURRENT_TIMESTAMP")
-                        .addTimezone("GMT")
+                                "LOCALTIMESTAMP = CAST(CURRENT_TIMESTAMP AS TIMESTAMP)")
+                        .addTimezone("UTC")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -542,20 +678,25 @@ public class TransformDataOperatorTest {
 
     @Test
     void testTimestampDiffTransform() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 TIMESTAMPDIFF_TABLEID.identifier(),
-                                "col1, TIMESTAMP_DIFF('SECOND', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as second_diff,"
-                                        + " TIMESTAMP_DIFF('MINUTE', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as minute_diff,"
-                                        + " TIMESTAMP_DIFF('HOUR', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as hour_diff,"
-                                        + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as day_diff,"
-                                        + " TIMESTAMP_DIFF('MONTH', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as month_diff,"
-                                        + " TIMESTAMP_DIFF('YEAR', LOCALTIMESTAMP, CURRENT_TIMESTAMP) as year_diff",
-                                null)
-                        .addTimezone("GMT-8:00")
+                                "col1, TIMESTAMP_DIFF('SECOND', LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as second_diff,"
+                                        + " TIMESTAMP_DIFF('MINUTE', LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as minute_diff,"
+                                        + " TIMESTAMP_DIFF('HOUR', LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as hour_diff,"
+                                        + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, CAST(CURRENT_TIMESTAMP AS TIMESTAMP)) as day_diff",
+                                "col1='1'")
+                        .addTransform(
+                                TIMESTAMPDIFF_TABLEID.identifier(),
+                                "col1, TIMESTAMP_DIFF('SECOND', LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as second_diff,"
+                                        + " TIMESTAMP_DIFF('MINUTE', LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as minute_diff,"
+                                        + " TIMESTAMP_DIFF('HOUR', LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as hour_diff,"
+                                        + " TIMESTAMP_DIFF('DAY', LOCALTIMESTAMP, CAST(NOW() AS TIMESTAMP)) as day_diff",
+                                "col1='2'")
+                        .addTimezone("Asia/Shanghai")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -570,16 +711,12 @@ public class TransformDataOperatorTest {
                 DataChangeEvent.insertEvent(
                         TIMESTAMPDIFF_TABLEID,
                         recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("1"), null, null, null, null, null, null
-                                }));
+                                new Object[] {new BinaryStringData("1"), null, null, null, null}));
         DataChangeEvent insertEventExpect =
                 DataChangeEvent.insertEvent(
                         TIMESTAMPDIFF_TABLEID,
                         recordDataGenerator.generate(
-                                new Object[] {
-                                    new BinaryStringData("1"), -28800, -480, -8, 0, 0, 0
-                                }));
+                                new Object[] {new BinaryStringData("1"), 0, 0, 0, 0}));
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
@@ -590,12 +727,73 @@ public class TransformDataOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
+
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        TIMESTAMPDIFF_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {new BinaryStringData("2"), null, null, null, null}));
+        DataChangeEvent insertEventExpect2 =
+                DataChangeEvent.insertEvent(
+                        TIMESTAMPDIFF_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {new BinaryStringData("2"), 0, 0, 0, 0}));
+
+        transform.processElement(new StreamRecord<>(insertEvent2));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect2));
+    }
+
+    @Test
+    void testTimezoneTransform() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                TIMEZONE_TABLEID.identifier(),
+                                "col1, DATE_FORMAT(TO_TIMESTAMP('2024-08-01 00:00:00'), 'yyyy-MM-dd HH:mm:ss') as datetime",
+                                null)
+                        .addTimezone("UTC")
+                        .build();
+        EventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(TIMEZONE_TABLEID, TIMEZONE_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) TIMEZONE_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        TIMEZONE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {new BinaryStringData("1"), null}));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        TIMEZONE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    new BinaryStringData("2024-08-01 00:00:00")
+                                }));
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(TIMEZONE_TABLEID, TIMEZONE_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
     }
 
     @Test
     void testNullCastTransform() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 NULL_TABLEID.identifier(),
                                 "col1"
@@ -609,10 +807,11 @@ public class TransformDataOperatorTest {
                                         + ",cast(colString as double) as nullDouble"
                                         + ",cast(colString as char) as nullChar"
                                         + ",cast(colString as varchar) as nullVarchar"
-                                        + ",cast(colString as DECIMAL(4,2)) as nullDecimal",
+                                        + ",cast(colString as DECIMAL(4,2)) as nullDecimal"
+                                        + ",cast(colString as TIMESTAMP(3)) as nullTimestamp",
                                 null)
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -639,6 +838,7 @@ public class TransformDataOperatorTest {
                                     null,
                                     null,
                                     null,
+                                    null
                                 }));
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(
@@ -652,8 +852,8 @@ public class TransformDataOperatorTest {
 
     @Test
     void testCastTransform() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 CAST_TABLEID.identifier(),
                                 "col1"
@@ -666,7 +866,8 @@ public class TransformDataOperatorTest {
                                         + ",cast(col1 as double) as castDouble"
                                         + ",cast(col1 as char) as castChar"
                                         + ",cast(col1 as varchar) as castVarchar"
-                                        + ",cast(col1 as DECIMAL(4,2)) as castDecimal",
+                                        + ",cast(col1 as DECIMAL(4,2)) as castDecimal"
+                                        + ", castTimestamp",
                                 "col1 = '1'")
                         .addTransform(
                                 CAST_TABLEID.identifier(),
@@ -680,7 +881,8 @@ public class TransformDataOperatorTest {
                                         + ",cast(castInt as double) as castDouble"
                                         + ",cast(castInt as char) as castChar"
                                         + ",cast(castInt as varchar) as castVarchar"
-                                        + ",cast(castInt as DECIMAL(4,2)) as castDecimal",
+                                        + ",cast(castInt as DECIMAL(4,2)) as castDecimal"
+                                        + ", castTimestamp",
                                 "col1 = '2'")
                         .addTransform(
                                 CAST_TABLEID.identifier(),
@@ -694,7 +896,8 @@ public class TransformDataOperatorTest {
                                         + ",cast(castBoolean as double) as castDouble"
                                         + ",cast(castBoolean as char) as castChar"
                                         + ",cast(castBoolean as varchar) as castVarchar"
-                                        + ",cast(castBoolean as DECIMAL(4,2)) as castDecimal",
+                                        + ",cast(castBoolean as DECIMAL(4,2)) as castDecimal"
+                                        + ", castTimestamp",
                                 "col1 = '3'")
                         .addTransform(
                                 CAST_TABLEID.identifier(),
@@ -708,7 +911,8 @@ public class TransformDataOperatorTest {
                                         + ",cast(castTinyint as double) as castDouble"
                                         + ",cast(castTinyint as char) as castChar"
                                         + ",cast(castTinyint as varchar) as castVarchar"
-                                        + ",cast(castTinyint as DECIMAL(4,2)) as castDecimal",
+                                        + ",cast(castTinyint as DECIMAL(4,2)) as castDecimal"
+                                        + ", castTimestamp",
                                 "col1 = '4'")
                         .addTransform(
                                 CAST_TABLEID.identifier(),
@@ -722,7 +926,8 @@ public class TransformDataOperatorTest {
                                         + ",cast(castSmallint as double) as castDouble"
                                         + ",cast(castSmallint as char) as castChar"
                                         + ",cast(castSmallint as varchar) as castVarchar"
-                                        + ",cast(castSmallint as DECIMAL(4,2)) as castDecimal",
+                                        + ",cast(castSmallint as DECIMAL(4,2)) as castDecimal"
+                                        + ", castTimestamp",
                                 "col1 = '5'")
                         .addTransform(
                                 CAST_TABLEID.identifier(),
@@ -736,7 +941,8 @@ public class TransformDataOperatorTest {
                                         + ",cast(castBigint as double) as castDouble"
                                         + ",cast(castBigint as char) as castChar"
                                         + ",cast(castBigint as varchar) as castVarchar"
-                                        + ",cast(castBigint as DECIMAL(4,2)) as castDecimal",
+                                        + ",cast(castBigint as DECIMAL(4,2)) as castDecimal"
+                                        + ", castTimestamp",
                                 "col1 = '6'")
                         .addTransform(
                                 CAST_TABLEID.identifier(),
@@ -750,7 +956,8 @@ public class TransformDataOperatorTest {
                                         + ",cast(castFloat as double) as castDouble"
                                         + ",cast(castFloat as char) as castChar"
                                         + ",cast(castFloat as varchar) as castVarchar"
-                                        + ",cast(castFloat as DECIMAL(4,2)) as castDecimal",
+                                        + ",cast(castFloat as DECIMAL(4,2)) as castDecimal"
+                                        + ", castTimestamp",
                                 "col1 = '7'")
                         .addTransform(
                                 CAST_TABLEID.identifier(),
@@ -764,7 +971,8 @@ public class TransformDataOperatorTest {
                                         + ",cast(castDouble as double) as castDouble"
                                         + ",cast(castDouble as char) as castChar"
                                         + ",cast(castDouble as varchar) as castVarchar"
-                                        + ",cast(castDouble as DECIMAL(4,2)) as castDecimal",
+                                        + ",cast(castDouble as DECIMAL(4,2)) as castDecimal"
+                                        + ", castTimestamp",
                                 "col1 = '8'")
                         .addTransform(
                                 CAST_TABLEID.identifier(),
@@ -778,10 +986,26 @@ public class TransformDataOperatorTest {
                                         + ",cast(castDecimal as double) as castDouble"
                                         + ",cast(castDecimal as char) as castChar"
                                         + ",cast(castDecimal as varchar) as castVarchar"
-                                        + ",cast(castDecimal as DECIMAL(4,2)) as castDecimal",
+                                        + ",cast(castDecimal as DECIMAL(4,2)) as castDecimal"
+                                        + ", castTimestamp",
                                 "col1 = '9'")
+                        .addTransform(
+                                CAST_TABLEID.identifier(),
+                                "col1"
+                                        + ",castInt"
+                                        + ",castBoolean"
+                                        + ",castTinyint"
+                                        + ",castSmallint"
+                                        + ",castBigint"
+                                        + ",castFloat"
+                                        + ",castDouble"
+                                        + ",castChar"
+                                        + ",cast(castTimestamp as varchar) as castVarchar"
+                                        + ",castDecimal"
+                                        + ",cast('1970-01-01T00:00:01.234' as TIMESTAMP(3)) as castTimestamp",
+                                "col1 = '10'")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -807,6 +1031,7 @@ public class TransformDataOperatorTest {
                                     null,
                                     null,
                                     null,
+                                    null
                                 }));
         DataChangeEvent insertEventExpect1 =
                 DataChangeEvent.insertEvent(
@@ -824,6 +1049,7 @@ public class TransformDataOperatorTest {
                                     new BinaryStringData("1"),
                                     new BinaryStringData("1"),
                                     DecimalData.fromBigDecimal(new BigDecimal(1.0), 4, 2),
+                                    null
                                 }));
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(
@@ -849,6 +1075,7 @@ public class TransformDataOperatorTest {
                                     null,
                                     null,
                                     null,
+                                    null
                                 }));
         DataChangeEvent insertEventExpect2 =
                 DataChangeEvent.insertEvent(
@@ -866,6 +1093,7 @@ public class TransformDataOperatorTest {
                                     new BinaryStringData("1"),
                                     new BinaryStringData("1"),
                                     DecimalData.fromBigDecimal(new BigDecimal(1.0), 4, 2),
+                                    null
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent2));
         Assertions.assertThat(
@@ -887,6 +1115,7 @@ public class TransformDataOperatorTest {
                                     null,
                                     null,
                                     null,
+                                    null
                                 }));
         DataChangeEvent insertEventExpect3 =
                 DataChangeEvent.insertEvent(
@@ -904,6 +1133,7 @@ public class TransformDataOperatorTest {
                                     new BinaryStringData("true"),
                                     new BinaryStringData("true"),
                                     DecimalData.fromBigDecimal(new BigDecimal(1.0), 4, 2),
+                                    null
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent3));
         Assertions.assertThat(
@@ -925,6 +1155,7 @@ public class TransformDataOperatorTest {
                                     null,
                                     null,
                                     null,
+                                    null
                                 }));
         DataChangeEvent insertEventExpect4 =
                 DataChangeEvent.insertEvent(
@@ -942,6 +1173,7 @@ public class TransformDataOperatorTest {
                                     new BinaryStringData("1"),
                                     new BinaryStringData("1"),
                                     DecimalData.fromBigDecimal(new BigDecimal(1.0), 4, 2),
+                                    null
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent4));
         Assertions.assertThat(
@@ -963,6 +1195,7 @@ public class TransformDataOperatorTest {
                                     null,
                                     null,
                                     null,
+                                    null
                                 }));
         DataChangeEvent insertEventExpect5 =
                 DataChangeEvent.insertEvent(
@@ -980,6 +1213,7 @@ public class TransformDataOperatorTest {
                                     new BinaryStringData("1"),
                                     new BinaryStringData("1"),
                                     DecimalData.fromBigDecimal(new BigDecimal(1.0), 4, 2),
+                                    null
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent5));
         Assertions.assertThat(
@@ -1001,6 +1235,7 @@ public class TransformDataOperatorTest {
                                     null,
                                     null,
                                     null,
+                                    null
                                 }));
         DataChangeEvent insertEventExpect6 =
                 DataChangeEvent.insertEvent(
@@ -1018,6 +1253,7 @@ public class TransformDataOperatorTest {
                                     new BinaryStringData("1"),
                                     new BinaryStringData("1"),
                                     DecimalData.fromBigDecimal(new BigDecimal(1.0), 4, 2),
+                                    null
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent6));
         Assertions.assertThat(
@@ -1039,6 +1275,7 @@ public class TransformDataOperatorTest {
                                     null,
                                     null,
                                     null,
+                                    null
                                 }));
         DataChangeEvent insertEventExpect7 =
                 DataChangeEvent.insertEvent(
@@ -1056,6 +1293,7 @@ public class TransformDataOperatorTest {
                                     new BinaryStringData("1.0"),
                                     new BinaryStringData("1.0"),
                                     DecimalData.fromBigDecimal(new BigDecimal(1.0), 4, 2),
+                                    null
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent7));
         Assertions.assertThat(
@@ -1077,6 +1315,7 @@ public class TransformDataOperatorTest {
                                     null,
                                     null,
                                     null,
+                                    null
                                 }));
         DataChangeEvent insertEventExpect8 =
                 DataChangeEvent.insertEvent(
@@ -1094,6 +1333,7 @@ public class TransformDataOperatorTest {
                                     new BinaryStringData("1.0"),
                                     new BinaryStringData("1.0"),
                                     DecimalData.fromBigDecimal(new BigDecimal(1.0), 4, 2),
+                                    null
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent8));
         Assertions.assertThat(
@@ -1115,6 +1355,7 @@ public class TransformDataOperatorTest {
                                     null,
                                     null,
                                     DecimalData.fromBigDecimal(new BigDecimal(1.0), 4, 2),
+                                    null
                                 }));
         DataChangeEvent insertEventExpect9 =
                 DataChangeEvent.insertEvent(
@@ -1132,17 +1373,59 @@ public class TransformDataOperatorTest {
                                     new BinaryStringData("1.00"),
                                     new BinaryStringData("1.00"),
                                     DecimalData.fromBigDecimal(new BigDecimal(1.0), 4, 2),
+                                    null
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent9));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect9));
+
+        DataChangeEvent insertEvent10 =
+                DataChangeEvent.insertEvent(
+                        CAST_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("10"),
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    TimestampData.fromMillis(1234, 0)
+                                }));
+        DataChangeEvent insertEventExpect10 =
+                DataChangeEvent.insertEvent(
+                        CAST_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("10"),
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    new BinaryStringData("1970-01-01T00:00:01.234"),
+                                    null,
+                                    TimestampData.fromMillis(1234, 0)
+                                }));
+        transform.processElement(new StreamRecord<>(insertEvent10));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect10));
     }
 
     @Test
     void testCastErrorTransform() throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 CAST_TABLEID.identifier(),
                                 "col1"
@@ -1155,10 +1438,11 @@ public class TransformDataOperatorTest {
                                         + ",cast(castFloat as double) as castDouble"
                                         + ",cast(castFloat as char) as castChar"
                                         + ",cast(castFloat as varchar) as castVarchar"
-                                        + ",cast(castFloat as DECIMAL(4,2)) as castDecimal",
+                                        + ",cast(castFloat as DECIMAL(4,2)) as castDecimal"
+                                        + ",cast(castFloat as TIMESTAMP(3)) as castTimestamp",
                                 "col1 = '1'")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -1184,6 +1468,7 @@ public class TransformDataOperatorTest {
                                     null,
                                     null,
                                     null,
+                                    null
                                 }));
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(
@@ -1255,18 +1540,19 @@ public class TransformDataOperatorTest {
         testExpressionConditionTransform("cast(null as char) is null");
         testExpressionConditionTransform("cast(null as varchar) is null");
         testExpressionConditionTransform("cast(null as DECIMAL(4,2)) is null");
+        testExpressionConditionTransform("cast(null as TIMESTAMP(3)) is null");
     }
 
     private void testExpressionConditionTransform(String expression) throws Exception {
-        TransformDataOperator transform =
-                TransformDataOperator.newBuilder()
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
                         .addTransform(
                                 CONDITION_TABLEID.identifier(),
                                 "col1, IF(" + expression + ", true, false) as condition_result",
                                 expression)
-                        .addTimezone("GMT")
+                        .addTimezone("UTC")
                         .build();
-        EventOperatorTestHarness<TransformDataOperator, Event>
+        EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         new EventOperatorTestHarness<>(transform, 1);
         // Initialization
@@ -1297,5 +1583,203 @@ public class TransformDataOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
+    }
+
+    @Test
+    public void testReduceSchemaTransform() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                REDUCE_TABLEID.identifier(),
+                                "id, upper(id) as uid, age + 1 as newage, lower(ref1) as ref1, 17 as seventeen",
+                                "newage > 17 and ref2 > 17")
+                        .addTimezone("GMT")
+                        .build();
+        EventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(REDUCE_TABLEID, REDUCE_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) REDUCE_SCHEMA.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) EXPECTED_REDUCE_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        REDUCE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("id001"),
+                                    17,
+                                    new BinaryStringData("Reference"),
+                                    42
+                                }));
+
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        REDUCE_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("id001"),
+                                    new BinaryStringData("ID001"),
+                                    18,
+                                    new BinaryStringData("reference"),
+                                    17
+                                }));
+
+        // Update
+        DataChangeEvent updateEvent =
+                DataChangeEvent.updateEvent(
+                        REDUCE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("id001"),
+                                    17,
+                                    new BinaryStringData("Reference"),
+                                    42
+                                }),
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("id001"),
+                                    18,
+                                    new BinaryStringData("UpdatedReference"),
+                                    41
+                                }));
+
+        DataChangeEvent updateEventExpect =
+                DataChangeEvent.updateEvent(
+                        REDUCE_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("id001"),
+                                    new BinaryStringData("ID001"),
+                                    18,
+                                    new BinaryStringData("reference"),
+                                    17
+                                }),
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("id001"),
+                                    new BinaryStringData("ID001"),
+                                    19,
+                                    new BinaryStringData("updatedreference"),
+                                    17
+                                }));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(REDUCE_TABLEID, EXPECTED_REDUCE_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+
+        transform.processElement(new StreamRecord<>(updateEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(updateEventExpect));
+    }
+
+    @Test
+    public void testWildcardSchemaTransform() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                WILDCARD_TABLEID.identifier(),
+                                "*, age + 1 as newage",
+                                "newage > 17")
+                        .addTimezone("GMT")
+                        .build();
+        EventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(WILDCARD_TABLEID, WILDCARD_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) WILDCARD_SCHEMA.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) EXPECTED_WILDCARD_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        WILDCARD_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("id001"),
+                                    17,
+                                    new BinaryStringData("Alice"),
+                                }));
+
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        WILDCARD_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("id001"),
+                                    17,
+                                    new BinaryStringData("Alice"),
+                                    18
+                                }));
+
+        // Update
+        DataChangeEvent updateEvent =
+                DataChangeEvent.updateEvent(
+                        WILDCARD_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("id001"),
+                                    17,
+                                    new BinaryStringData("Alice"),
+                                }),
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("id001"),
+                                    18,
+                                    new BinaryStringData("Arisu"),
+                                }));
+
+        DataChangeEvent updateEventExpect =
+                DataChangeEvent.updateEvent(
+                        WILDCARD_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("id001"),
+                                    17,
+                                    new BinaryStringData("Alice"),
+                                    18
+                                }),
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("id001"),
+                                    18,
+                                    new BinaryStringData("Arisu"),
+                                    19
+                                }));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(WILDCARD_TABLEID, EXPECTED_WILDCARD_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+
+        transform.processElement(new StreamRecord<>(updateEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(updateEventExpect));
     }
 }

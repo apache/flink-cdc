@@ -124,3 +124,36 @@ VALUES (DEFAULT,
         '2020-07-17 18:00:22.123456',
         '2020-07-17 18:00:22',
         NULL);
+
+CREATE TABLE precision_types
+(
+    id                   SERIAL,
+    decimal_c0           DECIMAL(6, 2),
+    decimal_c1           DECIMAL(9, 4),
+    decimal_c2           DECIMAL(20, 4),
+    time_c               TIME(0),
+    time_3_c             TIME(3),
+    time_6_c             TIME(6),
+    datetime_c           DATETIME(0),
+    datetime3_c          DATETIME(3),
+    datetime6_c          DATETIME(6),
+    timestamp_c          TIMESTAMP(0) NULL,
+    timestamp3_c         TIMESTAMP(3) NULL,
+    timestamp6_c         TIMESTAMP(6) NULL,
+    PRIMARY KEY (id)
+) DEFAULT CHARSET=utf8;
+
+INSERT INTO precision_types
+VALUES (DEFAULT,
+        123.4,
+        1234.5,
+        1234.56,
+        '18:00',
+        '18:00:22.1',
+        '18:00:22.1',
+        '2020-07-17 18:00',
+        '2020-07-17 18:00:22',
+        '2020-07-17 18:00:22',
+        '2020-07-17 18:00',
+        '2020-07-17 18:00:22',
+        '2020-07-17 18:00:22');
