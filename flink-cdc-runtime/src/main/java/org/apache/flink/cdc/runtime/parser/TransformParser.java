@@ -109,7 +109,7 @@ public class TransformParser {
             List<Column> columns,
             SqlNode sqlNode,
             List<UserDefinedFunctionDescriptor> udfDescriptors) {
-        List<Column> columnsWithMetadata = copyFillMetadataColumn(sqlNode.toString(), columns);
+        List<Column> columnsWithMetadata = copyFillMetadataColumn(columns);
         CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
         SchemaPlus schema = rootSchema.plus();
         Map<String, Object> operand = new HashMap<>();
@@ -498,27 +498,13 @@ public class TransformParser {
         return parseSelect(statement.toString());
     }
 
-    private static List<Column> copyFillMetadataColumn(
-            String transformStatement, List<Column> columns) {
+    private static List<Column> copyFillMetadataColumn(List<Column> columns) {
+        // Add metaColumn for SQLValidator.validate
         List<Column> columnsWithMetadata = new ArrayList<>(columns);
-        if (transformStatement.contains(DEFAULT_NAMESPACE_NAME)
-                && !containsMetadataColumn(columnsWithMetadata, DEFAULT_NAMESPACE_NAME)) {
-            columnsWithMetadata.add(
-                    Column.physicalColumn(DEFAULT_NAMESPACE_NAME, DataTypes.STRING()));
-        }
-        if (transformStatement.contains(DEFAULT_SCHEMA_NAME)
-                && !containsMetadataColumn(columnsWithMetadata, DEFAULT_SCHEMA_NAME)) {
-            columnsWithMetadata.add(Column.physicalColumn(DEFAULT_SCHEMA_NAME, DataTypes.STRING()));
-        }
-        if (transformStatement.contains(DEFAULT_TABLE_NAME)
-                && !containsMetadataColumn(columnsWithMetadata, DEFAULT_TABLE_NAME)) {
-            columnsWithMetadata.add(Column.physicalColumn(DEFAULT_TABLE_NAME, DataTypes.STRING()));
-        }
+        columnsWithMetadata.add(Column.physicalColumn(DEFAULT_NAMESPACE_NAME, DataTypes.STRING()));
+        columnsWithMetadata.add(Column.physicalColumn(DEFAULT_SCHEMA_NAME, DataTypes.STRING()));
+        columnsWithMetadata.add(Column.physicalColumn(DEFAULT_TABLE_NAME, DataTypes.STRING()));
         return columnsWithMetadata;
-    }
-
-    private static boolean containsMetadataColumn(List<Column> columns, String columnName) {
-        return columns.stream().anyMatch(column -> column.getName().equals(columnName));
     }
 
     private static boolean isMetadataColumn(String columnName) {

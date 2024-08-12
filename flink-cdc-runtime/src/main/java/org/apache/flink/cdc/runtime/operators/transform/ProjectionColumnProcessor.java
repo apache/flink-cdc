@@ -156,22 +156,22 @@ public class ProjectionColumnProcessor {
                 }
             }
         }
-        if (scriptExpression.contains(TransformParser.DEFAULT_NAMESPACE_NAME)
-                && !argumentNames.contains(TransformParser.DEFAULT_NAMESPACE_NAME)) {
-            argumentNames.add(TransformParser.DEFAULT_NAMESPACE_NAME);
-            paramTypes.add(String.class);
-        }
 
-        if (scriptExpression.contains(TransformParser.DEFAULT_SCHEMA_NAME)
-                && !argumentNames.contains(TransformParser.DEFAULT_SCHEMA_NAME)) {
-            argumentNames.add(TransformParser.DEFAULT_SCHEMA_NAME);
-            paramTypes.add(String.class);
-        }
-
-        if (scriptExpression.contains(TransformParser.DEFAULT_TABLE_NAME)
-                && !argumentNames.contains(TransformParser.DEFAULT_TABLE_NAME)) {
-            argumentNames.add(TransformParser.DEFAULT_TABLE_NAME);
-            paramTypes.add(String.class);
+        for (String originalColumnName : originalColumnNames) {
+            switch (originalColumnName) {
+                case TransformParser.DEFAULT_NAMESPACE_NAME:
+                    argumentNames.add(TransformParser.DEFAULT_NAMESPACE_NAME);
+                    paramTypes.add(String.class);
+                    break;
+                case TransformParser.DEFAULT_SCHEMA_NAME:
+                    argumentNames.add(TransformParser.DEFAULT_SCHEMA_NAME);
+                    paramTypes.add(String.class);
+                    break;
+                case TransformParser.DEFAULT_TABLE_NAME:
+                    argumentNames.add(TransformParser.DEFAULT_TABLE_NAME);
+                    paramTypes.add(String.class);
+                    break;
+            }
         }
 
         argumentNames.add(JaninoCompiler.DEFAULT_TIME_ZONE);
