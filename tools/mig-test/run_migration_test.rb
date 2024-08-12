@@ -114,7 +114,7 @@ def test_migration(from_version, to_version)
   end
 end
 
-version_list = %w[3.0.0 3.0.1 3.1.0 3.1.1 3.2-SNAPSHOT]
+version_list = %w[3.0.0 3.0.1 3.1.0 3.1.1 3.3-SNAPSHOT]
 no_savepoint_versions = %w[3.0.0 3.0.1]
 version_result = Hash.new('❓')
 @failures = []

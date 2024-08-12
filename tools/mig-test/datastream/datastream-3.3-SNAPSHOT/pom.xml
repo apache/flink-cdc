@@ -22,13 +22,13 @@ limitations under the License.
 
     <groupId>org.apache.flink</groupId>
     <artifactId>datastream-job</artifactId>
-    <version>3.2-SNAPSHOT</version>
+    <version>3.3-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <flink.version>1.18.1</flink.version>
-        <flink.cdc.version>3.2-SNAPSHOT</flink.cdc.version>
+        <flink.cdc.version>3.3-SNAPSHOT</flink.cdc.version>
         <debezium.version>1.9.7.Final</debezium.version>
         <scala.binary.version>2.12</scala.binary.version>
         <slf4j.version>2.0.13</slf4j.version>
