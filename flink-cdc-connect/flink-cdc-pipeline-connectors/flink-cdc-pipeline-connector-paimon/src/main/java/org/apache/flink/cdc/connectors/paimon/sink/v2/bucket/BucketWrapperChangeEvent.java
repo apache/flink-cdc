@@ -20,10 +20,12 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2.bucket;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 /** A wrapper class for {@link ChangeEvent} to attach bucket id. */
-public class BucketWrapperChangeEvent implements ChangeEvent, BucketWrapper {
+public class BucketWrapperChangeEvent implements ChangeEvent, BucketWrapper, Serializable {
+    private static final long serialVersionUID = 1L;
     private final int bucket;
 
     private final ChangeEvent innerEvent;

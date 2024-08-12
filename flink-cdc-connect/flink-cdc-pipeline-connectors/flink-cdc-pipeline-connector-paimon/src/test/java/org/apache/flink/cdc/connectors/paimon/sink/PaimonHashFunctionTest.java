@@ -31,7 +31,6 @@ import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.options.Options;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -42,6 +41,8 @@ import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link PaimonHashFunction}. */
 public class PaimonHashFunctionTest {
@@ -130,6 +131,7 @@ public class PaimonHashFunctionTest {
                                 }));
         int key3 = hashFunction.hashcode(dataChangeEvent3);
 
-        Assertions.assertEquals(key1, key2, key3);
+        assertThat(key1).isEqualTo(key2);
+        assertThat(key1).isEqualTo(key3);
     }
 }

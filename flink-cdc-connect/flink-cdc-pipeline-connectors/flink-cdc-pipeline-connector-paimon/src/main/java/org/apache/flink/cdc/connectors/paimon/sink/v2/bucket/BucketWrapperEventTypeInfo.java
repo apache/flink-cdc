@@ -65,7 +65,7 @@ public class BucketWrapperEventTypeInfo extends TypeInformation<Event> {
 
     @Override
     public String toString() {
-        return "Event";
+        return "BucketWrapperEvent";
     }
 
     @Override

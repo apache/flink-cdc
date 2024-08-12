@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.OperatorIDGenerator;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonWriterHelper;
@@ -62,7 +63,7 @@ import java.util.Optional;
 public class BucketAssignOperator extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event> {
 
-    public static final String COMMIT_USER = "admin";
+    public final String commitUser;
 
     private final Options catalogOptions;
 
@@ -84,10 +85,12 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
 
     private final ZoneId zoneId;
 
-    public BucketAssignOperator(Options catalogOptions, String schemaOperatorUid, ZoneId zoneId) {
+    public BucketAssignOperator(
+            Options catalogOptions, String schemaOperatorUid, ZoneId zoneId, String commitUser) {
         this.catalogOptions = catalogOptions;
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.schemaOperatorUid = schemaOperatorUid;
+        this.commitUser = commitUser;
         this.zoneId = zoneId;
     }
 
@@ -198,6 +201,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
 
     private Tuple4<BucketMode, RowKeyExtractor, BucketAssigner, RowPartitionKeyExtractor>
             getTableInfo(TableId tableId) {
+        Preconditions.checkNotNull(tableId, "Invalid tableId in given event.");
         FileStoreTable table;
         try {
             table = (FileStoreTable) catalog.getTable(Identifier.fromString(tableId.toString()));
@@ -211,7 +215,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                 table.createRowKeyExtractor(),
                 new HashBucketAssigner(
                         table.snapshotManager(),
-                        COMMIT_USER,
+                        commitUser,
                         table.store().newIndexFileHandler(),
                         totalTasksNumber,
                         MathUtils.min(numAssigners, totalTasksNumber),

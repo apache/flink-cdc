@@ -38,8 +38,11 @@ public interface DataSink {
      * Get the {@code HashFunctionProvider<DataChangeEvent>} for calculating hash value if you need
      * to partition by data change event before Sink.
      */
-    default HashFunctionProvider<DataChangeEvent> getDataChangeEventHashFunctionProvider(
-            int parallelism) {
+    default HashFunctionProvider<DataChangeEvent> getDataChangeEventHashFunctionProvider() {
         return new DefaultDataChangeEventHashFunctionProvider();
+    }
+
+    default HashFunctionProvider<DataChangeEvent> getDataChangeEventHashFunctionProvider(int parallelism) {
+        return getDataChangeEventHashFunctionProvider(); // fallback to nullary version if it isn't overridden
     }
 }

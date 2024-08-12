@@ -17,8 +17,12 @@
 
 package org.apache.flink.cdc.connectors.paimon.sink.v2.bucket;
 
+import org.apache.paimon.data.InternalRow;
+import org.apache.paimon.flink.sink.StoreSinkWrite;
+
 /** Wrapper class with bucket. */
 public interface BucketWrapper {
 
+    /** Bucket value that was passed in {@link StoreSinkWrite#write(InternalRow, int)}. */
     int getBucket();
 }

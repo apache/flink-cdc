@@ -59,6 +59,6 @@ public class BucketWrapperFlushEvent extends FlushEvent implements BucketWrapper
 
     @Override
     public String toString() {
-        return "BucketWrapperFlushEvent{" + "bucket=" + bucket + '}';
+        return "BucketWrapperFlushEvent{tableId=" + getTableId() + ", bucket=" + bucket + '}';
     }
 }
