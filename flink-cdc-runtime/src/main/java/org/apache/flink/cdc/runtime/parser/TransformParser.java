@@ -20,7 +20,6 @@ package org.apache.flink.cdc.runtime.parser;
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSchemaFactory;
@@ -84,6 +83,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.apache.flink.cdc.common.utils.StringUtils.isNullOrWhitespaceOnly;
+import static org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns.METADATA_COLUMNS;
 import static org.apache.flink.cdc.runtime.typeutils.DataTypeConverter.convertCalciteType;
 
 /** Use Flink's calcite parser to parse the statement of flink cdc pipeline transform. */
@@ -91,9 +91,6 @@ public class TransformParser {
     private static final Logger LOG = LoggerFactory.getLogger(TransformParser.class);
     private static final String DEFAULT_SCHEMA = "default_schema";
     private static final String DEFAULT_TABLE = "TB";
-    public static final String DEFAULT_NAMESPACE_NAME = "__namespace_name__";
-    public static final String DEFAULT_SCHEMA_NAME = "__schema_name__";
-    public static final String DEFAULT_TABLE_NAME = "__table_name__";
 
     private static SqlParser getCalciteParser(String sql) {
         return SqlParser.create(
@@ -497,16 +494,14 @@ public class TransformParser {
     private static List<Column> copyFillMetadataColumn(List<Column> columns) {
         // Add metaColumn for SQLValidator.validate
         List<Column> columnsWithMetadata = new ArrayList<>(columns);
-        columnsWithMetadata.add(Column.physicalColumn(DEFAULT_NAMESPACE_NAME, DataTypes.STRING()));
-        columnsWithMetadata.add(Column.physicalColumn(DEFAULT_SCHEMA_NAME, DataTypes.STRING()));
-        columnsWithMetadata.add(Column.physicalColumn(DEFAULT_TABLE_NAME, DataTypes.STRING()));
+        METADATA_COLUMNS.stream()
+                .map(col -> Column.physicalColumn(col.f0, col.f1))
+                .forEach(columnsWithMetadata::add);
         return columnsWithMetadata;
     }
 
     private static boolean isMetadataColumn(String columnName) {
-        return DEFAULT_TABLE_NAME.equals(columnName)
-                || DEFAULT_SCHEMA_NAME.equals(columnName)
-                || DEFAULT_NAMESPACE_NAME.equals(columnName);
+        return METADATA_COLUMNS.stream().anyMatch(col -> col.f0.equals(columnName));
     }
 
     public static SqlSelect parseFilterExpression(String filterExpression) {

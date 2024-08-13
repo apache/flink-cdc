@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
+import org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
 import org.codehaus.janino.ExpressionEvaluator;
@@ -32,11 +33,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.stream.Stream;
 
-import static org.apache.flink.cdc.runtime.parser.TransformParser.DEFAULT_NAMESPACE_NAME;
-import static org.apache.flink.cdc.runtime.parser.TransformParser.DEFAULT_SCHEMA_NAME;
-import static org.apache.flink.cdc.runtime.parser.TransformParser.DEFAULT_TABLE_NAME;
+import static org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns.METADATA_COLUMNS;
 
 /** The processor of the transform filter. It processes the data change event of matched table. */
 public class TransformFilterProcessor {
@@ -74,9 +72,10 @@ public class TransformFilterProcessor {
                 tableInfo, transformFilter, timezone, udfDescriptors, udfFunctionInstances);
     }
 
-    public boolean process(BinaryRecordData after, long epochTime) {
+    public boolean process(BinaryRecordData record, long epochTime, String opType) {
         try {
-            return (Boolean) expressionEvaluator.evaluate(generateParams(after, epochTime));
+            return (Boolean)
+                    expressionEvaluator.evaluate(generateParams(record, epochTime, opType));
         } catch (InvocationTargetException e) {
             LOG.error(
                     "Table:{} filter:{} execute failed. {}",
@@ -102,19 +101,19 @@ public class TransformFilterProcessor {
                 }
             }
         }
-        Stream.of(DEFAULT_NAMESPACE_NAME, DEFAULT_SCHEMA_NAME, DEFAULT_TABLE_NAME)
+
+        METADATA_COLUMNS.stream()
                 .forEach(
-                        metadataColumn -> {
-                            if (scriptExpression.contains(metadataColumn)
-                                    && !argNames.contains(metadataColumn)) {
-                                argNames.add(metadataColumn);
-                                argTypes.add(String.class);
+                        col -> {
+                            if (scriptExpression.contains(col.f0) && !argNames.contains(col.f0)) {
+                                argNames.add(col.f0);
+                                argTypes.add(col.f2);
                             }
                         });
         return Tuple2.of(argNames, argTypes);
     }
 
-    private Object[] generateParams(BinaryRecordData after, long epochTime) {
+    private Object[] generateParams(BinaryRecordData record, long epochTime, String opType) {
         List<Object> params = new ArrayList<>();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
 
@@ -123,14 +122,17 @@ public class TransformFilterProcessor {
         RecordData.FieldGetter[] fieldGetters = tableInfo.getPreTransformedFieldGetters();
         for (String columnName : args.f0) {
             switch (columnName) {
-                case DEFAULT_NAMESPACE_NAME:
+                case MetadataColumns.DEFAULT_NAMESPACE_NAME:
                     params.add(tableInfo.getNamespace());
                     continue;
-                case DEFAULT_SCHEMA_NAME:
+                case MetadataColumns.DEFAULT_SCHEMA_NAME:
                     params.add(tableInfo.getSchemaName());
                     continue;
-                case DEFAULT_TABLE_NAME:
+                case MetadataColumns.DEFAULT_TABLE_NAME:
                     params.add(tableInfo.getTableName());
+                    continue;
+                case MetadataColumns.DEFAULT_DATA_EVENT_TYPE:
+                    params.add(opType);
                     continue;
             }
             for (int i = 0; i < columns.size(); i++) {
@@ -138,7 +140,7 @@ public class TransformFilterProcessor {
                 if (column.getName().equals(columnName)) {
                     params.add(
                             DataTypeConverter.convertToOriginal(
-                                    fieldGetters[i].getFieldOrNull(after), column.getType()));
+                                    fieldGetters[i].getFieldOrNull(record), column.getType()));
                     break;
                 }
             }
