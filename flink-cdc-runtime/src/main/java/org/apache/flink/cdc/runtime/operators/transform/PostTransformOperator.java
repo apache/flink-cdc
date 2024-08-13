@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -389,13 +390,15 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         // insert and update event only process afterData, delete only process beforeData
         if (after != null) {
-            if (transformFilterProcessor.process(after, epochTime)) {
+            if (transformFilterProcessor.process(
+                    after, epochTime, opTypeToRowKind(dataChangeEvent.op(), '+'))) {
                 return Optional.of(dataChangeEvent);
             } else {
                 return Optional.empty();
             }
         } else if (before != null) {
-            if (transformFilterProcessor.process(before, epochTime)) {
+            if (transformFilterProcessor.process(
+                    before, epochTime, opTypeToRowKind(dataChangeEvent.op(), '-'))) {
                 return Optional.of(dataChangeEvent);
             } else {
                 return Optional.empty();
@@ -412,11 +415,14 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         if (before != null) {
             BinaryRecordData projectedBefore =
-                    postTransformProcessor.processData(before, epochTime);
+                    postTransformProcessor.processData(
+                            before, epochTime, opTypeToRowKind(dataChangeEvent.op(), '-'));
             dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
         }
         if (after != null) {
-            BinaryRecordData projectedAfter = postTransformProcessor.processData(after, epochTime);
+            BinaryRecordData projectedAfter =
+                    postTransformProcessor.processData(
+                            after, epochTime, opTypeToRowKind(dataChangeEvent.op(), '+'));
             dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
         }
         return Optional.of(dataChangeEvent);
@@ -498,5 +504,9 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                         throw new RuntimeException("Failed to destroy UDF " + udf, ex);
                     }
                 });
+    }
+
+    private String opTypeToRowKind(OperationType opType, char beforeOrAfter) {
+        return String.format("%c%c", beforeOrAfter, opType.name().charAt(0));
     }
 }

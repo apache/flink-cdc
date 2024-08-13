@@ -113,7 +113,7 @@ public class TransformProjectionProcessor {
                         .collect(Collectors.toList()));
     }
 
-    public BinaryRecordData processData(BinaryRecordData payload, long epochTime) {
+    public BinaryRecordData processData(BinaryRecordData payload, long epochTime, String opType) {
         List<Object> valueList = new ArrayList<>();
         List<Column> columns = postTransformChangeInfo.getPostTransformedSchema().getColumns();
 
@@ -124,7 +124,7 @@ public class TransformProjectionProcessor {
                 ProjectionColumn projectionColumn = projectionColumnProcessor.getProjectionColumn();
                 valueList.add(
                         DataTypeConverter.convert(
-                                projectionColumnProcessor.evaluate(payload, epochTime),
+                                projectionColumnProcessor.evaluate(payload, epochTime, opType),
                                 projectionColumn.getDataType()));
             } else {
                 Column column = columns.get(i);
