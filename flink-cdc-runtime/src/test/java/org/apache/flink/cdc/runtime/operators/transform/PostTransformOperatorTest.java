@@ -1511,6 +1511,12 @@ public class PostTransformOperatorTest {
         testExpressionConditionTransform("SUBSTRING('ABC', 1) = 'ABC'");
         testExpressionConditionTransform("SUBSTRING('ABC', 2, 2) = 'BC'");
         testExpressionConditionTransform("SUBSTRING('ABC', 2, 100) = 'BC'");
+        testExpressionConditionTransform("SUBSTRING('ABC' FROM -1) = 'C'");
+        testExpressionConditionTransform("SUBSTRING('ABC' FROM -2 FOR 2) = 'BC'");
+        testExpressionConditionTransform("SUBSTRING('ABC' FROM 0) = 'ABC'");
+        testExpressionConditionTransform("SUBSTRING('ABC' FROM 1) = 'ABC'");
+        testExpressionConditionTransform("SUBSTRING('ABC' FROM 2 FOR 2) = 'BC'");
+        testExpressionConditionTransform("SUBSTRING('ABC' FROM 2 FOR 100) = 'BC'");
         testExpressionConditionTransform("'ABC' like '^[a-zA-Z]'");
         testExpressionConditionTransform("'123' not like '^[a-zA-Z]'");
         testExpressionConditionTransform("abs(2) = 2");
