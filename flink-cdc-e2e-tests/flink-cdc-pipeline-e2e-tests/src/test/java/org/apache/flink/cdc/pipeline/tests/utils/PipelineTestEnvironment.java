@@ -60,16 +60,16 @@ import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
-/** Test environment running pipeline job on Flink containers. */
 @RunWith(Parameterized.class)
 public abstract class PipelineTestEnvironment extends TestLogger {
     private static final Logger LOG = LoggerFactory.getLogger(PipelineTestEnvironment.class);
 
-    @Parameterized.Parameter public String flinkVersion;
+    @Parameterized.Parameter(0)
+    public String flinkVersion;
 
-    // ------------------------------------------------------------------------------------------
-    // Flink Variables
-    // ------------------------------------------------------------------------------------------
+    @Parameterized.Parameter(1)
+    public String elasticsearchVersion;
+
     public static final int JOB_MANAGER_REST_PORT = 8081;
     public static final String INTER_CONTAINER_JM_ALIAS = "jobmanager";
     public static final String INTER_CONTAINER_TM_ALIAS = "taskmanager";
@@ -83,17 +83,22 @@ public abstract class PipelineTestEnvironment extends TestLogger {
     protected GenericContainer<?> taskManager;
 
     protected ToStringConsumer jobManagerConsumer;
-
     protected ToStringConsumer taskManagerConsumer;
 
-    @Parameterized.Parameters(name = "flinkVersion: {0}")
-    public static List<String> getFlinkVersion() {
-        return Arrays.asList("1.17.2", "1.18.1", "1.19.0");
+    @Parameterized.Parameters(name = "flinkVersion: {0}, elasticsearchVersion: {1}")
+    public static Collection<Object[]> getTestParameters() {
+        return Arrays.asList(new Object[][] {
+                {"1.19.0", "6.8.20"},
+                {"1.19.0", "7.10.2"},
+                {"1.19.0", "8.12.1"},
+                {"1.17.2", "8.12.1"},
+                {"1.18.1", "8.12.1"},
+        });
     }
 
     @Before
     public void before() throws Exception {
-        LOG.info("Starting containers...");
+        LOG.info("Starting containers for Flink {} and Elasticsearch {}...", flinkVersion, elasticsearchVersion);
         jobManagerConsumer = new ToStringConsumer();
 
         String flinkProperties = getFlinkProperties(flinkVersion);
@@ -136,17 +141,6 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         }
     }
 
-    /** Allow overriding the default flink properties. */
-    public void overrideFlinkProperties(String properties) {
-        jobManager.withEnv("FLINK_PROPERTIES", properties);
-        taskManager.withEnv("FLINK_PROPERTIES", properties);
-    }
-
-    /**
-     * Submits a SQL job to the running cluster.
-     *
-     * <p><b>NOTE:</b> You should not use {@code '\t'}.
-     */
     public void submitPipelineJob(String pipelineJob, Path... jars)
             throws IOException, InterruptedException {
         for (Path jar : jars) {
@@ -183,11 +177,6 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         }
     }
 
-    /**
-     * Get {@link RestClusterClient} connected to this FlinkContainer.
-     *
-     * <p>This method lazily initializes the REST client on-demand.
-     */
     public RestClusterClient<StandaloneClusterId> getRestClusterClient() {
         if (restClusterClient != null) {
             return restClusterClient;
@@ -252,15 +241,11 @@ public abstract class PipelineTestEnvironment extends TestLogger {
     }
 
     private static String getFlinkProperties(String flinkVersion) {
-        // this is needed for oracle-cdc tests.
-        // see https://stackoverflow.com/a/47062742/4915129
         String javaOptsConfig;
         Version version = parseVersion(flinkVersion);
         if (version.compareTo(parseVersion("1.17.0")) >= 0) {
-            // Flink 1.17 renames `env.java.opts` to `env.java.opts.all`
             javaOptsConfig = "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false";
         } else {
-            // Legacy Flink version, might drop their support in near future
             javaOptsConfig = "env.java.opts: -Doracle.jdbc.timezoneAsRegion=false";
         }
 
@@ -272,5 +257,9 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                         "parallelism.default: 4",
                         "execution.checkpointing.interval: 300",
                         javaOptsConfig));
+    }
+
+    public String getElasticsearchVersion() {
+        return elasticsearchVersion;
     }
 }
