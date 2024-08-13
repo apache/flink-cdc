@@ -191,6 +191,19 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                                     SqlTypeFamily.INTEGER,
                                     SqlTypeFamily.INTEGER)),
                     SqlFunctionCategory.STRING);
+    public static final SqlFunction SUBSTRING =
+            new SqlFunction(
+                    "SUBSTRING",
+                    SqlKind.OTHER_FUNCTION,
+                    TransformSqlReturnTypes.ARG0_VARCHAR_FORCE_NULLABLE,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER),
+                            OperandTypes.family(
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.INTEGER,
+                                    SqlTypeFamily.INTEGER)),
+                    SqlFunctionCategory.STRING);
 
     // ------------------
     // Temporal Functions

@@ -361,11 +361,64 @@ public class SystemFunctionUtils {
     }
 
     public static String substr(String str, int beginIndex) {
-        return str.substring(beginIndex);
+        return substring(str, beginIndex);
     }
 
     public static String substr(String str, int beginIndex, int length) {
-        return str.substring(beginIndex, beginIndex + length);
+        return substring(str, beginIndex, length);
+    }
+
+    public static String substring(String str, int beginIndex) {
+        return substring(str, beginIndex, Integer.MAX_VALUE);
+    }
+
+    public static String substring(String str, int beginIndex, int length) {
+        if (length < 0) {
+            LOG.error(
+                    "length of 'substring(str, beginIndex, length)' must be >= 0 and Int type, but length = {}",
+                    length);
+            throw new RuntimeException(
+                    "length of 'substring(str, beginIndex, length)' must be >= 0 and Int type, but length = "
+                            + length);
+        }
+        if (length > Integer.MAX_VALUE || beginIndex > Integer.MAX_VALUE) {
+            LOG.error(
+                    "length or start of 'substring(str, beginIndex, length)' must be Int type, but length = {}, beginIndex = {}",
+                    beginIndex,
+                    length);
+            throw new RuntimeException(
+                    "length or start of 'substring(str, beginIndex, length)' must be Int type, but length = "
+                            + beginIndex
+                            + ", beginIndex = "
+                            + length);
+        }
+        if (str.isEmpty()) {
+            return "";
+        }
+
+        int startPos;
+        int endPos;
+
+        if (beginIndex > 0) {
+            startPos = beginIndex - 1;
+            if (startPos >= str.length()) {
+                return "";
+            }
+        } else if (beginIndex < 0) {
+            startPos = str.length() + beginIndex;
+            if (startPos < 0) {
+                return "";
+            }
+        } else {
+            startPos = 0;
+        }
+
+        if ((str.length() - startPos) < length) {
+            endPos = str.length();
+        } else {
+            endPos = startPos + length;
+        }
+        return str.substring(startPos, endPos);
     }
 
     public static String upper(String str) {
