@@ -39,7 +39,10 @@ public class TransformExpressionCompiler {
 
     /** Triggers internal garbage collection of expired cache entries. */
     public static void cleanUp() {
-        COMPILED_EXPRESSION_CACHE.cleanUp();
+        // com.google.common.cache.Cache from Guava isn't guaranteed to clear all cached records
+        // when invoking Cache#cleanUp, which may cause classloader leakage. Use #invalidateAll
+        // instead to ensure all key / value pairs to be correctly discarded.
+        COMPILED_EXPRESSION_CACHE.invalidateAll();
     }
 
     /** Compiles an expression code to a janino {@link ExpressionEvaluator}. */
