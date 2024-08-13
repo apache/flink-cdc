@@ -24,12 +24,11 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
 import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -95,12 +94,12 @@ public class MySqlToElasticsearchE2eITCase extends PipelineTestEnvironment {
 
         // Elasticsearch 8.x supports all Flink versions
         for (String flinkVersion : Arrays.asList("1.17.2", "1.18.1", "1.19.1", "1.20.0")) {
-            parameters.add(new Object[]{flinkVersion, "8.12.1"});
+            parameters.add(new Object[] {flinkVersion, "8.12.1"});
         }
 
         // Elasticsearch 6.x and 7.x only support Flink 1.20.0
-        parameters.add(new Object[]{"1.20.0", "6.8.20"});
-        parameters.add(new Object[]{"1.20.0", "7.10.2"});
+        parameters.add(new Object[] {"1.20.0", "6.8.20"});
+        parameters.add(new Object[] {"1.20.0", "7.10.2"});
 
         return parameters;
     }
@@ -113,7 +112,8 @@ public class MySqlToElasticsearchE2eITCase extends PipelineTestEnvironment {
         LOG.info("Starting Elasticsearch {} container...", elasticsearchVersion);
         elasticsearch =
                 new ElasticsearchContainer(
-                        "docker.elastic.co/elasticsearch/elasticsearch:" + elasticsearchVersion)
+                                "docker.elastic.co/elasticsearch/elasticsearch:"
+                                        + elasticsearchVersion)
                         .withNetwork(NETWORK)
                         .withNetworkAliases("elasticsearch")
                         .withEnv("discovery.type", "single-node")
@@ -169,7 +169,7 @@ public class MySqlToElasticsearchE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_PASSWORD,
                         mysqlInventoryDatabase.getDatabaseName(),
                         elasticsearchVersion.split("\\.")[0] // Use major version number
-                );
+                        );
 
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path elasticsearchCdcConnector =
@@ -203,9 +203,9 @@ public class MySqlToElasticsearchE2eITCase extends PipelineTestEnvironment {
                         mysqlInventoryDatabase.getDatabaseName());
 
         try (Connection conn =
-                     DriverManager.getConnection(
-                             mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-             Statement stat = conn.createStatement()) {
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
 
             stat.execute(
                     "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2, null, null, null);");
@@ -249,7 +249,10 @@ public class MySqlToElasticsearchE2eITCase extends PipelineTestEnvironment {
 
                 int statusCode = response.getStatusLine().getStatusCode();
                 String responseBody = EntityUtils.toString(response.getEntity());
-                LOG.info("Elasticsearch query response (status code {}): \n{}", statusCode, responseBody);
+                LOG.info(
+                        "Elasticsearch query response (status code {}): \n{}",
+                        statusCode,
+                        responseBody);
 
                 if (statusCode != 200) {
                     LOG.warn("Failed to query index. Status code: {}", statusCode);
@@ -273,7 +276,8 @@ public class MySqlToElasticsearchE2eITCase extends PipelineTestEnvironment {
 
     private void dropElasticsearchIndex(String tableName) {
         try {
-            String indexName = String.format("%s.%s", mysqlInventoryDatabase.getDatabaseName(), tableName);
+            String indexName =
+                    String.format("%s.%s", mysqlInventoryDatabase.getDatabaseName(), tableName);
             int hostPort = elasticsearch.getMappedPort(9200);
             String url = String.format("http://localhost:%d/%s", hostPort, indexName);
             LOG.info("Dropping Elasticsearch index: {}", url);
@@ -288,7 +292,8 @@ public class MySqlToElasticsearchE2eITCase extends PipelineTestEnvironment {
 
                 if (statusCode != 200 && statusCode != 404) {
                     LOG.error("Failed to delete index. Status code: {}", statusCode);
-                    throw new RuntimeException("Failed to delete index. Status code: " + statusCode);
+                    throw new RuntimeException(
+                            "Failed to delete index. Status code: " + statusCode);
                 }
             }
         } catch (Exception e) {
