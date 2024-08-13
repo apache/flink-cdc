@@ -21,7 +21,7 @@ import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
-import org.apache.flink.cdc.runtime.parser.TransformParser;
+import org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
 import org.codehaus.janino.ExpressionEvaluator;
@@ -32,6 +32,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+
+import static org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns.METADATA_COLUMNS;
 
 /**
  * The processor of the projection column. It processes the data column and the user-defined
@@ -79,9 +81,9 @@ public class ProjectionColumnProcessor {
         return projectionColumn;
     }
 
-    public Object evaluate(BinaryRecordData after, long epochTime) {
+    public Object evaluate(BinaryRecordData record, long epochTime, String opType) {
         try {
-            return expressionEvaluator.evaluate(generateParams(after, epochTime));
+            return expressionEvaluator.evaluate(generateParams(record, epochTime, opType));
         } catch (InvocationTargetException e) {
             LOG.error(
                     "Table:{} column:{} projection:{} execute failed. {}",
@@ -93,7 +95,7 @@ public class ProjectionColumnProcessor {
         }
     }
 
-    private Object[] generateParams(BinaryRecordData after, long epochTime) {
+    private Object[] generateParams(BinaryRecordData record, long epochTime, String opType) {
         List<Object> params = new ArrayList<>();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
 
@@ -103,14 +105,17 @@ public class ProjectionColumnProcessor {
                 new LinkedHashSet<>(projectionColumn.getOriginalColumnNames());
         for (String originalColumnName : originalColumnNames) {
             switch (originalColumnName) {
-                case TransformParser.DEFAULT_NAMESPACE_NAME:
+                case MetadataColumns.DEFAULT_NAMESPACE_NAME:
                     params.add(tableInfo.getNamespace());
                     continue;
-                case TransformParser.DEFAULT_SCHEMA_NAME:
+                case MetadataColumns.DEFAULT_SCHEMA_NAME:
                     params.add(tableInfo.getSchemaName());
                     continue;
-                case TransformParser.DEFAULT_TABLE_NAME:
+                case MetadataColumns.DEFAULT_TABLE_NAME:
                     params.add(tableInfo.getTableName());
+                    continue;
+                case MetadataColumns.DEFAULT_DATA_EVENT_TYPE:
+                    params.add(opType);
                     continue;
             }
 
@@ -120,7 +125,7 @@ public class ProjectionColumnProcessor {
                 if (column.getName().equals(originalColumnName)) {
                     params.add(
                             DataTypeConverter.convertToOriginal(
-                                    fieldGetters[i].getFieldOrNull(after), column.getType()));
+                                    fieldGetters[i].getFieldOrNull(record), column.getType()));
                     argumentFound = true;
                     break;
                 }
@@ -158,20 +163,14 @@ public class ProjectionColumnProcessor {
         }
 
         for (String originalColumnName : originalColumnNames) {
-            switch (originalColumnName) {
-                case TransformParser.DEFAULT_NAMESPACE_NAME:
-                    argumentNames.add(TransformParser.DEFAULT_NAMESPACE_NAME);
-                    paramTypes.add(String.class);
-                    break;
-                case TransformParser.DEFAULT_SCHEMA_NAME:
-                    argumentNames.add(TransformParser.DEFAULT_SCHEMA_NAME);
-                    paramTypes.add(String.class);
-                    break;
-                case TransformParser.DEFAULT_TABLE_NAME:
-                    argumentNames.add(TransformParser.DEFAULT_TABLE_NAME);
-                    paramTypes.add(String.class);
-                    break;
-            }
+            METADATA_COLUMNS.stream()
+                    .filter(col -> col.f0.equals(originalColumnName))
+                    .findFirst()
+                    .ifPresent(
+                            col -> {
+                                argumentNames.add(col.f0);
+                                paramTypes.add(col.f2);
+                            });
         }
 
         argumentNames.add(JaninoCompiler.DEFAULT_TIME_ZONE);
