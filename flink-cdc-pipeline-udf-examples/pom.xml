@@ -22,7 +22,7 @@ limitations under the License.
     <parent>
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-cdc-parent</artifactId>
-        <version>${revision}</version>
+        <version>3.2.0</version>
     </parent>
 
     <artifactId>flink-cdc-pipeline-udf-examples</artifactId>
