@@ -87,7 +87,7 @@ public class TableDiscoveryUtils {
                                             "\t including table '{}' for further processing",
                                             tableId);
                                 } else {
-                                    LOG.info("\t '{}' is filtered out of table capturing", tableId);
+                                    LOG.debug("\t '{}' is filtered out of table capturing", tableId);
                                 }
                             }
                         });

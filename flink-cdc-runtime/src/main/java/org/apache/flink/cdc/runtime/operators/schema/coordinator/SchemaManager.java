@@ -224,7 +224,7 @@ public class SchemaManager {
                 !schemaExists(schemaMap, event.tableId()),
                 "Unable to apply CreateTableEvent to an existing schema for table \"%s\"",
                 event.tableId());
-        LOG.info("Handling schema change event: {}", event);
+        LOG.debug("Handling schema change event: {}", event);
         registerNewSchema(schemaMap, event.tableId(), event.getSchema());
     }
 
