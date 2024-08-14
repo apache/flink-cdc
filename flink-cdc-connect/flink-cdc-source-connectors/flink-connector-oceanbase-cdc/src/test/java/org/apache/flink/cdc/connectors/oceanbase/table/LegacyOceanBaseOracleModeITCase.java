@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.table;
 
-import org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestBase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -40,7 +39,7 @@ import java.util.List;
 /** Integration tests for OceanBase Oracle mode table source. */
 @Ignore("Test ignored before oceanbase-xe docker image is available")
 @RunWith(Parameterized.class)
-public class OceanBaseOracleModeITCase extends OceanBaseTestBase {
+public class LegacyOceanBaseOracleModeITCase extends LegacyOceanBaseTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -51,7 +50,7 @@ public class OceanBaseOracleModeITCase extends OceanBaseTestBase {
     private final String schema;
     private final String configUrl;
 
-    public OceanBaseOracleModeITCase(
+    public LegacyOceanBaseOracleModeITCase(
             String username,
             String password,
             String hostname,
