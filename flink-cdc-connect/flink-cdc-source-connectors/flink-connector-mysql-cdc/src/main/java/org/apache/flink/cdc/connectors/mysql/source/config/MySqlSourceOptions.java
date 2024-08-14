@@ -191,6 +191,13 @@ public class MySqlSourceOptions {
                     .withDescription(
                             "Optional interval of sending heartbeat event for tracing the latest available binlog offsets");
 
+    public static final ConfigOption<Boolean> SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED =
+            ConfigOptions.key("scan.read-changelog-as-append-only.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to convert the changelog data stream to an append-only data stream");
+
     // ----------------------------------------------------------------------------
     // experimental options, won't add them to documentation
     // ----------------------------------------------------------------------------
