@@ -269,7 +269,14 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
                 final Cdcpb.Event.Row prewriteRow =
                         prewrites.remove(RowKeyWithTs.ofStart(commitRow));
                 // if pull cdc event block when region split, cdc event will lose.
-                committedEvents.offer(prewriteRow);
+                try {
+                    committedEvents.offer(prewriteRow);
+                } catch (NullPointerException e) {
+                    LOG.error(
+                            "Flush rows npe, remove pre writes error.flush row ts:{},commits {}",
+                            timestamp,
+                            commitRow);
+                }
             }
         }
     }
