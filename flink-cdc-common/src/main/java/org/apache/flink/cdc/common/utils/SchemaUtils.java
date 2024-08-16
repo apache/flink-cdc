@@ -273,7 +273,7 @@ public class SchemaUtils {
 
                     @Override
                     public Schema visit(DropTableEvent event) {
-                        return null;
+                        return schema;
                     }
 
                     @Override
