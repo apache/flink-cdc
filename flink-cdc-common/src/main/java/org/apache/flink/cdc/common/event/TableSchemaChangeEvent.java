@@ -20,35 +20,28 @@ package org.apache.flink.cdc.common.event;
 /** Schema change events on table-level. */
 public interface TableSchemaChangeEvent extends SchemaChangeEvent {
 
-    default void visit(TableSchemaChangeEventVisitorVoid visitor) {
-        try {
-            if (this instanceof CreateTableEvent) {
-                visitor.visit((CreateTableEvent) this);
-            } else if (this instanceof DropTableEvent) {
-                visitor.visit((DropTableEvent) this);
-            } else if (this instanceof TruncateTableEvent) {
-                visitor.visit((TruncateTableEvent) this);
-            } else {
-                throw new IllegalArgumentException("Unknown schema change event type " + getType());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+    default <E extends Throwable> void visit(TableSchemaChangeEventVisitorVoid<E> visitor)
+            throws E {
+        if (this instanceof CreateTableEvent) {
+            visitor.visit((CreateTableEvent) this);
+        } else if (this instanceof DropTableEvent) {
+            visitor.visit((DropTableEvent) this);
+        } else if (this instanceof TruncateTableEvent) {
+            visitor.visit((TruncateTableEvent) this);
+        } else {
+            throw new IllegalArgumentException("Unknown schema change event type " + getType());
         }
     }
 
-    default <T> T visit(TableSchemaChangeEventVisitor<T> visitor) {
-        try {
-            if (this instanceof CreateTableEvent) {
-                return visitor.visit((CreateTableEvent) this);
-            } else if (this instanceof DropTableEvent) {
-                return visitor.visit((DropTableEvent) this);
-            } else if (this instanceof TruncateTableEvent) {
-                return visitor.visit((TruncateTableEvent) this);
-            } else {
-                throw new IllegalArgumentException("Unknown schema change event type " + getType());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+    default <T, E extends Throwable> T visit(TableSchemaChangeEventVisitor<T, E> visitor) throws E {
+        if (this instanceof CreateTableEvent) {
+            return visitor.visit((CreateTableEvent) this);
+        } else if (this instanceof DropTableEvent) {
+            return visitor.visit((DropTableEvent) this);
+        } else if (this instanceof TruncateTableEvent) {
+            return visitor.visit((TruncateTableEvent) this);
+        } else {
+            throw new IllegalArgumentException("Unknown schema change event type " + getType());
         }
     }
 }

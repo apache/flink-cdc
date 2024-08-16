@@ -18,5 +18,5 @@
 package org.apache.flink.cdc.common.event;
 
 /** Visitor clas for all {@link SchemaChangeEvent}s and returns nothing. */
-public interface SchemaChangeEventVisitorVoid
-        extends ColumnSchemaChangeEventVisitorVoid, TableSchemaChangeEventVisitorVoid {}
+public interface SchemaChangeEventVisitorVoid<E extends Throwable>
+        extends ColumnSchemaChangeEventVisitorVoid<E>, TableSchemaChangeEventVisitorVoid<E> {}

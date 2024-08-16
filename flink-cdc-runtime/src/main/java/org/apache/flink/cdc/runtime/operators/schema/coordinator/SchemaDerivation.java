@@ -116,7 +116,8 @@ public class SchemaDerivation {
                         schemaManager.getLatestEvolvedSchema(derivedTable).get();
                 events.addAll(
                         schemaChangeEvent.visit(
-                                new SchemaChangeEventVisitor<List<SchemaChangeEvent>>() {
+                                new SchemaChangeEventVisitor<
+                                        List<SchemaChangeEvent>, RuntimeException>() {
 
                                     @Override
                                     public List<SchemaChangeEvent> visit(AddColumnEvent event) {

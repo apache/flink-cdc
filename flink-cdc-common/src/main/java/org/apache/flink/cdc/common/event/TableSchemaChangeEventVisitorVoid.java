@@ -18,10 +18,10 @@
 package org.apache.flink.cdc.common.event;
 
 /** Visitor class for all {@link TableSchemaChangeEvent}s and returns nothing. */
-public interface TableSchemaChangeEventVisitorVoid {
-    void visit(CreateTableEvent event) throws Exception;
+public interface TableSchemaChangeEventVisitorVoid<E extends Throwable> {
+    void visit(CreateTableEvent event) throws E;
 
-    void visit(DropTableEvent event) throws Exception;
+    void visit(DropTableEvent event) throws E;
 
-    void visit(TruncateTableEvent event) throws Exception;
+    void visit(TruncateTableEvent event) throws E;
 }

@@ -18,12 +18,12 @@
 package org.apache.flink.cdc.common.event;
 
 /** Visitor class for all {@link ColumnSchemaChangeEvent}s. */
-public interface ColumnSchemaChangeEventVisitor<T> {
-    T visit(AddColumnEvent event) throws Exception;
+public interface ColumnSchemaChangeEventVisitor<T, E extends Throwable> {
+    T visit(AddColumnEvent event) throws E;
 
-    T visit(AlterColumnTypeEvent event) throws Exception;
+    T visit(AlterColumnTypeEvent event) throws E;
 
-    T visit(DropColumnEvent event) throws Exception;
+    T visit(DropColumnEvent event) throws E;
 
-    T visit(RenameColumnEvent event) throws Exception;
+    T visit(RenameColumnEvent event) throws E;
 }

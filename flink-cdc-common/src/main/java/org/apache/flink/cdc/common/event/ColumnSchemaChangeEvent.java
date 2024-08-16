@@ -19,39 +19,33 @@ package org.apache.flink.cdc.common.event;
 
 /** Schema change events on column-level. */
 public interface ColumnSchemaChangeEvent extends SchemaChangeEvent {
-    default void visit(ColumnSchemaChangeEventVisitorVoid visitor) {
-        try {
-            if (this instanceof AddColumnEvent) {
-                visitor.visit((AddColumnEvent) this);
-            } else if (this instanceof AlterColumnTypeEvent) {
-                visitor.visit((AlterColumnTypeEvent) this);
-            } else if (this instanceof DropColumnEvent) {
-                visitor.visit((DropColumnEvent) this);
-            } else if (this instanceof RenameColumnEvent) {
-                visitor.visit((RenameColumnEvent) this);
-            } else {
-                throw new IllegalArgumentException("Unknown schema change event type " + getType());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+    default <E extends Throwable> void visit(ColumnSchemaChangeEventVisitorVoid<E> visitor)
+            throws E {
+        if (this instanceof AddColumnEvent) {
+            visitor.visit((AddColumnEvent) this);
+        } else if (this instanceof AlterColumnTypeEvent) {
+            visitor.visit((AlterColumnTypeEvent) this);
+        } else if (this instanceof DropColumnEvent) {
+            visitor.visit((DropColumnEvent) this);
+        } else if (this instanceof RenameColumnEvent) {
+            visitor.visit((RenameColumnEvent) this);
+        } else {
+            throw new IllegalArgumentException("Unknown schema change event type " + getType());
         }
     }
 
-    default <T> T visit(ColumnSchemaChangeEventVisitor<T> visitor) {
-        try {
-            if (this instanceof AddColumnEvent) {
-                return visitor.visit((AddColumnEvent) this);
-            } else if (this instanceof AlterColumnTypeEvent) {
-                return visitor.visit((AlterColumnTypeEvent) this);
-            } else if (this instanceof DropColumnEvent) {
-                return visitor.visit((DropColumnEvent) this);
-            } else if (this instanceof RenameColumnEvent) {
-                return visitor.visit((RenameColumnEvent) this);
-            } else {
-                throw new IllegalArgumentException("Unknown schema change event type " + getType());
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+    default <T, E extends Throwable> T visit(ColumnSchemaChangeEventVisitor<T, E> visitor)
+            throws E {
+        if (this instanceof AddColumnEvent) {
+            return visitor.visit((AddColumnEvent) this);
+        } else if (this instanceof AlterColumnTypeEvent) {
+            return visitor.visit((AlterColumnTypeEvent) this);
+        } else if (this instanceof DropColumnEvent) {
+            return visitor.visit((DropColumnEvent) this);
+        } else if (this instanceof RenameColumnEvent) {
+            return visitor.visit((RenameColumnEvent) this);
+        } else {
+            throw new IllegalArgumentException("Unknown schema change event type " + getType());
         }
     }
 }

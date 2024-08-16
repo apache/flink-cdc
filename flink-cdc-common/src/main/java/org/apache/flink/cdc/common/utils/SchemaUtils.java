@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
@@ -249,7 +250,7 @@ public class SchemaUtils {
     /** apply SchemaChangeEvent to the old schema and return the schema after changing. */
     public static Schema applySchemaChangeEvent(Schema schema, SchemaChangeEvent event) {
         return event.visit(
-                new SchemaChangeEventVisitor<Schema>() {
+                new SchemaChangeEventVisitor<Schema, SchemaEvolveException>() {
                     @Override
                     public Schema visit(AddColumnEvent event) {
                         return applyAddColumnEvent(event, schema);

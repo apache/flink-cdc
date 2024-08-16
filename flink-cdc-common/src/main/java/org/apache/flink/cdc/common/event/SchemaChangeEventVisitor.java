@@ -18,5 +18,5 @@
 package org.apache.flink.cdc.common.event;
 
 /** Visitor clas for all {@link SchemaChangeEvent}s and returns a {@link T}-typed object. */
-public interface SchemaChangeEventVisitor<T>
-        extends ColumnSchemaChangeEventVisitor<T>, TableSchemaChangeEventVisitor<T> {}
+public interface SchemaChangeEventVisitor<T, E extends Throwable>
+        extends ColumnSchemaChangeEventVisitor<T, E>, TableSchemaChangeEventVisitor<T, E> {}

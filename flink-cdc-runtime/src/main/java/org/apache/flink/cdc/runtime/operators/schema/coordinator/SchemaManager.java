@@ -150,48 +150,39 @@ public class SchemaManager {
 
     /** Apply schema change to a table. */
     public void applyOriginalSchemaChange(SchemaChangeEvent schemaChangeEvent) {
-        Optional<Schema> optionalSchema = getLatestOriginalSchema(schemaChangeEvent.tableId());
-        if (!(schemaChangeEvent instanceof CreateTableEvent)) {
+        if (schemaChangeEvent instanceof CreateTableEvent) {
+            handleCreateTableEvent(originalSchemas, ((CreateTableEvent) schemaChangeEvent));
+        } else {
+            Optional<Schema> optionalSchema = getLatestOriginalSchema(schemaChangeEvent.tableId());
             checkArgument(
                     optionalSchema.isPresent(),
                     "Unable to apply SchemaChangeEvent for table \"%s\" without existing schema",
                     schemaChangeEvent.tableId());
-        }
 
-        LOG.info("Handling upstream schema change event: {}", schemaChangeEvent);
-        Schema appliedSchema =
-                SchemaUtils.applySchemaChangeEvent(optionalSchema.orElse(null), schemaChangeEvent);
-
-        if (appliedSchema != null) {
-            registerNewSchema(originalSchemas, schemaChangeEvent.tableId(), appliedSchema);
-        } else {
-            dropSchema(originalSchemas, schemaChangeEvent.tableId());
+            LOG.info("Handling original schema change event: {}", schemaChangeEvent);
+            registerNewSchema(
+                    originalSchemas,
+                    schemaChangeEvent.tableId(),
+                    SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), schemaChangeEvent));
         }
     }
 
     /** Apply schema change to a table. */
     public void applyEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
-        Optional<Schema> optionalSchema = getLatestEvolvedSchema(schemaChangeEvent.tableId());
-        if (!(schemaChangeEvent instanceof CreateTableEvent)) {
+        if (schemaChangeEvent instanceof CreateTableEvent) {
+            handleCreateTableEvent(evolvedSchemas, ((CreateTableEvent) schemaChangeEvent));
+        } else {
+            Optional<Schema> optionalSchema = getLatestEvolvedSchema(schemaChangeEvent.tableId());
             checkArgument(
                     optionalSchema.isPresent(),
                     "Unable to apply SchemaChangeEvent for table \"%s\" without existing schema",
                     schemaChangeEvent.tableId());
-        } else {
-            checkArgument(
-                    !optionalSchema.isPresent(),
-                    "Unable to apply CreateTableEvent to an existing schema for table \"%s\"",
-                    schemaChangeEvent.tableId());
-        }
 
-        LOG.info("Handling evolved schema change event: {}", schemaChangeEvent);
-        Schema appliedSchema =
-                SchemaUtils.applySchemaChangeEvent(optionalSchema.orElse(null), schemaChangeEvent);
-
-        if (appliedSchema != null) {
-            registerNewSchema(evolvedSchemas, schemaChangeEvent.tableId(), appliedSchema);
-        } else {
-            dropSchema(evolvedSchemas, schemaChangeEvent.tableId());
+            LOG.info("Handling evolved schema change event: {}", schemaChangeEvent);
+            registerNewSchema(
+                    evolvedSchemas,
+                    schemaChangeEvent.tableId(),
+                    SchemaUtils.applySchemaChangeEvent(optionalSchema.get(), schemaChangeEvent));
         }
     }
 
@@ -227,6 +218,16 @@ public class SchemaManager {
         }
     }
 
+    private void handleCreateTableEvent(
+            final Map<TableId, SortedMap<Integer, Schema>> schemaMap, CreateTableEvent event) {
+        checkArgument(
+                !schemaExists(schemaMap, event.tableId()),
+                "Unable to apply CreateTableEvent to an existing schema for table \"%s\"",
+                event.tableId());
+        LOG.info("Handling schema change event: {}", event);
+        registerNewSchema(schemaMap, event.tableId(), event.getSchema());
+    }
+
     private void registerNewSchema(
             final Map<TableId, SortedMap<Integer, Schema>> schemaMap,
             TableId tableId,
@@ -243,11 +244,6 @@ public class SchemaManager {
             versionedSchemas.put(INITIAL_SCHEMA_VERSION, newSchema);
             schemaMap.putIfAbsent(tableId, versionedSchemas);
         }
-    }
-
-    private void dropSchema(
-            final Map<TableId, SortedMap<Integer, Schema>> schemaMap, TableId tableId) {
-        schemaMap.remove(tableId, null);
     }
 
     /** Serializer for {@link SchemaManager}. */

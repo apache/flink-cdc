@@ -81,7 +81,7 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
     @Override
     public SchemaChangeEvent copy(SchemaChangeEvent from) {
         return from.visit(
-                new SchemaChangeEventVisitor<SchemaChangeEvent>() {
+                new SchemaChangeEventVisitor<SchemaChangeEvent, RuntimeException>() {
 
                     @Override
                     public SchemaChangeEvent visit(AddColumnEvent event) {

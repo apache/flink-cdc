@@ -70,7 +70,7 @@ public class ChangeEventUtils {
             SchemaChangeEvent schemaChangeEvent, TableId tableId) {
 
         return schemaChangeEvent.visit(
-                new SchemaChangeEventVisitor<SchemaChangeEvent>() {
+                new SchemaChangeEventVisitor<SchemaChangeEvent, RuntimeException>() {
                     @Override
                     public SchemaChangeEvent visit(AddColumnEvent event) {
                         return new AddColumnEvent(tableId, event.getAddedColumns());
