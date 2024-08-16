@@ -303,7 +303,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     private Optional<DataChangeEvent> processDataChangeEvent(DataChangeEvent dataChangeEvent)
             throws Exception {
         TableId tableId = dataChangeEvent.tableId();
-        PostTransformChangeInfo tableInfo = getPostTransformChangeInfo(tableId);
+        PostTransformChangeInfo tableInfo = postTransformChangeInfoMap.get(tableId);
         List<Optional<DataChangeEvent>> transformedDataChangeEventOptionalList = new ArrayList<>();
         long epochTime = System.currentTimeMillis();
         for (PostTransformer transform : transforms) {

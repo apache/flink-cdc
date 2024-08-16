@@ -24,7 +24,7 @@ import java.util.Objects;
  * A {@link SchemaChangeEvent} that represents an {@code RENAME COLUMN} DDL, which may contain the
  * lenient column type changes.
  */
-public class RenameColumnEvent implements SchemaChangeEvent {
+public class RenameColumnEvent implements ColumnSchemaChangeEvent {
 
     private static final long serialVersionUID = 1L;
 

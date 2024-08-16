@@ -380,8 +380,8 @@ class SchemaDerivationTest {
                         () ->
                                 schemaDerivation.applySchemaChange(
                                         new CreateTableEvent(TABLE_2, INCOMPATIBLE_SCHEMA)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Incompatible types: \"INT\" and \"STRING\"");
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("Incompatible types: \"INT\" and \"STRING\"");
     }
 
     @Test

@@ -17,31 +17,20 @@
 
 package org.apache.flink.cdc.common.event;
 
-import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.common.source.DataSource;
 
-import java.util.List;
 import java.util.Objects;
 
 /**
- * A {@link SchemaChangeEvent} that represents an {@code DROP COLUMN} DDL, which may contain the
- * lenient column type changes.
+ * A {@link SchemaChangeEvent} that represents an {@code TRUNCATE TABLE} DDL. this will be sent by
+ * {@link DataSource} before all {@link DataChangeEvent} with the same tableId.
  */
-@PublicEvolving
-public class DropColumnEvent implements ColumnSchemaChangeEvent {
-
+public class TruncateTableEvent implements TableSchemaChangeEvent {
     private static final long serialVersionUID = 1L;
-
     private final TableId tableId;
 
-    private final List<String> droppedColumnNames;
-
-    public DropColumnEvent(TableId tableId, List<String> droppedColumnNames) {
+    public TruncateTableEvent(TableId tableId) {
         this.tableId = tableId;
-        this.droppedColumnNames = droppedColumnNames;
-    }
-
-    public List<String> getDroppedColumnNames() {
-        return droppedColumnNames;
     }
 
     @Override
@@ -49,27 +38,21 @@ public class DropColumnEvent implements ColumnSchemaChangeEvent {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof DropColumnEvent)) {
+        if (!(o instanceof TruncateTableEvent)) {
             return false;
         }
-        DropColumnEvent that = (DropColumnEvent) o;
-        return Objects.equals(tableId, that.tableId)
-                && Objects.equals(droppedColumnNames, that.droppedColumnNames);
+        TruncateTableEvent that = (TruncateTableEvent) o;
+        return Objects.equals(tableId, that.tableId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId, droppedColumnNames);
+        return Objects.hash(tableId);
     }
 
     @Override
     public String toString() {
-        return "DropColumnEvent{"
-                + "tableId="
-                + tableId
-                + ", droppedColumnNames="
-                + droppedColumnNames
-                + '}';
+        return "TruncateTableEvent{" + "tableId=" + tableId + '}';
     }
 
     @Override
@@ -79,6 +62,6 @@ public class DropColumnEvent implements ColumnSchemaChangeEvent {
 
     @Override
     public SchemaChangeEventType getType() {
-        return SchemaChangeEventType.DROP_COLUMN;
+        return SchemaChangeEventType.TRUNCATE_TABLE;
     }
 }

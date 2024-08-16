@@ -249,7 +249,9 @@ public class SchemaEvolveTest {
             List<Event> alterColumnTypeEvents =
                     Arrays.asList(
                             new AlterColumnTypeEvent(
-                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)),
+                                    tableId,
+                                    ImmutableMap.of("score", BIGINT, "toshi", FLOAT),
+                                    ImmutableMap.of("score", INT, "toshi", SMALLINT)),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -504,7 +506,9 @@ public class SchemaEvolveTest {
             List<Event> alterColumnTypeEvents =
                     Arrays.asList(
                             new AlterColumnTypeEvent(
-                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)),
+                                    tableId,
+                                    ImmutableMap.of("score", BIGINT, "toshi", FLOAT),
+                                    ImmutableMap.of("score", INT, "toshi", SMALLINT)),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1828,7 +1832,9 @@ public class SchemaEvolveTest {
                                                     Column.physicalColumn(
                                                             "toshi", SMALLINT, null)))),
                             new AlterColumnTypeEvent(
-                                    tableId, Collections.singletonMap("name", STRING)),
+                                    tableId,
+                                    Collections.singletonMap("name", STRING),
+                                    Collections.singletonMap("name", STRING.notNull())),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1906,7 +1912,9 @@ public class SchemaEvolveTest {
             List<Event> alterColumnTypeEvents =
                     Arrays.asList(
                             new AlterColumnTypeEvent(
-                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)),
+                                    tableId,
+                                    ImmutableMap.of("score", BIGINT, "toshi", FLOAT),
+                                    ImmutableMap.of("score", INT, "toshi", SMALLINT)),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1923,7 +1931,9 @@ public class SchemaEvolveTest {
             List<Event> lenientAlterColumnTypeEvents =
                     Arrays.asList(
                             new AlterColumnTypeEvent(
-                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)),
+                                    tableId,
+                                    ImmutableMap.of("score", BIGINT, "toshi", FLOAT),
+                                    ImmutableMap.of("score", INT, "toshi", SMALLINT)),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -2106,7 +2116,9 @@ public class SchemaEvolveTest {
             List<Event> lenientDropColumnEvents =
                     Arrays.asList(
                             new AlterColumnTypeEvent(
-                                    tableId, Collections.singletonMap("name", STRING)),
+                                    tableId,
+                                    Collections.singletonMap("name", STRING),
+                                    Collections.singletonMap("name", STRING.notNull())),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -2311,7 +2323,9 @@ public class SchemaEvolveTest {
                                             new AddColumnEvent.ColumnWithPosition(
                                                     Column.physicalColumn("yina", INT)))),
                             new AlterColumnTypeEvent(
-                                    tableId, Collections.singletonMap("iina", INT)),
+                                    tableId,
+                                    Collections.singletonMap("iina", INT),
+                                    Collections.singletonMap("iina", INT.notNull())),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(

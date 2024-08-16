@@ -92,15 +92,19 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
             }
             newSchema = SchemaUtils.applySchemaChangeEvent(tableInfo.schema, event);
         }
-        TableInfo tableInfo = new TableInfo();
-        tableInfo.schema = newSchema;
-        tableInfo.fieldGetters = new RecordData.FieldGetter[newSchema.getColumnCount()];
-        for (int i = 0; i < newSchema.getColumnCount(); i++) {
-            tableInfo.fieldGetters[i] =
-                    StarRocksUtils.createFieldGetter(
-                            newSchema.getColumns().get(i).getType(), i, zoneId);
+        if (newSchema != null) {
+            TableInfo tableInfo = new TableInfo();
+            tableInfo.schema = newSchema;
+            tableInfo.fieldGetters = new RecordData.FieldGetter[newSchema.getColumnCount()];
+            for (int i = 0; i < newSchema.getColumnCount(); i++) {
+                tableInfo.fieldGetters[i] =
+                        StarRocksUtils.createFieldGetter(
+                                newSchema.getColumns().get(i).getType(), i, zoneId);
+            }
+            tableInfoMap.put(tableId, tableInfo);
+        } else {
+            tableInfoMap.remove(tableId);
         }
-        tableInfoMap.put(tableId, tableInfo);
     }
 
     private StarRocksRowData applyDataChangeEvent(DataChangeEvent event) {

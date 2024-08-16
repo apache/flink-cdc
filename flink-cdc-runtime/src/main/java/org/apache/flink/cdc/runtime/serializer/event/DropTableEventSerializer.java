@@ -20,7 +20,7 @@ package org.apache.flink.cdc.runtime.serializer.event;
 import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
-import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.runtime.serializer.MapSerializer;
@@ -32,16 +32,14 @@ import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
 
 import java.io.IOException;
-import java.util.Collections;
 
-/** A {@link TypeSerializer} for {@link AlterColumnTypeEvent}. */
-public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<AlterColumnTypeEvent> {
+/** A {@link TypeSerializer} for {@link DropTableEvent}. */
+public class DropTableEventSerializer extends TypeSerializerSingleton<DropTableEvent> {
 
     private static final long serialVersionUID = 1L;
 
     /** Sharable instance of the TableIdSerializer. */
-    public static final AlterColumnTypeEventSerializer INSTANCE =
-            new AlterColumnTypeEventSerializer();
+    public static final DropTableEventSerializer INSTANCE = new DropTableEventSerializer();
 
     private final TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
     private final MapSerializer<String, DataType> typeMapSerializer =
@@ -53,20 +51,17 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
     }
 
     @Override
-    public AlterColumnTypeEvent createInstance() {
-        return new AlterColumnTypeEvent(TableId.tableId("unknown"), Collections.emptyMap());
+    public DropTableEvent createInstance() {
+        return new DropTableEvent(TableId.tableId("unknown"));
     }
 
     @Override
-    public AlterColumnTypeEvent copy(AlterColumnTypeEvent from) {
-        return new AlterColumnTypeEvent(
-                from.tableId(),
-                typeMapSerializer.copy(from.getTypeMapping()),
-                typeMapSerializer.copy(from.getOldTypeMapping()));
+    public DropTableEvent copy(DropTableEvent from) {
+        return new DropTableEvent(from.tableId());
     }
 
     @Override
-    public AlterColumnTypeEvent copy(AlterColumnTypeEvent from, AlterColumnTypeEvent reuse) {
+    public DropTableEvent copy(DropTableEvent from, DropTableEvent reuse) {
         return copy(from);
     }
 
@@ -76,22 +71,17 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
     }
 
     @Override
-    public void serialize(AlterColumnTypeEvent record, DataOutputView target) throws IOException {
+    public void serialize(DropTableEvent record, DataOutputView target) throws IOException {
         tableIdSerializer.serialize(record.tableId(), target);
-        typeMapSerializer.serialize(record.getTypeMapping(), target);
-        typeMapSerializer.serialize(record.getOldTypeMapping(), target);
     }
 
     @Override
-    public AlterColumnTypeEvent deserialize(DataInputView source) throws IOException {
-        return new AlterColumnTypeEvent(
-                tableIdSerializer.deserialize(source),
-                typeMapSerializer.deserialize(source),
-                typeMapSerializer.deserialize(source));
+    public DropTableEvent deserialize(DataInputView source) throws IOException {
+        return new DropTableEvent(tableIdSerializer.deserialize(source));
     }
 
     @Override
-    public AlterColumnTypeEvent deserialize(AlterColumnTypeEvent reuse, DataInputView source)
+    public DropTableEvent deserialize(DropTableEvent reuse, DataInputView source)
             throws IOException {
         return deserialize(source);
     }
@@ -102,16 +92,16 @@ public class AlterColumnTypeEventSerializer extends TypeSerializerSingleton<Alte
     }
 
     @Override
-    public TypeSerializerSnapshot<AlterColumnTypeEvent> snapshotConfiguration() {
-        return new AlterColumnTypeEventSerializerSnapshot();
+    public TypeSerializerSnapshot<DropTableEvent> snapshotConfiguration() {
+        return new DropTableEventSerializer.DropTableEventSerializerSnapshot();
     }
 
     /** Serializer configuration snapshot for compatibility and format evolution. */
     @SuppressWarnings("WeakerAccess")
-    public static final class AlterColumnTypeEventSerializerSnapshot
-            extends SimpleTypeSerializerSnapshot<AlterColumnTypeEvent> {
+    public static final class DropTableEventSerializerSnapshot
+            extends SimpleTypeSerializerSnapshot<DropTableEvent> {
 
-        public AlterColumnTypeEventSerializerSnapshot() {
+        public DropTableEventSerializerSnapshot() {
             super(() -> INSTANCE);
         }
     }

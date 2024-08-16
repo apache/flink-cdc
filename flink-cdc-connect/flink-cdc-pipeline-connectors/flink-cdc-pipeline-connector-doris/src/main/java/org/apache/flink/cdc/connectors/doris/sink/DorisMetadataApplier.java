@@ -22,11 +22,13 @@ import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.SchemaChangeEventVisitorVoid;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -60,6 +62,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_PROPERTIES_PREFIX;
@@ -93,29 +96,49 @@ public class DorisMetadataApplier implements MetadataApplier {
 
     @Override
     public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
-        return Sets.newHashSet(ADD_COLUMN, DROP_COLUMN, RENAME_COLUMN);
+        return Sets.newHashSet(ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN);
     }
 
     @Override
-    public void applySchemaChange(SchemaChangeEvent event) throws SchemaEvolveException {
-        try {
-            // send schema change op to doris
-            if (event instanceof CreateTableEvent) {
-                applyCreateTableEvent((CreateTableEvent) event);
-            } else if (event instanceof AddColumnEvent) {
-                applyAddColumnEvent((AddColumnEvent) event);
-            } else if (event instanceof DropColumnEvent) {
-                applyDropColumnEvent((DropColumnEvent) event);
-            } else if (event instanceof RenameColumnEvent) {
-                applyRenameColumnEvent((RenameColumnEvent) event);
-            } else if (event instanceof AlterColumnTypeEvent) {
-                applyAlterColumnTypeEvent((AlterColumnTypeEvent) event);
-            } else {
-                throw new UnsupportedSchemaChangeEventException(event);
-            }
-        } catch (Exception ex) {
-            throw new SchemaEvolveException(event, ex.getMessage(), null);
-        }
+    public void applySchemaChange(SchemaChangeEvent event) {
+        event.visit(
+                new SchemaChangeEventVisitorVoid() {
+
+                    @Override
+                    public void visit(AddColumnEvent event) throws Exception {
+                        applyAddColumnEvent(event);
+                    }
+
+                    @Override
+                    public void visit(AlterColumnTypeEvent event) throws Exception {
+                        applyAlterColumnTypeEvent(event);
+                    }
+
+                    @Override
+                    public void visit(CreateTableEvent event) throws Exception {
+                        applyCreateTableEvent(event);
+                    }
+
+                    @Override
+                    public void visit(DropColumnEvent event) throws Exception {
+                        applyDropColumnEvent(event);
+                    }
+
+                    @Override
+                    public void visit(DropTableEvent event) {
+                        throw new UnsupportedSchemaChangeEventException(event);
+                    }
+
+                    @Override
+                    public void visit(RenameColumnEvent event) throws Exception {
+                        applyRenameColumnEvent(event);
+                    }
+
+                    @Override
+                    public void visit(TruncateTableEvent event) {
+                        throw new UnsupportedSchemaChangeEventException(event);
+                    }
+                });
     }
 
     private void applyCreateTableEvent(CreateTableEvent event)
