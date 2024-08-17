@@ -51,6 +51,7 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.flink.cdc.debezium.rate.DebeziumRateLimiter;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
@@ -123,7 +124,8 @@ public class MySqlSource<T>
 
     MySqlSource(
             MySqlSourceConfigFactory configFactory,
-            DebeziumDeserializationSchema<T> deserializationSchema) {
+            DebeziumDeserializationSchema<T> deserializationSchema,
+            DebeziumRateLimiter rateLimiter) {
         this(
                 configFactory,
                 deserializationSchema,
@@ -131,7 +133,8 @@ public class MySqlSource<T>
                         new MySqlRecordEmitter<>(
                                 deserializationSchema,
                                 sourceReaderMetrics,
-                                sourceConfig.isIncludeSchemaChanges()));
+                                sourceConfig.isIncludeSchemaChanges(),
+                                rateLimiter));
     }
 
     MySqlSource(

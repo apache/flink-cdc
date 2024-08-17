@@ -181,7 +181,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         }
         configFactory.tableList(capturedTables.toArray(new String[0]));
 
-        return new MySqlDataSource(configFactory);
+        return new MySqlDataSource(configFactory, context.getPipelineConfiguration());
     }
 
     @Override

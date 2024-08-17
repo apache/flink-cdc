@@ -25,6 +25,8 @@ import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.history.FlinkJsonTableChangeSerializer;
+import org.apache.flink.cdc.debezium.rate.DebeziumRateLimiter;
+import org.apache.flink.cdc.debezium.rate.TokenRateLimiter;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
 
@@ -53,15 +55,17 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
     private final MySqlSourceReaderMetrics sourceReaderMetrics;
     private final boolean includeSchemaChanges;
     private final OutputCollector<T> outputCollector;
+    private DebeziumRateLimiter rateLimiter;
 
     public MySqlRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
-            boolean includeSchemaChanges) {
+            boolean includeSchemaChanges,
+            DebeziumRateLimiter rateLimiter) {
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceReaderMetrics = sourceReaderMetrics;
         this.includeSchemaChanges = includeSchemaChanges;
-        this.outputCollector = new OutputCollector<>();
+        this.outputCollector = new OutputCollector<>(rateLimiter);
     }
 
     @Override
@@ -137,6 +141,16 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
     private static class OutputCollector<T> implements Collector<T> {
         private SourceOutput<T> output;
         private Long currentMessageTimestamp;
+        private final DebeziumRateLimiter rateLimiter;
+        private boolean isSingleReader = false;
+
+        public OutputCollector(DebeziumRateLimiter rateLimiter) {
+            if (rateLimiter == null) {
+                rateLimiter = TokenRateLimiter.createZeroRateLimiter();
+            }
+            this.rateLimiter = rateLimiter;
+            rateLimiter.resetRate(isSingleReader);
+        }
 
         @Override
         public void collect(T record) {
@@ -150,7 +164,12 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
                 // without timestamp to collect the record. Metric "currentEmitEventTimeLag" will
                 // not be updated in the source operator in this case.
                 output.collect(record);
+                if (!isSingleReader) {
+                    isSingleReader = true;
+                    rateLimiter.resetRate(isSingleReader);
+                }
             }
+            rateLimiter.acquire();
         }
 
         @Override

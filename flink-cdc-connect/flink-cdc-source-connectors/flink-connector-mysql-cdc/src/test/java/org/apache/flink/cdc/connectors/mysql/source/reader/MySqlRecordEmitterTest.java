@@ -102,7 +102,8 @@ public class MySqlRecordEmitterTest {
                 },
                 new MySqlSourceReaderMetrics(
                         UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup()),
-                false);
+                false,
+                null);
     }
 
     private MySqlBinlogSplitState createBinlogSplitState() {

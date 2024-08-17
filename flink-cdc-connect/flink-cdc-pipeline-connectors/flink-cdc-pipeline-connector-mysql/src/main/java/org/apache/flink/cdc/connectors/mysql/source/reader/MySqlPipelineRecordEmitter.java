@@ -30,6 +30,7 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.table.StartupMode;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlTypeUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.flink.cdc.debezium.rate.DebeziumRateLimiter;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
@@ -73,11 +74,13 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     public MySqlPipelineRecordEmitter(
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
-            MySqlSourceConfig sourceConfig) {
+            MySqlSourceConfig sourceConfig,
+            DebeziumRateLimiter rateLimiter) {
         super(
                 debeziumDeserializationSchema,
                 sourceReaderMetrics,
-                sourceConfig.isIncludeSchemaChanges());
+                sourceConfig.isIncludeSchemaChanges(),
+                rateLimiter);
         this.sourceConfig = sourceConfig;
         this.alreadySendCreateTableTables = new HashSet<>();
         this.createTableEventCache = new ArrayList<>();

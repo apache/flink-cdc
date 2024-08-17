@@ -39,6 +39,13 @@ public class PipelineOptions {
                     .defaultValue("Flink CDC Pipeline Job")
                     .withDescription("The name of the pipeline");
 
+    public static final ConfigOption<Long> RATE_LIMIT =
+            ConfigOptions.key("rate.limit")
+                    .longType()
+                    .defaultValue(0L)
+                    .withDescription(
+                            "Limits the number of records per second, default 0 is disabled");
+
     public static final ConfigOption<Integer> PIPELINE_PARALLELISM =
             ConfigOptions.key("parallelism")
                     .intType()

@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.flink.cdc.debezium.rate.TokenRateLimiter;
 import org.apache.flink.table.catalog.ObjectPath;
 
 import java.time.Duration;
@@ -274,6 +275,9 @@ public class MySqlSourceBuilder<T> {
      * @return a MySqlParallelSource with the settings made for this builder.
      */
     public MySqlSource<T> build() {
-        return new MySqlSource<>(configFactory, checkNotNull(deserializer));
+        return new MySqlSource<>(
+                configFactory,
+                checkNotNull(deserializer),
+                TokenRateLimiter.createZeroRateLimiter());
     }
 }
