@@ -193,7 +193,9 @@ public class StatefulTaskContext {
                 mySqlSplit.isSnapshotSplit()
                         ? BinlogOffset.ofEarliest()
                         : initializeEffectiveOffset(
-                                mySqlSplit.asBinlogSplit().getStartingOffset(), connection);
+                                mySqlSplit.asBinlogSplit().getStartingOffset(),
+                                connection,
+                                sourceConfig);
 
         LOG.info("Starting offset is initialized to {}", offset);
 

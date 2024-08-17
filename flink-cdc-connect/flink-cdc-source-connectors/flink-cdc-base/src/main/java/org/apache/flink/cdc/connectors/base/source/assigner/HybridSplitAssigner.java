@@ -32,6 +32,7 @@ import io.debezium.relational.TableId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -218,7 +219,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         snapshotSplitAssigner.close();
     }
 

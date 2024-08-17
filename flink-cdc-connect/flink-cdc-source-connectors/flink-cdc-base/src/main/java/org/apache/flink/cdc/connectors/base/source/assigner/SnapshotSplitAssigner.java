@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -202,7 +203,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
 
     private void captureNewlyAddedTables() {
         if (sourceConfig.isScanNewlyAddedTableEnabled()
-                && !sourceConfig.getStartupOptions().isSnapshotOnly()) {
+                && !sourceConfig.getStartupOptions().isSnapshotOnly()
+                && AssignerStatus.isAssigningFinished(assignerStatus)) {
             try {
                 // check whether we got newly added tables
                 final List<TableId> currentCapturedTables =
@@ -398,7 +400,9 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     }
 
     @Override
-    public void close() {}
+    public void close() throws IOException {
+        dialect.close();
+    }
 
     @Override
     public boolean noMoreSplits() {

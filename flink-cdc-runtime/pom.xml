@@ -19,7 +19,7 @@ limitations under the License.
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
-        <artifactId>flink-cdc</artifactId>
+        <artifactId>flink-cdc-parent</artifactId>
         <groupId>org.apache.flink</groupId>
         <version>${revision}</version>
     </parent>
@@ -43,34 +43,6 @@ limitations under the License.
             <!-- Used for translation of expression -->
             <groupId>org.apache.calcite</groupId>
             <artifactId>calcite-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-table-planner_2.12</artifactId>
-            <version>${flink.version}</version>
-            <scope>provided</scope>
-            <exclusions>
-                <exclusion>
-                    <artifactId>value</artifactId>
-                    <groupId>org.immutables</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>value-annotations</artifactId>
-                    <groupId>org.immutables</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>commons-compiler</artifactId>
-                    <groupId>org.codehaus.janino</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>janino</artifactId>
-                    <groupId>org.codehaus.janino</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>flink-scala_2.12</artifactId>
-                    <groupId>org.apache.flink</groupId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -110,6 +82,12 @@ limitations under the License.
             <version>${flink.version}</version>
             <scope>test</scope>
             <type>test-jar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-udf-examples</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

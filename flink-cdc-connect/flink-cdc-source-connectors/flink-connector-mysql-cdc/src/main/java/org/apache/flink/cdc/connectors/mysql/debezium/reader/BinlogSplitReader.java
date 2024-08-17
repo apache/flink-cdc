@@ -215,6 +215,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     private boolean shouldEmit(SourceRecord sourceRecord) {
         if (RecordUtils.isDataChangeRecord(sourceRecord)) {
             TableId tableId = RecordUtils.getTableId(sourceRecord);
+            if (pureBinlogPhaseTables.contains(tableId)) {
+                return true;
+            }
             BinlogOffset position = RecordUtils.getBinlogPosition(sourceRecord);
             if (hasEnterPureBinlogPhase(tableId, position)) {
                 return true;
@@ -254,9 +257,6 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     }
 
     private boolean hasEnterPureBinlogPhase(TableId tableId, BinlogOffset position) {
-        if (pureBinlogPhaseTables.contains(tableId)) {
-            return true;
-        }
         // the existed tables those have finished snapshot reading
         if (maxSplitHighWatermarkMap.containsKey(tableId)
                 && position.isAtOrAfter(maxSplitHighWatermarkMap.get(tableId))) {

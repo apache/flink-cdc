@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -91,7 +92,7 @@ public class ValuesDatabaseTest {
      * <p>｜----｜----｜.
      */
     @Before
-    public void before() {
+    public void before() throws SchemaEvolveException {
         ValuesDatabase.clear();
         metadataApplier = new ValuesDatabase.ValuesMetadataApplier();
         metadataAccessor = new ValuesDatabase.ValuesMetadataAccessor();
@@ -159,7 +160,7 @@ public class ValuesDatabaseTest {
     }
 
     @Test
-    public void testApplySchemaChangeEvent() {
+    public void testApplySchemaChangeEvent() throws SchemaEvolveException {
         AddColumnEvent.ColumnWithPosition columnWithPosition =
                 new AddColumnEvent.ColumnWithPosition(
                         Column.physicalColumn("col3", new CharType()));
@@ -258,7 +259,7 @@ public class ValuesDatabaseTest {
     }
 
     @Test
-    public void testSchemaChangeWithExistedData() {
+    public void testSchemaChangeWithExistedData() throws SchemaEvolveException {
         AddColumnEvent.ColumnWithPosition columnWithPosition =
                 new AddColumnEvent.ColumnWithPosition(
                         Column.physicalColumn("col3", new CharType()));

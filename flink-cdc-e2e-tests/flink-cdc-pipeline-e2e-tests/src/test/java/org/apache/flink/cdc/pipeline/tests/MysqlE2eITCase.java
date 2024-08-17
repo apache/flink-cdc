@@ -55,6 +55,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
+    protected static final long EVENT_WAITING_TIMEOUT = 60000L;
 
     @ClassRule
     public static final MySqlContainer MYSQL =
@@ -117,17 +118,15 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai, 123567891234], op=INSERT, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()),
-                60000L);
+                        mysqlInventoryDatabase.getDatabaseName()));
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.products, before=[], after=[109, spare tire, 24 inch spare tire, 22.2, null, null, null], op=INSERT, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()),
-                60000L);
+                        mysqlInventoryDatabase.getDatabaseName()));
         List<String> expectedEvents =
                 Arrays.asList(
                         String.format(
-                                "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL,`address` VARCHAR(1024),`phone_number` VARCHAR(512)}, primaryKeys=id, options=()}",
+                                "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`address` VARCHAR(1024),`phone_number` VARCHAR(512)}, primaryKeys=id, options=()}",
                                 mysqlInventoryDatabase.getDatabaseName()),
                         String.format(
                                 "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai, 123567891234], op=INSERT, meta=()}",
@@ -142,7 +141,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                                 "DataChangeEvent{tableId=%s.customers, before=[], after=[101, user_1, Shanghai, 123567891234], op=INSERT, meta=()}",
                                 mysqlInventoryDatabase.getDatabaseName()),
                         String.format(
-                                "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL,`description` VARCHAR(512),`weight` FLOAT,`enum_c` STRING,`json_c` STRING,`point_c` STRING}, primaryKeys=id, options=()}",
+                                "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`description` VARCHAR(512),`weight` FLOAT,`enum_c` STRING 'red',`json_c` STRING,`point_c` STRING}, primaryKeys=id, options=()}",
                                 mysqlInventoryDatabase.getDatabaseName()),
                         String.format(
                                 "DataChangeEvent{tableId=%s.products, before=[], after=[109, spare tire, 24 inch spare tire, 22.2, null, null, null], op=INSERT, meta=()}",
@@ -191,8 +190,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
             waitUntilSpecificEvent(
                     String.format(
                             "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0, null, null, null], after=[106, hammer, 18oz carpenter hammer, 1.0, null, null, null], op=UPDATE, meta=()}",
-                            mysqlInventoryDatabase.getDatabaseName()),
-                    20000L);
+                            mysqlInventoryDatabase.getDatabaseName()));
 
             // modify table schema
             stat.execute("ALTER TABLE products ADD COLUMN new_col INT;");
@@ -212,8 +210,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEvent(
                 String.format(
                         "DataChangeEvent{tableId=%s.products, before=[111, scooter, Big 2-wheel scooter , 5.17, null, null, null, 1], after=[], op=DELETE, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()),
-                60000L);
+                        mysqlInventoryDatabase.getDatabaseName()));
 
         expectedEvents =
                 Arrays.asList(
@@ -246,13 +243,13 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
 
     private void validateResult(List<String> expectedEvents) throws Exception {
         for (String event : expectedEvents) {
-            waitUntilSpecificEvent(event, 6000L);
+            waitUntilSpecificEvent(event);
         }
     }
 
-    private void waitUntilSpecificEvent(String event, long timeout) throws Exception {
+    private void waitUntilSpecificEvent(String event) throws Exception {
         boolean result = false;
-        long endTimeout = System.currentTimeMillis() + timeout;
+        long endTimeout = System.currentTimeMillis() + MysqlE2eITCase.EVENT_WAITING_TIMEOUT;
         while (System.currentTimeMillis() < endTimeout) {
             String stdout = taskManagerConsumer.toUtf8String();
             if (stdout.contains(event)) {

@@ -65,7 +65,7 @@ public class FlinkEnvironmentUtils {
                     Stream.concat(previousJars.stream(), jarUrls.stream().map(URL::toString))
                             .distinct()
                             .collect(Collectors.toList());
-            LOG.info("pipeline.jars is " + String.join(",", currentJars));
+            LOG.info("pipeline.jars is {}", String.join(",", currentJars));
             configuration.set(PipelineOptions.JARS, currentJars);
         } catch (Exception e) {
             throw new RuntimeException("Failed to add JAR to Flink execution environment", e);
