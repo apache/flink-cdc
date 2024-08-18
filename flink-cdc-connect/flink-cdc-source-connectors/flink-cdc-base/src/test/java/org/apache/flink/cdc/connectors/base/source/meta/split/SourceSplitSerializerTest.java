@@ -105,7 +105,8 @@ public class SourceSplitSerializerTest {
                 new ArrayList<>(),
                 new HashMap<>(),
                 0,
-                isSuspend);
+                isSuspend,
+                false);
     }
 
     private StreamSplitVersion4 constuctStreamSplitVersion4() {
