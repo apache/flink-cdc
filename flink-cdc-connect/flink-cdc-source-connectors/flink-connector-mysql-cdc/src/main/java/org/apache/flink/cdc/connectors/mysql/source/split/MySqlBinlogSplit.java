@@ -183,30 +183,47 @@ public class MySqlBinlogSplit extends MySqlSplit {
      *
      * <p>When restore from a checkpoint, the finished split infos may contain some splits from the
      * deleted tables. We need to remove these splits from the total finished split infos and update
-     * the size.
+     * the size, while also removing the outdated tables from the table schemas of binlog split.
      */
     public static MySqlBinlogSplit filterOutdatedSplitInfos(
             MySqlBinlogSplit binlogSplit, Tables.TableFilter currentTableFilter) {
-        Set<TableId> tablesToRemove =
+        Map<TableId, TableChange> filteredTableSchemas =
+                binlogSplit.getTableSchemas().entrySet().stream()
+                        .filter(entry -> currentTableFilter.isIncluded(entry.getKey()))
+                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        Set<TableId> tablesToRemoveInFinishedSnapshotSplitInfos =
                 binlogSplit.getFinishedSnapshotSplitInfos().stream()
                         .filter(i -> !currentTableFilter.isIncluded(i.getTableId()))
                         .map(split -> split.getTableId())
                         .collect(Collectors.toSet());
-        if (tablesToRemove.isEmpty()) {
-            return binlogSplit;
+        if (tablesToRemoveInFinishedSnapshotSplitInfos.isEmpty()) {
+            return new MySqlBinlogSplit(
+                    binlogSplit.splitId,
+                    binlogSplit.getStartingOffset(),
+                    binlogSplit.getEndingOffset(),
+                    binlogSplit.getFinishedSnapshotSplitInfos(),
+                    filteredTableSchemas,
+                    binlogSplit.totalFinishedSplitSize,
+                    binlogSplit.isSuspended());
         }
 
-        LOG.info("Reader remove tables after restart: {}", tablesToRemove);
+        LOG.info(
+                "Reader remove tables after restart: {}",
+                tablesToRemoveInFinishedSnapshotSplitInfos);
         List<FinishedSnapshotSplitInfo> allFinishedSnapshotSplitInfos =
                 binlogSplit.getFinishedSnapshotSplitInfos().stream()
-                        .filter(i -> !tablesToRemove.contains(i.getTableId()))
+                        .filter(
+                                i ->
+                                        !tablesToRemoveInFinishedSnapshotSplitInfos.contains(
+                                                i.getTableId()))
                         .collect(Collectors.toList());
         return new MySqlBinlogSplit(
                 binlogSplit.splitId,
                 binlogSplit.getStartingOffset(),
                 binlogSplit.getEndingOffset(),
                 allFinishedSnapshotSplitInfos,
-                binlogSplit.getTableSchemas(),
+                filteredTableSchemas,
                 binlogSplit.getTotalFinishedSplitSize()
                         - (binlogSplit.getFinishedSnapshotSplitInfos().size()
                                 - allFinishedSnapshotSplitInfos.size()),
