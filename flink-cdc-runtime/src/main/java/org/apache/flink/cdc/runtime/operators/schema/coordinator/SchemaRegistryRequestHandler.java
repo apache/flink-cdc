@@ -430,6 +430,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
                 }
             case DROP_TABLE:
                 // We don't drop any tables in Lenient mode.
+                LOG.info("A drop table event {} has been ignored in Lenient mode.", event);
                 return Collections.emptyList();
             default:
                 return Collections.singletonList(event);
