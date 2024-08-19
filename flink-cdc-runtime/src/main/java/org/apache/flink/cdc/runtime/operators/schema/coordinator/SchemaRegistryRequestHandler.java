@@ -428,6 +428,9 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     }
                     return events;
                 }
+            case DROP_TABLE:
+                // We don't drop any tables in Lenient mode.
+                return Collections.emptyList();
             default:
                 return Collections.singletonList(event);
         }

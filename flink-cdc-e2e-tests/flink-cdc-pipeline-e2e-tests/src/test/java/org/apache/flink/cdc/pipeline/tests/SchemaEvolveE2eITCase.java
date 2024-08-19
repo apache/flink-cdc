@@ -192,8 +192,12 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`biological_sex` TINYINT, position=LAST, existedColumnName=null}]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null, null, 16.0, null], op=INSERT, meta=()}",
                         "TruncateTableEvent{tableId=%s.members}",
-                        "DataChangeEvent{tableId=%s.members, before=[], after=[1014, Gem, null, null, 17.0, null], op=INSERT, meta=()}",
-                        "DropTableEvent{tableId=%s.members}"));
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1014, Gem, null, null, 17.0, null], op=INSERT, meta=()}"));
+
+        assertNotExists(
+                Collections.singletonList(
+                        "Applied schema change event DropTableEvent{tableId=%s.members}"),
+                taskManagerConsumer);
     }
 
     @Test
@@ -401,6 +405,17 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
             throws Exception {
         for (String event : expectedEvents) {
             waitUntilSpecificEvent(event, consumer);
+        }
+    }
+
+    private void assertNotExists(List<String> unexpectedEvents, ToStringConsumer consumer) {
+        String consumerLog = consumer.toUtf8String();
+        System.out.println(consumerLog);
+        for (String event : unexpectedEvents) {
+            System.out.println("Assuming there's no " + event + " in logs...");
+            Assert.assertFalse(
+                    consumerLog.contains(
+                            String.format(event, schemaEvolveDatabase.getDatabaseName())));
         }
     }
 
