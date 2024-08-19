@@ -20,11 +20,9 @@ package org.apache.flink.cdc.connectors.doris.sink;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.configuration.Configuration;
-import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
-import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
@@ -34,16 +32,13 @@ import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
-import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisContainer;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisSinkTestBase;
-import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -206,21 +201,9 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
                         .primaryKey("id")
                         .build();
-        RowType rowType =
-                RowType.of(
-                        new DataType[] {
-                            DataTypes.INT().notNull(), DataTypes.DOUBLE(), DataTypes.VARCHAR(17)
-                        },
-                        new String[] {"id", "number", "name"});
-        BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
+
         return Arrays.asList(
                 new CreateTableEvent(tableId, schema),
-                DataChangeEvent.insertEvent(
-                        tableId,
-                        generator.generate(
-                                new Object[] {
-                                    17, 3.1415926, BinaryStringData.fromString("Alice")
-                                })),
                 // Double -> Float is a narrowing cast, should fail
                 new AlterColumnTypeEvent(
                         tableId, Collections.singletonMap("number", DataTypes.FLOAT())));
@@ -458,6 +441,5 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 schemaOperatorIDGenerator.generate());
 
         env.execute("Doris Schema Evolution Test");
-        System.out.println("Done");
     }
 }

@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.values.sink;
 import org.apache.flink.api.common.eventtime.Watermark;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -59,16 +60,19 @@ public class ValuesDataSinkFunction implements SinkFunction<Event> {
         if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             TableId tableId = schemaChangeEvent.tableId();
-            Schema appliedSchema =
-                    SchemaUtils.applySchemaChangeEvent(
-                            schemaMaps.get(schemaChangeEvent.tableId()), schemaChangeEvent);
-
-            if (appliedSchema != null) {
-                schemaMaps.put(tableId, appliedSchema);
-                fieldGetterMaps.put(tableId, SchemaUtils.createFieldGetters(appliedSchema));
+            if (event instanceof CreateTableEvent) {
+                Schema schema = ((CreateTableEvent) event).getSchema();
+                schemaMaps.put(tableId, schema);
+                fieldGetterMaps.put(tableId, SchemaUtils.createFieldGetters(schema));
             } else {
-                schemaMaps.remove(tableId);
-                fieldGetterMaps.remove(tableId);
+                if (!schemaMaps.containsKey(tableId)) {
+                    throw new RuntimeException("schema of " + tableId + " is not existed.");
+                }
+                Schema schema =
+                        SchemaUtils.applySchemaChangeEvent(
+                                schemaMaps.get(tableId), schemaChangeEvent);
+                schemaMaps.put(tableId, schema);
+                fieldGetterMaps.put(tableId, SchemaUtils.createFieldGetters(schema));
             }
         } else if (materializedInMemory && event instanceof DataChangeEvent) {
             ValuesDatabase.applyDataChangeEvent((DataChangeEvent) event);

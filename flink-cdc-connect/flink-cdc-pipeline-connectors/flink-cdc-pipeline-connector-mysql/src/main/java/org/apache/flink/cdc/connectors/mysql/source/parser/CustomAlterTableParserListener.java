@@ -280,13 +280,6 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     }
 
     @Override
-    public void enterTableOptionComment(MySqlParser.TableOptionCommentContext ctx) {
-        if (!parser.skipComments()) {
-            super.enterTableOptionComment(ctx);
-        }
-    }
-
-    @Override
     public void exitTruncateTable(MySqlParser.TruncateTableContext ctx) {
         TableId tableId = parser.parseQualifiedTableId(ctx.tableName().fullId());
         changes.add(new TruncateTableEvent(toCdcTableId(tableId)));

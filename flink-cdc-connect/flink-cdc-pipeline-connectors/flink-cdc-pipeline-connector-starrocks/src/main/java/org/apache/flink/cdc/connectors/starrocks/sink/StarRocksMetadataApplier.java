@@ -305,7 +305,8 @@ public class StarRocksMetadataApplier implements MetadataApplier {
         throw new UnsupportedSchemaChangeEventException(renameColumnEvent);
     }
 
-    private void applyAlterColumnType(AlterColumnTypeEvent alterColumnTypeEvent) {
+    private void applyAlterColumnType(AlterColumnTypeEvent alterColumnTypeEvent)
+            throws SchemaEvolveException {
         // TODO There are limitations for data type conversions. We should know the data types
         // before and after changing so that we can make a validation. But the event only contains
         // data

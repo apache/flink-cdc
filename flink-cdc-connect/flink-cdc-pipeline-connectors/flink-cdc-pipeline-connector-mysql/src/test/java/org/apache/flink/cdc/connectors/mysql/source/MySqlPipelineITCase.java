@@ -668,7 +668,6 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         expected.add(
                 new AlterColumnTypeEvent(
                         tableId, Collections.singletonMap("description", DataTypes.VARCHAR(255))));
-
         expected.add(
                 new RenameColumnEvent(tableId, Collections.singletonMap("description", "desc")));
 
