@@ -14,16 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.flink.cdc.common.event.visitor;
 
-package org.apache.flink.cdc.common.event;
+import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 
-/** Visitor class for all {@link ColumnSchemaChangeEvent}s. */
-public interface ColumnSchemaChangeEventVisitor<T, E extends Throwable> {
-    T visit(AddColumnEvent event) throws E;
-
+@Internal
+@FunctionalInterface
+public interface AlterColumnTypeEventVisitor<T, E extends Throwable> {
     T visit(AlterColumnTypeEvent event) throws E;
-
-    T visit(DropColumnEvent event) throws E;
-
-    T visit(RenameColumnEvent event) throws E;
 }

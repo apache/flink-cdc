@@ -14,9 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.flink.cdc.common.event.visitor;
 
-package org.apache.flink.cdc.common.event;
+import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 
-/** Visitor clas for all {@link SchemaChangeEvent}s and returns nothing. */
-public interface SchemaChangeEventVisitorVoid<E extends Throwable>
-        extends ColumnSchemaChangeEventVisitorVoid<E>, TableSchemaChangeEventVisitorVoid<E> {}
+@Internal
+@FunctionalInterface
+public interface DropColumnEventVisitor<T, E extends Throwable> {
+    T visit(DropColumnEvent event) throws E;
+}

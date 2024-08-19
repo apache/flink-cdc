@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.common.event;
 
+import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.source.DataSource;
 
 import java.util.Objects;
@@ -25,8 +26,11 @@ import java.util.Objects;
  * A {@link SchemaChangeEvent} that represents an {@code DROP TABLE} DDL. this will be sent by
  * {@link DataSource} before all {@link DataChangeEvent} with the same tableId.
  */
-public class DropTableEvent implements TableSchemaChangeEvent {
+@PublicEvolving
+public class DropTableEvent implements SchemaChangeEvent {
+
     private static final long serialVersionUID = 1L;
+
     private final TableId tableId;
 
     public DropTableEvent(TableId tableId) {

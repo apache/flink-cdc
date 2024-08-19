@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.common.event;
 
+import org.apache.flink.cdc.common.annotation.PublicEvolving;
+
 import java.util.Map;
 import java.util.Objects;
 
@@ -24,7 +26,8 @@ import java.util.Objects;
  * A {@link SchemaChangeEvent} that represents an {@code RENAME COLUMN} DDL, which may contain the
  * lenient column type changes.
  */
-public class RenameColumnEvent implements ColumnSchemaChangeEvent {
+@PublicEvolving
+public class RenameColumnEvent implements SchemaChangeEvent {
 
     private static final long serialVersionUID = 1L;
 

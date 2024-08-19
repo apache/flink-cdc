@@ -28,9 +28,9 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
-import org.apache.flink.cdc.common.event.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -69,44 +69,21 @@ public class ChangeEventUtils {
     public static SchemaChangeEvent recreateSchemaChangeEvent(
             SchemaChangeEvent schemaChangeEvent, TableId tableId) {
 
-        return schemaChangeEvent.visit(
-                new SchemaChangeEventVisitor<SchemaChangeEvent, RuntimeException>() {
-                    @Override
-                    public SchemaChangeEvent visit(AddColumnEvent event) {
-                        return new AddColumnEvent(tableId, event.getAddedColumns());
-                    }
-
-                    @Override
-                    public SchemaChangeEvent visit(AlterColumnTypeEvent event) {
-                        return new AlterColumnTypeEvent(
-                                tableId, event.getTypeMapping(), event.getOldTypeMapping());
-                    }
-
-                    @Override
-                    public SchemaChangeEvent visit(CreateTableEvent event) {
-                        return new CreateTableEvent(tableId, event.getSchema());
-                    }
-
-                    @Override
-                    public SchemaChangeEvent visit(DropColumnEvent event) {
-                        return new DropColumnEvent(tableId, event.getDroppedColumnNames());
-                    }
-
-                    @Override
-                    public SchemaChangeEvent visit(DropTableEvent event) {
-                        return new DropTableEvent(tableId);
-                    }
-
-                    @Override
-                    public SchemaChangeEvent visit(RenameColumnEvent event) {
-                        return new RenameColumnEvent(tableId, event.getNameMapping());
-                    }
-
-                    @Override
-                    public SchemaChangeEvent visit(TruncateTableEvent event) {
-                        return new TruncateTableEvent(tableId);
-                    }
-                });
+        return SchemaChangeEventVisitor.visit(
+                schemaChangeEvent,
+                addColumnEvent -> new AddColumnEvent(tableId, addColumnEvent.getAddedColumns()),
+                alterColumnEvent ->
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                alterColumnEvent.getTypeMapping(),
+                                alterColumnEvent.getOldTypeMapping()),
+                createTableEvent -> new CreateTableEvent(tableId, createTableEvent.getSchema()),
+                dropColumnEvent ->
+                        new DropColumnEvent(tableId, dropColumnEvent.getDroppedColumnNames()),
+                dropTableEvent -> new DropTableEvent(tableId),
+                renameColumnEvent ->
+                        new RenameColumnEvent(tableId, renameColumnEvent.getNameMapping()),
+                truncateTableEvent -> new TruncateTableEvent(tableId));
     }
 
     public static Set<SchemaChangeEventType> resolveSchemaEvolutionOptions(

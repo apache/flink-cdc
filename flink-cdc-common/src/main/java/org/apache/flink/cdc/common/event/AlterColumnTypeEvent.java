@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.common.event;
 
+import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
@@ -31,8 +32,8 @@ import java.util.stream.Collectors;
  * A {@link SchemaChangeEvent} that represents an {@code ALTER COLUMN} DDL, which may contain the
  * lenient column type changes.
  */
-public class AlterColumnTypeEvent
-        implements ColumnSchemaChangeEvent, SchemaChangeEventWithPreSchema {
+@PublicEvolving
+public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, SchemaChangeEvent {
 
     private static final long serialVersionUID = 1L;
 

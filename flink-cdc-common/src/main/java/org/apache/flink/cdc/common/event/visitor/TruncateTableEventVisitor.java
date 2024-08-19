@@ -14,16 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.flink.cdc.common.event.visitor;
 
-package org.apache.flink.cdc.common.event;
+import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 
-/** Visitor class for all {@link ColumnSchemaChangeEvent}s and returns nothing. */
-public interface ColumnSchemaChangeEventVisitorVoid<E extends Throwable> {
-    void visit(AddColumnEvent event) throws E;
-
-    void visit(AlterColumnTypeEvent event) throws E;
-
-    void visit(DropColumnEvent event) throws E;
-
-    void visit(RenameColumnEvent event) throws E;
+@Internal
+@FunctionalInterface
+public interface TruncateTableEventVisitor<T, E extends Throwable> {
+    T visit(TruncateTableEvent event) throws E;
 }

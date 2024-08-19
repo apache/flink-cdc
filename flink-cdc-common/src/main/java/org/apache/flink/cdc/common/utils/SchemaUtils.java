@@ -22,14 +22,10 @@ import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
-import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
-import org.apache.flink.cdc.common.event.SchemaChangeEventVisitor;
-import org.apache.flink.cdc.common.event.TruncateTableEvent;
-import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
@@ -249,43 +245,15 @@ public class SchemaUtils {
 
     /** apply SchemaChangeEvent to the old schema and return the schema after changing. */
     public static Schema applySchemaChangeEvent(Schema schema, SchemaChangeEvent event) {
-        return event.visit(
-                new SchemaChangeEventVisitor<Schema, SchemaEvolveException>() {
-                    @Override
-                    public Schema visit(AddColumnEvent event) {
-                        return applyAddColumnEvent(event, schema);
-                    }
-
-                    @Override
-                    public Schema visit(AlterColumnTypeEvent event) {
-                        return applyAlterColumnTypeEvent(event, schema);
-                    }
-
-                    @Override
-                    public Schema visit(CreateTableEvent event) {
-                        return event.getSchema();
-                    }
-
-                    @Override
-                    public Schema visit(DropColumnEvent event) {
-                        return applyDropColumnEvent(event, schema);
-                    }
-
-                    @Override
-                    public Schema visit(DropTableEvent event) {
-                        return schema;
-                    }
-
-                    @Override
-                    public Schema visit(RenameColumnEvent event) {
-                        return applyRenameColumnEvent(event, schema);
-                    }
-
-                    @Override
-                    public Schema visit(TruncateTableEvent event) {
-                        return schema;
-                    }
-                });
+        return SchemaChangeEventVisitor.visit(
+                event,
+                addColumnEvent -> applyAddColumnEvent(addColumnEvent, schema),
+                alterColumnTypeEvent -> applyAlterColumnTypeEvent(alterColumnTypeEvent, schema),
+                createTableEvent -> createTableEvent.getSchema(),
+                dropColumnEvent -> applyDropColumnEvent(dropColumnEvent, schema),
+                dropTableEvent -> schema,
+                renameColumnEvent -> applyRenameColumnEvent(renameColumnEvent, schema),
+                truncateTableEvent -> schema);
     }
 
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {

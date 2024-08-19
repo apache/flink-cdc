@@ -14,14 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.flink.cdc.common.event.visitor;
 
-package org.apache.flink.cdc.common.event;
+import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 
-/** Visitor class for all {@link TableSchemaChangeEvent}s and returns nothing. */
-public interface TableSchemaChangeEventVisitorVoid<E extends Throwable> {
-    void visit(CreateTableEvent event) throws E;
-
-    void visit(DropTableEvent event) throws E;
-
-    void visit(TruncateTableEvent event) throws E;
+@Internal
+@FunctionalInterface
+public interface DropTableEventVisitor<T, E extends Throwable> {
+    T visit(DropTableEvent event) throws E;
 }
