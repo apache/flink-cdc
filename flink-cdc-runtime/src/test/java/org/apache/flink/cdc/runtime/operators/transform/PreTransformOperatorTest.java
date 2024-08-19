@@ -254,7 +254,16 @@ public class PreTransformOperatorTest {
         transform.processElement(new StreamRecord<>(addColumnEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
-                .isEqualTo(new StreamRecord<>(addColumnEvent));
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new AddColumnEvent(
+                                        CUSTOMERS_TABLEID,
+                                        Collections.singletonList(
+                                                new AddColumnEvent.ColumnWithPosition(
+                                                        Column.physicalColumn(
+                                                                "col3", DataTypes.STRING()),
+                                                        AddColumnEvent.ColumnPosition.AFTER,
+                                                        "col2")))));
         transform.processElement(new StreamRecord<>(insertEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())

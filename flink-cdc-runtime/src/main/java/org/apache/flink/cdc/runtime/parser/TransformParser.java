@@ -18,6 +18,11 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
@@ -584,5 +589,93 @@ public class TransformParser {
         } else {
             return filter;
         }
+    }
+
+    public static boolean hasAsterisk(String projection) {
+        return parseProjectionExpression(projection).getOperandList().stream()
+                .anyMatch(TransformParser::hasAsterisk);
+    }
+
+    private static boolean hasAsterisk(SqlNode sqlNode) {
+        if (sqlNode instanceof SqlIdentifier) {
+            return ((SqlIdentifier) sqlNode).isStar();
+        } else if (sqlNode instanceof SqlBasicCall) {
+            SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+            return sqlBasicCall.getOperandList().stream().anyMatch(TransformParser::hasAsterisk);
+        } else if (sqlNode instanceof SqlNodeList) {
+            SqlNodeList sqlNodeList = (SqlNodeList) sqlNode;
+            return sqlNodeList.getList().stream().anyMatch(TransformParser::hasAsterisk);
+        } else {
+            return false;
+        }
+    }
+
+    public static Optional<SchemaChangeEvent> transformSchemaChangeEvent(
+            boolean hasAsterisk, List<String> referencedColumns, SchemaChangeEvent event) {
+        Optional<SchemaChangeEvent> evolvedSchemaChangeEvent = Optional.empty();
+        if (event instanceof AddColumnEvent) {
+            // Send add column events to downstream iff there's an asterisk
+            if (hasAsterisk) {
+                List<AddColumnEvent.ColumnWithPosition> addedColumns =
+                        ((AddColumnEvent) event)
+                                .getAddedColumns().stream()
+                                        .map(
+                                                e -> {
+                                                    if (AddColumnEvent.ColumnPosition.LAST.equals(
+                                                            e.getPosition())) {
+                                                        return new AddColumnEvent
+                                                                .ColumnWithPosition(
+                                                                e.getAddColumn(),
+                                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                                referencedColumns.get(
+                                                                        referencedColumns.size()
+                                                                                - 1));
+                                                    } else if (AddColumnEvent.ColumnPosition.FIRST
+                                                            .equals(e.getPosition())) {
+                                                        return new AddColumnEvent
+                                                                .ColumnWithPosition(
+                                                                e.getAddColumn(),
+                                                                AddColumnEvent.ColumnPosition
+                                                                        .BEFORE,
+                                                                referencedColumns.get(0));
+                                                    } else {
+                                                        return e;
+                                                    }
+                                                })
+                                        .collect(Collectors.toList());
+                evolvedSchemaChangeEvent =
+                        Optional.of(new AddColumnEvent(event.tableId(), addedColumns));
+            }
+        } else if (event instanceof AlterColumnTypeEvent) {
+            AlterColumnTypeEvent alterColumnTypeEvent = (AlterColumnTypeEvent) event;
+            if (hasAsterisk) {
+                // In wildcard mode, all alter column type events should be sent to downstream
+                evolvedSchemaChangeEvent = Optional.of(event);
+            } else {
+                // Or, we need to filter out those referenced columns and reconstruct
+                // SchemaChangeEvents
+                Map<String, DataType> newDataTypeMap =
+                        alterColumnTypeEvent.getTypeMapping().entrySet().stream()
+                                .filter(e -> referencedColumns.contains(e.getKey()))
+                                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                if (!newDataTypeMap.isEmpty()) {
+                    evolvedSchemaChangeEvent =
+                            Optional.of(
+                                    new AlterColumnTypeEvent(
+                                            alterColumnTypeEvent.tableId(), newDataTypeMap));
+                }
+            }
+        } else if (event instanceof RenameColumnEvent) {
+            if (hasAsterisk) {
+                evolvedSchemaChangeEvent = Optional.of(event);
+            }
+        } else if (event instanceof DropColumnEvent) {
+            if (hasAsterisk) {
+                evolvedSchemaChangeEvent = Optional.of(event);
+            }
+        } else {
+            evolvedSchemaChangeEvent = Optional.of(event);
+        }
+        return evolvedSchemaChangeEvent;
     }
 }

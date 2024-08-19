@@ -29,9 +29,11 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
@@ -49,6 +51,8 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -68,6 +72,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private final List<Tuple2<String, String>> udfFunctions;
     private List<UserDefinedFunctionDescriptor> udfDescriptors;
     private Map<TableId, PreTransformProcessor> preTransformProcessorMap;
+    private final boolean hasAsterisk;
+    private List<String> referencedColumns;
 
     public static PreTransformOperator.Builder newBuilder() {
         return new PreTransformOperator.Builder();
@@ -122,6 +128,11 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         this.schemaMetadataTransformers = new ArrayList<>();
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.udfFunctions = udfFunctions;
+        this.hasAsterisk =
+                transformRules.stream()
+                        .map(TransformRule::getProjection)
+                        .anyMatch(TransformParser::hasAsterisk);
+        this.referencedColumns = new ArrayList<>();
     }
 
     @Override
@@ -233,8 +244,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         } else if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             preTransformProcessorMap.remove(schemaChangeEvent.tableId());
-            cacheChangeSchema(schemaChangeEvent);
-            output.collect(new StreamRecord<>(event));
+            cacheChangeSchema(schemaChangeEvent)
+                    .ifPresent(e -> output.collect(new StreamRecord<>(e)));
         } else if (event instanceof DataChangeEvent) {
             output.collect(new StreamRecord<>(processDataChangeEvent(((DataChangeEvent) event))));
         }
@@ -250,23 +261,47 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         return event;
     }
 
-    private SchemaChangeEvent cacheChangeSchema(SchemaChangeEvent event) {
+    private Optional<SchemaChangeEvent> cacheChangeSchema(SchemaChangeEvent event) {
         TableId tableId = event.tableId();
         PreTransformChangeInfo tableChangeInfo = preTransformChangeInfoMap.get(tableId);
         Schema originalSchema =
                 SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getSourceSchema(), event);
-        Schema newSchema =
-                SchemaUtils.applySchemaChangeEvent(
-                        tableChangeInfo.getPreTransformedSchema(), event);
-        preTransformChangeInfoMap.put(
-                tableId, PreTransformChangeInfo.of(tableId, originalSchema, newSchema));
-        return event;
+
+        Optional<SchemaChangeEvent> schemaChangeEvent =
+                TransformParser.transformSchemaChangeEvent(hasAsterisk, referencedColumns, event);
+        if (schemaChangeEvent.isPresent()) {
+            Schema newSchema =
+                    SchemaUtils.applySchemaChangeEvent(
+                            tableChangeInfo.getPreTransformedSchema(), schemaChangeEvent.get());
+            preTransformChangeInfoMap.put(
+                    tableId, PreTransformChangeInfo.of(tableId, originalSchema, newSchema));
+        }
+        return schemaChangeEvent;
+    }
+
+    private void cacheTransformInfo(CreateTableEvent createTableEvent) {
+        Set<String> referencedColumnsSet =
+                transformRules.stream()
+                        .flatMap(
+                                rule ->
+                                        TransformParser.generateReferencedColumns(
+                                                rule.getProjection(),
+                                                rule.getFilter(),
+                                                createTableEvent.getSchema().getColumns())
+                                                .stream())
+                        .map(Column::getName)
+                        .collect(Collectors.toSet());
+
+        referencedColumns =
+                createTableEvent.getSchema().getColumnNames().stream()
+                        .filter(referencedColumnsSet::contains)
+                        .collect(Collectors.toList());
     }
 
     private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
         TableId tableId = createTableEvent.tableId();
         PreTransformChangeInfo tableChangeInfo = preTransformChangeInfoMap.get(tableId);
-
+        cacheTransformInfo(createTableEvent);
         for (Tuple2<Selectors, SchemaMetadataTransform> transform : schemaMetadataTransformers) {
             Selectors selectors = transform.f0;
             if (selectors.isMatch(tableId)) {
@@ -292,7 +327,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                     }
                     PreTransformProcessor preTransformProcessor =
                             preTransformProcessorMap.get(tableId);
-                    // filter out unreferenced columns in pre-transform process
+                    // TODO: Currently this code wrongly filters out rows that weren't referenced in
+                    // the first matching transform rule but in the following transform rules.
                     return preTransformProcessor.preTransformCreateTableEvent(createTableEvent);
                 }
             }
