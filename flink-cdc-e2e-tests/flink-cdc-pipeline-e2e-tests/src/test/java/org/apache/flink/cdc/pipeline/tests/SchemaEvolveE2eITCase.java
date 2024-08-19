@@ -410,9 +410,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
 
     private void assertNotExists(List<String> unexpectedEvents, ToStringConsumer consumer) {
         String consumerLog = consumer.toUtf8String();
-        System.out.println(consumerLog);
         for (String event : unexpectedEvents) {
-            System.out.println("Assuming there's no " + event + " in logs...");
             Assert.assertFalse(
                     consumerLog.contains(
                             String.format(event, schemaEvolveDatabase.getDatabaseName())));
