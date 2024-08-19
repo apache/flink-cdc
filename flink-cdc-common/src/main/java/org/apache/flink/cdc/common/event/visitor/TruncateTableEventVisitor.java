@@ -14,11 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.flink.cdc.common.event.visitor;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 
+/** Visitor for {@link TruncateTableEvent}s. */
 @Internal
 @FunctionalInterface
 public interface TruncateTableEventVisitor<T, E extends Throwable> {

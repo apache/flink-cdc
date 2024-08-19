@@ -14,11 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.flink.cdc.common.event.visitor;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 
+/** Visitor for {@link AddColumnEvent}s. */
 @Internal
 @FunctionalInterface
 public interface AddColumnEventVisitor<T, E extends Throwable> {

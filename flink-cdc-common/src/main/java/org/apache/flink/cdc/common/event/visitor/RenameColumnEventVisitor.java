@@ -14,11 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.flink.cdc.common.event.visitor;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 
+/** Visitor for {@link RenameColumnEvent}s. */
 @Internal
 @FunctionalInterface
 public interface RenameColumnEventVisitor<T, E extends Throwable> {
