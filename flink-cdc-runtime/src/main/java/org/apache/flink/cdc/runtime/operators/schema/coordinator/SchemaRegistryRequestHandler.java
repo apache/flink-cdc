@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.SchemaChangeEventWithPreSchema;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
@@ -175,14 +176,26 @@ public class SchemaRegistryRequestHandler implements Closeable {
             LOG.info(
                     "Received schema change event request from table {}. Start to buffer requests for others.",
                     request.getTableId().toString());
-            if (request.getSchemaChangeEvent() instanceof CreateTableEvent
+            SchemaChangeEvent event = request.getSchemaChangeEvent();
+            if (event instanceof CreateTableEvent
                     && schemaManager.originalSchemaExists(request.getTableId())) {
                 return CompletableFuture.completedFuture(
                         wrap(new SchemaChangeResponse(Collections.emptyList())));
             }
-            schemaManager.applyOriginalSchemaChange(request.getSchemaChangeEvent());
+            schemaManager.applyOriginalSchemaChange(event);
             List<SchemaChangeEvent> derivedSchemaChangeEvents =
                     calculateDerivedSchemaChangeEvents(request.getSchemaChangeEvent());
+            derivedSchemaChangeEvents.forEach(
+                    e -> {
+                        if (e instanceof SchemaChangeEventWithPreSchema) {
+                            SchemaChangeEventWithPreSchema pe = (SchemaChangeEventWithPreSchema) e;
+                            if (!pe.hasPreSchema()) {
+                                schemaManager
+                                        .getLatestEvolvedSchema(pe.tableId())
+                                        .ifPresent(pe::fillPreSchema);
+                            }
+                        }
+                    });
             CompletableFuture<CoordinationResponse> response =
                     CompletableFuture.completedFuture(
                             wrap(new SchemaChangeResponse(derivedSchemaChangeEvents)));
@@ -415,6 +428,10 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     }
                     return events;
                 }
+            case DROP_TABLE:
+                // We don't drop any tables in Lenient mode.
+                LOG.info("A drop table event {} has been ignored in Lenient mode.", event);
+                return Collections.emptyList();
             default:
                 return Collections.singletonList(event);
         }

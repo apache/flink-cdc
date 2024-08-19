@@ -24,10 +24,12 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -223,6 +225,13 @@ public class ValuesDatabase {
         return builder.primaryKey(table.primaryKeys).build();
     }
 
+    public static void applyTruncateTableEvent(TruncateTableEvent event) {
+        ValuesTable table = globalTables.get(event.tableId());
+        Preconditions.checkNotNull(table, event.tableId() + " is not existed");
+        table.applyTruncateTableEvent(event);
+        LOG.info("apply TruncateTableEvent: " + event);
+    }
+
     public static void applyDataChangeEvent(DataChangeEvent event) {
         ValuesTable table = globalTables.get(event.tableId());
         Preconditions.checkNotNull(table, event.tableId() + " is not existed");
@@ -236,6 +245,13 @@ public class ValuesDatabase {
             if (!globalTables.containsKey(tableId)) {
                 globalTables.put(
                         tableId, new ValuesTable(tableId, ((CreateTableEvent) event).getSchema()));
+            }
+        } else if (event instanceof DropTableEvent) {
+            globalTables.remove(tableId);
+        } else if (event instanceof TruncateTableEvent) {
+            if (globalTables.containsKey(tableId)) {
+                ValuesTable table = globalTables.get(event.tableId());
+                table.applyTruncateTableEvent((TruncateTableEvent) event);
             }
         } else {
             ValuesTable table = globalTables.get(event.tableId());
@@ -488,6 +504,10 @@ public class ValuesDatabase {
                                             }
                                         });
                             });
+        }
+
+        private void applyTruncateTableEvent(TruncateTableEvent event) {
+            records.clear();
         }
     }
 }

@@ -18,32 +18,23 @@
 package org.apache.flink.cdc.common.event;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.common.source.DataSource;
 
-import java.util.Map;
 import java.util.Objects;
 
 /**
- * A {@link SchemaChangeEvent} that represents an {@code RENAME COLUMN} DDL, which may contain the
- * lenient column type changes.
+ * A {@link SchemaChangeEvent} that represents an {@code DROP TABLE} DDL. this will be sent by
+ * {@link DataSource} before all {@link DataChangeEvent} with the same tableId.
  */
 @PublicEvolving
-public class RenameColumnEvent implements SchemaChangeEvent {
+public class DropTableEvent implements SchemaChangeEvent {
 
     private static final long serialVersionUID = 1L;
 
     private final TableId tableId;
 
-    /** key => column name before changing, value => column name after changing. */
-    private final Map<String, String> nameMapping;
-
-    public RenameColumnEvent(TableId tableId, Map<String, String> nameMapping) {
+    public DropTableEvent(TableId tableId) {
         this.tableId = tableId;
-        this.nameMapping = nameMapping;
-    }
-
-    /** Returns the name mapping. */
-    public Map<String, String> getNameMapping() {
-        return nameMapping;
     }
 
     @Override
@@ -51,22 +42,21 @@ public class RenameColumnEvent implements SchemaChangeEvent {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof RenameColumnEvent)) {
+        if (!(o instanceof DropTableEvent)) {
             return false;
         }
-        RenameColumnEvent that = (RenameColumnEvent) o;
-        return Objects.equals(tableId, that.tableId)
-                && Objects.equals(nameMapping, that.nameMapping);
+        DropTableEvent that = (DropTableEvent) o;
+        return Objects.equals(tableId, that.tableId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId, nameMapping);
+        return Objects.hash(tableId);
     }
 
     @Override
     public String toString() {
-        return "RenameColumnEvent{" + "tableId=" + tableId + ", nameMapping=" + nameMapping + '}';
+        return "DropTableEvent{" + "tableId=" + tableId + '}';
     }
 
     @Override
@@ -76,6 +66,6 @@ public class RenameColumnEvent implements SchemaChangeEvent {
 
     @Override
     public SchemaChangeEventType getType() {
-        return SchemaChangeEventType.RENAME_COLUMN;
+        return SchemaChangeEventType.DROP_TABLE;
     }
 }

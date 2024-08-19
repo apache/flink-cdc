@@ -96,11 +96,14 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 Arrays.asList(
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 0], op=INSERT, meta=()}",
-                        "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
+                        "AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}",
                         "RenameColumnEvent{tableId=%s.members, nameMapping={age=precise_age}}",
                         "RenameColumnEvent{tableId=%s.members, nameMapping={gender=biological_sex}}",
                         "DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]}",
-                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, 16.0], op=INSERT, meta=()}"));
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, 16.0], op=INSERT, meta=()}",
+                        "TruncateTableEvent{tableId=%s.members}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1014, Gem, 17.0], op=INSERT, meta=()}",
+                        "DropTableEvent{tableId=%s.members}"));
     }
 
     @Test
@@ -157,7 +160,8 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 false,
                 Arrays.asList(
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null], op=INSERT, meta=()}"));
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1014, Gem, null], op=INSERT, meta=()}"));
     }
 
     @Test
@@ -183,10 +187,17 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 Arrays.asList(
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 0], op=INSERT, meta=()}",
-                        "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
+                        "AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}",
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`precise_age` DOUBLE, position=LAST, existedColumnName=null}]}",
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`biological_sex` TINYINT, position=LAST, existedColumnName=null}]}",
-                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null, null, 16.0, null], op=INSERT, meta=()}"));
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null, null, 16.0, null], op=INSERT, meta=()}",
+                        "TruncateTableEvent{tableId=%s.members}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1014, Gem, null, null, 17.0, null], op=INSERT, meta=()}"));
+
+        assertNotExists(
+                Collections.singletonList(
+                        "Applied schema change event DropTableEvent{tableId=%s.members}"),
+                taskManagerConsumer);
     }
 
     @Test
@@ -200,12 +211,15 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 Arrays.asList(
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 0], op=INSERT, meta=()}",
-                        "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
+                        "AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}",
                         "RenameColumnEvent{tableId=%s.members, nameMapping={age=precise_age}}",
                         "RenameColumnEvent{tableId=%s.members, nameMapping={gender=biological_sex}}",
-                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, 16.0, null], op=INSERT, meta=()}"),
-                Collections.singletonList(
-                        "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]} to table %s.members."));
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, 16.0, null], op=INSERT, meta=()}",
+                        "TruncateTableEvent{tableId=%s.members}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1014, Gem, 17.0, null], op=INSERT, meta=()}"),
+                Arrays.asList(
+                        "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]} to table %s.members.",
+                        "Ignored schema change DropTableEvent{tableId=%s.members} to table %s.members."));
     }
 
     @Test
@@ -337,6 +351,13 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
             // triggers DropColumnEvent
             stmt.execute("ALTER TABLE members DROP COLUMN biological_sex");
             stmt.execute("INSERT INTO members VALUES (1013, 'Fiona', 16);");
+
+            // triggers TruncateTableEvent
+            stmt.execute("TRUNCATE TABLE members;");
+            stmt.execute("INSERT INTO members VALUES (1014, 'Gem', 17);");
+
+            // triggers DropTableEvent
+            stmt.execute("DROP TABLE members;");
         }
 
         List<String> expectedTmEvents =
@@ -384,6 +405,15 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
             throws Exception {
         for (String event : expectedEvents) {
             waitUntilSpecificEvent(event, consumer);
+        }
+    }
+
+    private void assertNotExists(List<String> unexpectedEvents, ToStringConsumer consumer) {
+        String consumerLog = consumer.toUtf8String();
+        for (String event : unexpectedEvents) {
+            Assert.assertFalse(
+                    consumerLog.contains(
+                            String.format(event, schemaEvolveDatabase.getDatabaseName())));
         }
     }
 

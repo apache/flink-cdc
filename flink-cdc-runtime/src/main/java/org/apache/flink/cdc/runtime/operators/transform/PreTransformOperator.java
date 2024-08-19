@@ -24,9 +24,11 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
@@ -223,16 +225,18 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         if (event instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) event;
             preTransformProcessorMap.remove(createTableEvent.tableId());
-            event = cacheCreateTable(createTableEvent);
+            output.collect(new StreamRecord<>(cacheCreateTable(createTableEvent)));
+        } else if (event instanceof DropTableEvent) {
+            output.collect(new StreamRecord<>(event));
+        } else if (event instanceof TruncateTableEvent) {
             output.collect(new StreamRecord<>(event));
         } else if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             preTransformProcessorMap.remove(schemaChangeEvent.tableId());
-            event = cacheChangeSchema(schemaChangeEvent);
+            cacheChangeSchema(schemaChangeEvent);
             output.collect(new StreamRecord<>(event));
         } else if (event instanceof DataChangeEvent) {
-            DataChangeEvent dataChangeEvent = processDataChangeEvent(((DataChangeEvent) event));
-            output.collect(new StreamRecord<>(dataChangeEvent));
+            output.collect(new StreamRecord<>(processDataChangeEvent(((DataChangeEvent) event))));
         }
     }
 

@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
@@ -46,12 +47,10 @@ import org.apache.doris.flink.catalog.doris.DataModel;
 import org.apache.doris.flink.catalog.doris.FieldSchema;
 import org.apache.doris.flink.catalog.doris.TableSchema;
 import org.apache.doris.flink.cfg.DorisOptions;
-import org.apache.doris.flink.exception.IllegalArgumentException;
 import org.apache.doris.flink.sink.schema.SchemaChangeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -60,6 +59,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_PROPERTIES_PREFIX;
@@ -93,52 +93,66 @@ public class DorisMetadataApplier implements MetadataApplier {
 
     @Override
     public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
-        return Sets.newHashSet(ADD_COLUMN, DROP_COLUMN, RENAME_COLUMN);
+        return Sets.newHashSet(ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN);
     }
 
     @Override
-    public void applySchemaChange(SchemaChangeEvent event) throws SchemaEvolveException {
-        try {
-            // send schema change op to doris
-            if (event instanceof CreateTableEvent) {
-                applyCreateTableEvent((CreateTableEvent) event);
-            } else if (event instanceof AddColumnEvent) {
-                applyAddColumnEvent((AddColumnEvent) event);
-            } else if (event instanceof DropColumnEvent) {
-                applyDropColumnEvent((DropColumnEvent) event);
-            } else if (event instanceof RenameColumnEvent) {
-                applyRenameColumnEvent((RenameColumnEvent) event);
-            } else if (event instanceof AlterColumnTypeEvent) {
-                applyAlterColumnTypeEvent((AlterColumnTypeEvent) event);
-            } else {
-                throw new UnsupportedSchemaChangeEventException(event);
-            }
-        } catch (Exception ex) {
-            throw new SchemaEvolveException(event, ex.getMessage(), null);
-        }
+    public void applySchemaChange(SchemaChangeEvent event) {
+        SchemaChangeEventVisitor.<Void, SchemaEvolveException>visit(
+                event,
+                addColumnEvent -> {
+                    applyAddColumnEvent(addColumnEvent);
+                    return null;
+                },
+                alterColumnTypeEvent -> {
+                    applyAlterColumnTypeEvent(alterColumnTypeEvent);
+                    return null;
+                },
+                createTableEvent -> {
+                    applyCreateTableEvent(createTableEvent);
+                    return null;
+                },
+                dropColumnEvent -> {
+                    applyDropColumnEvent(dropColumnEvent);
+                    return null;
+                },
+                dropTableEvent -> {
+                    throw new UnsupportedSchemaChangeEventException(event);
+                },
+                renameColumnEvent -> {
+                    applyRenameColumnEvent(renameColumnEvent);
+                    return null;
+                },
+                truncateTableEvent -> {
+                    throw new UnsupportedSchemaChangeEventException(event);
+                });
     }
 
-    private void applyCreateTableEvent(CreateTableEvent event)
-            throws IOException, IllegalArgumentException {
-        Schema schema = event.getSchema();
-        TableId tableId = event.tableId();
-        TableSchema tableSchema = new TableSchema();
-        tableSchema.setTable(tableId.getTableName());
-        tableSchema.setDatabase(tableId.getSchemaName());
-        tableSchema.setFields(buildFields(schema));
-        tableSchema.setDistributeKeys(buildDistributeKeys(schema));
+    private void applyCreateTableEvent(CreateTableEvent event) throws SchemaEvolveException {
+        try {
+            Schema schema = event.getSchema();
+            TableId tableId = event.tableId();
+            TableSchema tableSchema = new TableSchema();
+            tableSchema.setTable(tableId.getTableName());
+            tableSchema.setDatabase(tableId.getSchemaName());
+            tableSchema.setFields(buildFields(schema));
+            tableSchema.setDistributeKeys(buildDistributeKeys(schema));
 
-        if (CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
-            tableSchema.setModel(DataModel.DUPLICATE);
-        } else {
-            tableSchema.setKeys(schema.primaryKeys());
-            tableSchema.setModel(DataModel.UNIQUE);
+            if (CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
+                tableSchema.setModel(DataModel.DUPLICATE);
+            } else {
+                tableSchema.setKeys(schema.primaryKeys());
+                tableSchema.setModel(DataModel.UNIQUE);
+            }
+
+            Map<String, String> tableProperties =
+                    DorisDataSinkOptions.getPropertiesByPrefix(
+                            config, TABLE_CREATE_PROPERTIES_PREFIX);
+            tableSchema.setProperties(tableProperties);
+            schemaChangeManager.createTable(tableSchema);
+        } catch (Exception e) {
+            throw new SchemaEvolveException(event, e.getMessage(), e);
         }
-
-        Map<String, String> tableProperties =
-                DorisDataSinkOptions.getPropertiesByPrefix(config, TABLE_CREATE_PROPERTIES_PREFIX);
-        tableSchema.setProperties(tableProperties);
-        schemaChangeManager.createTable(tableSchema);
     }
 
     private Map<String, FieldSchema> buildFields(Schema schema) {
@@ -191,59 +205,74 @@ public class DorisMetadataApplier implements MetadataApplier {
         }
     }
 
-    private void applyAddColumnEvent(AddColumnEvent event)
-            throws IOException, IllegalArgumentException {
-        TableId tableId = event.tableId();
-        List<AddColumnEvent.ColumnWithPosition> addedColumns = event.getAddedColumns();
-        for (AddColumnEvent.ColumnWithPosition col : addedColumns) {
-            Column column = col.getAddColumn();
-            FieldSchema addFieldSchema =
-                    new FieldSchema(
-                            column.getName(),
-                            buildTypeString(column.getType()),
-                            column.getDefaultValueExpression(),
-                            column.getComment());
-            schemaChangeManager.addColumn(
-                    tableId.getSchemaName(), tableId.getTableName(), addFieldSchema);
+    private void applyAddColumnEvent(AddColumnEvent event) throws SchemaEvolveException {
+        try {
+            TableId tableId = event.tableId();
+            List<AddColumnEvent.ColumnWithPosition> addedColumns = event.getAddedColumns();
+            for (AddColumnEvent.ColumnWithPosition col : addedColumns) {
+                Column column = col.getAddColumn();
+                FieldSchema addFieldSchema =
+                        new FieldSchema(
+                                column.getName(),
+                                buildTypeString(column.getType()),
+                                column.getDefaultValueExpression(),
+                                column.getComment());
+                schemaChangeManager.addColumn(
+                        tableId.getSchemaName(), tableId.getTableName(), addFieldSchema);
+            }
+        } catch (Exception e) {
+            throw new SchemaEvolveException(event, e.getMessage(), e);
         }
     }
 
-    private void applyDropColumnEvent(DropColumnEvent event)
-            throws IOException, IllegalArgumentException {
-        TableId tableId = event.tableId();
-        List<String> droppedColumns = event.getDroppedColumnNames();
-        for (String col : droppedColumns) {
-            schemaChangeManager.dropColumn(tableId.getSchemaName(), tableId.getTableName(), col);
+    private void applyDropColumnEvent(DropColumnEvent event) throws SchemaEvolveException {
+        try {
+            TableId tableId = event.tableId();
+            List<String> droppedColumns = event.getDroppedColumnNames();
+            for (String col : droppedColumns) {
+                schemaChangeManager.dropColumn(
+                        tableId.getSchemaName(), tableId.getTableName(), col);
+            }
+        } catch (Exception e) {
+            throw new SchemaEvolveException(event, e.getMessage(), e);
         }
     }
 
-    private void applyRenameColumnEvent(RenameColumnEvent event)
-            throws IOException, IllegalArgumentException {
-        TableId tableId = event.tableId();
-        Map<String, String> nameMapping = event.getNameMapping();
-        for (Map.Entry<String, String> entry : nameMapping.entrySet()) {
-            schemaChangeManager.renameColumn(
-                    tableId.getSchemaName(),
-                    tableId.getTableName(),
-                    entry.getKey(),
-                    entry.getValue());
+    private void applyRenameColumnEvent(RenameColumnEvent event) throws SchemaEvolveException {
+        try {
+            TableId tableId = event.tableId();
+            Map<String, String> nameMapping = event.getNameMapping();
+            for (Map.Entry<String, String> entry : nameMapping.entrySet()) {
+                schemaChangeManager.renameColumn(
+                        tableId.getSchemaName(),
+                        tableId.getTableName(),
+                        entry.getKey(),
+                        entry.getValue());
+            }
+        } catch (Exception e) {
+            throw new SchemaEvolveException(event, e.getMessage(), e);
         }
     }
 
     private void applyAlterColumnTypeEvent(AlterColumnTypeEvent event)
-            throws IOException, IllegalArgumentException {
-        TableId tableId = event.tableId();
-        Map<String, DataType> typeMapping = event.getTypeMapping();
+            throws SchemaEvolveException {
+        try {
+            TableId tableId = event.tableId();
+            Map<String, DataType> typeMapping = event.getTypeMapping();
 
-        for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
-            schemaChangeManager.modifyColumnDataType(
-                    tableId.getSchemaName(),
-                    tableId.getTableName(),
-                    new FieldSchema(
-                            entry.getKey(),
-                            buildTypeString(entry.getValue()),
-                            null)); // Currently, AlterColumnTypeEvent carries no comment info. This
-            // will be fixed after FLINK-35243 got merged.
+            for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
+                schemaChangeManager.modifyColumnDataType(
+                        tableId.getSchemaName(),
+                        tableId.getTableName(),
+                        new FieldSchema(
+                                entry.getKey(),
+                                buildTypeString(entry.getValue()),
+                                null)); // Currently, AlterColumnTypeEvent carries no comment info.
+                // This
+                // will be fixed after FLINK-35243 got merged.
+            }
+        } catch (Exception e) {
+            throw new SchemaEvolveException(event, e.getMessage(), e);
         }
     }
 }

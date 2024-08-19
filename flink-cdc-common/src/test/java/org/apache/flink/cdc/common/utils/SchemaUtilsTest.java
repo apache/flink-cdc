@@ -40,7 +40,7 @@ import java.util.Map;
 public class SchemaUtilsTest {
 
     @Test
-    public void testApplySchemaChangeEvent() {
+    public void testApplyColumnSchemaChangeEvent() {
         TableId tableId = TableId.parse("default.default.table1");
         Schema schema =
                 Schema.newBuilder()

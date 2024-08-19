@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
@@ -244,20 +245,15 @@ public class SchemaUtils {
 
     /** apply SchemaChangeEvent to the old schema and return the schema after changing. */
     public static Schema applySchemaChangeEvent(Schema schema, SchemaChangeEvent event) {
-        if (event instanceof AddColumnEvent) {
-            return applyAddColumnEvent((AddColumnEvent) event, schema);
-        } else if (event instanceof DropColumnEvent) {
-            return applyDropColumnEvent((DropColumnEvent) event, schema);
-        } else if (event instanceof RenameColumnEvent) {
-            return applyRenameColumnEvent((RenameColumnEvent) event, schema);
-        } else if (event instanceof AlterColumnTypeEvent) {
-            return applyAlterColumnTypeEvent((AlterColumnTypeEvent) event, schema);
-        } else {
-            throw new UnsupportedOperationException(
-                    String.format(
-                            "Unsupported schema change event type \"%s\"",
-                            event.getClass().getCanonicalName()));
-        }
+        return SchemaChangeEventVisitor.visit(
+                event,
+                addColumnEvent -> applyAddColumnEvent(addColumnEvent, schema),
+                alterColumnTypeEvent -> applyAlterColumnTypeEvent(alterColumnTypeEvent, schema),
+                createTableEvent -> createTableEvent.getSchema(),
+                dropColumnEvent -> applyDropColumnEvent(dropColumnEvent, schema),
+                dropTableEvent -> schema,
+                renameColumnEvent -> applyRenameColumnEvent(renameColumnEvent, schema),
+                truncateTableEvent -> schema);
     }
 
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
