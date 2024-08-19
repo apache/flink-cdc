@@ -48,10 +48,11 @@ Multiple rules can be declared in one single pipeline YAML file.
 There are some hidden columns used to access metadata information. They will only take effect when explicitly referenced in the transform rules.
 
 | Field               | Data Type | Description                                  |
-|--------------------|-----------|----------------------------------------------|
-| __namespace_name__ | String    | Name of the namespace that contains the row. |
-| __schema_name__    | String    | Name of the schema that contains the row.    |
-| __table_name__     | String    | Name of the table that contains the row.     |
+|---------------------|-----------|----------------------------------------------|
+| __namespace_name__  | String    | Name of the namespace that contains the row. |
+| __schema_name__     | String    | Name of the schema that contains the row.    |
+| __table_name__      | String    | Name of the table that contains the row.     |
+| __data_event_type__ | String    | Operation type of data change event.         |
 
 ## Metadata relationship
 
@@ -252,7 +253,9 @@ transform:
 Tips: The format of table-options is `key1=value1,key2=value2`.
 
 ## Classification mapping
-Multiple transform rules can be defined to classify input data rows and apply different processings. For example, we may define a transform rule as follows:
+Multiple transform rules can be defined to classify input data rows and apply different processing.
+Only the first matched transform rule will apply.
+For example, we may define a transform rule as follows:
 
 ```yaml
 transform:
@@ -264,6 +267,75 @@ transform:
     projection: order_id as id, id as order_id
     filter: UPPER(province) = 'BEIJING'
     description: classification mapping example
+```
+
+## User-defined Functions
+
+User-defined functions (UDFs) can be used in transform rules.
+
+Classes could be used as a UDF if:
+
+* implements `org.apache.flink.cdc.common.udf.UserDefinedFunction` interface
+* has a public constructor with no parameters
+* has at least one public method named `eval`
+
+It may also:
+
+* overrides `getReturnType` method to indicate its return CDC type
+* overrides `open` and `close` method to do some initialization and cleanup work
+
+For example, this is a valid UDF class:
+
+```java
+public class AddOneFunctionClass implements UserDefinedFunction {
+    
+    public Object eval(Integer num) {
+        return num + 1;
+    }
+    
+    @Override
+    public DataType getReturnType() {
+        return DataTypes.INT();
+    }
+    
+    @Override
+    public void open() throws Exception {
+        // ...
+    }
+
+    @Override
+    public void close() throws Exception {
+        // ...
+    }
+}
+```
+
+To ease the migration from Flink SQL to Flink CDC, a Flink `ScalarFunction` could also be used as a transform UDF, with some limitations:
+
+* `ScalarFunction` which has a constructor with parameters is not supported.
+* Flink-style type hint in `ScalarFunction` will be ignored.
+* `open` / `close` lifecycle hooks will not be invoked.
+
+UDF classes could be registered by adding a `user-defined-function` block:
+
+```yaml
+pipeline:
+  user-defined-function:
+    - name: addone
+      classpath: org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass
+    - name: format
+      classpath: org.apache.flink.cdc.udf.examples.java.FormatFunctionClass
+```
+
+Notice that given classpath must be fully-qualified, and corresponding `jar` files must be included in Flink `/lib` folder, or be passed with `flink-cdc.sh --jar` option.
+
+After being correctly registered, UDFs could be used in both `projection` and `filter` expressions, just like built-in functions:
+
+```yaml
+transform:
+  - source-table: db.\.*
+    projection: "*, inc(inc(inc(id))) as inc_id, format(id, 'id -> %d') as formatted_id"
+    filter: inc(id) < 100
 ```
 
 # Known limitations

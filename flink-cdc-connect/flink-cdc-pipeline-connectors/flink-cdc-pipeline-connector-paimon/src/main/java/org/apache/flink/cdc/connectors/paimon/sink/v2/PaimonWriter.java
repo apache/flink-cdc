@@ -33,7 +33,6 @@ import org.apache.paimon.flink.sink.StoreSinkWrite;
 import org.apache.paimon.memory.HeapMemorySegmentPool;
 import org.apache.paimon.memory.MemoryPoolFactory;
 import org.apache.paimon.options.Options;
-import org.apache.paimon.table.BucketMode;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.utils.ExecutorThreadFactory;
 
@@ -134,7 +133,7 @@ public class PaimonWriter<InputT>
                                 return storeSinkWrite;
                             });
             try {
-                write.write(paimonEvent.getGenericRow());
+                write.write(paimonEvent.getGenericRow(), paimonEvent.getBucket());
             } catch (Exception e) {
                 throw new IOException(e);
             }
@@ -142,22 +141,15 @@ public class PaimonWriter<InputT>
     }
 
     private FileStoreTable getTable(Identifier tableId) {
-        FileStoreTable table =
-                tables.computeIfAbsent(
-                        tableId,
-                        id -> {
-                            try {
-                                return (FileStoreTable) catalog.getTable(tableId);
-                            } catch (Exception e) {
-                                throw new RuntimeException(e);
-                            }
-                        });
-
-        if (table.bucketMode() != BucketMode.FIXED) {
-            throw new UnsupportedOperationException(
-                    "Unified Sink only supports FIXED bucket mode, but is " + table.bucketMode());
-        }
-        return table;
+        return tables.computeIfAbsent(
+                tableId,
+                id -> {
+                    try {
+                        return (FileStoreTable) catalog.getTable(tableId);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
     }
 
     /**

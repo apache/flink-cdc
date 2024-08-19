@@ -17,11 +17,22 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamResponse;
@@ -37,14 +48,19 @@ import javax.annotation.concurrent.NotThreadSafe;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistryRequestHandler.RequestStatus.RECEIVED_RELEASE_REQUEST;
 import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
@@ -69,28 +85,38 @@ public class SchemaRegistryRequestHandler implements Closeable {
      * sink writers.
      */
     private final List<PendingSchemaChange> pendingSchemaChanges;
+
+    private final List<SchemaChangeEvent> finishedSchemaChanges;
+    private final List<Tuple2<SchemaChangeEvent, Throwable>> failedSchemaChanges;
+    private final List<SchemaChangeEvent> ignoredSchemaChanges;
+
     /** Sink writers which have sent flush success events for the request. */
     private final Set<Integer> flushedSinkWriters;
 
     /** Status of the execution of current schema change request. */
     private boolean isSchemaChangeApplying;
-    /** Actual exception if failed to apply schema change. */
-    private Exception schemaChangeException;
     /** Executor service to execute schema change. */
     private final ExecutorService schemaChangeThreadPool;
+
+    private final SchemaChangeBehavior schemaChangeBehavior;
 
     public SchemaRegistryRequestHandler(
             MetadataApplier metadataApplier,
             SchemaManager schemaManager,
-            SchemaDerivation schemaDerivation) {
+            SchemaDerivation schemaDerivation,
+            SchemaChangeBehavior schemaChangeBehavior) {
         this.metadataApplier = metadataApplier;
         this.activeSinkWriters = new HashSet<>();
         this.flushedSinkWriters = new HashSet<>();
         this.pendingSchemaChanges = new LinkedList<>();
+        this.finishedSchemaChanges = new LinkedList<>();
+        this.failedSchemaChanges = new LinkedList<>();
+        this.ignoredSchemaChanges = new LinkedList<>();
         this.schemaManager = schemaManager;
         this.schemaDerivation = schemaDerivation;
-        schemaChangeThreadPool = Executors.newSingleThreadExecutor();
-        isSchemaChangeApplying = false;
+        this.schemaChangeThreadPool = Executors.newSingleThreadExecutor();
+        this.isSchemaChangeApplying = false;
+        this.schemaChangeBehavior = schemaChangeBehavior;
     }
 
     /**
@@ -102,21 +128,40 @@ public class SchemaRegistryRequestHandler implements Closeable {
     private void applySchemaChange(
             TableId tableId, List<SchemaChangeEvent> derivedSchemaChangeEvents) {
         isSchemaChangeApplying = true;
-        schemaChangeException = null;
-        try {
-            for (SchemaChangeEvent changeEvent : derivedSchemaChangeEvents) {
-                metadataApplier.applySchemaChange(changeEvent);
-                LOG.debug("Apply schema change {} to table {}.", changeEvent, tableId);
+        finishedSchemaChanges.clear();
+        failedSchemaChanges.clear();
+        ignoredSchemaChanges.clear();
+
+        for (SchemaChangeEvent changeEvent : derivedSchemaChangeEvents) {
+            if (changeEvent.getType() != SchemaChangeEventType.CREATE_TABLE) {
+                if (schemaChangeBehavior == SchemaChangeBehavior.IGNORE) {
+                    ignoredSchemaChanges.add(changeEvent);
+                    continue;
+                }
             }
-            PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
-            if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
-                startNextSchemaChangeRequest();
+            if (!metadataApplier.acceptsSchemaEvolutionType(changeEvent.getType())) {
+                LOG.info("Ignored schema change {} to table {}.", changeEvent, tableId);
+                ignoredSchemaChanges.add(changeEvent);
+            } else {
+                try {
+                    metadataApplier.applySchemaChange(changeEvent);
+                    LOG.debug("Applied schema change {} to table {}.", changeEvent, tableId);
+                    finishedSchemaChanges.add(changeEvent);
+                } catch (SchemaEvolveException e) {
+                    LOG.error(
+                            "Failed to apply schema change {} to table {}. Caused by: {}",
+                            changeEvent,
+                            tableId,
+                            e);
+                    failedSchemaChanges.add(Tuple2.of(changeEvent, e));
+                }
             }
-        } catch (Exception e) {
-            this.schemaChangeException = e;
-        } finally {
-            this.isSchemaChangeApplying = false;
         }
+        PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
+        if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
+            startNextSchemaChangeRequest();
+        }
+        isSchemaChangeApplying = false;
     }
 
     /**
@@ -131,13 +176,13 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     "Received schema change event request from table {}. Start to buffer requests for others.",
                     request.getTableId().toString());
             if (request.getSchemaChangeEvent() instanceof CreateTableEvent
-                    && schemaManager.schemaExists(request.getTableId())) {
+                    && schemaManager.originalSchemaExists(request.getTableId())) {
                 return CompletableFuture.completedFuture(
                         wrap(new SchemaChangeResponse(Collections.emptyList())));
             }
-            schemaManager.applySchemaChange(request.getSchemaChangeEvent());
+            schemaManager.applyOriginalSchemaChange(request.getSchemaChangeEvent());
             List<SchemaChangeEvent> derivedSchemaChangeEvents =
-                    schemaDerivation.applySchemaChange(request.getSchemaChangeEvent());
+                    calculateDerivedSchemaChangeEvents(request.getSchemaChangeEvent());
             CompletableFuture<CoordinationResponse> response =
                     CompletableFuture.completedFuture(
                             wrap(new SchemaChangeResponse(derivedSchemaChangeEvents)));
@@ -195,15 +240,20 @@ public class SchemaRegistryRequestHandler implements Closeable {
             schemaChangeThreadPool.submit(
                     () -> applySchemaChange(tableId, waitFlushSuccess.derivedSchemaChangeEvents));
             Thread.sleep(1000);
-            if (schemaChangeException != null) {
-                throw new RuntimeException("failed to apply schema change.", schemaChangeException);
-            }
+
             if (isSchemaChangeApplying) {
                 waitFlushSuccess
                         .getResponseFuture()
                         .complete(wrap(new SchemaChangeProcessingResponse()));
             } else {
-                waitFlushSuccess.getResponseFuture().complete(wrap(new ReleaseUpstreamResponse()));
+                waitFlushSuccess
+                        .getResponseFuture()
+                        .complete(
+                                wrap(
+                                        new ReleaseUpstreamResponse(
+                                                finishedSchemaChanges,
+                                                failedSchemaChanges,
+                                                ignoredSchemaChanges)));
             }
         }
     }
@@ -215,15 +265,14 @@ public class SchemaRegistryRequestHandler implements Closeable {
             PendingSchemaChange pendingSchemaChange = pendingSchemaChanges.get(0);
             SchemaChangeRequest request = pendingSchemaChange.changeRequest;
             if (request.getSchemaChangeEvent() instanceof CreateTableEvent
-                    && schemaManager.schemaExists(request.getTableId())) {
+                    && schemaManager.evolvedSchemaExists(request.getTableId())) {
                 pendingSchemaChange
                         .getResponseFuture()
                         .complete(wrap(new SchemaChangeResponse(Collections.emptyList())));
                 pendingSchemaChanges.remove(0);
             } else {
-                schemaManager.applySchemaChange(request.getSchemaChangeEvent());
                 List<SchemaChangeEvent> derivedSchemaChangeEvents =
-                        schemaDerivation.applySchemaChange(request.getSchemaChangeEvent());
+                        calculateDerivedSchemaChangeEvents(request.getSchemaChangeEvent());
                 pendingSchemaChange
                         .getResponseFuture()
                         .complete(wrap(new SchemaChangeResponse(derivedSchemaChangeEvents)));
@@ -243,13 +292,16 @@ public class SchemaRegistryRequestHandler implements Closeable {
     }
 
     public CompletableFuture<CoordinationResponse> getSchemaChangeResult() {
-        if (schemaChangeException != null) {
-            throw new RuntimeException("failed to apply schema change.", schemaChangeException);
-        }
         if (isSchemaChangeApplying) {
             return CompletableFuture.supplyAsync(() -> wrap(new SchemaChangeProcessingResponse()));
         } else {
-            return CompletableFuture.supplyAsync(() -> wrap(new ReleaseUpstreamResponse()));
+            return CompletableFuture.supplyAsync(
+                    () ->
+                            wrap(
+                                    new ReleaseUpstreamResponse(
+                                            finishedSchemaChanges,
+                                            failedSchemaChanges,
+                                            ignoredSchemaChanges)));
         }
     }
 
@@ -257,6 +309,114 @@ public class SchemaRegistryRequestHandler implements Closeable {
     public void close() throws IOException {
         if (schemaChangeThreadPool != null) {
             schemaChangeThreadPool.shutdown();
+        }
+    }
+
+    private List<SchemaChangeEvent> calculateDerivedSchemaChangeEvents(SchemaChangeEvent event) {
+        if (SchemaChangeBehavior.LENIENT.equals(schemaChangeBehavior)) {
+            return lenientizeSchemaChangeEvent(event).stream()
+                    .flatMap(evt -> schemaDerivation.applySchemaChange(evt).stream())
+                    .collect(Collectors.toList());
+        } else {
+            return schemaDerivation.applySchemaChange(event);
+        }
+    }
+
+    private List<SchemaChangeEvent> lenientizeSchemaChangeEvent(SchemaChangeEvent event) {
+        if (event instanceof CreateTableEvent) {
+            return Collections.singletonList(event);
+        }
+        TableId tableId = event.tableId();
+        Schema evolvedSchema =
+                schemaManager
+                        .getLatestEvolvedSchema(tableId)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "Evolved schema does not exist, not ready for schema change event "
+                                                        + event));
+        switch (event.getType()) {
+            case ADD_COLUMN:
+                {
+                    AddColumnEvent addColumnEvent = (AddColumnEvent) event;
+                    return Collections.singletonList(
+                            new AddColumnEvent(
+                                    tableId,
+                                    addColumnEvent.getAddedColumns().stream()
+                                            .map(
+                                                    col ->
+                                                            new AddColumnEvent.ColumnWithPosition(
+                                                                    Column.physicalColumn(
+                                                                            col.getAddColumn()
+                                                                                    .getName(),
+                                                                            col.getAddColumn()
+                                                                                    .getType()
+                                                                                    .nullable(),
+                                                                            col.getAddColumn()
+                                                                                    .getComment())))
+                                            .collect(Collectors.toList())));
+                }
+            case DROP_COLUMN:
+                {
+                    DropColumnEvent dropColumnEvent = (DropColumnEvent) event;
+                    Map<String, DataType> convertNullableColumns =
+                            dropColumnEvent.getDroppedColumnNames().stream()
+                                    .map(evolvedSchema::getColumn)
+                                    .flatMap(e -> e.map(Stream::of).orElse(Stream.empty()))
+                                    .filter(col -> !col.getType().isNullable())
+                                    .collect(
+                                            Collectors.toMap(
+                                                    Column::getName,
+                                                    column -> column.getType().nullable()));
+
+                    if (convertNullableColumns.isEmpty()) {
+                        return Collections.emptyList();
+                    } else {
+                        return Collections.singletonList(
+                                new AlterColumnTypeEvent(tableId, convertNullableColumns));
+                    }
+                }
+            case RENAME_COLUMN:
+                {
+                    RenameColumnEvent renameColumnEvent = (RenameColumnEvent) event;
+                    List<AddColumnEvent.ColumnWithPosition> appendColumns = new ArrayList<>();
+                    Map<String, DataType> convertNullableColumns = new HashMap<>();
+                    renameColumnEvent
+                            .getNameMapping()
+                            .forEach(
+                                    (key, value) -> {
+                                        Column column =
+                                                evolvedSchema
+                                                        .getColumn(key)
+                                                        .orElseThrow(
+                                                                () ->
+                                                                        new IllegalArgumentException(
+                                                                                "Non-existed column "
+                                                                                        + key
+                                                                                        + " in evolved schema."));
+                                        if (!column.getType().isNullable()) {
+                                            // It's a not-nullable column, we need to cast it to
+                                            // nullable first
+                                            convertNullableColumns.put(
+                                                    key, column.getType().nullable());
+                                        }
+                                        appendColumns.add(
+                                                new AddColumnEvent.ColumnWithPosition(
+                                                        Column.physicalColumn(
+                                                                value,
+                                                                column.getType().nullable(),
+                                                                column.getComment())));
+                                    });
+
+                    List<SchemaChangeEvent> events = new ArrayList<>();
+                    events.add(new AddColumnEvent(tableId, appendColumns));
+                    if (!convertNullableColumns.isEmpty()) {
+                        events.add(new AlterColumnTypeEvent(tableId, convertNullableColumns));
+                    }
+                    return events;
+                }
+            default:
+                return Collections.singletonList(event);
         }
     }
 

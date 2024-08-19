@@ -21,7 +21,7 @@ limitations under the License.
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>org.apache.flink</groupId>
-        <artifactId>flink-cdc</artifactId>
+        <artifactId>flink-cdc-parent</artifactId>
         <version>${revision}</version>
     </parent>
 
@@ -33,6 +33,7 @@ limitations under the License.
         <module>flink-cdc-release-3.0.0</module>
         <module>flink-cdc-release-3.0.1</module>
         <module>flink-cdc-release-3.1.0</module>
+        <module>flink-cdc-release-3.1.1</module>
         <module>flink-cdc-release-snapshot</module>
         <module>flink-cdc-migration-testcases</module>
     </modules>

@@ -49,7 +49,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.rowToArray;
 import static org.apache.flink.table.api.DataTypes.FIELD;
 import static org.apache.flink.table.api.DataTypes.ROW;
 
@@ -59,26 +58,6 @@ public class Db2Utils {
     private static final String EVENT_SERIAL_NO_KEY = "event_serial_no";
 
     public Db2Utils() {}
-
-    public static Object[] queryMinMax(JdbcConnection jdbc, TableId tableId, String columnName)
-            throws SQLException {
-        final String minMaxQuery =
-                String.format(
-                        "SELECT MIN(%s), MAX(%s) FROM %s",
-                        quote(columnName), quote(columnName), quoteSchemaAndTable(tableId));
-        return jdbc.queryAndMap(
-                minMaxQuery,
-                rs -> {
-                    if (!rs.next()) {
-                        // this should never happen
-                        throw new SQLException(
-                                String.format(
-                                        "No result returned after running query [%s]",
-                                        minMaxQuery));
-                    }
-                    return rowToArray(rs, 2);
-                });
-    }
 
     public static long queryApproximateRowCnt(JdbcConnection jdbc, TableId tableId)
             throws SQLException {
@@ -100,27 +79,6 @@ public class Db2Utils {
                                         rowCountQuery));
                     }
                     return rs.getLong(1);
-                });
-    }
-
-    public static Object queryMin(
-            JdbcConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
-            throws SQLException {
-        final String minQuery =
-                String.format(
-                        "SELECT MIN(%s) FROM %s WHERE %s > ?",
-                        columnName, quote(tableId), columnName);
-        return jdbc.prepareQueryAndMap(
-                minQuery,
-                ps -> ps.setObject(1, excludedLowerBound),
-                rs -> {
-                    if (!rs.next()) {
-                        // this should never happen
-                        throw new SQLException(
-                                String.format(
-                                        "No result returned after running query [%s]", minQuery));
-                    }
-                    return rs.getObject(1);
                 });
     }
 

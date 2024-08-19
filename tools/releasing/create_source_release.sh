@@ -77,10 +77,10 @@ rsync -a \
   --exclude ".travis.yml" \
   . flink-cdc-${RELEASE_VERSION}
 
-tar czf ${RELEASE_DIR}/apache-flink-cdc-${RELEASE_VERSION}-src.tgz flink-cdc-${RELEASE_VERSION}
-gpg --armor --detach-sig ${RELEASE_DIR}/apache-flink-cdc-${RELEASE_VERSION}-src.tgz
+tar czf ${RELEASE_DIR}/flink-cdc-${RELEASE_VERSION}-src.tgz flink-cdc-${RELEASE_VERSION}
+gpg --armor --detach-sig ${RELEASE_DIR}/flink-cdc-${RELEASE_VERSION}-src.tgz
 cd ${RELEASE_DIR}
-${SHASUM} apache-flink-cdc-${RELEASE_VERSION}-src.tgz > apache-flink-cdc-${RELEASE_VERSION}-src.tgz.sha512
+${SHASUM} flink-cdc-${RELEASE_VERSION}-src.tgz > flink-cdc-${RELEASE_VERSION}-src.tgz.sha512
 
 rm -rf ${CLONE_DIR}
 

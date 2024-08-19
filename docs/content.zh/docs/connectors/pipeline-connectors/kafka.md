@@ -88,6 +88,20 @@ Pipeline 连接器配置项
       <td>Sink 的名称。 </td>
     </tr>
     <tr>
+      <td>partition.strategy</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>定义发送数据到 Kafka 分区的策略， 可以设置的选项有 `all-to-zero`（将所有数据发送到 0 号分区） 以及 `hash-by-key`（所有数据根据主键的哈希值分发），默认值为 `all-to-zero`。 </td>
+    </tr>
+    <tr>
+      <td>key.format</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>用于序列化 Kafka 消息的键部分数据的格式。可以设置的选项有 `csv` 以及 `json`， 默认值为 `json`。 </td>
+    </tr>
+    <tr>
       <td>value.format</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -139,6 +153,47 @@ Pipeline 连接器配置项
 * 写入 Kafka 的 topic 默认会是上游表 `namespace.schemaName.tableName` 对应的字符串，可以通过 pipeline 的 route 功能进行修改。
 * 如果配置了 `topic` 参数，所有的消息都会发送到这一个主题。
 * 写入 Kafka 的 topic 如果不存在，则会默认创建。
+
+### 输出格式
+对于不同的内置 `value.format` 选项，输出的格式也是不同的:
+#### debezium-json
+参考 [Debezium docs](https://debezium.io/documentation/reference/1.9/connectors/mysql.html)， debezium-json 格式会包含 `before`,`after`,`op`,`source` 几个元素， 但是 `ts_ms` 字段并不会包含在 `source` 元素中。    
+一个输出的示例是:
+```json
+{
+  "before": null,
+  "after": {
+    "col1": "1",
+    "col2": "1"
+  },
+  "op": "c",
+  "source": {
+    "db": "default_namespace",
+    "table": "table1"
+  }
+}
+```
+
+#### canal-json
+参考 [Canal | Apache Flink](https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/canal/#available-metadata)， canal-json 格式会包含 `old`,`data`,`type`,`database`,`table`,`pkNames` 几个元素， 但是 `ts` 并不会包含在其中。   
+一个输出的示例是:
+```json
+{
+    "old": null,
+    "data": [
+        {
+            "col1": "1",
+            "col2": "1"
+        }
+    ],
+    "type": "INSERT",
+    "database": "default_schema",
+    "table": "table1",
+    "pkNames": [
+        "col1"
+    ]
+}
+```
 
 数据类型映射
 ----------------

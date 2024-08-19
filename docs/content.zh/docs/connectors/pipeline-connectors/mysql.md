@@ -172,8 +172,7 @@ pipeline:
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td> MySQL CDC 消费者可选的启动模式，
-         合法的模式为 "initial"，"earliest-offset"，"latest-offset"，"specific-offset" 和 "timestamp"。
-           请查阅 <a href="#a-name-id-002-a">启动模式</a> 章节了解更多详细信息。</td>
+         合法的模式为 "initial"，"earliest-offset"，"latest-offset"，"specific-offset"，"timestamp" 和 ""snapshot"。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.file</td>
@@ -195,6 +194,13 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>在 "specific-offset" 启动模式下，启动位点的 GTID 集合。</td>
+    </tr>
+    <tr>
+      <td>scan.startup.timestamp-millis</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>Long</td>
+      <td>在 "timestamp" 启动模式下，启动位点的毫秒时间戳。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.skip-events</td>
@@ -262,6 +268,13 @@ pipeline:
       <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。<br>
           若 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 默认值变更为 true，可以不用显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = true。</td>
     </tr>
+    <tr>
+      <td>scan.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否启用动态加表特性，默认关闭。 此配置项只有作业从savepoint/checkpoint启动时才生效。</td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -274,6 +287,7 @@ pipeline:
 - `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从 binlog 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
 - `specific-offset`：跳过快照阶段，从指定的 binlog 位点开始读取。位点可通过 binlog 文件名和位置指定，或者在 GTID 在集群上启用时通过 GTID 集合指定。
 - `timestamp`：跳过快照阶段，从指定的时间戳开始读取 binlog 事件。
+- `snapshot`: 只进行快照阶段，跳过增量阶段，快照阶段读取结束后退出。
 
 例如，可以在 YAML 配置文件中这样指定启动模式：
 
@@ -284,6 +298,7 @@ source:
   scan.startup.mode: latest-offset                      # Start from latest offset
   scan.startup.mode: specific-offset                    # Start from specific offset
   scan.startup.mode: timestamp                          # Start from timestamp
+  scan.startup.mode: snapshot                          # Read snapshot only
   scan.startup.specific-offset.file: 'mysql-bin.000003' # Binlog filename under specific offset startup mode
   scan.startup.specific-offset.pos: 4                   # Binlog position under specific offset mode
   scan.startup.specific-offset.gtid-set: 24DA167-...    # GTID set under specific offset startup mode

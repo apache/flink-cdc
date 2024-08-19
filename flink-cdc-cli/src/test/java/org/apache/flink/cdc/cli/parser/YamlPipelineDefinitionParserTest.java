@@ -24,6 +24,7 @@ import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
+import org.apache.flink.cdc.composer.definition.UdfDef;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
@@ -166,6 +167,23 @@ class YamlPipelineDefinitionParserTest {
                                 + "Or use 'UTC' without time zone and daylight saving time.");
     }
 
+    @Test
+    void testRouteWithReplacementSymbol() throws Exception {
+        URL resource =
+                Resources.getResource("definitions/pipeline-definition-full-with-repsym.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(fullDefWithRouteRepSym);
+    }
+
+    @Test
+    void testUdfDefinition() throws Exception {
+        URL resource = Resources.getResource("definitions/pipeline-definition-with-udf.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(pipelineDefWithUdf);
+    }
+
     private final PipelineDef fullDef =
             new PipelineDef(
                     new SourceDef(
@@ -197,10 +215,12 @@ class YamlPipelineDefinitionParserTest {
                             new RouteDef(
                                     "mydb.default.app_order_.*",
                                     "odsdb.default.app_order",
+                                    null,
                                     "sync all sharding tables to one"),
                             new RouteDef(
                                     "mydb.default.web_order",
                                     "odsdb.default.ods_web_order",
+                                    null,
                                     "sync table to with given prefix ods_")),
                     Arrays.asList(
                             new TransformDef(
@@ -219,6 +239,7 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     "add new uniq_id for each row")),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -226,6 +247,57 @@ class YamlPipelineDefinitionParserTest {
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
                                     .build()));
+
+    @Test
+    void testParsingFullDefinitionFromString() throws Exception {
+        String pipelineDefText =
+                "source:\n"
+                        + "  type: mysql\n"
+                        + "  name: source-database\n"
+                        + "  host: localhost\n"
+                        + "  port: 3306\n"
+                        + "  username: admin\n"
+                        + "  password: pass\n"
+                        + "  tables: adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*\n"
+                        + "  chunk-column: app_order_.*:id,web_order:product_id\n"
+                        + "  capture-new-tables: true\n"
+                        + "\n"
+                        + "sink:\n"
+                        + "  type: kafka\n"
+                        + "  name: sink-queue\n"
+                        + "  bootstrap-servers: localhost:9092\n"
+                        + "  auto-create-table: true\n"
+                        + "\n"
+                        + "route:\n"
+                        + "  - source-table: mydb.default.app_order_.*\n"
+                        + "    sink-table: odsdb.default.app_order\n"
+                        + "    description: sync all sharding tables to one\n"
+                        + "  - source-table: mydb.default.web_order\n"
+                        + "    sink-table: odsdb.default.ods_web_order\n"
+                        + "    description: sync table to with given prefix ods_\n"
+                        + "\n"
+                        + "transform:\n"
+                        + "  - source-table: mydb.app_order_.*\n"
+                        + "    projection: id, order_id, TO_UPPER(product_name)\n"
+                        + "    filter: id > 10 AND order_id > 100\n"
+                        + "    primary-keys: id\n"
+                        + "    partition-keys: product_name\n"
+                        + "    table-options: comment=app order\n"
+                        + "    description: project fields from source table\n"
+                        + "  - source-table: mydb.web_order_.*\n"
+                        + "    projection: CONCAT(id, order_id) as uniq_id, *\n"
+                        + "    filter: uniq_id > 10\n"
+                        + "    description: add new uniq_id for each row\n"
+                        + "\n"
+                        + "pipeline:\n"
+                        + "  name: source-database-sync-pipe\n"
+                        + "  parallelism: 4\n"
+                        + "  schema.change.behavior: evolve\n"
+                        + "  schema-operator.rpc-timeout: 1 h";
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(pipelineDefText, new Configuration());
+        assertThat(pipelineDef).isEqualTo(fullDef);
+    }
 
     private final PipelineDef fullDefWithGlobalConf =
             new PipelineDef(
@@ -258,10 +330,12 @@ class YamlPipelineDefinitionParserTest {
                             new RouteDef(
                                     "mydb.default.app_order_.*",
                                     "odsdb.default.app_order",
+                                    null,
                                     "sync all sharding tables to one"),
                             new RouteDef(
                                     "mydb.default.web_order",
                                     "odsdb.default.ods_web_order",
+                                    null,
                                     "sync table to with given prefix ods_")),
                     Arrays.asList(
                             new TransformDef(
@@ -280,6 +354,7 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     "add new uniq_id for each row")),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -312,7 +387,11 @@ class YamlPipelineDefinitionParserTest {
                                             .build())),
                     Collections.singletonList(
                             new RouteDef(
-                                    "mydb.default.app_order_.*", "odsdb.default.app_order", null)),
+                                    "mydb.default.app_order_.*",
+                                    "odsdb.default.app_order",
+                                    null,
+                                    null)),
+                    Collections.emptyList(),
                     Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
@@ -325,5 +404,96 @@ class YamlPipelineDefinitionParserTest {
                     new SinkDef("kafka", null, new Configuration()),
                     Collections.emptyList(),
                     Collections.emptyList(),
+                    Collections.emptyList(),
                     Configuration.fromMap(Collections.singletonMap("parallelism", "1")));
+
+    private final PipelineDef fullDefWithRouteRepSym =
+            new PipelineDef(
+                    new SourceDef(
+                            "mysql",
+                            "source-database",
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("host", "localhost")
+                                            .put("port", "3306")
+                                            .put("username", "admin")
+                                            .put("password", "pass")
+                                            .put(
+                                                    "tables",
+                                                    "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
+                                            .put(
+                                                    "chunk-column",
+                                                    "app_order_.*:id,web_order:product_id")
+                                            .put("capture-new-tables", "true")
+                                            .build())),
+                    new SinkDef(
+                            "kafka",
+                            "sink-queue",
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("bootstrap-servers", "localhost:9092")
+                                            .put("auto-create-table", "true")
+                                            .build())),
+                    Arrays.asList(
+                            new RouteDef(
+                                    "mydb.default.app_order_.*",
+                                    "odsdb.default.app_order_<>",
+                                    "<>",
+                                    "sync all sharding tables to one"),
+                            new RouteDef(
+                                    "mydb.default.web_order",
+                                    "odsdb.default.ods_web_order_>_<",
+                                    ">_<",
+                                    "sync table to with given prefix ods_")),
+                    Arrays.asList(
+                            new TransformDef(
+                                    "mydb.app_order_.*",
+                                    "id, order_id, TO_UPPER(product_name)",
+                                    "id > 10 AND order_id > 100",
+                                    "id",
+                                    "product_name",
+                                    "comment=app order",
+                                    "project fields from source table"),
+                            new TransformDef(
+                                    "mydb.web_order_.*",
+                                    "CONCAT(id, order_id) as uniq_id, *",
+                                    "uniq_id > 10",
+                                    null,
+                                    null,
+                                    null,
+                                    "add new uniq_id for each row")),
+                    Collections.emptyList(),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("name", "source-database-sync-pipe")
+                                    .put("parallelism", "4")
+                                    .put("schema.change.behavior", "evolve")
+                                    .put("schema-operator.rpc-timeout", "1 h")
+                                    .build()));
+
+    private final PipelineDef pipelineDefWithUdf =
+            new PipelineDef(
+                    new SourceDef("values", null, new Configuration()),
+                    new SinkDef("values", null, new Configuration()),
+                    Collections.emptyList(),
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "mydb.web_order",
+                                    "*, inc(inc(inc(id))) as inc_id, format(id, 'id -> %d') as formatted_id",
+                                    "inc(id) < 100",
+                                    null,
+                                    null,
+                                    null,
+                                    null)),
+                    Arrays.asList(
+                            new UdfDef(
+                                    "inc",
+                                    "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
+                            new UdfDef(
+                                    "format",
+                                    "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass")),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("parallelism", "1")
+                                    .build()));
 }

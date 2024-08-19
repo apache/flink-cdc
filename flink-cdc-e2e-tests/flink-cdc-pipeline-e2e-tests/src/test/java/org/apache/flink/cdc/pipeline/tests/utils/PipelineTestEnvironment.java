@@ -88,7 +88,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     @Parameterized.Parameters(name = "flinkVersion: {0}")
     public static List<String> getFlinkVersion() {
-        return Arrays.asList("1.17.2", "1.18.1", "1.19.0");
+        return Arrays.asList("1.17.2", "1.18.1", "1.19.1", "1.20.0");
     }
 
     @Before
@@ -102,7 +102,6 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                 new GenericContainer<>(getFlinkDockerImageTag())
                         .withCommand("jobmanager")
                         .withNetwork(NETWORK)
-                        .withExtraHost("host.docker.internal", "host-gateway")
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
                         .withEnv("FLINK_PROPERTIES", flinkProperties)
@@ -111,7 +110,6 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         taskManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
                         .withCommand("taskmanager")
-                        .withExtraHost("host.docker.internal", "host-gateway")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
                         .withEnv("FLINK_PROPERTIES", flinkProperties)
@@ -267,6 +265,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         return String.join(
                 "\n",
                 Arrays.asList(
+                        "restart-strategy.type: off",
                         "jobmanager.rpc.address: jobmanager",
                         "taskmanager.numberOfTaskSlots: 10",
                         "parallelism.default: 4",
