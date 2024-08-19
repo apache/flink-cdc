@@ -22,13 +22,11 @@ import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
-import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
-import org.apache.flink.cdc.common.event.SchemaChangeEventVisitorVoid;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
@@ -100,43 +98,33 @@ public class DorisMetadataApplier implements MetadataApplier {
 
     @Override
     public void applySchemaChange(SchemaChangeEvent event) {
-        event.visit(
-                new SchemaChangeEventVisitorVoid<SchemaEvolveException>() {
-
-                    @Override
-                    public void visit(AddColumnEvent event) throws SchemaEvolveException {
-                        applyAddColumnEvent(event);
-                    }
-
-                    @Override
-                    public void visit(AlterColumnTypeEvent event) throws SchemaEvolveException {
-                        applyAlterColumnTypeEvent(event);
-                    }
-
-                    @Override
-                    public void visit(CreateTableEvent event) throws SchemaEvolveException {
-                        applyCreateTableEvent(event);
-                    }
-
-                    @Override
-                    public void visit(DropColumnEvent event) throws SchemaEvolveException {
-                        applyDropColumnEvent(event);
-                    }
-
-                    @Override
-                    public void visit(DropTableEvent event) {
-                        throw new UnsupportedSchemaChangeEventException(event);
-                    }
-
-                    @Override
-                    public void visit(RenameColumnEvent event) throws SchemaEvolveException {
-                        applyRenameColumnEvent(event);
-                    }
-
-                    @Override
-                    public void visit(TruncateTableEvent event) {
-                        throw new UnsupportedSchemaChangeEventException(event);
-                    }
+        SchemaChangeEventVisitor.<Void, SchemaEvolveException>visit(
+                event,
+                addColumnEvent -> {
+                    applyAddColumnEvent(addColumnEvent);
+                    return null;
+                },
+                alterColumnTypeEvent -> {
+                    applyAlterColumnTypeEvent(alterColumnTypeEvent);
+                    return null;
+                },
+                createTableEvent -> {
+                    applyCreateTableEvent(createTableEvent);
+                    return null;
+                },
+                dropColumnEvent -> {
+                    applyDropColumnEvent(dropColumnEvent);
+                    return null;
+                },
+                dropTableEvent -> {
+                    throw new UnsupportedSchemaChangeEventException(event);
+                },
+                renameColumnEvent -> {
+                    applyRenameColumnEvent(renameColumnEvent);
+                    return null;
+                },
+                truncateTableEvent -> {
+                    throw new UnsupportedSchemaChangeEventException(event);
                 });
     }
 

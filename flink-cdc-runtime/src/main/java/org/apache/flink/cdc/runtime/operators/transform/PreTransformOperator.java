@@ -22,15 +22,12 @@ import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.state.OperatorStateStore;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
-import org.apache.flink.cdc.common.event.ColumnSchemaChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.event.TableSchemaChangeEvent;
-import org.apache.flink.cdc.common.event.TableSchemaChangeEventVisitorVoid;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
@@ -225,27 +222,15 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
-        if (event instanceof TableSchemaChangeEvent) {
-            ((TableSchemaChangeEvent) event)
-                    .visit(
-                            new TableSchemaChangeEventVisitorVoid() {
-                                @Override
-                                public void visit(CreateTableEvent event) {
-                                    preTransformProcessorMap.remove(event.tableId());
-                                    output.collect(new StreamRecord<>(cacheCreateTable(event)));
-                                }
-
-                                @Override
-                                public void visit(DropTableEvent event) {
-                                    output.collect(new StreamRecord<>(event));
-                                }
-
-                                @Override
-                                public void visit(TruncateTableEvent event) {
-                                    output.collect(new StreamRecord<>(event));
-                                }
-                            });
-        } else if (event instanceof ColumnSchemaChangeEvent) {
+        if (event instanceof CreateTableEvent) {
+            CreateTableEvent createTableEvent = (CreateTableEvent) event;
+            preTransformProcessorMap.remove(createTableEvent.tableId());
+            output.collect(new StreamRecord<>(cacheCreateTable(createTableEvent)));
+        } else if (event instanceof DropTableEvent) {
+            output.collect(new StreamRecord<>(event));
+        } else if (event instanceof TruncateTableEvent) {
+            output.collect(new StreamRecord<>(event));
+        } else if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             preTransformProcessorMap.remove(schemaChangeEvent.tableId());
             cacheChangeSchema(schemaChangeEvent);

@@ -21,13 +21,10 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
-import org.apache.flink.cdc.common.event.DropColumnEvent;
-import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
-import org.apache.flink.cdc.common.event.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
@@ -50,6 +47,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -115,54 +113,42 @@ public class SchemaDerivation {
                 Schema derivedTableSchema =
                         schemaManager.getLatestEvolvedSchema(derivedTable).get();
                 events.addAll(
-                        schemaChangeEvent.visit(
-                                new SchemaChangeEventVisitor<
-                                        List<SchemaChangeEvent>, RuntimeException>() {
-
-                                    @Override
-                                    public List<SchemaChangeEvent> visit(AddColumnEvent event) {
-                                        return handleAddColumnEvent(
-                                                event, derivedTableSchema, derivedTable);
-                                    }
-
-                                    @Override
-                                    public List<SchemaChangeEvent> visit(
-                                            AlterColumnTypeEvent event) {
-                                        return handleAlterColumnTypeEvent(
-                                                event, derivedTableSchema, derivedTable);
-                                    }
-
-                                    @Override
-                                    public List<SchemaChangeEvent> visit(CreateTableEvent event) {
-                                        return handleCreateTableEvent(
-                                                event, derivedTableSchema, derivedTable);
-                                    }
-
-                                    @Override
-                                    public List<SchemaChangeEvent> visit(DropColumnEvent event) {
-                                        // Column drop shouldn't be spread to route destination.
-                                        return Collections.emptyList();
-                                    }
-
-                                    @Override
-                                    public List<SchemaChangeEvent> visit(DropTableEvent event) {
-                                        // Table drop shouldn't be spread to route destination.
-                                        return Collections.emptyList();
-                                    }
-
-                                    @Override
-                                    public List<SchemaChangeEvent> visit(RenameColumnEvent event) {
-                                        return handleRenameColumnEvent(
-                                                event, derivedTableSchema, derivedTable);
-                                    }
-
-                                    @Override
-                                    public List<SchemaChangeEvent> visit(TruncateTableEvent event) {
-                                        // Table truncation shouldn't be spread to route
+                        Objects.requireNonNull(
+                                SchemaChangeEventVisitor.visit(
+                                        schemaChangeEvent,
+                                        addColumnEvent ->
+                                                handleAddColumnEvent(
+                                                        addColumnEvent,
+                                                        derivedTableSchema,
+                                                        derivedTable),
+                                        alterColumnTypeEvent ->
+                                                handleAlterColumnTypeEvent(
+                                                        alterColumnTypeEvent,
+                                                        derivedTableSchema,
+                                                        derivedTable),
+                                        createTableEvent ->
+                                                handleCreateTableEvent(
+                                                        createTableEvent,
+                                                        derivedTableSchema,
+                                                        derivedTable),
+                                        dropColumnEvent ->
+                                                Collections.emptyList(), // Column drop shouldn't be
+                                        // spread to route
                                         // destination.
-                                        return Collections.emptyList();
-                                    }
-                                }));
+                                        dropTableEvent ->
+                                                Collections.emptyList(), // Table drop shouldn't be
+                                        // spread to route
+                                        // destination.
+                                        renameColumnEvent ->
+                                                handleRenameColumnEvent(
+                                                        renameColumnEvent,
+                                                        derivedTableSchema,
+                                                        derivedTable),
+                                        truncateTableEvent ->
+                                                Collections.emptyList() // // Table truncation
+                                        // shouldn't be spread to route
+                                        // destination.
+                                        )));
             }
         }
 

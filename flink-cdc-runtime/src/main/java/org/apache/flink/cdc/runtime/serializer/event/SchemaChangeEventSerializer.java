@@ -20,18 +20,10 @@ package org.apache.flink.cdc.runtime.serializer.event;
 import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
-import org.apache.flink.cdc.common.event.AddColumnEvent;
-import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
-import org.apache.flink.cdc.common.event.DropColumnEvent;
-import org.apache.flink.cdc.common.event.DropTableEvent;
-import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
-import org.apache.flink.cdc.common.event.SchemaChangeEventVisitor;
-import org.apache.flink.cdc.common.event.SchemaChangeEventVisitorVoid;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.runtime.serializer.EnumSerializer;
 import org.apache.flink.cdc.runtime.serializer.TypeSerializerSingleton;
 import org.apache.flink.core.memory.DataInputView;
@@ -80,44 +72,15 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
 
     @Override
     public SchemaChangeEvent copy(SchemaChangeEvent from) {
-        return from.visit(
-                new SchemaChangeEventVisitor<SchemaChangeEvent, RuntimeException>() {
-
-                    @Override
-                    public SchemaChangeEvent visit(AddColumnEvent event) {
-                        return AddColumnEventSerializer.INSTANCE.copy(event);
-                    }
-
-                    @Override
-                    public SchemaChangeEvent visit(AlterColumnTypeEvent event) {
-                        return AlterColumnTypeEventSerializer.INSTANCE.copy(event);
-                    }
-
-                    @Override
-                    public SchemaChangeEvent visit(CreateTableEvent event) {
-                        return CreateTableEventSerializer.INSTANCE.copy(event);
-                    }
-
-                    @Override
-                    public SchemaChangeEvent visit(DropColumnEvent event) {
-                        return DropColumnEventSerializer.INSTANCE.copy(event);
-                    }
-
-                    @Override
-                    public SchemaChangeEvent visit(DropTableEvent event) {
-                        return DropTableEventSerializer.INSTANCE.copy(event);
-                    }
-
-                    @Override
-                    public SchemaChangeEvent visit(RenameColumnEvent event) {
-                        return RenameColumnEventSerializer.INSTANCE.copy(event);
-                    }
-
-                    @Override
-                    public SchemaChangeEvent visit(TruncateTableEvent event) {
-                        return TruncateTableEventSerializer.INSTANCE.copy(event);
-                    }
-                });
+        return SchemaChangeEventVisitor.visit(
+                from,
+                AddColumnEventSerializer.INSTANCE::copy,
+                AlterColumnTypeEventSerializer.INSTANCE::copy,
+                CreateTableEventSerializer.INSTANCE::copy,
+                DropColumnEventSerializer.INSTANCE::copy,
+                DropTableEventSerializer.INSTANCE::copy,
+                RenameColumnEventSerializer.INSTANCE::copy,
+                TruncateTableEventSerializer.INSTANCE::copy);
     }
 
     @Override
@@ -133,50 +96,42 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
     @Override
     public void serialize(SchemaChangeEvent record, DataOutputView target) throws IOException {
 
-        record.visit(
-                new SchemaChangeEventVisitorVoid() {
-
-                    @Override
-                    public void visit(AddColumnEvent event) throws Exception {
-                        enumSerializer.serialize(ADD_COLUMN, target);
-                        AddColumnEventSerializer.INSTANCE.serialize(event, target);
-                    }
-
-                    @Override
-                    public void visit(AlterColumnTypeEvent event) throws Exception {
-                        enumSerializer.serialize(ALTER_COLUMN_TYPE, target);
-                        AlterColumnTypeEventSerializer.INSTANCE.serialize(event, target);
-                    }
-
-                    @Override
-                    public void visit(CreateTableEvent event) throws Exception {
-                        enumSerializer.serialize(CREATE_TABLE, target);
-                        CreateTableEventSerializer.INSTANCE.serialize(event, target);
-                    }
-
-                    @Override
-                    public void visit(DropColumnEvent event) throws Exception {
-                        enumSerializer.serialize(DROP_COLUMN, target);
-                        DropColumnEventSerializer.INSTANCE.serialize(event, target);
-                    }
-
-                    @Override
-                    public void visit(DropTableEvent event) throws Exception {
-                        enumSerializer.serialize(DROP_TABLE, target);
-                        DropTableEventSerializer.INSTANCE.serialize(event, target);
-                    }
-
-                    @Override
-                    public void visit(RenameColumnEvent event) throws Exception {
-                        enumSerializer.serialize(RENAME_COLUMN, target);
-                        RenameColumnEventSerializer.INSTANCE.serialize(event, target);
-                    }
-
-                    @Override
-                    public void visit(TruncateTableEvent event) throws Exception {
-                        enumSerializer.serialize(TRUNCATE_TABLE, target);
-                        TruncateTableEventSerializer.INSTANCE.serialize(event, target);
-                    }
+        SchemaChangeEventVisitor.<Void, IOException>visit(
+                record,
+                addColumnEvent -> {
+                    enumSerializer.serialize(ADD_COLUMN, target);
+                    AddColumnEventSerializer.INSTANCE.serialize(addColumnEvent, target);
+                    return null;
+                },
+                alterColumnTypeEvent -> {
+                    enumSerializer.serialize(ALTER_COLUMN_TYPE, target);
+                    AlterColumnTypeEventSerializer.INSTANCE.serialize(alterColumnTypeEvent, target);
+                    return null;
+                },
+                createTableEvent -> {
+                    enumSerializer.serialize(CREATE_TABLE, target);
+                    CreateTableEventSerializer.INSTANCE.serialize(createTableEvent, target);
+                    return null;
+                },
+                dropColumnEvent -> {
+                    enumSerializer.serialize(DROP_COLUMN, target);
+                    DropColumnEventSerializer.INSTANCE.serialize(dropColumnEvent, target);
+                    return null;
+                },
+                dropTableEvent -> {
+                    enumSerializer.serialize(DROP_TABLE, target);
+                    DropTableEventSerializer.INSTANCE.serialize(dropTableEvent, target);
+                    return null;
+                },
+                renameColumnEvent -> {
+                    enumSerializer.serialize(RENAME_COLUMN, target);
+                    RenameColumnEventSerializer.INSTANCE.serialize(renameColumnEvent, target);
+                    return null;
+                },
+                truncateTableEvent -> {
+                    enumSerializer.serialize(TRUNCATE_TABLE, target);
+                    TruncateTableEventSerializer.INSTANCE.serialize(truncateTableEvent, target);
+                    return null;
                 });
     }
 
