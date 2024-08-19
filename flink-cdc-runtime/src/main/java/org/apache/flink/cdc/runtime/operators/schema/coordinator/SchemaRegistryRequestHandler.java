@@ -94,7 +94,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
     private final Set<Integer> flushedSinkWriters;
 
     /** Status of the execution of current schema change request. */
-    private boolean isSchemaChangeApplying;
+    private transient boolean isSchemaChangeApplying;
     /** Executor service to execute schema change. */
     private final ExecutorService schemaChangeThreadPool;
 
