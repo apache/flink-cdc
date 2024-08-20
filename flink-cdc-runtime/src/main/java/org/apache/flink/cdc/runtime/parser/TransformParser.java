@@ -591,7 +591,10 @@ public class TransformParser {
         }
     }
 
-    public static boolean hasAsterisk(String projection) {
+    public static boolean hasAsterisk(@Nullable String projection) {
+        if (isNullOrWhitespaceOnly(projection)) {
+            return false;
+        }
         return parseProjectionExpression(projection).getOperandList().stream()
                 .anyMatch(TransformParser::hasAsterisk);
     }

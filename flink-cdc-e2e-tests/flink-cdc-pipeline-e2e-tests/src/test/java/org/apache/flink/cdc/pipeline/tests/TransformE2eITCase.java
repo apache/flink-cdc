@@ -670,9 +670,6 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, 108.1, 18 - Bob], after=[1009, 200.0, 18 - Bob], op=UPDATE, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 107.0, 16 - IINA], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 111.0, 21 - Eva], after=[], op=DELETE, meta=()}");
-
-        String stdout = taskManagerConsumer.toUtf8String();
-        System.out.println(stdout);
     }
 
     @Test
@@ -805,8 +802,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         }
 
         validateEvents(
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3008, id -> 3008, 8], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3009, id -> 3009, 0], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3008, id -> 3008, 80], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3009, id -> 3009, 90], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3010, id -> 3010, 10], op=INSERT, meta=()}");
     }
 
@@ -907,7 +904,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         validateEvents(
                 "AddColumnEvent{tableId=%s.TABLEALPHA, addedColumns=[ColumnWithPosition{column=`LAST` VARCHAR(17), position=AFTER, existedColumnName=NAMEALPHA}]}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3008, 8, 8, 80, 17, Jazz, Last, id -> 3008], op=INSERT, meta=()}",
-                "AlterColumnTypeEvent{tableId=%s.TABLEALPHA, nameMapping={CODENAME=DOUBLE}}",
+                "AlterColumnTypeEvent{tableId=%s.TABLEALPHA, typeMapping={CODENAME=DOUBLE}, oldTypeMapping={CODENAME=TINYINT}}",
                 "RenameColumnEvent{tableId=%s.TABLEALPHA, nameMapping={CODENAME=CODE_NAME}}",
                 "RenameColumnEvent{tableId=%s.TABLEALPHA, nameMapping={CODE_NAME=CODE_NAME_EX}}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3009, 9, 9.0, 90, 18, Keka, Finale, id -> 3009], op=INSERT, meta=()}",
@@ -1014,7 +1011,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                 "AddColumnEvent{tableId=%s.TABLEALPHA, addedColumns=[ColumnWithPosition{column=`CODENAME` TINYINT, position=AFTER, existedColumnName=VERSION}]}",
                 "AddColumnEvent{tableId=%s.TABLEALPHA, addedColumns=[ColumnWithPosition{column=`FIRST` VARCHAR(17), position=BEFORE, existedColumnName=ID}]}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3008 <- id, First, 3008, 8, 8, 80, 17, Jazz], op=INSERT, meta=()}",
-                "AlterColumnTypeEvent{tableId=%s.TABLEALPHA, nameMapping={CODENAME=DOUBLE}}",
+                "AlterColumnTypeEvent{tableId=%s.TABLEALPHA, typeMapping={CODENAME=DOUBLE}, oldTypeMapping={CODENAME=TINYINT}}",
                 "RenameColumnEvent{tableId=%s.TABLEALPHA, nameMapping={CODENAME=CODE_NAME}}",
                 "RenameColumnEvent{tableId=%s.TABLEALPHA, nameMapping={CODE_NAME=CODE_NAME_EX}}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3009 <- id, 1st, 3009, 9, 9.0, 90, 18, Keka], op=INSERT, meta=()}",

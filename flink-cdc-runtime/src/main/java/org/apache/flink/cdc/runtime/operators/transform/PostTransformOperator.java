@@ -44,6 +44,7 @@ import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -76,8 +77,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             transformProjectionProcessorMap;
     private transient Map<Tuple2<TableId, TransformFilter>, TransformFilterProcessor>
             transformFilterProcessorMap;
-    private final boolean hasAsterisk;
-    private List<String> projectedColumns;
+    private final Map<TableId, Boolean> hasAsteriskMap;
+    private final Map<TableId, List<String>> projectedColumnsMap;
 
     public static PostTransformOperator.Builder newBuilder() {
         return new PostTransformOperator.Builder();
@@ -144,11 +145,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         this.transformProjectionProcessorMap = new ConcurrentHashMap<>();
         this.udfFunctions = udfFunctions;
         this.udfFunctionInstances = new ConcurrentHashMap<>();
-        this.hasAsterisk =
-                transformRules.stream()
-                        .map(TransformRule::getProjection)
-                        .anyMatch(TransformParser::hasAsterisk);
-        this.projectedColumns = new ArrayList<>();
+        this.hasAsteriskMap = new HashMap<>();
+        this.projectedColumnsMap = new HashMap<>();
     }
 
     @Override
@@ -229,6 +227,9 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             transformProjectionProcessorMap
                     .keySet()
                     .removeIf(e -> Objects.equals(e.f0, schemaChangeEvent.tableId()));
+            transformFilterProcessorMap
+                    .keySet()
+                    .removeIf(e -> Objects.equals(e.f0, schemaChangeEvent.tableId()));
             cacheSchema(schemaChangeEvent).ifPresent(e -> output.collect(new StreamRecord<>(e)));
         } else if (event instanceof DataChangeEvent) {
             Optional<DataChangeEvent> dataChangeEventOptional =
@@ -240,27 +241,41 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     }
 
     private Optional<SchemaChangeEvent> cacheSchema(SchemaChangeEvent event) throws Exception {
+        TableId tableId = event.tableId();
         if (event instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) event;
-
-            Set<String> referencedColumnsSet =
-                    transformRules.stream()
+            Set<String> projectedColumnsSet =
+                    transforms.stream()
+                            .filter(t -> t.getSelectors().isMatch(tableId))
                             .flatMap(
                                     rule ->
                                             TransformParser.generateProjectionColumns(
-                                                    rule.getProjection(),
+                                                    rule.getProjection()
+                                                            .map(TransformProjection::getProjection)
+                                                            .orElse(null),
                                                     createTableEvent.getSchema().getColumns(),
                                                     udfDescriptors)
                                                     .stream())
                             .map(ProjectionColumn::getColumnName)
                             .collect(Collectors.toSet());
+            boolean hasAsterisk =
+                    transforms.stream()
+                            .filter(t -> t.getSelectors().isMatch(tableId))
+                            .anyMatch(
+                                    t ->
+                                            TransformParser.hasAsterisk(
+                                                    t.getProjection()
+                                                            .map(TransformProjection::getProjection)
+                                                            .orElse(null)));
 
-            projectedColumns =
+            hasAsteriskMap.put(tableId, hasAsterisk);
+            projectedColumnsMap.put(
+                    tableId,
                     createTableEvent.getSchema().getColumnNames().stream()
-                            .filter(referencedColumnsSet::contains)
-                            .collect(Collectors.toList());
+                            .filter(projectedColumnsSet::contains)
+                            .collect(Collectors.toList()));
         }
-        TableId tableId = event.tableId();
+
         Schema schema;
         if (event instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) event;
@@ -276,9 +291,10 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                 tableId, PostTransformChangeInfo.of(tableId, projectedSchema, schema));
 
         if (event instanceof CreateTableEvent) {
-            return Optional.of(new CreateTableEvent(event.tableId(), projectedSchema));
+            return Optional.of(new CreateTableEvent(tableId, projectedSchema));
         } else {
-            return TransformParser.transformSchemaChangeEvent(hasAsterisk, projectedColumns, event);
+            return TransformParser.transformSchemaChangeEvent(
+                    hasAsteriskMap.get(tableId), projectedColumnsMap.get(tableId), event);
         }
     }
 

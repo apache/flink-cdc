@@ -703,7 +703,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
         validateResult(
                 "AddColumnEvent{tableId=%s.ALL, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
-                "DataChangeEvent{tableId=%s.ALL, before=[], after=[10001, 12, Derrida, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[10001, 12, extras, Derrida], op=INSERT, meta=()}",
                 "AddColumnEvent{tableId=%s.ALL, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=LAST, existedColumnName=null}]}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[10002, null, extras, null, 15], op=INSERT, meta=()}",
                 "AlterColumnTypeEvent{tableId=%s.ALL, typeMapping={VERSION=STRING}, oldTypeMapping={VERSION=VARCHAR(17)}}",
