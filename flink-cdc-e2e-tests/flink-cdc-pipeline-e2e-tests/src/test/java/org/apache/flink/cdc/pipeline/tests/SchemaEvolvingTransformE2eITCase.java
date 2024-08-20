@@ -98,7 +98,7 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 0, 1024144], op=INSERT, meta=()}",
                         "AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}",
-                        "RenameColumnEvent{tableId=%s.members, nameMapping={age=precise_age}}",
+                        "AlterColumnTypeEvent{tableId=%s.members, typeMapping={gender=BIGINT}, oldTypeMapping={gender=TINYINT}}",
                         "RenameColumnEvent{tableId=%s.members, nameMapping={gender=biological_sex}}",
                         "DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, 16.0, 1026169], op=INSERT, meta=()}"));
@@ -184,9 +184,8 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=LAST, existedColumnName=null}]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 1024144, 0], op=INSERT, meta=()}",
                         "AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}",
-                        "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`precise_age` DOUBLE, position=LAST, existedColumnName=null}]}",
-                        "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`biological_sex` TINYINT, position=LAST, existedColumnName=null}]}",
-                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null, 1026169, null, 16.0, null], op=INSERT, meta=()}"));
+                        "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`biological_sex` BIGINT, position=LAST, existedColumnName=null}]}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, 16.0, 1026169, null, null], op=INSERT, meta=()}"));
     }
 
     @Test
@@ -201,7 +200,7 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17, 0, 1024144], op=INSERT, meta=()}",
                         "AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}",
-                        "RenameColumnEvent{tableId=%s.members, nameMapping={age=precise_age}}",
+                        "AlterColumnTypeEvent{tableId=%s.members, typeMapping={gender=BIGINT}, oldTypeMapping={gender=TINYINT}}",
                         "RenameColumnEvent{tableId=%s.members, nameMapping={gender=biological_sex}}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, 16.0, null, 1026169], op=INSERT, meta=()}"),
                 Collections.singletonList(
@@ -331,19 +330,23 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                                 mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
                 Statement stmt = conn.createStatement()) {
 
+            // Current schema: (id, name, age)
             waitForIncrementalStage(dbName, mergeTable ? "merged" : "members", stmt);
 
             // triggers AddColumnEvent
+            // Current schema: (id, name, age, gender)
             stmt.execute("ALTER TABLE members ADD COLUMN gender TINYINT AFTER age;");
             stmt.execute("INSERT INTO members VALUES (1012, 'Eve', 17, 0);");
 
-            // triggers AlterColumnTypeEvent and RenameColumnEvent
-            stmt.execute("ALTER TABLE members CHANGE COLUMN age precise_age DOUBLE;");
+            // triggers AlterColumnTypeEvent
+            stmt.execute("ALTER TABLE members MODIFY COLUMN age DOUBLE");
 
-            // triggers RenameColumnEvent
-            stmt.execute("ALTER TABLE members RENAME COLUMN gender TO biological_sex;");
+            // triggers AlterColumnTypeEvent and RenameColumnEvent
+            // Current schema: (id, name, age, biological_sex)
+            stmt.execute("ALTER TABLE members CHANGE COLUMN gender biological_sex BIGINT;");
 
             // triggers DropColumnEvent
+            // Current schema: (id, name, age)
             stmt.execute("ALTER TABLE members DROP COLUMN biological_sex");
             stmt.execute("INSERT INTO members VALUES (1013, 'Fiona', 16);");
         }

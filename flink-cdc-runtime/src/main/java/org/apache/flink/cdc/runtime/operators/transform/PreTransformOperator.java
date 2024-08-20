@@ -49,7 +49,6 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,8 +72,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private final List<Tuple2<String, String>> udfFunctions;
     private List<UserDefinedFunctionDescriptor> udfDescriptors;
     private Map<TableId, PreTransformProcessor> preTransformProcessorMap;
-    private final Map<TableId, Boolean> hasAsteriskMap;
-    private final Map<TableId, List<String>> referencedColumnsMap;
+    private Map<TableId, Boolean> hasAsteriskMap;
+    private Map<TableId, List<String>> referencedColumnsMap;
 
     public static PreTransformOperator.Builder newBuilder() {
         return new PreTransformOperator.Builder();
@@ -129,8 +128,6 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         this.schemaMetadataTransformers = new ArrayList<>();
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.udfFunctions = udfFunctions;
-        this.hasAsteriskMap = new HashMap<>();
-        this.referencedColumnsMap = new HashMap<>();
     }
 
     @Override
@@ -143,12 +140,10 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                 this.udfFunctions.stream()
                         .map(udf -> new UserDefinedFunctionDescriptor(udf.f0, udf.f1))
                         .collect(Collectors.toList());
-    }
 
-    @Override
-    public void open() throws Exception {
-        super.open();
-        transforms = new ArrayList<>();
+        // Initialize data fields in advance because they might be accessed in
+        // `::initializeState` function when restoring from a previous state.
+        this.transforms = new ArrayList<>();
         for (TransformRule transformRule : transformRules) {
             String tableInclusions = transformRule.getTableInclusions();
             String projection = transformRule.getProjection();
@@ -169,6 +164,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                             new SchemaMetadataTransform(primaryKeys, partitionKeys, tableOptions)));
         }
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
+        this.hasAsteriskMap = new ConcurrentHashMap<>();
+        this.referencedColumnsMap = new ConcurrentHashMap<>();
     }
 
     @Override
