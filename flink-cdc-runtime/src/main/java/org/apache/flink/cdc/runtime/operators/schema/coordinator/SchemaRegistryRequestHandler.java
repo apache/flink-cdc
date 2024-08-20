@@ -95,7 +95,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
     /** Status of the execution of current schema change request. */
     private volatile boolean isSchemaChangeApplying;
     /** Actual exception if failed to apply schema change. */
-    private volatile Exception schemaChangeException;
+    private volatile Throwable schemaChangeException;
     /** Executor service to execute schema change. */
     private final ExecutorService schemaChangeThreadPool;
 
@@ -148,14 +148,14 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     LOG.debug("Applied schema change {} to table {}.", changeEvent, tableId);
                     schemaManager.applyEvolvedSchemaChange(changeEvent);
                     finishedSchemaChanges.add(changeEvent);
-                } catch (Exception e) {
+                } catch (Throwable t) {
                     LOG.error(
                             "Failed to apply schema change {} to table {}. Caused by: {}",
                             changeEvent,
                             tableId,
-                            e);
-                    if (!shouldIgnoreException(e)) {
-                        schemaChangeException = e;
+                            t);
+                    if (!shouldIgnoreException(t)) {
+                        schemaChangeException = t;
                         break;
                     } else {
                         LOG.warn(
@@ -264,7 +264,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
             Thread.sleep(1000);
 
             if (schemaChangeException != null) {
-                throw new RuntimeException("failed to apply schema change.", schemaChangeException);
+                throw new RuntimeException("Failed to apply schema change.", schemaChangeException);
             }
 
             if (isSchemaChangeApplying) {
@@ -314,7 +314,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
 
     public CompletableFuture<CoordinationResponse> getSchemaChangeResult() {
         if (schemaChangeException != null) {
-            throw new RuntimeException("failed to apply schema change.", schemaChangeException);
+            throw new RuntimeException("Failed to apply schema change.", schemaChangeException);
         }
 
         if (isSchemaChangeApplying) {
@@ -444,23 +444,13 @@ public class SchemaRegistryRequestHandler implements Closeable {
         }
     }
 
-    private boolean shouldIgnoreException(Exception exception) {
+    private boolean shouldIgnoreException(Throwable throwable) {
 
-        // only UnsupportedSchemaChangeEventException maybe ignore(depends on SchemaChangeBehavior)
-        if (!(exception instanceof UnsupportedSchemaChangeEventException)) {
-            return false;
-        }
-
-        // Only TRY_EVOLVE will need to ignore error
-        // IGNORE:  Won't apply schema change event, thus no UnsupportedSchemaChangeEventException
-        // will be return.
-        // EVOLVE and LENIENT:  Will throw UnsupportedSchemaChangeEventException and stop the job.
-        // EXCEPTION: Exception has already been thrown in schema operator.
-        if (schemaChangeBehavior == SchemaChangeBehavior.TRY_EVOLVE) {
-            return true;
-        }
-
-        return false;
+        // In IGNORE mode, will never try to apply schema change events
+        // In EVOLVE and and LENIENT mode, such failure will not be tolerated
+        // In EXCEPTION mode, an exception will be thrown once captured
+        return (throwable instanceof UnsupportedSchemaChangeEventException)
+                && (schemaChangeBehavior == SchemaChangeBehavior.TRY_EVOLVE);
     }
 
     private static class PendingSchemaChange {

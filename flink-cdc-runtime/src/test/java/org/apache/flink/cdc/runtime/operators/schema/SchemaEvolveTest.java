@@ -1043,7 +1043,7 @@ public class SchemaEvolveTest {
                 .cause()
                 .cause()
                 .isExactlyInstanceOf(RuntimeException.class)
-                .hasMessageContaining("failed to apply schema change");
+                .hasMessageContaining("Failed to apply schema change");
         harness.close();
     }
 
