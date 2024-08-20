@@ -17,15 +17,13 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeResponse;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaResponse;
@@ -202,16 +200,6 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
         } else if (request instanceof GetOriginalSchemaRequest) {
             return CompletableFuture.completedFuture(
                     wrap(handleGetOriginalSchemaRequest((GetOriginalSchemaRequest) request)));
-        } else if (request instanceof ApplyOriginalSchemaChangeRequest) {
-            return CompletableFuture.completedFuture(
-                    wrap(
-                            handleApplyOriginalSchemaChangeRequest(
-                                    (ApplyOriginalSchemaChangeRequest) request)));
-        } else if (request instanceof ApplyEvolvedSchemaChangeRequest) {
-            return CompletableFuture.completedFuture(
-                    wrap(
-                            handleApplyEvolvedSchemaChangeRequest(
-                                    (ApplyEvolvedSchemaChangeRequest) request)));
         } else if (request instanceof SchemaChangeResultRequest) {
             return requestHandler.getSchemaChangeResult();
         } else if (request instanceof RefreshPendingListsRequest) {
@@ -342,18 +330,15 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
         }
     }
 
-    private ApplyOriginalSchemaChangeResponse handleApplyOriginalSchemaChangeRequest(
-            ApplyOriginalSchemaChangeRequest applyOriginalSchemaChangeRequest) {
-        schemaManager.applyOriginalSchemaChange(
-                applyOriginalSchemaChangeRequest.getSchemaChangeEvent());
-        return new ApplyOriginalSchemaChangeResponse();
+    // --------------------Only visible for test -----------------
+
+    @VisibleForTesting
+    public void handleApplyOriginalSchemaChangeEvent(SchemaChangeEvent schemaChangeEvent) {
+        schemaManager.applyOriginalSchemaChange(schemaChangeEvent);
     }
 
-    private ApplyEvolvedSchemaChangeResponse handleApplyEvolvedSchemaChangeRequest(
-            ApplyEvolvedSchemaChangeRequest applyEvolvedSchemaChangeRequest) {
-        applyEvolvedSchemaChangeRequest
-                .getSchemaChangeEvent()
-                .forEach(schemaManager::applyEvolvedSchemaChange);
-        return new ApplyEvolvedSchemaChangeResponse();
+    @VisibleForTesting
+    public void handleApplyEvolvedSchemaChangeRequest(SchemaChangeEvent schemaChangeEvent) {
+        schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
     }
 }

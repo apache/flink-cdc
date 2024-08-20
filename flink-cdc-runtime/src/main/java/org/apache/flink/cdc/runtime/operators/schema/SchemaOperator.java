@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.runtime.operators.schema;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
@@ -29,7 +28,6 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
@@ -40,8 +38,6 @@ import org.apache.flink.cdc.common.types.DataTypeFamily;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
@@ -431,72 +427,15 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             ReleaseUpstreamResponse schemaEvolveResponse = requestReleaseUpstream();
             List<SchemaChangeEvent> finishedSchemaChangeEvents =
                     schemaEvolveResponse.getFinishedSchemaChangeEvents();
-            List<Tuple2<SchemaChangeEvent, Throwable>> failedSchemaChangeEvents =
-                    schemaEvolveResponse.getFailedSchemaChangeEvents();
-            List<SchemaChangeEvent> ignoredSchemaChangeEvents =
-                    schemaEvolveResponse.getIgnoredSchemaChangeEvents();
-
-            if (schemaChangeBehavior == SchemaChangeBehavior.EVOLVE
-                    || schemaChangeBehavior == SchemaChangeBehavior.EXCEPTION) {
-                if (schemaEvolveResponse.hasException()) {
-                    throw new RuntimeException(
-                            String.format(
-                                    "Failed to apply schema change event %s.\nExceptions: %s",
-                                    schemaChangeEvent,
-                                    schemaEvolveResponse.getPrintableFailedSchemaChangeEvents()));
-                }
-            } else if (schemaChangeBehavior == SchemaChangeBehavior.TRY_EVOLVE
-                    || schemaChangeBehavior == SchemaChangeBehavior.LENIENT
-                    || schemaChangeBehavior == SchemaChangeBehavior.IGNORE) {
-                if (schemaEvolveResponse.hasException()) {
-                    schemaEvolveResponse
-                            .getFailedSchemaChangeEvents()
-                            .forEach(
-                                    e ->
-                                            LOG.warn(
-                                                    "Failed to apply event {}, but keeps running in tolerant mode. Caused by: {}",
-                                                    e.f0,
-                                                    e.f1));
-                }
-            } else {
-                throw new SchemaEvolveException(
-                        schemaChangeEvent,
-                        "Unexpected schema change behavior: " + schemaChangeBehavior);
-            }
 
             // Update evolved schema changes based on apply results
-            requestApplyEvolvedSchemaChanges(tableId, finishedSchemaChangeEvents);
             finishedSchemaChangeEvents.forEach(e -> output.collect(new StreamRecord<>(e)));
-
-            LOG.info(
-                    "Applied schema change event {} to downstream. Among {} total evolved events, {} succeeded, {} failed, and {} ignored.",
-                    schemaChangeEvent,
-                    expectedSchemaChangeEvents.size(),
-                    finishedSchemaChangeEvents.size(),
-                    failedSchemaChangeEvents.size(),
-                    ignoredSchemaChangeEvents.size());
-
-            schemaOperatorMetrics.increaseFinishedSchemaChangeEvents(
-                    finishedSchemaChangeEvents.size());
-            schemaOperatorMetrics.increaseFailedSchemaChangeEvents(failedSchemaChangeEvents.size());
-            schemaOperatorMetrics.increaseIgnoredSchemaChangeEvents(
-                    ignoredSchemaChangeEvents.size());
         }
     }
 
     private SchemaChangeResponse requestSchemaChange(
             TableId tableId, SchemaChangeEvent schemaChangeEvent) {
         return sendRequestToCoordinator(new SchemaChangeRequest(tableId, schemaChangeEvent));
-    }
-
-    private void requestApplyOriginalSchemaChanges(
-            TableId tableId, SchemaChangeEvent schemaChangeEvent) {
-        sendRequestToCoordinator(new ApplyOriginalSchemaChangeRequest(tableId, schemaChangeEvent));
-    }
-
-    private void requestApplyEvolvedSchemaChanges(
-            TableId tableId, List<SchemaChangeEvent> schemaChangeEvents) {
-        sendRequestToCoordinator(new ApplyEvolvedSchemaChangeRequest(tableId, schemaChangeEvents));
     }
 
     private ReleaseUpstreamResponse requestReleaseUpstream()
