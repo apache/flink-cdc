@@ -28,6 +28,7 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.table.StartupMode;
+import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlTypeUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
@@ -68,7 +69,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
     // Used when startup mode is not initial
     private boolean alreadySendCreateTableForBinlogSplit = false;
-    private final List<CreateTableEvent> createTableEventCache;
+    private List<CreateTableEvent> createTableEventCache;
 
     public MySqlPipelineRecordEmitter(
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
@@ -80,23 +81,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 sourceConfig.isIncludeSchemaChanges());
         this.sourceConfig = sourceConfig;
         this.alreadySendCreateTableTables = new HashSet<>();
-        this.createTableEventCache = new ArrayList<>();
-
-        if (!sourceConfig.getStartupOptions().startupMode.equals(StartupMode.INITIAL)) {
-            try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
-                List<TableId> capturedTableIds = listTables(jdbc, sourceConfig.getTableFilters());
-                for (TableId tableId : capturedTableIds) {
-                    Schema schema = getSchema(jdbc, tableId);
-                    createTableEventCache.add(
-                            new CreateTableEvent(
-                                    org.apache.flink.cdc.common.event.TableId.tableId(
-                                            tableId.catalog(), tableId.table()),
-                                    schema));
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
-            }
-        }
+        this.createTableEventCache = generateCreateTableEvent(sourceConfig);
     }
 
     @Override
@@ -104,6 +89,8 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
             SourceRecord element, SourceOutput<Event> output, MySqlSplitState splitState)
             throws Exception {
         if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
+            // In Snapshot phase of INITIAL startup mode, we lazily send CreateTableEvent to
+            // downstream to avoid checkpoint timeout.
             TableId tableId = splitState.asSnapshotSplitState().toMySqlSplit().getTableId();
             if (!alreadySendCreateTableTables.contains(tableId)) {
                 try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
@@ -111,11 +98,24 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                     alreadySendCreateTableTables.add(tableId);
                 }
             }
-        } else if (splitState.isBinlogSplitState()
-                && !alreadySendCreateTableForBinlogSplit
-                && !sourceConfig.getStartupOptions().startupMode.equals(StartupMode.INITIAL)) {
-            createTableEventCache.forEach(output::collect);
+        } else if (splitState.isBinlogSplitState() && !alreadySendCreateTableForBinlogSplit) {
             alreadySendCreateTableForBinlogSplit = true;
+            if (sourceConfig.getStartupOptions().startupMode.equals(StartupMode.INITIAL)) {
+                // In Snapshot -> Binlog transition of INITIAL startup mode, ensure all table
+                // schemas have been sent to downstream. We use previously cached schema instead of
+                // re-request latest schema because there might be some pending schema change events
+                // in the queue, and that may accidentally emit evolved schema before corresponding
+                // schema change events.
+                createTableEventCache.stream()
+                        .filter(
+                                event ->
+                                        !alreadySendCreateTableTables.contains(
+                                                MySqlSchemaUtils.toDbzTableId(event.tableId())))
+                        .forEach(output::collect);
+            } else {
+                // In Binlog only mode, we simply emit all schemas at once.
+                createTableEventCache.forEach(output::collect);
+            }
         }
         super.processElement(element, output, splitState);
     }
@@ -232,5 +232,23 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
             mySqlAntlrDdlParser = new MySqlAntlrDdlParser();
         }
         return mySqlAntlrDdlParser;
+    }
+
+    private List<CreateTableEvent> generateCreateTableEvent(MySqlSourceConfig sourceConfig) {
+        try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
+            List<CreateTableEvent> createTableEventCache = new ArrayList<>();
+            List<TableId> capturedTableIds = listTables(jdbc, sourceConfig.getTableFilters());
+            for (TableId tableId : capturedTableIds) {
+                Schema schema = getSchema(jdbc, tableId);
+                createTableEventCache.add(
+                        new CreateTableEvent(
+                                org.apache.flink.cdc.common.event.TableId.tableId(
+                                        tableId.catalog(), tableId.table()),
+                                schema));
+            }
+            return createTableEventCache;
+        } catch (SQLException e) {
+            throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
+        }
     }
 }

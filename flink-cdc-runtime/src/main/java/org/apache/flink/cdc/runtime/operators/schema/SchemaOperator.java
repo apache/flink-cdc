@@ -39,20 +39,17 @@ import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
-import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeProcessingResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResultRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResultResponse;
 import org.apache.flink.cdc.runtime.operators.schema.metrics.SchemaOperatorMetrics;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
-import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
@@ -218,17 +215,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                 });
     }
 
-    @Override
-    public void initializeState(StateInitializationContext context) throws Exception {
-        if (context.isRestored()) {
-            // Multiple operators may appear during a restart process,
-            // only clear the pendingSchemaChanges when the first operator starts.
-            if (getRuntimeContext().getIndexOfThisSubtask() == 0) {
-                sendRequestToCoordinator(new RefreshPendingListsRequest());
-            }
-        }
-    }
-
     /**
      * This method is guaranteed to not be called concurrently with other methods of the operator.
      */
@@ -248,7 +234,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private void processSchemaChangeEvents(SchemaChangeEvent event)
             throws InterruptedException, TimeoutException, ExecutionException {
         TableId tableId = event.tableId();
-        LOG.info("Table {} received SchemaChangeEvent and start to be blocked.", tableId);
+        LOG.info("Table {} received SchemaChangeEvent {} and start to be blocked.", tableId, event);
         handleSchemaChangeEvent(tableId, event);
         // Update caches
         originalSchema.put(tableId, getLatestOriginalSchema(tableId));
@@ -412,7 +398,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                             schemaChangeEvent));
         }
 
-        // The request will need to send a FlushEvent or block until flushing finished
+        // The request will block if another schema change event is being handled
         SchemaChangeResponse response = requestSchemaChange(tableId, schemaChangeEvent);
         if (!response.getSchemaChangeEvents().isEmpty()) {
             LOG.info(
@@ -424,7 +410,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             schemaOperatorMetrics.increaseSchemaChangeEvents(expectedSchemaChangeEvents.size());
 
             // The request will block until flushing finished in each sink writer
-            ReleaseUpstreamResponse schemaEvolveResponse = requestReleaseUpstream();
+            SchemaChangeResultResponse schemaEvolveResponse = requestSchemaChangeResult();
             List<SchemaChangeEvent> finishedSchemaChangeEvents =
                     schemaEvolveResponse.getFinishedSchemaChangeEvents();
 
@@ -435,13 +421,26 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     private SchemaChangeResponse requestSchemaChange(
             TableId tableId, SchemaChangeEvent schemaChangeEvent) {
-        return sendRequestToCoordinator(new SchemaChangeRequest(tableId, schemaChangeEvent));
+        while (true) {
+            SchemaChangeResponse response =
+                    sendRequestToCoordinator(new SchemaChangeRequest(tableId, schemaChangeEvent));
+            if (response.isRejected()) {
+                try {
+                    LOG.info("Schema Registry is busy now, waiting for next request...");
+                    Thread.sleep(1000);
+                } catch (InterruptedException ignored) {
+                    // Do nothing, enter the next loop
+                }
+            } else {
+                return response;
+            }
+        }
     }
 
-    private ReleaseUpstreamResponse requestReleaseUpstream()
+    private SchemaChangeResultResponse requestSchemaChangeResult()
             throws InterruptedException, TimeoutException {
         CoordinationResponse coordinationResponse =
-                sendRequestToCoordinator(new ReleaseUpstreamRequest());
+                sendRequestToCoordinator(new SchemaChangeResultRequest());
         long nextRpcTimeOutMillis = System.currentTimeMillis() + rpcTimeOutInMillis;
         while (coordinationResponse instanceof SchemaChangeProcessingResponse) {
             if (System.currentTimeMillis() < nextRpcTimeOutMillis) {
@@ -451,7 +450,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 throw new TimeoutException("TimeOut when requesting release upstream");
             }
         }
-        return ((ReleaseUpstreamResponse) coordinationResponse);
+        return ((SchemaChangeResultResponse) coordinationResponse);
     }
 
     private <REQUEST extends CoordinationRequest, RESPONSE extends CoordinationResponse>

@@ -154,11 +154,12 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "  type: values\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
-                        routeTestDatabase.getDatabaseName());
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -248,13 +249,14 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: %s.ALL\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
-                        routeTestDatabase.getDatabaseName());
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -331,13 +333,14 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: NEW_%s.ALPHABET\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
-                        routeTestDatabase.getDatabaseName());
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -428,7 +431,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: NEW_%s.BETAGAMM\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -436,7 +439,8 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
-                        routeTestDatabase.getDatabaseName());
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -535,7 +539,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: NEW_%s.TABLEC\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -545,7 +549,8 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
-                        routeTestDatabase.getDatabaseName());
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -647,14 +652,15 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: %s.ALL\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
-                        routeTestDatabase.getDatabaseName());
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -733,13 +739,14 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    replace-symbol: <>\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
-                        routeTestDatabase.getDatabaseName());
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -829,7 +836,9 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                     "failed to get specific event: "
                             + event
                             + " from stdout: "
-                            + taskManagerConsumer.toUtf8String());
+                            + taskManagerConsumer.toUtf8String()
+                            + "\n==== JM Log ====\n"
+                            + jobManagerConsumer.toUtf8String());
         }
     }
 

@@ -62,6 +62,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -226,12 +227,33 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                         BinaryStringData.fromString("c-21")
                                     })));
         }
+        // In this configuration, several subtasks might emit their corresponding CreateTableEvent
+        // to downstream. Since it is not possible to predict how many CreateTableEvents should we
+        // expect, we simply filter them out from expected sets, and assert there's at least one.
         List<Event> actual =
-                fetchResults(events, 1 + expectedSnapshot.size() + expectedBinlog.size());
-        assertThat(actual.get(0)).isEqualTo(createTableEvent);
-        assertThat(actual.subList(1, 10))
+                fetchResultsExcept(
+                        events, expectedSnapshot.size() + expectedBinlog.size(), createTableEvent);
+        assertThat(actual.subList(0, expectedSnapshot.size()))
                 .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
-        assertThat(actual.subList(10, actual.size())).isEqualTo(expectedBinlog);
+        assertThat(actual.subList(expectedSnapshot.size(), actual.size()))
+                .isEqualTo(expectedBinlog);
+    }
+
+    private static <T> List<T> fetchResultsExcept(Iterator<T> iter, int size, T sideEvent) {
+        List<T> result = new ArrayList<>(size);
+        List<T> sideResults = new ArrayList<>();
+        while (size > 0 && iter.hasNext()) {
+            T event = iter.next();
+            if (!event.equals(sideEvent)) {
+                result.add(event);
+                size--;
+            } else {
+                sideResults.add(sideEvent);
+            }
+        }
+        // Also ensure we've received at least one or many side events.
+        assertThat(sideResults).isNotEmpty();
+        return result;
     }
 
     @Test

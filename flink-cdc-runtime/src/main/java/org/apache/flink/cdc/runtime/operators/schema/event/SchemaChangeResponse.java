@@ -38,8 +38,22 @@ public class SchemaChangeResponse implements CoordinationResponse {
      */
     private final List<SchemaChangeEvent> schemaChangeEvents;
 
+    private final boolean isRejected;
+
+    public static final SchemaChangeResponse REJECTED = new SchemaChangeResponse();
+
+    private SchemaChangeResponse() {
+        this.schemaChangeEvents = null;
+        this.isRejected = true;
+    }
+
     public SchemaChangeResponse(List<SchemaChangeEvent> schemaChangeEvents) {
         this.schemaChangeEvents = schemaChangeEvents;
+        this.isRejected = false;
+    }
+
+    public boolean isRejected() {
+        return isRejected;
     }
 
     public List<SchemaChangeEvent> getSchemaChangeEvents() {
@@ -55,7 +69,8 @@ public class SchemaChangeResponse implements CoordinationResponse {
             return false;
         }
         SchemaChangeResponse response = (SchemaChangeResponse) o;
-        return schemaChangeEvents.equals(response.schemaChangeEvents);
+        return Objects.equals(schemaChangeEvents, response.schemaChangeEvents)
+                && isRejected == response.isRejected;
     }
 
     @Override

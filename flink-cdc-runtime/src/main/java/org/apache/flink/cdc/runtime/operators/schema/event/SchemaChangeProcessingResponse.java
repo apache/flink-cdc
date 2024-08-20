@@ -23,8 +23,8 @@ import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
 /**
- * The response for {@link SchemaChangeResultRequest} or {@link ReleaseUpstreamRequest} from {@link
- * SchemaRegistry} to {@link SchemaOperator} if not apply {@link SchemaChangeEvent} in time.
+ * The response for {@link SchemaChangeResultRequest} from {@link SchemaRegistry} to {@link
+ * SchemaOperator} if not apply {@link SchemaChangeEvent} in time.
  */
 public class SchemaChangeProcessingResponse implements CoordinationResponse {
 

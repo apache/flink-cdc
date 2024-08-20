@@ -194,12 +194,13 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                 + "  table.create.properties.replication_num: 1\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         mysqlInventoryDatabase.getDatabaseName(),
                         DORIS.getUsername(),
-                        DORIS.getPassword());
+                        DORIS.getPassword(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path dorisCdcConnector = TestUtils.getResource("doris-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -324,13 +325,14 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                 + "    projection: \\*, 'fine' AS FINE\n"
                                 + "    filter: id <> 3 AND id <> 4\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         complexDataTypesDatabase.getDatabaseName(),
                         DORIS.getUsername(),
                         DORIS.getPassword(),
-                        complexDataTypesDatabase.getDatabaseName());
+                        complexDataTypesDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path dorisCdcConnector = TestUtils.getResource("doris-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");

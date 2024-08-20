@@ -18,11 +18,15 @@
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
 import org.apache.flink.cdc.runtime.serializer.schema.SchemaSerializer;
@@ -39,6 +43,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -91,6 +96,97 @@ public class SchemaManager {
 
     public SchemaChangeBehavior getBehavior() {
         return behavior;
+    }
+
+    /**
+     * This function checks if the given schema change event has been applied already. If so, it
+     * will be ignored to avoid sending duplicate evolved schema change events to sink metadata
+     * applier.
+     */
+    public final boolean isOriginalSchemaChangeEventRedundant(SchemaChangeEvent event) {
+        TableId tableId = event.tableId();
+        Optional<Schema> latestSchema = getLatestOriginalSchema(tableId);
+        return Boolean.TRUE.equals(
+                SchemaChangeEventVisitor.visit(
+                        event,
+                        addColumnEvent -> {
+                            // It has not been applied if schema does not even exist
+                            if (!latestSchema.isPresent()) {
+                                return false;
+                            }
+                            List<Column> existedColumns = latestSchema.get().getColumns();
+
+                            // It has been applied only if all columns are present in existedColumns
+                            for (AddColumnEvent.ColumnWithPosition column :
+                                    addColumnEvent.getAddedColumns()) {
+                                if (!existedColumns.contains(column.getAddColumn())) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        },
+                        alterColumnTypeEvent -> {
+                            // It has not been applied if schema does not even exist
+                            if (!latestSchema.isPresent()) {
+                                return false;
+                            }
+                            Schema schema = latestSchema.get();
+
+                            // It has been applied only if all column types are set as expected
+                            for (Map.Entry<String, DataType> entry :
+                                    alterColumnTypeEvent.getTypeMapping().entrySet()) {
+                                if (!schema.getColumn(entry.getKey()).isPresent()
+                                        || !schema.getColumn(entry.getKey())
+                                                .get()
+                                                .getType()
+                                                .equals(entry.getValue())) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        },
+                        createTableEvent -> {
+                            // It has been applied if such table already exists
+                            return latestSchema.isPresent();
+                        },
+                        dropColumnEvent -> {
+                            // It has not been applied if schema does not even exist
+                            if (!latestSchema.isPresent()) {
+                                return false;
+                            }
+                            List<String> existedColumnNames = latestSchema.get().getColumnNames();
+
+                            // It has been applied only if corresponding column types do not exist
+                            return dropColumnEvent.getDroppedColumnNames().stream()
+                                    .noneMatch(existedColumnNames::contains);
+                        },
+                        dropTableEvent -> {
+                            // It has been applied if such table does not exist
+                            return !latestSchema.isPresent();
+                        },
+                        renameColumnEvent -> {
+                            // It has been applied if such table already exists
+                            if (!latestSchema.isPresent()) {
+                                return false;
+                            }
+                            List<String> existedColumnNames = latestSchema.get().getColumnNames();
+
+                            // It has been applied only if all previous names do not exist, and all
+                            // new names already exist
+                            for (Map.Entry<String, String> entry :
+                                    renameColumnEvent.getNameMapping().entrySet()) {
+                                if (existedColumnNames.contains(entry.getKey())
+                                        || !existedColumnNames.contains(entry.getValue())) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        },
+                        truncateTableEvent -> {
+                            // We have no way to ensure if a TruncateTableEvent has been applied
+                            // before. Just assume it's not.
+                            return false;
+                        }));
     }
 
     public final boolean schemaExists(

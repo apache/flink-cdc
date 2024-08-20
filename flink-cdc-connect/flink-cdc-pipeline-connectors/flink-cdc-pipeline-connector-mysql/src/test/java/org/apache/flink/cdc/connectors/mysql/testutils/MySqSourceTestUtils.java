@@ -17,6 +17,9 @@
 
 package org.apache.flink.cdc.connectors.mysql.testutils;
 
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -36,6 +39,22 @@ public class MySqSourceTestUtils {
             size--;
         }
         return result;
+    }
+
+    public static <T> Tuple2<List<T>, List<CreateTableEvent>> fetchResultsAndCreateTableEvent(
+            Iterator<T> iter, int size) {
+        List<T> result = new ArrayList<>(size);
+        List<CreateTableEvent> createTableEvents = new ArrayList<>();
+        while (size > 0 && iter.hasNext()) {
+            T event = iter.next();
+            if (event instanceof CreateTableEvent) {
+                createTableEvents.add((CreateTableEvent) event);
+            } else {
+                result.add(event);
+                size--;
+            }
+        }
+        return Tuple2.of(result, createTableEvents);
     }
 
     public static String getServerId(int parallelism) {
