@@ -221,7 +221,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                         tableId.getSchemaName(), tableId.getTableName(), addFieldSchema);
             }
         } catch (Exception e) {
-            throw new SchemaEvolveException(event, e.getMessage(), e);
+            throw new SchemaEvolveException(event, "fail to apply add column event", e);
         }
     }
 
@@ -234,7 +234,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                         tableId.getSchemaName(), tableId.getTableName(), col);
             }
         } catch (Exception e) {
-            throw new SchemaEvolveException(event, e.getMessage(), e);
+            throw new SchemaEvolveException(event, "fail to apply drop column event", e);
         }
     }
 
@@ -250,7 +250,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                         entry.getValue());
             }
         } catch (Exception e) {
-            throw new SchemaEvolveException(event, e.getMessage(), e);
+            throw new SchemaEvolveException(event, "fail to apply rename column event", e);
         }
     }
 
@@ -272,7 +272,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                 // will be fixed after FLINK-35243 got merged.
             }
         } catch (Exception e) {
-            throw new SchemaEvolveException(event, e.getMessage(), e);
+            throw new SchemaEvolveException(event, "fail to apply alter column type event", e);
         }
     }
 }
