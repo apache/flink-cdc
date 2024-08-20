@@ -293,7 +293,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         if (event instanceof CreateTableEvent) {
             return Optional.of(new CreateTableEvent(tableId, projectedSchema));
         } else {
-            return TransformParser.transformSchemaChangeEvent(
+            return SchemaUtils.transformSchemaChangeEvent(
                     hasAsteriskMap.get(tableId), projectedColumnsMap.get(tableId), event);
         }
     }

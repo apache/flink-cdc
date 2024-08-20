@@ -269,7 +269,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                 SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getSourceSchema(), event);
         Schema preTransformedSchema = tableChangeInfo.getPreTransformedSchema();
         Optional<SchemaChangeEvent> schemaChangeEvent =
-                TransformParser.transformSchemaChangeEvent(
+                SchemaUtils.transformSchemaChangeEvent(
                         hasAsteriskMap.get(tableId), referencedColumnsMap.get(tableId), event);
         if (schemaChangeEvent.isPresent()) {
             preTransformedSchema =
