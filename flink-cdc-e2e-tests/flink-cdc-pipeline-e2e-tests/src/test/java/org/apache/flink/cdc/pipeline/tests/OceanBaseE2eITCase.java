@@ -21,7 +21,8 @@ import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
-import org.apache.flink.cdc.connectors.oceanbase.OceanBaseContainer;
+import org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseContainer;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.util.function.FunctionWithException;
 import org.apache.flink.util.function.SupplierWithException;
@@ -52,8 +53,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
-
-import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestBase.IMAGE_TAG;
 
 /** OceanBase flink cdc pipeline connector sink integrate test. */
 @RunWith(Parameterized.class)
@@ -91,10 +90,9 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
 
     @ClassRule
     public static final OceanBaseContainer OB_SERVER =
-            new OceanBaseContainer(OceanBaseContainer.DOCKER_IMAGE_NAME + ":" + IMAGE_TAG)
+            OceanBaseTestUtils.createOceanBaseContainerForJdbc()
                     .withNetwork(NETWORK)
                     .withNetworkAliases("oceanbase")
-                    .withSysPassword("123456")
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @Before
@@ -135,7 +133,7 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         uniqueDatabaseName,
-                        OB_SERVER.getJdbcUrlInContainer("test", "oceanbase"),
+                        getJdbcUrlInContainer("test", "oceanbase"),
                         OB_SERVER.getUsername(),
                         OB_SERVER.getPassword());
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
@@ -309,5 +307,9 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
         } catch (SQLException e) {
             throw new RuntimeException("Failed to drop database", e);
         }
+    }
+
+    public String getJdbcUrlInContainer(String databaseName, String networkAliases) {
+        return "jdbc:mysql://" + networkAliases + ":" + 2881 + "/" + databaseName;
     }
 }
