@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSource;
+import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.ServerIdRange;
@@ -38,6 +39,7 @@ import org.apache.flink.cdc.connectors.mysql.utils.OptionUtils;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ObjectPath;
 
+import io.debezium.relational.Tables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +64,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
@@ -128,6 +131,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
+        boolean scanIncrementalNewlyAddedTableEnabled =
+                config.get(SCAN_INCREMENTAL_NEWLY_ADDED_TABLE_ENABLED);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -166,26 +171,32 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .jdbcProperties(getJdbcProperties(configMap))
                         .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
 
-        Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
-        List<String> capturedTables = getTableList(configFactory.createConfig(0), selectors);
-        if (capturedTables.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Cannot find any table by the option 'tables' = " + tables);
-        }
-        if (tablesExclude != null) {
-            Selectors selectExclude =
-                    new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
-            List<String> excludeTables = getTableList(configFactory.createConfig(0), selectExclude);
-            if (!excludeTables.isEmpty()) {
-                capturedTables.removeAll(excludeTables);
-            }
+        if (scanIncrementalNewlyAddedTableEnabled) {
+            String newTables = validateTableAndReturnDebeziumStyle(tables);
+            configFactory.tableList(newTables);
+        } else {
+            Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
+            List<String> capturedTables = getTableList(configFactory.createConfig(0), selectors);
             if (capturedTables.isEmpty()) {
                 throw new IllegalArgumentException(
-                        "Cannot find any table with by the option 'tables.exclude'  = "
-                                + tablesExclude);
+                        "Cannot find any table by the option 'tables' = " + tables);
             }
+            if (tablesExclude != null) {
+                Selectors selectExclude =
+                        new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
+                List<String> excludeTables =
+                        getTableList(configFactory.createConfig(0), selectExclude);
+                if (!excludeTables.isEmpty()) {
+                    capturedTables.removeAll(excludeTables);
+                }
+                if (capturedTables.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "Cannot find any table with by the option 'tables.exclude'  = "
+                                    + tablesExclude);
+                }
+            }
+            configFactory.tableList(capturedTables.toArray(new String[0]));
         }
-        configFactory.tableList(capturedTables.toArray(new String[0]));
 
         String chunkKeyColumns = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         if (chunkKeyColumns != null) {
@@ -256,6 +267,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(CHUNK_META_GROUP_SIZE);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        options.add(SCAN_INCREMENTAL_NEWLY_ADDED_TABLE_ENABLED);
         return options;
     }
 
@@ -408,6 +420,33 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         0.0d,
                         1.0d,
                         distributionFactorLower));
+    }
+
+    /**
+     * Currently, The supported regular syntax is not exactly the same in {@link Selectors} and
+     * {@link Tables.TableFilter}.
+     *
+     * <p>The main distinction are :
+     *
+     * <p>1) {@link Selectors} use `,` to split table names and {@link Tables.TableFilter} use use
+     * `|` to split table names.
+     *
+     * <p>2) If there is a need to use a dot (.) in a regular expression to match any character, it
+     * is necessary to escape the dot with a backslash, refer to {@link
+     * MySqlDataSourceOptions#TABLES}.
+     */
+    private String validateTableAndReturnDebeziumStyle(String tables) {
+        // MySQL table names are not allowed to have `,` character.
+        if (tables.contains(",")) {
+            throw new IllegalArgumentException(
+                    "the `,` in "
+                            + tables
+                            + " is not supported when "
+                            + SCAN_INCREMENTAL_NEWLY_ADDED_TABLE_ENABLED
+                            + " was enabled.");
+        }
+
+        return tables.replace("\\.", ".");
     }
 
     /** Replaces the default timezone placeholder with session timezone, if applicable. */

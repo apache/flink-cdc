@@ -261,4 +261,12 @@ public class MySqlDataSourceOptions {
                                     + "If there is a need to use a dot (.) in a regular expression to match any character, "
                                     + "it is necessary to escape the dot with a backslash."
                                     + "eg. db0.\\.*, db1.user_table_[0-9]+, db[1-2].[app|web]_order_\\.*");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_NEWLY_ADDED_TABLE_ENABLED =
+            ConfigOptions.key("scan.incremental.newly-added-table.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to scan the ddl and dml statements of newly added tables or not in incremental reading stage, by default is false.");
 }
