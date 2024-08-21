@@ -84,7 +84,7 @@ import static java.lang.String.format;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
-import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
@@ -154,10 +154,10 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testAddNewlyTablesInIncrementalStage() throws Exception {
+    public void testScanBinlogNewlyAddedTableEnabled() throws Exception {
         List<String> tables = Collections.singletonList("address_\\.*");
         Map<String, String> options = new HashMap<>();
-        options.put(SCAN_INCREMENTAL_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
+        options.put(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
         options.put(SCAN_STARTUP_MODE.key(), "timestamp");
         options.put(
                 SCAN_STARTUP_TIMESTAMP_MILLIS.key(), String.valueOf(System.currentTimeMillis()));
@@ -180,7 +180,7 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
         CollectResultIterator<Event> iterator =
                 addCollector(env, source, resultBuffer, serializer, accumulatorName);
-        env.executeAsync("AddNewlyTablesInIncrementalStage");
+        env.executeAsync("AddNewlyTablesWhenReadingBinlog");
         initialAddressTables(getConnection(), Collections.singletonList("address_beijing"));
         List<Event> actual = fetchResults(iterator, 4);
         assertThat(((ChangeEvent) actual.get(0)).tableId())
