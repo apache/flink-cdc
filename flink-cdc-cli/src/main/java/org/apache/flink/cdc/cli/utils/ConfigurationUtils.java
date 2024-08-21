@@ -75,4 +75,16 @@ public class ConfigurationUtils {
                 && !target.equalsIgnoreCase(LocalExecutor.NAME)
                 && !target.equalsIgnoreCase(RemoteExecutor.NAME);
     }
+
+    public static Class<?> getClaimModeClass() {
+        try {
+            return Class.forName("org.apache.flink.core.execution.RestoreMode");
+        } catch (ClassNotFoundException ignored) {
+            try {
+                return Class.forName("org.apache.flink.runtime.jobgraph.RestoreMode");
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
 }
