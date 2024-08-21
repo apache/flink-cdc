@@ -277,8 +277,9 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                     throw new IOException(
                             "Unrecognized serialization version " + schemaManagerSerializerVersion);
             }
-        } catch (Throwable throwable) {
-            context.failJob(throwable);
+        } catch (Throwable t) {
+            context.failJob(t);
+            throw t;
         }
     }
 
