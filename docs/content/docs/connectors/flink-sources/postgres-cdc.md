@@ -166,7 +166,7 @@ SELECT * FROM shipments;
       <td>optional</td>
       <td style="word-wrap: break-word;">all</td>
       <td>String</td>
-      <td>The changelog mode used for encoding streaming changes. Supported values are <code>all</code> (which encodes changes as retract stream using all RowKinds) and <code>upsert</code> (which encodes changes as upsert stream that describes idempotent updates on a key).
+      <td>The changelog mode used for encoding streaming changes. Supported values are <code>all</code> (which encodes changes as retract stream using all RowKinds) <code>upsert</code> (which encodes changes as upsert stream that describes idempotent updates on a key), and <code>insert-only</code> (which encodes changes as an insert-only stream).
           <br/> <code>upsert</code> mode can be used for tables with primary keys when replica identity <code>FULL</code> is not an option. Primary keys must be set to use <code>upsert</code> mode.</td>
     </tr>
     <tr>

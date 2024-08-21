@@ -161,10 +161,12 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     @Override
     public ChangelogMode getChangelogMode() {
         switch (changelogMode) {
-            case UPSERT:
-                return org.apache.flink.table.connector.ChangelogMode.upsert();
             case ALL:
                 return org.apache.flink.table.connector.ChangelogMode.all();
+            case UPSERT:
+                return org.apache.flink.table.connector.ChangelogMode.upsert();
+            case INSERT_ONLY:
+                return org.apache.flink.table.connector.ChangelogMode.insertOnly();
             default:
                 throw new UnsupportedOperationException(
                         "Unsupported changelog mode: " + changelogMode);

@@ -128,12 +128,17 @@ public final class RowDataDebeziumDeserializeSchema
             insert.setRowKind(RowKind.INSERT);
             emit(record, insert, out);
         } else if (op == Envelope.Operation.DELETE) {
+            if (changelogMode == DebeziumChangelogMode.INSERT_ONLY) {
+                return;
+            }
             GenericRowData delete = extractBeforeRow(value, valueSchema);
             validator.validate(delete, RowKind.DELETE);
             delete.setRowKind(RowKind.DELETE);
             emit(record, delete, out);
         } else {
-            if (changelogMode == DebeziumChangelogMode.ALL) {
+            if (changelogMode == DebeziumChangelogMode.INSERT_ONLY) {
+                return;
+            } else if (changelogMode == DebeziumChangelogMode.ALL) {
                 GenericRowData before = extractBeforeRow(value, valueSchema);
                 validator.validate(before, RowKind.UPDATE_BEFORE);
                 before.setRowKind(RowKind.UPDATE_BEFORE);
