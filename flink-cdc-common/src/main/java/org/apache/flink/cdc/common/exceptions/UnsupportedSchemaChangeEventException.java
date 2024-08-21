@@ -37,4 +37,18 @@ public class UnsupportedSchemaChangeEventException extends SchemaEvolveException
             SchemaChangeEvent applyingEvent, String exceptionMessage, @Nullable Throwable cause) {
         super(applyingEvent, exceptionMessage, cause);
     }
+
+    @Override
+    public String toString() {
+        return "UnsupportedSchemaChangeEventException{"
+                + "applyingEvent="
+                + applyingEvent
+                + ", exceptionMessage='"
+                + exceptionMessage
+                + '\''
+                + ", cause='"
+                + cause
+                + '\''
+                + '}';
+    }
 }
