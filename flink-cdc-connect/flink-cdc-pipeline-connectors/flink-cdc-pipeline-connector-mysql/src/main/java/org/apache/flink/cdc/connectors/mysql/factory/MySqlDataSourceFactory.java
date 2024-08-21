@@ -131,7 +131,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
-        boolean scanIncrementalNewlyAddedTableEnabled =
+        boolean scanBinlogNewlyAddedTableEnabled =
                 config.get(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -171,7 +171,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .jdbcProperties(getJdbcProperties(configMap))
                         .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
 
-        if (scanIncrementalNewlyAddedTableEnabled) {
+        if (scanBinlogNewlyAddedTableEnabled) {
             String newTables = validateTableAndReturnDebeziumStyle(tables);
             configFactory.tableList(newTables);
         } else {
