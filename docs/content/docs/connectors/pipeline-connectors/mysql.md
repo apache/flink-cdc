@@ -289,7 +289,7 @@ pipeline:
       <td>Boolean</td>
       <td>In binlog reading stage, whether to scan the ddl and dml statements of newly added tables or not, by default is false. <br>
           The difference between scan.newly-added-table.enabled and scan.binlog.newly-added-table.enabled options is: <br>
-          scan.newly-added-table.enabled: do re-snapshot & binlog-reading for newly added table when restore; <br>
+          scan.newly-added-table.enabled: do re-snapshot & binlog-reading for newly added table when restored; <br>
           scan.binlog.newly-added-table.enabled: only do binlog-reading for newly added table during binlog reading phase.
       </td>
     </tr>

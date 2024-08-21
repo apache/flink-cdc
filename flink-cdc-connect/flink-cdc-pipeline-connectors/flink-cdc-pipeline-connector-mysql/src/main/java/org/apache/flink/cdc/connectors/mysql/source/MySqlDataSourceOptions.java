@@ -270,6 +270,6 @@ public class MySqlDataSourceOptions {
                     .withDescription(
                             "In binlog reading stage, whether to scan the ddl and dml statements of newly added tables or not, by default is false. \n"
                                     + "The difference between scan.newly-added-table.enabled and scan.binlog.newly-added-table.enabled options is: \n"
-                                    + "scan.newly-added-table.enabled: do re-snapshot & binlog-reading for newly added table when restore; \n"
+                                    + "scan.newly-added-table.enabled: do re-snapshot & binlog-reading for newly added table when restored; \n"
                                     + "scan.binlog.newly-added-table.enabled: only do binlog-reading for newly added table during binlog reading phase.");
 }
