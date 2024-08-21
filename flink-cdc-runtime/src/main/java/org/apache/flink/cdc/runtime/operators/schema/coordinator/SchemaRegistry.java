@@ -149,18 +149,23 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     @Override
     public void handleEventFromOperator(int subtask, int attemptNumber, OperatorEvent event)
             throws Exception {
-        if (event instanceof FlushSuccessEvent) {
-            FlushSuccessEvent flushSuccessEvent = (FlushSuccessEvent) event;
-            LOG.info(
-                    "Sink subtask {} succeed flushing for table {}.",
-                    flushSuccessEvent.getSubtask(),
-                    flushSuccessEvent.getTableId().toString());
-            requestHandler.flushSuccess(
-                    flushSuccessEvent.getTableId(), flushSuccessEvent.getSubtask());
-        } else if (event instanceof SinkWriterRegisterEvent) {
-            requestHandler.registerSinkWriter(((SinkWriterRegisterEvent) event).getSubtask());
-        } else {
-            throw new FlinkException("Unrecognized Operator Event: " + event);
+        try {
+            if (event instanceof FlushSuccessEvent) {
+                FlushSuccessEvent flushSuccessEvent = (FlushSuccessEvent) event;
+                LOG.info(
+                        "Sink subtask {} succeed flushing for table {}.",
+                        flushSuccessEvent.getSubtask(),
+                        flushSuccessEvent.getTableId().toString());
+                requestHandler.flushSuccess(
+                        flushSuccessEvent.getTableId(), flushSuccessEvent.getSubtask());
+            } else if (event instanceof SinkWriterRegisterEvent) {
+                requestHandler.registerSinkWriter(((SinkWriterRegisterEvent) event).getSubtask());
+            } else {
+                throw new FlinkException("Unrecognized Operator Event: " + event);
+            }
+        } catch (Throwable t) {
+            context.failJob(t);
+            throw t;
         }
     }
 
@@ -178,6 +183,9 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
             // Serialize SchemaDerivation mapping
             SchemaDerivation.serializeDerivationMapping(schemaDerivation, out);
             resultFuture.complete(baos.toByteArray());
+        } catch (Throwable t) {
+            context.failJob(t);
+            throw t;
         }
     }
 
@@ -189,23 +197,29 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     @Override
     public CompletableFuture<CoordinationResponse> handleCoordinationRequest(
             CoordinationRequest request) {
-        if (request instanceof SchemaChangeRequest) {
-            SchemaChangeRequest schemaChangeRequest = (SchemaChangeRequest) request;
-            return requestHandler.handleSchemaChangeRequest(schemaChangeRequest);
-        } else if (request instanceof ReleaseUpstreamRequest) {
-            return requestHandler.handleReleaseUpstreamRequest();
-        } else if (request instanceof GetEvolvedSchemaRequest) {
-            return CompletableFuture.completedFuture(
-                    wrap(handleGetEvolvedSchemaRequest(((GetEvolvedSchemaRequest) request))));
-        } else if (request instanceof GetOriginalSchemaRequest) {
-            return CompletableFuture.completedFuture(
-                    wrap(handleGetOriginalSchemaRequest((GetOriginalSchemaRequest) request)));
-        } else if (request instanceof SchemaChangeResultRequest) {
-            return requestHandler.getSchemaChangeResult();
-        } else if (request instanceof RefreshPendingListsRequest) {
-            return requestHandler.refreshPendingLists();
-        } else {
-            throw new IllegalArgumentException("Unrecognized CoordinationRequest type: " + request);
+        try {
+            if (request instanceof SchemaChangeRequest) {
+                SchemaChangeRequest schemaChangeRequest = (SchemaChangeRequest) request;
+                return requestHandler.handleSchemaChangeRequest(schemaChangeRequest);
+            } else if (request instanceof ReleaseUpstreamRequest) {
+                return requestHandler.handleReleaseUpstreamRequest();
+            } else if (request instanceof GetEvolvedSchemaRequest) {
+                return CompletableFuture.completedFuture(
+                        wrap(handleGetEvolvedSchemaRequest(((GetEvolvedSchemaRequest) request))));
+            } else if (request instanceof GetOriginalSchemaRequest) {
+                return CompletableFuture.completedFuture(
+                        wrap(handleGetOriginalSchemaRequest((GetOriginalSchemaRequest) request)));
+            } else if (request instanceof SchemaChangeResultRequest) {
+                return requestHandler.getSchemaChangeResult();
+            } else if (request instanceof RefreshPendingListsRequest) {
+                return requestHandler.refreshPendingLists();
+            } else {
+                throw new IllegalArgumentException(
+                        "Unrecognized CoordinationRequest type: " + request);
+            }
+        } catch (Throwable t) {
+            context.failJob(t);
+            throw t;
         }
     }
 
@@ -263,6 +277,8 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                     throw new IOException(
                             "Unrecognized serialization version " + schemaManagerSerializerVersion);
             }
+        } catch (Throwable throwable) {
+            context.failJob(throwable);
         }
     }
 

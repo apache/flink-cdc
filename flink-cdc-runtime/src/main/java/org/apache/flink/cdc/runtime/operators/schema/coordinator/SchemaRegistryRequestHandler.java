@@ -161,7 +161,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
                         LOG.warn(
                                 "Failed to apply event {}, but keeps running in tolerant mode. Caused by: {}",
                                 changeEvent,
-                                e);
+                                t);
                     }
                 }
             }
