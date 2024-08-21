@@ -39,8 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # '1.20.0' is excluded since FLINK-36105 has not been merged.
-        flink-version: [ '1.18.1', '1.19.1' ]
+        flink-version: [ '1.18.1', '1.19.1', '1.20.0' ]
 
     steps:
       - uses: actions/checkout@v4
