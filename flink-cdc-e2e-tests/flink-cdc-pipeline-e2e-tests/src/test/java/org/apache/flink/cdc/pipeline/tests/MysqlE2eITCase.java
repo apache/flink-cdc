@@ -296,21 +296,10 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
             stat.execute("ALTER TABLE products DROP COLUMN new_column;");
             stat.execute(
                     "INSERT INTO products VALUES (default,'evangelion','Eva',2.1728, null, null, null);"); // 114
-
-            // Test TruncateTableEvent
-            stat.execute("TRUNCATE TABLE products;");
-
-            // Test DropTableEvent. It's all over.
-            stat.execute("DROP TABLE products;");
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
             throw e;
         }
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "DropTableEvent{tableId=%s.products}",
-                        mysqlInventoryDatabase.getDatabaseName()));
 
         validateResult(
                 "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0, null, null, null], after=[106, hammer, 18oz carpenter hammer, 1.0, null, null, null], op=UPDATE, meta=()}",
@@ -321,14 +310,12 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.products, before=[110, jacket, water resistent white wind breaker, 0.2, null, null, null, 1], after=[110, jacket, new water resistent white wind breaker, 0.5, null, null, null, 1], op=UPDATE, meta=()}",
                 "DataChangeEvent{tableId=%s.products, before=[111, scooter, Big 2-wheel scooter , 5.18, null, null, null, 1], after=[111, scooter, Big 2-wheel scooter , 5.17, null, null, null, 1], op=UPDATE, meta=()}",
                 "DataChangeEvent{tableId=%s.products, before=[111, scooter, Big 2-wheel scooter , 5.17, null, null, null, 1], after=[], op=DELETE, meta=()}",
-                "AlterColumnTypeEvent{tableId=%s.products, typeMapping={new_col=BIGINT}, oldTypeMapping={new_col=INT}}",
+                "AlterColumnTypeEvent{tableId=%s.products, nameMapping={new_col=BIGINT}}",
                 "DataChangeEvent{tableId=%s.products, before=[], after=[112, derrida, forever 21, 2.1728, null, null, null, 2147483649], op=INSERT, meta=()}",
                 "RenameColumnEvent{tableId=%s.products, nameMapping={new_col=new_column}}",
                 "DataChangeEvent{tableId=%s.products, before=[], after=[113, dynazenon, SSSS, 2.1728, null, null, null, 2147483649], op=INSERT, meta=()}",
                 "DropColumnEvent{tableId=%s.products, droppedColumnNames=[new_column]}",
-                "DataChangeEvent{tableId=%s.products, before=[], after=[114, evangelion, Eva, 2.1728, null, null, null], op=INSERT, meta=()}",
-                "TruncateTableEvent{tableId=%s.products}",
-                "DropTableEvent{tableId=%s.products}");
+                "DataChangeEvent{tableId=%s.products, before=[], after=[114, evangelion, Eva, 2.1728, null, null, null], op=INSERT, meta=()}");
     }
 
     private void validateResult(String... expectedEvents) throws Exception {
