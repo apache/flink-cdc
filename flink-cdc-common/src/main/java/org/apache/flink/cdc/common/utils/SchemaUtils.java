@@ -40,7 +40,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -347,5 +349,74 @@ public class SchemaUtils {
                             }
                         });
         return oldSchema.copy(columns);
+    }
+
+    public static Optional<SchemaChangeEvent> transformSchemaChangeEvent(
+            boolean hasAsterisk, List<String> referencedColumns, SchemaChangeEvent event) {
+        Optional<SchemaChangeEvent> evolvedSchemaChangeEvent = Optional.empty();
+        if (event instanceof AddColumnEvent) {
+            // Send add column events to downstream iff there's an asterisk
+            if (hasAsterisk) {
+                List<AddColumnEvent.ColumnWithPosition> addedColumns =
+                        ((AddColumnEvent) event)
+                                .getAddedColumns().stream()
+                                        .map(
+                                                e -> {
+                                                    if (AddColumnEvent.ColumnPosition.LAST.equals(
+                                                            e.getPosition())) {
+                                                        return new AddColumnEvent
+                                                                .ColumnWithPosition(
+                                                                e.getAddColumn(),
+                                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                                referencedColumns.get(
+                                                                        referencedColumns.size()
+                                                                                - 1));
+                                                    } else if (AddColumnEvent.ColumnPosition.FIRST
+                                                            .equals(e.getPosition())) {
+                                                        return new AddColumnEvent
+                                                                .ColumnWithPosition(
+                                                                e.getAddColumn(),
+                                                                AddColumnEvent.ColumnPosition
+                                                                        .BEFORE,
+                                                                referencedColumns.get(0));
+                                                    } else {
+                                                        return e;
+                                                    }
+                                                })
+                                        .collect(Collectors.toList());
+                evolvedSchemaChangeEvent =
+                        Optional.of(new AddColumnEvent(event.tableId(), addedColumns));
+            }
+        } else if (event instanceof AlterColumnTypeEvent) {
+            AlterColumnTypeEvent alterColumnTypeEvent = (AlterColumnTypeEvent) event;
+            if (hasAsterisk) {
+                // In wildcard mode, all alter column type events should be sent to downstream
+                evolvedSchemaChangeEvent = Optional.of(event);
+            } else {
+                // Or, we need to filter out those referenced columns and reconstruct
+                // SchemaChangeEvents
+                Map<String, DataType> newDataTypeMap =
+                        alterColumnTypeEvent.getTypeMapping().entrySet().stream()
+                                .filter(e -> referencedColumns.contains(e.getKey()))
+                                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                if (!newDataTypeMap.isEmpty()) {
+                    evolvedSchemaChangeEvent =
+                            Optional.of(
+                                    new AlterColumnTypeEvent(
+                                            alterColumnTypeEvent.tableId(), newDataTypeMap));
+                }
+            }
+        } else if (event instanceof RenameColumnEvent) {
+            if (hasAsterisk) {
+                evolvedSchemaChangeEvent = Optional.of(event);
+            }
+        } else if (event instanceof DropColumnEvent) {
+            if (hasAsterisk) {
+                evolvedSchemaChangeEvent = Optional.of(event);
+            }
+        } else {
+            evolvedSchemaChangeEvent = Optional.of(event);
+        }
+        return evolvedSchemaChangeEvent;
     }
 }
