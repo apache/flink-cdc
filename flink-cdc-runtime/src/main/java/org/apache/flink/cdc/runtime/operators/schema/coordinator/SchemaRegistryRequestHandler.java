@@ -133,14 +133,14 @@ public class SchemaRegistryRequestHandler implements Closeable {
             if (schemaManager.isOriginalSchemaChangeEventRedundant(event)) {
                 LOG.info("Event {} has been addressed before, ignoring it.", event);
                 finishCurrentSchemaChangeRequest();
-                return CompletableFuture.completedFuture(wrap(SchemaChangeResponse.DUPLICATE()));
+                return CompletableFuture.completedFuture(wrap(SchemaChangeResponse.duplicate()));
             }
             schemaManager.applyOriginalSchemaChange(event);
             List<SchemaChangeEvent> derivedSchemaChangeEvents =
                     calculateDerivedSchemaChangeEvents(request.getSchemaChangeEvent());
             if (derivedSchemaChangeEvents.isEmpty()) {
                 finishCurrentSchemaChangeRequest();
-                return CompletableFuture.completedFuture(wrap(SchemaChangeResponse.IGNORED()));
+                return CompletableFuture.completedFuture(wrap(SchemaChangeResponse.ignored()));
             } else {
                 derivedSchemaChangeEvents.forEach(
                         e -> {
@@ -156,13 +156,13 @@ public class SchemaRegistryRequestHandler implements Closeable {
                         });
                 currentDerivedSchemaChangeEvents = new ArrayList<>(derivedSchemaChangeEvents);
                 return CompletableFuture.completedFuture(
-                        wrap(SchemaChangeResponse.ACCEPTED(derivedSchemaChangeEvents)));
+                        wrap(SchemaChangeResponse.accepted(derivedSchemaChangeEvents)));
             }
         } else {
             LOG.info(
                     "Schema Registry is busy processing a schema change request, could not handle request {} for now.",
                     request);
-            return CompletableFuture.completedFuture(wrap(SchemaChangeResponse.BUSY()));
+            return CompletableFuture.completedFuture(wrap(SchemaChangeResponse.busy()));
         }
     }
 

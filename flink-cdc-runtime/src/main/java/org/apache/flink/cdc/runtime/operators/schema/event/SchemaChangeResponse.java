@@ -41,19 +41,19 @@ public class SchemaChangeResponse implements CoordinationResponse {
 
     private final ResponseCode responseCode;
 
-    public static SchemaChangeResponse ACCEPTED(List<SchemaChangeEvent> schemaChangeEvents) {
+    public static SchemaChangeResponse accepted(List<SchemaChangeEvent> schemaChangeEvents) {
         return new SchemaChangeResponse(schemaChangeEvents, ResponseCode.ACCEPTED);
     }
 
-    public static SchemaChangeResponse BUSY() {
+    public static SchemaChangeResponse busy() {
         return new SchemaChangeResponse(Collections.emptyList(), ResponseCode.BUSY);
     }
 
-    public static SchemaChangeResponse DUPLICATE() {
+    public static SchemaChangeResponse duplicate() {
         return new SchemaChangeResponse(Collections.emptyList(), ResponseCode.DUPLICATE);
     }
 
-    public static SchemaChangeResponse IGNORED() {
+    public static SchemaChangeResponse ignored() {
         return new SchemaChangeResponse(Collections.emptyList(), ResponseCode.IGNORED);
     }
 
@@ -111,6 +111,20 @@ public class SchemaChangeResponse implements CoordinationResponse {
                 + '}';
     }
 
+    /**
+     * Schema Change Response status code.
+     *
+     * <p>- Accepted: Requested schema change request has been accepted exclusively. Any other
+     * schema change requests will be blocked.
+     *
+     * <p>- Busy: Schema registry is currently busy processing another schema change request.
+     *
+     * <p>- Duplicate: This schema change request has been submitted before, possibly by another
+     * paralleled subTask.
+     *
+     * <p>- Ignored: This schema change request has been assessed, but no actual evolution is
+     * required. Possibly caused by LENIENT mode or merging table strategies.
+     */
     public enum ResponseCode {
         ACCEPTED,
         BUSY,
