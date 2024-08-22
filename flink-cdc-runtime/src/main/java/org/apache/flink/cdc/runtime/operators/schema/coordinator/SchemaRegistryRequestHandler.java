@@ -25,7 +25,6 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
-import org.apache.flink.cdc.common.event.SchemaChangeEventWithPreSchema;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
@@ -48,11 +47,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
@@ -103,8 +102,8 @@ public class SchemaRegistryRequestHandler implements Closeable {
         this.schemaDerivation = schemaDerivation;
         this.schemaChangeBehavior = schemaChangeBehavior;
 
-        this.activeSinkWriters = new HashSet<>();
-        this.flushedSinkWriters = new HashSet<>();
+        this.activeSinkWriters = ConcurrentHashMap.newKeySet();
+        this.flushedSinkWriters = ConcurrentHashMap.newKeySet();
         this.schemaChangeThreadPool = Executors.newSingleThreadExecutor();
 
         this.currentDerivedSchemaChangeEvents = new ArrayList<>();
@@ -122,7 +121,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
             SchemaChangeRequest request) {
         if (schemaChangeStatus.compareAndSet(RequestStatus.IDLE, RequestStatus.WAITING_FOR_FLUSH)) {
             LOG.info(
-                    "Received schema change event request {} from table {}. Start to buffer requests for others.",
+                    "Received schema change event request {} from table {}. SchemaChangeStatus switched from IDLE to WAITING_FOR_FLUSH, other requests will be blocked.",
                     request.getSchemaChangeEvent(),
                     request.getTableId().toString());
             SchemaChangeEvent event = request.getSchemaChangeEvent();
@@ -134,7 +133,11 @@ public class SchemaRegistryRequestHandler implements Closeable {
                 Preconditions.checkState(
                         schemaChangeStatus.compareAndSet(
                                 RequestStatus.WAITING_FOR_FLUSH, RequestStatus.IDLE),
-                        "Illegal schemaChangeStatus state: should still in WAITING_FOR_FLUSH state if event was duplicated.");
+                        "Illegal schemaChangeStatus state: should still in WAITING_FOR_FLUSH state if event was duplicated, not "
+                                + schemaChangeStatus.get());
+                LOG.info(
+                        "SchemaChangeStatus switched from WAITING_FOR_FLUSH to IDLE for request {} due to duplicated request.",
+                        request);
                 return CompletableFuture.completedFuture(wrap(SchemaChangeResponse.duplicate()));
             }
             schemaManager.applyOriginalSchemaChange(event);
@@ -149,22 +152,13 @@ public class SchemaRegistryRequestHandler implements Closeable {
                 Preconditions.checkState(
                         schemaChangeStatus.compareAndSet(
                                 RequestStatus.WAITING_FOR_FLUSH, RequestStatus.IDLE),
-                        "Illegal schemaChangeStatus state: should still in WAITING_FOR_FLUSH state if event was ignored.");
+                        "Illegal schemaChangeStatus state: should still in WAITING_FOR_FLUSH state if event was ignored, not "
+                                + schemaChangeStatus.get());
+                LOG.info(
+                        "SchemaChangeStatus switched from WAITING_FOR_FLUSH to IDLE for request {} due to ignored request.",
+                        request);
                 return CompletableFuture.completedFuture(wrap(SchemaChangeResponse.ignored()));
             }
-
-            // Backfill pre-schema info for sink applying
-            derivedSchemaChangeEvents.forEach(
-                    e -> {
-                        if (e instanceof SchemaChangeEventWithPreSchema) {
-                            SchemaChangeEventWithPreSchema pe = (SchemaChangeEventWithPreSchema) e;
-                            if (!pe.hasPreSchema()) {
-                                schemaManager
-                                        .getLatestEvolvedSchema(pe.tableId())
-                                        .ifPresent(pe::fillPreSchema);
-                            }
-                        }
-                    });
             currentDerivedSchemaChangeEvents = new ArrayList<>(derivedSchemaChangeEvents);
             return CompletableFuture.completedFuture(
                     wrap(SchemaChangeResponse.accepted(derivedSchemaChangeEvents)));
@@ -220,7 +214,11 @@ public class SchemaRegistryRequestHandler implements Closeable {
         }
         Preconditions.checkState(
                 schemaChangeStatus.compareAndSet(RequestStatus.APPLYING, RequestStatus.FINISHED),
-                "Illegal schemaChangeStatus state: should be APPLYING before applySchemaChange finishes");
+                "Illegal schemaChangeStatus state: should be APPLYING before applySchemaChange finishes, not "
+                        + schemaChangeStatus.get());
+        LOG.info(
+                "SchemaChangeStatus switched from APPLYING to FINISHED for request {}.",
+                currentDerivedSchemaChangeEvents);
     }
 
     /**
@@ -239,13 +237,21 @@ public class SchemaRegistryRequestHandler implements Closeable {
      * @param tableId the subtask in SchemaOperator and table that the FlushEvent is about
      * @param sinkSubtask the sink subtask succeed flushing
      */
-    public void flushSuccess(TableId tableId, int sinkSubtask) {
+    public void flushSuccess(TableId tableId, int sinkSubtask, int parallelism) {
         flushedSinkWriters.add(sinkSubtask);
+        if (activeSinkWriters.size() < parallelism) {
+            LOG.info(
+                    "Not all active sink writers have been registered. Current {}, expected {}.",
+                    activeSinkWriters.size(),
+                    parallelism);
+            return;
+        }
         if (flushedSinkWriters.equals(activeSinkWriters)) {
             Preconditions.checkState(
                     schemaChangeStatus.compareAndSet(
                             RequestStatus.WAITING_FOR_FLUSH, RequestStatus.APPLYING),
-                    "Illegal schemaChangeStatus state: should be WAITING_FOR_FLUSH before collecting enough FlushEvents");
+                    "Illegal schemaChangeStatus state: should be WAITING_FOR_FLUSH before collecting enough FlushEvents, not "
+                            + schemaChangeStatus);
             LOG.info(
                     "All sink subtask have flushed for table {}. Start to apply schema change.",
                     tableId.toString());
@@ -259,6 +265,10 @@ public class SchemaRegistryRequestHandler implements Closeable {
                 !schemaChangeStatus.get().equals(RequestStatus.IDLE),
                 "Illegal schemaChangeStatus: should not be IDLE before getting schema change request results.");
         if (schemaChangeStatus.compareAndSet(RequestStatus.FINISHED, RequestStatus.IDLE)) {
+            LOG.info(
+                    "SchemaChangeStatus switched from FINISHED to IDLE for request {}",
+                    currentDerivedSchemaChangeEvents);
+
             // This request has been finished, return it and prepare for the next request
             List<SchemaChangeEvent> finishedEvents = clearCurrentSchemaChangeRequest();
             return CompletableFuture.supplyAsync(
@@ -379,10 +389,6 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     }
                     return events;
                 }
-            case DROP_TABLE:
-                // We don't drop any tables in Lenient mode.
-                LOG.info("A drop table event {} has been ignored in Lenient mode.", event);
-                return Collections.emptyList();
             default:
                 return Collections.singletonList(event);
         }

@@ -97,13 +97,11 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                 Arrays.asList(
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1012 -> Eve, 1012, Eve, 17, 0, 1024144, age < 20], op=INSERT, meta=()}",
-                        "AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}",
+                        "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
                         "RenameColumnEvent{tableId=%s.members, nameMapping={gender=biological_sex}}",
                         "DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1013 -> Fiona, 1013, Fiona, 16.0, 1026169, age < 20], op=INSERT, meta=()}",
-                        "TruncateTableEvent{tableId=%s.members}",
-                        "DataChangeEvent{tableId=%s.members, before=[], after=[1014 -> Gem, 1014, Gem, 17.0, 1028196, age < 20], op=INSERT, meta=()}",
-                        "DropTableEvent{tableId=%s.members}"));
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1014 -> Gem, 1014, Gem, 17.0, 1028196, age < 20], op=INSERT, meta=()}"));
     }
 
     @Test
@@ -186,10 +184,9 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                 Arrays.asList(
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=LAST, existedColumnName=null}]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1012 -> Eve, 1012, Eve, 17, 1024144, age < 20, 0], op=INSERT, meta=()}",
-                        "AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}",
+                        "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`biological_sex` TINYINT, position=LAST, existedColumnName=null}]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1013 -> Fiona, 1013, Fiona, 16.0, 1026169, age < 20, null, null], op=INSERT, meta=()}",
-                        "TruncateTableEvent{tableId=%s.members}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1014 -> Gem, 1014, Gem, 17.0, 1028196, age < 20, null, null], op=INSERT, meta=()}"));
     }
 
@@ -204,14 +201,12 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                 Arrays.asList(
                         "AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1012 -> Eve, 1012, Eve, 17, 0, 1024144, age < 20], op=INSERT, meta=()}",
-                        "AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}",
+                        "AlterColumnTypeEvent{tableId=%s.members, nameMapping={age=DOUBLE}}",
                         "RenameColumnEvent{tableId=%s.members, nameMapping={gender=biological_sex}}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1013 -> Fiona, 1013, Fiona, 16.0, null, 1026169, age < 20], op=INSERT, meta=()}",
-                        "TruncateTableEvent{tableId=%s.members}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1014 -> Gem, 1014, Gem, 17.0, null, 1028196, age < 20], op=INSERT, meta=()}"),
-                Arrays.asList(
-                        "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]} to table %s.members.",
-                        "Ignored schema change DropTableEvent{tableId=%s.members} to table %s.members."));
+                Collections.singletonList(
+                        "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]} to table %s.members."));
     }
 
     @Test
@@ -352,13 +347,6 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
             // triggers DropColumnEvent
             stmt.execute("ALTER TABLE members DROP COLUMN biological_sex");
             stmt.execute("INSERT INTO members VALUES (1013, 'Fiona', 16);");
-
-            // triggers TruncateTableEvent
-            stmt.execute("TRUNCATE TABLE members;");
-            stmt.execute("INSERT INTO members VALUES (1014, 'Gem', 17);");
-
-            // triggers DropTableEvent
-            stmt.execute("DROP TABLE members;");
         }
 
         List<String> expectedTmEvents =
