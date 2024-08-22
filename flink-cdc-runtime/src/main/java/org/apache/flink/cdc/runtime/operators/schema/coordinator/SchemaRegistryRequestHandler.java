@@ -412,22 +412,27 @@ public class SchemaRegistryRequestHandler implements Closeable {
 
     // Schema change event state could transfer in the following way:
     //
-    // If duplicate() or ignored()
-    //              |
-    //              v
-    //      -------------------
+    //      -------- B --------
     //      |                 |
     //      v                 |
-    //  --------     ---------------------
-    //  | IDLE |  -> | WAITING_FOR_FLUSH |
-    //  --------     ---------------------
-    //     ^                  |
-    //      \                 | <- Collected enough flush success
-    //       \                v
-    //  ------------    ------------
-    //  | FINISHED | <- | APPLYING |
-    //  ------------    ------------
+    //  --------           ---------------------
+    //  | IDLE | --- A --> | WAITING_FOR_FLUSH |
+    //  --------           ---------------------
+    //     ^                        |
+    //      E                       C
+    //       \                      v
+    //  ------------          ------------
+    //  | FINISHED | <-- D -- | APPLYING |
+    //  ------------          ------------
     //
+    //  A: When a request came to an idling request handler.
+    //  B: When current request is duplicate or ignored by LENIENT / routed table merging
+    // strategies.
+    //  C: When schema registry collected enough flush success events, and actually started to apply
+    // schema changes.
+    //  D: When schema change application finishes (successfully or with exceptions)
+    //  E: When current schema change request result has been retrieved by SchemaOperator, and ready
+    // for the next request.
     private enum RequestStatus {
         IDLE,
         WAITING_FOR_FLUSH,
