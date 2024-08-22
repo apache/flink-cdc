@@ -133,16 +133,14 @@ public class SchemaRegistryRequestHandler implements Closeable {
             if (schemaManager.isOriginalSchemaChangeEventRedundant(event)) {
                 LOG.info("Event {} has been addressed before, ignoring it.", event);
                 finishCurrentSchemaChangeRequest();
-                return CompletableFuture.completedFuture(
-                        wrap(new SchemaChangeResponse(Collections.emptyList())));
+                return CompletableFuture.completedFuture(wrap(SchemaChangeResponse.DUPLICATE()));
             }
             schemaManager.applyOriginalSchemaChange(event);
             List<SchemaChangeEvent> derivedSchemaChangeEvents =
                     calculateDerivedSchemaChangeEvents(request.getSchemaChangeEvent());
             if (derivedSchemaChangeEvents.isEmpty()) {
                 finishCurrentSchemaChangeRequest();
-                return CompletableFuture.completedFuture(
-                        wrap(new SchemaChangeResponse(Collections.emptyList())));
+                return CompletableFuture.completedFuture(wrap(SchemaChangeResponse.IGNORED()));
             } else {
                 derivedSchemaChangeEvents.forEach(
                         e -> {
@@ -158,11 +156,13 @@ public class SchemaRegistryRequestHandler implements Closeable {
                         });
                 currentDerivedSchemaChangeEvents = new ArrayList<>(derivedSchemaChangeEvents);
                 return CompletableFuture.completedFuture(
-                        wrap(new SchemaChangeResponse(derivedSchemaChangeEvents)));
+                        wrap(SchemaChangeResponse.ACCEPTED(derivedSchemaChangeEvents)));
             }
         } else {
-            LOG.info("There is already a schema change request in progress. Rejected {}.", request);
-            return CompletableFuture.completedFuture(wrap(SchemaChangeResponse.REJECTED));
+            LOG.info(
+                    "Schema Registry is busy processing a schema change request, could not handle request {} for now.",
+                    request);
+            return CompletableFuture.completedFuture(wrap(SchemaChangeResponse.BUSY()));
         }
     }
 

@@ -22,6 +22,7 @@ import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -38,22 +39,44 @@ public class SchemaChangeResponse implements CoordinationResponse {
      */
     private final List<SchemaChangeEvent> schemaChangeEvents;
 
-    private final boolean isRejected;
+    private final ResponseCode responseCode;
 
-    public static final SchemaChangeResponse REJECTED = new SchemaChangeResponse();
-
-    private SchemaChangeResponse() {
-        this.schemaChangeEvents = null;
-        this.isRejected = true;
+    public static SchemaChangeResponse ACCEPTED(List<SchemaChangeEvent> schemaChangeEvents) {
+        return new SchemaChangeResponse(schemaChangeEvents, ResponseCode.ACCEPTED);
     }
 
-    public SchemaChangeResponse(List<SchemaChangeEvent> schemaChangeEvents) {
+    public static SchemaChangeResponse BUSY() {
+        return new SchemaChangeResponse(Collections.emptyList(), ResponseCode.BUSY);
+    }
+
+    public static SchemaChangeResponse DUPLICATE() {
+        return new SchemaChangeResponse(Collections.emptyList(), ResponseCode.DUPLICATE);
+    }
+
+    public static SchemaChangeResponse IGNORED() {
+        return new SchemaChangeResponse(Collections.emptyList(), ResponseCode.IGNORED);
+    }
+
+    private SchemaChangeResponse(
+            List<SchemaChangeEvent> schemaChangeEvents, ResponseCode responseCode) {
         this.schemaChangeEvents = schemaChangeEvents;
-        this.isRejected = false;
+        this.responseCode = responseCode;
     }
 
-    public boolean isRejected() {
-        return isRejected;
+    public boolean isAccepted() {
+        return ResponseCode.ACCEPTED.equals(responseCode);
+    }
+
+    public boolean isRegistryBusy() {
+        return ResponseCode.BUSY.equals(responseCode);
+    }
+
+    public boolean isDuplicate() {
+        return ResponseCode.DUPLICATE.equals(responseCode);
+    }
+
+    public boolean isIgnored() {
+        return ResponseCode.IGNORED.equals(responseCode);
     }
 
     public List<SchemaChangeEvent> getSchemaChangeEvents() {
@@ -70,11 +93,28 @@ public class SchemaChangeResponse implements CoordinationResponse {
         }
         SchemaChangeResponse response = (SchemaChangeResponse) o;
         return Objects.equals(schemaChangeEvents, response.schemaChangeEvents)
-                && isRejected == response.isRejected;
+                && responseCode == response.responseCode;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(schemaChangeEvents);
+        return Objects.hash(schemaChangeEvents, responseCode);
+    }
+
+    @Override
+    public String toString() {
+        return "SchemaChangeResponse{"
+                + "schemaChangeEvents="
+                + schemaChangeEvents
+                + ", responseCode="
+                + responseCode
+                + '}';
+    }
+
+    public enum ResponseCode {
+        ACCEPTED,
+        BUSY,
+        DUPLICATE,
+        IGNORED
     }
 }

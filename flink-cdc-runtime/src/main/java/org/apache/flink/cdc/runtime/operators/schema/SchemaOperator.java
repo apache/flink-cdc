@@ -117,6 +117,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private final SchemaChangeBehavior schemaChangeBehavior;
 
     private transient SchemaOperatorMetrics schemaOperatorMetrics;
+    private transient int subTaskId;
 
     @VisibleForTesting
     public SchemaOperator(List<RouteRule> routingRules) {
@@ -150,6 +151,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         schemaOperatorMetrics =
                 new SchemaOperatorMetrics(
                         getRuntimeContext().getMetricGroup(), schemaChangeBehavior);
+        subTaskId = getRuntimeContext().getIndexOfThisSubtask();
     }
 
     @Override
@@ -234,7 +236,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private void processSchemaChangeEvents(SchemaChangeEvent event)
             throws InterruptedException, TimeoutException, ExecutionException {
         TableId tableId = event.tableId();
-        LOG.info("Table {} received SchemaChangeEvent {} and start to be blocked.", tableId, event);
+        LOG.info(
+                ">{} Table {} received SchemaChangeEvent {} and start to be blocked.",
+                subTaskId,
+                tableId,
+                event);
         handleSchemaChangeEvent(tableId, event);
         // Update caches
         originalSchema.put(tableId, getLatestOriginalSchema(tableId));
@@ -400,11 +406,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
         // The request will block if another schema change event is being handled
         SchemaChangeResponse response = requestSchemaChange(tableId, schemaChangeEvent);
-        if (!response.getSchemaChangeEvents().isEmpty()) {
-            LOG.info(
-                    "Sending the FlushEvent for table {} in subtask {}.",
-                    tableId,
-                    getRuntimeContext().getIndexOfThisSubtask());
+        if (response.isAccepted()) {
+            LOG.info(">{} Sending the FlushEvent for table {}.", subTaskId, tableId);
             output.collect(new StreamRecord<>(new FlushEvent(tableId)));
             List<SchemaChangeEvent> expectedSchemaChangeEvents = response.getSchemaChangeEvents();
             schemaOperatorMetrics.increaseSchemaChangeEvents(expectedSchemaChangeEvents.size());
@@ -416,20 +419,36 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
             // Update evolved schema changes based on apply results
             finishedSchemaChangeEvents.forEach(e -> output.collect(new StreamRecord<>(e)));
+        } else if (response.isDuplicate()) {
+            LOG.info(
+                    ">{} Schema change event {} has been handled in another subTask already.",
+                    subTaskId,
+                    schemaChangeEvent);
+        } else if (response.isIgnored()) {
+            LOG.info(
+                    ">{} Schema change event {} has been ignored. No schema evolution needed.",
+                    subTaskId,
+                    schemaChangeEvent);
+        } else {
+            throw new IllegalStateException("Unexpected response status " + response);
         }
     }
 
     private SchemaChangeResponse requestSchemaChange(
-            TableId tableId, SchemaChangeEvent schemaChangeEvent) {
+            TableId tableId, SchemaChangeEvent schemaChangeEvent)
+            throws InterruptedException, TimeoutException {
+        long schemaEvolveTimeOutMillis = System.currentTimeMillis() + rpcTimeOutInMillis;
         while (true) {
             SchemaChangeResponse response =
                     sendRequestToCoordinator(new SchemaChangeRequest(tableId, schemaChangeEvent));
-            if (response.isRejected()) {
-                try {
-                    LOG.info("Schema Registry is busy now, waiting for next request...");
+            if (response.isRegistryBusy()) {
+                if (System.currentTimeMillis() < schemaEvolveTimeOutMillis) {
+                    LOG.info(
+                            ">{} Schema Registry is busy now, waiting for next request...",
+                            subTaskId);
                     Thread.sleep(1000);
-                } catch (InterruptedException ignored) {
-                    // Do nothing, enter the next loop
+                } else {
+                    throw new TimeoutException("TimeOut when requesting schema change");
                 }
             } else {
                 return response;
