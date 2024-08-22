@@ -26,9 +26,7 @@ public enum DebeziumChangelogMode {
      * must be set in tables to use this changelog mode.
      */
     UPSERT("upsert"),
-    /**
-     * Encodes changes as an insert-only stream.
-     */
+    /** Encodes changes as an insert-only stream. */
     INSERT_ONLY("insert-only");
 
     private final String value;
