@@ -237,7 +237,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             throws InterruptedException, TimeoutException, ExecutionException {
         TableId tableId = event.tableId();
         LOG.info(
-                ">{} Table {} received SchemaChangeEvent {} and start to be blocked.",
+                "{}> Table {} received SchemaChangeEvent {} and start to be blocked.",
                 subTaskId,
                 tableId,
                 event);
@@ -407,7 +407,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         // The request will block if another schema change event is being handled
         SchemaChangeResponse response = requestSchemaChange(tableId, schemaChangeEvent);
         if (response.isAccepted()) {
-            LOG.info(">{} Sending the FlushEvent for table {}.", subTaskId, tableId);
+            LOG.info("{}> Sending the FlushEvent for table {}.", subTaskId, tableId);
             output.collect(new StreamRecord<>(new FlushEvent(tableId)));
             List<SchemaChangeEvent> expectedSchemaChangeEvents = response.getSchemaChangeEvents();
             schemaOperatorMetrics.increaseSchemaChangeEvents(expectedSchemaChangeEvents.size());
@@ -421,12 +421,12 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             finishedSchemaChangeEvents.forEach(e -> output.collect(new StreamRecord<>(e)));
         } else if (response.isDuplicate()) {
             LOG.info(
-                    ">{} Schema change event {} has been handled in another subTask already.",
+                    "{}> Schema change event {} has been handled in another subTask already.",
                     subTaskId,
                     schemaChangeEvent);
         } else if (response.isIgnored()) {
             LOG.info(
-                    ">{} Schema change event {} has been ignored. No schema evolution needed.",
+                    "{}> Schema change event {} has been ignored. No schema evolution needed.",
                     subTaskId,
                     schemaChangeEvent);
         } else {
@@ -444,7 +444,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             if (response.isRegistryBusy()) {
                 if (System.currentTimeMillis() < schemaEvolveTimeOutMillis) {
                     LOG.info(
-                            ">{} Schema Registry is busy now, waiting for next request...",
+                            "{}> Schema Registry is busy now, waiting for next request...",
                             subTaskId);
                     Thread.sleep(1000);
                 } else {
