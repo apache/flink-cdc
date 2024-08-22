@@ -21,6 +21,7 @@ import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
@@ -83,7 +84,10 @@ import static java.lang.String.format;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_MODE;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_ID;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
@@ -147,6 +151,40 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         io.debezium.config.Configuration configuration =
                 io.debezium.config.Configuration.from(properties);
         return DebeziumUtils.createMySqlConnection(configuration, new Properties());
+    }
+
+    @Test
+    public void testScanBinlogNewlyAddedTableEnabled() throws Exception {
+        List<String> tables = Collections.singletonList("address_\\.*");
+        Map<String, String> options = new HashMap<>();
+        options.put(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
+        options.put(SCAN_STARTUP_MODE.key(), "timestamp");
+        options.put(
+                SCAN_STARTUP_TIMESTAMP_MILLIS.key(), String.valueOf(System.currentTimeMillis()));
+
+        FlinkSourceProvider sourceProvider = getFlinkSourceProvider(tables, 4, options);
+        StreamExecutionEnvironment env =
+                StreamExecutionEnvironment.getExecutionEnvironment(new Configuration());
+        env.enableCheckpointing(200);
+        DataStreamSource<Event> source =
+                env.fromSource(
+                        sourceProvider.getSource(),
+                        WatermarkStrategy.noWatermarks(),
+                        MySqlDataSourceFactory.IDENTIFIER,
+                        new EventTypeInfo());
+
+        TypeSerializer<Event> serializer =
+                source.getTransformation().getOutputType().createSerializer(env.getConfig());
+        CheckpointedCollectResultBuffer<Event> resultBuffer =
+                new CheckpointedCollectResultBuffer<>(serializer);
+        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
+        CollectResultIterator<Event> iterator =
+                addCollector(env, source, resultBuffer, serializer, accumulatorName);
+        env.executeAsync("AddNewlyTablesWhenReadingBinlog");
+        initialAddressTables(getConnection(), Collections.singletonList("address_beijing"));
+        List<Event> actual = fetchResults(iterator, 4);
+        assertThat(((ChangeEvent) actual.get(0)).tableId())
+                .isEqualTo(TableId.tableId(customDatabase.getDatabaseName(), "address_beijing"));
     }
 
     @Test
@@ -228,7 +266,7 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         List<String> listenTablesFirstRound = testParam.getFirstRoundListenTables();
 
         FlinkSourceProvider sourceProvider =
-                getFlinkSourceProvider(listenTablesFirstRound, parallelism);
+                getFlinkSourceProvider(listenTablesFirstRound, parallelism, new HashMap<>());
         DataStreamSource<Event> source =
                 env.fromSource(
                         sourceProvider.getSource(),
@@ -272,7 +310,7 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
                 getStreamExecutionEnvironment(finishedSavePointPath, parallelism);
         List<String> listenTablesSecondRound = testParam.getSecondRoundListenTables();
         FlinkSourceProvider restoredSourceProvider =
-                getFlinkSourceProvider(listenTablesSecondRound, parallelism);
+                getFlinkSourceProvider(listenTablesSecondRound, parallelism, new HashMap<>());
         DataStreamSource<Event> restoreSource =
                 restoredEnv.fromSource(
                         restoredSourceProvider.getSource(),
@@ -432,7 +470,8 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         }
     }
 
-    private FlinkSourceProvider getFlinkSourceProvider(List<String> tables, int parallelism) {
+    private FlinkSourceProvider getFlinkSourceProvider(
+            List<String> tables, int parallelism, Map<String, String> additionalOptions) {
         List<String> fullTableNames =
                 tables.stream()
                         .map(table -> customDatabase.getDatabaseName() + "." + table)
@@ -446,6 +485,7 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         options.put(TABLES.key(), StringUtils.join(fullTableNames, ","));
         options.put(SERVER_ID.key(), getServerId(parallelism));
         options.put(SCAN_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
+        options.putAll(additionalOptions);
         Factory.Context context =
                 new FactoryHelper.DefaultContext(
                         org.apache.flink.cdc.common.configuration.Configuration.fromMap(options),
