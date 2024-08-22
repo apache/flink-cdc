@@ -836,9 +836,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                     "failed to get specific event: "
                             + event
                             + " from stdout: "
-                            + taskManagerConsumer.toUtf8String()
-                            + "\n==== JM Log ====\n"
-                            + jobManagerConsumer.toUtf8String());
+                            + taskManagerConsumer.toUtf8String());
         }
     }
 
