@@ -35,6 +35,7 @@ import org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch.SqlServerSo
 import org.apache.flink.cdc.connectors.sqlserver.testutils.RecordsFormatter;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
@@ -50,6 +51,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.sqlserver.source.utils.SqlServerConnectionUtils.createSqlServerConnection;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
@@ -187,6 +190,29 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                 readTableSnapshotSplits(
                         snapshotSplits, sqlServerSourceFetchTaskContext, 1, dataType, hooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+    }
+
+    @Test
+    public void testDateTimePrimaryKey() throws Exception {
+        String databaseName = "pk";
+        String tableName = "dbo.dt_pk";
+
+        initializeSqlServerTable(databaseName);
+
+        SqlServerSourceConfigFactory sourceConfigFactory =
+                getConfigFactory(databaseName, new String[] {tableName}, 8096);
+        SqlServerSourceConfig sourceConfig = sourceConfigFactory.create(0);
+        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfig);
+
+        List<SnapshotSplit> snapshotSplits = getSnapshotSplits(sourceConfig, sqlServerDialect);
+        assertFalse(snapshotSplits.isEmpty());
+
+        RowType expectedType =
+                (RowType)
+                        DataTypes.ROW(DataTypes.FIELD("dt", DataTypes.TIMESTAMP(3).notNull()))
+                                .getLogicalType();
+
+        snapshotSplits.forEach(s -> assertEquals(expectedType, s.getSplitKeyType()));
     }
 
     @Test
