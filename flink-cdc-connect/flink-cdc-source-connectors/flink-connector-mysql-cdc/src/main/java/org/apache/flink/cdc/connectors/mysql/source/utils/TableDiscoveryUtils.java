@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /** Utilities to discovery matched tables. */
@@ -72,6 +73,7 @@ public class TableDiscoveryUtils {
         // might lead to SQL injection, in our case we are reading the database names from the
         // database and not taking them from the user ...
         LOG.info("Read list of available tables in each database");
+        AtomicInteger tableCount = new AtomicInteger();
         for (String dbName : databaseNames) {
             try {
                 jdbc.query(
@@ -83,9 +85,10 @@ public class TableDiscoveryUtils {
                                 TableId tableId = new TableId(dbName, null, rs.getString(1));
                                 if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
                                     capturedTableIds.add(tableId);
-                                    LOG.info(
+                                    LOG.debug(
                                             "\t including table '{}' for further processing",
                                             tableId);
+                                    tableCount.getAndIncrement();
                                 } else {
                                     LOG.debug(
                                             "\t '{}' is filtered out of table capturing", tableId);
@@ -100,6 +103,7 @@ public class TableDiscoveryUtils {
                         e.getMessage());
             }
         }
+        LOG.info("Read table count: {}", tableCount.get());
         return capturedTableIds;
     }
 
