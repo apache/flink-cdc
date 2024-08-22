@@ -25,8 +25,6 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaResponse;
@@ -56,7 +54,6 @@ import org.apache.flink.util.SerializedValue;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Set;
 
@@ -166,14 +163,10 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
     }
 
     public void registerTableSchema(TableId tableId, Schema schema) {
-        schemaRegistry.handleCoordinationRequest(
-                new ApplyOriginalSchemaChangeRequest(
-                        tableId, new CreateTableEvent(tableId, schema)));
+        schemaRegistry.handleApplyOriginalSchemaChangeEvent(new CreateTableEvent(tableId, schema));
         schemaRegistry.handleCoordinationRequest(
                 new SchemaChangeRequest(tableId, new CreateTableEvent(tableId, schema)));
-        schemaRegistry.handleCoordinationRequest(
-                new ApplyEvolvedSchemaChangeRequest(
-                        tableId, Collections.singletonList(new CreateTableEvent(tableId, schema))));
+        schemaRegistry.handleApplyEvolvedSchemaChangeRequest(new CreateTableEvent(tableId, schema));
     }
 
     public Schema getLatestOriginalSchema(TableId tableId) throws Exception {
