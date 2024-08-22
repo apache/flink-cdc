@@ -130,7 +130,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
 
         if (event instanceof DataChangeEvent) {
             DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
-            if (schemaMaps.containsKey(dataChangeEvent.tableId())) {
+            if (!schemaMaps.containsKey(dataChangeEvent.tableId())) {
                 Optional<Schema> schema =
                         schemaEvolutionClient.getLatestEvolvedSchema(dataChangeEvent.tableId());
                 if (schema.isPresent()) {

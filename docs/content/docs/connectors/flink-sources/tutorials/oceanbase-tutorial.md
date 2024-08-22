@@ -37,25 +37,27 @@ under the License.
 
 Create `docker-compose.yml`.
 
-*Note*: `host` network mode is required in this demo, so it can only work on Linux, see [network-tutorial-host](https://docs.docker.com/network/network-tutorial-host/).
-
 ```yaml
 version: '2.1'
 services:
   observer:
-    image: oceanbase/oceanbase-ce:4.2.0.0
+    image: 'oceanbase/oceanbase-ce:4.2.1.6-106000012024042515'
     container_name: observer
     environment:
-      - 'MODE=slim'
-      - 'OB_ROOT_PASSWORD=pswd'
-    network_mode: "host"
+      - 'MODE=mini'
+      - 'OB_SYS_PASSWORD=123456'
+      - 'OB_TENANT_PASSWORD=654321'
+    ports:
+      - '2881:2881'
+      - '2882:2882'
   oblogproxy:
-    image: whhe/oblogproxy:1.1.3_4x
+    image: 'oceanbase/oblogproxy-ce:latest'
     container_name: oblogproxy
     environment:
       - 'OB_SYS_USERNAME=root'
-      - 'OB_SYS_PASSWORD=pswd'
-    network_mode: "host"
+      - 'OB_SYS_PASSWORD=123456'
+    ports:
+      - '2983:2983'
   elasticsearch:
     image: 'elastic/elasticsearch:7.6.0'
     container_name: elasticsearch
@@ -89,22 +91,18 @@ Execute the following command in the directory where `docker-compose.yml` is loc
 docker-compose up -d
 ```
 
-### Set password
+### Query Root Service List
 
-From OceanBase 4.0.0.0 CE, we can only fetch the commit log of non-sys tenant.
-
-Here we use the 'test' tenant for example.
-
-Login with 'root' user of 'test' tenant:
+Login with 'root' user of 'sys' tenant:
 
 ```shell
-docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@test
+docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@sys -p123456
 ```
 
-Set a password:
+Query the root service list by following SQL and store the value.
 
 ```mysql
-ALTER USER root IDENTIFIED BY 'test';
+SHOW PARAMETERS LIKE 'rootservice_list';
 ```
 
 ### Create data for reading snapshot
@@ -112,7 +110,7 @@ ALTER USER root IDENTIFIED BY 'test';
 Login 'root' user of 'test' tenant.
 
 ```shell
-docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@test -ptest
+docker-compose exec observer obclient -h127.0.0.1 -P2881 -uroot@test -p654321
 ```
 
 Insert data:
@@ -163,6 +161,8 @@ VALUES (default, '2020-07-30 10:08:22', 'Jark', 50.50, 102, false),
 
 ### Use Flink DDL to create dynamic table in Flink SQL CLI
 
+Note that in the SQL of the OceanBase source table, replace root_service_list with the actual value.
+
 ```sql
 -- checkpoint every 3000 milliseconds                     
 Flink SQL> SET execution.checkpointing.interval = 3s;
@@ -183,13 +183,13 @@ Flink SQL> CREATE TABLE orders (
     'connector' = 'oceanbase-cdc',
     'scan.startup.mode' = 'initial',
     'username' = 'root@test',
-    'password' = 'test',
+    'password' = '654321',
     'tenant-name' = 'test',
     'database-name' = '^ob$',
     'table-name' = '^orders$',
     'hostname' = 'localhost',
     'port' = '2881',
-    'rootserver-list' = '127.0.0.1:2882:2881',
+    'rootserver-list' = '${root_service_list}',
     'logproxy.host' = 'localhost',
     'logproxy.port' = '2983',
     'working-mode' = 'memory'
@@ -205,13 +205,13 @@ Flink SQL> CREATE TABLE products (
     'connector' = 'oceanbase-cdc',
     'scan.startup.mode' = 'initial',
     'username' = 'root@test',
-    'password' = 'test',
+    'password' = '654321',
     'tenant-name' = 'test',
     'database-name' = '^ob$',
     'table-name' = '^products$',
     'hostname' = 'localhost',
     'port' = '2881',
-    'rootserver-list' = '127.0.0.1:2882:2881',
+    'rootserver-list' = '${root_service_list}',
     'logproxy.host' = 'localhost',
     'logproxy.port' = '2983',
     'working-mode' = 'memory'

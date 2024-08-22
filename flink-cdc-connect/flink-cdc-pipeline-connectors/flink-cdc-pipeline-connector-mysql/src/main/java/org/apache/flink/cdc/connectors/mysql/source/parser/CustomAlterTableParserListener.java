@@ -20,8 +20,10 @@ package org.apache.flink.cdc.connectors.mysql.source.parser;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.types.DataType;
 
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
@@ -275,6 +277,25 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                 },
                 columnDefinitionListener);
         super.exitAlterByRenameColumn(ctx);
+    }
+
+    @Override
+    public void exitTruncateTable(MySqlParser.TruncateTableContext ctx) {
+        TableId tableId = parser.parseQualifiedTableId(ctx.tableName().fullId());
+        changes.add(new TruncateTableEvent(toCdcTableId(tableId)));
+        super.exitTruncateTable(ctx);
+    }
+
+    @Override
+    public void exitDropTable(MySqlParser.DropTableContext ctx) {
+        ctx.tables()
+                .tableName()
+                .forEach(
+                        evt -> {
+                            TableId tableId = parser.parseQualifiedTableId(evt.fullId());
+                            changes.add(new DropTableEvent(toCdcTableId(tableId)));
+                        });
+        super.exitDropTable(ctx);
     }
 
     private org.apache.flink.cdc.common.schema.Column toCdcColumn(Column dbzColumn) {

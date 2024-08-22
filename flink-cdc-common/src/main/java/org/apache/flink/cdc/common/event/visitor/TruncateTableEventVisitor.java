@@ -15,17 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.event;
+package org.apache.flink.cdc.common.event.visitor;
 
-import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
-import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 
-/**
- * The response from {@link SchemaRegistry} to {@link SchemaOperator} to request apply original
- * schema changes.
- */
-public class ApplyOriginalSchemaChangeResponse implements CoordinationResponse {
-
-    private static final long serialVersionUID = 1L;
+/** Visitor for {@link TruncateTableEvent}s. */
+@Internal
+@FunctionalInterface
+public interface TruncateTableEventVisitor<T, E extends Throwable> {
+    T visit(TruncateTableEvent event) throws E;
 }

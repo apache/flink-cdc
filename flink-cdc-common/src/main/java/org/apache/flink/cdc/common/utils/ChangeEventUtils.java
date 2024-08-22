@@ -23,11 +23,14 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -65,30 +68,22 @@ public class ChangeEventUtils {
 
     public static SchemaChangeEvent recreateSchemaChangeEvent(
             SchemaChangeEvent schemaChangeEvent, TableId tableId) {
-        if (schemaChangeEvent instanceof CreateTableEvent) {
-            CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
-            return new CreateTableEvent(tableId, createTableEvent.getSchema());
-        }
-        if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
-            AlterColumnTypeEvent alterColumnTypeEvent = (AlterColumnTypeEvent) schemaChangeEvent;
-            return new AlterColumnTypeEvent(tableId, alterColumnTypeEvent.getTypeMapping());
-        }
-        if (schemaChangeEvent instanceof RenameColumnEvent) {
-            RenameColumnEvent renameColumnEvent = (RenameColumnEvent) schemaChangeEvent;
-            return new RenameColumnEvent(tableId, renameColumnEvent.getNameMapping());
-        }
-        if (schemaChangeEvent instanceof DropColumnEvent) {
-            DropColumnEvent dropColumnEvent = (DropColumnEvent) schemaChangeEvent;
-            return new DropColumnEvent(tableId, dropColumnEvent.getDroppedColumnNames());
-        }
-        if (schemaChangeEvent instanceof AddColumnEvent) {
-            AddColumnEvent addColumnEvent = (AddColumnEvent) schemaChangeEvent;
-            return new AddColumnEvent(tableId, addColumnEvent.getAddedColumns());
-        }
-        throw new UnsupportedOperationException(
-                String.format(
-                        "Unsupported schema change event with type \"%s\"",
-                        schemaChangeEvent.getClass().getCanonicalName()));
+
+        return SchemaChangeEventVisitor.visit(
+                schemaChangeEvent,
+                addColumnEvent -> new AddColumnEvent(tableId, addColumnEvent.getAddedColumns()),
+                alterColumnEvent ->
+                        new AlterColumnTypeEvent(
+                                tableId,
+                                alterColumnEvent.getTypeMapping(),
+                                alterColumnEvent.getOldTypeMapping()),
+                createTableEvent -> new CreateTableEvent(tableId, createTableEvent.getSchema()),
+                dropColumnEvent ->
+                        new DropColumnEvent(tableId, dropColumnEvent.getDroppedColumnNames()),
+                dropTableEvent -> new DropTableEvent(tableId),
+                renameColumnEvent ->
+                        new RenameColumnEvent(tableId, renameColumnEvent.getNameMapping()),
+                truncateTableEvent -> new TruncateTableEvent(tableId));
     }
 
     public static Set<SchemaChangeEventType> resolveSchemaEvolutionOptions(

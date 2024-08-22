@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
@@ -26,8 +25,9 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.SchemaChangeEventWithPreSchema;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -87,14 +87,15 @@ public class SchemaRegistryRequestHandler implements Closeable {
     private final List<PendingSchemaChange> pendingSchemaChanges;
 
     private final List<SchemaChangeEvent> finishedSchemaChanges;
-    private final List<Tuple2<SchemaChangeEvent, Throwable>> failedSchemaChanges;
     private final List<SchemaChangeEvent> ignoredSchemaChanges;
 
     /** Sink writers which have sent flush success events for the request. */
     private final Set<Integer> flushedSinkWriters;
 
     /** Status of the execution of current schema change request. */
-    private boolean isSchemaChangeApplying;
+    private volatile boolean isSchemaChangeApplying;
+    /** Actual exception if failed to apply schema change. */
+    private volatile Throwable schemaChangeException;
     /** Executor service to execute schema change. */
     private final ExecutorService schemaChangeThreadPool;
 
@@ -110,7 +111,6 @@ public class SchemaRegistryRequestHandler implements Closeable {
         this.flushedSinkWriters = new HashSet<>();
         this.pendingSchemaChanges = new LinkedList<>();
         this.finishedSchemaChanges = new LinkedList<>();
-        this.failedSchemaChanges = new LinkedList<>();
         this.ignoredSchemaChanges = new LinkedList<>();
         this.schemaManager = schemaManager;
         this.schemaDerivation = schemaDerivation;
@@ -128,8 +128,8 @@ public class SchemaRegistryRequestHandler implements Closeable {
     private void applySchemaChange(
             TableId tableId, List<SchemaChangeEvent> derivedSchemaChangeEvents) {
         isSchemaChangeApplying = true;
+        schemaChangeException = null;
         finishedSchemaChanges.clear();
-        failedSchemaChanges.clear();
         ignoredSchemaChanges.clear();
 
         for (SchemaChangeEvent changeEvent : derivedSchemaChangeEvents) {
@@ -146,17 +146,27 @@ public class SchemaRegistryRequestHandler implements Closeable {
                 try {
                     metadataApplier.applySchemaChange(changeEvent);
                     LOG.debug("Applied schema change {} to table {}.", changeEvent, tableId);
+                    schemaManager.applyEvolvedSchemaChange(changeEvent);
                     finishedSchemaChanges.add(changeEvent);
-                } catch (SchemaEvolveException e) {
+                } catch (Throwable t) {
                     LOG.error(
                             "Failed to apply schema change {} to table {}. Caused by: {}",
                             changeEvent,
                             tableId,
-                            e);
-                    failedSchemaChanges.add(Tuple2.of(changeEvent, e));
+                            t);
+                    if (!shouldIgnoreException(t)) {
+                        schemaChangeException = t;
+                        break;
+                    } else {
+                        LOG.warn(
+                                "Failed to apply event {}, but keeps running in tolerant mode. Caused by: {}",
+                                changeEvent,
+                                t);
+                    }
                 }
             }
         }
+
         PendingSchemaChange waitFlushSuccess = pendingSchemaChanges.get(0);
         if (RECEIVED_RELEASE_REQUEST.equals(waitFlushSuccess.getStatus())) {
             startNextSchemaChangeRequest();
@@ -175,14 +185,26 @@ public class SchemaRegistryRequestHandler implements Closeable {
             LOG.info(
                     "Received schema change event request from table {}. Start to buffer requests for others.",
                     request.getTableId().toString());
-            if (request.getSchemaChangeEvent() instanceof CreateTableEvent
+            SchemaChangeEvent event = request.getSchemaChangeEvent();
+            if (event instanceof CreateTableEvent
                     && schemaManager.originalSchemaExists(request.getTableId())) {
                 return CompletableFuture.completedFuture(
                         wrap(new SchemaChangeResponse(Collections.emptyList())));
             }
-            schemaManager.applyOriginalSchemaChange(request.getSchemaChangeEvent());
+            schemaManager.applyOriginalSchemaChange(event);
             List<SchemaChangeEvent> derivedSchemaChangeEvents =
                     calculateDerivedSchemaChangeEvents(request.getSchemaChangeEvent());
+            derivedSchemaChangeEvents.forEach(
+                    e -> {
+                        if (e instanceof SchemaChangeEventWithPreSchema) {
+                            SchemaChangeEventWithPreSchema pe = (SchemaChangeEventWithPreSchema) e;
+                            if (!pe.hasPreSchema()) {
+                                schemaManager
+                                        .getLatestEvolvedSchema(pe.tableId())
+                                        .ifPresent(pe::fillPreSchema);
+                            }
+                        }
+                    });
             CompletableFuture<CoordinationResponse> response =
                     CompletableFuture.completedFuture(
                             wrap(new SchemaChangeResponse(derivedSchemaChangeEvents)));
@@ -241,6 +263,10 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     () -> applySchemaChange(tableId, waitFlushSuccess.derivedSchemaChangeEvents));
             Thread.sleep(1000);
 
+            if (schemaChangeException != null) {
+                throw new RuntimeException("Failed to apply schema change.", schemaChangeException);
+            }
+
             if (isSchemaChangeApplying) {
                 waitFlushSuccess
                         .getResponseFuture()
@@ -248,12 +274,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
             } else {
                 waitFlushSuccess
                         .getResponseFuture()
-                        .complete(
-                                wrap(
-                                        new ReleaseUpstreamResponse(
-                                                finishedSchemaChanges,
-                                                failedSchemaChanges,
-                                                ignoredSchemaChanges)));
+                        .complete(wrap(new ReleaseUpstreamResponse(finishedSchemaChanges)));
             }
         }
     }
@@ -292,16 +313,15 @@ public class SchemaRegistryRequestHandler implements Closeable {
     }
 
     public CompletableFuture<CoordinationResponse> getSchemaChangeResult() {
+        if (schemaChangeException != null) {
+            throw new RuntimeException("Failed to apply schema change.", schemaChangeException);
+        }
+
         if (isSchemaChangeApplying) {
             return CompletableFuture.supplyAsync(() -> wrap(new SchemaChangeProcessingResponse()));
         } else {
             return CompletableFuture.supplyAsync(
-                    () ->
-                            wrap(
-                                    new ReleaseUpstreamResponse(
-                                            finishedSchemaChanges,
-                                            failedSchemaChanges,
-                                            ignoredSchemaChanges)));
+                    () -> wrap(new ReleaseUpstreamResponse(finishedSchemaChanges)));
         }
     }
 
@@ -415,9 +435,22 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     }
                     return events;
                 }
+            case DROP_TABLE:
+                // We don't drop any tables in Lenient mode.
+                LOG.info("A drop table event {} has been ignored in Lenient mode.", event);
+                return Collections.emptyList();
             default:
                 return Collections.singletonList(event);
         }
+    }
+
+    private boolean shouldIgnoreException(Throwable throwable) {
+
+        // In IGNORE mode, will never try to apply schema change events
+        // In EVOLVE and and LENIENT mode, such failure will not be tolerated
+        // In EXCEPTION mode, an exception will be thrown once captured
+        return (throwable instanceof UnsupportedSchemaChangeEventException)
+                && (schemaChangeBehavior == SchemaChangeBehavior.TRY_EVOLVE);
     }
 
     private static class PendingSchemaChange {

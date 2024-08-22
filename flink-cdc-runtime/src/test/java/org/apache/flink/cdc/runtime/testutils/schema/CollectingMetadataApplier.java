@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 
 import java.time.Duration;
@@ -83,8 +84,7 @@ public class CollectingMetadataApplier implements MetadataApplier {
             try {
                 Thread.sleep(duration.toMillis());
                 if (errorsOnEventTypes.contains(schemaChangeEvent.getType())) {
-                    throw new SchemaEvolveException(
-                            schemaChangeEvent, "Dummy metadata apply exception for test.", null);
+                    throw new UnsupportedSchemaChangeEventException(schemaChangeEvent);
                 }
             } catch (InterruptedException ignore) {
                 // Ignores sleep interruption

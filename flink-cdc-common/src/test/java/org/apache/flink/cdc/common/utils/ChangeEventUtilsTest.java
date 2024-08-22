@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.common.utils;
 
-import org.assertj.core.api.Assertions;
 import org.assertj.core.util.Sets;
 import org.junit.jupiter.api.Test;
 
@@ -28,91 +27,108 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_TABLE;
+import static org.apache.flink.cdc.common.testutils.assertions.EventAssertions.assertThat;
 
 /** A test for the {@link org.apache.flink.cdc.common.utils.ChangeEventUtils}. */
 public class ChangeEventUtilsTest {
     @Test
     public void testResolveSchemaEvolutionOptions() {
-        Assertions.assertThat(
+        assertThat(
                         ChangeEventUtils.resolveSchemaEvolutionOptions(
                                 Collections.emptyList(), Collections.emptyList()))
                 .isEqualTo(
                         Sets.set(
+                                TRUNCATE_TABLE,
+                                RENAME_COLUMN,
                                 CREATE_TABLE,
-                                ADD_COLUMN,
+                                DROP_TABLE,
                                 ALTER_COLUMN_TYPE,
-                                DROP_COLUMN,
-                                RENAME_COLUMN));
+                                ADD_COLUMN,
+                                DROP_COLUMN));
 
-        Assertions.assertThat(
+        assertThat(
                         ChangeEventUtils.resolveSchemaEvolutionOptions(
                                 Collections.emptyList(), Collections.singletonList("drop")))
-                .isEqualTo(Sets.set(CREATE_TABLE, ADD_COLUMN, ALTER_COLUMN_TYPE, RENAME_COLUMN));
+                .isEqualTo(
+                        Sets.set(
+                                ADD_COLUMN,
+                                ALTER_COLUMN_TYPE,
+                                RENAME_COLUMN,
+                                CREATE_TABLE,
+                                TRUNCATE_TABLE));
 
-        Assertions.assertThat(
+        assertThat(
                         ChangeEventUtils.resolveSchemaEvolutionOptions(
                                 Arrays.asList("create", "add"), Collections.emptyList()))
-                .isEqualTo(Sets.set(CREATE_TABLE, ADD_COLUMN));
+                .isEqualTo(Sets.set(ADD_COLUMN, CREATE_TABLE));
 
-        Assertions.assertThat(
+        assertThat(
                         ChangeEventUtils.resolveSchemaEvolutionOptions(
                                 Collections.singletonList("column"),
                                 Collections.singletonList("drop.column")))
                 .isEqualTo(Sets.set(ADD_COLUMN, ALTER_COLUMN_TYPE, RENAME_COLUMN));
 
-        Assertions.assertThat(
+        assertThat(
                         ChangeEventUtils.resolveSchemaEvolutionOptions(
                                 Collections.emptyList(), Collections.singletonList("drop.column")))
-                .isEqualTo(Sets.set(CREATE_TABLE, ADD_COLUMN, ALTER_COLUMN_TYPE, RENAME_COLUMN));
+                .isEqualTo(
+                        Sets.set(
+                                ADD_COLUMN,
+                                DROP_TABLE,
+                                TRUNCATE_TABLE,
+                                RENAME_COLUMN,
+                                ALTER_COLUMN_TYPE,
+                                CREATE_TABLE));
     }
 
     @Test
     public void testResolveSchemaEvolutionTag() {
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("all"))
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("all"))
                 .isEqualTo(
                         Arrays.asList(
                                 ADD_COLUMN,
-                                CREATE_TABLE,
                                 ALTER_COLUMN_TYPE,
+                                CREATE_TABLE,
                                 DROP_COLUMN,
-                                RENAME_COLUMN));
+                                DROP_TABLE,
+                                RENAME_COLUMN,
+                                TRUNCATE_TABLE));
 
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("column"))
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("column"))
                 .isEqualTo(
                         Arrays.asList(ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN));
 
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("table"))
-                .isEqualTo(Collections.singletonList(CREATE_TABLE));
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("table"))
+                .isEqualTo(Arrays.asList(CREATE_TABLE, DROP_TABLE, TRUNCATE_TABLE));
 
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("rename"))
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("rename.column"))
                 .isEqualTo(Collections.singletonList(RENAME_COLUMN));
 
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("rename.column"))
-                .isEqualTo(Collections.singletonList(RENAME_COLUMN));
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("drop"))
+                .isEqualTo(Arrays.asList(DROP_COLUMN, DROP_TABLE));
 
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("drop"))
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("drop.column"))
                 .isEqualTo(Collections.singletonList(DROP_COLUMN));
 
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("drop.column"))
-                .isEqualTo(Collections.singletonList(DROP_COLUMN));
-
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("create"))
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("create"))
                 .isEqualTo(Collections.singletonList(CREATE_TABLE));
 
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("create.table"))
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("create.table"))
                 .isEqualTo(Collections.singletonList(CREATE_TABLE));
 
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("alter"))
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("alter"))
                 .isEqualTo(Collections.singletonList(ALTER_COLUMN_TYPE));
 
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("alter.column.type"))
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("alter.column.type"))
                 .isEqualTo(Collections.singletonList(ALTER_COLUMN_TYPE));
 
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("add"))
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("add"))
                 .isEqualTo(Collections.singletonList(ADD_COLUMN));
 
-        Assertions.assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("add.column"))
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("add.column"))
                 .isEqualTo(Collections.singletonList(ADD_COLUMN));
     }
 }

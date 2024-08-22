@@ -25,9 +25,11 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
@@ -61,6 +63,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCHEMA_CHANGE_ENABLED;
@@ -345,9 +348,142 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
                                             Column.physicalColumn("cols9", DataTypes.CHAR(1))))));
+
+            // Drop orders table first to remove foreign key restraints
+            statement.execute(
+                    String.format(
+                            "DROP TABLE `%s`.`orders`;", inventoryDatabase.getDatabaseName()));
+
+            statement.execute(
+                    String.format(
+                            "TRUNCATE TABLE `%s`.`products`;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(new TruncateTableEvent(tableId));
+
+            statement.execute(
+                    String.format(
+                            "DROP TABLE `%s`.`products`;", inventoryDatabase.getDatabaseName()));
+            expected.add(new DropTableEvent(tableId));
         }
         List<Event> actual = fetchResults(events, expected.size());
         assertThat(actual).isEqualTo(expected);
+    }
+
+    @Test
+    public void testSchemaChangeEvents() throws Exception {
+        env.setParallelism(1);
+        inventoryDatabase.createAndInitialize();
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(MYSQL8_CONTAINER.getHost())
+                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(inventoryDatabase.getDatabaseName() + ".*")
+                        .startupOptions(StartupOptions.latest())
+                        .serverId(getServerId(env.getParallelism()))
+                        .serverTimeZone("UTC")
+                        .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(5_000);
+
+        List<Event> expected =
+                new ArrayList<>(
+                        getInventoryCreateAllTableEvents(inventoryDatabase.getDatabaseName()));
+
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` ADD COLUMN `newcol1` INT NULL;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn("newcol1", DataTypes.INT())))));
+
+            // Test MODIFY COLUMN DDL
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` MODIFY COLUMN `newcol1` DOUBLE;",
+                            inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new AlterColumnTypeEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol1", DataTypes.DOUBLE())));
+
+            // Test CHANGE COLUMN DDL
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` CHANGE COLUMN `newcol1` `newcol2` INT;",
+                            inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new AlterColumnTypeEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol1", DataTypes.INT())));
+
+            expected.add(
+                    new RenameColumnEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol1", "newcol2")));
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` CHANGE COLUMN `newcol2` `newcol1` DOUBLE;",
+                            inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new AlterColumnTypeEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol2", DataTypes.DOUBLE())));
+
+            expected.add(
+                    new RenameColumnEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("newcol2", "newcol1")));
+
+            // Test truncate table DDL
+            statement.execute(
+                    String.format(
+                            "TRUNCATE TABLE `%s`.`orders`;", inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new TruncateTableEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "orders")));
+
+            // Test drop table DDL
+            statement.execute(
+                    String.format(
+                            "DROP TABLE `%s`.`orders`, `%s`.`customers`;",
+                            inventoryDatabase.getDatabaseName(),
+                            inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new DropTableEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "orders")));
+            expected.add(
+                    new DropTableEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers")));
+        }
+        List<Event> actual = fetchResults(events, expected.size());
+        assertEqualsInAnyOrder(
+                expected.stream().map(Object::toString).collect(Collectors.toList()),
+                actual.stream().map(Object::toString).collect(Collectors.toList()));
     }
 
     private CreateTableEvent getProductsCreateTableEvent(TableId tableId) {
@@ -360,6 +496,46 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .physicalColumn("weight", DataTypes.FLOAT())
                         .primaryKey(Collections.singletonList("id"))
                         .build());
+    }
+
+    private List<CreateTableEvent> getInventoryCreateAllTableEvents(String databaseName) {
+        return Arrays.asList(
+                new CreateTableEvent(
+                        TableId.tableId(databaseName, "products"),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), "flink")
+                                .physicalColumn("description", DataTypes.VARCHAR(512))
+                                .physicalColumn("weight", DataTypes.FLOAT())
+                                .primaryKey(Collections.singletonList("id"))
+                                .build()),
+                new CreateTableEvent(
+                        TableId.tableId(databaseName, "customers"),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("first_name", DataTypes.VARCHAR(255).notNull())
+                                .physicalColumn("last_name", DataTypes.VARCHAR(255).notNull())
+                                .physicalColumn("email", DataTypes.VARCHAR(255).notNull())
+                                .primaryKey(Collections.singletonList("id"))
+                                .build()),
+                new CreateTableEvent(
+                        TableId.tableId(databaseName, "orders"),
+                        Schema.newBuilder()
+                                .physicalColumn("order_number", DataTypes.INT().notNull())
+                                .physicalColumn("order_date", DataTypes.DATE().notNull())
+                                .physicalColumn("purchaser", DataTypes.INT().notNull())
+                                .physicalColumn("quantity", DataTypes.INT().notNull())
+                                .physicalColumn("product_id", DataTypes.INT().notNull())
+                                .primaryKey(Collections.singletonList("order_number"))
+                                .build()),
+                new CreateTableEvent(
+                        TableId.tableId(databaseName, "multi_max_table"),
+                        Schema.newBuilder()
+                                .physicalColumn("order_id", DataTypes.VARCHAR(128).notNull())
+                                .physicalColumn("index", DataTypes.INT().notNull())
+                                .physicalColumn("desc", DataTypes.VARCHAR(512).notNull())
+                                .primaryKey(Arrays.asList("order_id", "index"))
+                                .build()));
     }
 
     private List<Event> getSnapshotExpected(TableId tableId) {
