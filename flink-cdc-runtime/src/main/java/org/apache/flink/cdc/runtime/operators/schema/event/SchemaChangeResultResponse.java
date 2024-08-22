@@ -26,10 +26,10 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * The response for {@link ReleaseUpstreamRequest} from {@link SchemaRegistry} to {@link
+ * The response for {@link SchemaChangeResultRequest} from {@link SchemaRegistry} to {@link
  * SchemaOperator}.
  */
-public class ReleaseUpstreamResponse implements CoordinationResponse {
+public class SchemaChangeResultResponse implements CoordinationResponse {
 
     private static final long serialVersionUID = 1L;
 
@@ -39,7 +39,7 @@ public class ReleaseUpstreamResponse implements CoordinationResponse {
      */
     private final List<SchemaChangeEvent> finishedSchemaChangeEvents;
 
-    public ReleaseUpstreamResponse(List<SchemaChangeEvent> finishedSchemaChangeEvents) {
+    public SchemaChangeResultResponse(List<SchemaChangeEvent> finishedSchemaChangeEvents) {
         this.finishedSchemaChangeEvents = finishedSchemaChangeEvents;
     }
 
@@ -63,7 +63,7 @@ public class ReleaseUpstreamResponse implements CoordinationResponse {
         if (object == null || getClass() != object.getClass()) {
             return false;
         }
-        ReleaseUpstreamResponse that = (ReleaseUpstreamResponse) object;
+        SchemaChangeResultResponse that = (SchemaChangeResultResponse) object;
         return Objects.equals(finishedSchemaChangeEvents, that.finishedSchemaChangeEvents);
     }
 
