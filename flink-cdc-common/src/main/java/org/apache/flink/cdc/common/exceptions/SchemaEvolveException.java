@@ -24,9 +24,9 @@ import javax.annotation.Nullable;
 
 /** An exception occurred during schema evolution. */
 public class SchemaEvolveException extends FlinkRuntimeException {
-    private final SchemaChangeEvent applyingEvent;
-    private final String exceptionMessage;
-    private final @Nullable Throwable cause;
+    protected final SchemaChangeEvent applyingEvent;
+    protected final String exceptionMessage;
+    protected final @Nullable Throwable cause;
 
     public SchemaEvolveException(SchemaChangeEvent applyingEvent, String exceptionMessage) {
         this(applyingEvent, exceptionMessage, null);

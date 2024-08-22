@@ -1036,6 +1036,8 @@ public class SchemaEvolveTest {
                                                 Column.physicalColumn(
                                                         "height", DOUBLE, "Height data")))));
         Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents))
+                .cause()
+                .cause()
                 .isExactlyInstanceOf(RuntimeException.class)
                 .hasMessageContaining("Failed to apply schema change");
         harness.close();
