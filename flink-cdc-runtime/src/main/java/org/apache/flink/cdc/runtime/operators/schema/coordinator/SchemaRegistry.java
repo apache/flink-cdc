@@ -104,6 +104,12 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
 
     private SchemaChangeBehavior schemaChangeBehavior;
 
+    /**
+     * Current parallelism. Use this to verify if Schema Registry has collected enough flush success
+     * events from sink operators.
+     */
+    private int currentParallelism;
+
     public SchemaRegistry(
             String operatorName,
             OperatorCoordinator.Context context,
@@ -135,7 +141,9 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     public void start() throws Exception {
         LOG.info("Starting SchemaRegistry for {}.", operatorName);
         this.failedReasons.clear();
-        LOG.info("Started SchemaRegistry for {}.", operatorName);
+        this.currentParallelism = context.currentParallelism();
+        LOG.info(
+                "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
     }
 
     @Override
@@ -155,7 +163,9 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                         flushSuccessEvent.getSubtask(),
                         flushSuccessEvent.getTableId().toString());
                 requestHandler.flushSuccess(
-                        flushSuccessEvent.getTableId(), flushSuccessEvent.getSubtask());
+                        flushSuccessEvent.getTableId(),
+                        flushSuccessEvent.getSubtask(),
+                        currentParallelism);
             } else if (event instanceof SinkWriterRegisterEvent) {
                 requestHandler.registerSinkWriter(((SinkWriterRegisterEvent) event).getSubtask());
             } else {
