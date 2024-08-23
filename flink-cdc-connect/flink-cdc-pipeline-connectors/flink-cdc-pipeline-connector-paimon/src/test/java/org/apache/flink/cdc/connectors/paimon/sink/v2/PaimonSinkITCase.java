@@ -135,9 +135,9 @@ public class PaimonSinkITCase {
         // create table
         Schema schema =
                 Schema.newBuilder()
-                        .physicalColumn("col1", DataTypes.STRING())
-                        .physicalColumn("col2", DataTypes.STRING())
-                        .primaryKey("col1")
+                        .physicalColumn("Col1", DataTypes.STRING())
+                        .physicalColumn("Col2", DataTypes.STRING())
+                        .primaryKey("Col1")
                         .option("bucket", "1")
                         .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
@@ -406,9 +406,9 @@ public class PaimonSinkITCase {
         TableId table2 = TableId.tableId("test", "table2");
         Schema schema =
                 Schema.newBuilder()
-                        .physicalColumn("col1", DataTypes.STRING())
-                        .physicalColumn("col2", DataTypes.STRING())
-                        .primaryKey("col1")
+                        .physicalColumn("Col1", DataTypes.STRING())
+                        .physicalColumn("Col2", DataTypes.STRING())
+                        .primaryKey("Col1")
                         .option("bucket", "1")
                         .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(table2, schema);

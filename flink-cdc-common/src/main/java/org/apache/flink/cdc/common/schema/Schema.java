@@ -298,6 +298,7 @@ public class Schema implements Serializable {
          * @param type data type of the column
          */
         public Builder physicalColumn(String columnName, DataType type) {
+            columnName = columnName.toLowerCase();
             checkColumn(columnName, type);
             columns.add(Column.physicalColumn(columnName, type));
             return this;
@@ -396,6 +397,9 @@ public class Schema implements Serializable {
          * @param columnNames columns that form a unique primary key
          */
         public Builder primaryKey(String... columnNames) {
+            for (int i = 0; i < columnNames.length; i++) {
+                columnNames[i] = columnNames[i].toLowerCase();
+            }
             return primaryKey(Arrays.asList(columnNames));
         }
 
