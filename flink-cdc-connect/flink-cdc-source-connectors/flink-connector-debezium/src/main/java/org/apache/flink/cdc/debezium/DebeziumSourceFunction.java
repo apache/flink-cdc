@@ -394,6 +394,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
         // and https://debezium.io/blog/2018/03/16/note-on-database-history-topic-configuration/
         properties.setProperty("database.history", determineDatabase().getCanonicalName());
 
+        String snapshotMode = properties.getProperty("snapshot.mode");
+
         // we have to filter out the heartbeat events, otherwise the deserializer will fail
         String dbzHeartbeatPrefix =
                 properties.getProperty(
@@ -403,7 +405,8 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
                 new DebeziumChangeFetcher<>(
                         sourceContext,
                         deserializer,
-                        restoredOffsetState == null, // DB snapshot phase if restore state is null
+                        // DB snapshot phase if restore state is null
+                        !"never".equals(snapshotMode) && restoredOffsetState == null,
                         dbzHeartbeatPrefix,
                         handover);
 
