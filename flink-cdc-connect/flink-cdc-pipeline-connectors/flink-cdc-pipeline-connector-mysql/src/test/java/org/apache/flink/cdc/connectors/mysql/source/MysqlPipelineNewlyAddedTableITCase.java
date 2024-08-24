@@ -21,10 +21,10 @@ import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
-import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
@@ -182,9 +182,16 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
                 addCollector(env, source, resultBuffer, serializer, accumulatorName);
         env.executeAsync("AddNewlyTablesWhenReadingBinlog");
         initialAddressTables(getConnection(), Collections.singletonList("address_beijing"));
-        List<Event> actual = fetchResults(iterator, 4);
-        assertThat(((ChangeEvent) actual.get(0)).tableId())
-                .isEqualTo(TableId.tableId(customDatabase.getDatabaseName(), "address_beijing"));
+        initialAddressTables(getConnection(), Collections.singletonList("address_shanghai"));
+        List<Event> actual = fetchResults(iterator, 8);
+        List<String> tableNames =
+                actual.stream()
+                        .filter((event) -> event instanceof CreateTableEvent)
+                        .map((event) -> ((SchemaChangeEvent) event).tableId().getTableName())
+                        .collect(Collectors.toList());
+        assertThat(tableNames.size()).isEqualTo(2);
+        assertThat(tableNames.get(0)).isEqualTo("address_beijing");
+        assertThat(tableNames.get(1)).isEqualTo("address_shanghai");
     }
 
     @Test

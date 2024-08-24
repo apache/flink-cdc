@@ -501,6 +501,22 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
             expected.add(
                     new DropTableEvent(
                             TableId.tableId(inventoryDatabase.getDatabaseName(), "customers")));
+
+            // Test create table DDL
+            statement.execute(
+                    String.format(
+                            "CREATE TABLE `%s`.`newlyAddedTable1`(id int, id2 int, primary key(id));",
+                            inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new CreateTableEvent(
+                            TableId.tableId(
+                                    inventoryDatabase.getDatabaseName(), "newlyAddedTable1"),
+                            Schema.newBuilder()
+                                    .physicalColumn("id", DataTypes.INT().notNull())
+                                    .physicalColumn("id2", DataTypes.INT())
+                                    .primaryKey("id")
+                                    .build()));
         }
         List<Event> actual = fetchResults(events, expected.size());
         assertEqualsInAnyOrder(
