@@ -28,7 +28,6 @@ import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSource;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions;
-import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.ServerIdRange;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -42,6 +41,8 @@ import org.apache.flink.table.catalog.ObjectPath;
 import io.debezium.relational.Tables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -171,12 +172,15 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .jdbcProperties(getJdbcProperties(configMap))
                         .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
 
+        List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
         if (scanBinlogNewlyAddedTableEnabled) {
             String newTables = validateTableAndReturnDebeziumStyle(tables);
             configFactory.tableList(newTables);
+            configFactory.excludeTableList(tablesExclude);
+
         } else {
             Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
-            List<String> capturedTables = getTableList(configFactory.createConfig(0), selectors);
+            List<String> capturedTables = getTableList(tableIds, selectors);
             if (capturedTables.isEmpty()) {
                 throw new IllegalArgumentException(
                         "Cannot find any table by the option 'tables' = " + tables);
@@ -184,8 +188,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
             if (tablesExclude != null) {
                 Selectors selectExclude =
                         new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
-                List<String> excludeTables =
-                        getTableList(configFactory.createConfig(0), selectExclude);
+                List<String> excludeTables = getTableList(tableIds, selectExclude);
                 if (!excludeTables.isEmpty()) {
                     capturedTables.removeAll(excludeTables);
                 }
@@ -201,8 +204,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         String chunkKeyColumns = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         if (chunkKeyColumns != null) {
             Map<ObjectPath, String> chunkKeyColumnMap = new HashMap<>();
-            List<TableId> tableIds =
-                    MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
+
             for (String chunkKeyColumn : chunkKeyColumns.split(";")) {
                 String[] splits = chunkKeyColumn.split(":");
                 if (splits.length == 2) {
@@ -284,8 +286,9 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     private static final String SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET = "specific-offset";
     private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMP = "timestamp";
 
-    private static List<String> getTableList(MySqlSourceConfig sourceConfig, Selectors selectors) {
-        return MySqlSchemaUtils.listTables(sourceConfig, null).stream()
+    private static List<String> getTableList(
+            @Nullable List<TableId> tableIdList, Selectors selectors) {
+        return tableIdList.stream()
                 .filter(selectors::isMatch)
                 .map(TableId::toString)
                 .collect(Collectors.toList());

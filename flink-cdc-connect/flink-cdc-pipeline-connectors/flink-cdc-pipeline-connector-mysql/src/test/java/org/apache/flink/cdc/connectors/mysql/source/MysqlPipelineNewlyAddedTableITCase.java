@@ -60,6 +60,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.testcontainers.shaded.com.google.common.collect.Lists;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -91,6 +92,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_ID;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
@@ -192,6 +194,42 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         assertThat(tableNames.size()).isEqualTo(2);
         assertThat(tableNames.get(0)).isEqualTo("address_beijing");
         assertThat(tableNames.get(1)).isEqualTo("address_shanghai");
+    }
+
+    @Test
+    public void testScanBinlogNewlyAddedTableEnabledAndExcludeTables() throws Exception {
+        List<String> tables = Collections.singletonList("address_\\.*");
+        Map<String, String> options = new HashMap<>();
+        options.put(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
+        options.put(TABLES_EXCLUDE.key(), customDatabase.getDatabaseName() + ".address_beijing");
+        options.put(SCAN_STARTUP_MODE.key(), "timestamp");
+        options.put(
+                SCAN_STARTUP_TIMESTAMP_MILLIS.key(), String.valueOf(System.currentTimeMillis()));
+
+        FlinkSourceProvider sourceProvider = getFlinkSourceProvider(tables, 4, options);
+        StreamExecutionEnvironment env =
+                StreamExecutionEnvironment.getExecutionEnvironment(new Configuration());
+        env.enableCheckpointing(200);
+        DataStreamSource<Event> source =
+                env.fromSource(
+                        sourceProvider.getSource(),
+                        WatermarkStrategy.noWatermarks(),
+                        MySqlDataSourceFactory.IDENTIFIER,
+                        new EventTypeInfo());
+
+        TypeSerializer<Event> serializer =
+                source.getTransformation().getOutputType().createSerializer(env.getConfig());
+        CheckpointedCollectResultBuffer<Event> resultBuffer =
+                new CheckpointedCollectResultBuffer<>(serializer);
+        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
+        CollectResultIterator<Event> iterator =
+                addCollector(env, source, resultBuffer, serializer, accumulatorName);
+        env.executeAsync("AddNewlyTablesWhenReadingBinlog");
+        initialAddressTables(
+                getConnection(), Lists.newArrayList("address_beijing", "address_shanghai"));
+        List<Event> actual = fetchResults(iterator, 4);
+        assertThat(((ChangeEvent) actual.get(0)).tableId())
+                .isEqualTo(TableId.tableId(customDatabase.getDatabaseName(), "address_shanghai"));
     }
 
     @Test

@@ -601,11 +601,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             return new MySqlChunkSplitter(
                     mySqlSchema,
                     sourceConfig,
-                    tableId != null
-                                    && sourceConfig
-                                            .getTableFilters()
-                                            .dataCollectionFilter()
-                                            .isIncluded(tableId)
+                    tableId != null && sourceConfig.getTableFilter().test(tableId)
                             ? chunkSplitterState
                             : ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
         }

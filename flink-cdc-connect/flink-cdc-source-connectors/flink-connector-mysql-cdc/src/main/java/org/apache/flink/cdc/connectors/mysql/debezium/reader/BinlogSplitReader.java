@@ -40,7 +40,6 @@ import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.relational.TableId;
-import io.debezium.relational.Tables;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
@@ -81,7 +80,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     // tableId -> the max splitHighWatermark
     private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
     private final Set<TableId> pureBinlogPhaseTables;
-    private Tables.TableFilter capturedTableFilter;
+    private Predicate capturedTableFilter;
     private final StoppableChangeEventSourceContext changeEventSourceContext =
             new StoppableChangeEventSourceContext();
 
@@ -100,8 +99,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         this.currentBinlogSplit = mySqlSplit.asBinlogSplit();
         configureFilter();
         statefulTaskContext.configure(currentBinlogSplit);
-        this.capturedTableFilter =
-                statefulTaskContext.getConnectorConfig().getTableFilters().dataCollectionFilter();
+        this.capturedTableFilter = statefulTaskContext.getSourceConfig().getTableFilter();
         this.queue = statefulTaskContext.getQueue();
         this.binlogSplitReadTask =
                 new MySqlBinlogSplitReadTask(
@@ -247,7 +245,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         } else if (RecordUtils.isSchemaChangeEvent(sourceRecord)) {
             if (RecordUtils.isTableChangeRecord(sourceRecord)) {
                 TableId tableId = RecordUtils.getTableId(sourceRecord);
-                return capturedTableFilter.isIncluded(tableId);
+                return capturedTableFilter.test(tableId);
             } else {
                 // Not related to changes in table structure, like `CREATE/DROP DATABASE`, skip it
                 return false;
@@ -270,7 +268,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         if (!statefulTaskContext.getSourceConfig().isScanNewlyAddedTableEnabled()) {
             // the new added sharding table without history records
             return !maxSplitHighWatermarkMap.containsKey(tableId)
-                    && capturedTableFilter.isIncluded(tableId);
+                    && capturedTableFilter.test(tableId);
         }
         return false;
     }
@@ -280,7 +278,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                 currentBinlogSplit.getFinishedSnapshotSplitInfos();
         Map<TableId, List<FinishedSnapshotSplitInfo>> splitsInfoMap = new HashMap<>();
         Map<TableId, BinlogOffset> tableIdBinlogPositionMap = new HashMap<>();
-        // specific offset mode
+        // startup mode which is stream only
         if (finishedSplitInfos.isEmpty()) {
             for (TableId tableId : currentBinlogSplit.getTableSchemas().keySet()) {
                 tableIdBinlogPositionMap.put(tableId, currentBinlogSplit.getStartingOffset());
