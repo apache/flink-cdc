@@ -103,12 +103,12 @@ public class PaimonMetadataApplierTest {
                         TableId.parse("test.table1"),
                         org.apache.flink.cdc.common.schema.Schema.newBuilder()
                                 .physicalColumn(
-                                        "col1",
+                                        "Col1",
                                         org.apache.flink.cdc.common.types.DataTypes.STRING()
                                                 .notNull())
                                 .physicalColumn(
-                                        "col2", org.apache.flink.cdc.common.types.DataTypes.INT())
-                                .primaryKey("col1")
+                                        "Col2", org.apache.flink.cdc.common.types.DataTypes.INT())
+                                .primaryKey("Col1")
                                 .build());
         metadataApplier.applySchemaChange(createTableEvent);
         RowType tableSchema =
@@ -137,8 +137,8 @@ public class PaimonMetadataApplierTest {
                 tableSchema, catalog.getTable(Identifier.fromString("test.table1")).rowType());
 
         Map<String, String> nameMapping = new HashMap<>();
-        nameMapping.put("col2", "newcol2");
-        nameMapping.put("col3", "newcol3");
+        nameMapping.put("col2", "NewCol2");
+        nameMapping.put("col3", "NewCol3");
         RenameColumnEvent renameColumnEvent =
                 new RenameColumnEvent(TableId.parse("test.table1"), nameMapping);
         metadataApplier.applySchemaChange(renameColumnEvent);
@@ -188,7 +188,7 @@ public class PaimonMetadataApplierTest {
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
         Map<TableId, List<String>> partitionMaps = new HashMap<>();
-        partitionMaps.put(TableId.parse("test.table1"), Arrays.asList("col3", "col4"));
+        partitionMaps.put(TableId.parse("test.table1"), Arrays.asList("Col3", "Col4"));
         MetadataApplier metadataApplier =
                 new PaimonMetadataApplier(catalogOptions, tableOptions, partitionMaps);
         CreateTableEvent createTableEvent =
@@ -196,19 +196,19 @@ public class PaimonMetadataApplierTest {
                         TableId.parse("test.table1"),
                         org.apache.flink.cdc.common.schema.Schema.newBuilder()
                                 .physicalColumn(
-                                        "col1",
+                                        "Col1",
                                         org.apache.flink.cdc.common.types.DataTypes.STRING()
                                                 .notNull())
                                 .physicalColumn(
-                                        "col2",
+                                        "Col2",
                                         org.apache.flink.cdc.common.types.DataTypes.STRING())
                                 .physicalColumn(
-                                        "col3",
+                                        "Col3",
                                         org.apache.flink.cdc.common.types.DataTypes.STRING())
                                 .physicalColumn(
-                                        "col4",
+                                        "Col4",
                                         org.apache.flink.cdc.common.types.DataTypes.STRING())
-                                .primaryKey("col1")
+                                .primaryKey("Col1")
                                 .build());
         metadataApplier.applySchemaChange(createTableEvent);
         Table table = catalog.getTable(Identifier.fromString("test.table1"));
@@ -237,67 +237,67 @@ public class PaimonMetadataApplierTest {
                         TableId.parse("test.table1"),
                         org.apache.flink.cdc.common.schema.Schema.newBuilder()
                                 .physicalColumn(
-                                        "col1",
+                                        "Col1",
                                         org.apache.flink.cdc.common.types.DataTypes.STRING()
                                                 .notNull())
                                 .physicalColumn(
-                                        "boolean",
+                                        "Boolean",
                                         org.apache.flink.cdc.common.types.DataTypes.BOOLEAN())
                                 .physicalColumn(
-                                        "binary",
+                                        "Binary",
                                         org.apache.flink.cdc.common.types.DataTypes.BINARY(3))
                                 .physicalColumn(
-                                        "varbinary",
+                                        "Varbinary",
                                         org.apache.flink.cdc.common.types.DataTypes.VARBINARY(10))
                                 .physicalColumn(
-                                        "bytes",
+                                        "Bytes",
                                         org.apache.flink.cdc.common.types.DataTypes.BYTES())
                                 .physicalColumn(
-                                        "tinyint",
+                                        "Tinyint",
                                         org.apache.flink.cdc.common.types.DataTypes.TINYINT())
                                 .physicalColumn(
-                                        "smallint",
+                                        "Smallint",
                                         org.apache.flink.cdc.common.types.DataTypes.SMALLINT())
                                 .physicalColumn(
-                                        "int", org.apache.flink.cdc.common.types.DataTypes.INT())
+                                        "Int", org.apache.flink.cdc.common.types.DataTypes.INT())
                                 .physicalColumn(
-                                        "float",
+                                        "Float",
                                         org.apache.flink.cdc.common.types.DataTypes.FLOAT())
                                 .physicalColumn(
-                                        "double",
+                                        "Double",
                                         org.apache.flink.cdc.common.types.DataTypes.DOUBLE())
                                 .physicalColumn(
-                                        "decimal",
+                                        "Decimal",
                                         org.apache.flink.cdc.common.types.DataTypes.DECIMAL(6, 3))
                                 .physicalColumn(
-                                        "char", org.apache.flink.cdc.common.types.DataTypes.CHAR(5))
+                                        "Char", org.apache.flink.cdc.common.types.DataTypes.CHAR(5))
                                 .physicalColumn(
-                                        "varchar",
+                                        "Varchar",
                                         org.apache.flink.cdc.common.types.DataTypes.VARCHAR(10))
                                 .physicalColumn(
-                                        "string",
+                                        "String",
                                         org.apache.flink.cdc.common.types.DataTypes.STRING())
                                 .physicalColumn(
-                                        "date", org.apache.flink.cdc.common.types.DataTypes.DATE())
+                                        "Date", org.apache.flink.cdc.common.types.DataTypes.DATE())
                                 .physicalColumn(
-                                        "time", org.apache.flink.cdc.common.types.DataTypes.TIME())
+                                        "Time", org.apache.flink.cdc.common.types.DataTypes.TIME())
                                 .physicalColumn(
-                                        "time_with_precision",
+                                        "Time_with_precision",
                                         org.apache.flink.cdc.common.types.DataTypes.TIME(6))
                                 .physicalColumn(
-                                        "timestamp",
+                                        "Timestamp",
                                         org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP())
                                 .physicalColumn(
-                                        "timestamp_with_precision",
+                                        "Timestamp_with_precision",
                                         org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP(3))
                                 .physicalColumn(
-                                        "timestamp_ltz",
+                                        "Timestamp_ltz",
                                         org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP_LTZ())
                                 .physicalColumn(
-                                        "timestamp_ltz_with_precision",
+                                        "Timestamp_ltz_with_precision",
                                         org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP_LTZ(
                                                 3))
-                                .primaryKey("col1")
+                                .primaryKey("Col1")
                                 .build());
         metadataApplier.applySchemaChange(createTableEvent);
         RowType tableSchema =
@@ -348,12 +348,12 @@ public class PaimonMetadataApplierTest {
                         TableId.parse("test.table1"),
                         org.apache.flink.cdc.common.schema.Schema.newBuilder()
                                 .physicalColumn(
-                                        "col1",
+                                        "Col1",
                                         org.apache.flink.cdc.common.types.DataTypes.STRING()
                                                 .notNull())
                                 .physicalColumn(
-                                        "col2", org.apache.flink.cdc.common.types.DataTypes.INT())
-                                .primaryKey("col1")
+                                        "Col2", org.apache.flink.cdc.common.types.DataTypes.INT())
+                                .primaryKey("Col1")
                                 .build());
         metadataApplier.applySchemaChange(createTableEvent);
 
