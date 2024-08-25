@@ -526,4 +526,39 @@ public class PreTransformOperatorTest {
                         new StreamRecord<>(
                                 new CreateTableEvent(METADATA_TABLEID, EXPECTED_METADATA_SCHEMA)));
     }
+
+    @Test
+    void testMultiTransform() throws Exception {
+        PreTransformOperator transform =
+                PreTransformOperator.newBuilder()
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "col1, upper(col1) col12",
+                                "col1 = 'col1'",
+                                "col2",
+                                "col12",
+                                "key1=value1,key2=value2")
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "col2, upper(col2) col12",
+                                "col1 != 'col1'",
+                                "col2",
+                                "col12",
+                                "key1=value1,key2=value2")
+                        .build();
+        EventOperatorTestHarness<PreTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(CUSTOMERS_TABLEID, CUSTOMERS_SCHEMA);
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(new CreateTableEvent(CUSTOMERS_TABLEID, EXPECT_SCHEMA)));
+    }
 }
