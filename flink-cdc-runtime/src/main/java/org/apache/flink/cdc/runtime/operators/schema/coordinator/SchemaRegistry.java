@@ -309,7 +309,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
 
     private GetEvolvedSchemaResponse handleGetEvolvedSchemaRequest(
             GetEvolvedSchemaRequest getEvolvedSchemaRequest) {
-        LOG.info("Handling evolved schema request: {}", getEvolvedSchemaRequest);
+        LOG.debug("Handling evolved schema request: {}", getEvolvedSchemaRequest);
         int schemaVersion = getEvolvedSchemaRequest.getSchemaVersion();
         TableId tableId = getEvolvedSchemaRequest.getTableId();
         if (schemaVersion == GetEvolvedSchemaRequest.LATEST_SCHEMA_VERSION) {
@@ -331,7 +331,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
 
     private GetOriginalSchemaResponse handleGetOriginalSchemaRequest(
             GetOriginalSchemaRequest getOriginalSchemaRequest) {
-        LOG.info("Handling original schema request: {}", getOriginalSchemaRequest);
+        LOG.debug("Handling original schema request: {}", getOriginalSchemaRequest);
         int schemaVersion = getOriginalSchemaRequest.getSchemaVersion();
         TableId tableId = getOriginalSchemaRequest.getTableId();
         if (schemaVersion == GetOriginalSchemaRequest.LATEST_SCHEMA_VERSION) {
