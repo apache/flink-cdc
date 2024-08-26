@@ -173,6 +173,12 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
 
         List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
+
+        if (scanBinlogNewlyAddedTableEnabled && scanNewlyAddedTableEnabled) {
+            throw new IllegalArgumentException(
+                    "If both scan.binlog.newly-added-table.enabled and scan.newly-added-table.enabled are true, data maybe duplicate after restore");
+        }
+
         if (scanBinlogNewlyAddedTableEnabled) {
             String newTables = validateTableAndReturnDebeziumStyle(tables);
             configFactory.tableList(newTables);
