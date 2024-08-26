@@ -50,6 +50,7 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
@@ -440,7 +441,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         long schemaEvolveTimeOutMillis = System.currentTimeMillis() + rpcTimeOutInMillis;
         while (true) {
             SchemaChangeResponse response =
-                    sendRequestToCoordinator(new SchemaChangeRequest(tableId, schemaChangeEvent));
+                    sendRequestToCoordinator(
+                            new SchemaChangeRequest(tableId, schemaChangeEvent, subTaskId));
             if (response.isRegistryBusy()) {
                 if (System.currentTimeMillis() < schemaEvolveTimeOutMillis) {
                     LOG.info(
@@ -608,5 +610,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                         destinationType)));
             }
         }
+    }
+
+    @Override
+    public void snapshotState(StateSnapshotContext context) throws Exception {
+        // Needless to do anything, since AbstractStreamOperator#snapshotState and #processElement
+        // is guaranteed not to be mixed together.
     }
 }

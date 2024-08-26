@@ -338,6 +338,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
             // triggers DropColumnEvent
             stmt.execute("ALTER TABLE members DROP COLUMN biological_sex");
             stmt.execute("INSERT INTO members VALUES (1013, 'Fiona', 16);");
+            stmt.execute("INSERT INTO members VALUES (1014, 'Gem', 17);");
         }
 
         List<String> expectedTmEvents =
