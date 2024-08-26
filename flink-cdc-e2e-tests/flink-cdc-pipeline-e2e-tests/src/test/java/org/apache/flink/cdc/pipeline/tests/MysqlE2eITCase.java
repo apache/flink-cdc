@@ -332,6 +332,64 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                 "DropTableEvent{tableId=%s.products}");
     }
 
+    @Test
+    public void testDroppingTable() throws Exception {
+        Thread.sleep(5000);
+        LOG.info("Sleep 5 seconds to distinguish initial DDL events with dropping table events...");
+        long ddlTimestamp = System.currentTimeMillis();
+        Thread.sleep(5000);
+        LOG.info("Going to drop tables after timestamp {}", ddlTimestamp);
+
+        try (Connection connection = mysqlInventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("DROP TABLE products;");
+        }
+
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "  scan.startup.mode: timestamp\n"
+                                + "  scan.startup.timestamp-millis: %d\n"
+                                + "  scan.binlog.newly-added-table.enabled: true\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d\n"
+                                + "  schema.change.behavior: evolve",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        ddlTimestamp,
+                        parallelism);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+        waitUntilSpecificEvent(
+                String.format(
+                        "Table %s.products received SchemaChangeEvent DropTableEvent{tableId=%s.products} and start to be blocked.",
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        mysqlInventoryDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "Schema change event DropTableEvent{tableId=%s.products} has been handled in another subTask already.",
+                        mysqlInventoryDatabase.getDatabaseName()));
+    }
+
     private void validateResult(String... expectedEvents) throws Exception {
         String dbName = mysqlInventoryDatabase.getDatabaseName();
         for (String event : expectedEvents) {

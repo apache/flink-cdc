@@ -164,7 +164,7 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
 
     public void registerTableSchema(TableId tableId, Schema schema) {
         schemaRegistry.handleCoordinationRequest(
-                new SchemaChangeRequest(tableId, new CreateTableEvent(tableId, schema)));
+                new SchemaChangeRequest(tableId, new CreateTableEvent(tableId, schema), 0));
         schemaRegistry.handleApplyEvolvedSchemaChangeRequest(new CreateTableEvent(tableId, schema));
     }
 

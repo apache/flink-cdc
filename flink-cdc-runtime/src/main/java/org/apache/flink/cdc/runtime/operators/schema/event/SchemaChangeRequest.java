@@ -36,10 +36,14 @@ public class SchemaChangeRequest implements CoordinationRequest {
     private final TableId tableId;
     /** The schema changes. */
     private final SchemaChangeEvent schemaChangeEvent;
+    /** The ID of subTask that initiated the request. */
+    private final int subTaskId;
 
-    public SchemaChangeRequest(TableId tableId, SchemaChangeEvent schemaChangeEvent) {
+    public SchemaChangeRequest(
+            TableId tableId, SchemaChangeEvent schemaChangeEvent, int subTaskId) {
         this.tableId = tableId;
         this.schemaChangeEvent = schemaChangeEvent;
+        this.subTaskId = subTaskId;
     }
 
     public TableId getTableId() {
@@ -48,6 +52,10 @@ public class SchemaChangeRequest implements CoordinationRequest {
 
     public SchemaChangeEvent getSchemaChangeEvent() {
         return schemaChangeEvent;
+    }
+
+    public int getSubTaskId() {
+        return subTaskId;
     }
 
     @Override
@@ -60,11 +68,12 @@ public class SchemaChangeRequest implements CoordinationRequest {
         }
         SchemaChangeRequest that = (SchemaChangeRequest) o;
         return Objects.equals(tableId, that.tableId)
-                && Objects.equals(schemaChangeEvent, that.schemaChangeEvent);
+                && Objects.equals(schemaChangeEvent, that.schemaChangeEvent)
+                && subTaskId == that.subTaskId;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId, schemaChangeEvent);
+        return Objects.hash(tableId, schemaChangeEvent, subTaskId);
     }
 }

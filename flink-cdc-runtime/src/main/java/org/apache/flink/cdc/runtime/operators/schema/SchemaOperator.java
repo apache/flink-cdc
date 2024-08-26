@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -50,6 +51,7 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
@@ -242,7 +244,13 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 tableId,
                 event);
         handleSchemaChangeEvent(tableId, event);
-        // Update caches
+
+        if (event instanceof DropTableEvent) {
+            // Update caches unless event is a Drop table event. In that case, no schema will be
+            // available / necessary.
+            return;
+        }
+
         originalSchema.put(tableId, getLatestOriginalSchema(tableId));
         schemaDivergesMap.put(tableId, checkSchemaDiverges(tableId));
 
@@ -440,7 +448,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         long schemaEvolveTimeOutMillis = System.currentTimeMillis() + rpcTimeOutInMillis;
         while (true) {
             SchemaChangeResponse response =
-                    sendRequestToCoordinator(new SchemaChangeRequest(tableId, schemaChangeEvent));
+                    sendRequestToCoordinator(
+                            new SchemaChangeRequest(tableId, schemaChangeEvent, subTaskId));
             if (response.isRegistryBusy()) {
                 if (System.currentTimeMillis() < schemaEvolveTimeOutMillis) {
                     LOG.info(
@@ -608,5 +617,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                         destinationType)));
             }
         }
+    }
+
+    @Override
+    public void snapshotState(StateSnapshotContext context) throws Exception {
+        // Needless to do anything, since AbstractStreamOperator#snapshotState and #processElement
+        // is guaranteed not to be mixed together.
     }
 }
