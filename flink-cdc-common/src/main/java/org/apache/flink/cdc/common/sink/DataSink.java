@@ -41,4 +41,10 @@ public interface DataSink {
     default HashFunctionProvider<DataChangeEvent> getDataChangeEventHashFunctionProvider() {
         return new DefaultDataChangeEventHashFunctionProvider();
     }
+
+    default HashFunctionProvider<DataChangeEvent> getDataChangeEventHashFunctionProvider(
+            int parallelism) {
+        return getDataChangeEventHashFunctionProvider(); // fallback to nullary version if it isn't
+        // overridden
+    }
 }

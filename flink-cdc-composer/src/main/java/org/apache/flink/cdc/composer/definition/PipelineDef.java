@@ -54,6 +54,7 @@ public class PipelineDef {
     private final SinkDef sink;
     private final List<RouteDef> routes;
     private final List<TransformDef> transforms;
+    private final List<UdfDef> udfs;
     private final Configuration config;
 
     public PipelineDef(
@@ -61,11 +62,13 @@ public class PipelineDef {
             SinkDef sink,
             List<RouteDef> routes,
             List<TransformDef> transforms,
+            List<UdfDef> udfs,
             Configuration config) {
         this.source = source;
         this.sink = sink;
         this.routes = routes;
         this.transforms = transforms;
+        this.udfs = udfs;
         this.config = evaluatePipelineTimeZone(config);
     }
 
@@ -85,6 +88,10 @@ public class PipelineDef {
         return transforms;
     }
 
+    public List<UdfDef> getUdfs() {
+        return udfs;
+    }
+
     public Configuration getConfig() {
         return config;
     }
@@ -100,6 +107,8 @@ public class PipelineDef {
                 + routes
                 + ", transforms="
                 + transforms
+                + ", udfs="
+                + udfs
                 + ", config="
                 + config
                 + '}';
@@ -118,12 +127,13 @@ public class PipelineDef {
                 && Objects.equals(sink, that.sink)
                 && Objects.equals(routes, that.routes)
                 && Objects.equals(transforms, that.transforms)
+                && Objects.equals(udfs, that.udfs)
                 && Objects.equals(config, that.config);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(source, sink, routes, transforms, config);
+        return Objects.hash(source, sink, routes, transforms, udfs, config);
     }
 
     // ------------------------------------------------------------------------

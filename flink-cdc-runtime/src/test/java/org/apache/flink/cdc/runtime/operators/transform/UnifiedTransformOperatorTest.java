@@ -918,6 +918,57 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
+    public void testMetadataTransformIncludeMetaColumnString() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "schema_nullability");
+        UnifiedTransformTestCase.of(
+                        tableId,
+                        "id, name, age, id + age as computed, __namespace_name__ as metaColNameSpaceName,  __schema_name__ as metaColSchemaName, __table_name__ as metaColNameTableName, "
+                                + "UPPER(__schema_name__) as metaColSchemaNameUpper, '__table_name__' as metaColStr1, '__namespace__name__schema__name__table__name__' as metaColStr2",
+                        "id > 100",
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING().notNull())
+                                .physicalColumn("age", DataTypes.INT().notNull())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING().notNull())
+                                .physicalColumn("age", DataTypes.INT().notNull())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING().notNull())
+                                .physicalColumn("age", DataTypes.INT().notNull())
+                                .physicalColumn("computed", DataTypes.INT())
+                                .physicalColumn("metaColNameSpaceName", DataTypes.STRING())
+                                .physicalColumn("metaColSchemaName", DataTypes.STRING())
+                                .physicalColumn("metaColNameTableName", DataTypes.STRING())
+                                .physicalColumn("metaColSchemaNameUpper", DataTypes.STRING())
+                                .physicalColumn("metaColStr1", DataTypes.STRING())
+                                .physicalColumn("metaColStr2", DataTypes.STRING())
+                                .primaryKey("id")
+                                .build())
+                .initializeHarness()
+                .insertSource(1000, "Alice", 17)
+                .insertPreTransformed(1000, "Alice", 17)
+                .insertPostTransformed(
+                        1000,
+                        "Alice",
+                        17,
+                        1017,
+                        "my_company",
+                        "my_branch",
+                        "schema_nullability",
+                        "MY_BRANCH",
+                        "__table_name__",
+                        "__namespace__name__schema__name__table__name__")
+                .runTests()
+                .destroyHarness();
+    }
+
+    @Test
     public void testTransformWithCast() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "transform_with_cast");
         UnifiedTransformTestCase.of(

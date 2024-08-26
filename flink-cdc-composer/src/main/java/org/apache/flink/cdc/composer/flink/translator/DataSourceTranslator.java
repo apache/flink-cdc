@@ -23,7 +23,6 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
-import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceFunctionProvider;
@@ -41,26 +40,14 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 public class DataSourceTranslator {
 
     public DataStreamSource<Event> translate(
-            SourceDef sourceDef, StreamExecutionEnvironment env, Configuration pipelineConfig) {
-        // Search the data source factory
-        DataSourceFactory sourceFactory =
-                FactoryDiscoveryUtils.getFactoryByIdentifier(
-                        sourceDef.getType(), DataSourceFactory.class);
-
+            SourceDef sourceDef,
+            StreamExecutionEnvironment env,
+            Configuration pipelineConfig,
+            int sourceParallelism) {
         // Create data source
-        DataSource dataSource =
-                sourceFactory.createDataSource(
-                        new FactoryHelper.DefaultContext(
-                                sourceDef.getConfig(),
-                                pipelineConfig,
-                                Thread.currentThread().getContextClassLoader()));
-
-        // Add source JAR to environment
-        FactoryDiscoveryUtils.getJarPathByIdentifier(sourceDef.getType(), DataSourceFactory.class)
-                .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
+        DataSource dataSource = createDataSource(sourceDef, env, pipelineConfig);
 
         // Get source provider
-        final int sourceParallelism = pipelineConfig.get(PipelineOptions.PIPELINE_PARALLELISM);
         EventSourceProvider eventSourceProvider = dataSource.getEventSourceProvider();
         if (eventSourceProvider instanceof FlinkSourceProvider) {
             // Source
@@ -89,6 +76,24 @@ public class DataSourceTranslator {
                             "Unsupported EventSourceProvider type \"%s\"",
                             eventSourceProvider.getClass().getCanonicalName()));
         }
+    }
+
+    private DataSource createDataSource(
+            SourceDef sourceDef, StreamExecutionEnvironment env, Configuration pipelineConfig) {
+        // Search the data source factory
+        DataSourceFactory sourceFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier(
+                        sourceDef.getType(), DataSourceFactory.class);
+        // Add source JAR to environment
+        FactoryDiscoveryUtils.getJarPathByIdentifier(sourceFactory)
+                .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
+        DataSource dataSource =
+                sourceFactory.createDataSource(
+                        new FactoryHelper.DefaultContext(
+                                sourceDef.getConfig(),
+                                pipelineConfig,
+                                Thread.currentThread().getContextClassLoader()));
+        return dataSource;
     }
 
     private String generateDefaultSourceName(SourceDef sourceDef) {

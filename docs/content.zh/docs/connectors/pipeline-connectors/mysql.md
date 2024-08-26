@@ -268,6 +268,24 @@ pipeline:
       <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。<br>
           若 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 默认值变更为 true，可以不用显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = true。</td>
     </tr>
+    <tr>
+      <td>scan.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否启用动态加表特性，默认关闭。 此配置项只有作业从savepoint/checkpoint启动时才生效。</td>
+    </tr>
+    <tr>
+      <td>scan.binlog.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>在 binlog 读取阶段，是否读取新增表的表结构变更和数据变更，默认值是 false。 <br>
+          scan.newly-added-table.enabled 和 scan.binlog.newly-added-table.enabled 参数的不同在于: <br>
+          scan.newly-added-table.enabled: 在作业重启后，对新增表的全量和增量数据进行读取; <br>
+          scan.binlog.newly-added-table.enabled: 只在 binlog 读取阶段读取新增表的增量数据。
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

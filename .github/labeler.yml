@@ -84,3 +84,5 @@ doris-pipeline-connector:
   - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris/**/*
 starrocks-pipeline-connector:
   - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks/**/*
+elasticsearch-pipeline-connector:
+  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-elasticsearch/**/*

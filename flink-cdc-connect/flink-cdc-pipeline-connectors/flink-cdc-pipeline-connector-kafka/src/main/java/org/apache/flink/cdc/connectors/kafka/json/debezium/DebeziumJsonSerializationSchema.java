@@ -126,7 +126,8 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
             }
             jsonSerializers.put(
                     schemaChangeEvent.tableId(),
-                    new TableSchemaInfo(schema, jsonSerializer, zoneId));
+                    new TableSchemaInfo(
+                            schemaChangeEvent.tableId(), schema, jsonSerializer, zoneId));
             return null;
         }
 
@@ -144,7 +145,7 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
                             1,
                             jsonSerializers
                                     .get(dataChangeEvent.tableId())
-                                    .getRowDataFromRecordData(dataChangeEvent.after()));
+                                    .getRowDataFromRecordData(dataChangeEvent.after(), false));
                     reuseGenericRowData.setField(2, OP_INSERT);
                     return jsonSerializers
                             .get(dataChangeEvent.tableId())
@@ -155,7 +156,7 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
                             0,
                             jsonSerializers
                                     .get(dataChangeEvent.tableId())
-                                    .getRowDataFromRecordData(dataChangeEvent.before()));
+                                    .getRowDataFromRecordData(dataChangeEvent.before(), false));
                     reuseGenericRowData.setField(1, null);
                     reuseGenericRowData.setField(2, OP_DELETE);
                     return jsonSerializers
@@ -168,12 +169,12 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
                             0,
                             jsonSerializers
                                     .get(dataChangeEvent.tableId())
-                                    .getRowDataFromRecordData(dataChangeEvent.before()));
+                                    .getRowDataFromRecordData(dataChangeEvent.before(), false));
                     reuseGenericRowData.setField(
                             1,
                             jsonSerializers
                                     .get(dataChangeEvent.tableId())
-                                    .getRowDataFromRecordData(dataChangeEvent.after()));
+                                    .getRowDataFromRecordData(dataChangeEvent.after(), false));
                     reuseGenericRowData.setField(2, OP_UPDATE);
                     return jsonSerializers
                             .get(dataChangeEvent.tableId())

@@ -26,6 +26,8 @@ import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.janino.ExpressionEvaluator;
 
+import java.util.List;
+
 /**
  * The processor of the transform expression. It processes the expression of projections and
  * filters.
@@ -37,20 +39,34 @@ public class TransformExpressionCompiler {
 
     /** Triggers internal garbage collection of expired cache entries. */
     public static void cleanUp() {
-        COMPILED_EXPRESSION_CACHE.cleanUp();
+        // com.google.common.cache.Cache from Guava isn't guaranteed to clear all cached records
+        // when invoking Cache#cleanUp, which may cause classloader leakage. Use #invalidateAll
+        // instead to ensure all key / value pairs to be correctly discarded.
+        COMPILED_EXPRESSION_CACHE.invalidateAll();
     }
 
     /** Compiles an expression code to a janino {@link ExpressionEvaluator}. */
-    public static ExpressionEvaluator compileExpression(TransformExpressionKey key) {
+    public static ExpressionEvaluator compileExpression(
+            TransformExpressionKey key, List<UserDefinedFunctionDescriptor> udfDescriptors) {
         try {
             return COMPILED_EXPRESSION_CACHE.get(
                     key,
                     () -> {
                         ExpressionEvaluator expressionEvaluator = new ExpressionEvaluator();
+
+                        List<String> argumentNames = key.getArgumentNames();
+                        List<Class<?>> argumentClasses = key.getArgumentClasses();
+
+                        for (UserDefinedFunctionDescriptor udfFunction : udfDescriptors) {
+                            argumentNames.add("__instanceOf" + udfFunction.getClassName());
+                            argumentClasses.add(Class.forName(udfFunction.getClasspath()));
+                        }
+
                         // Input args
                         expressionEvaluator.setParameters(
-                                key.getArgumentNames().toArray(new String[0]),
-                                key.getArgumentClasses().toArray(new Class[0]));
+                                argumentNames.toArray(new String[0]),
+                                argumentClasses.toArray(new Class[0]));
+
                         // Result type
                         expressionEvaluator.setExpressionType(key.getReturnClass());
                         try {

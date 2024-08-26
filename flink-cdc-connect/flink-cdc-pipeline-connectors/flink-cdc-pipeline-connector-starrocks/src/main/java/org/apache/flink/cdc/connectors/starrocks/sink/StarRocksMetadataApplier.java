@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
@@ -97,19 +98,34 @@ public class StarRocksMetadataApplier implements MetadataApplier {
             catalog.open();
         }
 
-        if (schemaChangeEvent instanceof CreateTableEvent) {
-            applyCreateTable((CreateTableEvent) schemaChangeEvent);
-        } else if (schemaChangeEvent instanceof AddColumnEvent) {
-            applyAddColumn((AddColumnEvent) schemaChangeEvent);
-        } else if (schemaChangeEvent instanceof DropColumnEvent) {
-            applyDropColumn((DropColumnEvent) schemaChangeEvent);
-        } else if (schemaChangeEvent instanceof RenameColumnEvent) {
-            applyRenameColumn((RenameColumnEvent) schemaChangeEvent);
-        } else if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
-            applyAlterColumn((AlterColumnTypeEvent) schemaChangeEvent);
-        } else {
-            throw new UnsupportedSchemaChangeEventException(schemaChangeEvent);
-        }
+        SchemaChangeEventVisitor.visit(
+                schemaChangeEvent,
+                addColumnEvent -> {
+                    applyAddColumn(addColumnEvent);
+                    return null;
+                },
+                alterColumnTypeEvent -> {
+                    applyAlterColumnType(alterColumnTypeEvent);
+                    return null;
+                },
+                createTableEvent -> {
+                    applyCreateTable(createTableEvent);
+                    return null;
+                },
+                dropColumnEvent -> {
+                    applyDropColumn(dropColumnEvent);
+                    return null;
+                },
+                dropTableEvent -> {
+                    throw new UnsupportedSchemaChangeEventException(dropTableEvent);
+                },
+                renameColumnEvent -> {
+                    applyRenameColumn(renameColumnEvent);
+                    return null;
+                },
+                truncateTableEvent -> {
+                    throw new UnsupportedSchemaChangeEventException(truncateTableEvent);
+                });
     }
 
     private void applyCreateTable(CreateTableEvent createTableEvent) throws SchemaEvolveException {
@@ -289,7 +305,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
         throw new UnsupportedSchemaChangeEventException(renameColumnEvent);
     }
 
-    private void applyAlterColumn(AlterColumnTypeEvent alterColumnTypeEvent)
+    private void applyAlterColumnType(AlterColumnTypeEvent alterColumnTypeEvent)
             throws SchemaEvolveException {
         // TODO There are limitations for data type conversions. We should know the data types
         // before and after changing so that we can make a validation. But the event only contains

@@ -20,8 +20,8 @@ package org.apache.flink.cdc.runtime.parser;
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
+import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSchemaFactory;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
@@ -39,17 +39,25 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.schema.ScalarFunction;
+import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.schema.impl.ScalarFunctionImpl;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlFunction;
+import org.apache.calcite.sql.SqlFunctionCategory;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSelect;
-import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.type.InferTypes;
+import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.util.SqlOperatorTables;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
@@ -75,15 +83,14 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.apache.flink.cdc.common.utils.StringUtils.isNullOrWhitespaceOnly;
+import static org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns.METADATA_COLUMNS;
+import static org.apache.flink.cdc.runtime.typeutils.DataTypeConverter.convertCalciteType;
 
 /** Use Flink's calcite parser to parse the statement of flink cdc pipeline transform. */
 public class TransformParser {
     private static final Logger LOG = LoggerFactory.getLogger(TransformParser.class);
     private static final String DEFAULT_SCHEMA = "default_schema";
     private static final String DEFAULT_TABLE = "TB";
-    public static final String DEFAULT_NAMESPACE_NAME = "__namespace_name__";
-    public static final String DEFAULT_SCHEMA_NAME = "__schema_name__";
-    public static final String DEFAULT_TABLE_NAME = "__table_name__";
 
     private static SqlParser getCalciteParser(String sql) {
         return SqlParser.create(
@@ -94,15 +101,49 @@ public class TransformParser {
                         .withLex(Lex.JAVA));
     }
 
-    private static RelNode sqlToRel(List<Column> columns, SqlNode sqlNode) {
-        List<Column> columnsWithMetadata = copyFillMetadataColumn(sqlNode.toString(), columns);
+    private static RelNode sqlToRel(
+            List<Column> columns,
+            SqlNode sqlNode,
+            List<UserDefinedFunctionDescriptor> udfDescriptors) {
+        List<Column> columnsWithMetadata = copyFillMetadataColumn(columns);
         CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
+        SchemaPlus schema = rootSchema.plus();
         Map<String, Object> operand = new HashMap<>();
         operand.put("tableName", DEFAULT_TABLE);
         operand.put("columns", columnsWithMetadata);
         rootSchema.add(
                 DEFAULT_SCHEMA,
-                TransformSchemaFactory.INSTANCE.create(rootSchema.plus(), DEFAULT_SCHEMA, operand));
+                TransformSchemaFactory.INSTANCE.create(schema, DEFAULT_SCHEMA, operand));
+        List<SqlFunction> udfFunctions = new ArrayList<>();
+        for (UserDefinedFunctionDescriptor udf : udfDescriptors) {
+            try {
+                Class<?> clazz = Class.forName(udf.getClasspath());
+                SqlReturnTypeInference returnTypeInference;
+                ScalarFunction function = ScalarFunctionImpl.create(clazz, "eval");
+                if (udf.getReturnTypeHint() != null) {
+                    // This UDF has return type hint annotation
+                    returnTypeInference =
+                            o ->
+                                    o.getTypeFactory()
+                                            .createSqlType(
+                                                    convertCalciteType(udf.getReturnTypeHint()));
+                } else {
+                    // Infer it from eval method return type
+                    returnTypeInference = o -> function.getReturnType(o.getTypeFactory());
+                }
+                schema.add(udf.getName(), function);
+                udfFunctions.add(
+                        new SqlFunction(
+                                udf.getName(),
+                                SqlKind.OTHER_FUNCTION,
+                                returnTypeInference,
+                                InferTypes.RETURN_TYPE,
+                                OperandTypes.VARIADIC,
+                                SqlFunctionCategory.USER_DEFINED_FUNCTION));
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Failed to resolve UDF: " + udf, e);
+            }
+        }
         SqlTypeFactoryImpl factory = new SqlTypeFactoryImpl(RelDataTypeSystem.DEFAULT);
         CalciteCatalogReader calciteCatalogReader =
                 new CalciteCatalogReader(
@@ -111,10 +152,10 @@ public class TransformParser {
                         factory,
                         new CalciteConnectionConfigImpl(new Properties()));
         TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
-        SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
+        SqlOperatorTable udfOperatorTable = SqlOperatorTables.of(udfFunctions);
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(sqlStdOperatorTable, transformSqlOperatorTable),
+                        SqlOperatorTables.chain(transformSqlOperatorTable, udfOperatorTable),
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
@@ -219,7 +260,9 @@ public class TransformParser {
     // For example, given projection expression "a, b, c, upper(a) as d, b as e" and columns array
     // [a, b, c, x, y, z], returns projection column array [a, b, c, d, e].
     public static List<ProjectionColumn> generateProjectionColumns(
-            String projectionExpression, List<Column> columns) {
+            String projectionExpression,
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors) {
         if (isNullOrWhitespaceOnly(projectionExpression)) {
             return new ArrayList<>();
         }
@@ -228,7 +271,7 @@ public class TransformParser {
             return new ArrayList<>();
         }
         expandWildcard(sqlSelect, columns);
-        RelNode relNode = sqlToRel(columns, sqlSelect);
+        RelNode relNode = sqlToRel(columns, sqlSelect, udfDescriptors);
         Map<String, RelDataType> relDataTypeMap =
                 relNode.getRowType().getFieldList().stream()
                         .collect(
@@ -276,7 +319,7 @@ public class TransformParser {
                                                     relDataTypeMap.get(columnName)),
                                             transformOptional.get().toString(),
                                             JaninoCompiler.translateSqlNodeToJaninoExpression(
-                                                    transformOptional.get()),
+                                                    transformOptional.get(), udfDescriptors),
                                             parseColumnNameList(transformOptional.get()))
                                     : ProjectionColumn.of(
                                             columnName,
@@ -340,7 +383,8 @@ public class TransformParser {
         return projectionColumns;
     }
 
-    public static String translateFilterExpressionToJaninoExpression(String filterExpression) {
+    public static String translateFilterExpressionToJaninoExpression(
+            String filterExpression, List<UserDefinedFunctionDescriptor> udfDescriptors) {
         if (isNullOrWhitespaceOnly(filterExpression)) {
             return "";
         }
@@ -349,7 +393,7 @@ public class TransformParser {
             return "";
         }
         SqlNode where = sqlSelect.getWhere();
-        return JaninoCompiler.translateSqlNodeToJaninoExpression(where);
+        return JaninoCompiler.translateSqlNodeToJaninoExpression(where, udfDescriptors);
     }
 
     public static List<String> parseComputedColumnNames(String projection) {
@@ -447,33 +491,17 @@ public class TransformParser {
         return parseSelect(statement.toString());
     }
 
-    private static List<Column> copyFillMetadataColumn(
-            String transformStatement, List<Column> columns) {
+    private static List<Column> copyFillMetadataColumn(List<Column> columns) {
+        // Add metaColumn for SQLValidator.validate
         List<Column> columnsWithMetadata = new ArrayList<>(columns);
-        if (transformStatement.contains(DEFAULT_NAMESPACE_NAME)
-                && !containsMetadataColumn(columnsWithMetadata, DEFAULT_NAMESPACE_NAME)) {
-            columnsWithMetadata.add(
-                    Column.physicalColumn(DEFAULT_NAMESPACE_NAME, DataTypes.STRING()));
-        }
-        if (transformStatement.contains(DEFAULT_SCHEMA_NAME)
-                && !containsMetadataColumn(columnsWithMetadata, DEFAULT_SCHEMA_NAME)) {
-            columnsWithMetadata.add(Column.physicalColumn(DEFAULT_SCHEMA_NAME, DataTypes.STRING()));
-        }
-        if (transformStatement.contains(DEFAULT_TABLE_NAME)
-                && !containsMetadataColumn(columnsWithMetadata, DEFAULT_TABLE_NAME)) {
-            columnsWithMetadata.add(Column.physicalColumn(DEFAULT_TABLE_NAME, DataTypes.STRING()));
-        }
+        METADATA_COLUMNS.stream()
+                .map(col -> Column.physicalColumn(col.f0, col.f1))
+                .forEach(columnsWithMetadata::add);
         return columnsWithMetadata;
     }
 
-    private static boolean containsMetadataColumn(List<Column> columns, String columnName) {
-        return columns.stream().anyMatch(column -> column.getName().equals(columnName));
-    }
-
     private static boolean isMetadataColumn(String columnName) {
-        return DEFAULT_TABLE_NAME.equals(columnName)
-                || DEFAULT_SCHEMA_NAME.equals(columnName)
-                || DEFAULT_NAMESPACE_NAME.equals(columnName);
+        return METADATA_COLUMNS.stream().anyMatch(col -> col.f0.equals(columnName));
     }
 
     public static SqlSelect parseFilterExpression(String filterExpression) {
@@ -555,6 +583,28 @@ public class TransformParser {
             return sqlFilter.toString();
         } else {
             return filter;
+        }
+    }
+
+    public static boolean hasAsterisk(@Nullable String projection) {
+        if (isNullOrWhitespaceOnly(projection)) {
+            return false;
+        }
+        return parseProjectionExpression(projection).getOperandList().stream()
+                .anyMatch(TransformParser::hasAsterisk);
+    }
+
+    private static boolean hasAsterisk(SqlNode sqlNode) {
+        if (sqlNode instanceof SqlIdentifier) {
+            return ((SqlIdentifier) sqlNode).isStar();
+        } else if (sqlNode instanceof SqlBasicCall) {
+            SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+            return sqlBasicCall.getOperandList().stream().anyMatch(TransformParser::hasAsterisk);
+        } else if (sqlNode instanceof SqlNodeList) {
+            SqlNodeList sqlNodeList = (SqlNodeList) sqlNode;
+            return sqlNodeList.getList().stream().anyMatch(TransformParser::hasAsterisk);
+        } else {
+            return false;
         }
     }
 }

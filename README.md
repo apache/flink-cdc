@@ -35,41 +35,46 @@ full database synchronization, sharding table synchronization, schema evolution 
 2. [Download](https://github.com/apache/flink-cdc/releases) Flink CDC tar, unzip it and put jars of pipeline connector to Flink `lib` directory.
 3. Create a **YAML** file to describe the data source and data sink, the following example synchronizes all tables under MySQL app_db database to Doris :
   ```yaml
-    source:
-       type: mysql
-       name: MySQL Source
-       hostname: 127.0.0.1
-       port: 3306
-       username: admin
-       password: pass
-       tables: adb.\.*
-       server-id: 5401-5404
-    
-    sink:
-      type: doris
-      name: Doris Sink
-      fenodes: 127.0.0.1:8030
-      username: root
-      password: pass
-      
-    transform:
-      - source-table: adb.web_order01
-        projection: \*, UPPER(product_name) as product_name
-        filter: id > 10 AND order_id > 100
-        description: project fields and filter
-      - source-table: adb.web_order02
-        projection: \*, UPPER(product_name) as product_name
-        filter: id > 20 AND order_id > 200
-        description: project fields and filter  
+   source:
+     type: mysql
+     hostname: localhost
+     port: 3306
+     username: root
+     password: 123456
+     tables: app_db.\.*
 
-    route:
-      - source-table: adb.web_order\.*
-        sink-table: adb.ods_web_orders
-        description: sync sharding tables to one destination table
-    
-    pipeline:
-       name: MySQL to Doris Pipeline
-       parallelism: 4
+   sink:
+     type: doris
+     fenodes: 127.0.0.1:8030
+     username: root
+     password: ""
+
+   transform:
+     - source-table: adb.web_order01
+       projection: \*, format('%S', product_name) as product_name
+       filter: addone(id) > 10 AND order_id > 100
+       description: project fields and filter
+     - source-table: adb.web_order02
+       projection: \*, format('%S', product_name) as product_name
+       filter: addone(id) > 20 AND order_id > 200
+       description: project fields and filter
+
+   route:
+     - source-table: app_db.orders
+       sink-table: ods_db.ods_orders
+     - source-table: app_db.shipments
+       sink-table: ods_db.ods_shipments
+     - source-table: app_db.products
+       sink-table: ods_db.ods_products
+
+   pipeline:
+     name: Sync MySQL Database to Doris
+     parallelism: 2
+     user-defined-function:
+       - name: addone
+         classpath: com.example.functions.AddOneFunctionClass
+       - name: format
+         classpath: com.example.functions.FormatFunctionClass
   ```
 4. Submit pipeline job using `flink-cdc.sh` script.
  ```shell

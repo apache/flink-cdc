@@ -215,6 +215,16 @@ public class MySqlDataSourceOptions {
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
 
     @Experimental
+    public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =
+            ConfigOptions.key("scan.incremental.snapshot.chunk.key-column")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table."
+                                    + "By default, the chunk key is the first column of the primary key."
+                                    + "eg. db1.user_table_[0-9]+:col1;db[1-2].[app|web]_order_\\.*:col2;");
+
+    @Experimental
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED =
             ConfigOptions.key("scan.incremental.close-idle-reader.enabled")
                     .booleanType()
@@ -223,6 +233,14 @@ public class MySqlDataSourceOptions {
                             "Whether to close idle readers at the end of the snapshot phase. This feature depends on "
                                     + "FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be "
                                     + "greater than or equal to 1.14 when enabling this feature.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_NEWLY_ADDED_TABLE_ENABLED =
+            ConfigOptions.key("scan.newly-added-table.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to scan the newly added tables or not, by default is false. This option is only useful when we start the job from a savepoint/checkpoint.");
 
     @Experimental
     public static final ConfigOption<Boolean> SCHEMA_CHANGE_ENABLED =
@@ -243,4 +261,15 @@ public class MySqlDataSourceOptions {
                                     + "If there is a need to use a dot (.) in a regular expression to match any character, "
                                     + "it is necessary to escape the dot with a backslash."
                                     + "eg. db0.\\.*, db1.user_table_[0-9]+, db[1-2].[app|web]_order_\\.*");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED =
+            ConfigOptions.key("scan.binlog.newly-added-table.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "In binlog reading stage, whether to scan the ddl and dml statements of newly added tables or not, by default is false. \n"
+                                    + "The difference between scan.newly-added-table.enabled and scan.binlog.newly-added-table.enabled options is: \n"
+                                    + "scan.newly-added-table.enabled: do re-snapshot & binlog-reading for newly added table when restored; \n"
+                                    + "scan.binlog.newly-added-table.enabled: only do binlog-reading for newly added table during binlog reading phase.");
 }

@@ -23,7 +23,7 @@ Dir.chdir(__dir__)
 
 RELEASED_VERSIONS = {
   '3.0.0': {
-    tar: 'https://github.com/ververica/flink-cdc-connectors/releases/download/release-3.0.0/flink-cdc-3.0.0-bin.tar.gz',
+    tar: 'https://github.com/apache/flink-cdc/releases/download/release-3.0.0/flink-cdc-3.0.0-bin.tar.gz',
     connectors: %w[
       https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-doris/3.0.0/flink-cdc-pipeline-connector-doris-3.0.0.jar
       https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar
@@ -32,7 +32,7 @@ RELEASED_VERSIONS = {
     ]
   },
   '3.0.1': {
-    tar: 'https://github.com/ververica/flink-cdc-connectors/releases/download/release-3.0.1/flink-cdc-3.0.1-bin.tar.gz',
+    tar: 'https://github.com/apache/flink-cdc/releases/download/release-3.0.1/flink-cdc-3.0.1-bin.tar.gz',
     connectors: %w[
       https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-doris/3.0.1/flink-cdc-pipeline-connector-doris-3.0.1.jar
       https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.1/flink-cdc-pipeline-connector-mysql-3.0.1.jar
@@ -64,7 +64,7 @@ RELEASED_VERSIONS = {
   }
 }.freeze
 
-HEAD_VERSION = '3.2-SNAPSHOT'
+HEAD_VERSION = '3.3-SNAPSHOT'
 
 def download_or_get(link)
   `mkdir -p cache`

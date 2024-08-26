@@ -215,7 +215,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private void captureNewlyAddedTables() {
         // Don't scan newly added table in snapshot mode.
         if (sourceConfig.isScanNewlyAddedTableEnabled()
-                && !sourceConfig.getStartupOptions().isSnapshotOnly()) {
+                && !sourceConfig.getStartupOptions().isSnapshotOnly()
+                && AssignerStatus.isAssigningFinished(assignerStatus)) {
             // check whether we got newly added tables
             try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
                 final List<TableId> currentCapturedTables =
