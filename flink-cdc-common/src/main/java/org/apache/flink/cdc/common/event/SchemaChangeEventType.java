@@ -22,11 +22,21 @@ import org.apache.flink.cdc.common.annotation.PublicEvolving;
 /** An enumeration of schema change event types for {@link SchemaChangeEvent}. */
 @PublicEvolving
 public enum SchemaChangeEventType {
-    ADD_COLUMN,
-    ALTER_COLUMN_TYPE,
-    CREATE_TABLE,
-    DROP_COLUMN,
-    RENAME_COLUMN;
+    ADD_COLUMN("add.column"),
+    ALTER_COLUMN_TYPE("alter.column.type"),
+    CREATE_TABLE("create.table"),
+    DROP_COLUMN("drop.column"),
+    RENAME_COLUMN("rename.column");
+
+    private final String tag;
+
+    SchemaChangeEventType(String tag) {
+        this.tag = tag;
+    }
+
+    public String getTag() {
+        return tag;
+    }
 
     public static SchemaChangeEventType ofEvent(SchemaChangeEvent event) {
         if (event instanceof AddColumnEvent) {
