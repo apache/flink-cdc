@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.utils.StringUtils;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -41,6 +42,9 @@ public class TransformProjection implements Serializable {
     private static final long serialVersionUID = 1L;
     private String projection;
     private List<ProjectionColumn> projectionColumns;
+
+    // Cache immutable objects' hash code for optimization.
+    private transient volatile int hashCode;
 
     public TransformProjection(String projection, List<ProjectionColumn> projectionColumns) {
         this.projection = projection;
@@ -74,5 +78,26 @@ public class TransformProjection implements Serializable {
         return projectionColumns.stream()
                 .map(ProjectionColumn::getColumn)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        TransformProjection that = (TransformProjection) o;
+        return Objects.equals(projection, that.projection)
+                && Objects.equals(projectionColumns, that.projectionColumns);
+    }
+
+    @Override
+    public int hashCode() {
+        if (hashCode == 0) {
+            hashCode = Objects.hash(projection, projectionColumns);
+        }
+        return hashCode;
     }
 }

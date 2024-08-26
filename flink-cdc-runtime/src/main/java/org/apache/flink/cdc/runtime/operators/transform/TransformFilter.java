@@ -22,6 +22,7 @@ import org.apache.flink.cdc.runtime.parser.TransformParser;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -41,6 +42,9 @@ public class TransformFilter implements Serializable {
     private final String expression;
     private final String scriptExpression;
     private final List<String> columnNames;
+
+    // Cache immutable objects' hash code for optimization.
+    private transient volatile int hashCode;
 
     public TransformFilter(String expression, String scriptExpression, List<String> columnNames) {
         this.expression = expression;
@@ -72,7 +76,29 @@ public class TransformFilter implements Serializable {
         return Optional.of(new TransformFilter(filterExpression, scriptExpression, columnNames));
     }
 
-    public boolean isVaild() {
+    public boolean isValid() {
         return !columnNames.isEmpty();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        TransformFilter that = (TransformFilter) o;
+        return Objects.equals(expression, that.expression)
+                && Objects.equals(scriptExpression, that.scriptExpression)
+                && Objects.equals(columnNames, that.columnNames);
+    }
+
+    @Override
+    public int hashCode() {
+        if (hashCode == 0) {
+            hashCode = Objects.hash(expression, scriptExpression, columnNames);
+        }
+        return hashCode;
     }
 }
