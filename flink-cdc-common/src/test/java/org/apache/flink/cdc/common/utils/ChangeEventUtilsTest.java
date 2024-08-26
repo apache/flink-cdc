@@ -17,11 +17,16 @@
 
 package org.apache.flink.cdc.common.utils;
 
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
+
 import org.assertj.core.util.Sets;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
@@ -36,9 +41,12 @@ import static org.apache.flink.cdc.common.testutils.assertions.EventAssertions.a
 public class ChangeEventUtilsTest {
     @Test
     public void testResolveSchemaEvolutionOptions() {
-        assertThat(
-                        ChangeEventUtils.resolveSchemaEvolutionOptions(
-                                Collections.emptyList(), Collections.emptyList()))
+
+        List<String> allTags =
+                Arrays.stream(SchemaChangeEventTypeFamily.ALL)
+                        .map(SchemaChangeEventType::getTag)
+                        .collect(Collectors.toList());
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionOptions(allTags, Collections.emptyList()))
                 .isEqualTo(
                         Sets.set(
                                 TRUNCATE_TABLE,
@@ -51,7 +59,7 @@ public class ChangeEventUtilsTest {
 
         assertThat(
                         ChangeEventUtils.resolveSchemaEvolutionOptions(
-                                Collections.emptyList(), Collections.singletonList("drop")))
+                                allTags, Collections.singletonList("drop")))
                 .isEqualTo(
                         Sets.set(
                                 ADD_COLUMN,
@@ -73,7 +81,7 @@ public class ChangeEventUtilsTest {
 
         assertThat(
                         ChangeEventUtils.resolveSchemaEvolutionOptions(
-                                Collections.emptyList(), Collections.singletonList("drop.column")))
+                                allTags, Collections.singletonList("drop.column")))
                 .isEqualTo(
                         Sets.set(
                                 ADD_COLUMN,

@@ -90,12 +90,8 @@ public class ChangeEventUtils {
             List<String> includedSchemaEvolutionTypes, List<String> excludedSchemaEvolutionTypes) {
         List<SchemaChangeEventType> resultTypes = new ArrayList<>();
 
-        if (includedSchemaEvolutionTypes.isEmpty()) {
-            resultTypes.addAll(Arrays.asList(SchemaChangeEventTypeFamily.ALL));
-        } else {
-            for (String includeTag : includedSchemaEvolutionTypes) {
-                resultTypes.addAll(resolveSchemaEvolutionTag(includeTag));
-            }
+        for (String includeTag : includedSchemaEvolutionTypes) {
+            resultTypes.addAll(resolveSchemaEvolutionTag(includeTag));
         }
 
         for (String excludeTag : excludedSchemaEvolutionTypes) {
