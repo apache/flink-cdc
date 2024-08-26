@@ -94,9 +94,11 @@ public class TypeConvertUtils {
         TableSchema tableSchema = new TableSchema();
         Set<String> partitionKeys = new HashSet<>(flinkSchema.partitionKeys());
         List<org.apache.flink.cdc.common.schema.Column> columns = flinkSchema.getColumns();
+        Set<String> pkSet = new HashSet<>(flinkSchema.primaryKeys());
+
         for (int i = 0; i < flinkSchema.getColumnCount(); i++) {
             org.apache.flink.cdc.common.schema.Column flinkColumn = columns.get(i);
-            Column odpsColumn = toMaxCompute(flinkColumn);
+            Column odpsColumn = toMaxCompute(flinkColumn, pkSet.contains(flinkColumn.getName()));
             if (partitionKeys.contains(flinkColumn.getName())) {
                 tableSchema.addPartitionColumn(odpsColumn);
             } else {
@@ -106,12 +108,13 @@ public class TypeConvertUtils {
         return tableSchema;
     }
 
-    public static Column toMaxCompute(org.apache.flink.cdc.common.schema.Column flinkColumn) {
+    public static Column toMaxCompute(
+            org.apache.flink.cdc.common.schema.Column flinkColumn, boolean notNull) {
         Preconditions.checkNotNull(flinkColumn, "flink Schema Column");
         DataType type = flinkColumn.getType();
         Column.ColumnBuilder columnBuilder =
                 Column.newBuilder(flinkColumn.getName(), toMaxCompute(type));
-        if (!type.isNullable()) {
+        if (!type.isNullable() || notNull) {
             columnBuilder.notNull();
         }
         return columnBuilder.build();
