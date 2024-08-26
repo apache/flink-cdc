@@ -244,7 +244,13 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 tableId,
                 event);
         handleSchemaChangeEvent(tableId, event);
-        // Update caches
+
+        if (event instanceof DropTableEvent) {
+            // Update caches unless event is a Drop table event. In that case, no schema will be
+            // available / necessary.
+            return;
+        }
+
         originalSchema.put(tableId, getLatestOriginalSchema(tableId));
         schemaDivergesMap.put(tableId, checkSchemaDiverges(tableId));
 
