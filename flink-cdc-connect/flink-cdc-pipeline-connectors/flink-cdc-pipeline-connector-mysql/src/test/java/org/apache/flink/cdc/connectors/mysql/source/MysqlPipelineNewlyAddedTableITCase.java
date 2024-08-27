@@ -228,8 +228,13 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         initialAddressTables(
                 getConnection(), Lists.newArrayList("address_beijing", "address_shanghai"));
         List<Event> actual = fetchResults(iterator, 4);
-        assertThat(((ChangeEvent) actual.get(0)).tableId())
-                .isEqualTo(TableId.tableId(customDatabase.getDatabaseName(), "address_shanghai"));
+        List<String> tableNames =
+                actual.stream()
+                        .filter((event) -> event instanceof CreateTableEvent)
+                        .map((event) -> ((SchemaChangeEvent) event).tableId().getTableName())
+                        .collect(Collectors.toList());
+        assertThat(tableNames.size()).isEqualTo(1);
+        assertThat(tableNames.get(0)).isEqualTo("address_shanghai");
     }
 
     @Test
