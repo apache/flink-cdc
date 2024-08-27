@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /** Dummy classes for migration test. Called via reflection. */
@@ -69,6 +70,7 @@ public class SchemaRegistryMigrationMock implements MigrationMockBase {
         return new SchemaRegistry(
                 "Dummy Name",
                 null,
+                Executors.newFixedThreadPool(1),
                 new MetadataApplier() {
                     @Override
                     public boolean acceptsSchemaEvolutionType(

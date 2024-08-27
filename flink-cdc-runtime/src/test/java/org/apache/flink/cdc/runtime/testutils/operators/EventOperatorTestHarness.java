@@ -56,6 +56,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Set;
+import java.util.concurrent.Executors;
 
 import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.unwrap;
 
@@ -99,6 +100,7 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
                         "SchemaOperator",
                         new MockOperatorCoordinatorContext(
                                 SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
+                        Executors.newFixedThreadPool(1),
                         new CollectingMetadataApplier(duration),
                         new ArrayList<>(),
                         behavior);
@@ -118,6 +120,7 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
                         "SchemaOperator",
                         new MockOperatorCoordinatorContext(
                                 SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
+                        Executors.newFixedThreadPool(1),
                         new CollectingMetadataApplier(duration, enabledEventTypes),
                         new ArrayList<>(),
                         behavior);
@@ -138,6 +141,7 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
                         "SchemaOperator",
                         new MockOperatorCoordinatorContext(
                                 SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
+                        Executors.newFixedThreadPool(1),
                         new CollectingMetadataApplier(
                                 duration, enabledEventTypes, errorsOnEventTypes),
                         new ArrayList<>(),
