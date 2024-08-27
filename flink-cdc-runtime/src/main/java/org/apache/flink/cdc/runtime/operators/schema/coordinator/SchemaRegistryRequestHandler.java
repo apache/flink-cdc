@@ -468,7 +468,8 @@ public class SchemaRegistryRequestHandler implements Closeable {
 
     private List<SchemaChangeEvent> clearCurrentSchemaChangeRequest() {
         if (currentChangeException != null) {
-            throw new RuntimeException("Failed to apply schema change.", currentChangeException);
+            context.failJob(
+                    new RuntimeException("Failed to apply schema change.", currentChangeException));
         }
         List<SchemaChangeEvent> finishedSchemaChanges =
                 new ArrayList<>(currentFinishedSchemaChanges);
