@@ -251,7 +251,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                 versionParts.get(0), versionParts.get(1), versionParts.get(2), null, null, null);
     }
 
-    private static String getFlinkProperties(String flinkVersion) {
+    protected static String getFlinkProperties(String flinkVersion) {
         // this is needed for oracle-cdc tests.
         // see https://stackoverflow.com/a/47062742/4915129
         String javaOptsConfig;

@@ -24,7 +24,6 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -719,6 +718,11 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
     @Test
     public void testReplacementSymbol() throws Exception {
+        String defaultFlinkProperties = getFlinkProperties(flinkVersion);
+        overrideFlinkProperties(
+                defaultFlinkProperties.replace(
+                        "execution.checkpointing.interval: 300",
+                        "execution.checkpointing.interval: 10000"));
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -838,9 +842,5 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                             + " from stdout: "
                             + taskManagerConsumer.toUtf8String());
         }
-    }
-
-    private void assertNotExists(String event) {
-        Assert.assertFalse(taskManagerConsumer.toUtf8String().contains(event));
     }
 }
