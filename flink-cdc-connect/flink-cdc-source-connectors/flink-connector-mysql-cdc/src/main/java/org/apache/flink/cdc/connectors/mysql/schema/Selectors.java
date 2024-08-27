@@ -42,7 +42,7 @@ public class Selectors {
         private final Predicate<String> namespacePred;
         private final Predicate<String> tableNamePred;
 
-        public Selector(String namespace, String schemaName, String tableName) {
+        public Selector(String namespace, String tableName) {
             this.namespacePred =
                     namespace == null ? (namespacePred) -> false : Predicates.includes(namespace);
             this.tableNamePred =
@@ -98,9 +98,9 @@ public class Selectors {
                                 tableSplit, Predicates.RegExSplitterByDot::split, (str) -> str);
                 Iterator<String> iterator = tableIdList.iterator();
                 if (tableIdList.size() == 1) {
-                    selectors.add(new Selector(null, null, iterator.next()));
+                    selectors.add(new Selector(null, iterator.next()));
                 } else if (tableIdList.size() == 2) {
-                    selectors.add(new Selector(iterator.next(), null, iterator.next()));
+                    selectors.add(new Selector(iterator.next(), iterator.next()));
                 } else {
                     throw new IllegalArgumentException(
                             "Invalid table inclusion pattern: " + tableInclusions);
