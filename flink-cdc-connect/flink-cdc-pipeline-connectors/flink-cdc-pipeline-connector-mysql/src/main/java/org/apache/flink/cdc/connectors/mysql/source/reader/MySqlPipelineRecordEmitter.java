@@ -237,7 +237,9 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     private List<CreateTableEvent> generateCreateTableEvent(MySqlSourceConfig sourceConfig) {
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
             List<CreateTableEvent> createTableEventCache = new ArrayList<>();
-            List<TableId> capturedTableIds = listTables(jdbc, sourceConfig.getTableFilters());
+            List<TableId> capturedTableIds =
+                    listTables(
+                            jdbc, sourceConfig.getDatabaseFilter(), sourceConfig.getTableFilter());
             for (TableId tableId : capturedTableIds) {
                 Schema schema = getSchema(jdbc, tableId);
                 createTableEventCache.add(
