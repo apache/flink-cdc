@@ -128,7 +128,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                 executorService,
                 metadataApplier,
                 routes,
-                SchemaChangeBehavior.EVOLVE);
+                SchemaChangeBehavior.LENIENT);
     }
 
     public SchemaRegistry(
