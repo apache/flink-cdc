@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -1039,11 +1040,16 @@ public class SchemaEvolveTest {
                                         new AddColumnEvent.ColumnWithPosition(
                                                 Column.physicalColumn(
                                                         "height", DOUBLE, "Height data")))));
-        Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents))
+        processEvent(schemaOperator, addColumnEvents);
+        Assertions.assertThat(harness.isJobFailed()).isEqualTo(true);
+        Assertions.assertThat(harness.getJobFailureCause())
                 .cause()
-                .cause()
-                .isExactlyInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Failed to apply schema change");
+                .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
+                .matches(
+                        e ->
+                                ((UnsupportedSchemaChangeEventException) e)
+                                        .getExceptionMessage()
+                                        .equals("Sink doesn't support such schema change event."));
         harness.close();
     }
 
