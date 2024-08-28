@@ -25,6 +25,7 @@ import io.debezium.ddl.parser.mysql.generated.MySqlParser;
 import io.debezium.ddl.parser.mysql.generated.MySqlParserBaseListener;
 import io.debezium.relational.Column;
 import io.debezium.relational.ColumnEditor;
+import io.debezium.relational.TableEditor;
 import io.debezium.relational.ddl.DataType;
 import io.debezium.util.Strings;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
@@ -50,13 +51,16 @@ public class CustomColumnDefinitionParserListener extends MySqlParserBaseListene
     private boolean uniqueColumn;
     private AtomicReference<Boolean> optionalColumn = new AtomicReference<>();
     private DefaultValueParserListener defaultValueListener;
+    private final TableEditor tableEditor;
 
     private final List<ParseTreeListener> listeners;
 
     public CustomColumnDefinitionParserListener(
+            TableEditor tableEditor,
             ColumnEditor columnEditor,
             MySqlAntlrDdlParser parser,
             List<ParseTreeListener> listeners) {
+        this.tableEditor = tableEditor;
         this.columnEditor = columnEditor;
         this.parser = parser;
         this.dataTypeResolver = parser.dataTypeResolver();
@@ -106,6 +110,8 @@ public class CustomColumnDefinitionParserListener extends MySqlParserBaseListene
         // this rule will be parsed only if no primary key is set in a table
         // otherwise the statement can't be executed due to multiple primary key error
         optionalColumn.set(Boolean.FALSE);
+        tableEditor.addColumn(columnEditor.create());
+        tableEditor.setPrimaryKeyNames(columnEditor.name());
         super.enterPrimaryKeyColumnConstraint(ctx);
     }
 
