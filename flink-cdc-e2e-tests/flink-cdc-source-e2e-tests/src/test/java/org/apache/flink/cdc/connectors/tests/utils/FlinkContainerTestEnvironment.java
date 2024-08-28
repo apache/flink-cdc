@@ -114,6 +114,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     protected final UniqueDatabase mysqlInventoryDatabase =
             new UniqueDatabase(MYSQL, "mysql_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
     protected Path jdbcJar;
+    protected String flinkProperties;
 
     private GenericContainer<?> jobManager;
     private GenericContainer<?> taskManager;
@@ -127,8 +128,9 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     public void before() {
         mysqlInventoryDatabase.createAndInitialize();
         jdbcJar = TestUtils.getResource(getJdbcConnectorResourceName());
-
-        String flinkProperties = getFlinkProperties(flinkVersion);
+        if (flinkProperties == null) {
+            flinkProperties = getFlinkProperties(flinkVersion);
+        }
 
         LOG.info("Starting containers...");
         jobManager =
@@ -208,8 +210,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
 
     /** Allow overriding the default flink properties. */
     public void overrideFlinkProperties(String properties) {
-        jobManager.withEnv("FLINK_PROPERTIES", properties);
-        taskManager.withEnv("FLINK_PROPERTIES", properties);
+        this.flinkProperties = properties;
     }
 
     /**

@@ -74,6 +74,13 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
     @Before
     public void before() throws Exception {
+        // As the test #testReplacementSymbol may block due to checkpoint alignment blocking
+        // we temporarily set larger checkpoint interval for the corner case
+        overrideFlinkProperties(
+                getFlinkProperties(flinkVersion)
+                        .replace(
+                                "execution.checkpointing.interval: 300",
+                                "execution.checkpointing.interval: 5000"));
         super.before();
         routeTestDatabase.createAndInitialize();
     }
@@ -718,11 +725,6 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
     @Test
     public void testReplacementSymbol() throws Exception {
-        String defaultFlinkProperties = getFlinkProperties(flinkVersion);
-        overrideFlinkProperties(
-                defaultFlinkProperties.replace(
-                        "execution.checkpointing.interval: 300",
-                        "execution.checkpointing.interval: 10000"));
         String pipelineJob =
                 String.format(
                         "source:\n"

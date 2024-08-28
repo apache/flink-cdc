@@ -88,6 +88,8 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     protected ToStringConsumer taskManagerConsumer;
 
+    protected String flinkProperties;
+
     @Parameterized.Parameters(name = "flinkVersion: {0}")
     public static List<String> getFlinkVersion() {
         return Arrays.asList("1.17.2", "1.18.1", "1.19.1", "1.20.0");
@@ -98,7 +100,9 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         LOG.info("Starting containers...");
         jobManagerConsumer = new ToStringConsumer();
 
-        String flinkProperties = getFlinkProperties(flinkVersion);
+        if (flinkProperties == null) {
+            flinkProperties = getFlinkProperties(flinkVersion);
+        }
 
         jobManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
@@ -138,8 +142,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     /** Allow overriding the default flink properties. */
     public void overrideFlinkProperties(String properties) {
-        jobManager.withEnv("FLINK_PROPERTIES", properties);
-        taskManager.withEnv("FLINK_PROPERTIES", properties);
+        this.flinkProperties = properties;
     }
 
     /**
