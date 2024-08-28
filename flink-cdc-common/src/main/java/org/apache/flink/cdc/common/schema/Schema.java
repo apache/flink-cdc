@@ -317,6 +317,21 @@ public class Schema implements Serializable {
         }
 
         /**
+         * Declares a physical column that is appended to this schema.
+         *
+         * @param columnName column name
+         * @param type data type of the column
+         * @param comment description of the column
+         * @param defaultValue default value of the column
+         */
+        public Builder physicalColumn(
+                String columnName, DataType type, String comment, String defaultValue) {
+            checkColumn(columnName, type);
+            columns.add(Column.physicalColumn(columnName, type, comment, defaultValue));
+            return this;
+        }
+
+        /**
          * Declares a metadata column that is appended to this schema.
          *
          * @param columnName column name

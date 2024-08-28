@@ -275,6 +275,24 @@ pipeline:
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
     </tr>
+    <tr>
+      <td>scan.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to enable scan the newly added tables feature or not, by default is false. This option is only useful when we start the job from a savepoint/checkpoint.</td>
+    </tr>
+    <tr>
+      <td>scan.binlog.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>In binlog reading stage, whether to scan the ddl and dml statements of newly added tables or not, by default is false. <br>
+          The difference between scan.newly-added-table.enabled and scan.binlog.newly-added-table.enabled options is: <br>
+          scan.newly-added-table.enabled: do re-snapshot & binlog-reading for newly added table when restored; <br>
+          scan.binlog.newly-added-table.enabled: only do binlog-reading for newly added table during binlog reading phase.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

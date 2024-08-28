@@ -223,6 +223,97 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                 fullTypesMySql8Database, recordType, expectedSnapshot, expectedStreamRecord);
     }
 
+    @Test
+    public void testMysql57PrecisionTypes() throws Throwable {
+        testMysqlPrecisionTypes(fullTypesMySql57Database);
+    }
+
+    @Test
+    public void testMysql8PrecisionTypes() throws Throwable {
+        testMysqlPrecisionTypes(fullTypesMySql8Database);
+    }
+
+    public void testMysqlPrecisionTypes(UniqueDatabase database) throws Throwable {
+        RowType recordType =
+                RowType.of(
+                        DataTypes.DECIMAL(20, 0).notNull(),
+                        DataTypes.DECIMAL(6, 2),
+                        DataTypes.DECIMAL(9, 4),
+                        DataTypes.DECIMAL(20, 4),
+                        DataTypes.TIME(0),
+                        DataTypes.TIME(3),
+                        DataTypes.TIME(6),
+                        DataTypes.TIMESTAMP(0),
+                        DataTypes.TIMESTAMP(3),
+                        DataTypes.TIMESTAMP(6),
+                        DataTypes.TIMESTAMP_LTZ(0),
+                        DataTypes.TIMESTAMP_LTZ(3),
+                        DataTypes.TIMESTAMP_LTZ(6),
+                        DataTypes.TIMESTAMP_LTZ(0));
+
+        Object[] expectedSnapshot =
+                new Object[] {
+                    DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
+                    DecimalData.fromBigDecimal(new BigDecimal("123.4"), 6, 2),
+                    DecimalData.fromBigDecimal(new BigDecimal("1234.5"), 9, 4),
+                    DecimalData.fromBigDecimal(new BigDecimal("1234.56"), 20, 4),
+                    64800000,
+                    64822100,
+                    64822100,
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:00")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:00")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22"))
+                };
+
+        Object[] expectedStreamRecord =
+                new Object[] {
+                    DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
+                    DecimalData.fromBigDecimal(new BigDecimal("123.4"), 6, 2),
+                    DecimalData.fromBigDecimal(new BigDecimal("1234.5"), 9, 4),
+                    DecimalData.fromBigDecimal(new BigDecimal("1234.56"), 20, 4),
+                    64800000,
+                    64822100,
+                    null,
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:00")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
+                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:00")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22"))
+                };
+
+        database.createAndInitialize();
+        CloseableIterator<Event> iterator =
+                env.fromSource(
+                                getFlinkSourceProvider(new String[] {"precision_types"}, database)
+                                        .getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                "Event-Source")
+                        .executeAndCollect();
+
+        // skip CreateTableEvent
+        List<Event> snapshotResults =
+                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
+
+        Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, recordType))
+                .isEqualTo(expectedSnapshot);
+
+        try (Connection connection = database.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE precision_types SET time_6_c = null WHERE id = 1;");
+        }
+
+        List<Event> streamResults =
+                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+        RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
+        Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, recordType))
+                .isEqualTo(expectedStreamRecord);
+    }
+
     private void testCommonDataTypes(UniqueDatabase database) throws Exception {
         database.createAndInitialize();
         CloseableIterator<Event> iterator =
@@ -308,8 +399,9 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                 };
 
         // skip CreateTableEvent
-        List<Event> snapshotResults = MySqSourceTestUtils.fetchResults(iterator, 2);
-        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(1)).after();
+        List<Event> snapshotResults =
+                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
         Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, COMMON_TYPES))
                 .isEqualTo(expectedSnapshot);
 
@@ -323,7 +415,8 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         expectedSnapshot[44] = BinaryStringData.fromString("{\"key1\":\"value1\"}");
         Object[] expectedStreamRecord = expectedSnapshot;
 
-        List<Event> streamResults = MySqSourceTestUtils.fetchResults(iterator, 1);
+        List<Event> streamResults =
+                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
         Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, COMMON_TYPES))
                 .isEqualTo(expectedStreamRecord);
@@ -348,9 +441,10 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                                 "Event-Source")
                         .executeAndCollect();
 
-        // skip CreateTableEvent
-        List<Event> snapshotResults = MySqSourceTestUtils.fetchResults(iterator, 2);
-        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(1)).after();
+        // skip CreateTableEvents
+        List<Event> snapshotResults =
+                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
 
         Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, recordType))
                 .isEqualTo(expectedSnapshot);
@@ -361,7 +455,8 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     "UPDATE time_types SET time_6_c = null, timestamp_def_c = default WHERE id = 1;");
         }
 
-        List<Event> streamResults = MySqSourceTestUtils.fetchResults(iterator, 1);
+        List<Event> streamResults =
+                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
         Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, recordType))
                 .isEqualTo(expectedStreamRecord);

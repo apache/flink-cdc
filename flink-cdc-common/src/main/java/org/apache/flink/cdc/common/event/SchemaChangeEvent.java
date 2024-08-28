@@ -26,4 +26,7 @@ import java.io.Serializable;
  * system, such as CREATE, DROP, RENAME and so on.
  */
 @PublicEvolving
-public interface SchemaChangeEvent extends ChangeEvent, Serializable {}
+public interface SchemaChangeEvent extends ChangeEvent, Serializable {
+    /** Returns its {@link SchemaChangeEventType}. */
+    SchemaChangeEventType getType();
+}

@@ -18,11 +18,16 @@
 package org.apache.flink.cdc.composer.definition;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 
 import javax.annotation.Nullable;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Definition of a data sink.
@@ -40,11 +45,25 @@ public class SinkDef {
     private final String type;
     @Nullable private final String name;
     private final Configuration config;
+    private final Set<SchemaChangeEventType> includedSchemaEvolutionTypes;
 
     public SinkDef(String type, @Nullable String name, Configuration config) {
         this.type = type;
         this.name = name;
         this.config = config;
+        this.includedSchemaEvolutionTypes =
+                Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet());
+    }
+
+    public SinkDef(
+            String type,
+            @Nullable String name,
+            Configuration config,
+            Set<SchemaChangeEventType> includedSchemaEvolutionTypes) {
+        this.type = type;
+        this.name = name;
+        this.config = config;
+        this.includedSchemaEvolutionTypes = includedSchemaEvolutionTypes;
     }
 
     public String getType() {
@@ -59,6 +78,10 @@ public class SinkDef {
         return config;
     }
 
+    public Set<SchemaChangeEventType> getIncludedSchemaEvolutionTypes() {
+        return includedSchemaEvolutionTypes;
+    }
+
     @Override
     public String toString() {
         return "SinkDef{"
@@ -70,6 +93,8 @@ public class SinkDef {
                 + '\''
                 + ", config="
                 + config
+                + ", includedSchemaEvolutionTypes="
+                + includedSchemaEvolutionTypes
                 + '}';
     }
 
@@ -84,11 +109,13 @@ public class SinkDef {
         SinkDef sinkDef = (SinkDef) o;
         return Objects.equals(type, sinkDef.type)
                 && Objects.equals(name, sinkDef.name)
-                && Objects.equals(config, sinkDef.config);
+                && Objects.equals(config, sinkDef.config)
+                && Objects.equals(
+                        includedSchemaEvolutionTypes, sinkDef.includedSchemaEvolutionTypes);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, name, config);
+        return Objects.hash(type, name, config, includedSchemaEvolutionTypes);
     }
 }

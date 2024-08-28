@@ -193,7 +193,9 @@ public class DebeziumUtils {
 
         final List<TableId> capturedTableIds;
         try {
-            capturedTableIds = TableDiscoveryUtils.listTables(jdbc, sourceConfig.getTableFilters());
+            capturedTableIds =
+                    TableDiscoveryUtils.listTables(
+                            jdbc, sourceConfig.getDatabaseFilter(), sourceConfig.getTableFilter());
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Failed to discover captured tables", e);
         }

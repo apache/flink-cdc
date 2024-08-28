@@ -34,8 +34,6 @@ import org.apache.commons.cli.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -83,13 +81,9 @@ public class CliFrontend {
                     "Missing pipeline definition file path in arguments. ");
         }
 
-        // Take the first unparsed argument as the pipeline definition file
         Path pipelineDefPath = Paths.get(unparsedArgs.get(0));
-        if (!Files.exists(pipelineDefPath)) {
-            throw new FileNotFoundException(
-                    String.format("Cannot find pipeline definition file \"%s\"", pipelineDefPath));
-        }
-
+        // Take the first unparsed argument as the pipeline definition file
+        LOG.info("Real Path pipelineDefPath {}", pipelineDefPath);
         // Global pipeline configuration
         Configuration globalPipelineConfig = getGlobalConfig(commandLine);
 
@@ -111,6 +105,7 @@ public class CliFrontend {
 
         // Build executor
         return new CliExecutor(
+                commandLine,
                 pipelineDefPath,
                 flinkConfig,
                 globalPipelineConfig,

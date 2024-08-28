@@ -21,10 +21,10 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
-import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
@@ -47,6 +47,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -106,42 +107,48 @@ public class SchemaDerivation {
                 // single source mapping, replace the table ID directly
                 SchemaChangeEvent derivedSchemaChangeEvent =
                         ChangeEventUtils.recreateSchemaChangeEvent(schemaChangeEvent, derivedTable);
-                schemaManager.applySchemaChange(derivedSchemaChangeEvent);
                 events.add(derivedSchemaChangeEvent);
             } else {
                 // multiple source mapping (merging tables)
-                Schema derivedTableSchema = schemaManager.getLatestSchema(derivedTable).get();
-                if (schemaChangeEvent instanceof CreateTableEvent) {
-                    events.addAll(
-                            handleCreateTableEvent(
-                                    (CreateTableEvent) schemaChangeEvent,
-                                    derivedTableSchema,
-                                    derivedTable));
-                } else if (schemaChangeEvent instanceof AddColumnEvent) {
-                    events.addAll(
-                            handleAddColumnEvent(
-                                    (AddColumnEvent) schemaChangeEvent,
-                                    derivedTableSchema,
-                                    derivedTable));
-                } else if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
-                    events.addAll(
-                            handleAlterColumnTypeEvent(
-                                    (AlterColumnTypeEvent) schemaChangeEvent,
-                                    derivedTableSchema,
-                                    derivedTable));
-                } else if (schemaChangeEvent instanceof DropColumnEvent) {
-                    // Do nothing: drop column event should not be sent to downstream
-                } else if (schemaChangeEvent instanceof RenameColumnEvent) {
-                    events.addAll(
-                            handleRenameColumnEvent(
-                                    (RenameColumnEvent) schemaChangeEvent,
-                                    derivedTableSchema,
-                                    derivedTable));
-                } else {
-                    throw new IllegalStateException(
-                            String.format(
-                                    "Unrecognized SchemaChangeEvent type: %s", schemaChangeEvent));
-                }
+                Schema derivedTableSchema =
+                        schemaManager.getLatestEvolvedSchema(derivedTable).get();
+                events.addAll(
+                        Objects.requireNonNull(
+                                SchemaChangeEventVisitor.visit(
+                                        schemaChangeEvent,
+                                        addColumnEvent ->
+                                                handleAddColumnEvent(
+                                                        addColumnEvent,
+                                                        derivedTableSchema,
+                                                        derivedTable),
+                                        alterColumnTypeEvent ->
+                                                handleAlterColumnTypeEvent(
+                                                        alterColumnTypeEvent,
+                                                        derivedTableSchema,
+                                                        derivedTable),
+                                        createTableEvent ->
+                                                handleCreateTableEvent(
+                                                        createTableEvent,
+                                                        derivedTableSchema,
+                                                        derivedTable),
+                                        dropColumnEvent ->
+                                                Collections.emptyList(), // Column drop shouldn't be
+                                        // spread to route
+                                        // destination.
+                                        dropTableEvent ->
+                                                Collections.emptyList(), // Table drop shouldn't be
+                                        // spread to route
+                                        // destination.
+                                        renameColumnEvent ->
+                                                handleRenameColumnEvent(
+                                                        renameColumnEvent,
+                                                        derivedTableSchema,
+                                                        derivedTable),
+                                        truncateTableEvent ->
+                                                Collections.emptyList() // // Table truncation
+                                        // shouldn't be spread to route
+                                        // destination.
+                                        )));
             }
         }
 
@@ -229,7 +236,6 @@ public class SchemaDerivation {
             AddColumnEvent derivedSchemaChangeEvent = new AddColumnEvent(derivedTable, newColumns);
             schemaChangeEvents.add(derivedSchemaChangeEvent);
         }
-        schemaChangeEvents.forEach(schemaManager::applySchemaChange);
         return schemaChangeEvents;
     }
 
@@ -261,7 +267,6 @@ public class SchemaDerivation {
                     new AlterColumnTypeEvent(derivedTable, typeDifference);
             schemaChangeEvents.add(derivedSchemaChangeEvent);
         }
-        schemaChangeEvents.forEach(schemaManager::applySchemaChange);
         return schemaChangeEvents;
     }
 
@@ -300,7 +305,6 @@ public class SchemaDerivation {
         if (!newTypeMapping.isEmpty()) {
             schemaChangeEvents.add(new AlterColumnTypeEvent(derivedTable, newTypeMapping));
         }
-        schemaChangeEvents.forEach(schemaManager::applySchemaChange);
         return schemaChangeEvents;
     }
 
@@ -336,7 +340,6 @@ public class SchemaDerivation {
         if (!newTypeMapping.isEmpty()) {
             schemaChangeEvents.add(new AlterColumnTypeEvent(derivedTable, newTypeMapping));
         }
-        schemaChangeEvents.forEach(schemaManager::applySchemaChange);
         return schemaChangeEvents;
     }
 

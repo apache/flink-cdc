@@ -104,7 +104,17 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
             }
         }
         PaimonRecordSerializer<Event> serializer = new PaimonRecordEventSerializer(zoneId);
-        return new PaimonDataSink(options, tableOptions, commitUser, partitionMaps, serializer);
+        String schemaOperatorUid =
+                context.getPipelineConfiguration()
+                        .get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
+        return new PaimonDataSink(
+                options,
+                tableOptions,
+                commitUser,
+                partitionMaps,
+                serializer,
+                zoneId,
+                schemaOperatorUid);
     }
 
     @Override
