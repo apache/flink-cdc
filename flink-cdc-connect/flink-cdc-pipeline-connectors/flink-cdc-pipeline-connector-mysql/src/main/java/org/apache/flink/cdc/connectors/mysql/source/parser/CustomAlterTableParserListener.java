@@ -81,8 +81,8 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         TableId tableId = parser.parseQualifiedTableId(ctx.tableName().fullId());
         if (parser.databaseTables().forTable(tableId) == null) {
             tableEditor = parser.databaseTables().editOrCreateTable(tableId);
-            super.enterColumnCreateTable(ctx);
         }
+        super.enterColumnCreateTable(ctx);
     }
 
     @Override
@@ -113,14 +113,17 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                                     .collect(Collectors.toList()));
                     parser.databaseTables().overwriteTable(tableEditor.create());
                     parser.signalCreateTable(tableEditor.tableId(), ctx);
+
+                    Schema.Builder builder = Schema.newBuilder();
+                    tableEditor.columns().forEach(column -> builder.column(toCdcColumn(column)));
+                    if (tableEditor.hasPrimaryKey()) {
+                        builder.primaryKey(tableEditor.primaryKeyColumnNames());
+                    }
+                    changes.add(
+                            new CreateTableEvent(
+                                    toCdcTableId(tableEditor.tableId()), builder.build()));
                 },
                 tableEditor);
-        Schema.Builder builder = Schema.newBuilder();
-        tableEditor.columns().forEach(column -> builder.column(toCdcColumn(column)));
-        if (tableEditor.hasPrimaryKey()) {
-            builder.primaryKey(tableEditor.primaryKeyColumnNames());
-        }
-        changes.add(new CreateTableEvent(toCdcTableId(tableEditor.tableId()), builder.build()));
         super.exitColumnCreateTable(ctx);
     }
 
@@ -133,7 +136,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     if (columnDefinitionListener == null) {
                         columnDefinitionListener =
                                 new CustomColumnDefinitionParserListener(
-                                        columnEditor, parser, listeners);
+                                        tableEditor, columnEditor, parser, listeners);
                         listeners.add(columnDefinitionListener);
                     } else {
                         columnDefinitionListener.setColumnEditor(columnEditor);
@@ -194,7 +197,8 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         String columnName = parser.parseName(ctx.uid(0));
         ColumnEditor columnEditor = Column.editor().name(columnName);
         columnDefinitionListener =
-                new CustomColumnDefinitionParserListener(columnEditor, parser, listeners);
+                new CustomColumnDefinitionParserListener(
+                        tableEditor, columnEditor, parser, listeners);
         listeners.add(columnDefinitionListener);
         super.exitAlterByAddColumn(ctx);
     }
@@ -246,7 +250,8 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
             columnEditors.add(Column.editor().name(columnName));
         }
         columnDefinitionListener =
-                new CustomColumnDefinitionParserListener(columnEditors.get(0), parser, listeners);
+                new CustomColumnDefinitionParserListener(
+                        tableEditor, columnEditors.get(0), parser, listeners);
         listeners.add(columnDefinitionListener);
         super.enterAlterByAddColumns(ctx);
     }
@@ -296,7 +301,8 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         columnEditor.unsetDefaultValueExpression();
 
         columnDefinitionListener =
-                new CustomColumnDefinitionParserListener(columnEditor, parser, listeners);
+                new CustomColumnDefinitionParserListener(
+                        tableEditor, columnEditor, parser, listeners);
         listeners.add(columnDefinitionListener);
         super.enterAlterByChangeColumn(ctx);
     }
@@ -335,7 +341,8 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         String oldColumnName = parser.parseName(ctx.oldColumn);
         ColumnEditor columnEditor = Column.editor().name(oldColumnName);
         columnDefinitionListener =
-                new CustomColumnDefinitionParserListener(columnEditor, parser, listeners);
+                new CustomColumnDefinitionParserListener(
+                        tableEditor, columnEditor, parser, listeners);
         listeners.add(columnDefinitionListener);
         super.enterAlterByRenameColumn(ctx);
     }
@@ -347,7 +354,8 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         columnEditor.unsetDefaultValueExpression();
 
         columnDefinitionListener =
-                new CustomColumnDefinitionParserListener(columnEditor, parser, listeners);
+                new CustomColumnDefinitionParserListener(
+                        tableEditor, columnEditor, parser, listeners);
         listeners.add(columnDefinitionListener);
         super.enterAlterByModifyColumn(ctx);
     }
