@@ -38,6 +38,7 @@ import org.apache.flink.cdc.common.types.CharType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
@@ -57,6 +58,7 @@ import org.junit.Test;
 import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -686,6 +688,78 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         List<Event> actual = fetchResults(events, expected.size());
         assertEqualsInAnyOrder(
                 expected.stream().map(Object::toString).collect(Collectors.toList()),
+                actual.stream().map(Object::toString).collect(Collectors.toList()));
+    }
+
+    @Test
+    public void testDanglingDropTableEventInBinlog() throws Exception {
+        env.setParallelism(1);
+        inventoryDatabase.createAndInitialize();
+
+        // Create a new table for later deletion
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE live_fast(ID INT PRIMARY KEY);");
+        }
+
+        String logFileName = null;
+        Long logPosition = null;
+
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            ResultSet rs = statement.executeQuery("SHOW BINARY LOGS;");
+            while (rs.next()) {
+                logFileName = rs.getString("Log_name");
+                logPosition = rs.getLong("File_size");
+            }
+        }
+
+        // We start reading binlog from the tail of current position and file to avoid reading
+        // previous events. The next DDL event (DROP TABLE) will push binlog position forward.
+        Preconditions.checkNotNull(logFileName, "Log file name must not be null");
+        Preconditions.checkNotNull(logPosition, "Log position name must not be null");
+        LOG.info("Trying to restore from {} @ {}...", logFileName, logPosition);
+
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("DROP TABLE live_fast;");
+        }
+
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(MYSQL8_CONTAINER.getHost())
+                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(inventoryDatabase.getDatabaseName() + ".*")
+                        .startupOptions(StartupOptions.specificOffset(logFileName, logPosition))
+                        .serverId(getServerId(env.getParallelism()))
+                        .serverTimeZone("UTC")
+                        .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(5_000);
+
+        List<Event> expectedEvents =
+                new ArrayList<>(
+                        getInventoryCreateAllTableEvents(inventoryDatabase.getDatabaseName()));
+
+        expectedEvents.add(
+                new DropTableEvent(
+                        TableId.tableId(inventoryDatabase.getDatabaseName(), "live_fast")));
+
+        List<Event> actual = fetchResults(events, expectedEvents.size());
+        assertEqualsInAnyOrder(
+                expectedEvents.stream().map(Object::toString).collect(Collectors.toList()),
                 actual.stream().map(Object::toString).collect(Collectors.toList()));
     }
 
