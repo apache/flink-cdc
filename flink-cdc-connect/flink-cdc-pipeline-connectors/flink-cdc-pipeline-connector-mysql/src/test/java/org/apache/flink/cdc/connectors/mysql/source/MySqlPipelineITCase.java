@@ -648,6 +648,40 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     .physicalColumn("timestamp6_c", DataTypes.TIMESTAMP_LTZ(6))
                                     .primaryKey("id")
                                     .build()));
+
+            // Test create table DDL with inline primary key
+            statement.execute(
+                    String.format(
+                            "CREATE TABLE `%s`.`newlyAddedTable2`(id SERIAL PRIMARY KEY);",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new CreateTableEvent(
+                            TableId.tableId(
+                                    inventoryDatabase.getDatabaseName(), "newlyAddedTable2"),
+                            Schema.newBuilder()
+                                    .physicalColumn("id", DataTypes.DECIMAL(20, 0).notNull())
+                                    .primaryKey("id")
+                                    .build()));
+
+            // Test create table DDL with multiple primary keys
+            statement.execute(
+                    String.format(
+                            "CREATE TABLE `%s`.`newlyAddedTable3`("
+                                    + "id SERIAL,"
+                                    + "name VARCHAR(17),"
+                                    + "notes TEXT,"
+                                    + "PRIMARY KEY (id, name));",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new CreateTableEvent(
+                            TableId.tableId(
+                                    inventoryDatabase.getDatabaseName(), "newlyAddedTable3"),
+                            Schema.newBuilder()
+                                    .physicalColumn("id", DataTypes.DECIMAL(20, 0).notNull())
+                                    .physicalColumn("name", DataTypes.VARCHAR(17).notNull())
+                                    .physicalColumn("notes", DataTypes.STRING())
+                                    .primaryKey("id", "name")
+                                    .build()));
         }
         List<Event> actual = fetchResults(events, expected.size());
         assertEqualsInAnyOrder(
