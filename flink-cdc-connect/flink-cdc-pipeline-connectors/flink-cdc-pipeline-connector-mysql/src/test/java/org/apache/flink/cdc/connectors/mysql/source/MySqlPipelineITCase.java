@@ -680,6 +680,8 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
             }
         }
 
+        // We start reading binlog from the tail of current position and file to avoid reading
+        // previous events. The next DDL event (DROP TABLE) will push binlog position forward.
         Preconditions.checkNotNull(logFileName, "Log file name must not be null");
         Preconditions.checkNotNull(logPosition, "Log position name must not be null");
         LOG.info("Trying to restore from {} @ {}...", logFileName, logPosition);
