@@ -46,16 +46,16 @@ concurrency:
 jobs:
   license_check:
     name: License Check
-    uses: ./.github/workflows/steps/license_check.yml
+    uses: ./.github/workflows/license_check.yml
   ut:
     name: Unit Tests
-    uses: ./.github/workflows/steps/ut.yml
+    uses: ./.github/workflows/ut.yml
   pipeline_e2e:
     name: Pipeline End-to-end Tests
-    uses: ./.github/workflows/steps/pipeline_e2e.yml
+    uses: ./.github/workflows/pipeline_e2e.yml
   source_e2e:
     name: Source End-to-end Tests
-    uses: ./.github/workflows/steps/source_e2e.yml
+    uses: ./.github/workflows/source_e2e.yml
   migration_test:
     name: Migration Tests
-    uses: ./.github/workflows/steps/migration_test.yml
+    uses: ./.github/workflows/migration_test.yml
