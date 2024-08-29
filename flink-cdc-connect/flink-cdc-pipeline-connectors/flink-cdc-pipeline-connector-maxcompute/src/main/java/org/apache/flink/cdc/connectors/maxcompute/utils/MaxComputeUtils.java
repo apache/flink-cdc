@@ -30,6 +30,7 @@ import com.aliyun.odps.Column;
 import com.aliyun.odps.Odps;
 import com.aliyun.odps.OdpsException;
 import com.aliyun.odps.PartitionSpec;
+import com.aliyun.odps.Table;
 import com.aliyun.odps.TableSchema;
 import com.aliyun.odps.account.Account;
 import com.aliyun.odps.account.AliyunAccount;
@@ -85,6 +86,19 @@ public class MaxComputeUtils {
             tunnel.setEndpoint(maxComputeOptions.getTunnelEndpoint());
         }
         return tunnel;
+    }
+
+    public static Table getTable(MaxComputeOptions maxComputeOptions, TableId tableId) {
+        Odps odps = getOdps(maxComputeOptions);
+        if (maxComputeOptions.isSupportSchema()) {
+            return odps.tables()
+                    .get(
+                            maxComputeOptions.getProject(),
+                            tableId.getNamespace(),
+                            tableId.getTableName());
+        } else {
+            return odps.tables().get(tableId.getTableName());
+        }
     }
 
     public static TableSchema getTableSchema(MaxComputeOptions options, TableId tableId) {
