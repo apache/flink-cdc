@@ -64,4 +64,11 @@ public class PaimonDataSinkOptions {
                             "Partition keys for each partitioned table, allow setting multiple primary keys for multiTables. "
                                     + "Tables are separated by ';', and partition keys are separated by ','. "
                                     + "For example, we can set partition.key of two tables by 'testdb.table1:id1,id2;testdb.table2:name'.");
+
+    public static final ConfigOption<Boolean> IGNORE_INCOMPATIBLE_ON_RESTART =
+            key("sink.ignore_incompatible_on_restart")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "whether to ignore incompatible schema changes when restart job and the table already exists. default true.");
 }

@@ -54,6 +54,8 @@ public class PaimonDataSink implements DataSink, Serializable {
 
     public final String schemaOperatorUid;
 
+    private final boolean ignoreIncompatibleOnRestart;
+
     public PaimonDataSink(
             Options options,
             Map<String, String> tableOptions,
@@ -61,7 +63,8 @@ public class PaimonDataSink implements DataSink, Serializable {
             Map<TableId, List<String>> partitionMaps,
             PaimonRecordSerializer<Event> serializer,
             ZoneId zoneId,
-            String schemaOperatorUid) {
+            String schemaOperatorUid,
+            boolean ignoreIncompatibleOnRestart) {
         this.options = options;
         this.tableOptions = tableOptions;
         this.commitUser = commitUser;
@@ -69,6 +72,7 @@ public class PaimonDataSink implements DataSink, Serializable {
         this.serializer = serializer;
         this.zoneId = zoneId;
         this.schemaOperatorUid = schemaOperatorUid;
+        this.ignoreIncompatibleOnRestart = ignoreIncompatibleOnRestart;
     }
 
     @Override
@@ -79,7 +83,8 @@ public class PaimonDataSink implements DataSink, Serializable {
 
     @Override
     public MetadataApplier getMetadataApplier() {
-        return new PaimonMetadataApplier(options, tableOptions, partitionMaps);
+        return new PaimonMetadataApplier(
+                options, tableOptions, partitionMaps, ignoreIncompatibleOnRestart);
     }
 
     @Override

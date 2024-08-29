@@ -427,7 +427,8 @@ public class PaimonMetadataApplierTest {
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
         MetadataApplier metadataApplier =
-                new PaimonMetadataApplier(catalogOptions, tableOptions, Collections.emptyMap());
+                new PaimonMetadataApplier(
+                        catalogOptions, tableOptions, Collections.emptyMap(), true);
         CreateTableEvent createTableEvent =
                 new CreateTableEvent(
                         TableId.parse("test.table1"),
@@ -440,8 +441,7 @@ public class PaimonMetadataApplierTest {
                                         "col2",
                                         org.apache.flink.cdc.common.types.DataTypes.STRING())
                                 .physicalColumn(
-                                        "col3",
-                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                        "col3", org.apache.flink.cdc.common.types.DataTypes.INT())
                                 .primaryKey("col1")
                                 .build());
         metadataApplier.applySchemaChange(createTableEvent);
@@ -451,7 +451,7 @@ public class PaimonMetadataApplierTest {
                         Arrays.asList(
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
                                 new DataField(1, "col2", DataTypes.STRING()),
-                                new DataField(2, "col3", DataTypes.STRING())));
+                                new DataField(2, "col3", DataTypes.INT())));
         Assertions.assertEquals(tableSchema, table.rowType());
         Assertions.assertEquals(Collections.singletonList("col1"), table.primaryKeys());
         Assertions.assertEquals("-1", table.options().get("bucket"));
@@ -478,12 +478,18 @@ public class PaimonMetadataApplierTest {
                                         org.apache.flink.cdc.common.types.DataTypes.STRING())
                                 .physicalColumn(
                                         "col3",
-                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                        org.apache.flink.cdc.common.types.DataTypes.BIGINT())
                                 .physicalColumn(
                                         "col7_last",
                                         org.apache.flink.cdc.common.types.DataTypes.STRING())
                                 .primaryKey("col1")
                                 .build());
+
+        // alter table options and alter/add columns
+        tableOptions.put("snapshot.num-retained.max", "99");
+        metadataApplier =
+                new PaimonMetadataApplier(
+                        catalogOptions, tableOptions, Collections.emptyMap(), false);
         metadataApplier.applySchemaChange(createTableEventNew);
         Table tableNew = catalog.getTable(Identifier.fromString("test.table1"));
 
@@ -495,10 +501,11 @@ public class PaimonMetadataApplierTest {
                                 new DataField(4, "col5_before", DataTypes.STRING()),
                                 new DataField(1, "col2", DataTypes.STRING()),
                                 new DataField(5, "col6_after", DataTypes.STRING()),
-                                new DataField(2, "col3", DataTypes.STRING()),
+                                new DataField(2, "col3", DataTypes.BIGINT()),
                                 new DataField(6, "col7_last", DataTypes.STRING())));
         Assertions.assertEquals(tableSchemaNew, tableNew.rowType());
         Assertions.assertEquals(Collections.singletonList("col1"), tableNew.primaryKeys());
         Assertions.assertEquals("-1", tableNew.options().get("bucket"));
+        Assertions.assertEquals("99", tableNew.options().get("snapshot.num-retained.max"));
     }
 }
