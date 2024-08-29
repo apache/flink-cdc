@@ -22,11 +22,23 @@ import org.apache.flink.cdc.common.annotation.PublicEvolving;
 /** An enumeration of schema change event types for {@link SchemaChangeEvent}. */
 @PublicEvolving
 public enum SchemaChangeEventType {
-    ADD_COLUMN,
-    ALTER_COLUMN_TYPE,
-    CREATE_TABLE,
-    DROP_COLUMN,
-    RENAME_COLUMN;
+    ADD_COLUMN("add.column"),
+    ALTER_COLUMN_TYPE("alter.column.type"),
+    CREATE_TABLE("create.table"),
+    DROP_COLUMN("drop.column"),
+    DROP_TABLE("drop.table"),
+    RENAME_COLUMN("rename.column"),
+    TRUNCATE_TABLE("truncate.table");
+
+    private final String tag;
+
+    SchemaChangeEventType(String tag) {
+        this.tag = tag;
+    }
+
+    public String getTag() {
+        return tag;
+    }
 
     public static SchemaChangeEventType ofEvent(SchemaChangeEvent event) {
         if (event instanceof AddColumnEvent) {
@@ -37,8 +49,12 @@ public enum SchemaChangeEventType {
             return CREATE_TABLE;
         } else if (event instanceof DropColumnEvent) {
             return DROP_COLUMN;
+        } else if (event instanceof DropTableEvent) {
+            return DROP_TABLE;
         } else if (event instanceof RenameColumnEvent) {
             return RENAME_COLUMN;
+        } else if (event instanceof TruncateTableEvent) {
+            return TRUNCATE_TABLE;
         } else {
             throw new RuntimeException("Unknown schema change event type: " + event.getClass());
         }
@@ -54,8 +70,12 @@ public enum SchemaChangeEventType {
                 return CREATE_TABLE;
             case "drop.column":
                 return DROP_COLUMN;
+            case "drop.table":
+                return DROP_TABLE;
             case "rename.column":
                 return RENAME_COLUMN;
+            case "truncate.table":
+                return TRUNCATE_TABLE;
             default:
                 throw new RuntimeException("Unknown schema change event type: " + tag);
         }

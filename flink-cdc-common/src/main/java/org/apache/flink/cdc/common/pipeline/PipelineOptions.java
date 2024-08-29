@@ -55,7 +55,7 @@ public class PipelineOptions {
     public static final ConfigOption<SchemaChangeBehavior> PIPELINE_SCHEMA_CHANGE_BEHAVIOR =
             ConfigOptions.key("schema.change.behavior")
                     .enumType(SchemaChangeBehavior.class)
-                    .defaultValue(SchemaChangeBehavior.EVOLVE)
+                    .defaultValue(SchemaChangeBehavior.LENIENT)
                     .withDescription(
                             Description.builder()
                                     .text("Behavior for handling schema change events. ")

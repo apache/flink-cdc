@@ -128,7 +128,7 @@ public class UdfE2eITCase extends PipelineTestEnvironment {
                                 + "    projection: ID, VERSION, answer() AS ANS, typeof(ID) AS TYP\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1\n"
+                                + "  parallelism: %d\n"
                                 + "  user-defined-function:\n"
                                 + "    - name: addone\n"
                                 + "      classpath: org.apache.flink.cdc.udf.examples.%s.AddOneFunctionClass\n"
@@ -146,6 +146,7 @@ public class UdfE2eITCase extends PipelineTestEnvironment {
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
+                        parallelism,
                         language,
                         language,
                         language,
@@ -267,7 +268,7 @@ public class UdfE2eITCase extends PipelineTestEnvironment {
                                 + "    projection: ID, VERSION, typeof(ID) AS TYP\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1\n"
+                                + "  parallelism: %d\n"
                                 + "  user-defined-function:\n"
                                 + "    - name: addone\n"
                                 + "      classpath: org.apache.flink.udf.examples.%s.AddOneFunctionClass\n"
@@ -281,6 +282,7 @@ public class UdfE2eITCase extends PipelineTestEnvironment {
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
+                        parallelism,
                         language,
                         language,
                         language);
@@ -386,7 +388,7 @@ public class UdfE2eITCase extends PipelineTestEnvironment {
         long endTimeout = System.currentTimeMillis() + timeout;
         while (System.currentTimeMillis() < endTimeout) {
             String stdout = taskManagerConsumer.toUtf8String();
-            if (stdout.contains(event)) {
+            if (stdout.contains(event + "\n")) {
                 result = true;
                 break;
             }

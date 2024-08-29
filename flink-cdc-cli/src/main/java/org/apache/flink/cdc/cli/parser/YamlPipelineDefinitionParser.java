@@ -19,6 +19,8 @@ package org.apache.flink.cdc.cli.parser;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
@@ -35,11 +37,14 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YA
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR;
 import static org.apache.flink.cdc.common.utils.ChangeEventUtils.resolveSchemaEvolutionOptions;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
@@ -99,6 +104,19 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     private PipelineDef parse(JsonNode pipelineDefJsonNode, Configuration globalPipelineConfig)
             throws Exception {
+
+        // UDFs are optional. We parse UDF first and remove it from the pipelineDefJsonNode since
+        // it's not of plain data types and must be removed before calling toPipelineConfig.
+        List<UdfDef> udfDefs = new ArrayList<>();
+        Optional.ofNullable(((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(UDF_KEY))
+                .ifPresent(node -> node.forEach(udf -> udfDefs.add(toUdfDef(udf))));
+
+        // Pipeline configs are optional
+        Configuration userPipelineConfig = toPipelineConfig(pipelineDefJsonNode.get(PIPELINE_KEY));
+
+        SchemaChangeBehavior schemaChangeBehavior =
+                userPipelineConfig.get(PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
+
         // Source is required
         SourceDef sourceDef =
                 toSourceDef(
@@ -113,7 +131,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                         checkNotNull(
                                 pipelineDefJsonNode.get(SINK_KEY),
                                 "Missing required field \"%s\" in pipeline definition",
-                                SINK_KEY));
+                                SINK_KEY),
+                        schemaChangeBehavior);
 
         // Transforms are optional
         List<TransformDef> transformDefs = new ArrayList<>();
@@ -127,14 +146,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         List<RouteDef> routeDefs = new ArrayList<>();
         Optional.ofNullable(pipelineDefJsonNode.get(ROUTE_KEY))
                 .ifPresent(node -> node.forEach(route -> routeDefs.add(toRouteDef(route))));
-
-        // UDFs are optional
-        List<UdfDef> udfDefs = new ArrayList<>();
-        Optional.ofNullable(((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(UDF_KEY))
-                .ifPresent(node -> node.forEach(udf -> udfDefs.add(toUdfDef(udf))));
-
-        // Pipeline configs are optional
-        Configuration userPipelineConfig = toPipelineConfig(pipelineDefJsonNode.get(PIPELINE_KEY));
 
         // Merge user config into global config
         Configuration pipelineConfig = new Configuration();
@@ -162,7 +173,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         return new SourceDef(type, name, Configuration.fromMap(sourceMap));
     }
 
-    private SinkDef toSinkDef(JsonNode sinkNode) {
+    private SinkDef toSinkDef(JsonNode sinkNode, SchemaChangeBehavior schemaChangeBehavior) {
         List<String> includedSETypes = new ArrayList<>();
         List<String> excludedSETypes = new ArrayList<>();
 
@@ -171,6 +182,23 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
         Optional.ofNullable(sinkNode.get(EXCLUDE_SCHEMA_EVOLUTION_TYPES))
                 .ifPresent(e -> e.forEach(tag -> excludedSETypes.add(tag.asText())));
+
+        if (includedSETypes.isEmpty()) {
+            // If no schema evolution types are specified, include all schema evolution types by
+            // default.
+            Arrays.stream(SchemaChangeEventTypeFamily.ALL)
+                    .map(SchemaChangeEventType::getTag)
+                    .forEach(includedSETypes::add);
+        }
+
+        if (excludedSETypes.isEmpty()
+                && SchemaChangeBehavior.LENIENT.equals(schemaChangeBehavior)) {
+            // In lenient mode, we exclude DROP_TABLE and TRUNCATE_TABLE by default. This could be
+            // overridden by manually specifying excluded types.
+            Stream.of(SchemaChangeEventType.DROP_TABLE, SchemaChangeEventType.TRUNCATE_TABLE)
+                    .map(SchemaChangeEventType::getTag)
+                    .forEach(excludedSETypes::add);
+        }
 
         Set<SchemaChangeEventType> declaredSETypes =
                 resolveSchemaEvolutionOptions(includedSETypes, excludedSETypes);

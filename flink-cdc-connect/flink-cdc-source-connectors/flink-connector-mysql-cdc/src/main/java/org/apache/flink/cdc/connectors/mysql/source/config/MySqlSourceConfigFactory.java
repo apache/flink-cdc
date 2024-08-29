@@ -49,6 +49,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private ServerIdRange serverIdRange;
     private List<String> databaseList;
     private List<String> tableList;
+    private String excludeTableList;
     private String serverTimeZone = ZoneId.systemDefault().getId();
     private StartupOptions startupOptions = StartupOptions.initial();
     private int splitSize = MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue();
@@ -99,6 +100,11 @@ public class MySqlSourceConfigFactory implements Serializable {
      */
     public MySqlSourceConfigFactory tableList(String... tableList) {
         this.tableList = Arrays.asList(tableList);
+        return this;
+    }
+
+    public MySqlSourceConfigFactory excludeTableList(String tableInclusions) {
+        this.excludeTableList = tableInclusions;
         return this;
     }
 
@@ -360,6 +366,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 password,
                 databaseList,
                 tableList,
+                excludeTableList,
                 serverIdRange,
                 startupOptions,
                 splitSize,

@@ -15,18 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.event;
+package org.apache.flink.cdc.common.event.visitor;
 
-import org.apache.flink.cdc.common.event.FlushEvent;
-import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
-import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
+import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 
-/**
- * The request from {@link SchemaOperator} to {@link SchemaRegistry} to request to release upstream
- * after sending {@link FlushEvent}.
- */
-public class ReleaseUpstreamRequest implements CoordinationRequest {
-
-    private static final long serialVersionUID = 1L;
+/** Visitor for {@link AlterColumnTypeEvent}s. */
+@Internal
+@FunctionalInterface
+public interface AlterColumnTypeEventVisitor<T, E extends Throwable> {
+    T visit(AlterColumnTypeEvent event) throws E;
 }

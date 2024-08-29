@@ -15,12 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.event;
+package org.apache.flink.cdc.common.event.visitor;
 
-import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 
-/** Response to refresh the pendingSchemaChanges of {@link RefreshPendingListsRequest}. */
-public class RefreshPendingListsResponse implements CoordinationResponse {
-
-    private static final long serialVersionUID = 1L;
+/** Visitor for {@link DropColumnEvent}s. */
+@Internal
+@FunctionalInterface
+public interface DropColumnEventVisitor<T, E extends Throwable> {
+    T visit(DropColumnEvent event) throws E;
 }

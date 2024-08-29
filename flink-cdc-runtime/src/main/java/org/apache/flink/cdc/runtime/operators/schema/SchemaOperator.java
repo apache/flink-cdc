@@ -17,19 +17,18 @@
 
 package org.apache.flink.cdc.runtime.operators.schema;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
@@ -40,23 +39,19 @@ import org.apache.flink.cdc.common.types.DataTypeFamily;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
-import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeProcessingResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResultRequest;
+import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResultResponse;
 import org.apache.flink.cdc.runtime.operators.schema.metrics.SchemaOperatorMetrics;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
-import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
@@ -124,6 +119,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private final SchemaChangeBehavior schemaChangeBehavior;
 
     private transient SchemaOperatorMetrics schemaOperatorMetrics;
+    private transient int subTaskId;
 
     @VisibleForTesting
     public SchemaOperator(List<RouteRule> routingRules) {
@@ -157,6 +153,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         schemaOperatorMetrics =
                 new SchemaOperatorMetrics(
                         getRuntimeContext().getMetricGroup(), schemaChangeBehavior);
+        subTaskId = getRuntimeContext().getIndexOfThisSubtask();
     }
 
     @Override
@@ -222,17 +219,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                 });
     }
 
-    @Override
-    public void initializeState(StateInitializationContext context) throws Exception {
-        if (context.isRestored()) {
-            // Multiple operators may appear during a restart process,
-            // only clear the pendingSchemaChanges when the first operator starts.
-            if (getRuntimeContext().getIndexOfThisSubtask() == 0) {
-                sendRequestToCoordinator(new RefreshPendingListsRequest());
-            }
-        }
-    }
-
     /**
      * This method is guaranteed to not be called concurrently with other methods of the operator.
      */
@@ -252,9 +238,19 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private void processSchemaChangeEvents(SchemaChangeEvent event)
             throws InterruptedException, TimeoutException, ExecutionException {
         TableId tableId = event.tableId();
-        LOG.info("Table {} received SchemaChangeEvent and start to be blocked.", tableId);
+        LOG.info(
+                "{}> Table {} received SchemaChangeEvent {} and start to be blocked.",
+                subTaskId,
+                tableId,
+                event);
         handleSchemaChangeEvent(tableId, event);
-        // Update caches
+
+        if (event instanceof DropTableEvent) {
+            // Update caches unless event is a Drop table event. In that case, no schema will be
+            // available / necessary.
+            return;
+        }
+
         originalSchema.put(tableId, getLatestOriginalSchema(tableId));
         schemaDivergesMap.put(tableId, checkSchemaDiverges(tableId));
 
@@ -416,93 +412,63 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                             schemaChangeEvent));
         }
 
-        // The request will need to send a FlushEvent or block until flushing finished
+        // The request will block if another schema change event is being handled
         SchemaChangeResponse response = requestSchemaChange(tableId, schemaChangeEvent);
-        if (!response.getSchemaChangeEvents().isEmpty()) {
-            LOG.info(
-                    "Sending the FlushEvent for table {} in subtask {}.",
-                    tableId,
-                    getRuntimeContext().getIndexOfThisSubtask());
+        if (response.isAccepted()) {
+            LOG.info("{}> Sending the FlushEvent for table {}.", subTaskId, tableId);
             output.collect(new StreamRecord<>(new FlushEvent(tableId)));
             List<SchemaChangeEvent> expectedSchemaChangeEvents = response.getSchemaChangeEvents();
             schemaOperatorMetrics.increaseSchemaChangeEvents(expectedSchemaChangeEvents.size());
 
             // The request will block until flushing finished in each sink writer
-            ReleaseUpstreamResponse schemaEvolveResponse = requestReleaseUpstream();
+            SchemaChangeResultResponse schemaEvolveResponse = requestSchemaChangeResult();
             List<SchemaChangeEvent> finishedSchemaChangeEvents =
                     schemaEvolveResponse.getFinishedSchemaChangeEvents();
-            List<Tuple2<SchemaChangeEvent, Throwable>> failedSchemaChangeEvents =
-                    schemaEvolveResponse.getFailedSchemaChangeEvents();
-            List<SchemaChangeEvent> ignoredSchemaChangeEvents =
-                    schemaEvolveResponse.getIgnoredSchemaChangeEvents();
-
-            if (schemaChangeBehavior == SchemaChangeBehavior.EVOLVE
-                    || schemaChangeBehavior == SchemaChangeBehavior.EXCEPTION) {
-                if (schemaEvolveResponse.hasException()) {
-                    throw new RuntimeException(
-                            String.format(
-                                    "Failed to apply schema change event %s.\nExceptions: %s",
-                                    schemaChangeEvent,
-                                    schemaEvolveResponse.getPrintableFailedSchemaChangeEvents()));
-                }
-            } else if (schemaChangeBehavior == SchemaChangeBehavior.TRY_EVOLVE
-                    || schemaChangeBehavior == SchemaChangeBehavior.LENIENT
-                    || schemaChangeBehavior == SchemaChangeBehavior.IGNORE) {
-                if (schemaEvolveResponse.hasException()) {
-                    schemaEvolveResponse
-                            .getFailedSchemaChangeEvents()
-                            .forEach(
-                                    e ->
-                                            LOG.warn(
-                                                    "Failed to apply event {}, but keeps running in tolerant mode. Caused by: {}",
-                                                    e.f0,
-                                                    e.f1));
-                }
-            } else {
-                throw new SchemaEvolveException(
-                        schemaChangeEvent,
-                        "Unexpected schema change behavior: " + schemaChangeBehavior);
-            }
 
             // Update evolved schema changes based on apply results
-            requestApplyEvolvedSchemaChanges(tableId, finishedSchemaChangeEvents);
             finishedSchemaChangeEvents.forEach(e -> output.collect(new StreamRecord<>(e)));
-
+        } else if (response.isDuplicate()) {
             LOG.info(
-                    "Applied schema change event {} to downstream. Among {} total evolved events, {} succeeded, {} failed, and {} ignored.",
-                    schemaChangeEvent,
-                    expectedSchemaChangeEvents.size(),
-                    finishedSchemaChangeEvents.size(),
-                    failedSchemaChangeEvents.size(),
-                    ignoredSchemaChangeEvents.size());
-
-            schemaOperatorMetrics.increaseFinishedSchemaChangeEvents(
-                    finishedSchemaChangeEvents.size());
-            schemaOperatorMetrics.increaseFailedSchemaChangeEvents(failedSchemaChangeEvents.size());
-            schemaOperatorMetrics.increaseIgnoredSchemaChangeEvents(
-                    ignoredSchemaChangeEvents.size());
+                    "{}> Schema change event {} has been handled in another subTask already.",
+                    subTaskId,
+                    schemaChangeEvent);
+        } else if (response.isIgnored()) {
+            LOG.info(
+                    "{}> Schema change event {} has been ignored. No schema evolution needed.",
+                    subTaskId,
+                    schemaChangeEvent);
+        } else {
+            throw new IllegalStateException("Unexpected response status " + response);
         }
     }
 
     private SchemaChangeResponse requestSchemaChange(
-            TableId tableId, SchemaChangeEvent schemaChangeEvent) {
-        return sendRequestToCoordinator(new SchemaChangeRequest(tableId, schemaChangeEvent));
+            TableId tableId, SchemaChangeEvent schemaChangeEvent)
+            throws InterruptedException, TimeoutException {
+        long schemaEvolveTimeOutMillis = System.currentTimeMillis() + rpcTimeOutInMillis;
+        while (true) {
+            SchemaChangeResponse response =
+                    sendRequestToCoordinator(
+                            new SchemaChangeRequest(tableId, schemaChangeEvent, subTaskId));
+            if (response.isRegistryBusy()) {
+                if (System.currentTimeMillis() < schemaEvolveTimeOutMillis) {
+                    LOG.info(
+                            "{}> Schema Registry is busy now, waiting for next request...",
+                            subTaskId);
+                    Thread.sleep(1000);
+                } else {
+                    throw new TimeoutException("TimeOut when requesting schema change");
+                }
+            } else {
+                return response;
+            }
+        }
     }
 
-    private void requestApplyOriginalSchemaChanges(
-            TableId tableId, SchemaChangeEvent schemaChangeEvent) {
-        sendRequestToCoordinator(new ApplyOriginalSchemaChangeRequest(tableId, schemaChangeEvent));
-    }
-
-    private void requestApplyEvolvedSchemaChanges(
-            TableId tableId, List<SchemaChangeEvent> schemaChangeEvents) {
-        sendRequestToCoordinator(new ApplyEvolvedSchemaChangeRequest(tableId, schemaChangeEvents));
-    }
-
-    private ReleaseUpstreamResponse requestReleaseUpstream()
+    private SchemaChangeResultResponse requestSchemaChangeResult()
             throws InterruptedException, TimeoutException {
         CoordinationResponse coordinationResponse =
-                sendRequestToCoordinator(new ReleaseUpstreamRequest());
+                sendRequestToCoordinator(new SchemaChangeResultRequest());
         long nextRpcTimeOutMillis = System.currentTimeMillis() + rpcTimeOutInMillis;
         while (coordinationResponse instanceof SchemaChangeProcessingResponse) {
             if (System.currentTimeMillis() < nextRpcTimeOutMillis) {
@@ -512,7 +478,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 throw new TimeoutException("TimeOut when requesting release upstream");
             }
         }
-        return ((ReleaseUpstreamResponse) coordinationResponse);
+        return ((SchemaChangeResultResponse) coordinationResponse);
     }
 
     private <REQUEST extends CoordinationRequest, RESPONSE extends CoordinationResponse>
@@ -538,7 +504,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             return optionalSchema.get();
         } catch (Exception e) {
             throw new IllegalStateException(
-                    String.format("Unable to get latest schema for table \"%s\"", tableId));
+                    String.format("Unable to get latest schema for table \"%s\"", tableId), e);
         }
     }
 
@@ -553,7 +519,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             return optionalSchema.get();
         } catch (Exception e) {
             throw new IllegalStateException(
-                    String.format("Unable to get latest schema for table \"%s\"", tableId));
+                    String.format("Unable to get latest schema for table \"%s\"", tableId), e);
         }
     }
 
@@ -651,5 +617,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                         destinationType)));
             }
         }
+    }
+
+    @Override
+    public void snapshotState(StateSnapshotContext context) throws Exception {
+        // Needless to do anything, since AbstractStreamOperator#snapshotState and #processElement
+        // is guaranteed not to be mixed together.
     }
 }

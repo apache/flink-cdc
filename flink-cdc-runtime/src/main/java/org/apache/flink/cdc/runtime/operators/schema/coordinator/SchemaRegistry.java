@@ -17,22 +17,18 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.coordinator;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyEvolvedSchemaChangeResponse;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ApplyOriginalSchemaChangeResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetEvolvedSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.GetOriginalSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.event.RefreshPendingListsRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.ReleaseUpstreamRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResultRequest;
 import org.apache.flink.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
@@ -41,7 +37,9 @@ import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandle
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
+import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
+import org.apache.flink.util.function.ThrowingRunnable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 
 import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.wrap;
 
@@ -87,6 +86,9 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     /** The name of the operator this SchemaOperatorCoordinator is associated with. */
     private final String operatorName;
 
+    /** A single-thread executor to handle async execution of the coordinator. */
+    private final ExecutorService coordinatorExecutor;
+
     /**
      * Tracks the subtask failed reason to throw a more meaningful exception in {@link
      * #subtaskReset}.
@@ -108,21 +110,36 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
 
     private SchemaChangeBehavior schemaChangeBehavior;
 
+    /**
+     * Current parallelism. Use this to verify if Schema Registry has collected enough flush success
+     * events from sink operators.
+     */
+    private int currentParallelism;
+
     public SchemaRegistry(
             String operatorName,
             OperatorCoordinator.Context context,
+            ExecutorService executorService,
             MetadataApplier metadataApplier,
             List<RouteRule> routes) {
-        this(operatorName, context, metadataApplier, routes, SchemaChangeBehavior.EVOLVE);
+        this(
+                operatorName,
+                context,
+                executorService,
+                metadataApplier,
+                routes,
+                SchemaChangeBehavior.LENIENT);
     }
 
     public SchemaRegistry(
             String operatorName,
             OperatorCoordinator.Context context,
+            ExecutorService coordinatorExecutor,
             MetadataApplier metadataApplier,
             List<RouteRule> routes,
             SchemaChangeBehavior schemaChangeBehavior) {
         this.context = context;
+        this.coordinatorExecutor = coordinatorExecutor;
         this.operatorName = operatorName;
         this.failedReasons = new HashMap<>();
         this.metadataApplier = metadataApplier;
@@ -131,7 +148,11 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
         this.schemaDerivation = new SchemaDerivation(schemaManager, routes, new HashMap<>());
         this.requestHandler =
                 new SchemaRegistryRequestHandler(
-                        metadataApplier, schemaManager, schemaDerivation, schemaChangeBehavior);
+                        metadataApplier,
+                        schemaManager,
+                        schemaDerivation,
+                        schemaChangeBehavior,
+                        context);
         this.schemaChangeBehavior = schemaChangeBehavior;
     }
 
@@ -139,7 +160,9 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     public void start() throws Exception {
         LOG.info("Starting SchemaRegistry for {}.", operatorName);
         this.failedReasons.clear();
-        LOG.info("Started SchemaRegistry for {}.", operatorName);
+        this.currentParallelism = context.currentParallelism();
+        LOG.info(
+                "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
     }
 
     @Override
@@ -149,38 +172,87 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     }
 
     @Override
-    public void handleEventFromOperator(int subtask, int attemptNumber, OperatorEvent event)
-            throws Exception {
-        if (event instanceof FlushSuccessEvent) {
-            FlushSuccessEvent flushSuccessEvent = (FlushSuccessEvent) event;
-            LOG.info(
-                    "Sink subtask {} succeed flushing for table {}.",
-                    flushSuccessEvent.getSubtask(),
-                    flushSuccessEvent.getTableId().toString());
-            requestHandler.flushSuccess(
-                    flushSuccessEvent.getTableId(), flushSuccessEvent.getSubtask());
-        } else if (event instanceof SinkWriterRegisterEvent) {
-            requestHandler.registerSinkWriter(((SinkWriterRegisterEvent) event).getSubtask());
-        } else {
-            throw new FlinkException("Unrecognized Operator Event: " + event);
-        }
+    public void handleEventFromOperator(int subtask, int attemptNumber, OperatorEvent event) {
+        runInEventLoop(
+                () -> {
+                    try {
+                        if (event instanceof FlushSuccessEvent) {
+                            FlushSuccessEvent flushSuccessEvent = (FlushSuccessEvent) event;
+                            LOG.info(
+                                    "Sink subtask {} succeed flushing for table {}.",
+                                    flushSuccessEvent.getSubtask(),
+                                    flushSuccessEvent.getTableId().toString());
+                            requestHandler.flushSuccess(
+                                    flushSuccessEvent.getTableId(),
+                                    flushSuccessEvent.getSubtask(),
+                                    currentParallelism);
+                        } else if (event instanceof SinkWriterRegisterEvent) {
+                            requestHandler.registerSinkWriter(
+                                    ((SinkWriterRegisterEvent) event).getSubtask());
+                        } else {
+                            throw new FlinkException("Unrecognized Operator Event: " + event);
+                        }
+                    } catch (Throwable t) {
+                        context.failJob(t);
+                        throw t;
+                    }
+                },
+                "handling event %s from subTask %d",
+                event,
+                subtask);
     }
 
     @Override
-    public void checkpointCoordinator(long checkpointId, CompletableFuture<byte[]> resultFuture)
-            throws Exception {
-        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                DataOutputStream out = new DataOutputStream(baos)) {
-            // Serialize SchemaManager
-            int schemaManagerSerializerVersion = SchemaManager.SERIALIZER.getVersion();
-            out.writeInt(schemaManagerSerializerVersion);
-            byte[] serializedSchemaManager = SchemaManager.SERIALIZER.serialize(schemaManager);
-            out.writeInt(serializedSchemaManager.length);
-            out.write(serializedSchemaManager);
-            // Serialize SchemaDerivation mapping
-            SchemaDerivation.serializeDerivationMapping(schemaDerivation, out);
-            resultFuture.complete(baos.toByteArray());
-        }
+    public void checkpointCoordinator(long checkpointId, CompletableFuture<byte[]> resultFuture) {
+        // we generate checkpoint in an async thread to not block the JobManager's main thread, the
+        // coordinator state might be large if there are many schema changes and monitor many
+        // tables.
+        runInEventLoop(
+                () -> {
+                    try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                            DataOutputStream out = new DataOutputStream(baos)) {
+                        // Serialize SchemaManager
+                        int schemaManagerSerializerVersion = SchemaManager.SERIALIZER.getVersion();
+                        out.writeInt(schemaManagerSerializerVersion);
+                        byte[] serializedSchemaManager =
+                                SchemaManager.SERIALIZER.serialize(schemaManager);
+                        out.writeInt(serializedSchemaManager.length);
+                        out.write(serializedSchemaManager);
+                        // Serialize SchemaDerivation mapping
+                        SchemaDerivation.serializeDerivationMapping(schemaDerivation, out);
+                        resultFuture.complete(baos.toByteArray());
+                    } catch (Throwable t) {
+                        context.failJob(t);
+                        throw t;
+                    }
+                },
+                "taking checkpoint %d",
+                checkpointId);
+    }
+
+    private void runInEventLoop(
+            final ThrowingRunnable<Throwable> action,
+            final String actionName,
+            final Object... actionNameFormatParameters) {
+        coordinatorExecutor.execute(
+                () -> {
+                    try {
+                        action.run();
+                    } catch (Throwable t) {
+                        // if we have a JVM critical error, promote it immediately, there is a good
+                        // chance the logging or job failing will not succeed anymore
+                        ExceptionUtils.rethrowIfFatalErrorOrOOM(t);
+
+                        final String actionString =
+                                String.format(actionName, actionNameFormatParameters);
+                        LOG.error(
+                                "Uncaught exception in the SchemaEvolutionCoordinator for {} while {}. Triggering job failover.",
+                                operatorName,
+                                actionString,
+                                t);
+                        context.failJob(t);
+                    }
+                });
     }
 
     @Override
@@ -191,34 +263,34 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     @Override
     public CompletableFuture<CoordinationResponse> handleCoordinationRequest(
             CoordinationRequest request) {
-        if (request instanceof SchemaChangeRequest) {
-            SchemaChangeRequest schemaChangeRequest = (SchemaChangeRequest) request;
-            return requestHandler.handleSchemaChangeRequest(schemaChangeRequest);
-        } else if (request instanceof ReleaseUpstreamRequest) {
-            return requestHandler.handleReleaseUpstreamRequest();
-        } else if (request instanceof GetEvolvedSchemaRequest) {
-            return CompletableFuture.completedFuture(
-                    wrap(handleGetEvolvedSchemaRequest(((GetEvolvedSchemaRequest) request))));
-        } else if (request instanceof GetOriginalSchemaRequest) {
-            return CompletableFuture.completedFuture(
-                    wrap(handleGetOriginalSchemaRequest((GetOriginalSchemaRequest) request)));
-        } else if (request instanceof ApplyOriginalSchemaChangeRequest) {
-            return CompletableFuture.completedFuture(
-                    wrap(
-                            handleApplyOriginalSchemaChangeRequest(
-                                    (ApplyOriginalSchemaChangeRequest) request)));
-        } else if (request instanceof ApplyEvolvedSchemaChangeRequest) {
-            return CompletableFuture.completedFuture(
-                    wrap(
-                            handleApplyEvolvedSchemaChangeRequest(
-                                    (ApplyEvolvedSchemaChangeRequest) request)));
-        } else if (request instanceof SchemaChangeResultRequest) {
-            return requestHandler.getSchemaChangeResult();
-        } else if (request instanceof RefreshPendingListsRequest) {
-            return requestHandler.refreshPendingLists();
-        } else {
-            throw new IllegalArgumentException("Unrecognized CoordinationRequest type: " + request);
-        }
+        CompletableFuture<CoordinationResponse> responseFuture = new CompletableFuture<>();
+        runInEventLoop(
+                () -> {
+                    try {
+                        if (request instanceof SchemaChangeRequest) {
+                            SchemaChangeRequest schemaChangeRequest = (SchemaChangeRequest) request;
+                            requestHandler.handleSchemaChangeRequest(
+                                    schemaChangeRequest, responseFuture);
+                        } else if (request instanceof SchemaChangeResultRequest) {
+                            requestHandler.getSchemaChangeResult(responseFuture);
+                        } else if (request instanceof GetEvolvedSchemaRequest) {
+                            handleGetEvolvedSchemaRequest(
+                                    ((GetEvolvedSchemaRequest) request), responseFuture);
+                        } else if (request instanceof GetOriginalSchemaRequest) {
+                            handleGetOriginalSchemaRequest(
+                                    (GetOriginalSchemaRequest) request, responseFuture);
+                        } else {
+                            throw new IllegalArgumentException(
+                                    "Unrecognized CoordinationRequest type: " + request);
+                        }
+                    } catch (Throwable t) {
+                        context.failJob(t);
+                        throw t;
+                    }
+                },
+                "handling coordination request %s",
+                request);
+        return responseFuture;
     }
 
     @Override
@@ -247,7 +319,8 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                                         metadataApplier,
                                         schemaManager,
                                         schemaDerivation,
-                                        schemaManager.getBehavior());
+                                        schemaManager.getBehavior(),
+                                        context);
                         break;
                     }
                 case 1:
@@ -268,13 +341,17 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                                         metadataApplier,
                                         schemaManager,
                                         schemaDerivation,
-                                        schemaChangeBehavior);
+                                        schemaChangeBehavior,
+                                        context);
                         break;
                     }
                 default:
                     throw new IOException(
                             "Unrecognized serialization version " + schemaManagerSerializerVersion);
             }
+        } catch (Throwable t) {
+            context.failJob(t);
+            throw t;
         }
     }
 
@@ -298,62 +375,69 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
         // do nothing
     }
 
-    private GetEvolvedSchemaResponse handleGetEvolvedSchemaRequest(
-            GetEvolvedSchemaRequest getEvolvedSchemaRequest) {
+    private void handleGetEvolvedSchemaRequest(
+            GetEvolvedSchemaRequest getEvolvedSchemaRequest,
+            CompletableFuture<CoordinationResponse> response) {
         LOG.info("Handling evolved schema request: {}", getEvolvedSchemaRequest);
         int schemaVersion = getEvolvedSchemaRequest.getSchemaVersion();
         TableId tableId = getEvolvedSchemaRequest.getTableId();
         if (schemaVersion == GetEvolvedSchemaRequest.LATEST_SCHEMA_VERSION) {
-            return new GetEvolvedSchemaResponse(
-                    schemaManager.getLatestEvolvedSchema(tableId).orElse(null));
+            response.complete(
+                    wrap(
+                            new GetEvolvedSchemaResponse(
+                                    schemaManager.getLatestEvolvedSchema(tableId).orElse(null))));
         } else {
             try {
-                return new GetEvolvedSchemaResponse(
-                        schemaManager.getEvolvedSchema(tableId, schemaVersion));
+                response.complete(
+                        wrap(
+                                new GetEvolvedSchemaResponse(
+                                        schemaManager.getEvolvedSchema(tableId, schemaVersion))));
             } catch (IllegalArgumentException iae) {
                 LOG.warn(
                         "Some client is requesting an non-existed evolved schema for table {} with version {}",
                         tableId,
                         schemaVersion);
-                return new GetEvolvedSchemaResponse(null);
+                response.complete(wrap(new GetEvolvedSchemaResponse(null)));
             }
         }
     }
 
-    private GetOriginalSchemaResponse handleGetOriginalSchemaRequest(
-            GetOriginalSchemaRequest getOriginalSchemaRequest) {
+    private void handleGetOriginalSchemaRequest(
+            GetOriginalSchemaRequest getOriginalSchemaRequest,
+            CompletableFuture<CoordinationResponse> response) {
         LOG.info("Handling original schema request: {}", getOriginalSchemaRequest);
         int schemaVersion = getOriginalSchemaRequest.getSchemaVersion();
         TableId tableId = getOriginalSchemaRequest.getTableId();
         if (schemaVersion == GetOriginalSchemaRequest.LATEST_SCHEMA_VERSION) {
-            return new GetOriginalSchemaResponse(
-                    schemaManager.getLatestOriginalSchema(tableId).orElse(null));
+            response.complete(
+                    wrap(
+                            new GetOriginalSchemaResponse(
+                                    schemaManager.getLatestOriginalSchema(tableId).orElse(null))));
         } else {
             try {
-                return new GetOriginalSchemaResponse(
-                        schemaManager.getOriginalSchema(tableId, schemaVersion));
+                response.complete(
+                        wrap(
+                                new GetOriginalSchemaResponse(
+                                        schemaManager.getOriginalSchema(tableId, schemaVersion))));
             } catch (IllegalArgumentException iae) {
                 LOG.warn(
                         "Some client is requesting an non-existed original schema for table {} with version {}",
                         tableId,
                         schemaVersion);
-                return new GetOriginalSchemaResponse(null);
+                response.complete(wrap(new GetOriginalSchemaResponse(null)));
             }
         }
     }
 
-    private ApplyOriginalSchemaChangeResponse handleApplyOriginalSchemaChangeRequest(
-            ApplyOriginalSchemaChangeRequest applyOriginalSchemaChangeRequest) {
-        schemaManager.applyOriginalSchemaChange(
-                applyOriginalSchemaChangeRequest.getSchemaChangeEvent());
-        return new ApplyOriginalSchemaChangeResponse();
+    // --------------------Only visible for test -----------------
+
+    @VisibleForTesting
+    public void handleApplyOriginalSchemaChangeEvent(SchemaChangeEvent schemaChangeEvent) {
+        schemaManager.applyOriginalSchemaChange(schemaChangeEvent);
     }
 
-    private ApplyEvolvedSchemaChangeResponse handleApplyEvolvedSchemaChangeRequest(
-            ApplyEvolvedSchemaChangeRequest applyEvolvedSchemaChangeRequest) {
-        applyEvolvedSchemaChangeRequest
-                .getSchemaChangeEvent()
-                .forEach(schemaManager::applyEvolvedSchemaChange);
-        return new ApplyEvolvedSchemaChangeResponse();
+    @VisibleForTesting
+    public void handleApplyEvolvedSchemaChangeRequest(SchemaChangeEvent schemaChangeEvent) {
+        schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
     }
 }

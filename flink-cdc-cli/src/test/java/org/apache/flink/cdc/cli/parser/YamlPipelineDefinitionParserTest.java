@@ -27,6 +27,7 @@ import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,11 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
@@ -384,7 +390,13 @@ class YamlPipelineDefinitionParserTest {
                             Configuration.fromMap(
                                     ImmutableMap.<String, String>builder()
                                             .put("bootstrap-servers", "localhost:9092")
-                                            .build())),
+                                            .build()),
+                            ImmutableSet.of(
+                                    DROP_COLUMN,
+                                    ALTER_COLUMN_TYPE,
+                                    ADD_COLUMN,
+                                    CREATE_TABLE,
+                                    RENAME_COLUMN)),
                     Collections.singletonList(
                             new RouteDef(
                                     "mydb.default.app_order_.*",
@@ -401,7 +413,16 @@ class YamlPipelineDefinitionParserTest {
     private final PipelineDef minimizedDef =
             new PipelineDef(
                     new SourceDef("mysql", null, new Configuration()),
-                    new SinkDef("kafka", null, new Configuration()),
+                    new SinkDef(
+                            "kafka",
+                            null,
+                            new Configuration(),
+                            ImmutableSet.of(
+                                    DROP_COLUMN,
+                                    ALTER_COLUMN_TYPE,
+                                    ADD_COLUMN,
+                                    CREATE_TABLE,
+                                    RENAME_COLUMN)),
                     Collections.emptyList(),
                     Collections.emptyList(),
                     Collections.emptyList(),
@@ -474,7 +495,16 @@ class YamlPipelineDefinitionParserTest {
     private final PipelineDef pipelineDefWithUdf =
             new PipelineDef(
                     new SourceDef("values", null, new Configuration()),
-                    new SinkDef("values", null, new Configuration()),
+                    new SinkDef(
+                            "values",
+                            null,
+                            new Configuration(),
+                            ImmutableSet.of(
+                                    DROP_COLUMN,
+                                    ALTER_COLUMN_TYPE,
+                                    ADD_COLUMN,
+                                    CREATE_TABLE,
+                                    RENAME_COLUMN)),
                     Collections.emptyList(),
                     Collections.singletonList(
                             new TransformDef(
