@@ -1,6 +1,3 @@
-#!/usr/bin/env ruby
-# frozen_string_literal: true
-
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -16,21 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FLINK_HOME = ENV['FLINK_HOME']
-throw 'Unspecified `FLINK_HOME` environment variable.' if FLINK_HOME.nil?
+name: License Checks
 
-EXTRA_CONF = <<~EXTRACONF
-
-taskmanager.numberOfTaskSlots: 10
-parallelism.default: 4
-execution.checkpointing.interval: 300
-EXTRACONF
-
-if File.file?("#{FLINK_HOME}/conf/flink-conf.yaml")
-  File.write("#{FLINK_HOME}/conf/flink-conf.yaml", EXTRA_CONF, mode: 'a+')
-else
-  File.write("#{FLINK_HOME}/conf/config.yaml", EXTRA_CONF, mode: 'a+')
-end
-
-# MySQL connector is not provided
-`wget https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar -O #{FLINK_HOME}/lib/mysql-connector-java-8.0.27.jar`
+jobs:
+  license_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Set up Ruby environment
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Compiling jar packages
+        run: mvn --no-snapshot-updates -B package -DskipTests
+      - name: Run license check
+        run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
