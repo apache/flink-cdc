@@ -79,7 +79,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
 
     @Parameterized.Parameters(name = "mongoVersion: {0}")
     public static Object[] parameters() {
-        return Stream.of(MONGO_VERSIONS).map(e -> new Object[] {e}).toArray();
+        return Stream.of(getMongoVersions()).map(e -> new Object[] {e}).toArray();
     }
 
     private final ScheduledExecutorService mockChangelogExecutor =
