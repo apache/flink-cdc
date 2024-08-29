@@ -32,7 +32,9 @@ import org.apache.flink.cdc.connectors.maxcompute.utils.SchemaEvolutionUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.TypeConvertUtils;
 
 import com.aliyun.odps.OdpsException;
+import com.aliyun.odps.Table;
 import com.aliyun.odps.TableSchema;
+import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,14 +56,18 @@ public class MaxComputeMetadataApplier implements MetadataApplier {
             if (schemaChangeEvent instanceof CreateTableEvent) {
                 CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
                 if (MaxComputeUtils.isTableExist(maxComputeOptions, createTableEvent.tableId())) {
-                    TableSchema currentSchema =
-                            MaxComputeUtils.getTableSchema(
-                                    maxComputeOptions, createTableEvent.tableId());
+                    Table table =
+                            MaxComputeUtils.getTable(maxComputeOptions, createTableEvent.tableId());
                     TableSchema expectSchema =
                             TypeConvertUtils.toMaxCompute(createTableEvent.getSchema());
-                    if (!MaxComputeUtils.schemaEquals(currentSchema, expectSchema)) {
+                    if (!MaxComputeUtils.schemaEquals(table.getSchema(), expectSchema)) {
                         throw new IllegalStateException(
                                 "The schema of create table event is not equals to exist table schema, please drop/rename exist table before flink cdc task start.");
+                    }
+                    if (!CollectionUtils.isEqualCollection(
+                            createTableEvent.getSchema().primaryKeys(), table.getPrimaryKey())) {
+                        throw new IllegalStateException(
+                                "The primary key of create table event is not equals to exist table primary key, please drop/rename exist table before flink cdc task start.");
                     }
                 } else {
                     SchemaEvolutionUtils.createTable(
