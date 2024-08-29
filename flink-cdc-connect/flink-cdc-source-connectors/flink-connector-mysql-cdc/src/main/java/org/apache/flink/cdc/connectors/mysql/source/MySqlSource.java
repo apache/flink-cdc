@@ -24,6 +24,9 @@ import org.apache.flink.api.connector.source.SourceReader;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimitedSourceReader;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimiter;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimiterStrategy;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
@@ -64,6 +67,8 @@ import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The MySQL CDC Source based on FLIP-27 and Watermark Signal Algorithm which supports parallel
@@ -111,6 +116,8 @@ public class MySqlSource<T>
     // hook for generating changes.
     private SnapshotPhaseHooks snapshotHooks = SnapshotPhaseHooks.empty();
 
+    private final RateLimiterStrategy rateLimiterStrategy;
+
     /**
      * Get a MySqlParallelSourceBuilder to build a {@link MySqlSource}.
      *
@@ -131,16 +138,19 @@ public class MySqlSource<T>
                         new MySqlRecordEmitter<>(
                                 deserializationSchema,
                                 sourceReaderMetrics,
-                                sourceConfig.isIncludeSchemaChanges()));
+                                sourceConfig.isIncludeSchemaChanges()),
+                RateLimiterStrategy.noOp());
     }
 
     MySqlSource(
             MySqlSourceConfigFactory configFactory,
             DebeziumDeserializationSchema<T> deserializationSchema,
-            RecordEmitterSupplier<T> recordEmitterSupplier) {
+            RecordEmitterSupplier<T> recordEmitterSupplier,
+            RateLimiterStrategy rateLimiterStrategy) {
         this.configFactory = configFactory;
         this.deserializationSchema = deserializationSchema;
         this.recordEmitterSupplier = recordEmitterSupplier;
+        this.rateLimiterStrategy = rateLimiterStrategy;
     }
 
     public MySqlSourceConfigFactory getConfigFactory() {
@@ -156,6 +166,7 @@ public class MySqlSource<T>
             return Boundedness.CONTINUOUS_UNBOUNDED;
         }
     }
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlSource.class);
 
     @Override
     public SourceReader<T, MySqlSplit> createReader(SourceReaderContext readerContext)
@@ -182,13 +193,16 @@ public class MySqlSource<T>
                                 readerContext.getIndexOfSubtask(),
                                 mySqlSourceReaderContext,
                                 snapshotHooks);
-        return new MySqlSourceReader<>(
+        MySqlSourceReader<T> sourceReader = new MySqlSourceReader<>(
                 elementsQueue,
                 splitReaderSupplier,
                 recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig),
                 readerContext.getConfiguration(),
                 mySqlSourceReaderContext,
                 sourceConfig);
+        int parallelism = readerContext.currentParallelism();
+        RateLimiter rateLimiter = rateLimiterStrategy.createRateLimiter(parallelism);
+        return new RateLimitedSourceReader<>(sourceReader,rateLimiter);
     }
 
     @Override

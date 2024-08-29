@@ -140,6 +140,7 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
 
         @Override
         public void collect(T record) {
+            LOG.info("收到数据！！！！！！: {}", record);
             if (currentMessageTimestamp != null && currentMessageTimestamp > 0) {
                 // Only binlog event contains a valid timestamp. We use the output with timestamp to
                 // report the event time and let the source operator to report
