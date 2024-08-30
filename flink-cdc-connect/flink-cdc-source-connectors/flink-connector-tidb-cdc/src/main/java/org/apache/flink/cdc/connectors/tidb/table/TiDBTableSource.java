@@ -33,8 +33,6 @@ import org.apache.flink.types.RowKind;
 
 import org.tikv.common.TiConfiguration;
 
-import javax.annotation.Nullable;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +52,8 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
     private final String database;
     private final String tableName;
     private final String pdAddresses;
-    @Nullable private final String hostMapping;
+
+    private final String hostMapping;
     private final StartupOptions startupOptions;
     private final Map<String, String> options;
 
