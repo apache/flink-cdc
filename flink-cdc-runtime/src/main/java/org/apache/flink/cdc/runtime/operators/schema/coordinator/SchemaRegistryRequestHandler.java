@@ -352,8 +352,8 @@ public class SchemaRegistryRequestHandler implements Closeable {
 
     private List<SchemaChangeEvent> calculateDerivedSchemaChangeEvents(SchemaChangeEvent event) {
         if (SchemaChangeBehavior.LENIENT.equals(schemaChangeBehavior)) {
-            return lenientizeSchemaChangeEvent(event).stream()
-                    .flatMap(evt -> schemaDerivation.applySchemaChange(evt).stream())
+            return schemaDerivation.applySchemaChange(event).stream()
+                    .flatMap(evt -> lenientizeSchemaChangeEvent(evt).stream())
                     .collect(Collectors.toList());
         } else {
             return schemaDerivation.applySchemaChange(event);
