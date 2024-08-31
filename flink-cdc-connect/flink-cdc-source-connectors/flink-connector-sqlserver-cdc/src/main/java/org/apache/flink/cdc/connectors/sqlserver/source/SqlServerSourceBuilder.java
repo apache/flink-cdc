@@ -229,6 +229,10 @@ public class SqlServerSourceBuilder<T> {
         return this;
     }
 
+    public SqlServerSourceConfigFactory getConfigFactory() {
+        return configFactory;
+    }
+
     /**
      * Build the {@link SqlServerIncrementalSource}.
      *
