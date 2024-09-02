@@ -108,6 +108,16 @@ public class MySqlBinlogSplit extends MySqlSplit {
         return totalFinishedSplitSize == finishedSnapshotSplitInfos.size();
     }
 
+    public String getTables() {
+        String tables;
+        if (tableSchemas != null) {
+            tables = tableSchemas.keySet().toString();
+        } else {
+            tables = "[]";
+        }
+        return tables;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -142,10 +152,13 @@ public class MySqlBinlogSplit extends MySqlSplit {
 
     @Override
     public String toString() {
+        String tables = getTables();
         return "MySqlBinlogSplit{"
                 + "splitId='"
                 + splitId
                 + '\''
+                + ", tables="
+                + tables
                 + ", offset="
                 + startingOffset
                 + ", endOffset="
