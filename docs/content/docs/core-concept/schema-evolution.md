@@ -108,6 +108,6 @@ The following YAML configuration is set to include `CreateTableEvent` and column
 
 ```yaml
 sink:
-  include.schema.changes: [create.table.event, column]
-  exclude.schema.changes: [drop.column]
+  include.schema.changes: [create.table, column] # This matches CreateTable, AddColumn, AlterColumnType, RenameColumn, and DropColumn Events
+  exclude.schema.changes: [drop.column] # This excludes DropColumn Events
 ```

@@ -110,6 +110,6 @@ pipeline:
 
 ```yaml
 sink:
-  include.schema.changes: [create.table.event, column]
-  exclude.schema.changes: [drop.column]
+  include.schema.changes: [create.table, column] # 匹配了 CreateTable、AddColumn、AlterColumnType、RenameColumn、和 DropColumn 事件
+  exclude.schema.changes: [drop.column] # 排除了 DropColumn 事件
 ```
