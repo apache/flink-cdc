@@ -49,7 +49,7 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
 
     @Override
     public PhysicalColumn createInstance() {
-        return Column.physicalColumn("unknown", DataTypes.BIGINT());
+        return Column.physicalColumn("unknow", DataTypes.BIGINT());
     }
 
     @Override
