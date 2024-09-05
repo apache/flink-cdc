@@ -29,6 +29,9 @@ public class ComposeDeploymentFactory {
         if (target.equalsIgnoreCase("kubernetes-application")) {
             return new K8SApplicationDeploymentExecutor();
         }
+        if (target.equalsIgnoreCase("yarn-application")) {
+            return new YarnApplicationDeploymentExecutor();
+        }
         throw new IllegalArgumentException(
                 String.format("Deployment target %s is not supported", target));
     }
