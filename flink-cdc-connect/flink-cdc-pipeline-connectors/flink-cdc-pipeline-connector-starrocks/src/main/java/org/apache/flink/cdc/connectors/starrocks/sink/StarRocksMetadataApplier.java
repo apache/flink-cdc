@@ -23,9 +23,15 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+
+import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import com.starrocks.connector.flink.catalog.StarRocksCatalog;
 import com.starrocks.connector.flink.catalog.StarRocksCatalogException;
@@ -36,6 +42,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+
+import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksUtils.toStarRocksDataType;
 
 /** A {@code MetadataApplier} that applies metadata changes to StarRocks. */
 public class StarRocksMetadataApplier implements MetadataApplier {
@@ -48,6 +57,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
     private final TableCreateConfig tableCreateConfig;
     private final SchemaChangeConfig schemaChangeConfig;
     private boolean isOpened;
+    private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
     public StarRocksMetadataApplier(
             StarRocksCatalog catalog,
@@ -57,32 +67,68 @@ public class StarRocksMetadataApplier implements MetadataApplier {
         this.tableCreateConfig = tableCreateConfig;
         this.schemaChangeConfig = schemaChangeConfig;
         this.isOpened = false;
+        this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }
 
     @Override
-    public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
+    public MetadataApplier setAcceptedSchemaEvolutionTypes(
+            Set<SchemaChangeEventType> schemaEvolutionTypes) {
+        this.enabledSchemaEvolutionTypes = schemaEvolutionTypes;
+        return this;
+    }
+
+    @Override
+    public boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
+        return enabledSchemaEvolutionTypes.contains(schemaChangeEventType);
+    }
+
+    @Override
+    public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
+        return Sets.newHashSet(
+                SchemaChangeEventType.CREATE_TABLE,
+                SchemaChangeEventType.ADD_COLUMN,
+                SchemaChangeEventType.DROP_COLUMN);
+    }
+
+    @Override
+    public void applySchemaChange(SchemaChangeEvent schemaChangeEvent)
+            throws SchemaEvolveException {
         if (!isOpened) {
             isOpened = true;
             catalog.open();
         }
 
-        if (schemaChangeEvent instanceof CreateTableEvent) {
-            applyCreateTable((CreateTableEvent) schemaChangeEvent);
-        } else if (schemaChangeEvent instanceof AddColumnEvent) {
-            applyAddColumn((AddColumnEvent) schemaChangeEvent);
-        } else if (schemaChangeEvent instanceof DropColumnEvent) {
-            applyDropColumn((DropColumnEvent) schemaChangeEvent);
-        } else if (schemaChangeEvent instanceof RenameColumnEvent) {
-            applyRenameColumn((RenameColumnEvent) schemaChangeEvent);
-        } else if (schemaChangeEvent instanceof AlterColumnTypeEvent) {
-            applyAlterColumn((AlterColumnTypeEvent) schemaChangeEvent);
-        } else {
-            throw new UnsupportedOperationException(
-                    "StarRocksDataSink doesn't support schema change event " + schemaChangeEvent);
-        }
+        SchemaChangeEventVisitor.visit(
+                schemaChangeEvent,
+                addColumnEvent -> {
+                    applyAddColumn(addColumnEvent);
+                    return null;
+                },
+                alterColumnTypeEvent -> {
+                    applyAlterColumnType(alterColumnTypeEvent);
+                    return null;
+                },
+                createTableEvent -> {
+                    applyCreateTable(createTableEvent);
+                    return null;
+                },
+                dropColumnEvent -> {
+                    applyDropColumn(dropColumnEvent);
+                    return null;
+                },
+                dropTableEvent -> {
+                    throw new UnsupportedSchemaChangeEventException(dropTableEvent);
+                },
+                renameColumnEvent -> {
+                    applyRenameColumn(renameColumnEvent);
+                    return null;
+                },
+                truncateTableEvent -> {
+                    throw new UnsupportedSchemaChangeEventException(truncateTableEvent);
+                });
     }
 
-    private void applyCreateTable(CreateTableEvent createTableEvent) {
+    private void applyCreateTable(CreateTableEvent createTableEvent) throws SchemaEvolveException {
         StarRocksTable starRocksTable =
                 StarRocksUtils.toStarRocksTable(
                         createTableEvent.tableId(),
@@ -97,11 +143,11 @@ public class StarRocksMetadataApplier implements MetadataApplier {
             LOG.info("Successful to create table, event: {}", createTableEvent);
         } catch (StarRocksCatalogException e) {
             LOG.error("Failed to create table, event: {}", createTableEvent.tableId(), e);
-            throw new RuntimeException("Failed to create table, event: " + createTableEvent, e);
+            throw new SchemaEvolveException(createTableEvent, "Failed to create table", e);
         }
     }
 
-    private void applyAddColumn(AddColumnEvent addColumnEvent) {
+    private void applyAddColumn(AddColumnEvent addColumnEvent) throws SchemaEvolveException {
         List<StarRocksColumn> addColumns = new ArrayList<>();
         for (AddColumnEvent.ColumnWithPosition columnWithPosition :
                 addColumnEvent.getAddedColumns()) {
@@ -117,8 +163,9 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                     new StarRocksColumn.Builder()
                             .setColumnName(column.getName())
                             .setOrdinalPosition(-1)
-                            .setColumnComment(column.getComment());
-            StarRocksUtils.toStarRocksDataType(column, false, builder);
+                            .setColumnComment(column.getComment())
+                            .setDefaultValue(column.getDefaultValueExpression());
+            toStarRocksDataType(column, false, builder);
             addColumns.add(builder.build());
         }
 
@@ -171,9 +218,9 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                     "Failed to apply add column because of alter exception, event: {}",
                     addColumnEvent,
                     alterException);
-            throw new RuntimeException(
-                    "Failed to apply add column because of alter exception, event: "
-                            + addColumnEvent,
+            throw new SchemaEvolveException(
+                    addColumnEvent,
+                    "Failed to apply add column because of alter exception, event: ",
                     alterException);
         } else {
             String errorMsg =
@@ -181,11 +228,11 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                             "Failed to apply add column because of validation failure, event: %s, table: %s",
                             addColumnEvent, table);
             LOG.error(errorMsg);
-            throw new RuntimeException(errorMsg);
+            throw new SchemaEvolveException(addColumnEvent, errorMsg, null);
         }
     }
 
-    private void applyDropColumn(DropColumnEvent dropColumnEvent) {
+    private void applyDropColumn(DropColumnEvent dropColumnEvent) throws SchemaEvolveException {
         List<String> dropColumns = dropColumnEvent.getDroppedColumnNames();
         TableId tableId = dropColumnEvent.tableId();
         StarRocksCatalogException alterException = null;
@@ -237,9 +284,9 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                     "Failed to apply drop column because of alter exception, event: {}",
                     dropColumnEvent,
                     alterException);
-            throw new RuntimeException(
-                    "Failed to apply drop column because of alter exception, event: "
-                            + dropColumnEvent,
+            throw new SchemaEvolveException(
+                    dropColumnEvent,
+                    "Failed to apply drop column because of alter exception",
                     alterException);
         } else {
             String errorMsg =
@@ -247,23 +294,25 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                             "Failed to apply drop column because of validation failure, event: %s, table: %s",
                             dropColumnEvent, table);
             LOG.error(errorMsg);
-            throw new RuntimeException(errorMsg);
+            throw new SchemaEvolveException(dropColumnEvent, errorMsg, null);
         }
     }
 
-    private void applyRenameColumn(RenameColumnEvent renameColumnEvent) {
+    private void applyRenameColumn(RenameColumnEvent renameColumnEvent)
+            throws SchemaEvolveException {
         // TODO StarRocks plans to support column rename since 3.3 which has not been released.
         // Support it later.
-        throw new UnsupportedOperationException("Rename column is not supported currently");
+        throw new UnsupportedSchemaChangeEventException(renameColumnEvent);
     }
 
-    private void applyAlterColumn(AlterColumnTypeEvent alterColumnTypeEvent) {
+    private void applyAlterColumnType(AlterColumnTypeEvent alterColumnTypeEvent)
+            throws SchemaEvolveException {
         // TODO There are limitations for data type conversions. We should know the data types
         // before and after changing so that we can make a validation. But the event only contains
         // data
         // types after changing. One way is that the framework delivers the old schema. We can
         // support
         // the alter after a discussion.
-        throw new UnsupportedOperationException("Alter column is not supported currently");
+        throw new UnsupportedSchemaChangeEventException(alterColumnTypeEvent);
     }
 }

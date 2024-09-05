@@ -175,8 +175,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for MySQL CDC consumer, valid enumerations are "initial", "earliest-offset", "latest-offset", "specific-offset" and "timestamp".
-           Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
+      <td>Optional startup mode for MySQL CDC consumer, valid enumerations are "initial", "earliest-offset", "latest-offset", "specific-offset", "timestamp" and "snapshot".</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.file</td>
@@ -198,6 +197,13 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Optional GTID set used in case of "specific-offset" startup mode</td>
+    </tr>
+    <tr>
+      <td>scan.startup.timestamp-millis</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>Long</td>
+      <td>Optional millisecond timestamp used in case of "timestamp" startup mode.</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.skip-events</td>
@@ -269,6 +275,24 @@ pipeline:
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
     </tr>
+    <tr>
+      <td>scan.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to enable scan the newly added tables feature or not, by default is false. This option is only useful when we start the job from a savepoint/checkpoint.</td>
+    </tr>
+    <tr>
+      <td>scan.binlog.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>In binlog reading stage, whether to scan the ddl and dml statements of newly added tables or not, by default is false. <br>
+          The difference between scan.newly-added-table.enabled and scan.binlog.newly-added-table.enabled options is: <br>
+          scan.newly-added-table.enabled: do re-snapshot & binlog-reading for newly added table when restored; <br>
+          scan.binlog.newly-added-table.enabled: only do binlog-reading for newly added table during binlog reading phase.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -284,6 +308,7 @@ The config option `scan.startup.mode` specifies the startup mode for MySQL CDC c
 - `specific-offset`: Skip snapshot phase and start reading binlog events from a specific offset. The offset could be
   specified with binlog filename and position, or a GTID set if GTID is enabled on server.
 - `timestamp`: Skip snapshot phase and start reading binlog events from a specific timestamp.
+- `snapshot`: Only the snapshot phase is performed and exits after the snapshot phase reading is completed.
 
 For example in YAML definition:
 
@@ -294,6 +319,7 @@ source:
   scan.startup.mode: latest-offset                      # Start from latest offset
   scan.startup.mode: specific-offset                    # Start from specific offset
   scan.startup.mode: timestamp                          # Start from timestamp
+  scan.startup.mode: snapshot                          # Read snapshot only
   scan.startup.specific-offset.file: 'mysql-bin.000003' # Binlog filename under specific offset startup mode
   scan.startup.specific-offset.pos: 4                   # Binlog position under specific offset mode
   scan.startup.specific-offset.gtid-set: 24DA167-...    # GTID set under specific offset startup mode

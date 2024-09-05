@@ -89,7 +89,7 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
         stringSerializer.serialize(record.comment(), target);
     }
 
-    private static final int CURRENT_VERSION = 1;
+    private static final int CURRENT_VERSION = 2;
 
     @Override
     public Schema deserialize(DataInputView source) throws IOException {
@@ -97,6 +97,9 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
     }
 
     public Schema deserialize(int version, DataInputView source) throws IOException {
+        // Manually updating versions because column deserialization is wrapped by
+        // ListSerializer.
+        ColumnSerializer.updateVersion(version);
         switch (version) {
             case 0:
                 return Schema.newBuilder()
@@ -106,6 +109,7 @@ public class SchemaSerializer extends TypeSerializerSingleton<Schema> {
                         .comment(stringSerializer.deserialize(source))
                         .build();
             case 1:
+            case 2:
                 return Schema.newBuilder()
                         .setColumns(columnsSerializer.deserialize(source))
                         .primaryKey(primaryKeysSerializer.deserialize(source))

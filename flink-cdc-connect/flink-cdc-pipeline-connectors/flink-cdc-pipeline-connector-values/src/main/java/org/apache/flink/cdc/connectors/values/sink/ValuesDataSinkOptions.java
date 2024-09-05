@@ -42,4 +42,11 @@ public class ValuesDataSinkOptions {
                     .defaultValue(ValuesDataSink.SinkApi.SINK_V2)
                     .withDescription(
                             "The sink api on which the sink is based: SinkFunction or SinkV2.");
+
+    public static final ConfigOption<Boolean> ERROR_ON_SCHEMA_CHANGE =
+            ConfigOptions.key("error.on.schema.change")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "True if a runtime error should be thrown when handling schema change events.");
 }

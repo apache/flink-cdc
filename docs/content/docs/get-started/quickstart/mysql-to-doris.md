@@ -188,6 +188,7 @@ This command automatically starts all the containers defined in the Docker Compo
 
 2. Download the connector package listed below and move it to the `lib` directory  
    **Download links are available only for stable releases, SNAPSHOT dependencies need to be built based on master or release branches by yourself.**
+   **Please note that you need to move the jar to the lib directory of Flink CDC Home, not to the lib directory of Flink Home.**
     - [MySQL pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-mysql/3.1.0/flink-cdc-pipeline-connector-mysql-3.1.0.jar)
     - [Apache Doris pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-doris/3.1.0/flink-cdc-pipeline-connector-doris-3.1.0.jar)
 

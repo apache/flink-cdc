@@ -16,13 +16,8 @@
 -- ----------------------------------------------------------------------------------------------------------------
 -- DATABASE:  inventory
 -- ----------------------------------------------------------------------------------------------------------------
+
 -- Create and populate our products using a single insert with many rows
-DROP DATABASE IF EXISTS inventory;
-
-CREATE DATABASE inventory;
-
-USE inventory;
-
 CREATE TABLE products_source (
     id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL DEFAULT 'flink',

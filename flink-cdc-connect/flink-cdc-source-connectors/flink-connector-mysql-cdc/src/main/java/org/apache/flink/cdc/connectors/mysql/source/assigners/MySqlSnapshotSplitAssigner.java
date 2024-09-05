@@ -23,6 +23,7 @@ import org.apache.flink.cdc.connectors.mysql.source.assigners.state.ChunkSplitte
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions;
+import org.apache.flink.cdc.connectors.mysql.source.connection.JdbcConnectionPools;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
@@ -214,7 +215,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private void captureNewlyAddedTables() {
         // Don't scan newly added table in snapshot mode.
         if (sourceConfig.isScanNewlyAddedTableEnabled()
-                && !sourceConfig.getStartupOptions().isSnapshotOnly()) {
+                && !sourceConfig.getStartupOptions().isSnapshotOnly()
+                && AssignerStatus.isAssigningFinished(assignerStatus)) {
             // check whether we got newly added tables
             try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
                 final List<TableId> currentCapturedTables =
@@ -489,6 +491,8 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         if (chunkSplitter != null) {
             try {
                 chunkSplitter.close();
+                // clear jdbc connection pools
+                JdbcConnectionPools.getInstance().clear();
             } catch (Exception e) {
                 LOG.warn("Fail to close the chunk splitter.");
             }
@@ -597,11 +601,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             return new MySqlChunkSplitter(
                     mySqlSchema,
                     sourceConfig,
-                    tableId != null
-                                    && sourceConfig
-                                            .getTableFilters()
-                                            .dataCollectionFilter()
-                                            .isIncluded(tableId)
+                    tableId != null && sourceConfig.getTableFilter().test(tableId)
                             ? chunkSplitterState
                             : ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
         }

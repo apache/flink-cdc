@@ -108,7 +108,6 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
                         .slotName(SLOT_NAME)
                         .decodingPluginName(PLUGIN_NAME)
                         .deserializer(deserializer)
-                        .includeSchemaChanges(true) // output the schema changes as well
                         .splitSize(2)
                         .build();
 
@@ -153,7 +152,6 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
                         .slotName(SLOT_NAME)
                         .decodingPluginName(PLUGIN_NAME)
                         .deserializer(buildRowDataDebeziumDeserializeSchema(dataType))
-                        .includeSchemaChanges(true) // output the schema changes as well
                         .splitSize(2)
                         .debeziumProperties(debeziumProps)
                         .build();

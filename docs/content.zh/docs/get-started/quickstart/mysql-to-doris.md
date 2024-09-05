@@ -186,6 +186,7 @@ MacOS 由于内部实现容器的方式不同，在部署时宿主机直接修�
 
 2. 下载下面列出的 connector 包，并且移动到 `lib` 目录下；
    **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译.**
+   **请注意，您需要将 jar 移动到 Flink CDC Home 的 lib 目录，而非 Flink Home 的 lib 目录下。**
    - [MySQL pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-mysql/3.1.0/flink-cdc-pipeline-connector-mysql-3.1.0.jar)
    - [Apache Doris pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-doris/3.1.0/flink-cdc-pipeline-connector-doris-3.1.0.jar)
 
@@ -248,9 +249,9 @@ sink 添加 `table.create.properties.replication_num` 参数是由于 Docker 镜
 ### 同步变更
 进入 MySQL 容器
 
-   ```shell
-    docker-compose exec mysql mysql -uroot -p123456
-   ```
+```shell
+ docker-compose exec mysql mysql -uroot -p123456
+```
 
 接下来，修改 MySQL 数据库中表的数据，Doris 中显示的订单数据也将实时更新：
 1. 在 MySQL 的 `orders` 表中插入一条数据 

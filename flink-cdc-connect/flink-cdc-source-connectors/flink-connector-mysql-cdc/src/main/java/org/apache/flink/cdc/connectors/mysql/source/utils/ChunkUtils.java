@@ -57,9 +57,8 @@ public class ChunkUtils {
 
     /**
      * Get the chunk key column. This column could be set by `chunkKeyColumn`. If the table doesn't
-     * have primary keys, `chunkKeyColumn` must be set. If the table has primary keys,
-     * `chunkKeyColumn` must be a column of them or else null. When the parameter `chunkKeyColumn`
-     * is not set and the table has primary keys, return the first column of primary keys.
+     * have primary keys, `chunkKeyColumn` must be set. When the parameter `chunkKeyColumn` is not
+     * set and the table has primary keys, return the first column of primary keys.
      */
     public static Column getChunkKeyColumn(Table table, Map<ObjectPath, String> chunkKeyColumns) {
         List<Column> primaryKeys = table.primaryKeyColumns();
@@ -68,7 +67,8 @@ public class ChunkUtils {
             throw new ValidationException(
                     "'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
         }
-        List<Column> searchColumns = primaryKeys.isEmpty() ? table.columns() : primaryKeys;
+
+        List<Column> searchColumns = table.columns();
         if (chunkKeyColumn != null) {
             Optional<Column> targetColumn =
                     searchColumns.stream()
@@ -79,9 +79,8 @@ public class ChunkUtils {
             }
             throw new ValidationException(
                     String.format(
-                            "Chunk key column '%s' doesn't exist in the %s [%s] of the table %s.",
+                            "Chunk key column '%s' doesn't exist in the columns [%s] of the table %s.",
                             chunkKeyColumn,
-                            primaryKeys.isEmpty() ? "user specified columns" : "primary keys",
                             searchColumns.stream()
                                     .map(Column::name)
                                     .collect(Collectors.joining(",")),

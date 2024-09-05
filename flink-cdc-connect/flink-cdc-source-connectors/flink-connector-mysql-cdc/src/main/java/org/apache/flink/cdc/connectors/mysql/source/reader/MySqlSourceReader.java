@@ -235,10 +235,7 @@ public class MySqlSourceReader<T>
             LOG.info("Source reader {} adds split {}", subtaskId, split);
             if (split.isSnapshotSplit()) {
                 MySqlSnapshotSplit snapshotSplit = split.asSnapshotSplit();
-                if (sourceConfig
-                        .getTableFilters()
-                        .dataCollectionFilter()
-                        .isIncluded(split.asSnapshotSplit().getTableId())) {
+                if (sourceConfig.getTableFilter().test(split.asSnapshotSplit().getTableId())) {
                     if (snapshotSplit.isSnapshotReadFinished()) {
                         finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
                     } else {

@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.kafka.sink;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
@@ -67,9 +68,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
@@ -259,7 +262,7 @@ class KafkaDataSinkITCase extends TestLogger {
         env.execute();
 
         final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
-                drainAllRecordsFromTopic(topic, false);
+                drainAllRecordsFromTopic(topic, false, 0);
         final long recordsCount = 5;
         assertThat(recordsCount).isEqualTo(collectedRecords.size());
         ObjectMapper mapper =
@@ -268,15 +271,25 @@ class KafkaDataSinkITCase extends TestLogger {
         List<JsonNode> expected =
                 Arrays.asList(
                         mapper.readTree(
-                                "{\"before\":null,\"after\":{\"col1\":\"1\",\"col2\":\"1\"},\"op\":\"c\"}"),
+                                String.format(
+                                        "{\"before\":null,\"after\":{\"col1\":\"1\",\"col2\":\"1\"},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())),
                         mapper.readTree(
-                                "{\"before\":null,\"after\":{\"col1\":\"2\",\"col2\":\"2\"},\"op\":\"c\"}"),
+                                String.format(
+                                        "{\"before\":null,\"after\":{\"col1\":\"2\",\"col2\":\"2\"},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())),
                         mapper.readTree(
-                                "{\"before\":null,\"after\":{\"col1\":\"3\",\"col2\":\"3\"},\"op\":\"c\"}"),
+                                String.format(
+                                        "{\"before\":null,\"after\":{\"col1\":\"3\",\"col2\":\"3\"},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())),
                         mapper.readTree(
-                                "{\"before\":{\"col1\":\"1\",\"newCol3\":\"1\"},\"after\":null,\"op\":\"d\"}"),
+                                String.format(
+                                        "{\"before\":{\"col1\":\"1\",\"newCol3\":\"1\"},\"after\":null,\"op\":\"d\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())),
                         mapper.readTree(
-                                "{\"before\":{\"col1\":\"2\",\"newCol3\":\"\"},\"after\":{\"col1\":\"2\",\"newCol3\":\"x\"},\"op\":\"u\"}"));
+                                String.format(
+                                        "{\"before\":{\"col1\":\"2\",\"newCol3\":\"\"},\"after\":{\"col1\":\"2\",\"newCol3\":\"x\"},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())));
         assertThat(deserializeValues(collectedRecords)).containsAll(expected);
         checkProducerLeak();
     }
@@ -311,7 +324,7 @@ class KafkaDataSinkITCase extends TestLogger {
         env.execute();
 
         final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
-                drainAllRecordsFromTopic(topic, false);
+                drainAllRecordsFromTopic(topic, false, 0);
         final long recordsCount = 5;
         assertThat(recordsCount).isEqualTo(collectedRecords.size());
         for (ConsumerRecord<byte[], byte[]> consumerRecord : collectedRecords) {
@@ -330,16 +343,124 @@ class KafkaDataSinkITCase extends TestLogger {
         List<JsonNode> expected =
                 Arrays.asList(
                         mapper.readTree(
-                                "{\"old\":null,\"data\":[{\"col1\":\"1\",\"col2\":\"1\"}],\"type\":\"INSERT\"}"),
+                                String.format(
+                                        "{\"old\":null,\"data\":[{\"col1\":\"1\",\"col2\":\"1\"}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]}",
+                                        table1.getTableName())),
                         mapper.readTree(
-                                "{\"old\":null,\"data\":[{\"col1\":\"2\",\"col2\":\"2\"}],\"type\":\"INSERT\"}"),
+                                String.format(
+                                        "{\"old\":null,\"data\":[{\"col1\":\"2\",\"col2\":\"2\"}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]}",
+                                        table1.getTableName())),
                         mapper.readTree(
-                                "{\"old\":null,\"data\":[{\"col1\":\"3\",\"col2\":\"3\"}],\"type\":\"INSERT\"}"),
+                                String.format(
+                                        "{\"old\":null,\"data\":[{\"col1\":\"3\",\"col2\":\"3\"}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]}",
+                                        table1.getTableName())),
                         mapper.readTree(
-                                "{\"old\":[{\"col1\":\"1\",\"newCol3\":\"1\"}],\"data\":null,\"type\":\"DELETE\"}"),
+                                String.format(
+                                        "{\"old\":[{\"col1\":\"1\",\"newCol3\":\"1\"}],\"data\":null,\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]}",
+                                        table1.getTableName())),
                         mapper.readTree(
-                                "{\"old\":[{\"col1\":\"2\",\"newCol3\":\"\"}],\"data\":[{\"col1\":\"2\",\"newCol3\":\"x\"}],\"type\":\"UPDATE\"}"));
+                                String.format(
+                                        "{\"old\":[{\"col1\":\"2\",\"newCol3\":\"\"}],\"data\":[{\"col1\":\"2\",\"newCol3\":\"x\"}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]}",
+                                        table1.getTableName())));
         assertThat(deserializeValues(collectedRecords)).containsAll(expected);
+        checkProducerLeak();
+    }
+
+    @Test
+    void testHashByKeyPartitionStrategyUsingJson() throws Exception {
+        final StreamExecutionEnvironment env = new LocalStreamEnvironment();
+        env.enableCheckpointing(1000L);
+        env.setRestartStrategy(RestartStrategies.noRestart());
+        final DataStream<Event> source =
+                env.fromCollection(createSourceEvents(), new EventTypeInfo());
+        Map<String, String> config = new HashMap<>();
+        Properties properties = getKafkaClientConfiguration();
+        properties.forEach(
+                (key, value) ->
+                        config.put(
+                                KafkaDataSinkOptions.PROPERTIES_PREFIX + key.toString(),
+                                value.toString()));
+        config.put(KafkaDataSinkOptions.KEY_FORMAT.key(), KeyFormat.JSON.toString());
+        config.put(
+                KafkaDataSinkOptions.VALUE_FORMAT.key(),
+                JsonSerializationType.CANAL_JSON.toString());
+        source.sinkTo(
+                ((FlinkSinkProvider)
+                                (new KafkaDataSinkFactory()
+                                        .createDataSink(
+                                                new FactoryHelper.DefaultContext(
+                                                        Configuration.fromMap(config),
+                                                        Configuration.fromMap(new HashMap<>()),
+                                                        this.getClass().getClassLoader()))
+                                        .getEventSinkProvider()))
+                        .getSink());
+        env.execute();
+
+        final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
+                drainAllRecordsFromTopic(topic, false);
+        final long recordsCount = 5;
+        assertThat(recordsCount).isEqualTo(collectedRecords.size());
+        for (ConsumerRecord<byte[], byte[]> consumerRecord : collectedRecords) {
+            assertThat(
+                            consumerRecord
+                                    .headers()
+                                    .headers(
+                                            PipelineKafkaRecordSerializationSchema
+                                                    .TABLE_NAME_HEADER_KEY)
+                                    .iterator())
+                    .isExhausted();
+        }
+        ObjectMapper mapper =
+                JacksonMapperFactory.createObjectMapper()
+                        .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
+        List<Tuple2<JsonNode, JsonNode>> expected =
+                Arrays.asList(
+                        Tuple2.of(
+                                mapper.readTree(
+                                        String.format(
+                                                "{\"TableId\":\"%s\",\"col1\":\"1\"}",
+                                                table1.toString())),
+                                mapper.readTree(
+                                        String.format(
+                                                "{\"old\":null,\"data\":[{\"col1\":\"1\",\"col2\":\"1\"}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]})",
+                                                table1.getTableName()))),
+                        Tuple2.of(
+                                mapper.readTree(
+                                        String.format(
+                                                "{\"TableId\":\"%s\",\"col1\":\"2\"}",
+                                                table1.toString())),
+                                mapper.readTree(
+                                        String.format(
+                                                "{\"old\":null,\"data\":[{\"col1\":\"2\",\"col2\":\"2\"}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]})",
+                                                table1.getTableName()))),
+                        Tuple2.of(
+                                mapper.readTree(
+                                        String.format(
+                                                "{\"TableId\":\"%s\",\"col1\":\"3\"}",
+                                                table1.toString())),
+                                mapper.readTree(
+                                        String.format(
+                                                "{\"old\":null,\"data\":[{\"col1\":\"3\",\"col2\":\"3\"}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]})",
+                                                table1.getTableName()))),
+                        Tuple2.of(
+                                mapper.readTree(
+                                        String.format(
+                                                "{\"TableId\":\"%s\",\"col1\":\"1\"}",
+                                                table1.toString())),
+                                mapper.readTree(
+                                        String.format(
+                                                "{\"old\":[{\"col1\":\"1\",\"newCol3\":\"1\"}],\"data\":null,\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]})",
+                                                table1.getTableName()))),
+                        Tuple2.of(
+                                mapper.readTree(
+                                        String.format(
+                                                "{\"TableId\":\"%s\",\"col1\":\"2\"}",
+                                                table1.toString())),
+                                mapper.readTree(
+                                        String.format(
+                                                "{\"old\":[{\"col1\":\"2\",\"newCol3\":\"\"}],\"data\":[{\"col1\":\"2\",\"newCol3\":\"x\"}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]}",
+                                                table1.getTableName()))));
+        assertThat(deserializeKeyValues(collectedRecords)).containsAll(expected);
         checkProducerLeak();
     }
 
@@ -372,7 +493,7 @@ class KafkaDataSinkITCase extends TestLogger {
         env.execute();
 
         final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
-                drainAllRecordsFromTopic("test_topic", false);
+                drainAllRecordsFromTopic("test_topic", false, 0);
         final long recordsCount = 5;
         assertThat(recordsCount).isEqualTo(collectedRecords.size());
         for (ConsumerRecord<byte[], byte[]> consumerRecord : collectedRecords) {
@@ -416,23 +537,37 @@ class KafkaDataSinkITCase extends TestLogger {
         List<JsonNode> expected =
                 Arrays.asList(
                         mapper.readTree(
-                                "{\"before\":null,\"after\":{\"col1\":\"1\",\"col2\":\"1\"},\"op\":\"c\"}"),
+                                String.format(
+                                        "{\"before\":null,\"after\":{\"col1\":\"1\",\"col2\":\"1\"},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())),
                         mapper.readTree(
-                                "{\"before\":null,\"after\":{\"col1\":\"2\",\"col2\":\"2\"},\"op\":\"c\"}"),
+                                String.format(
+                                        "{\"before\":null,\"after\":{\"col1\":\"2\",\"col2\":\"2\"},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())),
                         mapper.readTree(
-                                "{\"before\":null,\"after\":{\"col1\":\"3\",\"col2\":\"3\"},\"op\":\"c\"}"),
+                                String.format(
+                                        "{\"before\":null,\"after\":{\"col1\":\"3\",\"col2\":\"3\"},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())),
                         mapper.readTree(
-                                "{\"before\":{\"col1\":\"1\",\"newCol3\":\"1\"},\"after\":null,\"op\":\"d\"}"),
+                                String.format(
+                                        "{\"before\":{\"col1\":\"1\",\"newCol3\":\"1\"},\"after\":null,\"op\":\"d\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())),
                         mapper.readTree(
-                                "{\"before\":{\"col1\":\"2\",\"newCol3\":\"\"},\"after\":{\"col1\":\"2\",\"newCol3\":\"x\"},\"op\":\"u\"}"));
+                                String.format(
+                                        "{\"before\":{\"col1\":\"2\",\"newCol3\":\"\"},\"after\":{\"col1\":\"2\",\"newCol3\":\"x\"},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())));
         assertThat(deserializeValues(collectedRecords)).containsAll(expected);
         checkProducerLeak();
     }
 
     private List<ConsumerRecord<byte[], byte[]>> drainAllRecordsFromTopic(
-            String topic, boolean committed) {
+            String topic, boolean committed, int... partitionArr) {
         Properties properties = getKafkaClientConfiguration();
-        return KafkaUtil.drainAllRecordsFromTopic(topic, properties, committed);
+        Set<Integer> partitions = new HashSet<>();
+        for (int partition : partitionArr) {
+            partitions.add(partition);
+        }
+        return KafkaUtil.drainAllRecordsFromTopic(topic, properties, committed, partitions);
     }
 
     private void checkProducerLeak() throws InterruptedException {
@@ -454,6 +589,18 @@ class KafkaDataSinkITCase extends TestLogger {
         fail(
                 "Detected producer leaks:\n"
                         + leaks.stream().map(this::format).collect(Collectors.joining("\n\n")));
+    }
+
+    private static List<Tuple2<JsonNode, JsonNode>> deserializeKeyValues(
+            List<ConsumerRecord<byte[], byte[]>> records) throws IOException {
+        ObjectMapper mapper =
+                JacksonMapperFactory.createObjectMapper()
+                        .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
+        List<Tuple2<JsonNode, JsonNode>> result = new ArrayList<>();
+        for (ConsumerRecord<byte[], byte[]> record : records) {
+            result.add(Tuple2.of(mapper.readTree(record.key()), mapper.readTree(record.value())));
+        }
+        return result;
     }
 
     private static List<JsonNode> deserializeValues(List<ConsumerRecord<byte[], byte[]>> records)

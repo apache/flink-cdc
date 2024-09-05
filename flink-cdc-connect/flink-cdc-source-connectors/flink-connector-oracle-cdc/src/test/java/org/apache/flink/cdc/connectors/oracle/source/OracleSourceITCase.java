@@ -25,9 +25,9 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import org.apache.flink.cdc.connectors.oracle.source.utils.OracleConnectionUtils;
+import org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.FailoverPhase;
+import org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.FailoverType;
 import org.apache.flink.cdc.connectors.oracle.testutils.TestTable;
-import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
-import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -58,6 +58,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
+import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.triggerFailover;
 import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
@@ -706,55 +707,5 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                 Statement statement = connection.createStatement()) {
             statement.execute(sql);
         }
-    }
-
-    // ------------------------------------------------------------------------
-    //  test utilities
-    // ------------------------------------------------------------------------
-
-    /** The type of failover. */
-    private enum FailoverType {
-        TM,
-        JM,
-        NONE
-    }
-
-    /** The phase of failover. */
-    private enum FailoverPhase {
-        SNAPSHOT,
-        REDO_LOG,
-        NEVER
-    }
-
-    private static void triggerFailover(
-            FailoverType type, JobID jobId, MiniCluster miniCluster, Runnable afterFailAction)
-            throws Exception {
-        switch (type) {
-            case TM:
-                restartTaskManager(miniCluster, afterFailAction);
-                break;
-            case JM:
-                triggerJobManagerFailover(jobId, miniCluster, afterFailAction);
-                break;
-            case NONE:
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + type);
-        }
-    }
-
-    private static void triggerJobManagerFailover(
-            JobID jobId, MiniCluster miniCluster, Runnable afterFailAction) throws Exception {
-        final HaLeadershipControl haLeadershipControl = miniCluster.getHaLeadershipControl().get();
-        haLeadershipControl.revokeJobMasterLeadership(jobId).get();
-        afterFailAction.run();
-        haLeadershipControl.grantJobMasterLeadership(jobId).get();
-    }
-
-    private static void restartTaskManager(MiniCluster miniCluster, Runnable afterFailAction)
-            throws Exception {
-        miniCluster.terminateTaskManager(0).get();
-        afterFailAction.run();
-        miniCluster.startTaskManager();
     }
 }

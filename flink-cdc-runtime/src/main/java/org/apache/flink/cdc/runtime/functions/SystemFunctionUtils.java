@@ -26,9 +26,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
@@ -37,65 +41,62 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.apache.flink.cdc.common.utils.DateTimeUtils.timestampMillisToDate;
+import static org.apache.flink.cdc.common.utils.DateTimeUtils.timestampMillisToTime;
+
 /** System function utils to support the call of flink cdc pipeline transform. */
 public class SystemFunctionUtils {
+
     private static final Logger LOG = LoggerFactory.getLogger(SystemFunctionUtils.class);
 
-    public static int localtime(long epochTime, String timezone) {
-        return DateTimeUtils.timestampMillisToTime(epochTime);
-    }
-
-    public static TimestampData localtimestamp(long epochTime, String timezone) {
-        return TimestampData.fromMillis(epochTime);
-    }
-
-    // synonym: localtime
-    public static int currentTime(long epochTime, String timezone) {
-        return localtime(epochTime, timezone);
-    }
-
-    public static int currentDate(long epochTime, String timezone) {
-        return DateTimeUtils.timestampMillisToDate(epochTime);
-    }
-
-    public static TimestampData currentTimestamp(long epochTime, String timezone) {
-        return TimestampData.fromMillis(
-                epochTime + TimeZone.getTimeZone(timezone).getOffset(epochTime));
-    }
-
-    public static LocalZonedTimestampData now(long epochTime, String timezone) {
+    public static LocalZonedTimestampData currentTimestamp(long epochTime) {
         return LocalZonedTimestampData.fromEpochMillis(epochTime);
     }
 
-    public static String dateFormat(LocalZonedTimestampData timestamp, String format) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
-        return dateFormat.format(new Date(timestamp.getEpochMillisecond()));
+    // synonym with currentTimestamp
+    public static LocalZonedTimestampData now(long epochTime) {
+        return LocalZonedTimestampData.fromEpochMillis(epochTime);
+    }
+
+    public static TimestampData localtimestamp(long epochTime, String timezone) {
+        return TimestampData.fromLocalDateTime(
+                Instant.ofEpochMilli(epochTime).atZone(ZoneId.of(timezone)).toLocalDateTime());
+    }
+
+    public static int localtime(long epochTime, String timezone) {
+        return timestampMillisToTime(localtimestamp(epochTime, timezone).getMillisecond());
+    }
+
+    public static int currentTime(long epochTime, String timezone) {
+        // the time value of currentTimestamp under given session time zone
+        return timestampMillisToTime(localtimestamp(epochTime, timezone).getMillisecond());
+    }
+
+    public static int currentDate(long epochTime, String timezone) {
+        // the date value of currentTimestamp under given session time zone
+        return timestampMillisToDate(localtimestamp(epochTime, timezone).getMillisecond());
     }
 
     public static String dateFormat(TimestampData timestamp, String format) {
+        return DateTimeUtils.formatTimestampMillis(
+                timestamp.getMillisecond(), format, TimeZone.getTimeZone("UTC"));
+    }
+
+    public static int toDate(String str, String timezone) {
+        return toDate(str, "yyyy-MM-dd", timezone);
+    }
+
+    public static int toDate(String str, String format, String timezone) {
+        return DateTimeUtils.parseDate(str, format, timezone);
+    }
+
+    public static TimestampData toTimestamp(String str, String timezone) {
+        return toTimestamp(str, "yyyy-MM-dd HH:mm:ss", timezone);
+    }
+
+    public static TimestampData toTimestamp(String str, String format, String timezone) {
         SimpleDateFormat dateFormat = new SimpleDateFormat(format);
-        return dateFormat.format(new Date(timestamp.getMillisecond()));
-    }
-
-    public static String dateFormat(ZonedTimestampData timestamp, String format) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
-        return dateFormat.format(new Date(timestamp.getMillisecond()));
-    }
-
-    public static int toDate(String str) {
-        return toDate(str, "yyyy-MM-dd");
-    }
-
-    public static int toDate(String str, String format) {
-        return DateTimeUtils.parseDate(str, format);
-    }
-
-    public static TimestampData toTimestamp(String str) {
-        return toTimestamp(str, "yyyy-MM-dd HH:mm:ss");
-    }
-
-    public static TimestampData toTimestamp(String str, String format) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat(format);
+        dateFormat.setTimeZone(TimeZone.getTimeZone(timezone));
         try {
             return TimestampData.fromMillis(dateFormat.parse(str).getTime());
         } catch (ParseException e) {
@@ -118,7 +119,41 @@ public class SystemFunctionUtils {
     }
 
     public static int timestampDiff(
+            String symbol, TimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
+        return timestampDiff(
+                symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, LocalZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
+        return timestampDiff(
+                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
+    }
+
+    public static int timestampDiff(
             String symbol, ZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, LocalZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+        return timestampDiff(
+                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, ZonedTimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
+        return timestampDiff(
+                symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, TimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
+    }
+
+    public static int timestampDiff(
+            String symbol, ZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
         return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
     }
 
@@ -509,5 +544,105 @@ public class SystemFunctionUtils {
             }
         }
         return null;
+    }
+
+    public static String castToString(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return object.toString();
+    }
+
+    public static Byte castToByte(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Byte.valueOf(castObjectIntoString(object));
+    }
+
+    public static Boolean castToBoolean(Object object) {
+        if (object == null) {
+            return null;
+        }
+        if (object instanceof Byte
+                || object instanceof Short
+                || object instanceof Integer
+                || object instanceof Long
+                || object instanceof Float
+                || object instanceof Double
+                || object instanceof BigDecimal) {
+            return !object.equals(0);
+        }
+        return Boolean.valueOf(castToString(object));
+    }
+
+    public static Short castToShort(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Short.valueOf(castObjectIntoString(object));
+    }
+
+    public static Integer castToInteger(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Integer.valueOf(castObjectIntoString(object));
+    }
+
+    public static Long castToLong(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Long.valueOf(castObjectIntoString(object));
+    }
+
+    public static Float castToFloat(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Float.valueOf(castObjectIntoString(object));
+    }
+
+    public static Double castToDouble(Object object) {
+        if (object == null) {
+            return null;
+        }
+        return Double.valueOf(castObjectIntoString(object));
+    }
+
+    public static BigDecimal castToBigDecimal(Object object, int precision, int scale) {
+        if (object == null) {
+            return null;
+        }
+        BigDecimal bigDecimal =
+                new BigDecimal(castObjectIntoString(object), new MathContext(precision));
+        bigDecimal = bigDecimal.setScale(scale, BigDecimal.ROUND_HALF_UP);
+        return bigDecimal;
+    }
+
+    public static TimestampData castToTimestamp(Object object, String timezone) {
+        if (object == null) {
+            return null;
+        }
+        if (object instanceof LocalZonedTimestampData) {
+            return TimestampData.fromLocalDateTime(
+                    LocalDateTime.ofInstant(
+                            ((LocalZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
+        } else if (object instanceof ZonedTimestampData) {
+            return TimestampData.fromLocalDateTime(
+                    LocalDateTime.ofInstant(
+                            ((ZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
+        } else {
+            return TimestampData.fromLocalDateTime(
+                    LocalDateTime.parse(castObjectIntoString(object)));
+        }
+    }
+
+    private static String castObjectIntoString(Object object) {
+        if (object instanceof Boolean) {
+            return Boolean.valueOf(castToString(object)) ? "1" : "0";
+        }
+        return String.valueOf(object);
     }
 }

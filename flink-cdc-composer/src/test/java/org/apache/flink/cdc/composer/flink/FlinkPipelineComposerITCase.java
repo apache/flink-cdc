@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
@@ -68,6 +69,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration test for {@link FlinkPipelineComposer}. */
 class FlinkPipelineComposerITCase {
+
     private static final int MAX_PARALLELISM = 4;
 
     // Always use parent-first classloader for CDC classes.
@@ -133,10 +135,13 @@ class FlinkPipelineComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
                         sinkDef,
+                        Collections.emptyList(),
                         Collections.emptyList(),
                         Collections.emptyList(),
                         pipelineConfig);
@@ -189,10 +194,13 @@ class FlinkPipelineComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
                         sinkDef,
+                        Collections.emptyList(),
                         Collections.emptyList(),
                         Collections.emptyList(),
                         pipelineConfig);
@@ -261,6 +269,7 @@ class FlinkPipelineComposerITCase {
                         sinkDef,
                         Collections.emptyList(),
                         Collections.emptyList(),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -309,12 +318,15 @@ class FlinkPipelineComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
                         new ArrayList<>(Arrays.asList(transformDef)),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -328,11 +340,73 @@ class FlinkPipelineComposerITCase {
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING}, primaryKeys=col1, partitionKeys=col12, options=({key1=value1})}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, 10], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, 20], op=INSERT, meta=()}",
-                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=LAST, existedColumnName=null}]}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=AFTER, existedColumnName=col2}]}",
                         "RenameColumnEvent{tableId=default_namespace.default_schema.table1, nameMapping={col2=newCol2, col3=newCol3}}",
                         "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[newCol2]}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, 1, 10], after=[], op=DELETE, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, , 20], after=[2, x, 20], op=UPDATE, meta=()}");
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testOpTypeMetadataColumn(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.TRANSFORM_TABLE);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup transform
+        TransformDef transformDef =
+                new TransformDef(
+                        "default_namespace.default_schema.table1",
+                        "*,concat(col1,'0') as col12,__data_event_type__ as rk",
+                        "col1 <> '3'",
+                        "col1",
+                        "col12",
+                        "key1=value1",
+                        "");
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        new ArrayList<>(Collections.singletonList(transformDef)),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING,`rk` STRING}, primaryKeys=col1, partitionKeys=col12, options=({key1=value1})}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, 10, +I], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, 20, +I], op=INSERT, meta=()}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=AFTER, existedColumnName=col2}]}",
+                        "RenameColumnEvent{tableId=default_namespace.default_schema.table1, nameMapping={col2=newCol2, col3=newCol3}}",
+                        "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[newCol2]}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, 1, 10, -D], after=[], op=DELETE, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, , 20, -U], after=[2, x, 20, +U], op=UPDATE, meta=()}");
     }
 
     @ParameterizedTest
@@ -359,7 +433,7 @@ class FlinkPipelineComposerITCase {
                 new TransformDef(
                         "default_namespace.default_schema.table1",
                         "*,concat(col1,'1') as col12",
-                        "col1 = '1'",
+                        "col1 = '1' OR col1 = '999'",
                         "col1",
                         "col12",
                         "key1=value1",
@@ -376,12 +450,15 @@ class FlinkPipelineComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
                         new ArrayList<>(Arrays.asList(transformDef1, transformDef2)),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -395,7 +472,7 @@ class FlinkPipelineComposerITCase {
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING}, primaryKeys=col1, partitionKeys=col12, options=({key1=value1})}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, 11], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, 22], op=INSERT, meta=()}",
-                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=LAST, existedColumnName=null}]}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=AFTER, existedColumnName=col2}]}",
                         "RenameColumnEvent{tableId=default_namespace.default_schema.table1, nameMapping={col2=newCol2, col3=newCol3}}",
                         "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[newCol2]}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, 1, 11], after=[], op=DELETE, meta=()}",
@@ -424,15 +501,22 @@ class FlinkPipelineComposerITCase {
         TableId routedTable2 = TableId.tableId("default_namespace", "default_schema", "routed2");
         List<RouteDef> routeDef =
                 Arrays.asList(
-                        new RouteDef(TABLE_1.toString(), routedTable1.toString(), null),
-                        new RouteDef(TABLE_2.toString(), routedTable2.toString(), null));
+                        new RouteDef(TABLE_1.toString(), routedTable1.toString(), null, null),
+                        new RouteDef(TABLE_2.toString(), routedTable2.toString(), null, null));
 
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef, sinkDef, routeDef, Collections.emptyList(), pipelineConfig);
+                        sourceDef,
+                        sinkDef,
+                        routeDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
 
         // Execute the pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
@@ -468,6 +552,81 @@ class FlinkPipelineComposerITCase {
                         "DropColumnEvent{tableId=default_namespace.default_schema.routed1, droppedColumnNames=[newCol2]}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.routed1, before=[1, 1], after=[], op=DELETE, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.routed1, before=[2, 2], after=[2, x], op=UPDATE, meta=()}");
+    }
+
+    @Test
+    void testIdenticalOneToOneRouting() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_MULTI_TABLES);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup route
+        TableId routedTable1 = TABLE_1;
+        TableId routedTable2 = TABLE_2;
+        List<RouteDef> routeDef =
+                Arrays.asList(
+                        new RouteDef(TABLE_1.toString(), routedTable1.toString(), null, null),
+                        new RouteDef(TABLE_2.toString(), routedTable2.toString(), null, null));
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        routeDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check result in ValuesDatabase
+        List<String> routed1Results = ValuesDatabase.getResults(routedTable1);
+        assertThat(routed1Results)
+                .contains(
+                        "default_namespace.default_schema.table1:col1=2;newCol3=x",
+                        "default_namespace.default_schema.table1:col1=3;newCol3=");
+        List<String> routed2Results = ValuesDatabase.getResults(routedTable2);
+        assertThat(routed2Results)
+                .contains(
+                        "default_namespace.default_schema.table2:col1=1;col2=1",
+                        "default_namespace.default_schema.table2:col1=2;col2=2",
+                        "default_namespace.default_schema.table2:col1=3;col2=3");
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table2, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[3, 3], op=INSERT, meta=()}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=LAST, existedColumnName=null}]}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table2, before=[], after=[1, 1], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table2, before=[], after=[2, 2], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table2, before=[], after=[3, 3], op=INSERT, meta=()}",
+                        "RenameColumnEvent{tableId=default_namespace.default_schema.table1, nameMapping={col2=newCol2, col3=newCol3}}",
+                        "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[newCol2]}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, 1], after=[], op=DELETE, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, 2], after=[2, x], op=UPDATE, meta=()}");
     }
 
     @Test
@@ -616,14 +775,22 @@ class FlinkPipelineComposerITCase {
                         new RouteDef(
                                 "default_namespace.default_schema.mytable[0-9]",
                                 mergedTable.toString(),
+                                null,
                                 null));
 
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef, sinkDef, routeDef, Collections.emptyList(), pipelineConfig);
+                        sourceDef,
+                        sinkDef,
+                        routeDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
 
         // Execute the pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
@@ -648,7 +815,7 @@ class FlinkPipelineComposerITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[2, Bob, 20], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[2, Bob, 20], after=[2, Bob, 30], op=UPDATE, meta=()}",
                         "AddColumnEvent{tableId=default_namespace.default_schema.merged, addedColumns=[ColumnWithPosition{column=`description` STRING, position=LAST, existedColumnName=null}]}",
-                        "AlterColumnTypeEvent{tableId=default_namespace.default_schema.merged, nameMapping={age=BIGINT, id=BIGINT}}",
+                        "AlterColumnTypeEvent{tableId=default_namespace.default_schema.merged, typeMapping={age=BIGINT, id=BIGINT}, oldTypeMapping={age=INT, id=INT}}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[3, Charlie, 15, student], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[4, Donald, 25, student], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[4, Donald, 25, student], after=[], op=DELETE, meta=()}",
@@ -656,5 +823,273 @@ class FlinkPipelineComposerITCase {
                         "AddColumnEvent{tableId=default_namespace.default_schema.merged, addedColumns=[ColumnWithPosition{column=`gender` STRING, position=LAST, existedColumnName=null}]}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[5, null, 24, null, Eliza, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[6, Frank, 30, student, null, male], op=INSERT, meta=()}");
+    }
+
+    @Test
+    void testTransformMergingWithRoute() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId myTable1 = TableId.tableId("default_namespace", "default_schema", "mytable1");
+        TableId myTable2 = TableId.tableId("default_namespace", "default_schema", "mytable2");
+        Schema table1Schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+        Schema table2Schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("name", DataTypes.VARCHAR(255))
+                        .physicalColumn("age", DataTypes.TINYINT())
+                        .physicalColumn("description", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        // Create test dataset:
+        // Create table 1 [id, name, age]
+        // Table 1: +I[1, Alice, 18]
+        // Table 1: +I[2, Bob, 20]
+        // Table 1: -U[2, Bob, 20] +U[2, Bob, 30]
+        // Create table 2 [id, name, age, description]
+        // Table 2: +I[3, Charlie, 15, student]
+        // Table 2: +I[4, Donald, 25, student]
+        // Table 2: -D[4, Donald, 25, student]
+        // Rename column for table 1: name -> last_name
+        // Add column for table 2: gender
+        // Table 1: +I[5, Eliza, 24]
+        // Table 2: +I[6, Frank, 30, student, male]
+        List<Event> events = new ArrayList<>();
+        BinaryRecordDataGenerator table1dataGenerator =
+                new BinaryRecordDataGenerator(
+                        table1Schema.getColumnDataTypes().toArray(new DataType[0]));
+        BinaryRecordDataGenerator table2dataGenerator =
+                new BinaryRecordDataGenerator(
+                        table2Schema.getColumnDataTypes().toArray(new DataType[0]));
+        events.add(new CreateTableEvent(myTable1, table1Schema));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        table1dataGenerator.generate(
+                                new Object[] {1, BinaryStringData.fromString("Alice"), 18})));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        table1dataGenerator.generate(
+                                new Object[] {2, BinaryStringData.fromString("Bob"), 20})));
+        events.add(
+                DataChangeEvent.updateEvent(
+                        myTable1,
+                        table1dataGenerator.generate(
+                                new Object[] {2, BinaryStringData.fromString("Bob"), 20}),
+                        table1dataGenerator.generate(
+                                new Object[] {2, BinaryStringData.fromString("Bob"), 30})));
+        events.add(new CreateTableEvent(myTable2, table2Schema));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable2,
+                        table2dataGenerator.generate(
+                                new Object[] {
+                                    3L,
+                                    BinaryStringData.fromString("Charlie"),
+                                    (byte) 15,
+                                    BinaryStringData.fromString("student")
+                                })));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable2,
+                        table2dataGenerator.generate(
+                                new Object[] {
+                                    4L,
+                                    BinaryStringData.fromString("Donald"),
+                                    (byte) 25,
+                                    BinaryStringData.fromString("student")
+                                })));
+        events.add(
+                DataChangeEvent.deleteEvent(
+                        myTable2,
+                        table2dataGenerator.generate(
+                                new Object[] {
+                                    4L,
+                                    BinaryStringData.fromString("Donald"),
+                                    (byte) 25,
+                                    BinaryStringData.fromString("student")
+                                })));
+        //        events.add(new RenameColumnEvent(myTable1, ImmutableMap.of("name", "last_name")));
+        events.add(
+                new AddColumnEvent(
+                        myTable2,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn("gender", DataTypes.STRING())))));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        table1dataGenerator.generate(
+                                new Object[] {5, BinaryStringData.fromString("Eliza"), 24})));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable2,
+                        new BinaryRecordDataGenerator(
+                                        new DataType[] {
+                                            DataTypes.BIGINT(),
+                                            DataTypes.VARCHAR(255),
+                                            DataTypes.TINYINT(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING()
+                                        })
+                                .generate(
+                                        new Object[] {
+                                            6L,
+                                            BinaryStringData.fromString("Frank"),
+                                            (byte) 30,
+                                            BinaryStringData.fromString("student"),
+                                            BinaryStringData.fromString("male")
+                                        })));
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup transform
+        List<TransformDef> transformDef =
+                Collections.singletonList(
+                        new TransformDef(
+                                "default_namespace.default_schema.mytable[0-9]",
+                                "*,'last_name' as last_name",
+                                null,
+                                null,
+                                null,
+                                null,
+                                ""));
+
+        // Setup route
+        TableId mergedTable = TableId.tableId("default_namespace", "default_schema", "merged");
+        List<RouteDef> routeDef =
+                Collections.singletonList(
+                        new RouteDef(
+                                "default_namespace.default_schema.mytable[0-9]",
+                                mergedTable.toString(),
+                                null,
+                                null));
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        routeDef,
+                        transformDef,
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+        Schema mergedTableSchema = ValuesDatabase.getTableSchema(mergedTable);
+        assertThat(mergedTableSchema)
+                .isEqualTo(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.BIGINT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.BIGINT())
+                                .physicalColumn("last_name", DataTypes.STRING())
+                                .physicalColumn("description", DataTypes.STRING())
+                                .physicalColumn("gender", DataTypes.STRING())
+                                .primaryKey("id")
+                                .build());
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.merged, schema=columns={`id` INT,`name` STRING,`age` INT,`last_name` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[1, Alice, 18, last_name], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[2, Bob, 20, last_name], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[2, Bob, 20, last_name], after=[2, Bob, 30, last_name], op=UPDATE, meta=()}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.merged, addedColumns=[ColumnWithPosition{column=`description` STRING, position=LAST, existedColumnName=null}]}",
+                        "AlterColumnTypeEvent{tableId=default_namespace.default_schema.merged, typeMapping={age=BIGINT, id=BIGINT}, oldTypeMapping={age=INT, id=INT}}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[3, Charlie, 15, last_name, student], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[4, Donald, 25, last_name, student], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[4, Donald, 25, last_name, student], after=[], op=DELETE, meta=()}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.merged, addedColumns=[ColumnWithPosition{column=`gender` STRING, position=LAST, existedColumnName=null}]}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[5, Eliza, 24, last_name, null, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[6, Frank, 30, last_name, student, male], op=INSERT, meta=()}");
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testRouteWithReplaceSymbol(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_MULTI_TABLES);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.singletonList(
+                                new RouteDef(
+                                        "default_namespace.default_schema.table[0-9]",
+                                        "replaced_namespace.replaced_schema.__$__",
+                                        "__$__",
+                                        null)),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=replaced_namespace.replaced_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
+                        "CreateTableEvent{tableId=replaced_namespace.replaced_schema.table2, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
+                        "DataChangeEvent{tableId=replaced_namespace.replaced_schema.table1, before=[], after=[1, 1], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=replaced_namespace.replaced_schema.table1, before=[], after=[2, 2], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=replaced_namespace.replaced_schema.table1, before=[], after=[3, 3], op=INSERT, meta=()}",
+                        "AddColumnEvent{tableId=replaced_namespace.replaced_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=LAST, existedColumnName=null}]}",
+                        "DataChangeEvent{tableId=replaced_namespace.replaced_schema.table2, before=[], after=[1, 1], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=replaced_namespace.replaced_schema.table2, before=[], after=[2, 2], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=replaced_namespace.replaced_schema.table2, before=[], after=[3, 3], op=INSERT, meta=()}",
+                        "RenameColumnEvent{tableId=replaced_namespace.replaced_schema.table1, nameMapping={col2=newCol2, col3=newCol3}}",
+                        "DropColumnEvent{tableId=replaced_namespace.replaced_schema.table1, droppedColumnNames=[newCol2]}",
+                        "DataChangeEvent{tableId=replaced_namespace.replaced_schema.table1, before=[1, 1], after=[], op=DELETE, meta=()}",
+                        "DataChangeEvent{tableId=replaced_namespace.replaced_schema.table1, before=[2, 2], after=[2, x], op=UPDATE, meta=()}");
     }
 }

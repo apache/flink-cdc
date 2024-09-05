@@ -83,7 +83,7 @@ public class CanalJsonSerializationSchemaTest {
                                 }));
         JsonNode expected =
                 mapper.readTree(
-                        "{\"old\":null,\"data\":[{\"col1\":\"1\",\"col2\":\"1\"}],\"type\":\"INSERT\"}");
+                        "{\"old\":null,\"data\":[{\"col1\":\"1\",\"col2\":\"1\"}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
         JsonNode actual = mapper.readTree(serializationSchema.serialize(insertEvent1));
         Assertions.assertEquals(expected, actual);
 
@@ -97,7 +97,7 @@ public class CanalJsonSerializationSchemaTest {
                                 }));
         expected =
                 mapper.readTree(
-                        "{\"old\":null,\"data\":[{\"col1\":\"2\",\"col2\":\"2\"}],\"type\":\"INSERT\"}");
+                        "{\"old\":null,\"data\":[{\"col1\":\"2\",\"col2\":\"2\"}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
         actual = mapper.readTree(serializationSchema.serialize(insertEvent2));
         Assertions.assertEquals(expected, actual);
 
@@ -111,7 +111,7 @@ public class CanalJsonSerializationSchemaTest {
                                 }));
         expected =
                 mapper.readTree(
-                        "{\"old\":[{\"col1\":\"2\",\"col2\":\"2\"}],\"data\":null,\"type\":\"DELETE\"}");
+                        "{\"old\":[{\"col1\":\"2\",\"col2\":\"2\"}],\"data\":null,\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
         actual = mapper.readTree(serializationSchema.serialize(deleteEvent));
         Assertions.assertEquals(expected, actual);
 
@@ -130,7 +130,7 @@ public class CanalJsonSerializationSchemaTest {
                                 }));
         expected =
                 mapper.readTree(
-                        "{\"old\":[{\"col1\":\"1\",\"col2\":\"1\"}],\"data\":[{\"col1\":\"1\",\"col2\":\"x\"}],\"type\":\"UPDATE\"}");
+                        "{\"old\":[{\"col1\":\"1\",\"col2\":\"1\"}],\"data\":[{\"col1\":\"1\",\"col2\":\"x\"}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
         actual = mapper.readTree(serializationSchema.serialize(updateEvent));
         Assertions.assertEquals(expected, actual);
     }
