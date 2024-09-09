@@ -24,7 +24,6 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -75,6 +74,13 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
     @Before
     public void before() throws Exception {
+        // As the test #testReplacementSymbol may block due to checkpoint alignment blocking
+        // we temporarily set larger checkpoint interval for the corner case
+        overrideFlinkProperties(
+                getFlinkProperties(flinkVersion)
+                        .replace(
+                                "execution.checkpointing.interval: 300",
+                                "execution.checkpointing.interval: 5000"));
         super.before();
         routeTestDatabase.createAndInitialize();
     }
@@ -838,9 +844,5 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                             + " from stdout: "
                             + taskManagerConsumer.toUtf8String());
         }
-    }
-
-    private void assertNotExists(String event) {
-        Assert.assertFalse(taskManagerConsumer.toUtf8String().contains(event));
     }
 }
