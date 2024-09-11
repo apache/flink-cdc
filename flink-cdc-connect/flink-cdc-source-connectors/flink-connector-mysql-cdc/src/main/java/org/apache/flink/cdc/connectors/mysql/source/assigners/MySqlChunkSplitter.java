@@ -182,7 +182,14 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                         chunkSize);
         // may sleep a while to avoid DDOS on MySQL server
         maySleep(nextChunkId, tableId);
-        if (chunkEnd != null && ObjectUtils.compare(chunkEnd, minMaxOfSplitColumn[1]) <= 0) {
+        if (chunkEnd != null
+                && ObjectUtils.dbCompare(
+                                chunkEnd,
+                                minMaxOfSplitColumn[1],
+                                jdbcConnection,
+                                tableId,
+                                splitColumn.name())
+                        <= 0) {
             nextChunkStart = ChunkSplitterState.ChunkBound.middleOf(chunkEnd);
             return createSnapshotSplit(
                     jdbcConnection,
@@ -348,7 +355,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                 return null;
             }
         }
-        if (ObjectUtils.compare(chunkEnd, max) >= 0) {
+        if (ObjectUtils.dbCompare(chunkEnd, max, jdbcConnection, tableId, splitColumnName) >= 0) {
             return null;
         } else {
             return chunkEnd;
