@@ -258,17 +258,29 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                                     .stream())
                             .map(ProjectionColumn::getColumnName)
                             .collect(Collectors.toSet());
-            boolean hasAsterisk =
-                    transforms.stream()
-                            .filter(t -> t.getSelectors().isMatch(tableId))
-                            .anyMatch(
-                                    t ->
-                                            TransformParser.hasAsterisk(
-                                                    t.getProjection()
-                                                            .map(TransformProjection::getProjection)
-                                                            .orElse(null)));
 
-            hasAsteriskMap.put(tableId, hasAsterisk);
+            boolean notTransformed =
+                    transforms.stream().noneMatch(t -> t.getSelectors().isMatch(tableId));
+
+            if (notTransformed) {
+                // If this TableId isn't presented in any transform block, it should behave like a
+                // "*" projection and should be regarded as asterisk-ful.
+                hasAsteriskMap.put(tableId, true);
+            } else {
+                boolean hasAsterisk =
+                        transforms.stream()
+                                .filter(t -> t.getSelectors().isMatch(tableId))
+                                .anyMatch(
+                                        t ->
+                                                TransformParser.hasAsterisk(
+                                                        t.getProjection()
+                                                                .map(
+                                                                        TransformProjection
+                                                                                ::getProjection)
+                                                                .orElse(null)));
+
+                hasAsteriskMap.put(tableId, hasAsterisk);
+            }
             projectedColumnsMap.put(
                     tableId,
                     createTableEvent.getSchema().getColumnNames().stream()
