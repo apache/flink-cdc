@@ -17,7 +17,12 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
+import io.debezium.document.Array;
+import io.debezium.relational.history.HistoryRecord;
+import io.debezium.relational.history.TableChanges;
+import java.util.Iterator;
 import org.apache.flink.api.connector.source.SourceOutput;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimiter;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
@@ -27,15 +32,9 @@ import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
-
-import io.debezium.document.Array;
-import io.debezium.relational.history.HistoryRecord;
-import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Iterator;
 
 /**
  * The {@link RecordEmitter} implementation for {@link MySqlSourceReader}.
@@ -54,6 +53,8 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
     private final boolean includeSchemaChanges;
     private final OutputCollector<T> outputCollector;
 
+    private RateLimiter rateLimiter;
+
     public MySqlRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
@@ -71,6 +72,9 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         final Iterator<SourceRecord> elementIterator = sourceRecords.iterator();
         while (elementIterator.hasNext()) {
             processElement(elementIterator.next(), output, splitState);
+            if (rateLimiter != null) {
+                rateLimiter.acquire().toCompletableFuture().join();
+            }
         }
     }
 
@@ -140,7 +144,6 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
 
         @Override
         public void collect(T record) {
-            LOG.info("收到数据！！！！！！: {}", record);
             if (currentMessageTimestamp != null && currentMessageTimestamp > 0) {
                 // Only binlog event contains a valid timestamp. We use the output with timestamp to
                 // report the event time and let the source operator to report
@@ -158,5 +161,9 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         public void close() {
             // do nothing
         }
+    }
+
+    public void setRateLimiter(RateLimiter rateLimiter) {
+        this.rateLimiter = rateLimiter;
     }
 }
