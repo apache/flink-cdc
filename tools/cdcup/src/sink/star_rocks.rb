@@ -20,7 +20,7 @@ class StarRocks
       pipeline_yaml['sink'] = {
         'type' => 'starrocks',
         'jdbc-url' => 'jdbc:mysql://starrocks:9030',
-        'load-url' => 'starrocks:8030',
+        'load-url' => 'starrocks:8080',
         'username' => 'root',
         'password' => '',
         'table.create.properties.replication_num' => 1
