@@ -20,7 +20,10 @@ package org.apache.flink.cdc.connectors.mysql.schema;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 
+import com.mysql.cj.conf.PropertyKey;
 import io.debezium.relational.Column;
+
+import java.util.Properties;
 
 /** Utilities for converting from MySQL types to Flink types. */
 public class MySqlTypeUtils {
@@ -107,8 +110,8 @@ public class MySqlTypeUtils {
     private static final String UNKNOWN = "UNKNOWN";
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
-    public static DataType fromDbzColumn(Column column) {
-        DataType dataType = convertFromColumn(column);
+    public static DataType fromDbzColumn(Column column, Properties jdbcProperties) {
+        DataType dataType = convertFromColumn(column, jdbcProperties);
         if (column.isOptional()) {
             return dataType;
         } else {
@@ -120,7 +123,7 @@ public class MySqlTypeUtils {
      * Returns a corresponding Flink data type from a debezium {@link Column} with nullable always
      * be true.
      */
-    private static DataType convertFromColumn(Column column) {
+    private static DataType convertFromColumn(Column column, Properties jdbcProperties) {
         String typeName = column.typeName();
         switch (typeName) {
             case BIT:
@@ -135,7 +138,13 @@ public class MySqlTypeUtils {
                 // user should not use tinyint(1) to store number although jdbc url parameter
                 // tinyInt1isBit=false can help change the return value, it's not a general way
                 // btw: mybatis and mysql-connector-java map tinyint(1) to boolean by default
-                return column.length() == 1 ? DataTypes.BOOLEAN() : DataTypes.TINYINT();
+                boolean tinyInt1isBit =
+                        Boolean.parseBoolean(
+                                jdbcProperties.getProperty(
+                                        PropertyKey.tinyInt1isBit.getKeyName(), "true"));
+                return (column.length() == 1 && tinyInt1isBit)
+                        ? DataTypes.BOOLEAN()
+                        : DataTypes.TINYINT();
             case TINYINT_UNSIGNED:
             case TINYINT_UNSIGNED_ZEROFILL:
             case SMALLINT:

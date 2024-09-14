@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getHistoryRecord;
 
@@ -59,21 +60,25 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final boolean includeSchemaChanges;
+    private final Properties jdbcProperties;
 
     private transient Tables tables;
     private transient CustomMySqlAntlrDdlParser customParser;
 
     public MySqlEventDeserializer(
-            DebeziumChangelogMode changelogMode, boolean includeSchemaChanges) {
+            DebeziumChangelogMode changelogMode,
+            boolean includeSchemaChanges,
+            Properties jdbcProperties) {
         super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
+        this.jdbcProperties = jdbcProperties;
     }
 
     @Override
     protected List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record) {
         if (includeSchemaChanges) {
             if (customParser == null) {
-                customParser = new CustomMySqlAntlrDdlParser();
+                customParser = new CustomMySqlAntlrDdlParser(jdbcProperties);
                 tables = new Tables();
             }
 

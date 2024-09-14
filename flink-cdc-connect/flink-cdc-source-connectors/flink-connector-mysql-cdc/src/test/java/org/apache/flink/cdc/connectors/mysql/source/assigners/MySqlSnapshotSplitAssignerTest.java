@@ -32,19 +32,14 @@ import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.ExceptionUtils;
 
+import com.mysql.cj.conf.PropertyKey;
 import io.debezium.relational.Column;
 import io.debezium.relational.TableId;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
@@ -574,9 +569,12 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         List<TableId> alreadyProcessedTables = new ArrayList<>();
         alreadyProcessedTables.add(processedTable);
 
+        Properties jdbcProperties = new Properties();
+        jdbcProperties.put(PropertyKey.tinyInt1isBit.getKeyName(), "true");
         RowType splitKeyType =
                 ChunkUtils.getChunkKeyColumnType(
-                        Column.editor().name("id").type("INT").jdbcType(4).create());
+                        Column.editor().name("id").type("INT").jdbcType(4).create(),
+                        jdbcProperties);
         List<MySqlSchemalessSnapshotSplit> remainingSplits =
                 Arrays.asList(
                         new MySqlSchemalessSnapshotSplit(
