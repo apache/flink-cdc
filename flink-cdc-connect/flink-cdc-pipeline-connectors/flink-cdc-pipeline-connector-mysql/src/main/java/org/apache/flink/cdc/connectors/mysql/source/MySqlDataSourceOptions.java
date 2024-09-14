@@ -126,7 +126,7 @@ public class MySqlDataSourceOptions {
                     .defaultValue("initial")
                     .withDescription(
                             "Optional startup mode for MySQL CDC consumer, valid enumerations are "
-                                    + "\"initial\", \"earliest-offset\", \"latest-offset\", \"timestamp\", \"specific-offset\"\n,"
+                                    + "\"initial\", \"earliest-offset\", \"latest-offset\", \"timestamp\", \"specific-offset\","
                                     + " or \"snapshot\"");
 
     public static final ConfigOption<String> SCAN_STARTUP_SPECIFIC_OFFSET_FILE =
