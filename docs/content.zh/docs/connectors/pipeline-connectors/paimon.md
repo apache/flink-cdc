@@ -229,4 +229,16 @@ Pipeline 连接器配置项
 </table>
 </div>
 
+## 支持的表结构变更事件
+
+目前，Paimon Pipeline 连接器支持应用以下表结构变更事件：
+
+| 类型                   | 是否支持 | 附注 |
+|----------------------|------|----|
+| AddColumnEvent       | ✅    |    |
+| AlterColumnTypeEvent | ✅    |    |
+| CreateTableEvent     | ✅    |    |
+| DropColumnEvent      | ✅    |    |
+| RenameColumnEvent    | ✅    |    |
+
 {{< top >}}
