@@ -72,15 +72,16 @@ public class PaimonCommitter implements Committer<MultiTableCommittable> {
             }
             commitRequests.forEach(CommitRequest::signalAlreadyCommitted);
             LOGGER.info(
-                    String.format(
-                            "Commit succeeded for %s with %s committable",
-                            checkpointId, committables.size()));
+                    "Commit succeeded for {} with {} committable",
+                    checkpointId,
+                    committables.size());
         } catch (Exception e) {
             commitRequests.forEach(CommitRequest::retryLater);
             LOGGER.warn(
-                    String.format(
-                            "Commit failed for %s with %s committable",
-                            checkpointId, committables.size()));
+                    "Commit failed for {} with {} committable",
+                    checkpointId,
+                    committables.size(),
+                    e);
         }
     }
 
