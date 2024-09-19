@@ -37,7 +37,7 @@ public class MysqlCdcGuavaRateLimiter
 
     private final Executor limiter =
             Executors.newSingleThreadExecutor(
-                    new ExecutorThreadFactory("flink-snapshot-rate-limiter"));
+                    new ExecutorThreadFactory("mysql-cdc-rate-limiter"));
     private final RateLimiter rateLimiter;
 
     private int getTokenCountAtOnce;
