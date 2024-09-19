@@ -27,7 +27,7 @@ import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.source.MetadataAccessor;
-import org.apache.flink.cdc.connectors.mysql.rate.SnapshotGuavaRateLimiter;
+import org.apache.flink.cdc.connectors.mysql.rate.MysqlCdcGuavaRateLimiter;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEmitter;
@@ -78,7 +78,7 @@ public class MySqlDataSource implements DataSource {
     }
 
     private RateLimiterStrategy createRateLimiterStrategy(double recordsPerSecond) {
-        return parallelism -> new SnapshotGuavaRateLimiter(recordsPerSecond, parallelism);
+        return parallelism -> new MysqlCdcGuavaRateLimiter(recordsPerSecond, parallelism);
     }
 
     @Override

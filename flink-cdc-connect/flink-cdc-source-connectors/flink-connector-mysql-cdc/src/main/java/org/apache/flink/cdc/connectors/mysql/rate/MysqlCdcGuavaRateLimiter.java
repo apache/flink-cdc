@@ -12,7 +12,7 @@ import org.apache.flink.util.concurrent.ExecutorThreadFactory;
  * It uses Guava's RateLimiter to control the number of requests allowed to pass per second,
  * ensuring that parallel tasks can adjust the rate limit after the checkpoint is completed.
  */
-public class SnapshotGuavaRateLimiter implements org.apache.flink.api.connector.source.util.ratelimit.RateLimiter {
+public class MysqlCdcGuavaRateLimiter implements org.apache.flink.api.connector.source.util.ratelimit.RateLimiter {
 
     private final Executor limiter =
             Executors.newSingleThreadExecutor(new ExecutorThreadFactory("flink-snapshot-rate-limiter"));
@@ -20,7 +20,7 @@ public class SnapshotGuavaRateLimiter implements org.apache.flink.api.connector.
 
     private int getTokenCountAtOnce;
 
-    public SnapshotGuavaRateLimiter(double recordsPerSecond, int parallelism) {
+    public MysqlCdcGuavaRateLimiter(double recordsPerSecond, int parallelism) {
         this.rateLimiter = RateLimiter.create(recordsPerSecond);
         this.getTokenCountAtOnce = parallelism;
     }
