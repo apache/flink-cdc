@@ -39,7 +39,7 @@ public class PipelineOptions {
                     .defaultValue("Flink CDC Pipeline Job")
                     .withDescription("The name of the pipeline");
 
-    public static final ConfigOption<Double> RATE_LIMIT =
+    public static final ConfigOption<Double> SOURCE_RATE_LIMIT =
             ConfigOptions.key("source-rate-limit")
                     .doubleType()
                     .defaultValue(0d)

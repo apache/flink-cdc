@@ -55,8 +55,8 @@ public class MySqlDataSource implements DataSource {
     public EventSourceProvider getEventSourceProvider() {
         double maxRatePeer =
                 piplineConfig
-                        .getOptional(PipelineOptions.RATE_LIMIT)
-                        .orElse(PipelineOptions.RATE_LIMIT.defaultValue());
+                        .getOptional(PipelineOptions.SOURCE_RATE_LIMIT)
+                        .orElse(PipelineOptions.SOURCE_RATE_LIMIT.defaultValue());
 
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
