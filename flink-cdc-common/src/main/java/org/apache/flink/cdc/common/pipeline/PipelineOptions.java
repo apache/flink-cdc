@@ -44,7 +44,7 @@ public class PipelineOptions {
                     .doubleType()
                     .defaultValue(0d)
                     .withDescription(
-                            "Limits the number of records per second, default 0 is disabled");
+                            "Limits the number of records per second, default value 0 means no limit");
 
     public static final ConfigOption<Integer> PIPELINE_PARALLELISM =
             ConfigOptions.key("parallelism")
