@@ -60,13 +60,15 @@ public class TransformFilter implements Serializable {
         return columnNames;
     }
 
-    public static Optional<TransformFilter> of(String filterExpression) {
+    public static Optional<TransformFilter> of(
+            String filterExpression, List<UserDefinedFunctionDescriptor> udfDescriptors) {
         if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
             return Optional.empty();
         }
         List<String> columnNames = TransformParser.parseFilterColumnNameList(filterExpression);
         String scriptExpression =
-                TransformParser.translateFilterExpressionToJaninoExpression(filterExpression);
+                TransformParser.translateFilterExpressionToJaninoExpression(
+                        filterExpression, udfDescriptors);
         return Optional.of(new TransformFilter(filterExpression, scriptExpression, columnNames));
     }
 

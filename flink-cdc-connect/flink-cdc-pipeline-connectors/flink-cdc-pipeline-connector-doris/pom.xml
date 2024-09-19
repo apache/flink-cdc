@@ -26,6 +26,10 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-connector-doris</artifactId>
     <name>flink-cdc-pipeline-connector-doris</name>
 
+    <properties>
+        <doris.connector.version>1.6.2</doris.connector.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -44,7 +48,7 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.doris</groupId>
             <artifactId>flink-doris-connector-${flink.major.version}</artifactId>
-            <version>1.6.0</version>
+            <version>${doris.connector.version}</version>
         </dependency>
 
         <dependency>

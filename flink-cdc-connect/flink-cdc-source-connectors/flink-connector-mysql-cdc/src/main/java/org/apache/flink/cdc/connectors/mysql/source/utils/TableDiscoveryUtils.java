@@ -24,7 +24,6 @@ import org.apache.flink.util.FlinkRuntimeException;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
-import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.slf4j.Logger;
@@ -35,6 +34,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /** Utilities to discovery matched tables. */
@@ -42,7 +42,8 @@ public class TableDiscoveryUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(TableDiscoveryUtils.class);
 
-    public static List<TableId> listTables(JdbcConnection jdbc, RelationalTableFilters tableFilters)
+    public static List<TableId> listTables(
+            JdbcConnection jdbc, Predicate<String> databaseFilter, Predicate<TableId> tableFilter)
             throws SQLException {
         final List<TableId> capturedTableIds = new ArrayList<>();
         // -------------------
@@ -57,7 +58,7 @@ public class TableDiscoveryUtils {
                 rs -> {
                     while (rs.next()) {
                         String databaseName = rs.getString(1);
-                        if (tableFilters.databaseFilter().test(databaseName)) {
+                        if (databaseFilter.test(databaseName)) {
                             databaseNames.add(databaseName);
                         }
                     }
@@ -81,7 +82,7 @@ public class TableDiscoveryUtils {
                         rs -> {
                             while (rs.next()) {
                                 TableId tableId = new TableId(dbName, null, rs.getString(1));
-                                if (tableFilters.dataCollectionFilter().isIncluded(tableId)) {
+                                if (tableFilter.test(tableId)) {
                                     capturedTableIds.add(tableId);
                                     LOG.info(
                                             "\t including table '{}' for further processing",
@@ -106,7 +107,9 @@ public class TableDiscoveryUtils {
             MySqlPartition partition, MySqlSourceConfig sourceConfig, MySqlConnection jdbc) {
         final List<TableId> capturedTableIds;
         try {
-            capturedTableIds = listTables(jdbc, sourceConfig.getTableFilters());
+            capturedTableIds =
+                    listTables(
+                            jdbc, sourceConfig.getDatabaseFilter(), sourceConfig.getTableFilter());
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Failed to discover captured tables", e);
         }
@@ -121,7 +124,11 @@ public class TableDiscoveryUtils {
         final List<TableId> capturedTableIds;
         try {
             capturedTableIds =
-                    listTables(jdbc, sourceConfig.getTableFilters()).stream()
+                    listTables(
+                                    jdbc,
+                                    sourceConfig.getDatabaseFilter(),
+                                    sourceConfig.getTableFilter())
+                            .stream()
                             .filter(tableId -> !existedTables.contains(tableId))
                             .collect(Collectors.toList());
         } catch (SQLException e) {

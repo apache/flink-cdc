@@ -123,6 +123,7 @@ public class SchemaOperatorTest {
                         schemaOperator.processElement(
                                 new StreamRecord<>(
                                         new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))));
+        harness.close();
     }
 
     @Test
@@ -137,6 +138,7 @@ public class SchemaOperatorTest {
                         schemaOperator.processElement(
                                 new StreamRecord<>(
                                         new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))));
+        harness.close();
     }
 
     private OneInputStreamOperatorTestHarness<Event, Event> createTestHarness(

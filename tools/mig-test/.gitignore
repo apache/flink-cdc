@@ -1,0 +1,8 @@
+*.sql
+savepoints/**
+cdc-versions/**
+cache/**
+.idea/**
+Gemfile.lock
+/logs/
+conf/temp.yaml

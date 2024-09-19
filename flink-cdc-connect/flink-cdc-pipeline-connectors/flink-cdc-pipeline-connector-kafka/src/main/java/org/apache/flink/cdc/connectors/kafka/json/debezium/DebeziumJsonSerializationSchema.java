@@ -92,7 +92,7 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
 
     @Override
     public void open(InitializationContext context) {
-        reuseGenericRowData = new GenericRowData(3);
+        reuseGenericRowData = new GenericRowData(4);
         this.context = context;
     }
 
@@ -126,11 +126,17 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
             }
             jsonSerializers.put(
                     schemaChangeEvent.tableId(),
-                    new TableSchemaInfo(schema, jsonSerializer, zoneId));
+                    new TableSchemaInfo(
+                            schemaChangeEvent.tableId(), schema, jsonSerializer, zoneId));
             return null;
         }
 
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
+        reuseGenericRowData.setField(
+                3,
+                GenericRowData.of(
+                        StringData.fromString(dataChangeEvent.tableId().getSchemaName()),
+                        StringData.fromString(dataChangeEvent.tableId().getTableName())));
         try {
             switch (dataChangeEvent.op()) {
                 case INSERT:
@@ -139,7 +145,7 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
                             1,
                             jsonSerializers
                                     .get(dataChangeEvent.tableId())
-                                    .getRowDataFromRecordData(dataChangeEvent.after()));
+                                    .getRowDataFromRecordData(dataChangeEvent.after(), false));
                     reuseGenericRowData.setField(2, OP_INSERT);
                     return jsonSerializers
                             .get(dataChangeEvent.tableId())
@@ -150,7 +156,7 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
                             0,
                             jsonSerializers
                                     .get(dataChangeEvent.tableId())
-                                    .getRowDataFromRecordData(dataChangeEvent.before()));
+                                    .getRowDataFromRecordData(dataChangeEvent.before(), false));
                     reuseGenericRowData.setField(1, null);
                     reuseGenericRowData.setField(2, OP_DELETE);
                     return jsonSerializers
@@ -163,12 +169,12 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
                             0,
                             jsonSerializers
                                     .get(dataChangeEvent.tableId())
-                                    .getRowDataFromRecordData(dataChangeEvent.before()));
+                                    .getRowDataFromRecordData(dataChangeEvent.before(), false));
                     reuseGenericRowData.setField(
                             1,
                             jsonSerializers
                                     .get(dataChangeEvent.tableId())
-                                    .getRowDataFromRecordData(dataChangeEvent.after()));
+                                    .getRowDataFromRecordData(dataChangeEvent.after(), false));
                     reuseGenericRowData.setField(2, OP_UPDATE);
                     return jsonSerializers
                             .get(dataChangeEvent.tableId())
@@ -185,14 +191,22 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
         }
     }
 
+    /**
+     * Refer to <a
+     * href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html">Debezium
+     * docs</a> for more details.
+     */
     private static RowType createJsonRowType(DataType databaseSchema) {
-        // Debezium JSON contains some other information, e.g. "source", "ts_ms"
-        // but we don't need them.
         return (RowType)
                 DataTypes.ROW(
                                 DataTypes.FIELD("before", databaseSchema),
                                 DataTypes.FIELD("after", databaseSchema),
-                                DataTypes.FIELD("op", DataTypes.STRING()))
+                                DataTypes.FIELD("op", DataTypes.STRING()),
+                                DataTypes.FIELD(
+                                        "source",
+                                        DataTypes.ROW(
+                                                DataTypes.FIELD("db", DataTypes.STRING()),
+                                                DataTypes.FIELD("table", DataTypes.STRING()))))
                         .getLogicalType();
     }
 }

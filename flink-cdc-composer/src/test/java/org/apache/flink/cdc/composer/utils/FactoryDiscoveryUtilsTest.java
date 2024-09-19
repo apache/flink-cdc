@@ -48,12 +48,4 @@ class FactoryDiscoveryUtilsTest {
                 .hasMessageStartingWith(
                         "Cannot find factory with identifier \"data-sink-factory-3\" in the classpath");
     }
-
-    @Test
-    void getJarPathByIdentifier() {
-        assertThat(
-                        FactoryDiscoveryUtils.getJarPathByIdentifier(
-                                "data-source-factory-1", Factory.class))
-                .isNotPresent();
-    }
 }

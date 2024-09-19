@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
@@ -45,7 +46,6 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -55,6 +55,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.BENODES;
@@ -367,7 +368,6 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
     }
 
     @Test
-    @Ignore("AlterColumnType is yet to be supported until we close FLINK-35072.")
     public void testDorisAlterColumnType() throws Exception {
         TableId tableId =
                 TableId.tableId(
@@ -426,7 +426,11 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 schemaOperatorTranslator.translate(
                         stream,
                         DEFAULT_PARALLELISM,
-                        dorisSink.getMetadataApplier(),
+                        dorisSink
+                                .getMetadataApplier()
+                                .setAcceptedSchemaEvolutionTypes(
+                                        Arrays.stream(SchemaChangeEventTypeFamily.ALL)
+                                                .collect(Collectors.toSet())),
                         new ArrayList<>());
 
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();

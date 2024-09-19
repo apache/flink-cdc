@@ -61,7 +61,11 @@ public class MysqlDebeziumTimeConverter
     private static boolean loggedUnknownTimeClass = false;
     private static boolean loggedUnknownTimestampWithTimeZoneClass = false;
 
-    private final String[] DATE_TYPES = {"DATE", "DATETIME", "TIME", "TIMESTAMP"};
+    private final String DATE = "DATE";
+    private final String DATETIME = "DATETIME";
+    private final String TIME = "TIME";
+    private final String TIMESTAMP = "TIMESTAMP";
+    private final String[] DATE_TYPES = {DATE, DATETIME, TIME, TIMESTAMP};
 
     protected static final String DATE_FORMAT = "yyyy-MM-dd";
     protected static final String TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
@@ -124,13 +128,13 @@ public class MysqlDebeziumTimeConverter
                         return convertDateDefaultValue(field);
                     }
                     switch (columnType.toUpperCase(Locale.ROOT)) {
-                        case "DATE":
+                        case DATE:
                             if (value instanceof Integer) {
                                 return this.convertToDate(
                                         columnType, LocalDate.ofEpochDay((Integer) value));
                             }
                             return this.convertToDate(columnType, value);
-                        case "TIME":
+                        case TIME:
                             if (value instanceof Long) {
                                 long l =
                                         Math.multiplyExact(
@@ -138,7 +142,7 @@ public class MysqlDebeziumTimeConverter
                                 return this.convertToTime(columnType, LocalTime.ofNanoOfDay(l));
                             }
                             return this.convertToTime(columnType, value);
-                        case "DATETIME":
+                        case DATETIME:
                             if (value instanceof Long) {
                                 if (getTimePrecision(field) <= 3) {
                                     return this.convertToTimestamp(
@@ -152,7 +156,7 @@ public class MysqlDebeziumTimeConverter
                                 }
                             }
                             return this.convertToTimestamp(columnType, value);
-                        case "TIMESTAMP":
+                        case TIMESTAMP:
                             return this.convertToTimestampWithTimezone(columnType, value);
                         default:
                             throw new IllegalArgumentException(
@@ -303,13 +307,13 @@ public class MysqlDebeziumTimeConverter
                         LocalDateTime.parse(DEFAULT_DATE_FORMAT_PATTERN, originalFormat);
                 String columnType = field.typeName().toUpperCase();
                 switch (columnType.toUpperCase(Locale.ROOT)) {
-                    case "DATE":
+                    case DATE:
                         return dateTime.format(dateFormatter);
-                    case "DATETIME":
+                    case DATETIME:
                         return dateTime.format(datetimeFormatter);
-                    case "TIME":
+                    case TIME:
                         return dateTime.format(timeFormatter);
-                    case "TIMESTAMP":
+                    case TIMESTAMP:
                         return dateTime.format(timestampFormatter);
                 }
             }

@@ -126,6 +126,13 @@ Connector Options
       <td>TiKV cluster's PD address.</td>
     </tr>
     <tr>
+      <td>host-mapping</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>TiKV cluster's host-mapping used to configure public IP and intranet IP mapping. When the TiKV cluster is running on the intranet, you can map a set of intranet IPs to public IPs for an outside Flink cluster to access. The format is {Intranet IP1}:{Public IP1};{Intranet IP2}:{Public IP2}, e.g. 192.168.0.2:8.8.8.8;192.168.0.3:9.9.9.9.</td>
+    </tr>
+    <tr>
       <td>tikv.grpc.timeout_in_ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>

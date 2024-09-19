@@ -17,8 +17,6 @@
 
 package org.apache.flink.cdc.runtime.parser;
 
-import org.apache.flink.cdc.common.data.TimestampData;
-
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
 import org.codehaus.janino.ExpressionEvaluator;
@@ -36,7 +34,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.TimeZone;
 
 /** Unit tests for the {@link JaninoCompiler}. */
 public class JaninoCompilerTest {
@@ -106,24 +103,6 @@ public class JaninoCompilerTest {
                         expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
         Assert.assertEquals(true, evaluate);
-    }
-
-    @Test
-    public void testJaninoTimestampFunction() throws InvocationTargetException {
-        long epochTime = System.currentTimeMillis();
-        long localTime = epochTime + TimeZone.getTimeZone("GMT-8:00").getOffset(epochTime);
-        String expression = "currentTimestamp(epochTime, \"GMT-8:00\")";
-        List<String> columnNames = Arrays.asList("epochTime");
-        List<Class<?>> paramTypes = Arrays.asList(Long.class);
-        List<Object> params = Arrays.asList(epochTime);
-        ExpressionEvaluator expressionEvaluator =
-                JaninoCompiler.compileExpression(
-                        JaninoCompiler.loadSystemFunction(expression),
-                        columnNames,
-                        paramTypes,
-                        TimestampData.class);
-        Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(TimestampData.fromMillis(localTime), evaluate);
     }
 
     @Test

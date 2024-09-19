@@ -23,19 +23,21 @@ under the License.
 -->
 
 <div class="index-wrapper">
-    <div class="top-container bg-purple">
-         <div class="flex flex-col w-full md:w-3/5 justify-center items-start text-center md:text-left">
+    <div class="top-container bg-purple py-12 block flex xl:items-start justify-between flex-col xl:flex-row">
+        <div class="flex flex-col w-full xl:w-[max-content] xl:min-w-[max-content] justify-center text-center xl:text-left">
             <h1 class="header-1 font-bold text-white leading-tight">
                 Flink CDC
             </h1>
             <p class="leading-normal text-xl text-white">
                 A streaming data integration tool
             </p>
-            <a href="{{< ref "docs/get-started/introduction" >}}" class="link-as-button mx-auto bg-white text-black font-bold my-4 px-8">
-                Quick Start
-            </a>
+            <div class="text-center xl:text-left">
+                <a href="{{< ref "docs/get-started/introduction" >}}" class="mx-auto link-as-button bg-white text-black font-bold px-8">
+                    Quick Start
+                </a>
+            </div>
         </div>
-        <div class="w-full md:w-3/5 py-6 text-center">
+        <div class="w-full text-center mt-8 xl:mt-0 ml-0 xl:ml-16">
             {{< img src="/fig/cdc-flow.png" alt="Flink CDC Flow" >}}
         </div>
     </div>
