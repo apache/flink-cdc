@@ -240,6 +240,7 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     "add new uniq_id for each row")),
                     Collections.emptyList(),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -355,6 +356,7 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     "add new uniq_id for each row")),
                     Collections.emptyList(),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -393,6 +395,7 @@ class YamlPipelineDefinitionParserTest {
                                     null)),
                     Collections.emptyList(),
                     Collections.emptyList(),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("parallelism", "4")
@@ -402,6 +405,7 @@ class YamlPipelineDefinitionParserTest {
             new PipelineDef(
                     new SourceDef("mysql", null, new Configuration()),
                     new SinkDef("kafka", null, new Configuration()),
+                    Collections.emptyList(),
                     Collections.emptyList(),
                     Collections.emptyList(),
                     Collections.emptyList(),
@@ -463,6 +467,7 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     "add new uniq_id for each row")),
                     Collections.emptyList(),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -492,6 +497,7 @@ class YamlPipelineDefinitionParserTest {
                             new UdfDef(
                                     "format",
                                     "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass")),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("parallelism", "1")

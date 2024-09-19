@@ -1,41 +1,26 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.apache.flink.cdc.composer.definition;
+
+import org.apache.flink.api.java.tuple.Tuple2;
 
 import java.util.Objects;
 
-/**
- * Definition of a user-defined function.
- *
- * <p>A transformation definition contains:
- *
- * <ul>
- *   <li>name: Static method name of user-defined functions.
- *   <li>classpath: Fully-qualified class path of package containing given function.
- * </ul>
- */
 public class UdfDef {
+    private static final String PARAM_SEPARATOR = ":::";
+    private static final String MODEL_UDF_CLASSPATH =
+            "org.apache.flink.cdc.runtime.operators.model.ModelUdf";
+
     private final String name;
     private final String classpath;
+    private final String serializedParams;
 
     public UdfDef(String name, String classpath) {
+        this(name, classpath, null);
+    }
+
+    public UdfDef(String name, String classpath, String serializedParams) {
         this.name = name;
         this.classpath = classpath;
+        this.serializedParams = serializedParams;
     }
 
     public String getName() {
@@ -44,6 +29,31 @@ public class UdfDef {
 
     public String getClasspath() {
         return classpath;
+    }
+
+    public String getSerializedParams() {
+        return serializedParams;
+    }
+
+    public Tuple2<String, String> toTuple2() {
+        if (MODEL_UDF_CLASSPATH.equals(classpath) && serializedParams != null) {
+            return Tuple2.of(encodeNameWithParams(name, serializedParams), classpath);
+        } else {
+            return Tuple2.of(name, classpath);
+        }
+    }
+
+    private String encodeNameWithParams(String name, String params) {
+        return name + PARAM_SEPARATOR + params;
+    }
+
+    public static UdfDef fromEncodedName(String encodedName, String classpath) {
+        String[] parts = encodedName.split(PARAM_SEPARATOR, 2);
+        if (parts.length > 1) {
+            return new UdfDef(parts[0], classpath, parts[1]);
+        } else {
+            return new UdfDef(encodedName, classpath);
+        }
     }
 
     @Override
@@ -56,16 +66,28 @@ public class UdfDef {
         }
 
         UdfDef udfDef = (UdfDef) o;
-        return Objects.equals(name, udfDef.name) && Objects.equals(classpath, udfDef.classpath);
+        return Objects.equals(name, udfDef.name)
+                && Objects.equals(classpath, udfDef.classpath)
+                && Objects.equals(serializedParams, udfDef.serializedParams);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, classpath);
+        return Objects.hash(name, classpath, serializedParams);
     }
 
     @Override
     public String toString() {
-        return "UdfDef{" + "name='" + name + '\'' + ", classpath='" + classpath + '\'' + '}';
+        return "UdfDef{"
+                + "name='"
+                + name
+                + '\''
+                + ", classpath='"
+                + classpath
+                + '\''
+                + ", serializedParams='"
+                + serializedParams
+                + '\''
+                + '}';
     }
 }

@@ -29,7 +29,9 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.udf.UserDefinedFunction;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.model.ModelUdf;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -40,7 +42,6 @@ import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
-import java.lang.reflect.InvocationTargetException;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -69,11 +70,13 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     private final List<Tuple2<String, String>> udfFunctions;
     private List<UserDefinedFunctionDescriptor> udfDescriptors;
     private transient Map<String, Object> udfFunctionInstances;
-
+    private static final String MODEL_UDF_CLASSPATH =
+            "org.apache.flink.cdc.runtime.operators.model.ModelUdf";
     private transient Map<Tuple2<TableId, TransformProjection>, TransformProjectionProcessor>
             transformProjectionProcessorMap;
     private transient Map<Tuple2<TableId, TransformFilter>, TransformFilterProcessor>
             transformFilterProcessorMap;
+    private static final String PARAM_SEPARATOR = ":::";
 
     public static PostTransformOperator.Builder newBuilder() {
         return new PostTransformOperator.Builder();
@@ -185,15 +188,28 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         udfDescriptors.forEach(
                 udf -> {
                     try {
+                        String fullName = udf.getName(); // 使用完整名称，包括参数
                         Class<?> clazz = Class.forName(udf.getClasspath());
-                        udfFunctionInstances.put(udf.getName(), clazz.newInstance());
-                    } catch (ClassNotFoundException
-                            | InstantiationException
-                            | IllegalAccessException e) {
-                        throw new RuntimeException("Failed to instantiate UDF function " + udf);
+                        Object instance = clazz.newInstance();
+
+                        if (MODEL_UDF_CLASSPATH.equals(udf.getClasspath())) {
+                            String[] parts = fullName.split(PARAM_SEPARATOR, 2);
+                            String params = parts.length > 1 ? parts[1] : null;
+                            if (params != null) {
+                                ((ModelUdf) instance).configure(params);
+                            }
+                        }
+
+                        udfFunctionInstances.put(fullName, instance); // 使用完整名称作为 key
+
+                        // 初始化 UDF
+                        if (instance instanceof UserDefinedFunction) {
+                            ((UserDefinedFunction) instance).open();
+                        }
+                    } catch (Exception e) {
+                        LOG.error("Failed to instantiate or initialize UDF " + udf.getName(), e);
                     }
                 });
-        initializeUdf();
     }
 
     @Override
@@ -465,43 +481,59 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     }
 
     private void initializeUdf() {
+        if (udfDescriptors == null) {
+            LOG.warn("UDF descriptors is null, skipping UDF initialization");
+            return;
+        }
         udfDescriptors.forEach(
                 udf -> {
                     try {
+                        String name = udf.getName().split(PARAM_SEPARATOR, 2)[0];
                         if (udf.isCdcPipelineUdf()) {
-                            // We use reflection to invoke UDF methods since we may add more methods
-                            // into UserDefinedFunction interface, thus the provided UDF classes
-                            // might not be compatible with the interface definition in CDC common.
-                            Object udfInstance = udfFunctionInstances.get(udf.getName());
-                            udfInstance.getClass().getMethod("open").invoke(udfInstance);
-                        } else {
-                            // Do nothing, Flink-style UDF lifecycle hooks are not supported
+                            Object udfInstance = udfFunctionInstances.get(name);
+                            if (udfInstance != null) {
+                                if (udfInstance instanceof UserDefinedFunction) {
+                                    ((UserDefinedFunction) udfInstance).open();
+                                } else {
+                                    LOG.warn(
+                                            "UDF {} does not implement UserDefinedFunction interface",
+                                            name);
+                                }
+                            } else {
+                                LOG.warn("UDF instance for {} is null", name);
+                            }
                         }
-                    } catch (InvocationTargetException
-                            | NoSuchMethodException
-                            | IllegalAccessException ex) {
-                        throw new RuntimeException("Failed to initialize UDF " + udf, ex);
+                    } catch (Exception ex) {
+                        LOG.error("Failed to initialize UDF " + udf.getName(), ex);
                     }
                 });
     }
 
     private void destroyUdf() {
+        if (udfDescriptors == null) {
+            LOG.warn("UDF descriptors is null, skipping UDF destruction");
+            return;
+        }
         udfDescriptors.forEach(
                 udf -> {
                     try {
+                        String name = udf.getName().split(PARAM_SEPARATOR, 2)[0];
                         if (udf.isCdcPipelineUdf()) {
-                            // We use reflection to invoke UDF methods since we may add more methods
-                            // into UserDefinedFunction interface, thus the provided UDF classes
-                            // might not be compatible with the interface definition in CDC common.
-                            Object udfInstance = udfFunctionInstances.get(udf.getName());
-                            udfInstance.getClass().getMethod("close").invoke(udfInstance);
-                        } else {
-                            // Do nothing, Flink-style UDF lifecycle hooks are not supported
+                            Object udfInstance = udfFunctionInstances.get(name);
+                            if (udfInstance != null) {
+                                if (udfInstance instanceof UserDefinedFunction) {
+                                    ((UserDefinedFunction) udfInstance).close();
+                                } else {
+                                    LOG.warn(
+                                            "UDF {} does not implement UserDefinedFunction interface",
+                                            name);
+                                }
+                            } else {
+                                LOG.warn("UDF instance for {} is null", name);
+                            }
                         }
-                    } catch (InvocationTargetException
-                            | NoSuchMethodException
-                            | IllegalAccessException ex) {
-                        throw new RuntimeException("Failed to destroy UDF " + udf, ex);
+                    } catch (Exception ex) {
+                        LOG.error("Failed to destroy UDF " + udf.getName(), ex);
                     }
                 });
     }

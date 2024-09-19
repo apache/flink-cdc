@@ -1,0 +1,34 @@
+source:
+  type: mysql
+  hostname: localhost
+  port: 3306
+  username: root
+  password: root
+  tables: testdb.articles
+  server-id: 5400-5404
+  server-time-zone: UTC
+
+sink:
+  type: elasticsearch
+  hosts: http://localhost:9200
+  version: 7
+
+
+
+transform:
+  - source-table: testdb.articles
+    projection: >
+      id, 
+      title, 
+      author, 
+      publication_date, 
+      content,
+      embedding('please summary the content', content, title) as content_embedding
+
+pipeline:
+  name: Sync MySQL Database to Values Sink with AI Embeddings
+  parallelism: 2
+  models:
+    - name: embedding
+      host: https://api.xty.app/v1/
+      key: sk-1t9n8WG06Z3JP9g9567d84D04fBb4a1584C9Cd0a76B1EdF1

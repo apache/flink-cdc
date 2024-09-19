@@ -27,9 +27,12 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.types.VarBinaryType;
+import org.apache.flink.cdc.runtime.parser.TransformParser;
 
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -48,6 +51,7 @@ public class DataTypeConverter {
     static final long MILLISECONDS_PER_SECOND = TimeUnit.SECONDS.toMillis(1);
     static final long NANOSECONDS_PER_MILLISECOND = TimeUnit.MILLISECONDS.toNanos(1);
     static final long NANOSECONDS_PER_DAY = TimeUnit.DAYS.toNanos(1);
+    private static final Logger LOG = LoggerFactory.getLogger(TransformParser.class);
 
     public static RowType toRowType(List<Column> columnList) {
         DataType[] dataTypes = columnList.stream().map(Column::getType).toArray(DataType[]::new);
@@ -140,6 +144,10 @@ public class DataTypeConverter {
     }
 
     public static DataType convertCalciteRelDataTypeToDataType(RelDataType relDataType) {
+        if (relDataType.getSqlTypeName() == SqlTypeName.ARRAY
+                && relDataType.getComponentType().getSqlTypeName() == SqlTypeName.FLOAT) {
+            return DataTypes.ARRAY(DataTypes.FLOAT());
+        }
         switch (relDataType.getSqlTypeName()) {
             case BOOLEAN:
                 return DataTypes.BOOLEAN();
@@ -173,8 +181,18 @@ public class DataTypeConverter {
                 return DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH);
             case DECIMAL:
                 return DataTypes.DECIMAL(relDataType.getPrecision(), relDataType.getScale());
-            case ROW:
             case ARRAY:
+                LOG.debug(
+                        "Processing ARRAY type: {}, class: {}",
+                        relDataType,
+                        relDataType.getClass().getName());
+                RelDataType componentType = relDataType.getComponentType();
+                if (componentType.getSqlTypeName() == SqlTypeName.FLOAT) {
+                    return DataTypes.ARRAY(DataTypes.FLOAT());
+                } else {
+                    return DataTypes.ARRAY(convertCalciteRelDataTypeToDataType(componentType));
+                }
+            case ROW:
             case MAP:
             default:
                 throw new UnsupportedOperationException(

@@ -102,10 +102,26 @@ public class TransformProjectionProcessor {
                 null, transformProjection, null, udfDescriptors, udfFunctionInstances);
     }
 
+    private static final String PARAM_SEPARATOR = ":::";
+
     public Schema processSchemaChangeEvent(Schema schema) {
+        // 预处理 UDF 描述符，去除名称中的参数
+        List<UserDefinedFunctionDescriptor> processedUdfDescriptors =
+                udfDescriptors.stream()
+                        .map(
+                                udf -> {
+                                    String[] parts = udf.getName().split(PARAM_SEPARATOR, 2);
+                                    String name = parts[0];
+                                    return new UserDefinedFunctionDescriptor(
+                                            name, udf.getClasspath());
+                                })
+                        .collect(Collectors.toList());
+
         List<ProjectionColumn> projectionColumns =
                 TransformParser.generateProjectionColumns(
-                        transformProjection.getProjection(), schema.getColumns(), udfDescriptors);
+                        transformProjection.getProjection(),
+                        schema.getColumns(),
+                        processedUdfDescriptors);
         transformProjection.setProjectionColumns(projectionColumns);
         return schema.copy(
                 projectionColumns.stream()
@@ -121,11 +137,16 @@ public class TransformProjectionProcessor {
             ProjectionColumnProcessor projectionColumnProcessor =
                     cachedProjectionColumnProcessors.get(i);
             if (projectionColumnProcessor != null) {
-                ProjectionColumn projectionColumn = projectionColumnProcessor.getProjectionColumn();
-                valueList.add(
-                        DataTypeConverter.convert(
-                                projectionColumnProcessor.evaluate(payload, epochTime, opType),
-                                projectionColumn.getDataType()));
+                try {
+                    ProjectionColumn projectionColumn =
+                            projectionColumnProcessor.getProjectionColumn();
+                    Object result = projectionColumnProcessor.evaluate(payload, epochTime, opType);
+                    valueList.add(
+                            DataTypeConverter.convert(result, projectionColumn.getDataType()));
+                } catch (Exception e) {
+                    LOG.error("Error evaluating projection column: " + columns.get(i).getName(), e);
+                    valueList.add(null); // 或者添加一个默认值
+                }
             } else {
                 Column column = columns.get(i);
                 valueList.add(

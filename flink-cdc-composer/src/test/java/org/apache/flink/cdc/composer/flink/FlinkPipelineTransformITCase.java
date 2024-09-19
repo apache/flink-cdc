@@ -221,6 +221,7 @@ class FlinkPipelineTransformITCase {
                                         null,
                                         null)),
                         Collections.emptyList(),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline

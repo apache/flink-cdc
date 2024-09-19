@@ -146,6 +146,7 @@ public class FlinkPipelineUdfITCase {
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
                         Collections.singletonList(udfDef),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -214,6 +215,7 @@ public class FlinkPipelineUdfITCase {
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
                         Collections.singletonList(udfDef),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -280,6 +282,7 @@ public class FlinkPipelineUdfITCase {
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
                         Collections.singletonList(udfDef),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -348,6 +351,7 @@ public class FlinkPipelineUdfITCase {
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
                         Collections.singletonList(udfDef),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -418,6 +422,7 @@ public class FlinkPipelineUdfITCase {
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
                         Collections.singletonList(udfDef),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -499,6 +504,7 @@ public class FlinkPipelineUdfITCase {
                                         String.format(
                                                 "org.apache.flink.cdc.udf.examples.%s.FormatFunctionClass",
                                                 language))),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -572,6 +578,7 @@ public class FlinkPipelineUdfITCase {
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
                         Collections.singletonList(udfDef),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -639,6 +646,7 @@ public class FlinkPipelineUdfITCase {
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
                         Collections.singletonList(udfDef),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -704,6 +712,7 @@ public class FlinkPipelineUdfITCase {
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
                         Collections.singletonList(udfDef),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline
@@ -780,6 +789,7 @@ public class FlinkPipelineUdfITCase {
                                         String.format(
                                                 "org.apache.flink.udf.examples.%s.FormatFunctionClass",
                                                 language))),
+                        Collections.emptyList(),
                         pipelineConfig);
 
         // Execute the pipeline

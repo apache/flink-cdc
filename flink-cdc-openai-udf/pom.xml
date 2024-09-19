@@ -1,39 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
     <parent>
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-cdc</artifactId>
-        <version>${revision}</version>
+        <version>3.3-SNAPSHOT</version>
     </parent>
 
-    <artifactId>flink-cdc-langchain4j-udf-example</artifactId>
-    <packaging>jar</packaging>
-
-    <name>flink-cdc-langchain4j-udf</name>
+    <artifactId>flink-cdc-langchain4j-udf</artifactId>
+    <name>Flink CDC LangChain4j UDF</name>
     <description>Flink CDC UDF for LangChain4j integration</description>
 
     <properties>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <flink.version>1.18.0</flink.version>
         <langchain4j.version>0.23.0</langchain4j.version>
-        <slf4j.version>1.7.32</slf4j.version>
+        <flink.version>1.18.0</flink.version>
     </properties>
 
     <dependencies>
-        <!-- Flink CDC Common -->
+        <!-- Flink Core Dependencies -->
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-cdc-common</artifactId>
-            <version>${project.version}</version>
+            <artifactId>flink-core</artifactId>
+            <version>${flink.version}</version>
             <scope>provided</scope>
         </dependency>
-
-        <!-- Flink Core -->
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-streaming-java</artifactId>
@@ -41,7 +35,14 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- LangChain4j -->
+        <!-- Flink CDC Dependencies -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- LangChain4j Dependencies -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j</artifactId>
@@ -53,20 +54,7 @@
             <version>${langchain4j.version}</version>
         </dependency>
 
-        <!-- SLF4J API -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>${slf4j.version}</version>
-        </dependency>
-
-        <!-- Testing -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.7.1</version>
-            <scope>test</scope>
-        </dependency>
+        <!-- Add other necessary dependencies -->
     </dependencies>
 
     <build>
@@ -76,8 +64,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
                 </configuration>
             </plugin>
             <plugin>
@@ -92,6 +80,12 @@
                         </goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>your.main.Class</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>

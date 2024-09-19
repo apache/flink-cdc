@@ -178,6 +178,40 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                     OperandTypes.family(
                             SqlTypeFamily.STRING, SqlTypeFamily.STRING, SqlTypeFamily.STRING),
                     SqlFunctionCategory.STRING);
+    public static final SqlFunction AI_CHAT_PREDICT =
+            new SqlFunction(
+                    "AI_CHAT_PREDICT",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.explicit(SqlTypeName.VARCHAR), // Return type is VARCHAR
+                    null,
+                    OperandTypes.family(
+                            SqlTypeFamily.STRING, SqlTypeFamily.STRING, SqlTypeFamily.STRING),
+                    SqlFunctionCategory.USER_DEFINED_FUNCTION // Category of the function
+                    );
+
+    // Define the AI_EMBEDDING function
+    public static final SqlFunction GET_EMBEDDING =
+            new SqlFunction(
+                    "GET_EMBEDDING",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.explicit(SqlTypeName.VARCHAR), // 返回类型是数组
+                    null,
+                    OperandTypes.family(
+                            SqlTypeFamily.STRING, SqlTypeFamily.STRING, SqlTypeFamily.STRING),
+                    SqlFunctionCategory.USER_DEFINED_FUNCTION // 函数类别
+                    );
+
+    // Define the AI_LANGCHAIN_PREDICT function
+    public static final SqlFunction AI_LANGCHAIN_PREDICT =
+            new SqlFunction(
+                    "AI_LANGCHAIN_PREDICT",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.explicit(SqlTypeName.VARCHAR), // Return type is VARCHAR
+                    null,
+                    OperandTypes.family(
+                            SqlTypeFamily.STRING, SqlTypeFamily.STRING, SqlTypeFamily.STRING),
+                    SqlFunctionCategory.USER_DEFINED_FUNCTION // Category of the function
+                    );
     public static final SqlFunction SUBSTR =
             new SqlFunction(
                     "SUBSTR",

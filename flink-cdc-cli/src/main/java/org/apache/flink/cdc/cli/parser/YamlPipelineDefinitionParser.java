@@ -1,25 +1,9 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.apache.flink.cdc.cli.parser;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.utils.StringUtils;
+import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
@@ -35,6 +19,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YA
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,7 +28,6 @@ import java.util.Set;
 import static org.apache.flink.cdc.common.utils.ChangeEventUtils.resolveSchemaEvolutionOptions;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
-/** Parser for converting YAML formatted pipeline definition to {@link PipelineDef}. */
 public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     // Parent node keys
@@ -52,6 +36,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String ROUTE_KEY = "route";
     private static final String TRANSFORM_KEY = "transform";
     private static final String PIPELINE_KEY = "pipeline";
+    private static final String MODEL_KEY = "models";
 
     // Source / sink keys
     private static final String TYPE_KEY = "type";
@@ -76,15 +61,17 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String UDF_FUNCTION_NAME_KEY = "name";
     private static final String UDF_CLASSPATH_KEY = "classpath";
 
+    // Model related keys
+    private static final String MODEL_NAME_KEY = "name";
+    private static final String MODEL_HOST_KEY = "host";
+    private static final String MODEL_API_KEY = "key";
+
     public static final String TRANSFORM_PRIMARY_KEY_KEY = "primary-keys";
-
     public static final String TRANSFORM_PARTITION_KEY_KEY = "partition-keys";
-
     public static final String TRANSFORM_TABLE_OPTION_KEY = "table-options";
 
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
-    /** Parse the specified pipeline definition file. */
     @Override
     public PipelineDef parse(Path pipelineDefPath, Configuration globalPipelineConfig)
             throws Exception {
@@ -99,7 +86,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     private PipelineDef parse(JsonNode pipelineDefJsonNode, Configuration globalPipelineConfig)
             throws Exception {
-        // Source is required
         SourceDef sourceDef =
                 toSourceDef(
                         checkNotNull(
@@ -107,7 +93,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 "Missing required field \"%s\" in pipeline definition",
                                 SOURCE_KEY));
 
-        // Sink is required
         SinkDef sinkDef =
                 toSinkDef(
                         checkNotNull(
@@ -115,7 +100,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 "Missing required field \"%s\" in pipeline definition",
                                 SINK_KEY));
 
-        // Transforms are optional
         List<TransformDef> transformDefs = new ArrayList<>();
         Optional.ofNullable(pipelineDefJsonNode.get(TRANSFORM_KEY))
                 .ifPresent(
@@ -123,40 +107,40 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 node.forEach(
                                         transform -> transformDefs.add(toTransformDef(transform))));
 
-        // Routes are optional
         List<RouteDef> routeDefs = new ArrayList<>();
         Optional.ofNullable(pipelineDefJsonNode.get(ROUTE_KEY))
                 .ifPresent(node -> node.forEach(route -> routeDefs.add(toRouteDef(route))));
 
-        // UDFs are optional
         List<UdfDef> udfDefs = new ArrayList<>();
         Optional.ofNullable(((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(UDF_KEY))
                 .ifPresent(node -> node.forEach(udf -> udfDefs.add(toUdfDef(udf))));
 
-        // Pipeline configs are optional
+        List<ModelDef> modelDefs = new ArrayList<>();
+        JsonNode modelsNode = pipelineDefJsonNode.get(PIPELINE_KEY).get(MODEL_KEY);
+        if (modelsNode != null) {
+            modelDefs = parseModels(modelsNode);
+        }
+
         Configuration userPipelineConfig = toPipelineConfig(pipelineDefJsonNode.get(PIPELINE_KEY));
 
-        // Merge user config into global config
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.addAll(globalPipelineConfig);
         pipelineConfig.addAll(userPipelineConfig);
 
         return new PipelineDef(
-                sourceDef, sinkDef, routeDefs, transformDefs, udfDefs, pipelineConfig);
+                sourceDef, sinkDef, routeDefs, transformDefs, udfDefs, modelDefs, pipelineConfig);
     }
 
     private SourceDef toSourceDef(JsonNode sourceNode) {
         Map<String, String> sourceMap =
                 mapper.convertValue(sourceNode, new TypeReference<Map<String, String>>() {});
 
-        // "type" field is required
         String type =
                 checkNotNull(
                         sourceMap.remove(TYPE_KEY),
                         "Missing required field \"%s\" in source configuration",
                         TYPE_KEY);
 
-        // "name" field is optional
         String name = sourceMap.remove(NAME_KEY);
 
         return new SourceDef(type, name, Configuration.fromMap(sourceMap));
@@ -183,14 +167,12 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         Map<String, String> sinkMap =
                 mapper.convertValue(sinkNode, new TypeReference<Map<String, String>>() {});
 
-        // "type" field is required
         String type =
                 checkNotNull(
                         sinkMap.remove(TYPE_KEY),
                         "Missing required field \"%s\" in sink configuration",
                         TYPE_KEY);
 
-        // "name" field is optional
         String name = sinkMap.remove(NAME_KEY);
 
         return new SinkDef(type, name, Configuration.fromMap(sinkMap), declaredSETypes);
@@ -237,6 +219,29 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         return new UdfDef(functionName, classpath);
     }
 
+    private ModelDef toModelDef(JsonNode modelNode) {
+        String name =
+                checkNotNull(
+                                modelNode.get(MODEL_NAME_KEY),
+                                "Missing required field \"%s\" in model configuration",
+                                MODEL_NAME_KEY)
+                        .asText();
+        String host =
+                checkNotNull(
+                                modelNode.get(MODEL_HOST_KEY),
+                                "Missing required field \"%s\" in model configuration",
+                                MODEL_HOST_KEY)
+                        .asText();
+        String apiKey =
+                checkNotNull(
+                                modelNode.get(MODEL_API_KEY),
+                                "Missing required field \"%s\" in model configuration",
+                                MODEL_API_KEY)
+                        .asText();
+
+        return new ModelDef(name, host, apiKey);
+    }
+
     private TransformDef toTransformDef(JsonNode transformNode) {
         String sourceTable =
                 checkNotNull(
@@ -248,7 +253,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 Optional.ofNullable(transformNode.get(TRANSFORM_PROJECTION_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
-        // When the star is in the first place, a backslash needs to be added for escape.
         if (!StringUtils.isNullOrWhitespaceOnly(projection) && projection.contains("\\*")) {
             projection = projection.replace("\\*", "*");
         }
@@ -287,9 +291,27 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         if (pipelineConfigNode == null || pipelineConfigNode.isNull()) {
             return new Configuration();
         }
-        Map<String, String> pipelineConfigMap =
-                mapper.convertValue(
-                        pipelineConfigNode, new TypeReference<Map<String, String>>() {});
+        Map<String, String> pipelineConfigMap = new HashMap<>();
+        pipelineConfigNode
+                .fields()
+                .forEachRemaining(
+                        entry -> {
+                            String key = entry.getKey();
+                            JsonNode value = entry.getValue();
+                            if (!key.equals(MODEL_KEY)) {
+                                pipelineConfigMap.put(key, value.asText());
+                            }
+                        });
         return Configuration.fromMap(pipelineConfigMap);
+    }
+
+    private List<ModelDef> parseModels(JsonNode modelsNode) {
+        List<ModelDef> modelDefs = new ArrayList<>();
+        if (modelsNode != null && modelsNode.isArray()) {
+            for (JsonNode modelNode : modelsNode) {
+                modelDefs.add(toModelDef(modelNode));
+            }
+        }
+        return modelDefs;
     }
 }

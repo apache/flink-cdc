@@ -32,6 +32,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns.METADATA_COLUMNS;
 
@@ -59,12 +60,29 @@ public class ProjectionColumnProcessor {
         this.tableInfo = tableInfo;
         this.projectionColumn = projectionColumn;
         this.timezone = timezone;
-        this.udfDescriptors = udfDescriptors;
+        this.udfDescriptors = preprocessUdfDescriptors(udfDescriptors);
         this.transformExpressionKey = generateTransformExpressionKey();
         this.expressionEvaluator =
                 TransformExpressionCompiler.compileExpression(
-                        transformExpressionKey, udfDescriptors);
+                        transformExpressionKey, this.udfDescriptors);
         this.udfFunctionInstances = udfFunctionInstances;
+    }
+
+    private List<UserDefinedFunctionDescriptor> preprocessUdfDescriptors(
+            List<UserDefinedFunctionDescriptor> descriptors) {
+        return descriptors.stream().map(this::preprocessUdfDescriptor).collect(Collectors.toList());
+    }
+
+    private static final String PARAM_SEPARATOR = ":::";
+
+    private UserDefinedFunctionDescriptor preprocessUdfDescriptor(
+            UserDefinedFunctionDescriptor descriptor) {
+        String[] parts = descriptor.getName().split(PARAM_SEPARATOR, 2);
+        String name = parts[0];
+        String params = parts.length > 1 ? parts[1] : null;
+
+        // 创建一个新的 UserDefinedFunctionDescriptor，只使用 UDF 的名称
+        return new UserDefinedFunctionDescriptor(name, descriptor.getClasspath());
     }
 
     public static ProjectionColumnProcessor of(

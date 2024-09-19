@@ -1,24 +1,8 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
@@ -26,6 +10,7 @@ import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,8 +20,15 @@ import java.util.stream.Collectors;
  */
 public class TransformTranslator {
 
+    private static final String MODEL_UDF_CLASSPATH =
+            "org.apache.flink.cdc.runtime.operators.model.ModelUdf";
+    private static final String PARAM_SEPARATOR = ":::";
+
     public DataStream<Event> translatePreTransform(
-            DataStream<Event> input, List<TransformDef> transforms, List<UdfDef> udfFunctions) {
+            DataStream<Event> input,
+            List<TransformDef> transforms,
+            List<UdfDef> udfFunctions,
+            List<ModelDef> models) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -54,10 +46,12 @@ public class TransformTranslator {
                         transform.getTableOptions());
             }
         }
+
+        List<UdfDef> allFunctions = new ArrayList<>(udfFunctions);
+        allFunctions.addAll(convertModelsToUdfs(models));
+
         preTransformFunctionBuilder.addUdfFunctions(
-                udfFunctions.stream()
-                        .map(udf -> Tuple2.of(udf.getName(), udf.getClasspath()))
-                        .collect(Collectors.toList()));
+                allFunctions.stream().map(this::udfDefToTuple2).collect(Collectors.toList()));
         return input.transform(
                 "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
     }
@@ -66,7 +60,8 @@ public class TransformTranslator {
             DataStream<Event> input,
             List<TransformDef> transforms,
             String timezone,
-            List<UdfDef> udfFunctions) {
+            List<UdfDef> udfFunctions,
+            List<ModelDef> models) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -85,11 +80,45 @@ public class TransformTranslator {
             }
         }
         postTransformFunctionBuilder.addTimezone(timezone);
+
+        List<UdfDef> allFunctions = new ArrayList<>(udfFunctions);
+        allFunctions.addAll(convertModelsToUdfs(models));
+
         postTransformFunctionBuilder.addUdfFunctions(
-                udfFunctions.stream()
-                        .map(udf -> Tuple2.of(udf.getName(), udf.getClasspath()))
-                        .collect(Collectors.toList()));
+                allFunctions.stream().map(this::udfDefToTuple2).collect(Collectors.toList()));
         return input.transform(
                 "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build());
+    }
+
+    private List<UdfDef> convertModelsToUdfs(List<ModelDef> models) {
+        return models.stream().map(this::modelToUdf).collect(Collectors.toList());
+    }
+
+    private UdfDef modelToUdf(ModelDef model) {
+        String udfName = model.getName();
+        String serializedParams = serializeModelParams(model);
+        return new UdfDef(udfName, MODEL_UDF_CLASSPATH, serializedParams);
+    }
+
+    private String serializeModelParams(ModelDef model) {
+        return String.format(
+                "{\"name\":\"%s\",\"host\":\"%s\",\"apiKey\":\"%s\"}",
+                model.getName(), model.getHost(), model.getApiKey());
+    }
+
+    private Tuple2<String, String> udfDefToTuple2(UdfDef udf) {
+        if (MODEL_UDF_CLASSPATH.equals(udf.getClasspath())) {
+            // For ModelUdf, encode the serialized params into the name
+            return Tuple2.of(
+                    encodeNameWithParams(udf.getName(), udf.getSerializedParams()),
+                    udf.getClasspath());
+        } else {
+            // For regular UDFs, just use the name and classpath
+            return Tuple2.of(udf.getName(), udf.getClasspath());
+        }
+    }
+
+    private String encodeNameWithParams(String name, String params) {
+        return params != null ? name + PARAM_SEPARATOR + params : name;
     }
 }
