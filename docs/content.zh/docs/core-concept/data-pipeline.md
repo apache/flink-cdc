@@ -111,9 +111,9 @@ We could use following yaml file to define a complicated Data Pipeline describin
 # Pipeline Configurations
 The following config options of Data Pipeline level are supported:
 
-| parameter       | meaning                                                                                 | optional/required |
-|-----------------|-----------------------------------------------------------------------------------------|-------------------|
-| name            | The name of the pipeline, which will be submitted to the Flink cluster as the job name. | optional          |
-| parallelism     | The global parallelism of the pipeline. Defaults to 1.                                  | optional          |
-| local-time-zone | The local time zone defines current session time zone id.                               | optional          |
-| rate.limit      | 限制数据源读取速率，防止下游压力过大。单位为条/秒。（目前仅支持mysql数据源）                         | 可选               |
+| parameter         | meaning                                                                                 | optional/required |
+|-------------------|-----------------------------------------------------------------------------------------|-------------------|
+| name              | The name of the pipeline, which will be submitted to the Flink cluster as the job name. | optional          |
+| parallelism       | The global parallelism of the pipeline. Defaults to 1.                                  | optional          |
+| local-time-zone   | The local time zone defines current session time zone id.                               | optional          |
+| source-rate-limit | 限制数据源读取速率，防止下游压力过大。单位为条/秒。（目前仅支持mysql数据源）                                               | 可选                |

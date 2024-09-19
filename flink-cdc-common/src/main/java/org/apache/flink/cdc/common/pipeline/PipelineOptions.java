@@ -40,7 +40,7 @@ public class PipelineOptions {
                     .withDescription("The name of the pipeline");
 
     public static final ConfigOption<Double> RATE_LIMIT =
-            ConfigOptions.key("rate.limit")
+            ConfigOptions.key("source-rate-limit")
                     .doubleType()
                     .defaultValue(0d)
                     .withDescription(
