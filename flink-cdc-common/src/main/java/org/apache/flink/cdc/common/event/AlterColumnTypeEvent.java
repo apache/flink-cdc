@@ -44,19 +44,28 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
 
     private final Map<String, DataType> oldTypeMapping;
 
+    private final Map<String, String> columnDefaultValue;
+
     public AlterColumnTypeEvent(TableId tableId, Map<String, DataType> typeMapping) {
-        this.tableId = tableId;
-        this.typeMapping = typeMapping;
-        this.oldTypeMapping = new HashMap<>();
+        this(tableId, typeMapping, new HashMap<>(), new HashMap<>());
     }
 
     public AlterColumnTypeEvent(
             TableId tableId,
             Map<String, DataType> typeMapping,
             Map<String, DataType> oldTypeMapping) {
+        this(tableId, typeMapping, oldTypeMapping, new HashMap<>());
+    }
+
+    public AlterColumnTypeEvent(
+            TableId tableId,
+            Map<String, DataType> typeMapping,
+            Map<String, DataType> oldTypeMapping,
+            Map<String, String> columnDefaultValue) {
         this.tableId = tableId;
         this.typeMapping = typeMapping;
         this.oldTypeMapping = oldTypeMapping;
+        this.columnDefaultValue = columnDefaultValue;
     }
 
     /** Returns the type mapping. */
@@ -75,12 +84,13 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
         AlterColumnTypeEvent that = (AlterColumnTypeEvent) o;
         return Objects.equals(tableId, that.tableId)
                 && Objects.equals(typeMapping, that.typeMapping)
-                && Objects.equals(oldTypeMapping, that.oldTypeMapping);
+                && Objects.equals(oldTypeMapping, that.oldTypeMapping)
+                && Objects.equals(columnDefaultValue, that.columnDefaultValue);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId, typeMapping, oldTypeMapping);
+        return Objects.hash(tableId, typeMapping, oldTypeMapping, columnDefaultValue);
     }
 
     @Override
@@ -93,6 +103,8 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
                     + typeMapping
                     + ", oldTypeMapping="
                     + oldTypeMapping
+                    + ", columnDefaultValue="
+                    + columnDefaultValue
                     + '}';
         } else {
             return "AlterColumnTypeEvent{"
@@ -113,6 +125,10 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
         return oldTypeMapping;
     }
 
+    public Map<String, String> getColumnDefaultValue() {
+        return columnDefaultValue;
+    }
+
     @Override
     public boolean hasPreSchema() {
         return !oldTypeMapping.isEmpty();
@@ -125,6 +141,16 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
                 oldTypeSchema.getColumns().stream()
                         .filter(e -> typeMapping.containsKey(e.getName()) && e.getType() != null)
                         .collect(Collectors.toMap(Column::getName, Column::getType)));
+
+        columnDefaultValue.putAll(
+                oldTypeSchema.getColumns().stream()
+                        .filter(
+                                e ->
+                                        typeMapping.containsKey(e.getName())
+                                                && e.getDefaultValueExpression() != null)
+                        .collect(
+                                Collectors.toMap(
+                                        Column::getName, Column::getDefaultValueExpression)));
     }
 
     @Override
@@ -138,6 +164,7 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
             // Remove redundant alter column type records that doesn't really change the type
             typeMapping.keySet().removeAll(redundantlyChangedColumns);
             oldTypeMapping.keySet().removeAll(redundantlyChangedColumns);
+            columnDefaultValue.keySet().removeAll(redundantlyChangedColumns);
         }
         return !typeMapping.isEmpty();
     }

@@ -259,6 +259,7 @@ public class DorisMetadataApplier implements MetadataApplier {
         try {
             TableId tableId = event.tableId();
             Map<String, DataType> typeMapping = event.getTypeMapping();
+            Map<String, String> columnDefaultValueMapping = event.getColumnDefaultValue();
 
             for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
                 schemaChangeManager.modifyColumnDataType(
@@ -267,9 +268,9 @@ public class DorisMetadataApplier implements MetadataApplier {
                         new FieldSchema(
                                 entry.getKey(),
                                 buildTypeString(entry.getValue()),
-                                null)); // Currently, AlterColumnTypeEvent carries no comment info.
-                // This
-                // will be fixed after FLINK-35243 got merged.
+                                columnDefaultValueMapping.get(
+                                        columnDefaultValueMapping.get(entry.getKey())),
+                                null));
             }
         } catch (Exception e) {
             throw new SchemaEvolveException(event, "fail to apply alter column type event", e);
