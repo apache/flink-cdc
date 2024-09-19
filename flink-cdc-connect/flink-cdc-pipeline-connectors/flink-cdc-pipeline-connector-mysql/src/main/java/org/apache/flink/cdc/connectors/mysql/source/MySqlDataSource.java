@@ -33,9 +33,7 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFact
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEmitter;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
-/**
- * A {@link DataSource} for mysql cdc connector.
- */
+/** A {@link DataSource} for mysql cdc connector. */
 @Internal
 public class MySqlDataSource implements DataSource {
 
@@ -64,7 +62,10 @@ public class MySqlDataSource implements DataSource {
                 new MySqlEventDeserializer(
                         DebeziumChangelogMode.ALL, sourceConfig.isIncludeSchemaChanges());
 
-        RateLimiterStrategy rateLimiterStrategy = maxRatePeer > 0 ? createRateLimiterStrategy(maxRatePeer) : RateLimiterStrategy.noOp();
+        RateLimiterStrategy rateLimiterStrategy =
+                maxRatePeer > 0
+                        ? createRateLimiterStrategy(maxRatePeer)
+                        : RateLimiterStrategy.noOp();
         MySqlSource<Event> source =
                 new MySqlSource<>(
                         configFactory,

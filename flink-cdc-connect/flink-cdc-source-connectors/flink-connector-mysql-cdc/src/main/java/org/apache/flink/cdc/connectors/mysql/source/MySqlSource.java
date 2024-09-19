@@ -17,11 +17,6 @@
 
 package org.apache.flink.cdc.connectors.mysql.source;
 
-import io.debezium.jdbc.JdbcConnection;
-import java.io.Serializable;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.function.Supplier;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.Boundedness;
 import org.apache.flink.api.connector.source.Source;
@@ -66,8 +61,15 @@ import org.apache.flink.connector.base.source.reader.synchronization.FutureCompl
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.FlinkRuntimeException;
+
+import io.debezium.jdbc.JdbcConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.Serializable;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.function.Supplier;
 
 /**
  * The MySQL CDC Source based on FLIP-27 and Watermark Signal Algorithm which supports parallel
@@ -193,14 +195,16 @@ public class MySqlSource<T>
                                 readerContext.getIndexOfSubtask(),
                                 mySqlSourceReaderContext,
                                 snapshotHooks);
-        RecordEmitter<SourceRecords, T, MySqlSplitState> recordEmitter = recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig);
-        MySqlSourceReader<T> sourceReader = new MySqlSourceReader<>(
-                elementsQueue,
-                splitReaderSupplier,
-                recordEmitter,
-                readerContext.getConfiguration(),
-                mySqlSourceReaderContext,
-                sourceConfig);
+        RecordEmitter<SourceRecords, T, MySqlSplitState> recordEmitter =
+                recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig);
+        MySqlSourceReader<T> sourceReader =
+                new MySqlSourceReader<>(
+                        elementsQueue,
+                        splitReaderSupplier,
+                        recordEmitter,
+                        readerContext.getConfiguration(),
+                        mySqlSourceReaderContext,
+                        sourceConfig);
         int parallelism = readerContext.currentParallelism();
 
         RateLimiter rateLimiter = rateLimiterStrategy.createRateLimiter(parallelism);
@@ -209,7 +213,8 @@ public class MySqlSource<T>
             return sourceReader;
         }
 
-        SourceReader<T, MySqlSplit> rateSoureceReader = new RateLimitedSourceReader<>(sourceReader, rateLimiter);
+        SourceReader<T, MySqlSplit> rateSoureceReader =
+                new RateLimitedSourceReader<>(sourceReader, rateLimiter);
 
         if (recordEmitter instanceof MySqlRecordEmitter) {
             MySqlRecordEmitter<T> mySqlRecordEmitter = (MySqlRecordEmitter<T>) recordEmitter;
@@ -293,9 +298,7 @@ public class MySqlSource<T>
         this.snapshotHooks = snapshotHooks;
     }
 
-    /**
-     * Create a {@link RecordEmitter} for {@link MySqlSourceReader}.
-     */
+    /** Create a {@link RecordEmitter} for {@link MySqlSourceReader}. */
     @Internal
     @FunctionalInterface
     interface RecordEmitterSupplier<T> extends Serializable {

@@ -17,10 +17,6 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
-import io.debezium.document.Array;
-import io.debezium.relational.history.HistoryRecord;
-import io.debezium.relational.history.TableChanges;
-import java.util.Iterator;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.api.connector.source.util.ratelimit.RateLimiter;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
@@ -32,9 +28,15 @@ import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
+
+import io.debezium.document.Array;
+import io.debezium.relational.history.HistoryRecord;
+import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Iterator;
 
 /**
  * The {@link RecordEmitter} implementation for {@link MySqlSourceReader}.
