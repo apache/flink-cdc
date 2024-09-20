@@ -268,8 +268,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                         new FieldSchema(
                                 entry.getKey(),
                                 buildTypeString(entry.getValue()),
-                                columnDefaultValueMapping.get(
-                                        columnDefaultValueMapping.get(entry.getKey())),
+                                columnDefaultValueMapping.get(entry.getKey()),
                                 null));
             }
         } catch (Exception e) {
