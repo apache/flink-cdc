@@ -648,6 +648,7 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                                 + " name STRING,"
                                 + " address STRING,"
                                 + " phone_number STRING,"
+                                + " op_type STRING METADATA FROM 'op_type' VIRTUAL,"
                                 + " primary key (_id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mongodb-cdc',"
@@ -674,31 +675,31 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         // first step: check the snapshot data
         String[] snapshotForSingleTable =
                 new String[] {
-                    "+I[101, user_1, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "+I[103, user_3, Shanghai, 123567891234]",
-                    "+I[109, user_4, Shanghai, 123567891234]",
-                    "+I[110, user_5, Shanghai, 123567891234]",
-                    "+I[111, user_6, Shanghai, 123567891234]",
-                    "+I[118, user_7, Shanghai, 123567891234]",
-                    "+I[121, user_8, Shanghai, 123567891234]",
-                    "+I[123, user_9, Shanghai, 123567891234]",
-                    "+I[1009, user_10, Shanghai, 123567891234]",
-                    "+I[1010, user_11, Shanghai, 123567891234]",
-                    "+I[1011, user_12, Shanghai, 123567891234]",
-                    "+I[1012, user_13, Shanghai, 123567891234]",
-                    "+I[1013, user_14, Shanghai, 123567891234]",
-                    "+I[1014, user_15, Shanghai, 123567891234]",
-                    "+I[1015, user_16, Shanghai, 123567891234]",
-                    "+I[1016, user_17, Shanghai, 123567891234]",
-                    "+I[1017, user_18, Shanghai, 123567891234]",
-                    "+I[1018, user_19, Shanghai, 123567891234]",
-                    "+I[1019, user_20, Shanghai, 123567891234]",
-                    "+I[2000, user_21, Shanghai, 123567891234]"
+                    "+I[101, user_1, Shanghai, 123567891234, insert]",
+                    "+I[102, user_2, Shanghai, 123567891234, insert]",
+                    "+I[103, user_3, Shanghai, 123567891234, insert]",
+                    "+I[109, user_4, Shanghai, 123567891234, insert]",
+                    "+I[110, user_5, Shanghai, 123567891234, insert]",
+                    "+I[111, user_6, Shanghai, 123567891234, insert]",
+                    "+I[118, user_7, Shanghai, 123567891234, insert]",
+                    "+I[121, user_8, Shanghai, 123567891234, insert]",
+                    "+I[123, user_9, Shanghai, 123567891234, insert]",
+                    "+I[1009, user_10, Shanghai, 123567891234, insert]",
+                    "+I[1010, user_11, Shanghai, 123567891234, insert]",
+                    "+I[1011, user_12, Shanghai, 123567891234, insert]",
+                    "+I[1012, user_13, Shanghai, 123567891234, insert]",
+                    "+I[1013, user_14, Shanghai, 123567891234, insert]",
+                    "+I[1014, user_15, Shanghai, 123567891234, insert]",
+                    "+I[1015, user_16, Shanghai, 123567891234, insert]",
+                    "+I[1016, user_17, Shanghai, 123567891234, insert]",
+                    "+I[1017, user_18, Shanghai, 123567891234, insert]",
+                    "+I[1018, user_19, Shanghai, 123567891234, insert]",
+                    "+I[1019, user_20, Shanghai, 123567891234, insert]",
+                    "+I[2000, user_21, Shanghai, 123567891234, insert]"
                 };
         tEnv.executeSql(sourceDDL);
         TableResult tableResult =
-                tEnv.executeSql("select cid, name, address, phone_number from customers");
+                tEnv.executeSql("select cid, name, address, phone_number, op_type from customers");
         CloseableIterator<Row> iterator = tableResult.collect();
         JobID jobId = tableResult.getJobClient().get().getJobID();
         List<String> expectedSnapshotData = new ArrayList<>();
@@ -731,17 +732,17 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
 
         String[] changeEventsForSingleTable =
                 new String[] {
-                    "-U[101, user_1, Shanghai, 123567891234]",
-                    "+U[101, user_1, Hangzhou, 123567891234]",
-                    "-D[102, user_2, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
-                    "-U[103, user_3, Shanghai, 123567891234]",
-                    "+U[103, user_3, Hangzhou, 123567891234]",
-                    "-U[1010, user_11, Shanghai, 123567891234]",
-                    "+U[1010, user_11, Hangzhou, 123567891234]",
-                    "+I[2001, user_22, Shanghai, 123567891234]",
-                    "+I[2002, user_23, Shanghai, 123567891234]",
-                    "+I[2003, user_24, Shanghai, 123567891234]"
+                    "-U[101, user_1, Shanghai, 123567891234, update]",
+                    "+U[101, user_1, Hangzhou, 123567891234, update]",
+                    "-D[102, user_2, Shanghai, 123567891234, delete]",
+                    "+I[102, user_2, Shanghai, 123567891234, insert]",
+                    "-U[103, user_3, Shanghai, 123567891234, update]",
+                    "+U[103, user_3, Hangzhou, 123567891234, update]",
+                    "-U[1010, user_11, Shanghai, 123567891234, update]",
+                    "+U[1010, user_11, Hangzhou, 123567891234, update]",
+                    "+I[2001, user_22, Shanghai, 123567891234, insert]",
+                    "+I[2002, user_23, Shanghai, 123567891234, insert]",
+                    "+I[2003, user_24, Shanghai, 123567891234, insert]"
                 };
         List<String> expectedChangeStreamData = new ArrayList<>();
         for (int i = 0; i < captureCustomerCollections.length; i++) {

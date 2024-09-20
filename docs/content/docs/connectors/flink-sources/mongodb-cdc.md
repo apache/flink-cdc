@@ -357,6 +357,11 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
     </tr>
+    <tr>
+      <td>op_type</td>
+      <td>STRING NOT NULL</td>
+      <td>Operation type of the row.</td>
+    </tr>
   </tbody>
 </table>
 

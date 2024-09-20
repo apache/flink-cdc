@@ -332,6 +332,11 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>它指示在数据库中进行更改的时间。 <br>如果记录是从表的快照而不是改变流中读取的，该值将始终为0。</td>
     </tr>
+    <tr>
+      <td>op_type</td>
+      <td>STRING NOT NULL</td>
+      <td>该行的操作类型。</td>
+    </tr>
   </tbody>
 </table>
 
