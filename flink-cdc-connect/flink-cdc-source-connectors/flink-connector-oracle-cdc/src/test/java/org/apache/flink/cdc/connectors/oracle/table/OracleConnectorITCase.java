@@ -843,9 +843,6 @@ public class OracleConnectorITCase {
 
     @Test
     public void testSnapshotToStreamingSwitchPendingTransactions() throws Exception {
-
-        createAndInitialize("product.sql");
-
         Assume.assumeFalse(parallelismSnapshot);
 
         CompletableFuture<Void> finishFuture = createRecordInserters();
