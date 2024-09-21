@@ -1062,4 +1062,77 @@ public class OracleConnectorITCase {
         waitForSinkSize("sink", 12);
         result.getJobClient().get().cancel().get();
     }
+
+    @Test
+    public void testPartitionTable() throws Exception {
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "CREATE TABLE debezium.product_retail_partition ("
+                            + "    ID NUMBER(9, 0) NOT NULL,"
+                            + "    PRODUCT_ID NUMBER(9, 0),"
+                            + "    PRIMARY KEY(ID)"
+                            + ") partition by range(PRODUCT_ID) ("
+                            + " partition par_01 values less than(200)"
+                            + ")");
+            statement.execute("INSERT INTO debezium.product_retail_partition VALUES (1001,101)");
+            statement.execute("INSERT INTO debezium.product_retail_partition VALUES (1002,102)");
+        }
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE test_partition_table ("
+                                + " ID BIGINT,"
+                                + " PRODUCT_ID BIGINT,"
+                                + " PRIMARY KEY (ID) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true',"
+                                + " 'database-name' = 'ORCLCDB',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s'"
+                                + ")",
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
+                        "dbzuser",
+                        "dbz",
+                        parallelismSnapshot,
+                        "debezium",
+                        "product_retail_partition");
+        String sinkDDL =
+                "CREATE TABLE test_partition_sink ("
+                        + " ID BIGINT,"
+                        + " PRODUCT_ID BIGINT,"
+                        + " PRIMARY KEY (ID) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO test_partition_sink SELECT * FROM test_partition_table");
+
+        waitForSnapshotStarted("test_partition_sink");
+
+        // waiting for change events finished.
+        waitForSinkSize("test_partition_sink", 2);
+
+        List<String> expected = Arrays.asList("+I[1001,101]", "+I[1002,102]");
+
+        List<String> actual = TestValuesTableFactory.getRawResults("test_partition_sink");
+        Collections.sort(actual);
+        assertEquals(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
 }
