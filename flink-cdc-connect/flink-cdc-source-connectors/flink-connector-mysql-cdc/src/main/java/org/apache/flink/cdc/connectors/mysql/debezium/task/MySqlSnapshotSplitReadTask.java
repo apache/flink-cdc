@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.debezium.task;
 
+import com.mysql.cj.conf.PropertyKey;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.EventDispatcherImpl;
 import org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.SignalEventDispatcher;
@@ -54,11 +55,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.UnsupportedEncodingException;
-import java.sql.Blob;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Types;
+import java.sql.*;
 import java.time.Duration;
 import java.util.Calendar;
 
@@ -153,6 +150,9 @@ public class MySqlSnapshotSplitReadTask
         if (hooks.getPreLowWatermarkAction() != null) {
             hooks.getPreLowWatermarkAction().accept(jdbcConnection, snapshotSplit);
         }
+        LOG.info(jdbcConnection.connection().getAutoCommit()+"getAutoCommit");
+        jdbcConnection.setAutoCommit(false);
+        jdbcConnection.execute("start transaction");
         final BinlogOffset lowWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection);
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
@@ -168,7 +168,9 @@ public class MySqlSnapshotSplitReadTask
         }
 
         LOG.info("Snapshot step 2 - Snapshotting data");
-        createDataEvents(ctx, snapshotSplit.getTableId());
+        BinlogOffset selectOffset = createDataEvents(ctx, snapshotSplit.getTableId());
+        jdbcConnection.execute("start transaction");
+        jdbcConnection.setAutoCommit(true);
 
         if (hooks.getPreHighWatermarkAction() != null) {
             hooks.getPreHighWatermarkAction().accept(jdbcConnection, snapshotSplit);
@@ -186,7 +188,12 @@ public class MySqlSnapshotSplitReadTask
             highWatermark = lowWatermark;
         } else {
             // Get the current binlog offset as HW
-            highWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection);
+            if(selectOffset != null){
+            // Using the offset obtained within a query transaction as high watermark ensures exactly-once semantics.
+                highWatermark = selectOffset;
+            }else {
+                highWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection);
+            }
         }
 
         LOG.info(
@@ -224,16 +231,17 @@ public class MySqlSnapshotSplitReadTask
         }
     }
 
-    private void createDataEvents(MySqlSnapshotContext snapshotContext, TableId tableId)
+    private BinlogOffset createDataEvents(MySqlSnapshotContext snapshotContext, TableId tableId)
             throws Exception {
         LOG.debug("Snapshotting table {}", tableId);
-        createDataEventsForTable(
+        BinlogOffset offset = createDataEventsForTable(
                 snapshotContext, snapshotReceiver, databaseSchema.tableFor(tableId));
         snapshotReceiver.completeSnapshot();
+        return offset;
     }
 
     /** Dispatches the data change events for the records of a single table. */
-    private void createDataEventsForTable(
+    private BinlogOffset createDataEventsForTable(
             MySqlSnapshotContext snapshotContext,
             EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver,
             Table table)
@@ -242,18 +250,26 @@ public class MySqlSnapshotSplitReadTask
         long exportStart = clock.currentTimeInMillis();
         LOG.info("Exporting data from split '{}' of table {}", snapshotSplit.splitId(), table.id());
 
-        final String selectSql =
+        String selectSql =
                 StatementUtils.buildSplitScanQuery(
                         snapshotSplit.getTableId(),
                         snapshotSplit.getSplitKeyType(),
                         snapshotSplit.getSplitStart() == null,
                         snapshotSplit.getSplitEnd() == null);
+
+        String showMasterStmt = "show master status;";
+        final String multiQueriesConf = sourceConfig.getJdbcProperties().getProperty(PropertyKey.allowMultiQueries.getKeyName(),"false");
+        Boolean getOffsetDurSelect = false;
+        if(snapshotSplit.getSplitStart() == null && snapshotSplit.getSplitEnd() == null && multiQueriesConf.equals("true")){
+            getOffsetDurSelect = true;
+            selectSql = showMasterStmt + selectSql;
+        }
+
         LOG.info(
                 "For split '{}' of table {} using select statement: '{}'",
                 snapshotSplit.splitId(),
                 table.id(),
                 selectSql);
-
         try (PreparedStatement selectStatement =
                         StatementUtils.readTableSplitDataStatement(
                                 jdbcConnection,
@@ -263,8 +279,18 @@ public class MySqlSnapshotSplitReadTask
                                 snapshotSplit.getSplitStart(),
                                 snapshotSplit.getSplitEnd(),
                                 snapshotSplit.getSplitKeyType().getFieldCount(),
-                                sourceConfig.getFetchSize());
-                ResultSet rs = selectStatement.executeQuery()) {
+                                sourceConfig.getFetchSize())
+             ) {
+            selectStatement.execute();
+            ResultSet rs = selectStatement.getResultSet();
+
+            //process the rs of offset first
+            BinlogOffset offset = null;
+            if(getOffsetDurSelect){
+                offset = DebeziumUtils.getOffsetFromRs(rs,showMasterStmt);
+                selectStatement.getMoreResults();
+                rs = selectStatement.getResultSet();
+            }
 
             ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);
             long rows = 0;
@@ -295,11 +321,14 @@ public class MySqlSnapshotSplitReadTask
                         getChangeRecordEmitter(snapshotContext, table.id(), row),
                         snapshotReceiver);
             }
+
+            rs.close();
             LOG.info(
                     "Finished exporting {} records for split '{}', total duration '{}'",
                     rows,
                     snapshotSplit.splitId(),
                     Strings.duration(clock.currentTimeInMillis() - exportStart));
+            return offset;
         } catch (SQLException e) {
             throw new ConnectException("Snapshotting of table " + table.id() + " failed", e);
         }

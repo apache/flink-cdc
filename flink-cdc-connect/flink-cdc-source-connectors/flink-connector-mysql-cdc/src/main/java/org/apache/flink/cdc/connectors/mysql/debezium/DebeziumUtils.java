@@ -47,6 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -115,30 +116,30 @@ public class DebeziumUtils {
                 schemaNameAdjuster,
                 isTableIdCaseSensitive);
     }
-
-    /** Fetch current binlog offsets in MySql Server. */
+    public static BinlogOffset getOffsetFromRs(ResultSet rs, String command) throws SQLException {
+        if (rs.next()) {
+            final String binlogFilename = rs.getString(1);
+            final long binlogPosition = rs.getLong(2);
+            final String gtidSet =
+                    rs.getMetaData().getColumnCount() > 4 ? rs.getString(5) : null;
+            return BinlogOffset.builder()
+                    .setBinlogFilePosition(binlogFilename, binlogPosition)
+                    .setGtidSet(gtidSet)
+                    .build();
+        } else {
+            throw new FlinkRuntimeException(
+                    "Cannot read the binlog filename and position via '"
+                            + command
+                            + "'. Make sure your server is correctly configured");
+        }
+    }
+        /** Fetch current binlog offsets in MySql Server. */
     public static BinlogOffset currentBinlogOffset(JdbcConnection jdbc) {
         final String showMasterStmt = "SHOW MASTER STATUS";
         try {
             return jdbc.queryAndMap(
                     showMasterStmt,
-                    rs -> {
-                        if (rs.next()) {
-                            final String binlogFilename = rs.getString(1);
-                            final long binlogPosition = rs.getLong(2);
-                            final String gtidSet =
-                                    rs.getMetaData().getColumnCount() > 4 ? rs.getString(5) : null;
-                            return BinlogOffset.builder()
-                                    .setBinlogFilePosition(binlogFilename, binlogPosition)
-                                    .setGtidSet(gtidSet)
-                                    .build();
-                        } else {
-                            throw new FlinkRuntimeException(
-                                    "Cannot read the binlog filename and position via '"
-                                            + showMasterStmt
-                                            + "'. Make sure your server is correctly configured");
-                        }
-                    });
+                    rs -> getOffsetFromRs(rs, showMasterStmt));
         } catch (SQLException e) {
             throw new FlinkRuntimeException(
                     "Cannot read the binlog filename and position via '"
