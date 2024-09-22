@@ -257,9 +257,11 @@ public class MySqlSnapshotSplitReadTask
                         snapshotSplit.getSplitEnd() == null);
 
         String showMasterStmt = "show master status;";
-        final String multiQueriesConf = sourceConfig.getJdbcProperties().getProperty(PropertyKey.allowMultiQueries.getKeyName(),"false");
+        final String multiQueriesConf = sourceConfig.getJdbcProperties()
+                .getProperty(PropertyKey.allowMultiQueries.getKeyName(),"false");
         Boolean getOffsetDurSelect = false;
-        if(snapshotSplit.getSplitStart() == null && snapshotSplit.getSplitEnd() == null && multiQueriesConf.equals("true")){
+        if(snapshotSplit.getSplitStart() == null && snapshotSplit.getSplitEnd() == null
+                && multiQueriesConf.equals("true")){
             getOffsetDurSelect = true;
             selectSql = showMasterStmt + selectSql;
         }
@@ -286,7 +288,7 @@ public class MySqlSnapshotSplitReadTask
             //process the rs of offset first
             BinlogOffset offset = null;
             if(getOffsetDurSelect){
-                offset = DebeziumUtils.getOffsetFromRs(rs,showMasterStmt);
+                offset = DebeziumUtils.getOffsetFromRs(rs, showMasterStmt);
                 selectStatement.getMoreResults();
                 rs = selectStatement.getResultSet();
             }
