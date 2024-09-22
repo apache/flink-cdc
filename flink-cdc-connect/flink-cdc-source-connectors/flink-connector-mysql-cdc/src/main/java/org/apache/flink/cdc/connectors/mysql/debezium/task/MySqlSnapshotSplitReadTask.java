@@ -150,9 +150,6 @@ public class MySqlSnapshotSplitReadTask
         if (hooks.getPreLowWatermarkAction() != null) {
             hooks.getPreLowWatermarkAction().accept(jdbcConnection, snapshotSplit);
         }
-        LOG.info(jdbcConnection.connection().getAutoCommit()+"getAutoCommit");
-        jdbcConnection.setAutoCommit(false);
-        jdbcConnection.execute("start transaction");
         final BinlogOffset lowWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection);
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
@@ -169,8 +166,6 @@ public class MySqlSnapshotSplitReadTask
 
         LOG.info("Snapshot step 2 - Snapshotting data");
         BinlogOffset selectOffset = createDataEvents(ctx, snapshotSplit.getTableId());
-        jdbcConnection.execute("start transaction");
-        jdbcConnection.setAutoCommit(true);
 
         if (hooks.getPreHighWatermarkAction() != null) {
             hooks.getPreHighWatermarkAction().accept(jdbcConnection, snapshotSplit);
