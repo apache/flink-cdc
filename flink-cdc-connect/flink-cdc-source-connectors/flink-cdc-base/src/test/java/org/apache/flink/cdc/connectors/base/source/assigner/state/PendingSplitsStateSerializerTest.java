@@ -55,14 +55,14 @@ public class PendingSplitsStateSerializerTest {
                 new PendingSplitsStateSerializer(constructSourceSplitSerializer());
         PendingSplitsState streamSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        6, pendingSplitsStateSerializer.serialize(streamPendingSplitsStateBefore));
+                        7, pendingSplitsStateSerializer.serialize(streamPendingSplitsStateBefore));
         Assert.assertEquals(streamPendingSplitsStateBefore, streamSplitsStateAfter);
 
         SnapshotPendingSplitsState snapshotPendingSplitsStateBefore =
                 constructSnapshotPendingSplitsState(AssignerStatus.NEWLY_ADDED_ASSIGNING);
         PendingSplitsState snapshotPendingSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        6,
+                        7,
                         pendingSplitsStateSerializer.serialize(snapshotPendingSplitsStateBefore));
         Assert.assertEquals(snapshotPendingSplitsStateBefore, snapshotPendingSplitsStateAfter);
 
@@ -179,7 +179,9 @@ public class PendingSplitsStateSerializerTest {
                 assignerStatus,
                 Arrays.asList(TableId.parse("catalog2.schema2.table2")),
                 true,
-                true);
+                true,
+                new HashMap<>(),
+                new HashMap<>());
     }
 
     private SnapshotPendingSplitsStateVersion5 constructSnapshotPendingSplitsStateVersion4(
