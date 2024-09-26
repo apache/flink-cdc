@@ -445,7 +445,9 @@ public class SchemaRegistryRequestHandler implements Closeable {
                                                         Column.physicalColumn(
                                                                 value,
                                                                 column.getType().nullable(),
-                                                                column.getComment())));
+                                                                column.getComment(),
+                                                                column
+                                                                        .getDefaultValueExpression())));
                                     });
 
                     List<SchemaChangeEvent> events = new ArrayList<>();
