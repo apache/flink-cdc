@@ -335,7 +335,7 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
     <tr>
       <td>op_type</td>
       <td>STRING NOT NULL</td>
-      <td>该行的操作类型。</td>
+      <td>该行的操作类型，值为：insert、update、replace、delete。<br>由于DeduplicateFunctionHelper#processLastRowOnChangelog返回删除前的行，delete类型暂时缺失。</td>
     </tr>
   </tbody>
 </table>
@@ -346,6 +346,7 @@ CREATE TABLE products (
     db_name STRING METADATA FROM 'database_name' VIRTUAL,
     collection_name STRING METADATA  FROM 'collection_name' VIRTUAL,
     operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation_type STRING METADATA FROM 'op_type' VIRTUAL,
     _id STRING, // 必须声明
     name STRING,
     weight DECIMAL(10,3),
