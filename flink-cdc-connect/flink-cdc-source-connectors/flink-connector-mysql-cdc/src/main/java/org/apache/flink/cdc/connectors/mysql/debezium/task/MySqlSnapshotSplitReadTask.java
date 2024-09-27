@@ -194,7 +194,6 @@ public class MySqlSnapshotSplitReadTask
             highWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection);
             long epochSecond = clock.currentTime().getEpochSecond();
             highWatermark.getOffset().put(BinlogOffset.TIMESTAMP_KEY, String.valueOf(epochSecond));
-            highWatermark.getOffset().put(BinlogOffset.SERVER_ID_KEY, String.valueOf(epochSecond));
         }
 
         LOG.info(
