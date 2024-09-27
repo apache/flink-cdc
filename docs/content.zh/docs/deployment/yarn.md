@@ -37,7 +37,7 @@ Flink 可以根据在 JobManager 上运行的作业处理所需的 slot 数量�
 
 - 通过运行 `yarn top` 无错误信息显示以确保你的 YARN 集群准备好接受 Flink 应用程序的提交。
 - 从[下载页面](https://flink.apache.org/downloads/)下载最新的 Flink 发行版并解压缩。
-- 一定要确保设置了 `HADOOP_CLASSPATH` 环境变量（可以通过运行 `echo $HADOOP_CLASSPATH` 来检查）。如果没有，请使用以下方式进行设置。
+- 一定要确保设置了 `HADOOP_CLASSPATH` 环境变量（可以通过运行 `echo $HADOOP_CLASSPATH` 来检查）。如果没有，请使用以下命令进行设置。
 
 ```bash
 export HADOOP_CLASSPATH=`hadoop classpath`
@@ -46,8 +46,8 @@ export HADOOP_CLASSPATH=`hadoop classpath`
 ## Session 模式
 
 Flink 在所有类 UNIX 的环境中运行，即在 Linux、Mac OS X 以及（针对 Windows 的）Cygwin 上运行。
-您可以参考[概览]({{< ref "docs/connectors/pipeline-connectors/overview" >}})来检查支持的版本并下载[Flink二进制版本](https://flink.apache.org/downloads/)，
-然后提取该归档文件：
+你可以参考[概览]({{< ref "docs/connectors/pipeline-connectors/overview" >}})来检查支持的版本并下载[Flink二进制版本](https://flink.apache.org/downloads/)，
+然后解压文件：
 
 ```bash
 tar -xzf flink-*.tgz
