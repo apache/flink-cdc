@@ -192,8 +192,11 @@ public class MySqlSnapshotSplitReadTask
         } else {
             // Get the current binlog offset as HW
             highWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection);
-            long epochSecond = clock.currentTime().getEpochSecond();
-            highWatermark.getOffset().put(BinlogOffset.TIMESTAMP_KEY, String.valueOf(epochSecond));
+            highWatermark
+                    .getOffset()
+                    .put(
+                            BinlogOffset.TIMESTAMP_KEY,
+                            String.valueOf(clock.currentTime().getEpochSecond()));
         }
 
         LOG.info(
