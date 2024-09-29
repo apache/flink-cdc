@@ -235,7 +235,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
             configFactory.chunkKeyColumn(chunkKeyColumnMap);
         }
 
-        return new MySqlDataSource(configFactory);
+        return new MySqlDataSource(configFactory, context.getPipelineConfiguration());
     }
 
     @Override
