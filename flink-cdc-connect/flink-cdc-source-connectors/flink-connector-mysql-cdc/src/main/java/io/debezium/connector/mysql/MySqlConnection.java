@@ -23,6 +23,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.history.DatabaseHistory;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.util.Strings;
+import org.apache.kafka.connect.errors.ConnectException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Copied from Debezium project(1.9.8.final) to add custom jdbc properties in the jdbc url. The new
@@ -74,6 +76,8 @@ public class MySqlConnection extends JdbcConnection {
 
     private final String urlPattern;
 
+    private final boolean isMariaDB;
+
     /**
      * Creates a new connection using the supplied configuration.
      *
@@ -90,6 +94,7 @@ public class MySqlConnection extends JdbcConnection {
         this.connectionConfig = connectionConfig;
         this.mysqlFieldReader = fieldReader;
         this.urlPattern = connectionConfig.getUrlPattern();
+        this.isMariaDB = queryIsMariadb();
     }
 
     /**
@@ -138,6 +143,28 @@ public class MySqlConnection extends JdbcConnection {
         // Read the system variables from the MySQL instance and get the current database name ...
         LOGGER.debug("Reading MySQL system variables");
         return querySystemVariables(SQL_SHOW_SYSTEM_VARIABLES);
+    }
+
+    public boolean isMariaDB() {
+        return isMariaDB;
+    }
+
+    private boolean queryIsMariadb() {
+        AtomicReference<Boolean> mode = new AtomicReference<>(false);
+        try {
+            query(
+                    "SELECT VERSION()",
+                    rs -> {
+                        if (rs.next()) {
+                            String version = rs.getString(1);
+                            mode.set(version.toLowerCase().contains("mariadb"));
+                        }
+                    });
+        } catch (SQLException e) {
+            throw new ConnectException(
+                    "Unexpected error while connecting to MySQL and looking at GTID mode: ", e);
+        }
+        return mode.get();
     }
 
     private Map<String, String> querySystemVariables(String statement) {
@@ -252,14 +279,25 @@ public class MySqlConnection extends JdbcConnection {
      */
     public boolean isGtidModeEnabled() {
         try {
-            return queryAndMap(
-                    "SHOW GLOBAL VARIABLES LIKE 'GTID_MODE'",
-                    rs -> {
-                        if (rs.next()) {
-                            return !"OFF".equalsIgnoreCase(rs.getString(2));
-                        }
-                        return false;
-                    });
+            if (isMariaDB) {
+                return queryAndMap(
+                        "SHOW GLOBAL VARIABLES LIKE 'GTID_CURRENT_POS'",
+                        rs -> {
+                            if (rs.next()) {
+                                return !"".equalsIgnoreCase(rs.getString(2));
+                            }
+                            return false;
+                        });
+            } else {
+                return queryAndMap(
+                        "SHOW GLOBAL VARIABLES LIKE 'GTID_MODE'",
+                        rs -> {
+                            if (rs.next()) {
+                                return !"OFF".equalsIgnoreCase(rs.getString(2));
+                            }
+                            return false;
+                        });
+            }
         } catch (SQLException e) {
             throw new DebeziumException(
                     "Unexpected error while connecting to MySQL and looking at GTID mode: ", e);
@@ -274,15 +312,27 @@ public class MySqlConnection extends JdbcConnection {
      */
     public String knownGtidSet() {
         try {
-            return queryAndMap(
-                    "SHOW MASTER STATUS",
-                    rs -> {
-                        if (rs.next() && rs.getMetaData().getColumnCount() > 4) {
-                            return rs.getString(
-                                    5); // GTID set, may be null, blank, or contain a GTID set
-                        }
-                        return "";
-                    });
+            if (isMariaDB) {
+                return queryAndMap(
+                        "SHOW GLOBAL VARIABLES LIKE 'GTID_CURRENT_POS';",
+                        rs -> {
+                            if (rs.next()) {
+                                return rs.getString(
+                                        2); // GTID set, may be null, blank, or contain a GTID set
+                            }
+                            return "";
+                        });
+            } else {
+                return queryAndMap(
+                        "SHOW MASTER STATUS",
+                        rs -> {
+                            if (rs.next() && rs.getMetaData().getColumnCount() > 4) {
+                                return rs.getString(
+                                        5); // GTID set, may be null, blank, or contain a GTID set
+                            }
+                            return "";
+                        });
+            }
         } catch (SQLException e) {
             throw new DebeziumException(
                     "Unexpected error while connecting to MySQL and looking at GTID mode: ", e);
