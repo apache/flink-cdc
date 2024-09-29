@@ -105,14 +105,18 @@ class SchemaDerivationTest {
         AddColumnEvent.ColumnWithPosition newCol2 =
                 new AddColumnEvent.ColumnWithPosition(
                         new PhysicalColumn("new_col2", DataTypes.STRING(), null));
-        List<AddColumnEvent.ColumnWithPosition> newColumns = Arrays.asList(newCol1, newCol2);
+        AddColumnEvent.ColumnWithPosition newCol3 =
+                new AddColumnEvent.ColumnWithPosition(
+                        new PhysicalColumn("new_col3", DataTypes.STRING(), null, "abc"));
+        List<AddColumnEvent.ColumnWithPosition> newColumns =
+                Arrays.asList(newCol1, newCol2, newCol3);
         List<SchemaChangeEvent> derivedChangesAfterAddColumn =
                 schemaDerivation.applySchemaChange(new AddColumnEvent(TABLE_1, newColumns));
         assertThat(derivedChangesAfterAddColumn).hasSize(1);
         assertThat(derivedChangesAfterAddColumn.get(0))
                 .asAddColumnEvent()
                 .hasTableId(MERGED_TABLE)
-                .containsAddedColumns(newCol1, newCol2);
+                .containsAddedColumns(newCol1, newCol2, newCol3);
 
         // Alter column type
         ImmutableMap<String, DataType> typeMapping = ImmutableMap.of("age", DataTypes.BIGINT());
