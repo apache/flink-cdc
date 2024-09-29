@@ -482,6 +482,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                                 + " weight DECIMAL(10,3),"
                                 + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
                                 + " collection_name STRING METADATA VIRTUAL,"
+                                + " op_type STRING METADATA VIRTUAL,"
                                 + " PRIMARY KEY (_id) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'mongodb-cdc',"
@@ -508,6 +509,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                         + " weight DECIMAL(10,3),"
                         + " database_name STRING,"
                         + " collection_name STRING,"
+                        + " op_type STRING,"
                         + " PRIMARY KEY (_id) NOT ENFORCED"
                         + ") WITH ("
                         + " 'connector' = 'values',"
@@ -562,22 +564,24 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
 
         List<String> expected =
                 Stream.of(
-                                "+I(100000000000000000000101,scooter,Small 2-wheel scooter,3.140,%s,products)",
-                                "+I(100000000000000000000102,car battery,12V car battery,8.100,%s,products)",
-                                "+I(100000000000000000000103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.800,%s,products)",
-                                "+I(100000000000000000000104,hammer,12oz carpenter''s hammer,0.750,%s,products)",
-                                "+I(100000000000000000000105,hammer,12oz carpenter''s hammer,0.875,%s,products)",
-                                "+I(100000000000000000000106,hammer,12oz carpenter''s hammer,1.000,%s,products)",
-                                "+I(100000000000000000000107,rocks,box of assorted rocks,5.300,%s,products)",
-                                "+I(100000000000000000000108,jacket,water resistent black wind breaker,0.100,%s,products)",
-                                "+I(100000000000000000000109,spare tire,24 inch spare tire,22.200,%s,products)",
-                                "+I(100000000000000000000110,jacket,water resistent white wind breaker,0.200,%s,products)",
-                                "+I(100000000000000000000111,scooter,Big 2-wheel scooter,5.180,%s,products)",
-                                "+U(100000000000000000000106,hammer,18oz carpenter hammer,1.000,%s,products)",
-                                "+U(100000000000000000000107,rocks,box of assorted rocks,5.100,%s,products)",
-                                "+U(100000000000000000000110,jacket,new water resistent white wind breaker,0.500,%s,products)",
-                                "+U(100000000000000000000111,scooter,Big 2-wheel scooter,5.170,%s,products)",
-                                "-D(100000000000000000000111,scooter,Big 2-wheel scooter,5.170,%s,products)")
+                                "+I(100000000000000000000101,scooter,Small 2-wheel scooter,3.140,%s,products,insert)",
+                                "+I(100000000000000000000102,car battery,12V car battery,8.100,%s,products,insert)",
+                                "+I(100000000000000000000103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.800,%s,products,insert)",
+                                "+I(100000000000000000000104,hammer,12oz carpenter''s hammer,0.750,%s,products,insert)",
+                                "+I(100000000000000000000105,hammer,12oz carpenter''s hammer,0.875,%s,products,insert)",
+                                "+I(100000000000000000000106,hammer,12oz carpenter''s hammer,1.000,%s,products,insert)",
+                                "+I(100000000000000000000107,rocks,box of assorted rocks,5.300,%s,products,insert)",
+                                "+I(100000000000000000000108,jacket,water resistent black wind breaker,0.100,%s,products,insert)",
+                                "+I(100000000000000000000109,spare tire,24 inch spare tire,22.200,%s,products,insert)",
+                                "+I(100000000000000000000110,jacket,water resistent white wind breaker,0.200,%s,products,insert)",
+                                "+I(100000000000000000000111,scooter,Big 2-wheel scooter,5.180,%s,products,insert)",
+                                "+U(100000000000000000000106,hammer,18oz carpenter hammer,1.000,%s,products,update)",
+                                "+U(100000000000000000000107,rocks,box of assorted rocks,5.100,%s,products,update)",
+                                "+U(100000000000000000000110,jacket,new water resistent white wind breaker,0.500,%s,products,update)",
+                                "+U(100000000000000000000111,scooter,Big 2-wheel scooter,5.170,%s,products,update)",
+                                // NOTE: DeduplicateFunctionHelper#processLastRowOnChangelog returns
+                                // the preRow before deletion, so the `op_type` is 'update' here.
+                                "-D(100000000000000000000111,scooter,Big 2-wheel scooter,5.170,%s,products,update)")
                         .map(s -> String.format(s, database))
                         .sorted()
                         .collect(Collectors.toList());

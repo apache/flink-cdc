@@ -81,6 +81,20 @@ public enum MongoDBReadableMetadata {
                     return TimestampData.fromEpochMillis(
                             (Long) source.get(AbstractSourceInfo.TIMESTAMP_KEY));
                 }
+            }),
+
+    OP_TYPE(
+            "op_type",
+            DataTypes.STRING().notNull(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record) {
+                    Struct value = (Struct) record.value();
+                    String opType = value.getString(MongoDBEnvelope.OPERATION_TYPE_FIELD);
+                    return StringData.fromString(opType);
+                }
             });
 
     private final String key;
