@@ -272,6 +272,8 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                 stoppingOffset,
                 divideMetaToGroups ? new ArrayList<>() : finishedSnapshotSplitInfos,
                 new HashMap<>(),
-                finishedSnapshotSplitInfos.size());
+                finishedSnapshotSplitInfos.size(),
+                false,
+                true);
     }
 }
