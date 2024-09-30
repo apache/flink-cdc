@@ -44,11 +44,7 @@ import org.apache.paimon.table.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
@@ -160,15 +156,24 @@ public class PaimonMetadataApplier implements MetadataApplier {
                     .forEach(
                             (column) ->
                                     builder.column(
-                                            column.getName(),
+                                            column.getName().toLowerCase(),
                                             LogicalTypeConversion.toDataType(
                                                     DataTypeUtils.toFlinkDataType(column.getType())
                                                             .getLogicalType())));
-            builder.primaryKey(schema.primaryKeys().toArray(new String[0]));
+            builder.primaryKey(schema.primaryKeys().toString().toLowerCase().replaceAll("\\[|]", ""));
             if (partitionMaps.containsKey(event.tableId())) {
-                builder.partitionKeys(partitionMaps.get(event.tableId()));
+                builder.partitionKeys(partitionMaps.get(event.tableId()).
+                                                    toString().
+                                                    replaceAll("\\[|]", "").
+                                                    replaceAll(" ", "").
+                                                    toLowerCase().
+                                                    split(","));
             } else if (schema.partitionKeys() != null && !schema.partitionKeys().isEmpty()) {
-                builder.partitionKeys(schema.partitionKeys());
+                builder.partitionKeys(schema.partitionKeys().toString().
+                                                             replaceAll("\\[|]", "").
+                                                             replaceAll(" ", "").
+                                                             toLowerCase().
+                                                             split(","));
             }
             builder.options(tableOptions);
             builder.options(schema.options());
@@ -296,7 +301,7 @@ public class PaimonMetadataApplier implements MetadataApplier {
                     .forEach(
                             (oldName, newName) ->
                                     tableChangeList.add(
-                                            SchemaChangeProvider.rename(oldName, newName)));
+                                            SchemaChangeProvider.rename(oldName.toLowerCase(), newName.toLowerCase())));
             catalog.alterTable(
                     new Identifier(event.tableId().getSchemaName(), event.tableId().getTableName()),
                     tableChangeList,
