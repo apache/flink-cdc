@@ -97,29 +97,23 @@ jobs:
   compile_and_test:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    strategy:
-      matrix:
-        java-version: ${{ inputs.java-version }}
-        flink-version: ${{ inputs.flink-version }}
-        module: ${{ inputs.module }}
-        custom-maven-parameter: ${{ inputs.custom-maven-parameter }}
     steps:
       - run: echo "Running CI pipeline for JDK version ${{ inputs.java-version }}"
 
       - name: Clean up disk space
         run: |
           set -euo pipefail
-  
+
           echo "Disk space before cleanup"
           df -h 
-  
+
           echo "Cleaning up disk space"
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
-  
+
           echo "Disk space after cleanup"
           df -h
 
@@ -144,7 +138,7 @@ jobs:
         timeout-minutes: 60
         run: |
           set -o pipefail
-  
+
           case ${{ inputs.module }} in
               ("core")
                modules=${{ env.MODULES_CORE }}
@@ -197,7 +191,7 @@ jobs:
           fi
           
           build_maven_parameter=""
-  
+
           if [ ${{ inputs.module }} == "mongodb6" ]; then
             build_maven_parameter="-DspecifiedMongoVersion=6.0.16"
           elif [ ${{ inputs.module }} == "mongodb7" ]; then
