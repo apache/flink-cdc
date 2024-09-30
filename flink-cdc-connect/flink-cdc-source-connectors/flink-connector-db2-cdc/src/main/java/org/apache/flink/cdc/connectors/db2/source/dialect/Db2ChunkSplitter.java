@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.JdbcSourceChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.db2.source.utils.Db2TypeUtils;
 import org.apache.flink.cdc.connectors.db2.source.utils.Db2Utils;
 import org.apache.flink.table.types.DataType;
@@ -37,8 +38,11 @@ import java.sql.SQLException;
 @Internal
 public class Db2ChunkSplitter extends JdbcSourceChunkSplitter {
 
-    public Db2ChunkSplitter(JdbcSourceConfig sourceConfig, JdbcDataSourceDialect dialect) {
-        super(sourceConfig, dialect);
+    public Db2ChunkSplitter(
+            JdbcSourceConfig sourceConfig,
+            JdbcDataSourceDialect dialect,
+            ChunkSplitterState chunkSplitterState) {
+        super(sourceConfig, dialect, chunkSplitterState);
     }
 
     @Override

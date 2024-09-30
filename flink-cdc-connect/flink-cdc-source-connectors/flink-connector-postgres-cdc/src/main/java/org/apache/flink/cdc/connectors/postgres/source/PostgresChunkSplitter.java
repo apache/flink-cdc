@@ -19,7 +19,9 @@ package org.apache.flink.cdc.connectors.postgres.source;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
+import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.JdbcSourceChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresQueryUtils;
 import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresTypeUtils;
 import org.apache.flink.table.types.DataType;
@@ -36,8 +38,11 @@ import java.sql.SQLException;
 @Internal
 public class PostgresChunkSplitter extends JdbcSourceChunkSplitter {
 
-    public PostgresChunkSplitter(JdbcSourceConfig sourceConfig, PostgresDialect postgresDialect) {
-        super(sourceConfig, postgresDialect);
+    public PostgresChunkSplitter(
+            JdbcSourceConfig sourceConfig,
+            JdbcDataSourceDialect dialect,
+            ChunkSplitterState chunkSplitterState) {
+        super(sourceConfig, dialect, chunkSplitterState);
     }
 
     @Override

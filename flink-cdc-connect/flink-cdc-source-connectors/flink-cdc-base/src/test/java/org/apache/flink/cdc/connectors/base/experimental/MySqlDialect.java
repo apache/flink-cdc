@@ -30,6 +30,7 @@ import org.apache.flink.cdc.connectors.base.experimental.utils.TableDiscoveryUti
 import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionFactory;
 import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
@@ -105,7 +106,14 @@ public class MySqlDialect implements JdbcDataSourceDialect {
 
     @Override
     public ChunkSplitter createChunkSplitter(JdbcSourceConfig sourceConfig) {
-        return new MySqlChunkSplitter(sourceConfig, this);
+        return new MySqlChunkSplitter(
+                sourceConfig, this, ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
+    }
+
+    @Override
+    public ChunkSplitter createChunkSplitter(
+            JdbcSourceConfig sourceConfig, ChunkSplitterState chunkSplitterState) {
+        return new MySqlChunkSplitter(sourceConfig, this, chunkSplitterState);
     }
 
     @Override
