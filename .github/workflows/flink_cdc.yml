@@ -46,16 +46,54 @@ concurrency:
 jobs:
   license_check:
     name: License Check
-    uses: ./.github/workflows/license_check.yml
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Set up Ruby environment
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Compiling jar packages
+        run: mvn --no-snapshot-updates -B package -DskipTests
+      - name: Run license check
+        run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
   ut:
+    strategy:
+      matrix:
+        java-version: [ '8' ]
+        module: [ 'core', 'pipeline_connectors', 'mysql', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase', 'db2', 'vitess' ]
     name: Unit Tests
-    uses: ./.github/workflows/flink_cdc_ut.yml
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-version: ${{ matrix.java-version }}
+      module: ${{ matrix.module }}
   pipeline_e2e:
+    strategy:
+      matrix:
+        java-version: [ '8' ]
+        flink-version: ['1.17.2', '1.18.1', '1.19.1', '1.20.0']
+        module: [ 'pipeline_e2e' ]
     name: Pipeline End-to-end Tests
-    uses: ./.github/workflows/flink_cdc_pipeline_e2e.yml
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-version: ${{ matrix.java-version }}
+      flink-version: ${{ matrix.flink-version }}
+      module: ${{ matrix.module }}
   source_e2e:
+    strategy:
+      matrix:
+        java-version: [ '8' ]
+        flink-version: ['1.16.3', '1.17.2', '1.18.1', '1.19.1', '1.20.0']
+        module: [ 'source_e2e' ]
     name: Source End-to-end Tests
-    uses: ./.github/workflows/flink_cdc_source_e2e.yml
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-version: ${{ matrix.java-version }}
+      flink-version: ${{ matrix.flink-version }}
+      module: ${{ matrix.module }}
   migration_test:
     name: Migration Tests
     uses: ./.github/workflows/flink_cdc_migration_test.yml

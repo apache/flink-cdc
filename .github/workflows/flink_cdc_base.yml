@@ -13,10 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Source End-to-end Tests
+name: Flink CDC Base Workflow
 
 on:
   workflow_call:
+    inputs:
+      java-version:
+        description: "Jdk version to test against."
+        required: false
+        type: string
+        default: "8"
+      flink-version:
+        description: "Flink version to test against."
+        required: false
+        type: string
+      module:
+        description: "Flink CDC module to test against."
+        required: true
+        type: string
+      custom-maven-parameter:
+        description: "Custom maven parameter."
+        required: false
+        type: string
 
 env:
   MODULES_CORE: "\
@@ -76,12 +94,8 @@ env:
   flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 
 jobs:
-  flink_cdc_source_e2e_tests:
+  compile_and_test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        jdk: [ 8 ]
-        flink-version: ['1.16.3', '1.17.2', '1.18.1', '1.19.1', '1.20.0']
     timeout-minutes: 120
     env:
       MVN_COMMON_OPTIONS: -Dmaven.wagon.http.pool=false \
@@ -93,7 +107,7 @@ jobs:
         -Dfast -Dlog.dir=/home/vsts/work/_temp/debug_files \
         -Dlog4j.configurationFile=file:///home/vsts/work/1/s/tools/ci/log4j.properties
     steps:
-      - run: echo "Running CI pipeline for JDK version ${{ matrix.jdk }}"
+      - run: echo "Running CI pipeline for JDK version ${{ inputs.java-version }}"
 
       - name: Clean up disk space
         run: |
@@ -120,7 +134,7 @@ jobs:
       - name: Set JDK
         uses: actions/setup-java@v4
         with:
-          java-version: ${{ matrix.jdk }}
+          java-version: ${{ inputs.java-version }}
           distribution: 'temurin'
           cache: 'maven'
 
@@ -129,30 +143,84 @@ jobs:
         with:
           maven-version: 3.8.6
 
-      - name: Compile and test ${{ matrix.module }}
-        timeout-minutes: 90
+      - name: Compile and test
+        timeout-minutes: 60
         run: |
           set -o pipefail
-          compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_PIPELINE_E2E }}"
-          modules=${{ env.MODULES_SOURCE_E2E }}
-          mvn --no-snapshot-updates -B -DskipTests -pl $compile_modules -am install && mvn --no-snapshot-updates -B -DspecifiedFlinkVersion=${{ matrix.flink-version }} -pl $modules verify
+
+          case ${{ inputs.module }} in
+              ("core")
+               modules=${{ env.MODULES_CORE }}
+              ;;
+              ("pipeline_connectors")
+               modules=${{ env.MODULES_PIPELINE_CONNECTORS }}
+              ;;
+              ("mysql")
+               modules=${{ env.MODULES_MYSQL }}
+              ;;
+              ("postgres")
+               modules=${{ env.MODULES_POSTGRES }}
+              ;;
+              ("oracle")
+               modules=${{ env.MODULES_ORACLE }}
+              ;;
+              ("mongodb6")
+               modules=${{ env.MODULES_MONGODB }}
+              ;;
+              ("mongodb7")
+               modules=${{ env.MODULES_MONGODB }}
+              ;;
+              ("sqlserver")
+               modules=${{ env.MODULES_SQLSERVER }}
+              ;;
+              ("tidb")
+               modules=${{ env.MODULES_TIDB }}
+              ;;
+              ("oceanbase")
+               modules=${{ env.MODULES_OCEANBASE }}
+              ;;
+              ("db2")
+               modules=${{ env.MODULES_DB2 }}
+              ;;
+              ("vitess")
+               modules=${{ env.MODULES_VITESS }}
+              ;;
+              ("pipeline_e2e")
+               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_PIPELINE_E2E }}"
+               modules=${{ env.MODULES_PIPELINE_E2E }}
+              ;;
+              ("source_e2e")
+               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_SOURCE_E2E }}"
+               modules=${{ env.MODULES_SOURCE_E2E }}
+              ;;
+          esac
+          
+          if [ ${{ inputs.module }} != "pipeline_e2e" ] && [ ${{ inputs.module }} != "source_e2e" ]; then
+            compile_modules=$modules
+          fi
+          
+          custom_maven_parameter=""
+
+          if [ ${{ inputs.module }} == "mongodb6" ]; then
+            custom_maven_parameter="-DspecifiedMongoVersion=6.0.16"
+          elif [ ${{ inputs.module }} == "mongodb7" ]; then
+            custom_maven_parameter="-DspecifiedMongoVersion=7.0.12"
+          fi
+          
+          if [ -z "${{ inputs.flink-version }}" ]; then
+            custom_maven_parameter="${custom_maven_parameter} -DspecifiedFlinkVersion=${{ inputs.flink-version }}"
+          fi
+          
+          mvn --no-snapshot-updates -B -DskipTests -pl $compile_modules -am install && mvn --no-snapshot-updates -B $custom_maven_parameter -pl $modules verify
 
       - name: Print JVM thread dumps when cancelled
         if: ${{ failure() }}
         run: |
-          # ----------------------------------------------------------------------------
-          # Copyright 2023 The Netty Project
-          #
-          # ----------------------------------------------------------------------------
-          # Source: https://github.com/netty/netty/blob/main/.github/actions/thread-dump-jvms/action.yml
           echo "$OSTYPE"
           if [[ "$OSTYPE" == "linux-gnu"* ]] && command -v sudo &> /dev/null; then
             echo "Setting up JVM thread dumps"
-            # use jattach so that Java processes in docker containers are also covered
-            # download jattach
             curl -s -L -o /tmp/jattach https://github.com/apangin/jattach/releases/download/v2.1/jattach
             if command -v sha256sum &> /dev/null; then
-              # verify hash of jattach binary
               sha256sum -c <(echo "07885fdc782e02e7302c6d190f54c3930afa10a38140365adf54076ec1086a8e  /tmp/jattach") || exit 1
             fi
             chmod +x /tmp/jattach
