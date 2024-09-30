@@ -381,7 +381,7 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
         return splits;
     }
 
-    private Object nextChunkEnd(
+    protected Object nextChunkEnd(
             JdbcConnection jdbc,
             Object previousChunkEnd,
             TableId tableId,

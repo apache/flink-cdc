@@ -33,16 +33,22 @@ import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import oracle.sql.ROWID;
+import org.apache.flink.util.FlinkRuntimeException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
 import java.sql.SQLException;
+import java.util.Objects;
 
 /**
  * The {@code ChunkSplitter} used to split Oracle table into a set of chunks for JDBC data source.
  */
 @Internal
 public class OracleChunkSplitter extends JdbcSourceChunkSplitter {
+
+    private final Logger LOG = LoggerFactory.getLogger(OracleChunkSplitter.class);
 
     public OracleChunkSplitter(JdbcSourceConfig sourceConfig, JdbcDataSourceDialect dialect) {
         super(sourceConfig, dialect);
@@ -65,6 +71,23 @@ public class OracleChunkSplitter extends JdbcSourceChunkSplitter {
         String quoteSchemaAndTable = OracleUtils.quoteSchemaAndTable(tableId);
         return JdbcChunkUtils.queryMin(
                 jdbc, quoteSchemaAndTable, jdbc.quotedTableIdString(tableId), excludedLowerBound);
+    }
+
+    @Override
+    protected Object nextChunkEnd(JdbcConnection jdbc, Object previousChunkEnd, TableId tableId, Column splitColumn, Object max, int chunkSize) throws SQLException {
+        // chunk end might be null when max values are removed
+        Object chunkEnd =
+                queryNextChunkMax(jdbc, tableId, splitColumn, chunkSize, previousChunkEnd);
+        if (Objects.equals(previousChunkEnd, chunkEnd)) {
+            // we don't allow equal chunk start and end,
+            // should query the next one larger than chunkEnd
+            chunkEnd = queryMin(jdbc, tableId, splitColumn, chunkEnd);
+        }
+        if (isChunkEndGeMax(jdbc, tableId, chunkEnd, max)) {
+            return null;
+        } else {
+            return chunkEnd;
+        }
     }
 
     @Override
@@ -100,32 +123,49 @@ public class OracleChunkSplitter extends JdbcSourceChunkSplitter {
         return super.isEvenlySplitColumn(splitColumn);
     }
 
-    /** ChunkEnd less than or equal to max. */
+    /**
+     * ChunkEnd less than or equal to max.
+     */
     @Override
     protected boolean isChunkEndLeMax(Object chunkEnd, Object max, Column splitColumn) {
         boolean chunkEndMaxCompare;
         if (chunkEnd instanceof ROWID && max instanceof ROWID) {
             chunkEndMaxCompare =
                     ROWID.compareBytes(((ROWID) chunkEnd).getBytes(), ((ROWID) max).getBytes())
-                            <= 0;
+                            != 0;
         } else {
             chunkEndMaxCompare = chunkEnd != null && ObjectUtils.compare(chunkEnd, max) <= 0;
         }
         return chunkEndMaxCompare;
     }
 
-    /** ChunkEnd greater than or equal to max. */
-    @Override
-    protected boolean isChunkEndGeMax(Object chunkEnd, Object max, Column splitColumn) {
+    /**
+     * ChunkEnd greater than or equal to max.
+     */
+    protected boolean isChunkEndGeMax(JdbcConnection jdbcConnection, TableId tableId, Object chunkEnd, Object max) {
         boolean chunkEndMaxCompare;
         if (chunkEnd instanceof ROWID && max instanceof ROWID) {
-            chunkEndMaxCompare =
-                    ROWID.compareBytes(((ROWID) chunkEnd).getBytes(), ((ROWID) max).getBytes())
-                            >= 0;
+            int compared = ROWID.compareBytes(((ROWID) chunkEnd).getBytes(), ((ROWID) max).getBytes());
+            if (compared == 0) {
+                return true;
+            } else if (compared < 0) {
+                return false;
+            } else {
+                return compareRowId(jdbcConnection, tableId, (ROWID) chunkEnd, (ROWID) max) >= 0;
+            }
         } else {
             chunkEndMaxCompare = chunkEnd != null && ObjectUtils.compare(chunkEnd, max) >= 0;
         }
         return chunkEndMaxCompare;
+    }
+
+    private int compareRowId(JdbcConnection jdbcConnection, TableId tableId, ROWID chunkEnd, ROWID max) {
+        try {
+            return OracleUtils.compareRowId(jdbcConnection, tableId, chunkEnd, max);
+        } catch (SQLException e) {
+            LOG.error("oracle-jdbc-compareRowId exception: table:{}, chunkEnd:{}, max:{}", tableId, chunkEnd, max);
+            throw new FlinkRuntimeException(e);
+        }
     }
 
     @Override
