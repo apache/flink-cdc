@@ -66,7 +66,7 @@ public class MongoDBTimeZoneITCase extends MongoDBSourceTestBase {
             name = "mongoVersion: {0}, localTimeZone: {1}, parallelismSnapshot: {2}")
     public static Object[] parameters() {
         List<Object[]> parameterTuples = new ArrayList<>();
-        for (String mongoVersion : MONGO_VERSIONS) {
+        for (String mongoVersion : getMongoVersions()) {
             for (String timezone : new String[] {"Asia/Shanghai", "Europe/Berlin", "UTC"}) {
                 for (boolean parallelismSnapshot : new boolean[] {true, false}) {
                     parameterTuples.add(new Object[] {mongoVersion, timezone, parallelismSnapshot});

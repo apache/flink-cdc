@@ -90,7 +90,7 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
     @Parameterized.Parameters(name = "mongoVersion: {0} parallelismSnapshot: {1}")
     public static Object[] parameters() {
         List<Object[]> parameterTuples = new ArrayList<>();
-        for (String mongoVersion : MONGO_VERSIONS) {
+        for (String mongoVersion : getMongoVersions()) {
             parameterTuples.add(new Object[] {mongoVersion, true});
             parameterTuples.add(new Object[] {mongoVersion, false});
         }
