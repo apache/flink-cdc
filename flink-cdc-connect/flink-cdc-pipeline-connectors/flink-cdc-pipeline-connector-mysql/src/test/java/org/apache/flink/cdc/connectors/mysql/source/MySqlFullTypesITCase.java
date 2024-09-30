@@ -249,7 +249,18 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                         DataTypes.TIMESTAMP_LTZ(0),
                         DataTypes.TIMESTAMP_LTZ(3),
                         DataTypes.TIMESTAMP_LTZ(6),
-                        DataTypes.TIMESTAMP_LTZ(0));
+                        DataTypes.DOUBLE(),
+                        DataTypes.DOUBLE(),
+                        DataTypes.DOUBLE(),
+                        DataTypes.DOUBLE(),
+                        DataTypes.DOUBLE(),
+                        DataTypes.DOUBLE(),
+                        DataTypes.DOUBLE(),
+                        DataTypes.DOUBLE(),
+                        DataTypes.DOUBLE(),
+                        DataTypes.DOUBLE(),
+                        DataTypes.DOUBLE(),
+                        DataTypes.DOUBLE());
 
         Object[] expectedSnapshot =
                 new Object[] {
@@ -265,7 +276,19 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
                     LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:00")),
                     LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
-                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22"))
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                    2d,
+                    3d,
+                    5d,
+                    7d,
+                    11d,
+                    13d,
+                    17d,
+                    19d,
+                    23d,
+                    29d,
+                    31d,
+                    37d
                 };
 
         Object[] expectedStreamRecord =
@@ -282,7 +305,19 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
                     LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:00")),
                     LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
-                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22"))
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                    2d,
+                    3d,
+                    5d,
+                    7d,
+                    11d,
+                    13d,
+                    17d,
+                    19d,
+                    23d,
+                    29d,
+                    31d,
+                    37d
                 };
 
         database.createAndInitialize();
