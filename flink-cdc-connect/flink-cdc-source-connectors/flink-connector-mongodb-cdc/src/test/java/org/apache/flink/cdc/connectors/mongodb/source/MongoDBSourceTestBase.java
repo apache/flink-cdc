@@ -45,7 +45,14 @@ public class MongoDBSourceTestBase {
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
     }
 
-    public static final String[] MONGO_VERSIONS = {"6.0.16", "7.0.12"};
+    public static String[] getMongoVersions() {
+        String specifiedMongoVersion = System.getProperty("specifiedMongoVersion");
+        if (specifiedMongoVersion != null) {
+            return new String[] {specifiedMongoVersion};
+        } else {
+            return new String[] {"6.0.16", "7.0.12"};
+        }
+    }
 
     protected static final int DEFAULT_PARALLELISM = 4;
 

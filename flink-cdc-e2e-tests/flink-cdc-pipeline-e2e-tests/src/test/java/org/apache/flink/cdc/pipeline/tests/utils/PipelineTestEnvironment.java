@@ -53,6 +53,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -90,7 +91,12 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     @Parameterized.Parameters(name = "flinkVersion: {0}")
     public static List<String> getFlinkVersion() {
-        return Arrays.asList("1.17.2", "1.18.1", "1.19.1", "1.20.0");
+        String flinkVersion = System.getProperty("specifiedFlinkVersion");
+        if (flinkVersion != null) {
+            return Collections.singletonList(flinkVersion);
+        } else {
+            return Arrays.asList("1.17.2", "1.18.1", "1.19.1", "1.20.0");
+        }
     }
 
     @Before
