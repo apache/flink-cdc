@@ -164,7 +164,12 @@ public class MySqlTypeUtils {
             case FLOAT:
             case FLOAT_UNSIGNED:
             case FLOAT_UNSIGNED_ZEROFILL:
-                return DataTypes.FLOAT();
+                if (column.length() != -1) {
+                    // For FLOAT types with length provided explicitly, treat it like DOUBLE
+                    return DataTypes.DOUBLE();
+                } else {
+                    return DataTypes.FLOAT();
+                }
             case REAL:
             case REAL_UNSIGNED:
             case REAL_UNSIGNED_ZEROFILL:
@@ -236,7 +241,7 @@ public class MySqlTypeUtils {
                 return DataTypes.ARRAY(DataTypes.STRING());
             default:
                 throw new UnsupportedOperationException(
-                        String.format("Don't support MySQL type '%s' yet.", typeName));
+                        String.format("MySQL type '%s' is not supported yet.", typeName));
         }
     }
 
