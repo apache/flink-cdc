@@ -26,7 +26,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
@@ -67,17 +66,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
         LOG.info("Starting containers...");
 
         oracle =
-                new OracleContainer(
-                                DockerImageName.parse(ORACLE_IMAGE)
-                                        .withTag(
-                                                DockerClientFactory.instance()
-                                                                .client()
-                                                                .versionCmd()
-                                                                .exec()
-                                                                .getArch()
-                                                                .equals("amd64")
-                                                        ? "non-cdb"
-                                                        : "arm-non-cdb"))
+                new OracleContainer(DockerImageName.parse(ORACLE_IMAGE).withTag("non-cdb"))
                         .withUsername(CONNECTOR_USER)
                         .withPassword(CONNECTOR_PWD)
                         .withDatabaseName(ORACLE_DATABASE)
