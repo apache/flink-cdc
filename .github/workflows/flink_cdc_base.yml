@@ -97,15 +97,6 @@ jobs:
   compile_and_test:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    env:
-      MVN_COMMON_OPTIONS: -Dmaven.wagon.http.pool=false \
-        -Dorg.slf4j.simpleLogger.showDateTime=true \
-        -Dorg.slf4j.simpleLogger.dateTimeFormat=HH:mm:ss.SSS \
-        -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn \
-        --no-snapshot-updates -B \
-        --settings /home/vsts/work/1/s/tools/ci/google-mirror-settings.xml \
-        -Dfast -Dlog.dir=/home/vsts/work/_temp/debug_files \
-        -Dlog4j.configurationFile=file:///home/vsts/work/1/s/tools/ci/log4j.properties
     steps:
       - run: echo "Running CI pipeline for JDK version ${{ inputs.java-version }}"
 
@@ -199,19 +190,21 @@ jobs:
             compile_modules=$modules
           fi
           
-          custom_maven_parameter=""
+          build_maven_parameter=""
 
           if [ ${{ inputs.module }} == "mongodb6" ]; then
-            custom_maven_parameter="-DspecifiedMongoVersion=6.0.16"
+            build_maven_parameter="-DspecifiedMongoVersion=6.0.16"
           elif [ ${{ inputs.module }} == "mongodb7" ]; then
-            custom_maven_parameter="-DspecifiedMongoVersion=7.0.12"
+            build_maven_parameter="-DspecifiedMongoVersion=7.0.12"
           fi
           
-          if [ -z "${{ inputs.flink-version }}" ]; then
-            custom_maven_parameter="${custom_maven_parameter} -DspecifiedFlinkVersion=${{ inputs.flink-version }}"
+          if [ ! -z "${{ inputs.flink-version }}" ]; then
+            build_maven_parameter="${build_maven_parameter:+$build_maven_parameter }-DspecifiedFlinkVersion=${{ inputs.flink-version }}"
           fi
           
-          mvn --no-snapshot-updates -B -DskipTests -pl $compile_modules -am install && mvn --no-snapshot-updates -B $custom_maven_parameter -pl $modules verify
+          build_maven_parameter="${build_maven_parameter:+$build_maven_parameter }${{ inputs.custom-maven-parameter }}"
+          
+          mvn --no-snapshot-updates -B -DskipTests -pl $compile_modules -am install && mvn --no-snapshot-updates -B $build_maven_parameter -pl $modules verify
 
       - name: Print JVM thread dumps when cancelled
         if: ${{ failure() }}
