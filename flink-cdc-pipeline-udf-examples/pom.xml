@@ -31,7 +31,7 @@ limitations under the License.
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <scala.plugin.version>4.9.2</scala.plugin.version>
+        <scala.plugin.version>4.8.0</scala.plugin.version>
         <compiler.encoding>UTF-8</compiler.encoding>
     </properties>
     <dependencies>
