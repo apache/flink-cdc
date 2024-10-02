@@ -199,7 +199,7 @@ public abstract class SourceSplitSerializer
             boolean useCatalogBeforeSchema =
                     SerializerUtils.shouldUseCatalogBeforeSchema(entry.getKey());
             out.writeBoolean(useCatalogBeforeSchema);
-            out.writeUTF(entry.getKey().toString());
+            out.writeUTF(entry.getKey().toDoubleQuotedString());
             final String tableChangeStr =
                     documentWriter.write(jsonSerializer.toDocument(entry.getValue()));
             final byte[] tableChangeBytes = tableChangeStr.getBytes(StandardCharsets.UTF_8);

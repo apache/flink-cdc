@@ -24,7 +24,10 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.version4.StreamSpl
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.RowType;
 
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
+import io.debezium.relational.history.TableChanges;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -49,6 +52,7 @@ public class SourceSplitSerializerTest {
                                 sourceSplitSerializer.serialize(snapshotSplitBefore));
 
         assertEquals(snapshotSplitBefore, snapshotSplitAfter);
+        assertEquals(snapshotSplitBefore.getTableSchemas(), snapshotSplitAfter.getTableSchemas());
 
         StreamSplit streamSplitBefore = constuctStreamSplit(true);
         StreamSplit streamSplitAfter =
@@ -86,15 +90,22 @@ public class SourceSplitSerializerTest {
     }
 
     private SnapshotSplit constuctSnapshotSplit() {
+        TableId tableId = new TableId("cata`log\"", "s\"che`ma", "ta\"ble.1`");
+        HashMap<TableId, TableChanges.TableChange> map = new HashMap<>();
+        Tables tables = new Tables();
+        Table table = tables.editOrCreateTable(tableId).create();
+        TableChanges.TableChange tableChange =
+                new TableChanges.TableChange(TableChanges.TableChangeType.CREATE, table);
+        map.put(tableId, tableChange);
         return new SnapshotSplit(
-                new TableId("cata`log\"", "s\"che`ma", "ta\"ble.1`"),
+                tableId,
                 "test",
                 new RowType(
                         Collections.singletonList(new RowType.RowField("id", new BigIntType()))),
                 null,
                 null,
                 null,
-                new HashMap<>());
+                map);
     }
 
     private StreamSplit constuctStreamSplit(boolean isSuspend) {
