@@ -318,10 +318,8 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
 
                 while (rs.next()) {
                     rows++;
-                    final Object[] row = new Object[columnArray.getGreatestColumnPosition()];
-                    for (int i = 0; i < columnArray.getColumns().length; i++) {
-                        row[columnArray.getColumns()[i].position() - 1] = rs.getObject(i + 1);
-                    }
+                    final Object[] row = jdbcConnection.rowToArray(table, null, rs, columnArray);
+
                     if (logTimer.expired()) {
                         long stop = clock.currentTimeInMillis();
                         LOG.info(
