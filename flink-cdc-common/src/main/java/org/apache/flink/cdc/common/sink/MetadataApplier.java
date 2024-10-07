@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 /** {@code MetadataApplier} is used to apply metadata changes to external systems. */
 @PublicEvolving
-public interface MetadataApplier extends Serializable {
+public interface MetadataApplier extends Serializable, AutoCloseable {
 
     /** Apply the given {@link SchemaChangeEvent} to external systems. */
     void applySchemaChange(SchemaChangeEvent schemaChangeEvent) throws SchemaEvolveException;
@@ -50,4 +50,8 @@ public interface MetadataApplier extends Serializable {
     default Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
         return Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet());
     }
+
+    /** Closes the metadata applier and its underlying resources. */
+    @Override
+    default void close() throws Exception {}
 }
