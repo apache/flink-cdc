@@ -123,6 +123,10 @@ public class NullableSerializerWrapper<T> extends TypeSerializer<T> {
         return new NullableSerializerWrapperSnapshot<>(innerSerializer);
     }
 
+    public TypeSerializer<T> getWrappedSerializer() {
+        return innerSerializer;
+    }
+
     /** Serializer configuration snapshot for compatibility and format evolution. */
     @SuppressWarnings("WeakerAccess")
     public static final class NullableSerializerWrapperSnapshot<T>
