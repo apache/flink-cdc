@@ -145,7 +145,7 @@ public class SqlServerTestBase extends AbstractTestBase {
                                                                 "ALTER DATABASE [%s] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;",
                                                                 databaseName));
                                     } catch (SQLException e2) {
-                                        LOG.error("Failed to rollbackimmediately", e2);
+                                        LOG.error("Failed to rollback immediately", e2);
                                     }
                                     return false;
                                 }
@@ -167,7 +167,7 @@ public class SqlServerTestBase extends AbstractTestBase {
     }
 
     /**
-     * Executes a JDBC statement using the default jdbc config without autocommitting the
+     * Executes a JDBC statement using the default jdbc config without auto committing the
      * connection.
      */
     protected void initializeSqlServerTable(String sqlFile) {

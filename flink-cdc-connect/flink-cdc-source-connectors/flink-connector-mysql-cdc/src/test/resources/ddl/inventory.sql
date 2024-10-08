@@ -34,7 +34,7 @@ VALUES (default,"scooter","Small 2-wheel scooter",3.14),
        (default,"hammer","14oz carpenter's hammer",0.875),
        (default,"hammer","16oz carpenter's hammer",1.0),
        (default,"rocks","box of assorted rocks",5.3),
-       (default,"jacket","water resistent black wind breaker",0.1),
+       (default,"jacket","water resistant black wind breaker",0.1),
        (default,"spare tire","24 inch spare tire",22.2);
 
 -- Create and populate our products using a single insert with many rows
@@ -56,7 +56,7 @@ VALUES (100,"scooter","Small 2-wheel scooter",3.14),
        (104,"rocks","box of assorted rocks",5.3),
        (104,"rocks","box of assorted rocks",5.3),
        (104,"rocks","box of assorted rocks",5.3),
-       (105,"jacket","water resistent black wind breaker",0.1),
+       (105,"jacket","water resistant black wind breaker",0.1),
        (106,"spare tire","24 inch spare tire",22.2);
 
 -- Create and populate the products on hand using multiple inserts

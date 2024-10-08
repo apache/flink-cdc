@@ -165,11 +165,11 @@ public class Db2ConnectorITCase extends Db2TestBase {
                     "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106;");
             statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT='5.1' WHERE ID=107;");
             statement.execute(
-                    "INSERT INTO DB2INST1.PRODUCTS VALUES (110,'jacket','water resistent white wind breaker',0.2);");
+                    "INSERT INTO DB2INST1.PRODUCTS VALUES (110,'jacket','water resistant white wind breaker',0.2);");
             statement.execute(
                     "INSERT INTO DB2INST1.PRODUCTS VALUES (111,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='new water resistent white wind breaker', WEIGHT='0.5' WHERE ID=110;");
+                    "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='new water resistant white wind breaker', WEIGHT='0.5' WHERE ID=110;");
             statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT='5.17' WHERE ID=111;");
             statement.execute("DELETE FROM DB2INST1.PRODUCTS WHERE ID=111;");
         }
@@ -191,9 +191,9 @@ public class Db2ConnectorITCase extends Db2TestBase {
          * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
          * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
          * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
-         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 108 | jacket             | water resistant black wind breaker                      |    0.1 |
          * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
-         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * | 110 | jacket             | new water resistant white wind breaker                  |    0.5 |
          * +-----+--------------------+---------------------------------------------------------+--------+
          * </pre>
          */
@@ -359,11 +359,11 @@ public class Db2ConnectorITCase extends Db2TestBase {
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
-                    "INSERT INTO DB2INST1.PRODUCTS VALUES (default,'jacket','water resistent white wind breaker',0.2)");
+                    "INSERT INTO DB2INST1.PRODUCTS VALUES (default,'jacket','water resistant white wind breaker',0.2)");
             statement.execute(
                     "INSERT INTO DB2INST1.PRODUCTS VALUES (default,'scooter','Big 2-wheel scooter ',5.18)");
             statement.execute(
-                    "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='new water resistent white wind breaker', WEIGHT='0.5' WHERE ID=110");
+                    "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='new water resistant white wind breaker', WEIGHT='0.5' WHERE ID=110");
             statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT='5.17' WHERE ID=111");
             statement.execute("DELETE FROM DB2INST1.PRODUCTS WHERE ID=111");
         }
@@ -371,7 +371,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
         waitForSinkSize("sink", 5);
 
         String[] expected =
-                new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
+                new String[] {"110,jacket,new water resistant white wind breaker,0.500"};
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
         assertThat(actual, containsInAnyOrder(expected));
@@ -440,11 +440,11 @@ public class Db2ConnectorITCase extends Db2TestBase {
                     "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='18oz carpenter hammer' WHERE ID=106;");
             statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT='5.1' WHERE ID=107;");
             statement.execute(
-                    "INSERT INTO DB2INST1.PRODUCTS VALUES (110,'jacket','water resistent white wind breaker',0.2);");
+                    "INSERT INTO DB2INST1.PRODUCTS VALUES (110,'jacket','water resistant white wind breaker',0.2);");
             statement.execute(
                     "INSERT INTO DB2INST1.PRODUCTS VALUES (111,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='new water resistent white wind breaker', WEIGHT='0.5' WHERE ID=110;");
+                    "UPDATE DB2INST1.PRODUCTS SET DESCRIPTION='new water resistant white wind breaker', WEIGHT='0.5' WHERE ID=110;");
             statement.execute("UPDATE DB2INST1.PRODUCTS SET WEIGHT='5.17' WHERE ID=111;");
             statement.execute("DELETE FROM DB2INST1.PRODUCTS WHERE ID=111;");
         }
@@ -460,13 +460,13 @@ public class Db2ConnectorITCase extends Db2TestBase {
                         "+I(testdb,DB2INST1,PRODUCTS,105,hammer,14oz carpenter's hammer,0.875)",
                         "+I(testdb,DB2INST1,PRODUCTS,106,hammer,16oz carpenter's hammer,1.000)",
                         "+I(testdb,DB2INST1,PRODUCTS,107,rocks,box of assorted rocks,5.300)",
-                        "+I(testdb,DB2INST1,PRODUCTS,108,jacket,water resistent black wind breaker,0.100)",
+                        "+I(testdb,DB2INST1,PRODUCTS,108,jacket,water resistant black wind breaker,0.100)",
                         "+I(testdb,DB2INST1,PRODUCTS,109,spare tire,24 inch spare tire,22.200)",
                         "+U(testdb,DB2INST1,PRODUCTS,106,hammer,18oz carpenter hammer,1.000)",
                         "+U(testdb,DB2INST1,PRODUCTS,107,rocks,box of assorted rocks,5.100)",
-                        "+I(testdb,DB2INST1,PRODUCTS,110,jacket,water resistent white wind breaker,0.200)",
+                        "+I(testdb,DB2INST1,PRODUCTS,110,jacket,water resistant white wind breaker,0.200)",
                         "+I(testdb,DB2INST1,PRODUCTS,111,scooter,Big 2-wheel scooter ,5.180)",
-                        "+U(testdb,DB2INST1,PRODUCTS,110,jacket,new water resistent white wind breaker,0.500)",
+                        "+U(testdb,DB2INST1,PRODUCTS,110,jacket,new water resistant white wind breaker,0.500)",
                         "+U(testdb,DB2INST1,PRODUCTS,111,scooter,Big 2-wheel scooter ,5.170)",
                         "-D(testdb,DB2INST1,PRODUCTS,111,scooter,Big 2-wheel scooter ,5.170)");
 

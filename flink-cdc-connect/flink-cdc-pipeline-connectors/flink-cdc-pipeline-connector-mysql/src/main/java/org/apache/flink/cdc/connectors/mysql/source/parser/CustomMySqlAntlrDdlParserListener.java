@@ -70,7 +70,7 @@ public class CustomMySqlAntlrDdlParserListener extends MySqlParserBaseListener
      */
     private int skippedNodesCount = 0;
 
-    /** Collection of catched exceptions. */
+    /** Collection of caught exceptions. */
     private final Collection<ParsingException> errors = new ArrayList<>();
 
     public CustomMySqlAntlrDdlParserListener(

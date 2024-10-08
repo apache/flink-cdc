@@ -227,11 +227,11 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
         }
@@ -253,9 +253,9 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
          * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
          * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
          * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
-         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 108 | jacket             | water resistant black wind breaker                      |    0.1 |
          * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
-         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * | 110 | jacket             | new water resistant white wind breaker                  |    0.5 |
          * +-----+--------------------+---------------------------------------------------------+--------+
          * </pre>
          */
@@ -350,12 +350,12 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "UPDATE products_no_pk SET description='18oz carpenter hammer' WHERE type=103;");
             statement.execute("UPDATE products_no_pk SET weight='5.1' WHERE type=106;");
             statement.execute(
-                    "INSERT INTO products_no_pk VALUES (110,'jacket','water resistent white wind breaker',0.2);");
+                    "INSERT INTO products_no_pk VALUES (110,'jacket','water resistant white wind breaker',0.2);");
             statement.execute("DELETE FROM products_no_pk WHERE type=102;");
             statement.execute(
                     "INSERT INTO products_no_pk VALUES (111,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE products_no_pk SET description='new water resistent white wind breaker', weight='0.5' WHERE type=110;");
+                    "UPDATE products_no_pk SET description='new water resistant white wind breaker', weight='0.5' WHERE type=110;");
             statement.execute("UPDATE products_no_pk SET weight='5.17' WHERE type=111;");
             statement.execute("DELETE FROM products_no_pk WHERE type=111;");
         }
@@ -378,9 +378,9 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
          * | 104  | rocks              | box of assorted rocks                                   |    5.1 |
          * | 104  | rocks              | box of assorted rocks                                   |    5.1 |
          * | 104  | rocks              | box of assorted rocks                                   |    5.1 |
-         * | 105  | jacket             | water resistent black wind breaker                      |    0.1 |
+         * | 105  | jacket             | water resistant black wind breaker                      |    0.1 |
          * | 106  | spare tire         | 24 inch spare tire                                      |    5.1 |
-         * | 110  | jacket             | new water resistent white wind breaker                  |    0.5 |
+         * | 110  | jacket             | new water resistant white wind breaker                  |    0.5 |
          * +-----+--------------------+---------------------------------------------------------+--------+
          * </pre>
          */
@@ -392,9 +392,9 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                             "+I[101, car battery, 12V car battery, 8.100]",
                             "+I[103, hammer, 18oz carpenter hammer, 1.000]",
                             "+I[104, rocks, box of assorted rocks, 5.300]",
-                            "+I[105, jacket, water resistent black wind breaker, 0.100]",
+                            "+I[105, jacket, water resistant black wind breaker, 0.100]",
                             "+I[106, spare tire, 24 inch spare tire, 5.100]",
-                            "+I[110, jacket, new water resistent white wind breaker, 0.500]"
+                            "+I[110, jacket, new water resistant white wind breaker, 0.500]"
                         }
                         : new String[] {
                             "+I[100, scooter, Small 2-wheel scooter, 3.140]",
@@ -405,9 +405,9 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                             "+I[104, rocks, box of assorted rocks, 5.300]",
                             "+I[104, rocks, box of assorted rocks, 5.300]",
                             "+I[104, rocks, box of assorted rocks, 5.300]",
-                            "+I[105, jacket, water resistent black wind breaker, 0.100]",
+                            "+I[105, jacket, water resistant black wind breaker, 0.100]",
                             "+I[106, spare tire, 24 inch spare tire, 5.100]",
-                            "+I[110, jacket, new water resistent white wind breaker, 0.500]"
+                            "+I[110, jacket, new water resistant white wind breaker, 0.500]"
                         };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
@@ -469,7 +469,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
                     "+I[106, hammer, 16oz carpenter's hammer, 1.000]",
                     "+I[107, rocks, box of assorted rocks, 5.300]",
-                    "+I[108, jacket, water resistent black wind breaker, 0.100]",
+                    "+I[108, jacket, water resistant black wind breaker, 0.100]",
                     "+I[109, spare tire, 24 inch spare tire, 22.200]"
                 };
         assertEqualsInAnyOrder(
@@ -479,21 +479,21 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
         }
 
         String[] expectedBinlog =
                 new String[] {
-                    "+I[110, jacket, water resistent white wind breaker, 0.200]",
+                    "+I[110, jacket, water resistant white wind breaker, 0.200]",
                     "+I[111, scooter, Big 2-wheel scooter , 5.180]",
-                    "-U[110, jacket, water resistent white wind breaker, 0.200]",
-                    "+U[110, jacket, new water resistent white wind breaker, 0.500]",
+                    "-U[110, jacket, water resistant white wind breaker, 0.200]",
+                    "+U[110, jacket, new water resistant white wind breaker, 0.500]",
                     "-U[111, scooter, Big 2-wheel scooter , 5.180]",
                     "+U[111, scooter, Big 2-wheel scooter , 5.170]",
                     "-D[111, scooter, Big 2-wheel scooter , 5.170]"
@@ -1077,21 +1077,21 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
         }
 
         String[] expected =
                 new String[] {
-                    "+I[110, jacket, water resistent white wind breaker, 0.200]",
+                    "+I[110, jacket, water resistant white wind breaker, 0.200]",
                     "+I[111, scooter, Big 2-wheel scooter , 5.180]",
-                    "-U[110, jacket, water resistent white wind breaker, 0.200]",
-                    "+U[110, jacket, new water resistent white wind breaker, 0.500]",
+                    "-U[110, jacket, water resistant white wind breaker, 0.200]",
+                    "+U[110, jacket, new water resistant white wind breaker, 0.500]",
                     "-U[111, scooter, Big 2-wheel scooter , 5.180]",
                     "+U[111, scooter, Big 2-wheel scooter , 5.170]",
                     "-D[111, scooter, Big 2-wheel scooter , 5.170]"
@@ -1721,7 +1721,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
         }
 
         // async submit job
@@ -1733,7 +1733,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute(
                     "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
         }
@@ -1742,7 +1742,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         waitForSinkSize("sink", 5);
 
         String[] expected =
-                new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
+                new String[] {"+I[110, jacket, new water resistant white wind breaker, 0.500]"};
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
@@ -1822,7 +1822,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
         }
 
         // async submit job
@@ -1834,7 +1834,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute(
                     "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
         }
@@ -1843,7 +1843,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         waitForSinkSize("sink", 5);
 
         String[] expected =
-                new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
+                new String[] {"+I[110, jacket, new water resistant white wind breaker, 0.500]"};
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
@@ -1897,11 +1897,11 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
             statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
         }
@@ -1918,11 +1918,11 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.800]",
                     "+I[104, hammer, 12oz carpenter's hammer, 0.750]",
                     "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
-                    "+I[108, jacket, water resistent black wind breaker, 0.100]",
+                    "+I[108, jacket, water resistant black wind breaker, 0.100]",
                     "+I[109, spare tire, 24 inch spare tire, 22.200]",
                     "+I[106, hammer, 18oz carpenter hammer, 1.000]",
                     "+I[107, rocks, box of assorted rocks, 5.100]",
-                    "+I[110, jacket, new water resistent white wind breaker, 0.500]"
+                    "+I[110, jacket, new water resistant white wind breaker, 0.500]"
                 };
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
@@ -1986,11 +1986,11 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                 Statement statement = connection.createStatement()) {
 
             statement.execute(
-                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO products VALUES (default,'jacket','water resistant white wind breaker',0.2);"); // 110
             statement.execute(
                     "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+                    "UPDATE products SET description='new water resistant white wind breaker', weight='0.5' WHERE id=110;");
             statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
             statement.execute("DELETE FROM products WHERE id=111;");
         }
@@ -1998,7 +1998,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         waitForSinkSize("sink", 5);
 
         String[] expected =
-                new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
+                new String[] {"+I[110, jacket, new water resistant white wind breaker, 0.500]"};
 
         List<String> actual = TestValuesTableFactory.getResults("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);

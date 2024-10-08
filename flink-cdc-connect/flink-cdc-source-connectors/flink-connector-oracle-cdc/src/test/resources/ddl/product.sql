@@ -50,6 +50,6 @@ INSERT INTO DEBEZIUM.PRODUCTS (ID,NAME,DESCRIPTION,WEIGHT)
 INSERT INTO DEBEZIUM.PRODUCTS (ID,NAME,DESCRIPTION,WEIGHT)
     VALUES (107,'rocks','box of assorted rocks',5.3);
 INSERT INTO DEBEZIUM.PRODUCTS (ID,NAME,DESCRIPTION,WEIGHT)
-    VALUES (108,'jacket','water resistent black wind breaker',0.1);
+    VALUES (108,'jacket','water resistant black wind breaker',0.1);
 INSERT INTO DEBEZIUM.PRODUCTS (ID,NAME,DESCRIPTION,WEIGHT)
     VALUES (109,'spare tire','24 inch spare tire',22.2);

@@ -230,7 +230,7 @@ public class TokenStream {
      *
      * <p>The {@link #ANY_VALUE ANY_VALUE} constant can be used as a wildcard.
      *
-     * @param type the expected type of the curent token
+     * @param type the expected type of the current token
      * @param expected the expected value of the current token
      * @return true if the current token did match, or false if the current token did not match
      * @throws IllegalStateException if this method was called before the stream was {@link #start()

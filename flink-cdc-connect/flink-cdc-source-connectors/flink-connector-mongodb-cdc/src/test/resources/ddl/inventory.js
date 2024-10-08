@@ -19,6 +19,6 @@ db.getCollection('products').insertMany([
 {"_id": ObjectId("100000000000000000000105"), "name": "hammer", "description": "12oz carpenter''s hammer", "weight": 0.875},
 {"_id": ObjectId("100000000000000000000106"), "name": "hammer", "description": "12oz carpenter''s hammer", "weight": 1.0},
 {"_id": ObjectId("100000000000000000000107"), "name": "rocks", "description": "box of assorted rocks", "weight": 5.3},
-{"_id": ObjectId("100000000000000000000108"), "name": "jacket", "description": "water resistent black wind breaker", "weight": 0.1},
+{"_id": ObjectId("100000000000000000000108"), "name": "jacket", "description": "water resistant black wind breaker", "weight": 0.1},
 {"_id": ObjectId("100000000000000000000109"), "name": "spare tire", "description": "24 inch spare tire", "weight": 22.2}
 ]);
