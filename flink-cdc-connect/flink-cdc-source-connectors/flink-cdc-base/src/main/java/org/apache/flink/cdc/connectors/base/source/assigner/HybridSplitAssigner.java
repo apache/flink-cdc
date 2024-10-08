@@ -170,6 +170,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
             } else if (isNewlyAddedAssigningFinished(snapshotSplitAssigner.getAssignerStatus())) {
                 // do not need to create stream split, but send event to wake up the binlog reader
                 isStreamSplitAssigned = true;
+                enumeratorMetrics.enterStreamReading();
                 return Optional.empty();
             } else {
                 // stream split is not ready by now

@@ -34,8 +34,8 @@ import io.debezium.relational.history.TableChanges;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -366,7 +366,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         for (int i = 0; i < size; i++) {
             String tableIdStr = in.readUTF();
             int splitIdSize = in.readInt();
-            Set<String> splitIds = Collections.newSetFromMap(new HashMap<>());
+            Set<String> splitIds = new HashSet<>();
             for (int j = 0; j < splitIdSize; j++) {
                 splitIds.add(in.readUTF());
             }

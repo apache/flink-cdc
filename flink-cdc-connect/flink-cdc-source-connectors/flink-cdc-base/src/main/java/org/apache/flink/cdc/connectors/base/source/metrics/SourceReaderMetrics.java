@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.base.source.metrics;
 
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics.TableMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReader;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
@@ -79,9 +80,8 @@ public class SourceReaderMetrics {
 
     /** The total number of record that failed to consume, process or emit. */
     private final Counter numRecordsInErrorsCounter;
-
+    /** The timestamp of the last record received. */
     private volatile long lastReceivedEventTime = UNDEFINED;
-    private volatile long currentReadTimestampMs = UNDEFINED;
 
     public SourceReaderMetrics(SourceReaderMetricGroup metricGroup) {
         this.metricGroup = metricGroup;
@@ -89,7 +89,6 @@ public class SourceReaderMetrics {
 
         metricGroup.gauge(
                 MetricNames.CURRENT_FETCH_EVENT_TIME_LAG, (Gauge<Long>) this::getFetchDelay);
-        metricGroup.gauge(CURRENT_READ_TIMESTAMP_MS, () -> currentReadTimestampMs);
         metricGroup.gauge(CURRENT_EVENT_TIME_LAG, this::getCurrentEventTimeLag);
 
         snapshotCounter = metricGroup.counter(NUM_SNAPSHOT_RECORDS);
@@ -118,7 +117,11 @@ public class SourceReaderMetrics {
     }
 
     public void markRecord() {
-        metricGroup.getIOMetricGroup().getNumRecordsInCounter().inc();
+        try {
+            metricGroup.getIOMetricGroup().getNumRecordsInCounter().inc();
+        } catch (Exception e) {
+            LOG.warn("Failed to update record counters.", e);
+        }
     }
 
     public void updateRecordCounters(SourceRecord record) {
