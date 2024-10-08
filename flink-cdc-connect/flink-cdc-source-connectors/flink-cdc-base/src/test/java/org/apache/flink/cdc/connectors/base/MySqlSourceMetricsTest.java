@@ -69,7 +69,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-/** MySQL Source Metrics Tests */
+/** MySQL Source Metrics Tests. */
 public class MySqlSourceMetricsTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceMetricsTest.class);

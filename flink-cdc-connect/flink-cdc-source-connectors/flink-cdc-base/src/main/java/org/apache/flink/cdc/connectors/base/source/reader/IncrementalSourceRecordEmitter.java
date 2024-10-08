@@ -172,6 +172,11 @@ public class IncrementalSourceRecordEmitter<T>
         }
     }
 
+    /**
+     * Collector for outputting records.
+     *
+     * @param <T>
+     */
     protected static class OutputCollector<T> implements Collector<T> {
         public SourceOutput<T> output;
         public Long currentMessageTimestamp;
