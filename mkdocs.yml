@@ -1,0 +1,11 @@
+plugins:
+  - macros
+extra:
+  flinkCDCVersionMajor: '3.2'
+  flinkCDCVersion: '3.2.0'
+  flinkVersion: '1.18.0'
+  flinkVersionMajor: '1.18'
+  social:
+
+exclude_docs: |
+  !.asf.yaml
