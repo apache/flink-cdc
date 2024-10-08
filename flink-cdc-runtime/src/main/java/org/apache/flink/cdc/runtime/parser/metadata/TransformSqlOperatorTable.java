@@ -191,6 +191,7 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                                     SqlTypeFamily.INTEGER,
                                     SqlTypeFamily.INTEGER)),
                     SqlFunctionCategory.STRING);
+    public static final SqlFunction SUBSTRING = SqlStdOperatorTable.SUBSTRING;
 
     // ------------------
     // Temporal Functions
