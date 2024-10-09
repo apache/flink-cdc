@@ -142,12 +142,12 @@ public class MySqlTestUtils {
                     } else if (currentStatus.isTerminalState()) {
                         try {
                             client.getJobExecutionResult().get();
-                        } catch (Exception var4) {
+                        } catch (Exception e) {
                             throw new IllegalStateException(
                                     String.format(
                                             "Job has entered %s state, but expecting %s",
                                             currentStatus, expectedStatus),
-                                    var4);
+                                    e);
                         }
 
                         throw new IllegalStateException(

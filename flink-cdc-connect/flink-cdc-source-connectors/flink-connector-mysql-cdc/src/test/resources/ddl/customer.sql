@@ -326,3 +326,23 @@ CREATE TABLE default_value_test (
 INSERT INTO default_value_test
 VALUES (1,'user1','Shanghai',123567),
        (2,'user2','Shanghai',123567);
+
+CREATE TABLE quote_pk_table (
+  `key` VARCHAR(10) NOT NULL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL DEFAULT 'flink',
+  address VARCHAR(1024),
+  phone_number INTEGER DEFAULT ' 123 '
+);
+INSERT INTO quote_pk_table
+VALUES ('10000','user1','Shanghai',123567),
+       ('10001','user2','Shanghai',123567),
+       ('10002','user3','Shanghai',123567),
+       ('10003','user4','Shanghai',123567),
+       ('10004','user5','Shanghai',123567),
+       ('10005','user6','Shanghai',123567),
+       ('10006','user7','Shanghai',123567),
+       ('10007','user8','Shanghai',123567),
+       ('10008','user9','Shanghai',123567),
+       ('10009','user10','Shanghai',123567),
+       ('10010','user11','Shanghai',123567),
+       ('10086','user66','Shanghai',123567);
