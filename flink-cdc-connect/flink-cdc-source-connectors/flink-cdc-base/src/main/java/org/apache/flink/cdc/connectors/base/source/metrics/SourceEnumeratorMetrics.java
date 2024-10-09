@@ -49,7 +49,7 @@ public class SourceEnumeratorMetrics {
     public static final String NUM_SNAPSHOT_SPLITS_FINISHED = "numSnapshotSplitsFinished";
     public static final String SNAPSHOT_START_TIME = "snapshotStartTime";
     public static final String SNAPSHOT_END_TIME = "snapshotEndTime";
-    public static final String DATABASE_GROUP_KEY = "database";
+    public static final String NAMESPACE_GROUP_KEY = "namespace";
     public static final String SCHEMA_GROUP_KEY = "schema";
     public static final String TABLE_GROUP_KEY = "table";
 
@@ -138,7 +138,7 @@ public class SourceEnumeratorMetrics {
             tableName = processNull(tableName);
             MetricGroup metricGroup =
                     parentGroup
-                            .addGroup(DATABASE_GROUP_KEY, databaseName)
+                            .addGroup(NAMESPACE_GROUP_KEY, databaseName)
                             .addGroup(SCHEMA_GROUP_KEY, schemaName)
                             .addGroup(TABLE_GROUP_KEY, tableName);
             metricGroup.gauge(
