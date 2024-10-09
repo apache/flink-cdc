@@ -58,7 +58,6 @@ public class SourceReaderMetrics {
     public static final String NUM_UPDATE_DML_RECORDS = "numUpdateDMLRecords";
     public static final String NUM_DELETE_DML_RECORDS = "numDeleteDMLRecords";
     public static final String NUM_DDL_RECORDS = "numDDLRecords";
-    public static final String CURRENT_READ_TIMESTAMP_MS = "currentReadTimestampMs";
     public static final String CURRENT_EVENT_TIME_LAG = "currentEventTimeLag";
 
     private final SourceReaderMetricGroup metricGroup;
