@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.base.source.metrics;
 
-import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics.TableMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReader;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
@@ -48,7 +47,7 @@ public class SourceReaderMetrics {
     public static final long UNDEFINED = -1;
 
     // Metric group keys
-    public static final String DATABASE_GROUP_KEY = "database";
+    public static final String NAMESPACE_GROUP_KEY = "namespace";
     public static final String SCHEMA_GROUP_KEY = "schema";
     public static final String TABLE_GROUP_KEY = "table";
 
@@ -210,7 +209,7 @@ public class SourceReaderMetrics {
             tableName = processNull(tableName);
             MetricGroup metricGroup =
                     parentGroup
-                            .addGroup(DATABASE_GROUP_KEY, databaseName)
+                            .addGroup(NAMESPACE_GROUP_KEY, databaseName)
                             .addGroup(SCHEMA_GROUP_KEY, schemaName)
                             .addGroup(TABLE_GROUP_KEY, tableName);
             recordsCounter = metricGroup.counter(MetricNames.IO_NUM_RECORDS_IN);
