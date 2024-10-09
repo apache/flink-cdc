@@ -121,7 +121,6 @@ public class IncrementalSource<T, C extends SourceConfig>
         final SourceReaderMetrics sourceReaderMetrics =
                 new SourceReaderMetrics(readerContext.metricGroup());
 
-        sourceReaderMetrics.registerMetrics();
         IncrementalSourceReaderContext incrementalSourceReaderContext =
                 new IncrementalSourceReaderContext(readerContext);
         Supplier<IncrementalSourceSplitReader<C>> splitReaderSupplier =
@@ -161,13 +160,16 @@ public class IncrementalSource<T, C extends SourceConfig>
                                 remainingTables,
                                 isTableIdCaseSensitive,
                                 dataSourceDialect,
-                                offsetFactory);
+                                offsetFactory,
+                                enumContext);
             } catch (Exception e) {
                 throw new FlinkRuntimeException(
                         "Failed to discover captured tables for enumerator", e);
             }
         } else {
-            splitAssigner = new StreamSplitAssigner(sourceConfig, dataSourceDialect, offsetFactory);
+            splitAssigner =
+                    new StreamSplitAssigner(
+                            sourceConfig, dataSourceDialect, offsetFactory, enumContext);
         }
 
         return new IncrementalSourceEnumerator(
@@ -187,14 +189,16 @@ public class IncrementalSource<T, C extends SourceConfig>
                             enumContext.currentParallelism(),
                             (HybridPendingSplitsState) checkpoint,
                             dataSourceDialect,
-                            offsetFactory);
+                            offsetFactory,
+                            enumContext);
         } else if (checkpoint instanceof StreamPendingSplitsState) {
             splitAssigner =
                     new StreamSplitAssigner(
                             sourceConfig,
                             (StreamPendingSplitsState) checkpoint,
                             dataSourceDialect,
-                            offsetFactory);
+                            offsetFactory,
+                            enumContext);
         } else {
             throw new UnsupportedOperationException(
                     "Unsupported restored PendingSplitsState: " + checkpoint);

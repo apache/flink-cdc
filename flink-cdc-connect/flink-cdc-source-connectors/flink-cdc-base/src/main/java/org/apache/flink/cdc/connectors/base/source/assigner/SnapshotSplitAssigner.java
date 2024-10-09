@@ -27,6 +27,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSp
 import org.apache.flink.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
@@ -49,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.base.source.assigner.AssignerStatus.INITIAL_ASSIGNING;
@@ -81,6 +83,11 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     private final DataSourceDialect<C> dialect;
     private final OffsetFactory offsetFactory;
 
+    private SourceEnumeratorMetrics enumeratorMetrics;
+    private final Map<String, Long> splitFinishedCheckpointIds;
+    private final Map<TableId, Set<String>> finishedSplits;
+    private static final long UNDEFINED_CHECKPOINT_ID = -1;
+
     public SnapshotSplitAssigner(
             C sourceConfig,
             int currentParallelism,
@@ -101,7 +108,9 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 isTableIdCaseSensitive,
                 true,
                 dialect,
-                offsetFactory);
+                offsetFactory,
+                new ConcurrentHashMap<>(),
+                new ConcurrentHashMap<>());
     }
 
     public SnapshotSplitAssigner(
@@ -123,7 +132,9 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 checkpoint.isTableIdCaseSensitive(),
                 checkpoint.isRemainingTablesCheckpointed(),
                 dialect,
-                offsetFactory);
+                offsetFactory,
+                new ConcurrentHashMap<>(),
+                new ConcurrentHashMap<>());
     }
 
     private SnapshotSplitAssigner(
@@ -139,7 +150,9 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             boolean isTableIdCaseSensitive,
             boolean isRemainingTablesCheckpointed,
             DataSourceDialect<C> dialect,
-            OffsetFactory offsetFactory) {
+            OffsetFactory offsetFactory,
+            Map<String, Long> splitFinishedCheckpointIds,
+            Map<TableId, Set<String>> finishedSplits) {
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
@@ -163,6 +176,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.dialect = dialect;
         this.offsetFactory = offsetFactory;
+        this.splitFinishedCheckpointIds = splitFinishedCheckpointIds;
+        this.finishedSplits = finishedSplits;
     }
 
     @Override
@@ -269,6 +284,47 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         }
     }
 
+    /** This should be invoked after this class's open method. */
+    public void initEnumeratorMetrics(SourceEnumeratorMetrics enumeratorMetrics) {
+        this.enumeratorMetrics = enumeratorMetrics;
+
+        this.enumeratorMetrics.enterSnapshotPhase();
+        this.enumeratorMetrics.registerMetrics(
+                alreadyProcessedTables::size, assignedSplits::size, remainingSplits::size);
+        this.enumeratorMetrics.addNewTables(computeTablesPendingSnapshot());
+        for (SchemalessSnapshotSplit snapshotSplit : remainingSplits) {
+            this.enumeratorMetrics
+                    .getTableMetrics(snapshotSplit.getTableId())
+                    .addNewSplit(snapshotSplit.splitId());
+        }
+        for (SchemalessSnapshotSplit snapshotSplit : assignedSplits.values()) {
+            this.enumeratorMetrics
+                    .getTableMetrics(snapshotSplit.getTableId())
+                    .addProcessedSplit(snapshotSplit.splitId());
+        }
+        for (Map.Entry<TableId, Set<String>> tableFinishedSplits : finishedSplits.entrySet()) {
+            this.enumeratorMetrics
+                    .getTableMetrics(tableFinishedSplits.getKey())
+                    .addFinishedSplits(tableFinishedSplits.getValue());
+        }
+    }
+
+    // remainingTables + tables has been split but not processed
+    private int computeTablesPendingSnapshot() {
+        int numTablesPendingSnapshot = remainingTables.size();
+        Set<TableId> computedTables = new HashSet<>();
+        for (SchemalessSnapshotSplit split : remainingSplits) {
+            TableId tableId = split.getTableId();
+            if (!computedTables.contains(tableId)
+                    && !alreadyProcessedTables.contains(tableId)
+                    && !remainingTables.contains(tableId)) {
+                computedTables.add(tableId);
+                numTablesPendingSnapshot++;
+            }
+        }
+        return numTablesPendingSnapshot;
+    }
+
     @Override
     public Optional<SourceSplitBase> getNext() {
         if (!remainingSplits.isEmpty()) {
@@ -277,6 +333,9 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             SchemalessSnapshotSplit split = iterator.next();
             iterator.remove();
             assignedSplits.put(split.splitId(), split);
+            enumeratorMetrics
+                    .getTableMetrics(split.getTableId())
+                    .finishProcessSplit(split.splitId());
             return Optional.of(split.toSnapshotSplit(tableSchemas.get(split.getTableId())));
         } else {
             // it's turn for new table
@@ -294,7 +353,15 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                                 .collect(Collectors.toList());
                 remainingSplits.addAll(schemalessSnapshotSplits);
                 tableSchemas.putAll(tableSchema);
+                if (!alreadyProcessedTables.contains(nextTable)) {
+                    enumeratorMetrics.startSnapshotTables(1);
+                }
                 alreadyProcessedTables.add(nextTable);
+                List<String> splitIds =
+                        schemalessSnapshotSplits.stream()
+                                .map(SchemalessSnapshotSplit::splitId)
+                                .collect(Collectors.toList());
+                enumeratorMetrics.getTableMetrics(nextTable).addNewSplits(splitIds);
                 return getNext();
             } else {
                 return Optional.empty();
@@ -335,6 +402,12 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     @Override
     public void onFinishedSplits(Map<String, Offset> splitFinishedOffsets) {
         this.splitFinishedOffsets.putAll(splitFinishedOffsets);
+        for (String splitId : splitFinishedOffsets.keySet()) {
+            splitFinishedCheckpointIds.put(splitId, UNDEFINED_CHECKPOINT_ID);
+        }
+        LOG.info(
+                "onFinishedSplits, splitFinishedCheckpointIds size: {}",
+                splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size());
         if (allSnapshotSplitsFinished() && isAssigningSnapshotSplits(assignerStatus)) {
             // Skip the waiting checkpoint when current parallelism is 1 which means we do not need
             // to care about the global output data order of snapshot splits and stream split.
@@ -352,6 +425,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
 
     @Override
     public void addSplits(Collection<SourceSplitBase> splits) {
+        enumeratorMetrics.exitStreamReading();
         for (SourceSplitBase split : splits) {
             tableSchemas.putAll(split.asSnapshotSplit().getTableSchemas());
             remainingSplits.add(split.asSnapshotSplit().toSchemalessSnapshotSplit());
@@ -359,11 +433,33 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             // because they are failed
             assignedSplits.remove(split.splitId());
             splitFinishedOffsets.remove(split.splitId());
+
+            enumeratorMetrics
+                    .getTableMetrics(split.asSnapshotSplit().getTableId())
+                    .reprocessSplit(split.splitId());
+            TableId tableId = split.asSnapshotSplit().getTableId();
+            if (finishedSplits.containsKey(tableId)) {
+                finishedSplits.get(tableId).remove(split.splitId());
+                enumeratorMetrics.getTableMetrics(tableId).removeFinishedSplit(split.splitId());
+            }
         }
     }
 
     @Override
     public SnapshotPendingSplitsState snapshotState(long checkpointId) {
+        if (splitFinishedCheckpointIds != null && !splitFinishedCheckpointIds.isEmpty()) {
+            for (Map.Entry<String, Long> splitFinishedCheckpointId :
+                    splitFinishedCheckpointIds.entrySet()) {
+                if (splitFinishedCheckpointId.getValue() == UNDEFINED_CHECKPOINT_ID) {
+                    splitFinishedCheckpointId.setValue(checkpointId);
+                }
+            }
+        }
+        LOG.info(
+                "snapshotShot, splitFinishedCheckpointIds size : {}, finishedSplits size:{}",
+                splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size(),
+                finishedSplits == null ? 0 : finishedSplits.size());
+
         SnapshotPendingSplitsState state =
                 new SnapshotPendingSplitsState(
                         alreadyProcessedTables,
@@ -374,7 +470,9 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                         assignerStatus,
                         remainingTables,
                         isTableIdCaseSensitive,
-                        true);
+                        true,
+                        splitFinishedCheckpointIds,
+                        finishedSplits);
         // we need a complete checkpoint before mark this assigner to be finished, to wait for all
         // records of snapshot splits are completely processed
         if (checkpointIdToFinish == null
@@ -396,6 +494,30 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 assignerStatus = assignerStatus.onFinish();
             }
             LOG.info("Snapshot split assigner is turn into finished status.");
+        }
+
+        if (splitFinishedCheckpointIds != null && !splitFinishedCheckpointIds.isEmpty()) {
+            Iterator<Map.Entry<String, Long>> iterator =
+                    splitFinishedCheckpointIds.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<String, Long> splitFinishedCheckpointId = iterator.next();
+                String splitId = splitFinishedCheckpointId.getKey();
+                Long splitCheckpointId = splitFinishedCheckpointId.getValue();
+                if (splitCheckpointId != UNDEFINED_CHECKPOINT_ID
+                        && checkpointId >= splitCheckpointId) {
+                    // record table-level splits metrics
+                    TableId tableId = SnapshotSplit.parseTableId(splitId);
+                    enumeratorMetrics.getTableMetrics(tableId).addFinishedSplit(splitId);
+                    finishedSplits.put(
+                            tableId,
+                            enumeratorMetrics.getTableMetrics(tableId).getFinishedSplitIds());
+                    iterator.remove();
+                }
+            }
+            LOG.info(
+                    "snapshotShot, splitFinishedCheckpointIds size : {}, finishedSplits size:{}",
+                    splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size(),
+                    finishedSplits == null ? 0 : finishedSplits.size());
         }
     }
 

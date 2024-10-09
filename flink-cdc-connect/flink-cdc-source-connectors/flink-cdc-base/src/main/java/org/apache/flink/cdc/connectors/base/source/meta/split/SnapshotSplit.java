@@ -65,6 +65,10 @@ public class SnapshotSplit extends SourceSplitBase {
         return tableId;
     }
 
+    public static TableId parseTableId(String splitId) {
+        return TableId.parse(splitId.substring(0, splitId.lastIndexOf(":")));
+    }
+
     @Nullable
     public Object[] getSplitStart() {
         return splitStart;

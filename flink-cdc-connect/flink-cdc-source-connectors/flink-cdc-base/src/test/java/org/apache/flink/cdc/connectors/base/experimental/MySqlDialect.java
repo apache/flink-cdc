@@ -27,7 +27,6 @@ import org.apache.flink.cdc.connectors.base.experimental.fetch.MySqlStreamFetchT
 import org.apache.flink.cdc.connectors.base.experimental.utils.MySqlConnectionUtils;
 import org.apache.flink.cdc.connectors.base.experimental.utils.MySqlSchema;
 import org.apache.flink.cdc.connectors.base.experimental.utils.TableDiscoveryUtils;
-import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionFactory;
 import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
@@ -37,7 +36,6 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import io.debezium.connector.mysql.MySqlConnection;
-import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -71,12 +69,8 @@ public class MySqlDialect implements JdbcDataSourceDialect {
     }
 
     public JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
-        JdbcConnection jdbc =
-                new JdbcConnection(
-                        JdbcConfiguration.adapt(sourceConfig.getDbzConfiguration()),
-                        new JdbcConnectionFactory(sourceConfig, getPooledDataSourceFactory()),
-                        QUOTED_CHARACTER,
-                        QUOTED_CHARACTER);
+        MySqlConnection jdbc =
+                MySqlConnectionUtils.createMySqlConnection(sourceConfig.getDbzConfiguration());
         try {
             jdbc.connect();
         } catch (Exception e) {

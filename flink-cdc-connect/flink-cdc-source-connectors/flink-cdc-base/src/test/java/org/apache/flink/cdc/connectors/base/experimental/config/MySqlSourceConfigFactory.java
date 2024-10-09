@@ -63,6 +63,10 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
         props.setProperty("database.port", String.valueOf(port));
+        // props.setProperty("hostname", checkNotNull(hostname));
+        // props.setProperty("user", checkNotNull(username));
+        // props.setProperty("password", checkNotNull(password));
+        // props.setProperty("port", String.valueOf(port));
         props.setProperty("database.fetchSize", String.valueOf(fetchSize));
         props.setProperty("database.responseBuffering", "adaptive");
         props.setProperty("database.serverTimezone", serverTimeZone);
@@ -85,6 +89,7 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
         // but it'll cause lose of precise when the value is larger than 2^63,
         // so use "precise" mode to avoid it.
         props.put("bigint.unsigned.handling.mode", "precise");
+        props.put("transaction.topic", "transaction_topic");
 
         if (serverIdRange != null) {
             props.setProperty("database.server.id.range", String.valueOf(serverIdRange));

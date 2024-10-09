@@ -24,6 +24,7 @@ import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.util.SchemaNameAdjuster;
+import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -119,7 +120,11 @@ public class SourceRecordUtils {
         Struct value = (Struct) dataRecord.value();
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         String dbName = source.getString(DATABASE_NAME_KEY);
-        String schemaName = source.getString(SCHEMA_NAME_KEY);
+        Field field = source.schema().field(SCHEMA_NAME_KEY);
+        String schemaName = null;
+        if (field != null) {
+            schemaName = source.getString(SCHEMA_NAME_KEY);
+        }
         String tableName = source.getString(TABLE_NAME_KEY);
         return new TableId(dbName, schemaName, tableName);
     }
