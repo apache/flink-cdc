@@ -27,7 +27,6 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
@@ -50,7 +49,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -71,7 +69,6 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private List<UserDefinedFunctionDescriptor> udfDescriptors;
     private Map<TableId, PreTransformProcessor> preTransformProcessorMap;
     private Map<TableId, Boolean> hasAsteriskMap;
-    private Map<TableId, List<String>> referencedColumnsMap;
 
     public static PreTransformOperator.Builder newBuilder() {
         return new PreTransformOperator.Builder();
@@ -163,7 +160,6 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         }
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
         this.hasAsteriskMap = new ConcurrentHashMap<>();
-        this.referencedColumnsMap = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -186,8 +182,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                         new CreateTableEvent(
                                 stateTableChangeInfo.getTableId(),
                                 stateTableChangeInfo.getPreTransformedSchema());
-                // hasAsteriskMap and referencedColumnsMap needs to be recalculated after restoring
-                // from a checkpoint.
+                // hasAsteriskMap needs to be recalculated after restoring from a checkpoint.
                 cacheTransformRuleInfo(restoredCreateTableEvent);
 
                 // Since PostTransformOperator doesn't preserve state, pre-transformed schema
@@ -258,12 +253,32 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private Optional<SchemaChangeEvent> cacheChangeSchema(SchemaChangeEvent event) {
         TableId tableId = event.tableId();
         PreTransformChangeInfo tableChangeInfo = preTransformChangeInfoMap.get(tableId);
+        List<String> columnNamesBeforeChange = tableChangeInfo.getSourceSchema().getColumnNames();
+
         Schema originalSchema =
                 SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getSourceSchema(), event);
         Schema preTransformedSchema = tableChangeInfo.getPreTransformedSchema();
-        Optional<SchemaChangeEvent> schemaChangeEvent =
-                SchemaUtils.transformSchemaChangeEvent(
-                        hasAsteriskMap.get(tableId), referencedColumnsMap.get(tableId), event);
+
+        Optional<SchemaChangeEvent> schemaChangeEvent;
+        if (hasAsteriskMap.getOrDefault(tableId, true)) {
+            // If this TableId is asterisk-ful, we should use the latest upstream schema as
+            // referenced columns to perform schema evolution, not of the original ones generated
+            // when creating tables. If hasAsteriskMap has no entry for this TableId, it means that
+            // this TableId has not been referenced by any transform rules, and should be regarded
+            // as asterisk-ful by default.
+            schemaChangeEvent =
+                    SchemaUtils.transformSchemaChangeEvent(
+                            true, tableChangeInfo.getSourceSchema().getColumnNames(), event);
+        } else {
+            // Otherwise, we will use the pre-transformed columns to determine if the given schema
+            // change event should be passed to downstream, only when it is presented in the
+            // pre-transformed schema.
+            schemaChangeEvent =
+                    SchemaUtils.transformSchemaChangeEvent(
+                            false,
+                            tableChangeInfo.getPreTransformedSchema().getColumnNames(),
+                            event);
+        }
         if (schemaChangeEvent.isPresent()) {
             preTransformedSchema =
                     SchemaUtils.applySchemaChangeEvent(
@@ -276,26 +291,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
     private void cacheTransformRuleInfo(CreateTableEvent createTableEvent) {
         TableId tableId = createTableEvent.tableId();
-        Set<String> referencedColumnsSet =
-                transforms.stream()
-                        .filter(t -> t.getSelectors().isMatch(tableId))
-                        .flatMap(
-                                rule ->
-                                        TransformParser.generateReferencedColumns(
-                                                rule.getProjection()
-                                                        .map(TransformProjection::getProjection)
-                                                        .orElse(null),
-                                                rule.getFilter()
-                                                        .map(TransformFilter::getExpression)
-                                                        .orElse(null),
-                                                createTableEvent.getSchema().getColumns())
-                                                .stream())
-                        .map(Column::getName)
-                        .collect(Collectors.toSet());
-
         boolean notTransformed =
                 transforms.stream().noneMatch(t -> t.getSelectors().isMatch(tableId));
-
         if (notTransformed) {
             // If this TableId isn't presented in any transform block, it should behave like a "*"
             // projection and should be regarded as asterisk-ful.
@@ -313,11 +310,6 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
             hasAsteriskMap.put(createTableEvent.tableId(), hasAsterisk);
         }
-        referencedColumnsMap.put(
-                createTableEvent.tableId(),
-                createTableEvent.getSchema().getColumnNames().stream()
-                        .filter(referencedColumnsSet::contains)
-                        .collect(Collectors.toList()));
     }
 
     private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
