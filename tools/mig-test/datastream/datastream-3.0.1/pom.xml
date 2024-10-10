@@ -32,8 +32,6 @@ limitations under the License.
         <debezium.version>1.9.7.Final</debezium.version>
         <scala.binary.version>2.12</scala.binary.version>
         <slf4j.version>2.0.13</slf4j.version>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
