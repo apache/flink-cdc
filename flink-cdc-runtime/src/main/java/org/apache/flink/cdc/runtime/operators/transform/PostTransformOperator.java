@@ -44,6 +44,7 @@ import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -242,6 +243,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
 
     private Optional<SchemaChangeEvent> cacheSchema(SchemaChangeEvent event) throws Exception {
         TableId tableId = event.tableId();
+        List<String> columnNamesBeforeChange = Collections.emptyList();
+
         if (event instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) event;
             Set<String> projectedColumnsSet =
@@ -286,6 +289,9 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                     createTableEvent.getSchema().getColumnNames().stream()
                             .filter(projectedColumnsSet::contains)
                             .collect(Collectors.toList()));
+        } else {
+            columnNamesBeforeChange =
+                    getPostTransformChangeInfo(tableId).getPreTransformedSchema().getColumnNames();
         }
 
         Schema schema;
@@ -304,9 +310,12 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
 
         if (event instanceof CreateTableEvent) {
             return Optional.of(new CreateTableEvent(tableId, projectedSchema));
+        } else if (hasAsteriskMap.getOrDefault(tableId, true)) {
+            // See comments in PreTransformOperator#cacheChangeSchema method.
+            return SchemaUtils.transformSchemaChangeEvent(true, columnNamesBeforeChange, event);
         } else {
             return SchemaUtils.transformSchemaChangeEvent(
-                    hasAsteriskMap.get(tableId), projectedColumnsMap.get(tableId), event);
+                    false, projectedColumnsMap.get(tableId), event);
         }
     }
 
