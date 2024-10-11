@@ -20,8 +20,11 @@ package org.apache.flink.cdc.runtime.operators.schema;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
@@ -71,6 +74,8 @@ import javax.annotation.Nullable;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -95,6 +100,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private static final Duration CACHE_EXPIRE_DURATION = Duration.ofDays(1);
 
     private final List<RouteRule> routingRules;
+
+    private final String timezone;
 
     /**
      * Storing route source table selector, sink table name (before symbol replacement), and replace
@@ -126,6 +133,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT.toMillis();
         this.schemaChangeBehavior = SchemaChangeBehavior.EVOLVE;
+        this.timezone = "UTC";
     }
 
     @VisibleForTesting
@@ -134,8 +142,10 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = rpcTimeOut.toMillis();
         this.schemaChangeBehavior = SchemaChangeBehavior.EVOLVE;
+        this.timezone = "UTC";
     }
 
+    @VisibleForTesting
     public SchemaOperator(
             List<RouteRule> routingRules,
             Duration rpcTimeOut,
@@ -144,6 +154,19 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = rpcTimeOut.toMillis();
         this.schemaChangeBehavior = schemaChangeBehavior;
+        this.timezone = "UTC";
+    }
+
+    public SchemaOperator(
+            List<RouteRule> routingRules,
+            Duration rpcTimeOut,
+            SchemaChangeBehavior schemaChangeBehavior,
+            String timezone) {
+        this.routingRules = routingRules;
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
+        this.rpcTimeOutInMillis = rpcTimeOut.toMillis();
+        this.schemaChangeBehavior = schemaChangeBehavior;
+        this.timezone = timezone;
     }
 
     @Override
@@ -365,7 +388,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 } else {
                     fieldGetters.add(
                             new TypeCoercionFieldGetter(
-                                    column.getType(), fieldGetter, tolerantMode));
+                                    originalSchema.getColumn(columnName).get().getType(),
+                                    column.getType(),
+                                    fieldGetter,
+                                    tolerantMode,
+                                    timezone));
                 }
             }
         }
@@ -534,17 +561,23 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     }
 
     private static class TypeCoercionFieldGetter implements RecordData.FieldGetter {
+        private final DataType originalType;
         private final DataType destinationType;
         private final RecordData.FieldGetter originalFieldGetter;
         private final boolean tolerantMode;
+        private final String timezone;
 
         public TypeCoercionFieldGetter(
+                DataType originalType,
                 DataType destinationType,
                 RecordData.FieldGetter originalFieldGetter,
-                boolean tolerantMode) {
+                boolean tolerantMode,
+                String timezone) {
+            this.originalType = originalType;
             this.destinationType = destinationType;
             this.originalFieldGetter = originalFieldGetter;
             this.tolerantMode = tolerantMode;
+            this.timezone = timezone;
         }
 
         private Object fail(IllegalArgumentException e) throws IllegalArgumentException {
@@ -602,6 +635,21 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                                     + "Currently only CHAR / VARCHAR can be accepted by a STRING column",
                                             originalField.getClass())));
                 }
+            } else if (destinationType.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)
+                    && originalType.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)) {
+                // For now, TimestampData / ZonedTimestampData / LocalZonedTimestampData has no
+                // difference in its internal representation, so there's no need to do any precision
+                // conversion.
+                return originalField;
+            } else if (destinationType.is(DataTypeRoot.TIMESTAMP_WITH_TIME_ZONE)
+                    && originalType.is(DataTypeRoot.TIMESTAMP_WITH_TIME_ZONE)) {
+                return originalField;
+            } else if (destinationType.is(DataTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE)
+                    && originalType.is(DataTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE)) {
+                return originalField;
+            } else if (destinationType.is(DataTypeFamily.TIMESTAMP)
+                    && originalType.is(DataTypeFamily.TIMESTAMP)) {
+                return castToTimestamp(originalField, timezone);
             } else {
                 return fail(
                         new IllegalArgumentException(
@@ -616,5 +664,24 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     public void snapshotState(StateSnapshotContext context) throws Exception {
         // Needless to do anything, since AbstractStreamOperator#snapshotState and #processElement
         // is guaranteed not to be mixed together.
+    }
+
+    private static TimestampData castToTimestamp(Object object, String timezone) {
+        if (object == null) {
+            return null;
+        }
+        if (object instanceof LocalZonedTimestampData) {
+            return TimestampData.fromLocalDateTime(
+                    LocalDateTime.ofInstant(
+                            ((LocalZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
+        } else if (object instanceof ZonedTimestampData) {
+            return TimestampData.fromLocalDateTime(
+                    LocalDateTime.ofInstant(
+                            ((ZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
+        } else {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Unable to implicitly coerce object `%s` as a TIMESTAMP.", object));
+        }
     }
 }
