@@ -37,6 +37,8 @@ public final class TimestampType extends DataType {
 
     private static final long serialVersionUID = 1L;
 
+    private static final boolean ALLOW_LOSS = false;
+
     public static final int MIN_PRECISION = 0;
 
     public static final int MAX_PRECISION = 9;
@@ -54,12 +56,17 @@ public final class TimestampType extends DataType {
     public TimestampType(boolean isNullable, int precision) {
         super(isNullable, DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE);
         if (precision < MIN_PRECISION || precision > MAX_PRECISION) {
-            throw new IllegalArgumentException(
-                    String.format(
-                            "Timestamp precision must be between %d and %d (both inclusive).",
-                            MIN_PRECISION, MAX_PRECISION));
+            if ((!ALLOW_LOSS) || (precision < MIN_PRECISION)) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "Requested precision %d is not supported. Timestamp precision must be between %d and %d (both inclusive).",
+                                precision, MIN_PRECISION, MAX_PRECISION));
+            } else {
+                this.precision = DEFAULT_PRECISION;
+            }
+        } else {
+            this.precision = precision;
         }
-        this.precision = precision;
     }
 
     public TimestampType(int precision) {
