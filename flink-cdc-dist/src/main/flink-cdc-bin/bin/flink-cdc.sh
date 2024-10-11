@@ -37,8 +37,12 @@ fi
 # Setup Flink related configurations
 # Setting _FLINK_HOME_DETERMINED in order to avoid config.sh to overwrite it
 _FLINK_HOME_DETERMINED=1
-# FLINK_CONF_DIR is required by config.sh
-FLINK_CONF_DIR=$FLINK_HOME/conf
+
+# Before modifying FLINK_CONF_DIR, check if it's already set externally.
+if [ -z "$FLINK_CONF_DIR" ]; then
+    FLINK_CONF_DIR=$FLINK_HOME/conf
+fi
+
 # Use config.sh to setup Flink related configurations
 . $FLINK_HOME/bin/config.sh
 
