@@ -333,4 +333,16 @@ pipeline:
 </table>
 </div>
 
+## Supported Schema Evolution Types
+
+Currently, StarRocks pipeline connector supports the following schema evolution types.
+
+| Type                 | Supported | Notes                                                      |
+|----------------------|-----------|------------------------------------------------------------|
+| AddColumnEvent       | ✅         | New columns could not be inserted before any primary keys. |
+| AlterColumnTypeEvent | ❌         |                                                            |
+| CreateTableEvent     | ✅         |                                                            |
+| DropColumnEvent      | ✅         | Partition columns cannot be dropped.                       |
+| RenameColumnEvent    | ❌         |                                                            |
+
 {{< top >}}
