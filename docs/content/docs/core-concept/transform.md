@@ -155,7 +155,7 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 
 ## Casting Functions
 
-You can use `CAST( <EXPR> AS <TYPE> )` syntax to convert the type of expressions. Possible conversion paths are:
+You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXPR>` to a specific type `<T>`. Possible conversion paths are:
 
 | Source Type                         | Target Type | Notes                                                                                      |
 |-------------------------------------|-------------|--------------------------------------------------------------------------------------------|
