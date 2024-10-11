@@ -23,6 +23,7 @@ import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
@@ -85,6 +86,8 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
     /** A set of {@link TableId} that already processed {@link CreateTableEvent}. */
     private final Set<TableId> processedTableIds;
 
+    private DataSinkWriteMetrics dataSinkWriteMetrics;
+
     public DataSinkWriterOperator(
             Sink<Event> sink,
             ProcessingTimeService processingTimeService,
@@ -115,6 +118,7 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
 
     @Override
     public void open() throws Exception {
+        this.dataSinkWriteMetrics = new DataSinkWriteMetrics(getMetricGroup());
         this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator().open();
         copySinkWriter = getFieldValue("sinkWriter");
     }
@@ -175,6 +179,21 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
         processedTableIds.add(changeEvent.tableId());
         this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
                 .processElement(element);
+
+        if (changeEvent instanceof DataChangeEvent) {
+            DataChangeEvent dataChangeEvent = (DataChangeEvent) changeEvent;
+            switch (dataChangeEvent.op()) {
+                case INSERT:
+                    dataSinkWriteMetrics.numRecordsOutInsertIncrease(dataChangeEvent.tableId());
+                    break;
+                case UPDATE:
+                    dataSinkWriteMetrics.numRecordsOutUpdateIncrease(dataChangeEvent.tableId());
+                    break;
+                case DELETE:
+                    dataSinkWriteMetrics.numRecordsOutDeleteIncrease(dataChangeEvent.tableId());
+                    break;
+            }
+        }
     }
 
     @Override
