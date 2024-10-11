@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.debezium.task.context;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.context.exception.SchemaOutOfSyncException;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 
+import com.github.shyiko.mysql.binlog.network.ServerException;
 import io.debezium.DebeziumException;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlConnector;
@@ -32,6 +33,8 @@ import org.apache.kafka.connect.errors.ConnectException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.EOFException;
+import java.sql.SQLException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,6 +47,7 @@ public class MySqlErrorHandler extends ErrorHandler {
     private static final Pattern NOT_FOUND_TABLE_MSG_PATTERN =
             Pattern.compile(
                     "Encountered change event for table (.+)\\.(.+) whose schema isn't known to this connector");
+    private static final String SQL_CODE_TOO_MANY_CONNECTIONS = "08004";
 
     private final MySqlTaskContext context;
     private final MySqlSourceConfig sourceConfig;
@@ -56,6 +60,34 @@ public class MySqlErrorHandler extends ErrorHandler {
         super(MySqlConnector.class, mySqlConnectorConfig, queue);
         this.context = context;
         this.sourceConfig = sourceConfig;
+    }
+
+    @Override
+    protected boolean isRetriable(Throwable throwable) {
+        if (throwable instanceof SQLException) {
+            final SQLException sql = (SQLException) throwable;
+            if (SQL_CODE_TOO_MANY_CONNECTIONS.equals(sql.getSQLState())) {
+                LOG.warn("Retry to connect when sql state is " + SQL_CODE_TOO_MANY_CONNECTIONS);
+            }
+            return SQL_CODE_TOO_MANY_CONNECTIONS.equals(sql.getSQLState());
+        } else if (throwable instanceof ServerException) {
+            final ServerException sql = (ServerException) throwable;
+            if (SQL_CODE_TOO_MANY_CONNECTIONS.equals(sql.getSqlState())) {
+                LOG.warn("Retry to connect when sql state is " + SQL_CODE_TOO_MANY_CONNECTIONS);
+            }
+            return SQL_CODE_TOO_MANY_CONNECTIONS.equals(sql.getSqlState());
+        } else if (throwable instanceof EOFException) {
+            // Retry with reading binlog error
+            if (throwable.getMessage().contains("Failed to read next byte from position")) {
+                LOG.error(
+                        "Retry to connect when there is some error when reading binlog.",
+                        throwable);
+            }
+            return throwable.getMessage().contains("Failed to read next byte from position");
+        } else if (throwable instanceof DebeziumException && throwable.getCause() != null) {
+            return isRetriable(throwable.getCause());
+        }
+        return false;
     }
 
     @Override
