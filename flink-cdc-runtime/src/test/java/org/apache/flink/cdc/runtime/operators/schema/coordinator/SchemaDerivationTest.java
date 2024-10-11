@@ -381,7 +381,7 @@ class SchemaDerivationTest {
                                 schemaDerivation.applySchemaChange(
                                         new CreateTableEvent(TABLE_2, INCOMPATIBLE_SCHEMA)))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Incompatible types: \"INT\" and \"STRING\"");
+                .hasMessage("Incompatible types found for column `age': \"INT\" and \"STRING\"");
     }
 
     @Test

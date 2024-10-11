@@ -115,7 +115,7 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                 false,
                 Collections.emptyList(),
                 Arrays.asList(
-                        "java.lang.IllegalStateException: Incompatible types: \"INT\" and \"DOUBLE\"",
+                        "java.lang.IllegalStateException: Incompatible types found for column `age': \"INT\" and \"DOUBLE\"",
                         "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
     }
 

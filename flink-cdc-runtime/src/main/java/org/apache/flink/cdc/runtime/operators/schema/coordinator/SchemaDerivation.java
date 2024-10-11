@@ -31,9 +31,8 @@ import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypeFamily;
-import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
+import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
@@ -254,7 +253,9 @@ public class SchemaDerivation {
                                 // Check type compatibility
                                 DataType widerType =
                                         getWiderType(
-                                                existedColumnInDerivedTable.getType(), dataType);
+                                                columnName,
+                                                existedColumnInDerivedTable.getType(),
+                                                dataType);
                                 if (!widerType.equals(existedColumnInDerivedTable.getType())) {
                                     typeDifference.put(
                                             existedColumnInDerivedTable.getName(), widerType);
@@ -289,6 +290,7 @@ public class SchemaDerivation {
                         .equals(addedColumn.getAddColumn().getType())) {
                     DataType widerType =
                             getWiderType(
+                                    existedColumnInDerivedTable.getName(),
                                     existedColumnInDerivedTable.getType(),
                                     addedColumn.getAddColumn().getType());
                     if (!widerType.equals(existedColumnInDerivedTable.getType())) {
@@ -325,7 +327,10 @@ public class SchemaDerivation {
                 Column existedColumnInDerivedTable = optionalColumnInDerivedTable.get();
                 if (!existedColumnInDerivedTable.getType().equals(column.getType())) {
                     DataType widerType =
-                            getWiderType(existedColumnInDerivedTable.getType(), column.getType());
+                            getWiderType(
+                                    existedColumnInDerivedTable.getName(),
+                                    existedColumnInDerivedTable.getType(),
+                                    column.getType());
                     if (!widerType.equals(existedColumnInDerivedTable.getType())) {
                         newTypeMapping.put(existedColumnInDerivedTable.getName(), widerType);
                     }
@@ -343,23 +348,14 @@ public class SchemaDerivation {
         return schemaChangeEvents;
     }
 
-    private DataType getWiderType(DataType thisType, DataType thatType) {
-        if (thisType.equals(thatType)) {
-            return thisType;
+    private DataType getWiderType(String columnName, DataType thisType, DataType thatType) {
+        try {
+            return SchemaUtils.inferWiderType(thisType, thatType);
+        } catch (IllegalStateException e) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Incompatible types found for column `%s': \"%s\" and \"%s\"",
+                            columnName, thisType, thatType));
         }
-        if (thisType.is(DataTypeFamily.INTEGER_NUMERIC)
-                && thatType.is(DataTypeFamily.INTEGER_NUMERIC)) {
-            return DataTypes.BIGINT();
-        }
-        if (thisType.is(DataTypeFamily.CHARACTER_STRING)
-                && thatType.is(DataTypeFamily.CHARACTER_STRING)) {
-            return DataTypes.STRING();
-        }
-        if (thisType.is(DataTypeFamily.APPROXIMATE_NUMERIC)
-                && thatType.is(DataTypeFamily.APPROXIMATE_NUMERIC)) {
-            return DataTypes.DOUBLE();
-        }
-        throw new IllegalStateException(
-                String.format("Incompatible types: \"%s\" and \"%s\"", thisType, thatType));
     }
 }

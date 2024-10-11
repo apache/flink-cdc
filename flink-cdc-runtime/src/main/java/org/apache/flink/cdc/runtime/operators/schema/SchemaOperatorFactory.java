@@ -47,8 +47,9 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
             MetadataApplier metadataApplier,
             List<RouteRule> routingRules,
             Duration rpcTimeOut,
-            SchemaChangeBehavior schemaChangeBehavior) {
-        super(new SchemaOperator(routingRules, rpcTimeOut, schemaChangeBehavior));
+            SchemaChangeBehavior schemaChangeBehavior,
+            String timezone) {
+        super(new SchemaOperator(routingRules, rpcTimeOut, schemaChangeBehavior, timezone));
         this.metadataApplier = metadataApplier;
         this.routingRules = routingRules;
         this.schemaChangeBehavior = schemaChangeBehavior;
