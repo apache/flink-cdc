@@ -198,7 +198,7 @@ SET stmtSQL =   'INSERT INTO ASNCDC.IBMSNAP_PRUNCNTL ( ' ||
                 ' (Select CURRENT_SERVER from sysibm.sysdummy1 ), ' || 
                 '''ASNCDC'', ' || 
                 '''CDC_' ||  tableschema ||  '_' || tablename || ''', ' ||
-                ' ( SELECT CASE WHEN max(CAST(MAP_ID AS INT)) IS NULL THEN CAST(1 AS VARCHAR(10)) ELSE CAST(CAST(max(MAP_ID) AS INT) + 1 AS VARCHAR(10))  END AS MYINT from  ASNCDC.IBMSNAP_PRUNCNTL ) ' || 
+                ' ( SELECT CASE WHEN max(CAST(MAP_ID AS INT)) IS NULL THEN CAST(1 AS VARCHAR(10)) ELSE CAST(max(CAST(MAP_ID AS INT)) + 1 AS VARCHAR(10))  END AS MYINT from  ASNCDC.IBMSNAP_PRUNCNTL ) ' ||
                 '    )';
 EXECUTE IMMEDIATE stmtSQL;
 
