@@ -98,31 +98,16 @@ public class StarRocksMetadataApplier implements MetadataApplier {
             catalog.open();
         }
 
-        SchemaChangeEventVisitor.visit(
+        SchemaChangeEventVisitor.voidVisit(
                 schemaChangeEvent,
-                addColumnEvent -> {
-                    applyAddColumn(addColumnEvent);
-                    return null;
-                },
-                alterColumnTypeEvent -> {
-                    applyAlterColumnType(alterColumnTypeEvent);
-                    return null;
-                },
-                createTableEvent -> {
-                    applyCreateTable(createTableEvent);
-                    return null;
-                },
-                dropColumnEvent -> {
-                    applyDropColumn(dropColumnEvent);
-                    return null;
-                },
+                this::applyAddColumn,
+                this::applyAlterColumnType,
+                this::applyCreateTable,
+                this::applyDropColumn,
                 dropTableEvent -> {
                     throw new UnsupportedSchemaChangeEventException(dropTableEvent);
                 },
-                renameColumnEvent -> {
-                    applyRenameColumn(renameColumnEvent);
-                    return null;
-                },
+                this::applyRenameColumn,
                 truncateTableEvent -> {
                     throw new UnsupportedSchemaChangeEventException(truncateTableEvent);
                 });

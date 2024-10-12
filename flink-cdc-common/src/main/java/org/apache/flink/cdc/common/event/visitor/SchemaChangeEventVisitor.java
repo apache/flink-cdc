@@ -32,13 +32,13 @@ import org.apache.flink.cdc.common.event.TruncateTableEvent;
 public class SchemaChangeEventVisitor {
     public static <T, E extends Throwable> T visit(
             SchemaChangeEvent event,
-            AddColumnEventVisitor<T, E> addColumnVisitor,
-            AlterColumnTypeEventVisitor<T, E> alterColumnTypeEventVisitor,
-            CreateTableEventVisitor<T, E> createTableEventVisitor,
-            DropColumnEventVisitor<T, E> dropColumnEventVisitor,
-            DropTableEventVisitor<T, E> dropTableEventVisitor,
-            RenameColumnEventVisitor<T, E> renameColumnEventVisitor,
-            TruncateTableEventVisitor<T, E> truncateTableEventVisitor)
+            VisitorHandler<AddColumnEvent, T, E> addColumnVisitor,
+            VisitorHandler<AlterColumnTypeEvent, T, E> alterColumnTypeEventVisitor,
+            VisitorHandler<CreateTableEvent, T, E> createTableEventVisitor,
+            VisitorHandler<DropColumnEvent, T, E> dropColumnEventVisitor,
+            VisitorHandler<DropTableEvent, T, E> dropTableEventVisitor,
+            VisitorHandler<RenameColumnEvent, T, E> renameColumnEventVisitor,
+            VisitorHandler<TruncateTableEvent, T, E> truncateTableEventVisitor)
             throws E {
         if (event instanceof AddColumnEvent) {
             if (addColumnVisitor == null) {
@@ -75,6 +75,50 @@ public class SchemaChangeEventVisitor {
                 return null;
             }
             return truncateTableEventVisitor.visit((TruncateTableEvent) event);
+        } else {
+            throw new IllegalArgumentException(
+                    "Unknown schema change event type " + event.getType());
+        }
+    }
+
+    public static <E extends Throwable> void voidVisit(
+            SchemaChangeEvent event,
+            VoidVisitorHandler<AddColumnEvent, E> addColumnVisitor,
+            VoidVisitorHandler<AlterColumnTypeEvent, E> alterColumnTypeEventVisitor,
+            VoidVisitorHandler<CreateTableEvent, E> createTableEventVisitor,
+            VoidVisitorHandler<DropColumnEvent, E> dropColumnEventVisitor,
+            VoidVisitorHandler<DropTableEvent, E> dropTableEventVisitor,
+            VoidVisitorHandler<RenameColumnEvent, E> renameColumnEventVisitor,
+            VoidVisitorHandler<TruncateTableEvent, E> truncateTableEventVisitor)
+            throws E {
+        if (event instanceof AddColumnEvent) {
+            if (addColumnVisitor != null) {
+                addColumnVisitor.visit((AddColumnEvent) event);
+            }
+        } else if (event instanceof AlterColumnTypeEvent) {
+            if (alterColumnTypeEventVisitor != null) {
+                alterColumnTypeEventVisitor.visit((AlterColumnTypeEvent) event);
+            }
+        } else if (event instanceof CreateTableEvent) {
+            if (createTableEventVisitor != null) {
+                createTableEventVisitor.visit((CreateTableEvent) event);
+            }
+        } else if (event instanceof DropColumnEvent) {
+            if (dropColumnEventVisitor != null) {
+                dropColumnEventVisitor.visit((DropColumnEvent) event);
+            }
+        } else if (event instanceof DropTableEvent) {
+            if (dropTableEventVisitor != null) {
+                dropTableEventVisitor.visit((DropTableEvent) event);
+            }
+        } else if (event instanceof RenameColumnEvent) {
+            if (renameColumnEventVisitor != null) {
+                renameColumnEventVisitor.visit((RenameColumnEvent) event);
+            }
+        } else if (event instanceof TruncateTableEvent) {
+            if (truncateTableEventVisitor != null) {
+                truncateTableEventVisitor.visit((TruncateTableEvent) event);
+            }
         } else {
             throw new IllegalArgumentException(
                     "Unknown schema change event type " + event.getType());

@@ -98,31 +98,16 @@ public class DorisMetadataApplier implements MetadataApplier {
 
     @Override
     public void applySchemaChange(SchemaChangeEvent event) {
-        SchemaChangeEventVisitor.<Void, SchemaEvolveException>visit(
+        SchemaChangeEventVisitor.voidVisit(
                 event,
-                addColumnEvent -> {
-                    applyAddColumnEvent(addColumnEvent);
-                    return null;
-                },
-                alterColumnTypeEvent -> {
-                    applyAlterColumnTypeEvent(alterColumnTypeEvent);
-                    return null;
-                },
-                createTableEvent -> {
-                    applyCreateTableEvent(createTableEvent);
-                    return null;
-                },
-                dropColumnEvent -> {
-                    applyDropColumnEvent(dropColumnEvent);
-                    return null;
-                },
+                this::applyAddColumnEvent,
+                this::applyAlterColumnTypeEvent,
+                this::applyCreateTableEvent,
+                this::applyDropColumnEvent,
                 dropTableEvent -> {
                     throw new UnsupportedSchemaChangeEventException(event);
                 },
-                renameColumnEvent -> {
-                    applyRenameColumnEvent(renameColumnEvent);
-                    return null;
-                },
+                this::applyRenameColumnEvent,
                 truncateTableEvent -> {
                     throw new UnsupportedSchemaChangeEventException(event);
                 });

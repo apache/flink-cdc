@@ -95,43 +95,35 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
 
     @Override
     public void serialize(SchemaChangeEvent record, DataOutputView target) throws IOException {
-
-        SchemaChangeEventVisitor.<Void, IOException>visit(
+        SchemaChangeEventVisitor.voidVisit(
                 record,
                 addColumnEvent -> {
                     enumSerializer.serialize(ADD_COLUMN, target);
                     AddColumnEventSerializer.INSTANCE.serialize(addColumnEvent, target);
-                    return null;
                 },
                 alterColumnTypeEvent -> {
                     enumSerializer.serialize(ALTER_COLUMN_TYPE, target);
                     AlterColumnTypeEventSerializer.INSTANCE.serialize(alterColumnTypeEvent, target);
-                    return null;
                 },
                 createTableEvent -> {
                     enumSerializer.serialize(CREATE_TABLE, target);
                     CreateTableEventSerializer.INSTANCE.serialize(createTableEvent, target);
-                    return null;
                 },
                 dropColumnEvent -> {
                     enumSerializer.serialize(DROP_COLUMN, target);
                     DropColumnEventSerializer.INSTANCE.serialize(dropColumnEvent, target);
-                    return null;
                 },
                 dropTableEvent -> {
                     enumSerializer.serialize(DROP_TABLE, target);
                     DropTableEventSerializer.INSTANCE.serialize(dropTableEvent, target);
-                    return null;
                 },
                 renameColumnEvent -> {
                     enumSerializer.serialize(RENAME_COLUMN, target);
                     RenameColumnEventSerializer.INSTANCE.serialize(renameColumnEvent, target);
-                    return null;
                 },
                 truncateTableEvent -> {
                     enumSerializer.serialize(TRUNCATE_TABLE, target);
                     TruncateTableEventSerializer.INSTANCE.serialize(truncateTableEvent, target);
-                    return null;
                 });
     }
 
