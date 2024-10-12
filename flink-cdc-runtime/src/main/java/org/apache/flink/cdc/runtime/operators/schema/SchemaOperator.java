@@ -40,7 +40,6 @@ import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeFamily;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
-import org.apache.flink.cdc.common.types.TimeType;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
@@ -642,19 +641,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                             "Cannot fit type \"%s\" into a STRING column. "
                                                     + "Currently only CHAR / VARCHAR can be accepted by a STRING column",
                                             originalField.getClass())));
-                }
-            } else if (destinationType.is(DataTypeRoot.TIME_WITHOUT_TIME_ZONE)
-                    && originalType.is(DataTypeRoot.TIME_WITHOUT_TIME_ZONE)) {
-                Integer value = (Integer) originalField;
-                int precisionDifference =
-                        ((TimeType) originalType).getPrecision()
-                                - ((TimeType) destinationType).getPrecision();
-                if (precisionDifference > 0) {
-                    return value / (int) Math.pow(10, precisionDifference);
-                } else if (precisionDifference < 0) {
-                    return value * (int) Math.pow(10, -precisionDifference);
-                } else {
-                    return value;
                 }
             } else if (destinationType.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)
                     && originalType.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)) {

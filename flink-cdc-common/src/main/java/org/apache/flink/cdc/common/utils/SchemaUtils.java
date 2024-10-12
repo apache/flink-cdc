@@ -34,7 +34,6 @@ import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
-import org.apache.flink.cdc.common.types.TimeType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 
@@ -198,9 +197,6 @@ public class SchemaUtils {
                             ((LocalZonedTimestampType) rType).getPrecision()));
         } else if (lType.is(DataTypeFamily.TIMESTAMP) && rType.is(DataTypeFamily.TIMESTAMP)) {
             return DataTypes.TIMESTAMP(TimestampType.MAX_PRECISION);
-        } else if (lType instanceof TimeType && rType instanceof TimeType) {
-            return DataTypes.TIME(
-                    Math.max(((TimeType) lType).getPrecision(), ((TimeType) rType).getPrecision()));
         } else if (lType.is(DataTypeFamily.INTEGER_NUMERIC)
                 && rType.is(DataTypeFamily.INTEGER_NUMERIC)) {
             mergedType = DataTypes.BIGINT();

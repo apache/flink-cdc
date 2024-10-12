@@ -292,9 +292,6 @@ public class SchemaUtilsTest {
                 .isEqualTo(DataTypes.INT().nullable());
 
         // Test merging temporal types
-        Assertions.assertThat(SchemaUtils.inferWiderType(DataTypes.TIME(1), DataTypes.TIME(7)))
-                .isEqualTo(DataTypes.TIME(7));
-
         Assertions.assertThat(
                         SchemaUtils.inferWiderType(DataTypes.TIMESTAMP(9), DataTypes.TIMESTAMP(6)))
                 .isEqualTo(DataTypes.TIMESTAMP(9));
