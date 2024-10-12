@@ -686,7 +686,9 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                     LocalDateTime.ofInstant(
                             ((ZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
         } else {
-            return TimestampData.fromLocalDateTime(LocalDateTime.parse(String.valueOf(object)));
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Unable to implicitly coerce object `%s` as a TIMESTAMP.", object));
         }
     }
 }
