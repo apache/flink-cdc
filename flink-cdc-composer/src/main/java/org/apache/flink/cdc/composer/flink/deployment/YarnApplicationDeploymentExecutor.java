@@ -25,7 +25,10 @@ import org.apache.flink.client.program.ClusterClient;
 import org.apache.flink.client.program.ClusterClientProvider;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.DeploymentOptions;
+import org.apache.flink.configuration.DeploymentOptionsInternal;
 import org.apache.flink.configuration.PipelineOptions;
+import org.apache.flink.core.fs.FileStatus;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.yarn.YarnClusterClientFactory;
 import org.apache.flink.yarn.YarnClusterDescriptor;
 import org.apache.flink.yarn.configuration.YarnConfigOptions;
@@ -36,15 +39,13 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /** Deploy flink cdc job by yarn application mode. */
 public class YarnApplicationDeploymentExecutor implements PipelineDeploymentExecutor {
@@ -54,24 +55,27 @@ public class YarnApplicationDeploymentExecutor implements PipelineDeploymentExec
 
     @Override
     public PipelineExecution.ExecutionInfo deploy(
-            CommandLine commandLine, Configuration flinkConfig, List<Path> additionalJars)
+            CommandLine commandLine,
+            Configuration flinkConfig,
+            List<Path> additionalJars,
+            Path flinkHome)
             throws Exception {
         LOG.info("Submitting application in 'Flink Yarn Application Mode'.");
         flinkConfig.set(DeploymentOptions.TARGET, YarnDeploymentTarget.APPLICATION.getName());
         if (flinkConfig.get(PipelineOptions.JARS) == null) {
-            // Set the SHIP_FILES option in the Flink configuration to include additional JAR files
-            getFlinkCDCDistJarFromEnv()
-                    .ifPresent(
-                            distJar -> flinkConfig.set(YarnConfigOptions.FLINK_DIST_JAR, distJar));
+            flinkConfig.set(
+                    PipelineOptions.JARS, Collections.singletonList(getFlinkCDCDistJarFromEnv()));
         }
         flinkConfig.set(
                 YarnConfigOptions.SHIP_FILES,
                 additionalJars.stream().map(Path::toString).collect(Collectors.toList()));
 
         flinkConfig.set(ApplicationConfiguration.APPLICATION_ARGS, commandLine.getArgList());
+        flinkConfig.set(DeploymentOptionsInternal.CONF_DIR, flinkHome + "/conf");
+
         flinkConfig.set(
                 ApplicationConfiguration.APPLICATION_MAIN_CLASS,
-                "org.apache.flink.cdc.cli.CliFrontend");
+                "org.apache.flink.cdc.cli.CliExecutor");
         final YarnClusterClientFactory yarnClusterClientFactory = new YarnClusterClientFactory();
         final YarnClusterDescriptor descriptor =
                 yarnClusterClientFactory.createClusterDescriptor(flinkConfig);
@@ -102,31 +106,38 @@ public class YarnApplicationDeploymentExecutor implements PipelineDeploymentExec
         }
     }
 
-    private Optional<String> getFlinkCDCDistJarFromEnv() {
+    private String getFlinkCDCDistJarFromEnv() throws IOException {
         String flinkCDCHomeFromEnvVar = System.getenv(FLINK_CDC_HOME_ENV_VAR);
-        Path flinkCDCLibPath = Paths.get(flinkCDCHomeFromEnvVar).resolve("lib");
-        if (!Files.exists(flinkCDCLibPath) || !Files.isDirectory(flinkCDCLibPath)) {
-            LOG.error(
-                    "Flink cdc home lib is not file or not directory: {}",
-                    flinkCDCLibPath.toAbsolutePath());
-            return Optional.empty();
+        Path flinkCDCLibPath = new Path(flinkCDCHomeFromEnvVar, "lib");
+        if (!flinkCDCLibPath.getFileSystem().exists(flinkCDCLibPath)
+                || !flinkCDCLibPath.getFileSystem().getFileStatus(flinkCDCLibPath).isDir()) {
+            throw new RuntimeException(
+                    "Flink cdc home lib is not file or not directory: "
+                            + flinkCDCLibPath.makeQualified(flinkCDCLibPath.getFileSystem()));
         }
-        try (Stream<Path> paths = Files.walk(flinkCDCLibPath)) {
-            List<String> distJars = new ArrayList<>();
-            paths.filter(Files::isRegularFile)
-                    .filter(
-                            path ->
-                                    path.getFileName()
-                                            .toString()
-                                            .matches("flink-cdc-dist-.*-.*\\.jar"))
-                    .forEach(path -> distJars.add(String.valueOf(path.toAbsolutePath())));
-            return Optional.ofNullable(distJars.get(0));
-        } catch (IOException e) {
-            LOG.error(
-                    "Get  flink-cdc-dist.jar from Flink cdc home lib is : {} failed",
-                    flinkCDCLibPath.toAbsolutePath(),
-                    e);
-            return Optional.empty();
+
+        FileStatus[] fileStatuses = flinkCDCLibPath.getFileSystem().listStatus(flinkCDCLibPath);
+        Optional<Path> distJars =
+                Arrays.stream(fileStatuses)
+                        .filter(status -> !status.isDir())
+                        .filter(
+                                file ->
+                                        file.getPath()
+                                                .getName()
+                                                .matches(
+                                                        "^flink-cdc-dist-(\\d+(\\.\\d+)*)(-SNAPSHOT)?\\.jar$"))
+                        .map(FileStatus::getPath)
+                        .findFirst();
+
+        if (distJars.isPresent()) {
+            Path path = distJars.get().makeQualified(distJars.get().getFileSystem());
+            return path.toString();
+        } else {
+            throw new FileNotFoundException(
+                    "Failed to fetch Flink CDC dist jar from path + "
+                            + distJars.get()
+                                    .makeQualified(distJars.get().getFileSystem())
+                                    .toString());
         }
     }
 }
