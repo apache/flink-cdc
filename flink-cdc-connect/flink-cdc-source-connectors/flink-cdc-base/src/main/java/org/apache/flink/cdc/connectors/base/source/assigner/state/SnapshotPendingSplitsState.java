@@ -29,6 +29,7 @@ import io.debezium.relational.history.TableChanges;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** A {@link PendingSplitsState} for pending snapshot splits. */
 public class SnapshotPendingSplitsState extends PendingSplitsState {
@@ -68,6 +69,11 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
 
     private final Map<TableId, TableChanges.TableChange> tableSchemas;
 
+    /** Map to record splitId and the checkpointId mark the split is finished. */
+    private final Map<String, Long> splitFinishedCheckpointIds;
+    /** Map to record tableId and finished split ids. */
+    private final Map<TableId, Set<String>> finishedSplits;
+
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
             List<SchemalessSnapshotSplit> remainingSplits,
@@ -77,7 +83,9 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
             AssignerStatus assignerStatus,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
-            boolean isRemainingTablesCheckpointed) {
+            boolean isRemainingTablesCheckpointed,
+            Map<String, Long> splitFinishedCheckpointIds,
+            Map<TableId, Set<String>> finishedSplits) {
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
@@ -87,6 +95,16 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.isTableIdCaseSensitive = isTableIdCaseSensitive;
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.tableSchemas = tableSchemas;
+        this.splitFinishedCheckpointIds = splitFinishedCheckpointIds;
+        this.finishedSplits = finishedSplits;
+    }
+
+    public Map<String, Long> getSplitFinishedCheckpointIds() {
+        return splitFinishedCheckpointIds;
+    }
+
+    public Map<TableId, Set<String>> getFinishedSplits() {
+        return finishedSplits;
     }
 
     public List<TableId> getAlreadyProcessedTables() {
@@ -141,7 +159,9 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 && Objects.equals(alreadyProcessedTables, that.alreadyProcessedTables)
                 && Objects.equals(remainingSplits, that.remainingSplits)
                 && Objects.equals(assignedSplits, that.assignedSplits)
-                && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets);
+                && Objects.equals(splitFinishedOffsets, that.splitFinishedOffsets)
+                && Objects.equals(splitFinishedCheckpointIds, that.splitFinishedCheckpointIds)
+                && Objects.equals(finishedSplits, that.finishedSplits);
     }
 
     @Override
@@ -154,7 +174,9 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 splitFinishedOffsets,
                 assignerStatus,
                 isTableIdCaseSensitive,
-                isRemainingTablesCheckpointed);
+                isRemainingTablesCheckpointed,
+                splitFinishedCheckpointIds,
+                finishedSplits);
     }
 
     @Override
@@ -176,6 +198,10 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 + isTableIdCaseSensitive
                 + ", isRemainingTablesCheckpointed="
                 + isRemainingTablesCheckpointed
+                + ", splitFinishedCheckpointIds="
+                + splitFinishedCheckpointIds
+                + ", finishedSplits="
+                + finishedSplits
                 + '}';
     }
 }

@@ -26,6 +26,7 @@ import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReader;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceRecordEmitter;
 import org.apache.flink.cdc.connectors.mongodb.source.offset.ChangeStreamOffset;
+import org.apache.flink.cdc.connectors.mongodb.source.utils.MongoRecordUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
@@ -71,10 +72,14 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
         } else if (isHeartbeatEvent(element)) {
             if (splitState.isStreamSplitState()) {
                 updatePositionForStreamSplit(element, splitState);
+                sourceReaderMetrics.updateLastReceivedEventTime(
+                        MongoRecordUtils.getMessageTimestamp(element));
             }
         } else if (isDataChangeRecord(element)) {
             if (splitState.isStreamSplitState()) {
                 updatePositionForStreamSplit(element, splitState);
+                sourceReaderMetrics.updateLastReceivedEventTime(
+                        MongoRecordUtils.getMessageTimestamp(element));
             }
             reportMetrics(element);
             emitElement(element, output);
@@ -92,6 +97,17 @@ public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitte
             offset.updatePosition(resumeToken);
         }
         splitState.asStreamSplitState().setStartingOffset(offset);
+    }
+
+    @Override
+    protected void emitElement(SourceRecord element, SourceOutput<T> output) throws Exception {
+        sourceReaderMetrics.markRecord();
+        sourceReaderMetrics.updateRecordCounters(element);
+
+        outputCollector.output = output;
+        // use mongo timestamp as the current message timestamp
+        outputCollector.currentMessageTimestamp = MongoRecordUtils.getMessageTimestamp(element);
+        debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
 
     @Override
