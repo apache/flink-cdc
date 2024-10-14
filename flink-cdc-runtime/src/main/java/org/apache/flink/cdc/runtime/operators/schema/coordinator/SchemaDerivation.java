@@ -354,7 +354,7 @@ public class SchemaDerivation {
         } catch (IllegalStateException e) {
             throw new IllegalStateException(
                     String.format(
-                            "Incompatible types found for column `%s': \"%s\" and \"%s\"",
+                            "Incompatible types found for column `%s`: \"%s\" and \"%s\"",
                             columnName, thisType, thatType));
         }
     }
