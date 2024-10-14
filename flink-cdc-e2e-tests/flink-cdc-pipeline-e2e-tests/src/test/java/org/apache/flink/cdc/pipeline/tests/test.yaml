@@ -9,9 +9,7 @@ source:
   server-time-zone: UTC
 
 sink:
-  type: elasticsearch
-  hosts: http://localhost:9200
-  version: 7
+  type: values
 
 
 
@@ -30,5 +28,5 @@ pipeline:
   parallelism: 2
   models:
     - name: embedding
-      host: https://api.xty.app/v1/
-      key: sk-1t9n8WG06Z3JP9g9567d84D04fBb4a1584C9Cd0a76B1EdF1
+      host: https://run.v36.cm/v1/
+      key: sk-OJzl1Bxeq5AYXAR4DeDc81BcDdAc4230BfAd53D875EaB9E1

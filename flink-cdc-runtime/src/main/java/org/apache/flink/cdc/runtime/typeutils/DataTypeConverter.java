@@ -1,32 +1,11 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.apache.flink.cdc.runtime.typeutils;
 
-import org.apache.flink.cdc.common.data.DecimalData;
-import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
-import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.data.*;
+import org.apache.flink.cdc.common.data.binary.BinaryArrayData;
+import org.apache.flink.cdc.common.data.binary.BinaryMapData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.schema.Column;
-import org.apache.flink.cdc.common.types.BinaryType;
-import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.common.types.RowType;
-import org.apache.flink.cdc.common.types.VarBinaryType;
+import org.apache.flink.cdc.common.types.*;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 
 import org.apache.calcite.rel.type.RelDataType;
@@ -42,8 +21,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /** A data type converter. */
 public class DataTypeConverter {
@@ -94,7 +76,9 @@ public class DataTypeConverter {
             case ROW:
                 return Object.class;
             case ARRAY:
+                return ArrayData.class;
             case MAP:
+                return MapData.class;
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + dataType);
         }
@@ -137,17 +121,15 @@ public class DataTypeConverter {
             case ROW:
                 return SqlTypeName.ROW;
             case ARRAY:
+                return SqlTypeName.ARRAY;
             case MAP:
+                return SqlTypeName.MAP;
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + dataType);
         }
     }
 
     public static DataType convertCalciteRelDataTypeToDataType(RelDataType relDataType) {
-        if (relDataType.getSqlTypeName() == SqlTypeName.ARRAY
-                && relDataType.getComponentType().getSqlTypeName() == SqlTypeName.FLOAT) {
-            return DataTypes.ARRAY(DataTypes.FLOAT());
-        }
         switch (relDataType.getSqlTypeName()) {
             case BOOLEAN:
                 return DataTypes.BOOLEAN();
@@ -182,18 +164,16 @@ public class DataTypeConverter {
             case DECIMAL:
                 return DataTypes.DECIMAL(relDataType.getPrecision(), relDataType.getScale());
             case ARRAY:
-                LOG.debug(
-                        "Processing ARRAY type: {}, class: {}",
-                        relDataType,
-                        relDataType.getClass().getName());
                 RelDataType componentType = relDataType.getComponentType();
-                if (componentType.getSqlTypeName() == SqlTypeName.FLOAT) {
-                    return DataTypes.ARRAY(DataTypes.FLOAT());
-                } else {
-                    return DataTypes.ARRAY(convertCalciteRelDataTypeToDataType(componentType));
-                }
-            case ROW:
+                return DataTypes.ARRAY(convertCalciteRelDataTypeToDataType(componentType));
             case MAP:
+                RelDataType keyType = relDataType.getKeyType();
+                RelDataType valueType = relDataType.getValueType();
+                return DataTypes.MAP(
+                        convertCalciteRelDataTypeToDataType(keyType),
+                        convertCalciteRelDataTypeToDataType(valueType)
+                );
+            case ROW:
             default:
                 throw new UnsupportedOperationException(
                         "Unsupported type: " + relDataType.getSqlTypeName());
@@ -238,7 +218,9 @@ public class DataTypeConverter {
             case ROW:
                 return value;
             case ARRAY:
+                return convertToArray(value, (ArrayType) dataType);
             case MAP:
+                return convertToMap(value, (MapType) dataType);
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + dataType);
         }
@@ -282,7 +264,9 @@ public class DataTypeConverter {
             case ROW:
                 return value;
             case ARRAY:
+                return convertToArrayOriginal(value, (ArrayType) dataType);
             case MAP:
+                return convertToMapOriginal(value, (MapType) dataType);
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + dataType);
         }
@@ -374,11 +358,9 @@ public class DataTypeConverter {
             return LocalDate.of(date.getYear() + 1900, date.getMonth() + 1, date.getDate());
         }
         if (obj instanceof Long) {
-            // Assume the value is the epoch day number
             return LocalDate.ofEpochDay((Long) obj);
         }
         if (obj instanceof Integer) {
-            // Assume the value is the epoch day number
             return LocalDate.ofEpochDay((Integer) obj);
         }
         throw new IllegalArgumentException(
@@ -392,8 +374,98 @@ public class DataTypeConverter {
         if (obj instanceof Integer) {
             return obj;
         }
-        // get number of milliseconds of the day
         return toLocalTime(obj).toSecondOfDay() * 1000;
+    }
+
+    private static Object convertToArray(Object obj, ArrayType arrayType) {
+        if (obj instanceof ArrayData) {
+            return obj;
+        }
+        if (obj instanceof List) {
+            List<?> list = (List<?>) obj;
+            GenericArrayData arrayData = new GenericArrayData(list.toArray());
+            return arrayData;
+        }
+        if (obj.getClass().isArray()) {
+            return new GenericArrayData((Object[]) obj);
+        }
+        throw new IllegalArgumentException("Unable to convert to ArrayData: " + obj);
+    }
+
+    private static Object convertToArrayOriginal(Object obj, ArrayType arrayType) {
+        if (obj instanceof ArrayData) {
+            ArrayData arrayData = (ArrayData) obj;
+            Object[] result = new Object[arrayData.size()];
+            for (int i = 0; i < arrayData.size(); i++) {
+                result[i] = getArrayElement(arrayData, i, arrayType.getElementType());
+            }
+            return result;
+        }
+        return obj;
+    }
+
+    private static Object getArrayElement(ArrayData arrayData, int pos, DataType elementType) {
+        switch (elementType.getTypeRoot()) {
+            case BOOLEAN:
+                return arrayData.getBoolean(pos);
+            case TINYINT:
+                return arrayData.getByte(pos);
+            case SMALLINT:
+                return arrayData.getShort(pos);
+            case INTEGER:
+                return arrayData.getInt(pos);
+            case BIGINT:
+                return arrayData.getLong(pos);
+            case FLOAT:
+                return arrayData.getFloat(pos);
+            case DOUBLE:
+                return arrayData.getDouble(pos);
+            case CHAR:
+            case VARCHAR:
+                return arrayData.getString(pos);
+            case DECIMAL:
+                return arrayData.getDecimal(pos, ((DecimalType) elementType).getPrecision(), ((DecimalType) elementType).getScale());
+            case DATE:
+                return arrayData.getInt(pos);
+            case TIME_WITHOUT_TIME_ZONE:
+                return arrayData.getInt(pos);
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                return arrayData.getTimestamp(pos, ((TimestampType) elementType).getPrecision());
+            case ARRAY:
+                return convertToArrayOriginal(arrayData.getArray(pos), (ArrayType) elementType);
+            case MAP:
+                return convertToMapOriginal(arrayData.getMap(pos), (MapType) elementType);
+            default:
+                throw new UnsupportedOperationException("Unsupported array element type: " + elementType);
+        }
+    }
+
+    private static Object convertToMap(Object obj, MapType mapType) {
+        if (obj instanceof MapData) {
+            return obj;
+        }
+        if (obj instanceof Map) {
+            Map<?, ?> javaMap = (Map<?, ?>) obj;
+            GenericMapData mapData = new GenericMapData(javaMap);
+            return mapData;
+        }
+        throw new IllegalArgumentException("Unable to convert to MapData: " + obj);
+    }
+
+    private static Object convertToMapOriginal(Object obj, MapType mapType) {
+        if (obj instanceof MapData) {
+            MapData mapData = (MapData) obj;
+            Map<Object, Object> result = new HashMap<>();
+            ArrayData keyArray = mapData.keyArray();
+            ArrayData valueArray = mapData.valueArray();
+            for (int i = 0; i < mapData.size(); i++) {
+                Object key = getArrayElement(keyArray, i, mapType.getKeyType());
+                Object value = getArrayElement(valueArray, i, mapType.getValueType());
+                result.put(key, value);
+            }
+            return result;
+        }
+        return obj;
     }
 
     private static LocalTime toLocalTime(Object obj) {

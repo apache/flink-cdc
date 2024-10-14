@@ -1,5 +1,7 @@
 package org.apache.flink.cdc.runtime.operators.model;
 
+import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
@@ -22,11 +24,6 @@ import java.util.stream.Collectors;
 public class ModelUdf implements UserDefinedFunction {
 
     private static final Logger LOG = LoggerFactory.getLogger(ModelUdf.class);
-    private static final String DEFAULT_API_KEY =
-            "sk-WegHEuogRpIyRSwaF5Ce6fE3E62e459dA61eFaF6CcF8C79b";
-    private static final String DEFAULT_MODEL_NAME = "text-embedding-ada-002";
-    private static final int DEFAULT_TIMEOUT_SECONDS = 30;
-    private static final String DEFAULT_BASE_URL = "https://api.gpt.ge/v1/";
 
     private String name;
     private String host;
@@ -42,43 +39,39 @@ public class ModelUdf implements UserDefinedFunction {
     public void configure(String serializedParams) {
         Map<String, String> params = new Gson().fromJson(serializedParams, Map.class);
         this.name = params.get("name");
-        this.host = params.getOrDefault("host", DEFAULT_BASE_URL);
-        this.apiKey = params.getOrDefault("key", DEFAULT_API_KEY);
-        this.modelName = params.getOrDefault("modelName", DEFAULT_MODEL_NAME);
-        this.timeoutSeconds =
-                Integer.parseInt(
-                        params.getOrDefault(
-                                "timeoutSeconds", String.valueOf(DEFAULT_TIMEOUT_SECONDS)));
+        this.host = params.get("host");
+        this.apiKey = params.get("apiKey");
+        this.modelName = params.get("modelName");
         LOG.info("Configured ModelUdf: {} with host: {}", name, host);
     }
 
-    public String eval(String input) {
+    public ArrayData eval(String input) {
         return getEmbedding(input);
     }
 
-    public String eval(Integer input) {
+    public ArrayData eval(Integer input) {
         return getEmbedding(input.toString());
     }
 
-    public String eval(Double input) {
+    public ArrayData eval(Double input) {
         return getEmbedding(input.toString());
     }
 
-    public String eval(Boolean input) {
+    public ArrayData eval(Boolean input) {
         return getEmbedding(input.toString());
     }
 
     // Method to support multiple parameters
-    public String eval(Object... inputs) {
+    public ArrayData eval(Object... inputs) {
         String combinedInput =
                 Arrays.stream(inputs).map(Object::toString).collect(Collectors.joining(" "));
         return getEmbedding(combinedInput);
     }
 
-    private String getEmbedding(String input) {
+    private ArrayData getEmbedding(String input) {
         if (input == null || input.trim().isEmpty()) {
             LOG.debug("Empty or null input provided for embedding.");
-            return "";
+            return new GenericArrayData(new Float[0]); // 返回空的 ArrayData
         }
 
         try {
@@ -86,26 +79,26 @@ public class ModelUdf implements UserDefinedFunction {
             TextSegment textSegment = new TextSegment(input, new Metadata());
 
             // 获取嵌入结果
-            List<Embedding> embeddings =
-                    embeddingModel.embedAll(Collections.singletonList(textSegment)).content();
+            List<Embedding> embeddings = embeddingModel.embedAll(Collections.singletonList(textSegment)).content();
 
             if (embeddings != null && !embeddings.isEmpty()) {
-                // 提取嵌入向量并转换为字符串
-                List<Float> embedding = embeddings.get(0).vectorAsList();
-                return embedding.stream().map(String::valueOf).collect(Collectors.joining(", "));
+                List<Float> embeddingList = embeddings.get(0).vectorAsList();
+                // 将 List<Float> 转换为 ArrayData
+                Float[] embeddingArray = embeddingList.toArray(new Float[0]);
+                return new GenericArrayData(embeddingArray);
             } else {
                 LOG.debug("No embedding results returned for input: {}", input);
-                return "";
+                return new GenericArrayData(new Float[0]);
             }
         } catch (Exception e) {
             LOG.error("Error while getting embedding for input: {}", input, e);
-            return "";
+            return new GenericArrayData(new Float[0]);
         }
     }
 
     @Override
     public DataType getReturnType() {
-        return DataTypes.STRING();
+        return DataTypes.ARRAY(DataTypes.FLOAT());
     }
 
     @Override

@@ -17,8 +17,10 @@
 
 package org.apache.flink.cdc.runtime.parser;
 
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.types.ArrayType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
@@ -121,16 +123,26 @@ public class TransformParser {
                 SqlReturnTypeInference returnTypeInference;
                 ScalarFunction function = ScalarFunctionImpl.create(clazz, "eval");
                 if (udf.getReturnTypeHint() != null) {
-                    // This UDF has return type hint annotation
-                    returnTypeInference =
-                            o ->
-                                    o.getTypeFactory()
-                                            .createSqlType(
-                                                    convertCalciteType(udf.getReturnTypeHint()));
+                    returnTypeInference = o -> {
+                        RelDataTypeFactory typeFactory = o.getTypeFactory();
+                        DataType returnTypeHint = udf.getReturnTypeHint();
+
+                        // 检查 returnTypeHint 是否为 ArrayType 实例
+                        if (returnTypeHint instanceof ArrayType) {
+                            // 如果是数组类型，获取元素类型并创建数组类型
+                            DataType elementTypeHint = ((ArrayType) returnTypeHint).getElementType(); // 假设有 getElementType 方法
+                            RelDataType elementType = typeFactory.createSqlType(convertCalciteType(elementTypeHint));
+                            return typeFactory.createArrayType(elementType, -1);  // -1 表示没有基数限制
+                        }
+
+                        // 处理非数组类型
+                        return typeFactory.createSqlType(convertCalciteType(returnTypeHint));
+                    };
                 } else {
-                    // Infer it from eval method return type
+                    // 从 eval 方法推断返回类型
                     returnTypeInference = o -> function.getReturnType(o.getTypeFactory());
                 }
+
                 schema.add(udf.getName(), function);
                 udfFunctions.add(
                         new SqlFunction(
