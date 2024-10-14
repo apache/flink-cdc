@@ -24,6 +24,11 @@ import java.util.stream.Collectors;
 public class ModelUdf implements UserDefinedFunction {
 
     private static final Logger LOG = LoggerFactory.getLogger(ModelUdf.class);
+    private static final String DEFAULT_API_KEY =
+            "sk-WegHEuogRpIyRSwaF5Ce6fE3E62e459dA61eFaF6CcF8C79b";
+    private static final String DEFAULT_MODEL_NAME = "text-embedding-ada-002";
+    private static final int DEFAULT_TIMEOUT_SECONDS = 30;
+    private static final String DEFAULT_BASE_URL = "https://api.gpt.ge/v1/";
 
     private String name;
     private String host;
@@ -39,9 +44,13 @@ public class ModelUdf implements UserDefinedFunction {
     public void configure(String serializedParams) {
         Map<String, String> params = new Gson().fromJson(serializedParams, Map.class);
         this.name = params.get("name");
-        this.host = params.get("host");
-        this.apiKey = params.get("apiKey");
-        this.modelName = params.get("modelName");
+        this.host = params.getOrDefault("host", DEFAULT_BASE_URL);
+        this.apiKey = params.getOrDefault("apiKey", DEFAULT_API_KEY);
+        this.modelName = params.getOrDefault("modelName", DEFAULT_MODEL_NAME);
+        this.timeoutSeconds =
+                Integer.parseInt(
+                        params.getOrDefault(
+                                "timeoutSeconds", String.valueOf(DEFAULT_TIMEOUT_SECONDS)));
         LOG.info("Configured ModelUdf: {} with host: {}", name, host);
     }
 
