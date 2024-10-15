@@ -106,6 +106,10 @@ limitations under the License.
                                     <pattern>org.apache.flink.connector.kafka</pattern>
                                     <shadedPattern>org.apache.flink.cdc.connectors.kafka.shaded.org.apache.flink.connector.kafka</shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>org.apache.flink.streaming.connectors.kafka</pattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.kafka.shaded.org.apache.flink.streaming.connectors.kafka</shadedPattern>
+                                </relocation>
                             </relocations>
                         </configuration>
                     </execution>
