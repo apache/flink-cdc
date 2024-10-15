@@ -151,7 +151,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                             dataChangeEvent,
                             schemaMaps.get(dataChangeEvent.tableId()).getFieldGetters());
             switch (tuple4.f0) {
-                case DYNAMIC:
+                case HASH_DYNAMIC:
                     {
                         bucket =
                                 tuple4.f2.assign(
@@ -159,18 +159,18 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                                         tuple4.f3.trimmedPrimaryKey(genericRow).hashCode());
                         break;
                     }
-                case FIXED:
+                case HASH_FIXED:
                     {
                         tuple4.f1.setRecord(genericRow);
                         bucket = tuple4.f1.bucket();
                         break;
                     }
-                case UNAWARE:
+                case BUCKET_UNAWARE:
                     {
                         bucket = 0;
                         break;
                     }
-                case GLOBAL_DYNAMIC:
+                case CROSS_PARTITION:
                 default:
                     {
                         throw new RuntimeException("Unsupported bucket mode: " + tuple4.f0);
