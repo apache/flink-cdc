@@ -88,6 +88,9 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
                 context.getFactoryConfiguration().get(PaimonDataSinkOptions.COMMIT_USER);
         String partitionKey =
                 context.getFactoryConfiguration().get(PaimonDataSinkOptions.PARTITION_KEY);
+        Boolean ignoreIncompatibleOnRestart =
+                context.getFactoryConfiguration()
+                        .get(PaimonDataSinkOptions.IGNORE_INCOMPATIBLE_ON_RESTART);
         Map<TableId, List<String>> partitionMaps = new HashMap<>();
         if (!partitionKey.isEmpty()) {
             for (String tables : partitionKey.split(";")) {
@@ -114,7 +117,8 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
                 partitionMaps,
                 serializer,
                 zoneId,
-                schemaOperatorUid);
+                schemaOperatorUid,
+                ignoreIncompatibleOnRestart);
     }
 
     @Override
@@ -136,6 +140,7 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
         options.add(PaimonDataSinkOptions.URI);
         options.add(PaimonDataSinkOptions.COMMIT_USER);
         options.add(PaimonDataSinkOptions.PARTITION_KEY);
+        options.add(PaimonDataSinkOptions.IGNORE_INCOMPATIBLE_ON_RESTART);
         return options;
     }
 }
