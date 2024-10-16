@@ -357,6 +357,11 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
     </tr>
+    <tr>
+      <td>op_type</td>
+      <td>STRING NOT NULL</td>
+      <td>Operation type of the row, the value is one of: insert,update,replace,delete. <br>Since DeduplicateFunctionHelper#processLastRowOnChangelog returns the row before deletion, the `delete` type is temporarily missing.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -366,6 +371,7 @@ CREATE TABLE products (
     db_name STRING METADATA FROM 'database_name' VIRTUAL,
     collection_name STRING METADATA  FROM 'collection_name' VIRTUAL,
     operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation_type STRING METADATA FROM 'op_type' VIRTUAL,
     _id STRING, // must be declared
     name STRING,
     weight DECIMAL(10,3),
