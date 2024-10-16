@@ -106,6 +106,7 @@ public class PaimonSinkITCase {
         catalogOptions = new Options();
         catalogOptions.setString("metastore", metastore);
         catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
         table1 = TableId.tableId("test", "table1");
         if ("hive".equals(metastore)) {
             catalogOptions.setString("hadoop-conf-dir", HADOOP_CONF_DIR);
@@ -117,13 +118,14 @@ public class PaimonSinkITCase {
                                     + "'warehouse'='%s', "
                                     + "'metastore'='hive', "
                                     + "'hadoop-conf-dir'='%s', "
-                                    + "'hive-conf-dir'='%s' "
+                                    + "'hive-conf-dir'='%s', "
+                                    + "'cache-enabled'='false'"
                                     + ")",
                             warehouse, HADOOP_CONF_DIR, HIVE_CONF_DIR));
         } else {
             tEnv.executeSql(
                     String.format(
-                            "CREATE CATALOG paimon_catalog WITH ('type'='paimon', 'warehouse'='%s')",
+                            "CREATE CATALOG paimon_catalog WITH ('type'='paimon', 'warehouse'='%s', 'cache-enabled'='false')",
                             warehouse));
         }
         FlinkCatalogFactory.createPaimonCatalog(catalogOptions)

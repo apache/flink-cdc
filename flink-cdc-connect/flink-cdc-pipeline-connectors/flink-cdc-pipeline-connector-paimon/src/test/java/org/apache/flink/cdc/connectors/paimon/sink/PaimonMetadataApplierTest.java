@@ -87,6 +87,7 @@ public class PaimonMetadataApplierTest {
         }
         catalogOptions.setString("metastore", metastore);
         catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
         this.catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
         this.catalog.dropDatabase(TEST_DATABASE, true, true);
     }
@@ -177,6 +178,31 @@ public class PaimonMetadataApplierTest {
                                 new DataField(2, "newcol3", DataTypes.STRING())));
         Assertions.assertEquals(
                 tableSchema, catalog.getTable(Identifier.fromString("test.table1")).rowType());
+
+        // Create table with upper case.
+        catalogOptions.setString("allow-upper-case", "true");
+        metadataApplier = new PaimonMetadataApplier(catalogOptions);
+        createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.table_with_upper_case"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "COL1",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING()
+                                                .notNull())
+                                .physicalColumn(
+                                        "col2", org.apache.flink.cdc.common.types.DataTypes.INT())
+                                .primaryKey("COL1")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+        tableSchema =
+                new RowType(
+                        Arrays.asList(
+                                new DataField(0, "COL1", DataTypes.STRING().notNull()),
+                                new DataField(1, "col2", DataTypes.INT())));
+        Assertions.assertEquals(
+                tableSchema,
+                catalog.getTable(Identifier.fromString("test.table_with_upper_case")).rowType());
     }
 
     @ParameterizedTest
