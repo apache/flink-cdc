@@ -291,6 +291,35 @@ public class SchemaUtilsTest {
                                 DataTypes.INT().nullable(), DataTypes.INT().nullable()))
                 .isEqualTo(DataTypes.INT().nullable());
 
+        // Test merging temporal types
+        Assertions.assertThat(
+                        SchemaUtils.inferWiderType(DataTypes.TIMESTAMP(9), DataTypes.TIMESTAMP(6)))
+                .isEqualTo(DataTypes.TIMESTAMP(9));
+
+        Assertions.assertThat(
+                        SchemaUtils.inferWiderType(
+                                DataTypes.TIMESTAMP_TZ(3), DataTypes.TIMESTAMP_TZ(7)))
+                .isEqualTo(DataTypes.TIMESTAMP_TZ(7));
+
+        Assertions.assertThat(
+                        SchemaUtils.inferWiderType(
+                                DataTypes.TIMESTAMP_LTZ(2), DataTypes.TIMESTAMP_LTZ(1)))
+                .isEqualTo(DataTypes.TIMESTAMP_LTZ(2));
+
+        Assertions.assertThat(
+                        SchemaUtils.inferWiderType(
+                                DataTypes.TIMESTAMP_LTZ(), DataTypes.TIMESTAMP()))
+                .isEqualTo(DataTypes.TIMESTAMP(9));
+
+        Assertions.assertThat(
+                        SchemaUtils.inferWiderType(DataTypes.TIMESTAMP_TZ(), DataTypes.TIMESTAMP()))
+                .isEqualTo(DataTypes.TIMESTAMP(9));
+
+        Assertions.assertThat(
+                        SchemaUtils.inferWiderType(
+                                DataTypes.TIMESTAMP_LTZ(), DataTypes.TIMESTAMP_TZ()))
+                .isEqualTo(DataTypes.TIMESTAMP(9));
+
         // incompatible type merges test
         Assertions.assertThatThrownBy(
                         () -> SchemaUtils.inferWiderType(DataTypes.INT(), DataTypes.DOUBLE()))
