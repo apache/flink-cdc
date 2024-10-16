@@ -33,6 +33,7 @@ limitations under the License.
         <flink-1.19>1.19.1</flink-1.19>
         <flink-1.20>1.20.0</flink-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
+        <testcontainers.version>1.19.7</testcontainers.version>
         <starrocks.connector.version>1.2.9_flink-${flink.major.version}</starrocks.connector.version>
     </properties>
 
@@ -126,6 +127,12 @@ limitations under the License.
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
             <version>${scala.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>elasticsearch</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
