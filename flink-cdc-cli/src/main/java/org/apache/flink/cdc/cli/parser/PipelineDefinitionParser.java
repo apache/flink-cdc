@@ -19,8 +19,7 @@ package org.apache.flink.cdc.cli.parser;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
-
-import java.nio.file.Path;
+import org.apache.flink.core.fs.Path;
 
 /** Parsing pipeline definition files and generate {@link PipelineDef}. */
 public interface PipelineDefinitionParser {

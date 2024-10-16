@@ -33,13 +33,13 @@ import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.composer.flink.translator.TransformTranslator;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
 import org.apache.flink.configuration.DeploymentOptions;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.List;
@@ -73,6 +73,10 @@ public class FlinkPipelineComposer implements PipelineComposer {
                                 e);
                     }
                 });
+        return new FlinkPipelineComposer(env, false);
+    }
+
+    public static FlinkPipelineComposer ofApplicationCluster(StreamExecutionEnvironment env) {
         return new FlinkPipelineComposer(env, false);
     }
 
