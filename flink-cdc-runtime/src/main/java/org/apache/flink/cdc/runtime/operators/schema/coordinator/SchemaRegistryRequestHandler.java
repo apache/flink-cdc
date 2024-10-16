@@ -45,7 +45,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -343,10 +342,21 @@ public class SchemaRegistryRequestHandler implements Closeable {
         }
     }
 
+    /**
+     * As at Flink 1.20, the runtime (<code>
+     * DefaultOperatorCoordinatorHandler#disposeAllOperatorCoordinators</code>) will ignore the
+     * exception thrown by this method. Thus, it should report errors by logging them.
+     */
     @Override
-    public void close() throws IOException {
+    public void close() {
         if (schemaChangeThreadPool != null) {
             schemaChangeThreadPool.shutdown();
+        }
+
+        try {
+            metadataApplier.close();
+        } catch (Exception e) {
+            LOG.error("Failed to close metadata applier.", e);
         }
     }
 
