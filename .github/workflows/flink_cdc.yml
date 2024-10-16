@@ -47,6 +47,12 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
+      - name: Set JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
       - name: Compiling jar packages
         run: mvn --no-snapshot-updates -B package -DskipTests
       - name: Run license check

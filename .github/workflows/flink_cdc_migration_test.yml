@@ -26,6 +26,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 8
+          distribution: temurin
       - name: Compile snapshot CDC version
         run: mvn --no-snapshot-updates -B install -DskipTests
       - name: Run migration tests
