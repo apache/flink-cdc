@@ -17,20 +17,14 @@
 
 package org.apache.flink.cdc.connectors.oracle.source.utils;
 
-import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
-import org.apache.flink.table.types.logical.RowType;
-
-import io.debezium.connector.oracle.OracleConnection;
-import io.debezium.connector.oracle.OracleConnectorConfig;
-import io.debezium.connector.oracle.OracleDatabaseSchema;
-import io.debezium.connector.oracle.OracleDefaultValueConverter;
-import io.debezium.connector.oracle.OracleTopicSelector;
-import io.debezium.connector.oracle.OracleValueConverters;
-import io.debezium.connector.oracle.StreamingAdapter;
+import io.debezium.connector.oracle.*;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
+import oracle.sql.ROWID;
+import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
+import org.apache.flink.table.types.logical.RowType;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.sql.Connection;
@@ -42,7 +36,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/** Utils to prepare Oracle SQL statement. */
+/**
+ * Utils to prepare Oracle SQL statement.
+ */
 public class OracleUtils {
 
     private OracleUtils() {}
@@ -330,5 +326,26 @@ public class OracleUtils {
         sql.append(" ORDER BY ").append(orderBy).append(" LIMIT ").append(limit);
         sql.append(") T");
         return sql.toString();
+    }
+
+    public static int compareRowId(JdbcConnection jdbcConnection, TableId tableId, ROWID aRowId, ROWID bRowId) throws SQLException {
+        final StringBuilder sql = new StringBuilder("SELECT CASE  WHEN START_ID < END_ID THEN -1 ");
+        sql.append(" WHEN START_ID > END_ID THEN 1 ");
+        sql.append("  ELSE 0  ");
+        sql.append("  END AS RESULT");
+        sql.append("  FROM (");
+        sql.append("  SELECT \"ROWID\" AS START_ID FROM ");
+        sql.append(quoteSchemaAndTable(tableId));
+        sql.append(" WHERE \"ROWID\" ='").append(aRowId.toString()).append("') R1,");
+        sql.append(" ( SELECT \"ROWID\" AS END_ID FROM ");
+        sql.append(quoteSchemaAndTable(tableId));
+        sql.append(" WHERE \"ROWID\" ='").append(bRowId.toString()).append("') R2");
+
+        return jdbcConnection.queryAndMap(sql.toString(), rs -> {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+            return 0;
+        });
     }
 }
