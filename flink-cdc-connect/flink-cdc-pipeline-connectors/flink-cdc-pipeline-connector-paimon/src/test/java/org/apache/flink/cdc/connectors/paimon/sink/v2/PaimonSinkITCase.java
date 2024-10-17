@@ -454,6 +454,46 @@ public class PaimonSinkITCase {
                 Collections.singletonList(Row.ofKind(RowKind.INSERT, "1", "1")), result);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem", "hive"})
+    public void testDuplicateCommitAfterRestore(String metastore)
+            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+        initialize(metastore);
+        PaimonSink<Event> paimonSink =
+                new PaimonSink<>(
+                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+        PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
+        Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
+
+        // insert
+        for (Event event : createTestEvents()) {
+            writer.write(event, null);
+        }
+        writer.flush(false);
+        Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
+                writer.prepareCommit().stream()
+                        .map(MockCommitRequestImpl::new)
+                        .collect(Collectors.toList());
+        committer.commit(commitRequests);
+
+        // We've two steps in checkpoint: 1. snapshotState(ckp); 2. notifyCheckpointComplete(ckp).
+        // It's possible that flink job will restore from a checkpoint with only step#1 finished and
+        // step#2 not.
+        // CommitterOperator will try to re-commit recovered transactions.
+        committer.commit(commitRequests);
+
+        List<Row> result = new ArrayList<>();
+        tEnv.sqlQuery("select * from paimon_catalog.test.table1")
+                .execute()
+                .collect()
+                .forEachRemaining(result::add);
+        Assertions.assertEquals(
+                Arrays.asList(
+                        Row.ofKind(RowKind.INSERT, "1", "1"), Row.ofKind(RowKind.INSERT, "2", "2")),
+                result);
+    }
+
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {
 
         protected MockCommitRequestImpl(CommT committable) {
