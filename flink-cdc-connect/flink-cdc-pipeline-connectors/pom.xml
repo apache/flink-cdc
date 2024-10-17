@@ -30,6 +30,7 @@ limitations under the License.
     <modules>
         <module>flink-cdc-pipeline-connector-values</module>
         <module>flink-cdc-pipeline-connector-mysql</module>
+        <module>flink-cdc-pipeline-connector-sqlserver</module>
         <module>flink-cdc-pipeline-connector-doris</module>
         <module>flink-cdc-pipeline-connector-starrocks</module>
         <module>flink-cdc-pipeline-connector-kafka</module>
