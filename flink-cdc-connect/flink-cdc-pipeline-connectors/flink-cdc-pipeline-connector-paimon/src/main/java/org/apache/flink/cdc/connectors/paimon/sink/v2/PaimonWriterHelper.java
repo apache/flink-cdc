@@ -32,7 +32,6 @@ import org.apache.paimon.data.Timestamp;
 import org.apache.paimon.types.RowKind;
 
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -111,15 +110,11 @@ public class PaimonWriterHelper {
             case TIMESTAMP_WITH_TIME_ZONE:
                 fieldGetter =
                         row ->
-                                Timestamp.fromLocalDateTime(
-                                        ZonedDateTime.ofInstant(
-                                                        row.getLocalZonedTimestampData(
-                                                                        fieldPos,
-                                                                        DataTypeChecks.getPrecision(
-                                                                                fieldType))
-                                                                .toInstant(),
-                                                        zoneId)
-                                                .toLocalDateTime());
+                                Timestamp.fromInstant(
+                                        row.getLocalZonedTimestampData(
+                                                        fieldPos,
+                                                        DataTypeChecks.getPrecision(fieldType))
+                                                .toInstant());
                 break;
             case ROW:
                 final int rowFieldCount = getFieldCount(fieldType);
