@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
 
@@ -426,7 +427,9 @@ class YamlPipelineDefinitionParserTest {
                     Collections.emptyList(),
                     Collections.emptyList(),
                     Collections.emptyList(),
-                    Configuration.fromMap(Collections.singletonMap("parallelism", "1")));
+                    Configuration.fromMap(
+                            Collections.singletonMap(
+                                    "local-time-zone", ZoneId.systemDefault().toString())));
 
     private final PipelineDef fullDefWithRouteRepSym =
             new PipelineDef(
