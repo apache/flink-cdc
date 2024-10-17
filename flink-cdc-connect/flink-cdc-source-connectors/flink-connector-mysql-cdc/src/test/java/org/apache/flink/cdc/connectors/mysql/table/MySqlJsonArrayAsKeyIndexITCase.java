@@ -176,7 +176,6 @@ public class MySqlJsonArrayAsKeyIndexITCase extends MySqlSourceTestBase {
             Row row = iter.next();
             rows.add(row.toString());
             size--;
-            System.out.println("Gotta rows: " + rows);
         }
         return rows;
     }
