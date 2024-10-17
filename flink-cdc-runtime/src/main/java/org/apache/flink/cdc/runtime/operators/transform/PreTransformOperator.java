@@ -265,12 +265,26 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private Optional<SchemaChangeEvent> cacheChangeSchema(SchemaChangeEvent event) {
         TableId tableId = event.tableId();
         PreTransformChangeInfo tableChangeInfo = preTransformChangeInfoMap.get(tableId);
+        List<String> columnNamesBeforeChange = tableChangeInfo.getSourceSchema().getColumnNames();
+
         Schema originalSchema =
                 SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getSourceSchema(), event);
         Schema preTransformedSchema = tableChangeInfo.getPreTransformedSchema();
-        Optional<SchemaChangeEvent> schemaChangeEvent =
-                SchemaUtils.transformSchemaChangeEvent(
-                        hasAsteriskMap.get(tableId), referencedColumnsMap.get(tableId), event);
+
+        Optional<SchemaChangeEvent> schemaChangeEvent;
+        if (hasAsteriskMap.getOrDefault(tableId, true)) {
+            // If this TableId is asterisk-ful, we should use the latest upstream schema as
+            // referenced columns to perform schema evolution, not of the original ones generated
+            // when creating tables. If hasAsteriskMap has no entry for this TableId, it means that
+            // this TableId has not been captured by any transform rules, and should be regarded as
+            // asterisk-ful by default.
+            schemaChangeEvent =
+                    SchemaUtils.transformSchemaChangeEvent(true, columnNamesBeforeChange, event);
+        } else {
+            schemaChangeEvent =
+                    SchemaUtils.transformSchemaChangeEvent(
+                            false, referencedColumnsMap.get(tableId), event);
+        }
         if (schemaChangeEvent.isPresent()) {
             preTransformedSchema =
                     SchemaUtils.applySchemaChangeEvent(
