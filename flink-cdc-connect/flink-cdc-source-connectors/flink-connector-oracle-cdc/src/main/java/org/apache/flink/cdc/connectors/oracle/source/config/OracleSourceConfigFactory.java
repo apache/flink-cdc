@@ -44,7 +44,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
     private List<String> schemaList;
 
     /** Url to use when connecting to the Oracle database server. */
-    public JdbcSourceConfigFactory url(@Nullable String url) {
+    public OracleSourceConfigFactory url(@Nullable String url) {
         this.url = url;
         return this;
     }
@@ -54,7 +54,7 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
      * name not included in the whitelist will be excluded from monitoring. By default all
      * non-system schemas will be monitored.
      */
-    public JdbcSourceConfigFactory schemaList(String... schemaList) {
+    public OracleSourceConfigFactory schemaList(String... schemaList) {
         this.schemaList = Arrays.asList(schemaList);
         return this;
     }
