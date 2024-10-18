@@ -68,7 +68,7 @@ pipeline:
 
 这是默认的架构演变行为。
 
-> 注意：在此模式下，`TruncateTableEvent` 和 `DropTableEvent` 默认不会被发送到下游，以避免意外的数据丢失。这一行为可以通过配置 [Per-Event Type Control](#per-event-type-control) 调整。
+> 注意：在此模式下，`TruncateTableEvent` 和 `DropTableEvent` 默认不会被发送到下游，以避免意外的数据丢失。这一行为可以通过配置 [Per-Event Type Control](#按类型配置行为) 调整。
 
 ### Ignore 模式
 
