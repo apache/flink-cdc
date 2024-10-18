@@ -33,6 +33,9 @@ import org.apache.flink.cdc.common.types.DataTypeFamily;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DecimalType;
+import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
+import org.apache.flink.cdc.common.types.TimestampType;
+import org.apache.flink.cdc.common.types.ZonedTimestampType;
 
 import javax.annotation.Nullable;
 
@@ -176,6 +179,24 @@ public class SchemaUtils {
         if (lType.equals(rType)) {
             // identical type
             mergedType = rType;
+        } else if (lType instanceof TimestampType && rType instanceof TimestampType) {
+            return DataTypes.TIMESTAMP(
+                    Math.max(
+                            ((TimestampType) lType).getPrecision(),
+                            ((TimestampType) rType).getPrecision()));
+        } else if (lType instanceof ZonedTimestampType && rType instanceof ZonedTimestampType) {
+            return DataTypes.TIMESTAMP_TZ(
+                    Math.max(
+                            ((ZonedTimestampType) lType).getPrecision(),
+                            ((ZonedTimestampType) rType).getPrecision()));
+        } else if (lType instanceof LocalZonedTimestampType
+                && rType instanceof LocalZonedTimestampType) {
+            return DataTypes.TIMESTAMP_LTZ(
+                    Math.max(
+                            ((LocalZonedTimestampType) lType).getPrecision(),
+                            ((LocalZonedTimestampType) rType).getPrecision()));
+        } else if (lType.is(DataTypeFamily.TIMESTAMP) && rType.is(DataTypeFamily.TIMESTAMP)) {
+            return DataTypes.TIMESTAMP(TimestampType.MAX_PRECISION);
         } else if (lType.is(DataTypeFamily.INTEGER_NUMERIC)
                 && rType.is(DataTypeFamily.INTEGER_NUMERIC)) {
             mergedType = DataTypes.BIGINT();
@@ -185,7 +206,7 @@ public class SchemaUtils {
         } else if (lType.is(DataTypeFamily.APPROXIMATE_NUMERIC)
                 && rType.is(DataTypeFamily.APPROXIMATE_NUMERIC)) {
             mergedType = DataTypes.DOUBLE();
-        } else if (lType.is(DataTypeRoot.DECIMAL) && rType.is(DataTypeRoot.DECIMAL)) {
+        } else if (lType instanceof DecimalType && rType instanceof DecimalType) {
             // Merge two decimal types
             DecimalType lhsDecimal = (DecimalType) lType;
             DecimalType rhsDecimal = (DecimalType) rType;
@@ -194,25 +215,41 @@ public class SchemaUtils {
                             lhsDecimal.getPrecision() - lhsDecimal.getScale(),
                             rhsDecimal.getPrecision() - rhsDecimal.getScale());
             int resultScale = Math.max(lhsDecimal.getScale(), rhsDecimal.getScale());
+            Preconditions.checkArgument(
+                    resultIntDigits + resultScale <= DecimalType.MAX_PRECISION,
+                    String.format(
+                            "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
+                            lType,
+                            rType,
+                            resultIntDigits + resultScale,
+                            DecimalType.MAX_PRECISION));
             mergedType = DataTypes.DECIMAL(resultIntDigits + resultScale, resultScale);
-        } else if (lType.is(DataTypeRoot.DECIMAL) && rType.is(DataTypeFamily.EXACT_NUMERIC)) {
+        } else if (lType instanceof DecimalType && rType.is(DataTypeFamily.EXACT_NUMERIC)) {
             // Merge decimal and int
             DecimalType lhsDecimal = (DecimalType) lType;
-            mergedType =
-                    DataTypes.DECIMAL(
-                            Math.max(
-                                    lhsDecimal.getPrecision(),
-                                    lhsDecimal.getScale() + getNumericPrecision(rType)),
-                            lhsDecimal.getScale());
-        } else if (rType.is(DataTypeRoot.DECIMAL) && lType.is(DataTypeFamily.EXACT_NUMERIC)) {
+            int resultPrecision =
+                    Math.max(
+                            lhsDecimal.getPrecision(),
+                            lhsDecimal.getScale() + getNumericPrecision(rType));
+            Preconditions.checkArgument(
+                    resultPrecision <= DecimalType.MAX_PRECISION,
+                    String.format(
+                            "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
+                            lType, rType, resultPrecision, DecimalType.MAX_PRECISION));
+            mergedType = DataTypes.DECIMAL(resultPrecision, lhsDecimal.getScale());
+        } else if (rType instanceof DecimalType && lType.is(DataTypeFamily.EXACT_NUMERIC)) {
             // Merge decimal and int
             DecimalType rhsDecimal = (DecimalType) rType;
-            mergedType =
-                    DataTypes.DECIMAL(
-                            Math.max(
-                                    rhsDecimal.getPrecision(),
-                                    rhsDecimal.getScale() + getNumericPrecision(lType)),
-                            rhsDecimal.getScale());
+            int resultPrecision =
+                    Math.max(
+                            rhsDecimal.getPrecision(),
+                            rhsDecimal.getScale() + getNumericPrecision(lType));
+            Preconditions.checkArgument(
+                    resultPrecision <= DecimalType.MAX_PRECISION,
+                    String.format(
+                            "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
+                            lType, rType, resultPrecision, DecimalType.MAX_PRECISION));
+            mergedType = DataTypes.DECIMAL(resultPrecision, rhsDecimal.getScale());
         } else {
             throw new IllegalStateException(
                     String.format("Incompatible types: \"%s\" and \"%s\"", lType, rType));
