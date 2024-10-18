@@ -50,7 +50,7 @@ jobs:
       - name: Set JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '8'
+          java-version: '11'
           distribution: 'temurin'
           cache: 'maven'
       - name: Compiling jar packages
@@ -60,7 +60,7 @@ jobs:
   ut:
     strategy:
       matrix:
-        java-version: [ '8' ]
+        java-version: [ '8', '11' ]
         module: [ 'core', 'pipeline_connectors', 'mysql', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase', 'db2', 'vitess' ]
     name: Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
@@ -70,7 +70,7 @@ jobs:
   pipeline_e2e:
     strategy:
       matrix:
-        java-version: [ '8' ]
+        java-version: [ '8', '11' ]
         flink-version: ['1.17.2', '1.18.1', '1.19.1', '1.20.0']
         module: [ 'pipeline_e2e' ]
     name: Pipeline E2E Tests
@@ -82,7 +82,7 @@ jobs:
   source_e2e:
     strategy:
       matrix:
-        java-version: [ '8' ]
+        java-version: [ '8', '11' ]
         flink-version: ['1.16.3', '1.17.2', '1.18.1', '1.19.1', '1.20.0']
         module: [ 'source_e2e' ]
     name: Source E2E Tests
