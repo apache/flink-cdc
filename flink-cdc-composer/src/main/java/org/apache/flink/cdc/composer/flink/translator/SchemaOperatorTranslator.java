@@ -19,7 +19,6 @@ package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -39,16 +38,18 @@ import java.util.List;
 public class SchemaOperatorTranslator {
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final String schemaOperatorUid;
-
     private final Duration rpcTimeOut;
+    private final String timezone;
 
     public SchemaOperatorTranslator(
             SchemaChangeBehavior schemaChangeBehavior,
             String schemaOperatorUid,
-            Duration rpcTimeOut) {
+            Duration rpcTimeOut,
+            String timezone) {
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.schemaOperatorUid = schemaOperatorUid;
         this.rpcTimeOut = rpcTimeOut;
+        this.timezone = timezone;
     }
 
     public DataStream<Event> translate(
@@ -56,7 +57,8 @@ public class SchemaOperatorTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes) {
-        return addSchemaOperator(input, parallelism, metadataApplier, routes, schemaChangeBehavior);
+        return addSchemaOperator(
+                input, parallelism, metadataApplier, routes, schemaChangeBehavior, timezone);
     }
 
     public String getSchemaOperatorUid() {
@@ -68,7 +70,8 @@ public class SchemaOperatorTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes,
-            SchemaChangeBehavior schemaChangeBehavior) {
+            SchemaChangeBehavior schemaChangeBehavior,
+            String timezone) {
         List<RouteRule> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
             routingRules.add(
@@ -82,27 +85,12 @@ public class SchemaOperatorTranslator {
                         "SchemaOperator",
                         new EventTypeInfo(),
                         new SchemaOperatorFactory(
-                                metadataApplier, routingRules, rpcTimeOut, schemaChangeBehavior));
+                                metadataApplier,
+                                routingRules,
+                                rpcTimeOut,
+                                schemaChangeBehavior,
+                                timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
-    }
-
-    private DataStream<Event> dropSchemaChangeEvent(DataStream<Event> input, int parallelism) {
-        return input.filter(event -> !(event instanceof SchemaChangeEvent))
-                .setParallelism(parallelism);
-    }
-
-    private DataStream<Event> exceptionOnSchemaChange(DataStream<Event> input, int parallelism) {
-        return input.map(
-                        event -> {
-                            if (event instanceof SchemaChangeEvent) {
-                                throw new RuntimeException(
-                                        String.format(
-                                                "Aborting execution as the pipeline encountered a schema change event: %s",
-                                                event));
-                            }
-                            return event;
-                        })
-                .setParallelism(parallelism);
     }
 }
