@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.connector.sink2.StatefulSink;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
@@ -32,10 +33,15 @@ import org.apache.paimon.flink.sink.MultiTableCommittableSerializer;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.table.sink.CommitMessageSerializer;
 
+import java.io.IOException;
+import java.util.Collection;
+
 /**
  * A {@link Sink} for Paimon. Maintain this package until Paimon has it own sinkV2 implementation.
  */
-public class PaimonSink<InputT> implements WithPreCommitTopology<InputT, MultiTableCommittable> {
+public class PaimonSink<InputT>
+        implements WithPreCommitTopology<InputT, MultiTableCommittable>,
+                StatefulSink<InputT, PaimonWriterState> {
 
     // provided a default commit user.
     public static final String DEFAULT_COMMIT_USER = "admin";
@@ -60,8 +66,25 @@ public class PaimonSink<InputT> implements WithPreCommitTopology<InputT, MultiTa
     }
 
     @Override
-    public PaimonWriter<InputT> createWriter(InitContext context) {
+    public StatefulSinkWriter<InputT, PaimonWriterState> restoreWriter(
+            InitContext context, Collection<PaimonWriterState> recoveredState) throws IOException {
+        PaimonWriterState paimonWriterState = recoveredState.iterator().next();
+        return new PaimonWriter<>(
+                catalogOptions,
+                context.metricGroup(),
+                commitUser,
+                serializer,
+                paimonWriterState.getCheckpointId());
+    }
+
+    @Override
+    public PaimonWriter<InputT> createWriter(InitContext context) throws IOException {
         return new PaimonWriter<>(catalogOptions, context.metricGroup(), commitUser, serializer);
+    }
+
+    @Override
+    public SimpleVersionedSerializer<PaimonWriterState> getWriterStateSerializer() {
+        return new PaimonWriterStateSerializer();
     }
 
     @Override

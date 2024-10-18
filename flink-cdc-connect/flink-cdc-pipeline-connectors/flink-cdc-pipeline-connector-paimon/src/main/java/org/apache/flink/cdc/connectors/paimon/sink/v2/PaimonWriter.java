@@ -18,10 +18,12 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.connector.sink2.StatefulSink;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
 import org.apache.flink.runtime.io.disk.iomanager.IOManager;
 import org.apache.flink.runtime.io.disk.iomanager.IOManagerAsync;
 
@@ -39,6 +41,7 @@ import org.apache.paimon.utils.ExecutorThreadFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +51,8 @@ import java.util.stream.Collectors;
 
 /** A {@link Sink} to write {@link DataChangeEvent} to Paimon storage. */
 public class PaimonWriter<InputT>
-        implements TwoPhaseCommittingSink.PrecommittingSinkWriter<InputT, MultiTableCommittable> {
+        implements TwoPhaseCommittingSink.PrecommittingSinkWriter<InputT, MultiTableCommittable>,
+                StatefulSink.StatefulSinkWriter<InputT, PaimonWriterState> {
 
     // use `static` because Catalog is unSerializable.
     private static Catalog catalog;
@@ -68,6 +72,9 @@ public class PaimonWriter<InputT>
     private final MetricGroup metricGroup;
     private final List<MultiTableCommittable> committables;
 
+    /** A workaround variable to pass to {@link StoreSinkWrite#prepareCommit(boolean, long)}. */
+    private long checkpointId;
+
     public PaimonWriter(
             Options catalogOptions,
             MetricGroup metricGroup,
@@ -85,6 +92,28 @@ public class PaimonWriter<InputT>
                         new ExecutorThreadFactory(
                                 Thread.currentThread().getName() + "-CdcMultiWrite-Compaction"));
         this.serializer = serializer;
+        this.checkpointId = CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1;
+    }
+
+    public PaimonWriter(
+            Options catalogOptions,
+            MetricGroup metricGroup,
+            String commitUser,
+            PaimonRecordSerializer<InputT> serializer,
+            long checkpointId) {
+        catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        this.metricGroup = metricGroup;
+        this.commitUser = commitUser;
+        this.tables = new HashMap<>();
+        this.writes = new HashMap<>();
+        this.committables = new ArrayList<>();
+        this.ioManager = new IOManagerAsync();
+        this.compactExecutor =
+                Executors.newSingleThreadScheduledExecutor(
+                        new ExecutorThreadFactory(
+                                Thread.currentThread().getName() + "-CdcMultiWrite-Compaction"));
+        this.serializer = serializer;
+        this.checkpointId = checkpointId;
     }
 
     @Override
@@ -166,10 +195,11 @@ public class PaimonWriter<InputT>
             Identifier key = entry.getKey();
             StoreSinkWrite write = entry.getValue();
             boolean waitCompaction = false;
-            // checkpointId will be updated correctly by PreCommitOperator.
-            long checkpointId = 1L;
             committables.addAll(
-                    write.prepareCommit(waitCompaction, checkpointId).stream()
+                    // Execution order: flush(boolean endOfInput) => prepareCommit() =>
+                    // snapshotState(long checkpointId). So here we set it to snapshotId+1 to avoid
+                    // prepareCommit the same checkpointId
+                    write.prepareCommit(waitCompaction, checkpointId + 1).stream()
                             .map(
                                     committable ->
                                             MultiTableCommittable.fromCommittable(key, committable))
@@ -185,5 +215,11 @@ public class PaimonWriter<InputT>
         if (compactExecutor != null) {
             compactExecutor.shutdownNow();
         }
+    }
+
+    @Override
+    public List<PaimonWriterState> snapshotState(long checkpointId) throws IOException {
+        this.checkpointId = checkpointId;
+        return Collections.singletonList(new PaimonWriterState(checkpointId));
     }
 }
