@@ -24,6 +24,10 @@ import org.apache.flink.api.connector.source.SourceReader;
 import org.apache.flink.api.connector.source.SourceReaderContext;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.api.connector.source.util.ratelimit.NoOpRateLimiter;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimitedSourceReader;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimiter;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimiterStrategy;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
@@ -59,6 +63,8 @@ import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.jdbc.JdbcConnection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.lang.reflect.Method;
@@ -111,6 +117,8 @@ public class MySqlSource<T>
     // hook for generating changes.
     private SnapshotPhaseHooks snapshotHooks = SnapshotPhaseHooks.empty();
 
+    private final RateLimiterStrategy rateLimiterStrategy;
+
     /**
      * Get a MySqlParallelSourceBuilder to build a {@link MySqlSource}.
      *
@@ -131,16 +139,19 @@ public class MySqlSource<T>
                         new MySqlRecordEmitter<>(
                                 deserializationSchema,
                                 sourceReaderMetrics,
-                                sourceConfig.isIncludeSchemaChanges()));
+                                sourceConfig.isIncludeSchemaChanges()),
+                RateLimiterStrategy.noOp());
     }
 
     MySqlSource(
             MySqlSourceConfigFactory configFactory,
             DebeziumDeserializationSchema<T> deserializationSchema,
-            RecordEmitterSupplier<T> recordEmitterSupplier) {
+            RecordEmitterSupplier<T> recordEmitterSupplier,
+            RateLimiterStrategy rateLimiterStrategy) {
         this.configFactory = configFactory;
         this.deserializationSchema = deserializationSchema;
         this.recordEmitterSupplier = recordEmitterSupplier;
+        this.rateLimiterStrategy = rateLimiterStrategy;
     }
 
     public MySqlSourceConfigFactory getConfigFactory() {
@@ -156,6 +167,8 @@ public class MySqlSource<T>
             return Boundedness.CONTINUOUS_UNBOUNDED;
         }
     }
+
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlSource.class);
 
     @Override
     public SourceReader<T, MySqlSplit> createReader(SourceReaderContext readerContext)
@@ -182,13 +195,32 @@ public class MySqlSource<T>
                                 readerContext.getIndexOfSubtask(),
                                 mySqlSourceReaderContext,
                                 snapshotHooks);
-        return new MySqlSourceReader<>(
-                elementsQueue,
-                splitReaderSupplier,
-                recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig),
-                readerContext.getConfiguration(),
-                mySqlSourceReaderContext,
-                sourceConfig);
+        RecordEmitter<SourceRecords, T, MySqlSplitState> recordEmitter =
+                recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig);
+        MySqlSourceReader<T> sourceReader =
+                new MySqlSourceReader<>(
+                        elementsQueue,
+                        splitReaderSupplier,
+                        recordEmitter,
+                        readerContext.getConfiguration(),
+                        mySqlSourceReaderContext,
+                        sourceConfig);
+        int parallelism = readerContext.currentParallelism();
+
+        RateLimiter rateLimiter = rateLimiterStrategy.createRateLimiter(parallelism);
+
+        if (rateLimiter == null || rateLimiter instanceof NoOpRateLimiter) {
+            return sourceReader;
+        }
+
+        SourceReader<T, MySqlSplit> rateSoureceReader =
+                new RateLimitedSourceReader<>(sourceReader, rateLimiter);
+
+        if (recordEmitter instanceof MySqlRecordEmitter) {
+            MySqlRecordEmitter<T> mySqlRecordEmitter = (MySqlRecordEmitter<T>) recordEmitter;
+            mySqlRecordEmitter.setRateLimiter(rateLimiter);
+        }
+        return rateSoureceReader;
     }
 
     @Override
