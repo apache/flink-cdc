@@ -234,10 +234,14 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         .column(new PhysicalColumn("string", DataTypes.STRING(), "String"))
                         .column(new PhysicalColumn("decimal", DataTypes.DECIMAL(17, 7), "Decimal"))
                         .column(new PhysicalColumn("date", DataTypes.DATE(), "Date"))
-                        // Doris sink doesn't support TIME type yet.
-                        // .column(new PhysicalColumn("time", DataTypes.TIME(), "Time"))
-                        // .column(new PhysicalColumn("time_3", DataTypes.TIME(3), "Time With
-                        // Precision"))
+                        // Doris sink doesn't support TIME type ，thus convert TIME to STRING
+                        .column(new PhysicalColumn("time", DataTypes.TIME(), "Time"))
+                        .column(
+                                new PhysicalColumn(
+                                        "time_3", DataTypes.TIME(3), "Time With Precision"))
+                        .column(
+                                new PhysicalColumn(
+                                        "time_6", DataTypes.TIME(6), "Time With Precision"))
                         .column(new PhysicalColumn("timestamp", DataTypes.TIMESTAMP(), "Timestamp"))
                         .column(
                                 new PhysicalColumn(
@@ -296,6 +300,9 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         "string | TEXT | Yes | false | null",
                         "decimal | DECIMAL(17, 7) | Yes | false | null",
                         "date | DATE | Yes | false | null",
+                        "time | TEXT | Yes | false | null",
+                        "time_3 | TEXT | Yes | false | null",
+                        "time_6 | TEXT | Yes | false | null",
                         "timestamp | DATETIME(6) | Yes | false | null",
                         "timestamp_3 | DATETIME(3) | Yes | false | null",
                         "timestamptz | DATETIME(6) | Yes | false | null",
