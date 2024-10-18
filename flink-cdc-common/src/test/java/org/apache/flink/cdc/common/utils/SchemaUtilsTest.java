@@ -273,6 +273,23 @@ public class SchemaUtilsTest {
                                 DataTypes.DECIMAL(5, 4), DataTypes.DECIMAL(10, 2)))
                 .isEqualTo(DataTypes.DECIMAL(12, 4));
 
+        // Test overflow decimal conversions
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.inferWiderType(
+                                        DataTypes.DECIMAL(5, 5), DataTypes.DECIMAL(38, 0)))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "Failed to merge DECIMAL(5, 5) NOT NULL and DECIMAL(38, 0) NOT NULL type into DECIMAL. 43 precision digits required, 38 available");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                SchemaUtils.inferWiderType(
+                                        DataTypes.DECIMAL(38, 0), DataTypes.DECIMAL(5, 5)))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "Failed to merge DECIMAL(38, 0) NOT NULL and DECIMAL(5, 5) NOT NULL type into DECIMAL. 43 precision digits required, 38 available");
+
         // Test merging with nullability
         Assertions.assertThat(
                         SchemaUtils.inferWiderType(
