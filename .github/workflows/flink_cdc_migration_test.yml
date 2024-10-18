@@ -28,7 +28,7 @@ jobs:
           submodules: true
       - uses: actions/setup-java@v4
         with:
-          java-version: 8
+          java-version: 11
           distribution: temurin
       - name: Compile snapshot CDC version
         run: mvn --no-snapshot-updates -B install -DskipTests
@@ -51,7 +51,7 @@ jobs:
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
       - uses: actions/setup-java@v4
         with:
-          java-version: 8
+          java-version: 11
           distribution: temurin
           cache: maven
       - name: Install dependencies
@@ -90,7 +90,7 @@ jobs:
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
       - uses: actions/setup-java@v4
         with:
-          java-version: 8
+          java-version: 11
           distribution: temurin
           cache: maven
       - name: Install dependencies
