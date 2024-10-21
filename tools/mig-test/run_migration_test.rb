@@ -115,9 +115,9 @@ def test_migration(from_version, to_version)
 end
 
 version_list = case ARGV[0]
-               when '1.18.1' then %w[3.0.0 3.0.1 3.1.1 3.3-SNAPSHOT]
-               when '1.19.1' then %w[3.1.1 3.3-SNAPSHOT]
-               when '1.20.0' then %w[3.3-SNAPSHOT]
+               when '1.18.1' then %w[3.0.0 3.0.1 3.1.1 3.2.0 3.3-SNAPSHOT]
+               when '1.19.1' then %w[3.1.1 3.2.0 3.3-SNAPSHOT]
+               when '1.20.0' then %w[3.2.0 3.3-SNAPSHOT]
                else []
                end
 

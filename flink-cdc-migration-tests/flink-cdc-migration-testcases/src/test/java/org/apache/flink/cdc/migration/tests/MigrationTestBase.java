@@ -36,6 +36,7 @@ public class MigrationTestBase {
         v3_0_1,
         v3_1_0,
         v3_1_1,
+        v3_2_0,
         SNAPSHOT;
 
         public String getShadedClassPrefix() {
@@ -48,6 +49,8 @@ public class MigrationTestBase {
                     return "org.apache.flink.cdc.v3_1_0";
                 case v3_1_1:
                     return "org.apache.flink.cdc.v3_1_1";
+                case v3_2_0:
+                    return "org.apache.flink.cdc.v3_2_0";
                 case SNAPSHOT:
                     return "org.apache.flink.cdc.snapshot";
                 default:
@@ -62,6 +65,7 @@ public class MigrationTestBase {
                     FlinkCdcVersion.v3_0_1,
                     FlinkCdcVersion.v3_1_0,
                     FlinkCdcVersion.v3_1_1,
+                    FlinkCdcVersion.v3_2_0,
                     FlinkCdcVersion.SNAPSHOT);
 
     public static List<FlinkCdcVersion> getAllVersions() {
