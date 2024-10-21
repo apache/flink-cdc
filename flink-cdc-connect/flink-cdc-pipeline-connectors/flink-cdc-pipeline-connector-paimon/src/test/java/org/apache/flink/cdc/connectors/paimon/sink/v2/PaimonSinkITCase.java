@@ -454,6 +454,94 @@ public class PaimonSinkITCase {
                 Collections.singletonList(Row.ofKind(RowKind.INSERT, "1", "1")), result);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem", "hive"})
+    public void testDuplicateCommitAfterRestore(String metastore)
+            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+        initialize(metastore);
+        PaimonSink<Event> paimonSink =
+                new PaimonSink<>(
+                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+        PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
+        Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
+
+        // insert
+        for (Event event : createTestEvents()) {
+            writer.write(event, null);
+        }
+        writer.flush(false);
+        Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
+                writer.prepareCommit().stream()
+                        .map(MockCommitRequestImpl::new)
+                        .collect(Collectors.toList());
+        committer.commit(commitRequests);
+
+        // We add a loop for restore 3 times
+        for (int i = 0; i < 3; i++) {
+            // We've two steps in checkpoint: 1. snapshotState(ckp); 2.
+            // notifyCheckpointComplete(ckp).
+            // It's possible that flink job will restore from a checkpoint with only step#1 finished
+            // and
+            // step#2 not.
+            // CommitterOperator will try to re-commit recovered transactions.
+            committer.commit(commitRequests);
+            List<DataChangeEvent> events =
+                    Arrays.asList(
+                            DataChangeEvent.insertEvent(
+                                    table1,
+                                    generator.generate(
+                                            new Object[] {
+                                                BinaryStringData.fromString(
+                                                        Integer.toString(i + 2)),
+                                                BinaryStringData.fromString(Integer.toString(i + 2))
+                                            })));
+            Assertions.assertDoesNotThrow(
+                    () -> {
+                        for (Event event : events) {
+                            writer.write(event, null);
+                        }
+                    });
+            writer.flush(false);
+            //Checkpoint id start from 1
+            long checkpointId = i + 2;
+            committer.commit(
+                    writer.prepareCommit().stream()
+                            .map(
+                                    committable -> {
+                                        // update the right checkpointId for MultiTableCommittable
+                                        return new MultiTableCommittable(
+                                                committable.getDatabase(),
+                                                committable.getTable(),
+                                                checkpointId,
+                                                committable.kind(),
+                                                committable.wrappedCommittable());
+                                    })
+                            .map(MockCommitRequestImpl::new)
+                            .collect(Collectors.toList()));
+        }
+
+        List<Row> result = new ArrayList<>();
+        tEnv.sqlQuery("select * from paimon_catalog.test.`table1$snapshots`")
+                .execute()
+                .collect()
+                .forEachRemaining(result::add);
+        Assertions.assertEquals(result.size(), 4);
+        result.clear();
+
+        tEnv.sqlQuery("select * from paimon_catalog.test.`table1`")
+                .execute()
+                .collect()
+                .forEachRemaining(result::add);
+        Assertions.assertEquals(
+                Arrays.asList(
+                        Row.ofKind(RowKind.INSERT, "1", "1"),
+                        Row.ofKind(RowKind.INSERT, "2", "2"),
+                        Row.ofKind(RowKind.INSERT, "3", "3"),
+                        Row.ofKind(RowKind.INSERT, "4", "4")),
+                result);
+    }
+
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {
 
         protected MockCommitRequestImpl(CommT committable) {
