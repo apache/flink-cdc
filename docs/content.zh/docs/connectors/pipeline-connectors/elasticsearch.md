@@ -93,11 +93,11 @@ Pipeline Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>要连接到的一台或多台 Elasticsearch 主机，例如: 'http://host_name:9092;http://host_name:9093'.</td>
+      <td>要连接到的一台或多台 Elasticsearch 主机，例如: 'http://host_name:9092,http://host_name:9093'.</td>
     </tr>
     <tr>
       <td>version</td>
-      <td>required</td>
+      <td>optional</td>
       <td style="word-wrap: break-word;">7</td>
       <td>Integer</td>
       <td>指定要使用的连接器，有效值为：
@@ -148,14 +148,14 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">5242880</td>
       <td>Long</td>
-      <td>每个批量请求的缓冲操作在内存中的最大值。</td>
+      <td>每个批量请求的缓冲操作在内存中的最大值(以byte为单位)。</td>
     </tr>
     <tr>
       <td>buffer.time.max.ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">5000</td>
       <td>Long</td>
-      <td>每个批量请求的缓冲 flush 操作的间隔。</td>
+      <td>每个批量请求的缓冲 flush 操作的间隔(以ms为单位)。</td>
     </tr>
     <tr>
       <td>record.size.max.bytes</td>
@@ -171,13 +171,13 @@ Pipeline Connector Options
 Usage Notes
 --------
 
-* 写入 Elasticsearch 的 index 默认会是上游表 `namespace.schemaName.tableName` 对应的字符串，可以通过 pipeline 的 route 功能进行修改。
+* 写入 Elasticsearch 的 index 默认为与上游表同名字符串，可以通过 pipeline 的 route 功能进行修改。
 
 * 如果写入 Elasticsearch 的 index 不存在，不会被默认创建。
 
 Data Type Mapping
 ----------------
-Elasticsearch 将文档存储在 JSON 字符串中。因此数据类型映射介于 Flink 数据类型和 JSON 数据类型之间。
+Elasticsearch 将文档存储在 JSON 字符串中，数据类型之间的映射关系如下表所示：
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -231,17 +231,17 @@ Elasticsearch 将文档存储在 JSON 字符串中。因此数据类型映射介
     <tr>
       <td>DATE</td>
       <td>STRING</td>
-      <td>with format: date</td>
+      <td>with format: date（yyyy-MM-dd），example: 2024-10-21</td>
     </tr>
     <tr>
       <td>TIMESTAMP</td>
       <td>STRING</td>
-      <td>with format: date-time</td>
+      <td>with format: date-time (yyyy-MM-dd HH:mm:ss.SSSSSS, with UTC time zone), example: 2024-10-21 14:10:56.000000</td>
     </tr>
     <tr>
       <td>TIMESTAMP_LTZ</td>
       <td>STRING</td>
-      <td>with format: date-time (with UTC time zone)</td>
+      <td>with format: date-time (yyyy-MM-dd HH:mm:ss.SSSSSS, with UTC time zone), example: 2024-10-21 14:10:56.000000</td>
     </tr>
     <tr>
       <td>CHAR(n)</td>

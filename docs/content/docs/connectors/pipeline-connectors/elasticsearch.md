@@ -93,11 +93,11 @@ Pipeline Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>One or more Elasticsearch hosts to connect to, e.g. 'http://host_name:9092;http://host_name:9093'.</td>
+      <td>One or more Elasticsearch hosts to connect to, e.g. 'http://host_name:9092,http://host_name:9093'.</td>
     </tr>
     <tr>
       <td>version</td>
-      <td>required</td>
+      <td>optional</td>
       <td style="word-wrap: break-word;">7</td>
       <td>Integer</td>
       <td>Specify what connector to use, valid values are:
@@ -231,17 +231,17 @@ Elasticsearch stores document in a JSON string. So the data type mapping is betw
     <tr>
       <td>DATE</td>
       <td>STRING</td>
-      <td>with format: date</td>
+      <td>with format: date（yyyy-MM-dd），example: 2024-10-21</td>
     </tr>
     <tr>
       <td>TIMESTAMP</td>
       <td>STRING</td>
-      <td>with format: date-time</td>
+      <td>with format: date-time (yyyy-MM-dd HH:mm:ss.SSSSSS, with UTC time zone), example: 2024-10-21 14:10:56.000000</td>
     </tr>
     <tr>
       <td>TIMESTAMP_LTZ</td>
       <td>STRING</td>
-      <td>with format: date-time (with UTC time zone)</td>
+      <td>with format: date-time (yyyy-MM-dd HH:mm:ss.SSSSSS, with UTC time zone), example: 2024-10-21 14:10:56.000000</td>
     </tr>
     <tr>
       <td>CHAR(n)</td>
