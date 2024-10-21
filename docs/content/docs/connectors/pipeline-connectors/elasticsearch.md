@@ -231,7 +231,7 @@ Elasticsearch stores document in a JSON string. So the data type mapping is betw
     <tr>
       <td>DATE</td>
       <td>STRING</td>
-      <td>with format: date（yyyy-MM-dd），example: 2024-10-21</td>
+      <td>with format: date (yyyy-MM-dd), example: 2024-10-21</td>
     </tr>
     <tr>
       <td>TIMESTAMP</td>

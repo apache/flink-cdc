@@ -231,7 +231,7 @@ Elasticsearch 将文档存储在 JSON 字符串中，数据类型之间的映射
     <tr>
       <td>DATE</td>
       <td>STRING</td>
-      <td>with format: date（yyyy-MM-dd），example: 2024-10-21</td>
+      <td>with format: date (yyyy-MM-dd), example: 2024-10-21</td>
     </tr>
     <tr>
       <td>TIMESTAMP</td>
