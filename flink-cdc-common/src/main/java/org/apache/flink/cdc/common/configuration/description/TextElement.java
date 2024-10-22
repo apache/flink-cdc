@@ -19,7 +19,7 @@ package org.apache.flink.cdc.common.configuration.description;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 
-import org.apache.flink.shaded.guava31.com.google.common.base.Strings;
+import org.apache.flink.shaded.guava32.com.google.common.base.Strings;
 
 import java.util.Arrays;
 import java.util.Collections;

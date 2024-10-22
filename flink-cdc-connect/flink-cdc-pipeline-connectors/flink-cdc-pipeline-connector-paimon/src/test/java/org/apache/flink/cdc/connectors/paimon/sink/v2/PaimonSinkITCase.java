@@ -18,6 +18,8 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobInfo;
+import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.serialization.SerializationSchema;
@@ -572,7 +574,7 @@ public class PaimonSinkITCase {
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {
 
         protected MockCommitRequestImpl(CommT committable) {
-            super(committable);
+            super(committable,null);
         }
     }
 
@@ -631,6 +633,16 @@ public class PaimonSinkITCase {
         }
 
         public JobID getJobId() {
+            return null;
+        }
+
+        @Override
+        public JobInfo getJobInfo() {
+            return null;
+        }
+
+        @Override
+        public TaskInfo getTaskInfo() {
             return null;
         }
     }

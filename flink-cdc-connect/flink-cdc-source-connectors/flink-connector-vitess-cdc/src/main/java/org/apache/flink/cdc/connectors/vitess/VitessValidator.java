@@ -19,7 +19,7 @@ package org.apache.flink.cdc.connectors.vitess;
 
 import org.apache.flink.cdc.debezium.Validator;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.Maps;
+import org.apache.flink.shaded.guava32.com.google.common.collect.Maps;
 
 import io.debezium.connector.vitess.VitessConnector;
 

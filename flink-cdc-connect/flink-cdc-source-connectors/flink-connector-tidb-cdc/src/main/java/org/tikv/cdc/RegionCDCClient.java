@@ -19,7 +19,7 @@ package org.tikv.cdc;
 
 import org.apache.flink.util.Preconditions;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
+import org.apache.flink.shaded.guava32.com.google.common.collect.ImmutableSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -32,7 +32,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+import org.apache.flink.shaded.guava32.com.google.common.collect.ImmutableMap;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;

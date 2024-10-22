@@ -31,7 +31,7 @@ import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventExcept
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
+import org.apache.flink.shaded.guava32.com.google.common.collect.Sets;
 
 import com.starrocks.connector.flink.catalog.StarRocksCatalog;
 import com.starrocks.connector.flink.catalog.StarRocksCatalogException;
