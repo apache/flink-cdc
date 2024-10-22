@@ -426,6 +426,9 @@ public class PaimonMetadataApplierTest {
         initialize(metastore);
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
+        tableOptions.put("num-sorted-run.stop-trigger", "2147483647");
+        tableOptions.put("compaction.min.file-num", "10");
+
         MetadataApplier metadataApplier =
                 new PaimonMetadataApplier(
                         catalogOptions, tableOptions, Collections.emptyMap(), true);
@@ -455,6 +458,8 @@ public class PaimonMetadataApplierTest {
         Assertions.assertEquals(tableSchema, table.rowType());
         Assertions.assertEquals(Collections.singletonList("col1"), table.primaryKeys());
         Assertions.assertEquals("-1", table.options().get("bucket"));
+        Assertions.assertEquals("2147483647", table.options().get("num-sorted-run.stop-trigger"));
+        Assertions.assertEquals("10", table.options().get("compaction.min.file-num"));
 
         CreateTableEvent createTableEventNew =
                 new CreateTableEvent(
@@ -487,6 +492,7 @@ public class PaimonMetadataApplierTest {
 
         // alter table options and alter/add columns
         tableOptions.put("snapshot.num-retained.max", "99");
+        tableOptions.remove("num-sorted-run.stop-trigger");
         metadataApplier =
                 new PaimonMetadataApplier(
                         catalogOptions, tableOptions, Collections.emptyMap(), false);
@@ -503,9 +509,12 @@ public class PaimonMetadataApplierTest {
                                 new DataField(5, "col6_after", DataTypes.STRING()),
                                 new DataField(2, "col3", DataTypes.BIGINT()),
                                 new DataField(6, "col7_last", DataTypes.STRING())));
+
         Assertions.assertEquals(tableSchemaNew, tableNew.rowType());
         Assertions.assertEquals(Collections.singletonList("col1"), tableNew.primaryKeys());
         Assertions.assertEquals("-1", tableNew.options().get("bucket"));
         Assertions.assertEquals("99", tableNew.options().get("snapshot.num-retained.max"));
+        Assertions.assertEquals("10", table.options().get("compaction.min.file-num"));
+        Assertions.assertNull(tableNew.options().get("num-sorted-run.stop-trigger"));
     }
 }

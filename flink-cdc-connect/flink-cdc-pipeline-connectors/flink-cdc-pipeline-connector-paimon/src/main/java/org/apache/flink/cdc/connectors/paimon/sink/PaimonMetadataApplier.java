@@ -54,7 +54,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
@@ -185,7 +184,8 @@ public class PaimonMetadataApplier implements MetadataApplier {
                                         builder.column(
                                                 column.getName(),
                                                 LogicalTypeConversion.toDataType(
-                                                        DataTypeUtils.toFlinkDataType(column.getType())
+                                                        DataTypeUtils.toFlinkDataType(
+                                                                        column.getType())
                                                                 .getLogicalType())));
                 builder.primaryKey(schema.primaryKeys().toArray(new String[0]));
                 if (partitionMaps.containsKey(event.tableId())) {
@@ -276,25 +276,32 @@ public class PaimonMetadataApplier implements MetadataApplier {
     private void applyAlterTableOptions(Identifier identifier) {
         try {
             Table paimonTable = catalog.getTable(identifier);
-            // doesn't support altering bucket here
-            tableOptions.remove(CoreOptions.BUCKET.key());
             Map<String, String> oldOptions = paimonTable.options();
             Set<String> immutableOptionKeys = CoreOptions.getImmutableOptionKeys();
-            tableOptions
-                    .entrySet()
-                    .removeIf(
-                            entry ->
-                                    immutableOptionKeys.contains(entry.getKey())
-                                            || Objects.equals(
-                                                    oldOptions.get(entry.getKey()),
-                                                    entry.getValue()));
-            // alter the table dynamic options
-            List<SchemaChange> optionChanges =
-                    tableOptions.entrySet().stream()
-                            .map(entry -> SchemaChange.setOption(entry.getKey(), entry.getValue()))
-                            .collect(Collectors.toList());
+            List<SchemaChange> tableOptionChanges = new ArrayList<>();
 
-            catalog.alterTable(identifier, optionChanges, true);
+            // Remove options that are no longer present
+            oldOptions.keySet().stream()
+                    .filter(key -> !tableOptions.containsKey(key))
+                    .forEach(key -> tableOptionChanges.add(SchemaChange.removeOption(key)));
+
+            // Add or update options
+            tableOptions.entrySet().stream()
+                    .filter(entry -> !immutableOptionKeys.contains(entry.getKey()))
+                    .filter(entry -> !entry.getKey().equals(CoreOptions.BUCKET.key()))
+                    .filter(
+                            entry ->
+                                    !Objects.equals(
+                                            oldOptions.get(entry.getKey()), entry.getValue()))
+                    .forEach(
+                            entry ->
+                                    tableOptionChanges.add(
+                                            SchemaChange.setOption(
+                                                    entry.getKey(), entry.getValue())));
+
+            if (!tableOptionChanges.isEmpty()) {
+                catalog.alterTable(identifier, tableOptionChanges, true);
+            }
         } catch (Catalog.TableNotExistException
                 | Catalog.ColumnAlreadyExistException
                 | Catalog.ColumnNotExistException e) {
