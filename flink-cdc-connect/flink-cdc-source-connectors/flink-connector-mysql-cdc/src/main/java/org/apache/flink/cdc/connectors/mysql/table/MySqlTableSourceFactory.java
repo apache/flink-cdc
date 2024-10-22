@@ -104,6 +104,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 config.get(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         boolean parseOnLineSchemaChanges =
                 config.get(MySqlSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES);
+        boolean useLegacyJsonFormat = config.get(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
 
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
@@ -148,7 +149,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 heartbeatInterval,
                 chunkKeyColumn,
                 skipSnapshotBackFill,
-                parseOnLineSchemaChanges);
+                parseOnLineSchemaChanges,
+                useLegacyJsonFormat);
     }
 
     @Override
@@ -195,6 +197,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(MySqlSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES);
+        options.add(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
         return options;
     }
 

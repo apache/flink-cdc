@@ -305,4 +305,12 @@ public class MySqlDataSourceOptions {
                     .booleanType()
                     .defaultValue(true)
                     .withDescription("Whether treat TINYINT(1) as boolean, by default is true. ");
+
+    @Experimental
+    public static final ConfigOption<Boolean> USE_LEGACY_JSON_FORMAT =
+            ConfigOptions.key("use.legacy.json.format")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Whether to use legacy json format. The default value is true, which means there is no whitespace before value and after comma in json format.");
 }

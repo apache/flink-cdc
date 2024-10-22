@@ -94,6 +94,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TREAT_TINYINT1_AS_BOOLEAN_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USE_LEGACY_JSON_FORMAT;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
@@ -148,6 +149,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         boolean scanBinlogNewlyAddedTableEnabled =
                 config.get(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
         boolean isParsingOnLineSchemaChanges = config.get(PARSE_ONLINE_SCHEMA_CHANGES);
+        boolean useLegacyJsonFormat = config.get(USE_LEGACY_JSON_FORMAT);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -198,7 +200,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .jdbcProperties(getJdbcProperties(configMap))
                         .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                         .parseOnLineSchemaChanges(isParsingOnLineSchemaChanges)
-                        .treatTinyInt1AsBoolean(treatTinyInt1AsBoolean);
+                        .treatTinyInt1AsBoolean(treatTinyInt1AsBoolean)
+                        .useLegacyJsonFormat(useLegacyJsonFormat);
 
         List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
 
@@ -331,6 +334,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
         options.add(METADATA_LIST);
         options.add(INCLUDE_COMMENTS_ENABLED);
+        options.add(USE_LEGACY_JSON_FORMAT);
         return options;
     }
 

@@ -72,6 +72,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean skipSnapshotBackfill = false;
     private boolean parseOnLineSchemaChanges = false;
     private boolean treatTinyInt1AsBoolean = true;
+    private boolean useLegacyJsonFormat = true;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -279,6 +280,15 @@ public class MySqlSourceConfigFactory implements Serializable {
     }
 
     /**
+     * Whether to use legacy json format. The default value is true, which means there is no
+     * whitespace before value and after comma in json format.
+     */
+    public MySqlSourceConfigFactory useLegacyJsonFormat(boolean useLegacyJsonFormat) {
+        this.useLegacyJsonFormat = useLegacyJsonFormat;
+        return this;
+    }
+
+    /**
      * Whether to close idle readers at the end of the snapshot phase. This feature depends on
      * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
      * greater than or equal to 1.14, and the configuration <code>
@@ -399,6 +409,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 chunkKeyColumns,
                 skipSnapshotBackfill,
                 parseOnLineSchemaChanges,
-                treatTinyInt1AsBoolean);
+                treatTinyInt1AsBoolean,
+                useLegacyJsonFormat);
     }
 }

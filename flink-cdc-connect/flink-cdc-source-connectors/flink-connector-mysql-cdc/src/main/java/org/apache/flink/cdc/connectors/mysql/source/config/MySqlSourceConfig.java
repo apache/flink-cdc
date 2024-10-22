@@ -67,6 +67,7 @@ public class MySqlSourceConfig implements Serializable {
     private final Map<ObjectPath, String> chunkKeyColumns;
     private final boolean skipSnapshotBackfill;
     private final boolean parseOnLineSchemaChanges;
+    public static boolean useLegacyJsonFormat = true;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -103,7 +104,8 @@ public class MySqlSourceConfig implements Serializable {
             Map<ObjectPath, String> chunkKeyColumns,
             boolean skipSnapshotBackfill,
             boolean parseOnLineSchemaChanges,
-            boolean treatTinyInt1AsBoolean) {
+            boolean treatTinyInt1AsBoolean,
+            boolean useLegacyJsonFormat) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -133,6 +135,7 @@ public class MySqlSourceConfig implements Serializable {
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.parseOnLineSchemaChanges = parseOnLineSchemaChanges;
         this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
+        this.useLegacyJsonFormat = useLegacyJsonFormat;
     }
 
     public String getHostname() {
