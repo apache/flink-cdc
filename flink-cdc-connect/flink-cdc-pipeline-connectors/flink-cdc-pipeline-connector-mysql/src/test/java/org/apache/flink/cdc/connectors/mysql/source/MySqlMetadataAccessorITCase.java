@@ -222,6 +222,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
         fullTypesMySql57Database.createAndInitialize();
 
         String[] tables = new String[] {"precision_types"};
+
         MySqlMetadataAccessor metadataAccessor =
                 getMetadataAccessor(tables, fullTypesMySql57Database, true);
 
@@ -229,6 +230,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                 metadataAccessor.getTableSchema(
                         TableId.tableId(
                                 fullTypesMySql57Database.getDatabaseName(), "precision_types"));
+
         Schema expectedSchema =
                 Schema.newBuilder()
                         .primaryKey("id")
@@ -304,6 +306,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                 metadataAccessor.getTableSchema(
                         TableId.tableId(
                                 fullTypesMySql8Database.getDatabaseName(), "precision_types"));
+
         Schema expectedSchema =
                 Schema.newBuilder()
                         .primaryKey("id")
@@ -370,7 +373,8 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     private void testAccessDatabaseAndTable(UniqueDatabase database) {
         database.createAndInitialize();
 
-        String[] tables = new String[] {"common_types", "time_types", "precision_types"};
+        String[] tables =
+                new String[] {"common_types", "time_types", "precision_types", "json_types"};
         MySqlMetadataAccessor metadataAccessor = getMetadataAccessor(tables, database, true);
 
         assertThatThrownBy(metadataAccessor::listNamespaces)
@@ -526,6 +530,66 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
             String[] tables, UniqueDatabase database, boolean tinyint1IsBit) {
         MySqlSourceConfig sourceConfig = getConfig(tables, database, tinyint1IsBit);
         return new MySqlMetadataAccessor(sourceConfig);
+    }
+
+    @Test
+    public void testMysql57AccessJsonTypesSchema() {
+        fullTypesMySql57Database.createAndInitialize();
+
+        String[] tables = new String[] {"json_types"};
+        MySqlMetadataAccessor metadataAccessor =
+                getMetadataAccessor(tables, fullTypesMySql57Database, true);
+
+        Schema actualSchema =
+                metadataAccessor.getTableSchema(
+                        TableId.tableId(fullTypesMySql57Database.getDatabaseName(), "json_types"));
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .primaryKey("id")
+                        .fromRowDataType(
+                                RowType.of(
+                                        new DataType[] {
+                                            DataTypes.DECIMAL(20, 0).notNull(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.INT()
+                                        },
+                                        new String[] {
+                                            "id", "json_c0", "json_c1", "json_c2", "int_c",
+                                        }))
+                        .build();
+        assertThat(actualSchema).isEqualTo(expectedSchema);
+    }
+
+    @Test
+    public void testMysql8AccessJsonTypesSchema() {
+        fullTypesMySql57Database.createAndInitialize();
+
+        String[] tables = new String[] {"json_types"};
+        MySqlMetadataAccessor metadataAccessor =
+                getMetadataAccessor(tables, fullTypesMySql57Database, true);
+
+        Schema actualSchema =
+                metadataAccessor.getTableSchema(
+                        TableId.tableId(fullTypesMySql57Database.getDatabaseName(), "json_types"));
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .primaryKey("id")
+                        .fromRowDataType(
+                                RowType.of(
+                                        new DataType[] {
+                                            DataTypes.DECIMAL(20, 0).notNull(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.INT()
+                                        },
+                                        new String[] {
+                                            "id", "json_c0", "json_c1", "json_c2", "int_c",
+                                        }))
+                        .build();
+        assertThat(actualSchema).isEqualTo(expectedSchema);
     }
 
     private MySqlSourceConfig getConfig(
