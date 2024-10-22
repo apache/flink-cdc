@@ -22,9 +22,11 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.source.IncrementalSource;
+import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
+import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReader;
 import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfig;
 import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mongodb.source.dialect.MongoDBDialect;
@@ -32,6 +34,8 @@ import org.apache.flink.cdc.connectors.mongodb.source.offset.ChangeStreamOffsetF
 import org.apache.flink.cdc.connectors.mongodb.source.reader.MongoDBRecordEmitter;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
+
+import java.io.Serializable;
 
 /**
  * The MongoDB CDC Source based on FLIP-27 which supports parallel reading snapshot of collection
@@ -64,15 +68,31 @@ import org.apache.flink.connector.base.source.reader.RecordEmitter;
 public class MongoDBSource<T> extends IncrementalSource<T, MongoDBSourceConfig> {
 
     private static final long serialVersionUID = 1L;
+    private final RecordEmitterSupplier<T> recordEmitterSupplier;
 
     MongoDBSource(
             MongoDBSourceConfigFactory configFactory,
             DebeziumDeserializationSchema<T> deserializationSchema) {
+        this(
+                configFactory,
+                deserializationSchema,
+                (sourceReaderMetrics, sourceConfig, offsetFactory) ->
+                        new MongoDBRecordEmitter<>(
+                                deserializationSchema,
+                                sourceReaderMetrics,
+                                new ChangeStreamOffsetFactory()));
+    }
+
+    MongoDBSource(
+            MongoDBSourceConfigFactory configFactory,
+            DebeziumDeserializationSchema<T> deserializationSchema,
+            RecordEmitterSupplier<T> recordEmitterSupplier) {
         super(
                 configFactory,
                 deserializationSchema,
                 new ChangeStreamOffsetFactory(),
                 new MongoDBDialect());
+        this.recordEmitterSupplier = recordEmitterSupplier;
     }
 
     /**
@@ -88,7 +108,18 @@ public class MongoDBSource<T> extends IncrementalSource<T, MongoDBSourceConfig> 
     @Override
     protected RecordEmitter<SourceRecords, T, SourceSplitState> createRecordEmitter(
             SourceConfig sourceConfig, SourceReaderMetrics sourceReaderMetrics) {
-        return new MongoDBRecordEmitter<>(
-                deserializationSchema, sourceReaderMetrics, offsetFactory);
+        return recordEmitterSupplier.get(
+                sourceReaderMetrics, (MongoDBSourceConfig) sourceConfig, offsetFactory);
+    }
+
+    /** Create a {@link RecordEmitter} for {@link IncrementalSourceReader}. */
+    @Internal
+    @FunctionalInterface
+    interface RecordEmitterSupplier<T> extends Serializable {
+
+        RecordEmitter<SourceRecords, T, SourceSplitState> get(
+                SourceReaderMetrics metrics,
+                MongoDBSourceConfig sourceConfig,
+                OffsetFactory offsetFactory);
     }
 }
