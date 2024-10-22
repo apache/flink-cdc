@@ -76,16 +76,23 @@ public class StatementUtils {
                 });
     }
 
-    public static Object queryMin(
-            JdbcConnection jdbc, TableId tableId, String columnName, Object excludedLowerBound)
+    public static Object[] queryMin(
+            JdbcConnection jdbc,
+            TableId tableId,
+            String columnName,
+            Object excludedLowerBound,
+            Object max)
             throws SQLException {
         final String minQuery =
                 String.format(
-                        "SELECT MIN(%s) FROM %s WHERE %s > ?",
-                        quote(columnName), quote(tableId), quote(columnName));
+                        "SELECT MIN(%s), MIN(%s) >= ? FROM %s WHERE %s > ?",
+                        quote(columnName), quote(columnName), quote(tableId), quote(columnName));
         return jdbc.prepareQueryAndMap(
                 minQuery,
-                ps -> ps.setObject(1, excludedLowerBound),
+                ps -> {
+                    ps.setObject(1, max);
+                    ps.setObject(2, excludedLowerBound);
+                },
                 rs -> {
                     if (!rs.next()) {
                         // this should never happen
@@ -93,23 +100,25 @@ public class StatementUtils {
                                 String.format(
                                         "No result returned after running query [%s]", minQuery));
                     }
-                    return rs.getObject(1);
+                    return rowToArray(rs, 2);
                 });
     }
 
-    public static Object queryNextChunkMax(
+    public static Object[] queryNextChunkMax(
             JdbcConnection jdbc,
             TableId tableId,
             String splitColumnName,
             int chunkSize,
-            Object includedLowerBound)
+            Object includedLowerBound,
+            Object max)
             throws SQLException {
         String quotedColumn = quote(splitColumnName);
         String query =
                 String.format(
-                        "SELECT MAX(%s) FROM ("
+                        "SELECT MAX(%s), MAX(%s) >= ? FROM ("
                                 + "SELECT %s FROM %s WHERE %s >= ? ORDER BY %s ASC LIMIT %s"
                                 + ") AS T",
+                        quotedColumn,
                         quotedColumn,
                         quotedColumn,
                         quote(tableId),
@@ -118,7 +127,10 @@ public class StatementUtils {
                         chunkSize);
         return jdbc.prepareQueryAndMap(
                 query,
-                ps -> ps.setObject(1, includedLowerBound),
+                ps -> {
+                    ps.setObject(1, max);
+                    ps.setObject(2, includedLowerBound);
+                },
                 rs -> {
                     if (!rs.next()) {
                         // this should never happen
@@ -126,7 +138,7 @@ public class StatementUtils {
                                 String.format(
                                         "No result returned after running query [%s]", query));
                     }
-                    return rs.getObject(1);
+                    return rowToArray(rs, 2);
                 });
     }
 
