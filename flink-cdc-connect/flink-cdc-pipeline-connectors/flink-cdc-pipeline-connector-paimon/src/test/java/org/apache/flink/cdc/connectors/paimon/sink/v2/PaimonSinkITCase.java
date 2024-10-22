@@ -477,7 +477,7 @@ public class PaimonSinkITCase {
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
 
-        // We add a loop for restore 6 times
+        // We add a loop for restore 7 times
         for (int i = 2; i < 9; i++) {
             // We've two steps in checkpoint: 1. snapshotState(ckp); 2.
             // notifyCheckpointComplete(ckp).
