@@ -574,7 +574,7 @@ public class PaimonSinkITCase {
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {
 
         protected MockCommitRequestImpl(CommT committable) {
-            super(committable,null);
+            super(committable, null);
         }
     }
 
