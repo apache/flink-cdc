@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.base.experimental.fetch;
 
 import org.apache.flink.cdc.connectors.base.experimental.fetch.MySqlStreamFetchTask.MySqlBinlogSplitReadTask;
 import org.apache.flink.cdc.connectors.base.experimental.utils.MySqlUtils;
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
@@ -74,7 +73,7 @@ public class MySqlScanFetchTask extends AbstractScanFetchTask {
                         sourceFetchContext.getSnapshotChangeEventSourceMetrics(),
                         sourceFetchContext.getDatabaseSchema(),
                         sourceFetchContext.getConnection(),
-                        sourceFetchContext.getDispatcher(),
+                        sourceFetchContext.getEventDispatcher(),
                         snapshotSplit);
         MysqlSnapshotSplitChangeEventSourceContext changeEventSourceContext =
                 new MysqlSnapshotSplitChangeEventSourceContext();
@@ -120,7 +119,8 @@ public class MySqlScanFetchTask extends AbstractScanFetchTask {
         return new MySqlBinlogSplitReadTask(
                 new MySqlConnectorConfig(dezConf),
                 createMySqlConnection(context.getSourceConfig().getDbzConfiguration()),
-                context.getDispatcher(),
+                context.getEventDispatcher(),
+                context.getWaterMarkDispatcher(),
                 context.getErrorHandler(),
                 context.getTaskContext(),
                 context.getStreamingChangeEventSourceMetrics(),
@@ -139,7 +139,7 @@ public class MySqlScanFetchTask extends AbstractScanFetchTask {
         private final MySqlConnectorConfig connectorConfig;
         private final MySqlDatabaseSchema databaseSchema;
         private final MySqlConnection jdbcConnection;
-        private final JdbcSourceEventDispatcher<MySqlPartition> dispatcher;
+        private final EventDispatcher<MySqlPartition, TableId> eventDispatcher;
         private final Clock clock;
         private final SnapshotSplit snapshotSplit;
         private final MySqlOffsetContext offsetContext;
@@ -151,14 +151,14 @@ public class MySqlScanFetchTask extends AbstractScanFetchTask {
                 SnapshotProgressListener<MySqlPartition> snapshotProgressListener,
                 MySqlDatabaseSchema databaseSchema,
                 MySqlConnection jdbcConnection,
-                JdbcSourceEventDispatcher<MySqlPartition> dispatcher,
+                EventDispatcher<MySqlPartition, TableId> eventDispatcher,
                 SnapshotSplit snapshotSplit) {
             super(connectorConfig, snapshotProgressListener);
             this.offsetContext = previousOffset;
             this.connectorConfig = connectorConfig;
             this.databaseSchema = databaseSchema;
             this.jdbcConnection = jdbcConnection;
-            this.dispatcher = dispatcher;
+            this.eventDispatcher = eventDispatcher;
             this.clock = Clock.SYSTEM;
             this.snapshotSplit = snapshotSplit;
             this.snapshotProgressListener = snapshotProgressListener;
@@ -225,7 +225,7 @@ public class MySqlScanFetchTask extends AbstractScanFetchTask {
         private void createDataEvents(MySqlSnapshotContext snapshotContext, TableId tableId)
                 throws Exception {
             EventDispatcher.SnapshotReceiver<MySqlPartition> snapshotReceiver =
-                    dispatcher.getSnapshotChangeEventReceiver();
+                    eventDispatcher.getSnapshotChangeEventReceiver();
             LOG.debug("Snapshotting table {}", tableId);
             createDataEventsForTable(
                     snapshotContext, snapshotReceiver, databaseSchema.tableFor(tableId));
@@ -288,7 +288,7 @@ public class MySqlScanFetchTask extends AbstractScanFetchTask {
                                 snapshotContext.partition, table.id(), rows);
                         logTimer = getTableScanLogTimer();
                     }
-                    dispatcher.dispatchSnapshotEvent(
+                    eventDispatcher.dispatchSnapshotEvent(
                             snapshotContext.partition,
                             table.id(),
                             getChangeRecordEmitter(snapshotContext, table.id(), row),

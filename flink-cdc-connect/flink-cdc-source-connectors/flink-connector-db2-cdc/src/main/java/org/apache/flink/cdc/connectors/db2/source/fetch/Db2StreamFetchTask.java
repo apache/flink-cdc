@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.connectors.db2.source.fetch;
 
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
+import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
@@ -34,7 +34,9 @@ import io.debezium.connector.db2.Db2Partition;
 import io.debezium.connector.db2.Db2StreamingChangeEventSource;
 import io.debezium.connector.db2.Lsn;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.ChangeEventSource.ChangeEventSourceContext;
+import io.debezium.relational.TableId;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +63,8 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getConnection(),
                         sourceFetchContext.getMetaDataConnection(),
-                        sourceFetchContext.getDispatcher(),
+                        sourceFetchContext.getEventDispatcher(),
+                        sourceFetchContext.getWaterMarkDispatcher(),
                         sourceFetchContext.getErrorHandler(),
                         sourceFetchContext.getDatabaseSchema(),
                         split);
@@ -96,7 +99,7 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
 
         private static final Logger LOG = LoggerFactory.getLogger(StreamSplitReadTask.class);
         private final StreamSplit lsnSplit;
-        private final JdbcSourceEventDispatcher<Db2Partition> dispatcher;
+        private final WatermarkDispatcher watermarkDispatcher;
         private final ErrorHandler errorHandler;
         private ChangeEventSourceContext context;
 
@@ -104,7 +107,8 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
                 Db2ConnectorConfig connectorConfig,
                 Db2Connection connection,
                 Db2Connection metadataConnection,
-                JdbcSourceEventDispatcher<Db2Partition> dispatcher,
+                EventDispatcher<Db2Partition, TableId> eventDispatcher,
+                WatermarkDispatcher watermarkDispatcher,
                 ErrorHandler errorHandler,
                 Db2DatabaseSchema schema,
                 StreamSplit lsnSplit) {
@@ -112,12 +116,12 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
                     connectorConfig,
                     connection,
                     metadataConnection,
-                    dispatcher,
+                    eventDispatcher,
                     errorHandler,
                     Clock.system(),
                     schema);
             this.lsnSplit = lsnSplit;
-            this.dispatcher = dispatcher;
+            this.watermarkDispatcher = watermarkDispatcher;
             this.errorHandler = errorHandler;
         }
 
@@ -130,7 +134,7 @@ public class Db2StreamFetchTask implements FetchTask<SourceSplitBase> {
                 if (currentLsnOffset.isAtOrAfter(endingOffset)) {
                     // send streaming end event
                     try {
-                        dispatcher.dispatchWatermarkEvent(
+                        watermarkDispatcher.dispatchWatermarkEvent(
                                 partition.getSourcePartition(),
                                 lsnSplit,
                                 currentLsnOffset,

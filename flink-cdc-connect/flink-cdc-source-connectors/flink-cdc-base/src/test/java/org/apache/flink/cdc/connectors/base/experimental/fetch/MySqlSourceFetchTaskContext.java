@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.base.experimental.fetch;
 
+import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.experimental.EmbeddedFlinkDatabaseHistory;
@@ -216,7 +217,12 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     @Override
-    public JdbcSourceEventDispatcher<MySqlPartition> getDispatcher() {
+    public JdbcSourceEventDispatcher<MySqlPartition> getEventDispatcher() {
+        return dispatcher;
+    }
+
+    @Override
+    public WatermarkDispatcher getWaterMarkDispatcher() {
         return dispatcher;
     }
 
