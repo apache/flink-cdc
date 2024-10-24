@@ -211,7 +211,7 @@ class FlinkPipelineComposerLenientITCase {
         // Check result in ValuesDatabase
         List<String> results = ValuesDatabase.getResults(TABLE_1);
         assertThat(results)
-                .contains(
+                .containsExactly(
                         "default_namespace.default_schema.table1:col1=2;col2=;col3=;newCol2=;newCol3=x;colWithDefault=;newColWithDefault=",
                         "default_namespace.default_schema.table1:col1=3;col2=3;col3=;newCol2=;newCol3=;colWithDefault=;newColWithDefault=");
 
