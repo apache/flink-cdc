@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
 public class ErrorMessageUtils {
     private static final Pattern SERVER_ID_CONFLICT =
             Pattern.compile(
-                    ".*A slave with the same server_uuid/server_id as this slave has connected to the master.*");
+                    ".*A (slave|replica) with the same server_uuid/server_id as this (slave|replica) has connected to the (master|source).*");
     private static final Pattern MISSING_BINLOG_POSITION_WHEN_BINLOG_EXPIRE =
             Pattern.compile(
                     ".*The connector is trying to read binlog.*but this is no longer available on the server.*");

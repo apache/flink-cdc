@@ -61,7 +61,6 @@ import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.assertj.core.api.Assertions;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -101,13 +100,12 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
 
-    private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
-    private final UniqueDatabase inventoryDatabase8 =
-            new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
+    private final UniqueDatabase inventoryDatabase =
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
 
     private static final MySqlContainer MYSQL_CONTAINER_NOGTID =
-            createMySqlContainer(MySqlVersion.V5_7, "docker/server/my.cnf");
+            createMySqlContainer(MySqlVersion.CURRENT, "server/my.cnf");
+
     private final UniqueDatabase customerDatabaseNoGtid =
             new UniqueDatabase(MYSQL_CONTAINER_NOGTID, "customer", TEST_USER, TEST_PASSWORD);
 
@@ -116,9 +114,6 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
     @BeforeAll
     public static void beforeClass() {
-        LOG.info("Starting MySql8 containers...");
-        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
-        LOG.info("Container MySql8 is started.");
         LOG.info("Starting MySqlNoGtid containers...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER_NOGTID)).join();
         LOG.info("Container MySqlNoGtid is started.");
@@ -126,16 +121,13 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
     @AfterAll
     public static void afterClass() {
-        LOG.info("Stopping MySql8 containers...");
-        MYSQL8_CONTAINER.stop();
-        LOG.info("Container MySql8 is stopped.");
         LOG.info("Stopping MySqlNoGtid containers...");
         MYSQL_CONTAINER_NOGTID.stop();
         LOG.info("Container MySqlNoGtid is stopped.");
     }
 
     @AfterEach
-    public void after() throws Exception {
+    void after() throws Exception {
         if (mySqlConnection != null) {
             mySqlConnection.close();
         }
@@ -252,7 +244,6 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
-    @NotNull
     private SnapshotPhaseHooks getSnapshotPhaseHooksWithPreHighWatermark(String tableName) {
         String tableId = customerDatabase.getDatabaseName() + "." + tableName;
         String[] changingDataSql =
@@ -274,7 +265,6 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         return snapshotHooks;
     }
 
-    @NotNull
     private SnapshotPhaseHooks getSnapshotPhaseHooksWithPostHighWatermark(String tableName) {
         String tableId = customerDatabase.getDatabaseName() + "." + tableName;
         String[] changingDataSql =
@@ -959,9 +949,9 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
     @Test
     void testReadBinlogFromUnavailableBinlog() throws Exception {
         // Preparations
-        inventoryDatabase8.createAndInitialize();
+        inventoryDatabase.createAndInitialize();
         MySqlSourceConfig connectionConfig =
-                getConfig(MYSQL8_CONTAINER, inventoryDatabase8, new String[] {"products"});
+                getConfig(MYSQL_CONTAINER, inventoryDatabase, new String[] {"products"});
         binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
 
@@ -971,13 +961,13 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Create a new config to start reading from the offset captured above
         MySqlSourceConfig sourceConfig =
                 getConfig(
-                        MYSQL8_CONTAINER,
-                        inventoryDatabase8,
+                        MYSQL_CONTAINER,
+                        inventoryDatabase,
                         StartupOptions.specificOffset(startingOffset.getGtidSet()),
                         new String[] {"products"});
 
         // Create some binlog events and expire the binlog
-        try (Connection connection = inventoryDatabase8.getJdbcConnection();
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);");
@@ -1018,9 +1008,9 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
     @Test
     void testRestoreFromCheckpointWithTimestampStartingOffset() throws Exception {
         // Preparations
-        inventoryDatabase8.createAndInitialize();
+        inventoryDatabase.createAndInitialize();
         MySqlSourceConfig connectionConfig =
-                getConfig(MYSQL8_CONTAINER, inventoryDatabase8, new String[] {"products"});
+                getConfig(MYSQL_CONTAINER, inventoryDatabase, new String[] {"products"});
         binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
 
@@ -1031,8 +1021,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         long startTimestampMs = 15213L;
         MySqlSourceConfig sourceConfig =
                 getConfig(
-                        MYSQL8_CONTAINER,
-                        inventoryDatabase8,
+                        MYSQL_CONTAINER,
+                        inventoryDatabase,
                         StartupOptions.timestamp(startTimestampMs),
                         new String[] {"products"});
 
@@ -1040,8 +1030,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         MySqlBinlogSplit checkpointSplit =
                 createBinlogSplit(
                         getConfig(
-                                MYSQL8_CONTAINER,
-                                inventoryDatabase8,
+                                MYSQL_CONTAINER,
+                                inventoryDatabase,
                                 StartupOptions.specificOffset(checkpointOffset),
                                 new String[] {"products"}));
 

@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mysql.table;
 
 import org.apache.flink.cdc.connectors.mysql.MySqlValidatorTest;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
+import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
@@ -27,6 +28,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -67,6 +69,11 @@ class MySqlTimezoneITCase {
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
     public void setup(boolean incrementalSnapshot) throws Exception {
+        // Non-incremental snapshot version does not support MySQL > 8.0.x
+        if (!incrementalSnapshot) {
+            Assumptions.assumeThat(MySqlVersion.CURRENT).isLessThanOrEqualTo(MySqlVersion.V8_0);
+        }
+
         resourceFolder =
                 Paths.get(
                                 Objects.requireNonNull(
@@ -103,8 +110,9 @@ class MySqlTimezoneITCase {
         MySqlContainer mySqlContainer =
                 (MySqlContainer)
                         new MySqlContainer()
-                                .withConfigurationOverride(buildMySqlConfigWithTimezone(timezone))
-                                .withSetupSQL("docker/setup.sql")
+                                .withRawConfigurationOverride(
+                                        buildMySqlConfigWithTimezone(timezone))
+                                .withSetupSQL("setup.sql")
                                 .withDatabaseName("flink-test")
                                 .withUsername("flinkuser")
                                 .withPassword("flinkpw")

@@ -17,13 +17,14 @@
 
 package org.apache.flink.cdc.connectors.polardbx;
 
-import org.apache.flink.cdc.common.utils.TestCaseUtils;
+import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.lang3.StringUtils;
 import org.assertj.core.api.Assertions;
+import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
@@ -86,12 +87,18 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBase {
 
     @BeforeAll
     public static void startContainers() throws InterruptedException {
-        Startables.deepStart(Stream.of(POLARDBX_CONTAINER)).join();
-        // wait and check PolarDBx CDC node is ready
-        Thread.sleep(30_000);
-        TestCaseUtils.repeatedCheck(
-                PolardbxSourceTestBase::checkConnection, WAITING_TIMEOUT, Duration.ofSeconds(20));
-        LOG.info("Containers are started.");
+        // PolarDbX is irrelevant to MySQL versions. Running them on one single branch is enough.
+        Assumptions.assumeThat(MySqlVersion.CURRENT.getVersion())
+                .isEqualTo(MySqlVersion.V8_0.getVersion());
+
+        // no need to start container when the port 8527 is listening
+        if (!checkConnection()) {
+            LOG.info("Polardbx connection is not valid, so try to start containers...");
+            Startables.deepStart(Stream.of(POLARDBX_CONTAINER)).join();
+            LOG.info("Containers are started.");
+            // here should wait 10s that make sure the polardbx is ready
+            Thread.sleep(10 * 1000);
+        }
     }
 
     @AfterAll

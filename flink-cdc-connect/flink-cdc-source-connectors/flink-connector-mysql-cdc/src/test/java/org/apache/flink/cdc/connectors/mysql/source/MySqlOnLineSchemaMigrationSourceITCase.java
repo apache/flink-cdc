@@ -26,8 +26,6 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.TestCaseUtils;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
@@ -71,8 +69,6 @@ import static org.apache.flink.cdc.common.utils.TestCaseUtils.DEFAULT_TIMEOUT;
  * more details.
  */
 class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
-    private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
 
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
@@ -83,7 +79,7 @@ class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
             createPerconaToolkitContainer();
 
     private final UniqueDatabase customerDatabase =
-            new UniqueDatabase(MYSQL8_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -93,13 +89,12 @@ class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
 
     private static final String GH_OST_DOWNLOAD_LINK =
             DockerClientFactory.instance().client().versionCmd().exec().getArch().equals("amd64")
-                    ? "https://github.com/github/gh-ost/releases/download/v1.1.6/gh-ost-binary-linux-amd64-20231207144046.tar.gz"
-                    : "https://github.com/github/gh-ost/releases/download/v1.1.6/gh-ost-binary-linux-arm64-20231207144046.tar.gz";
+                    ? "https://github.com/github/gh-ost/releases/download/v1.1.7/gh-ost-binary-linux-amd64-20241219160321.tar.gz"
+                    : "https://github.com/github/gh-ost/releases/download/v1.1.7/gh-ost-binary-linux-arm64-20241219160321.tar.gz";
 
     @BeforeAll
     static void beforeClass() {
         LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         Startables.deepStart(Stream.of(PERCONA_TOOLKIT_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
@@ -107,7 +102,6 @@ class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
     @AfterAll
     static void afterClass() {
         LOG.info("Stopping containers...");
-        MYSQL8_CONTAINER.stop();
         PERCONA_TOOLKIT_CONTAINER.close();
         LOG.info("Containers are stopped.");
     }
@@ -160,13 +154,13 @@ class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
     @Test
     void testGhOstSchemaMigrationFromScratch() throws Exception {
         LOG.info("Step 1: Install gh-ost command line utility");
-        installGhOstCli(MYSQL8_CONTAINER);
+        installGhOstCli(MYSQL_CONTAINER);
 
         LOG.info("Step 2: Start pipeline job");
         MySqlSource<String> mySqlSource =
                 MySqlSource.<String>builder()
-                        .hostname(MYSQL8_CONTAINER.getHost())
-                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
                         .databaseList(customerDatabase.getDatabaseName())
                         .tableList(customerDatabase.getDatabaseName() + ".customers")
                         .username(customerDatabase.getUsername())
@@ -227,7 +221,7 @@ class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
         {
             LOG.info("Step 3: Evolve schema with gh-ost - ADD COLUMN");
             execInContainer(
-                    MYSQL8_CONTAINER,
+                    MYSQL_CONTAINER,
                     "evolve schema",
                     "gh-ost",
                     "--user=" + TEST_USER,
@@ -259,7 +253,7 @@ class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
         {
             LOG.info("Step 4: Evolve schema with gh-ost - MODIFY COLUMN");
             execInContainer(
-                    MYSQL8_CONTAINER,
+                    MYSQL_CONTAINER,
                     "evolve schema",
                     "gh-ost",
                     "--user=" + TEST_USER,
@@ -290,7 +284,7 @@ class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
         {
             LOG.info("Step 5: Evolve schema with gh-ost - DROP COLUMN");
             execInContainer(
-                    MYSQL8_CONTAINER,
+                    MYSQL_CONTAINER,
                     "evolve schema",
                     "gh-ost",
                     "--user=" + TEST_USER,
@@ -325,8 +319,8 @@ class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
         LOG.info("Step 1: Start pipeline job");
         MySqlSource<String> mySqlSource =
                 MySqlSource.<String>builder()
-                        .hostname(MYSQL8_CONTAINER.getHost())
-                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
                         .databaseList(customerDatabase.getDatabaseName())
                         .tableList(customerDatabase.getDatabaseName() + ".customers")
                         .username(customerDatabase.getUsername())
@@ -335,6 +329,7 @@ class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
                         .deserializer(new JsonDebeziumDeserializationSchema())
                         .serverTimeZone("UTC")
                         .includeSchemaChanges(true) // output the schema changes as well
+                        .parseOnLineSchemaChanges(true)
                         .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();

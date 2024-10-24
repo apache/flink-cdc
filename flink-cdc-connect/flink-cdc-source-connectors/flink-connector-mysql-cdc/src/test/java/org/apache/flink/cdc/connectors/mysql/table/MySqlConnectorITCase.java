@@ -24,8 +24,6 @@ import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -41,14 +39,9 @@ import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
 import java.sql.Statement;
@@ -70,22 +63,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Integration tests for MySQL Table source. */
 class MySqlConnectorITCase extends MySqlSourceTestBase {
 
-    private static final Logger LOG = LoggerFactory.getLogger(MySqlConnectorITCase.class);
-
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
-
-    private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
 
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
 
-    private final UniqueDatabase fullTypesMySql57Database =
+    private final UniqueDatabase fullTypesMySqlDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", TEST_USER, TEST_PASSWORD);
-    private final UniqueDatabase fullTypesMySql8Database =
-            new UniqueDatabase(
-                    MYSQL8_CONTAINER, "column_type_test_mysql8", TEST_USER, TEST_PASSWORD);
 
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
@@ -97,31 +82,14 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
     private final UniqueDatabase userDatabase2 =
             new UniqueDatabase(MYSQL_CONTAINER, "user_2", TEST_USER, TEST_PASSWORD);
 
-    private final UniqueDatabase inventoryDatabase8 =
-            new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
-
     private final UniqueDatabase binlogDatabase =
-            new UniqueDatabase(MYSQL8_CONTAINER, "binlog_metadata_test", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL_CONTAINER, "binlog_metadata_test", TEST_USER, TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
-
-    @BeforeAll
-    public static void beforeClass() {
-        LOG.info("Starting MySql8 containers...");
-        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
-        LOG.info("Container MySql8 is started.");
-    }
-
-    @AfterAll
-    public static void afterClass() {
-        LOG.info("Stopping MySql8 containers...");
-        MYSQL8_CONTAINER.stop();
-        LOG.info("Container MySql8 is stopped.");
-    }
 
     void setup(boolean incrementalSnapshot) {
         TestValuesTableFactory.clearAllData();
@@ -491,22 +459,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
 
     @ParameterizedTest(name = "incrementalSnapshot = {0}")
     @ValueSource(booleans = {true, false})
-    void testMysql57AllDataTypes(boolean incrementalSnapshot) throws Throwable {
-        setup(incrementalSnapshot);
-        testAllDataTypes(MYSQL_CONTAINER, fullTypesMySql57Database, incrementalSnapshot);
-    }
-
-    @ParameterizedTest(name = "incrementalSnapshot = {0}")
-    @ValueSource(booleans = {true, false})
-    void testMySql8AllDataTypes(boolean incrementalSnapshot) throws Throwable {
-        setup(incrementalSnapshot);
-        testAllDataTypes(MYSQL8_CONTAINER, fullTypesMySql8Database, incrementalSnapshot);
-    }
-
-    void testAllDataTypes(
-            MySqlContainer mySqlContainer, UniqueDatabase database, boolean incrementalSnapshot)
-            throws Throwable {
-        database.createAndInitialize();
+    public void testAllDataTypes(boolean incrementalSnapshot) throws Throwable {
+        fullTypesMySqlDatabase.createAndInitialize();
         String sourceDDL =
                 String.format(
                         "CREATE TABLE full_types (\n"
@@ -583,11 +537,11 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        mySqlContainer.getHost(),
-                        mySqlContainer.getDatabasePort(),
-                        database.getUsername(),
-                        database.getPassword(),
-                        database.getDatabaseName(),
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        fullTypesMySqlDatabase.getUsername(),
+                        fullTypesMySqlDatabase.getPassword(),
+                        fullTypesMySqlDatabase.getDatabaseName(),
                         "full_types",
                         incrementalSnapshot,
                         getServerId(incrementalSnapshot),
@@ -661,7 +615,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         CloseableIterator<Row> iterator = result.collect();
         waitForSnapshotStarted(iterator);
 
-        try (Connection connection = database.getJdbcConnection();
+        try (Connection connection = fullTypesMySqlDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
@@ -768,10 +722,10 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
     void testWideTable(boolean incrementalSnapshot) throws Exception {
         setup(incrementalSnapshot);
         final int tableColumnCount = 500;
-        fullTypesMySql57Database.createAndInitialize();
-        try (Connection connection = fullTypesMySql57Database.getJdbcConnection();
+        fullTypesMySqlDatabase.createAndInitialize();
+        try (Connection connection = fullTypesMySqlDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-            statement.execute(String.format("USE %s", fullTypesMySql57Database.getDatabaseName()));
+            statement.execute(String.format("USE %s", fullTypesMySqlDatabase.getDatabaseName()));
             statement.execute(
                     "CREATE TABLE wide_table("
                             + buildColumnsDDL("col", 0, tableColumnCount, "BIGINT")
@@ -803,9 +757,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
-                        fullTypesMySql57Database.getUsername(),
-                        fullTypesMySql57Database.getPassword(),
-                        fullTypesMySql57Database.getDatabaseName(),
+                        fullTypesMySqlDatabase.getUsername(),
+                        fullTypesMySqlDatabase.getPassword(),
+                        fullTypesMySqlDatabase.getDatabaseName(),
                         "wide_table",
                         incrementalSnapshot,
                         getServerId(incrementalSnapshot),
@@ -818,7 +772,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         CloseableIterator<Row> iterator = result.collect();
         waitForSnapshotStarted(iterator);
 
-        try (Connection connection = fullTypesMySql57Database.getJdbcConnection();
+        try (Connection connection = fullTypesMySqlDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
 
             statement.execute("UPDATE wide_table SET col1 = 1024 WHERE col0=0;");
@@ -839,10 +793,10 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
     void testBigTableWithHugeSplits() throws Exception {
         setup(true);
         final int tableRowNumber = 10;
-        fullTypesMySql57Database.createAndInitialize();
-        try (Connection connection = fullTypesMySql57Database.getJdbcConnection();
+        fullTypesMySqlDatabase.createAndInitialize();
+        try (Connection connection = fullTypesMySqlDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
-            statement.execute(String.format("USE %s", fullTypesMySql57Database.getDatabaseName()));
+            statement.execute(String.format("USE %s", fullTypesMySqlDatabase.getDatabaseName()));
             statement.execute(
                     "CREATE TABLE big_table1(id BIGINT, str VARCHAR(100), PRIMARY KEY (id))");
             statement.execute(
@@ -875,9 +829,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
-                        fullTypesMySql57Database.getUsername(),
-                        fullTypesMySql57Database.getPassword(),
-                        fullTypesMySql57Database.getDatabaseName(),
+                        fullTypesMySqlDatabase.getUsername(),
+                        fullTypesMySqlDatabase.getPassword(),
+                        fullTypesMySqlDatabase.getDatabaseName(),
                         getServerId(true));
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -897,7 +851,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         // wait for snapshot finished and begin binlog
         waitForSinkSize("sink", tableRowNumber * 2);
 
-        try (Connection connection = fullTypesMySql57Database.getJdbcConnection();
+        try (Connection connection = fullTypesMySqlDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute("UPDATE big_table1 SET str = '1024' WHERE id=0;");
             statement.execute("UPDATE big_table1 SET str = '1025' WHERE id=1;");
@@ -2152,8 +2106,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL8_CONTAINER.getHost(),
-                        MYSQL8_CONTAINER.getDatabasePort(),
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
                         TEST_USER,
                         TEST_PASSWORD,
                         binlogDatabase.getDatabaseName(),
