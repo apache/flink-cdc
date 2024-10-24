@@ -17,9 +17,7 @@
 
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
-import org.apache.flink.api.common.state.OperatorStateStore;
 import org.apache.flink.api.connector.sink2.Committer;
-import org.apache.flink.metrics.groups.OperatorMetricGroup;
 
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.sink.MultiTableCommittable;
@@ -49,34 +47,8 @@ public class PaimonCommitter implements Committer<MultiTableCommittable> {
         storeMultiCommitter =
                 new StoreMultiCommitter(
                         () -> FlinkCatalogFactory.createPaimonCatalog(catalogOptions),
-                        new org.apache.paimon.flink.sink.Committer.Context() {
-
-                            @Override
-                            public String commitUser() {
-                                return commitUser;
-                            }
-
-                            @Nullable
-                            @Override
-                            public OperatorMetricGroup metricGroup() {
-                                return null;
-                            }
-
-                            @Override
-                            public boolean streamingCheckpointEnabled() {
-                                return false;
-                            }
-
-                            @Override
-                            public boolean isRestored() {
-                                return false;
-                            }
-
-                            @Override
-                            public OperatorStateStore stateStore() {
-                                return null;
-                            }
-                        });
+                        org.apache.paimon.flink.sink.Committer.createContext(
+                                commitUser, null, true, false, null));
     }
 
     @Override
