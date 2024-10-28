@@ -425,7 +425,6 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
 
     @Override
     public void addSplits(Collection<SourceSplitBase> splits) {
-        enumeratorMetrics.exitStreamReading();
         for (SourceSplitBase split : splits) {
             tableSchemas.putAll(split.asSnapshotSplit().getTableSchemas());
             remainingSplits.add(split.asSnapshotSplit().toSchemalessSnapshotSplit());
@@ -457,9 +456,6 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         }
         LOG.info("SnapshotSplitAssigner snapshotState on checkpoint {} with splitFinishedCheckpointIds size {}, finishedSplits size {}.",
                checkpointId,
-                splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size(),
-                finishedSplits == null ? 0 : finishedSplits.size());
-                "snapshotShot, splitFinishedCheckpointIds size : {}, finishedSplits size:{}",
                 splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size(),
                 finishedSplits == null ? 0 : finishedSplits.size());
 
@@ -518,7 +514,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 }
             }
             LOG.info(
-                    "snapshotShot, splitFinishedCheckpointIds size : {}, finishedSplits size:{}",
+                    "Checkpoint completed on checkpoint {} with splitFinishedCheckpointIds size {}, finishedSplits size {}.",
+                    checkpointId,
                     splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size(),
                     finishedSplits == null ? 0 : finishedSplits.size());
         }
