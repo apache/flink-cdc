@@ -709,6 +709,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         .port(MYSQL_CONTAINER.getDatabasePort())
                         .databaseList(customDatabase.getDatabaseName())
                         .tableList(customDatabase.getDatabaseName() + ".customers")
+                        .serverTimeZone("UTC")
                         .username(customDatabase.getUsername())
                         .password(customDatabase.getPassword())
                         .deserializer(new StringDebeziumDeserializationSchema())
