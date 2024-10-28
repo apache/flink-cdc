@@ -25,7 +25,11 @@ import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitI
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import org.apache.flink.table.types.logical.RowType;
 
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.debezium.data.Envelope;
+import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
@@ -50,6 +54,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
@@ -384,6 +390,40 @@ public class RecordUtils {
         return new TableId(dbName, null, tableName);
     }
 
+    public static SourceRecord setTableId(
+            SourceRecord dataRecord, TableId originalTableId, TableId tableId) {
+        Struct value = (Struct) dataRecord.value();
+        Document historyRecordDocument;
+        try {
+            historyRecordDocument = getHistoryRecord(dataRecord).document();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        HistoryRecord newHistoryRecord =
+                new HistoryRecord(
+                        historyRecordDocument.set(
+                                "ddl",
+                                historyRecordDocument
+                                        .get("ddl")
+                                        .asString()
+                                        .replace(originalTableId.table(), tableId.table())));
+
+        Struct newSource =
+                value.getStruct(Envelope.FieldName.SOURCE)
+                        .put(DATABASE_NAME_KEY, tableId.catalog())
+                        .put(TABLE_NAME_KEY, tableId.table());
+        return dataRecord.newRecord(
+                dataRecord.topic(),
+                dataRecord.kafkaPartition(),
+                dataRecord.keySchema(),
+                dataRecord.key(),
+                dataRecord.valueSchema(),
+                value.put(Envelope.FieldName.SOURCE, newSource)
+                        .put(HISTORY_RECORD_FIELD, newHistoryRecord.toString()),
+                dataRecord.timestamp(),
+                dataRecord.headers());
+    }
+
     public static boolean isTableChangeRecord(SourceRecord dataRecord) {
         Struct value = (Struct) dataRecord.value();
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
@@ -488,5 +528,56 @@ public class RecordUtils {
             return Optional.of(WatermarkKind.valueOf(value.getString(WATERMARK_KIND)));
         }
         return Optional.empty();
+    }
+
+    /**
+     * This utility method checks if given source record is a gh-ost initiated schema change event
+     * by checking the iconic "gh-ost" comment.
+     */
+    public static boolean isGhostSchemaChangeEvent(SourceRecord record) {
+        if (!isSchemaChangeEvent(record)) {
+            return false;
+        }
+        Struct value = (Struct) record.value();
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            // There will be these schema change events generated in total during one transaction.
+            //
+            // DROP TABLE IF EXISTS `db`.`_tb1_gho`
+            // DROP TABLE IF EXISTS `db`.`_tb1_del`
+            // DROP TABLE IF EXISTS `db`.`_tb1_ghc`
+            // create /* gh-ost */ table `db`.`_tb1_ghc` ...
+            // create /* gh-ost */ table `db`.`_tb1_gho` like `db`.`tb1`
+            // alter /* gh-ost */ table `db`.`_tb1_gho` add column c varchar(255)
+            // create /* gh-ost */ table `db`.`_tb1_del` ...
+            // DROP TABLE IF EXISTS `db`.`_tb1_del`
+            // rename /* gh-ost */ table `db`.`tb1` to `db`.`_tb1_del`
+            // rename /* gh-ost */ table `db`.`_tb1_gho` to `db`.`tb1`
+            // DROP TABLE IF EXISTS `db`.`_tb1_ghc`
+            // DROP TABLE IF EXISTS `db`.`_tb1_del`
+            //
+            // Among all these, we only need the "ALTER" one that happens on the `_gho` table.
+            String ddl =
+                    mapper.readTree(value.getString(HISTORY_RECORD_FIELD))
+                            .get("ddl")
+                            .asText()
+                            .toLowerCase();
+            return ddl.contains("/* gh-ost */")
+                    && !ddl.contains("create")
+                    && !ddl.contains("rename");
+        } catch (JsonProcessingException e) {
+            return false;
+        }
+    }
+
+    private static final Pattern GHOST_TABLE_ID_PATTERN = Pattern.compile("^_(.*)_gho$");
+
+    /** This utility method peels out gh-ost mangled tableId to the original one. */
+    public static TableId peelTableId(TableId tableId) {
+        Matcher matchingResult = GHOST_TABLE_ID_PATTERN.matcher(tableId.table());
+        if (matchingResult.matches()) {
+            return new TableId(tableId.catalog(), tableId.schema(), matchingResult.group(1));
+        }
+        return tableId;
     }
 }

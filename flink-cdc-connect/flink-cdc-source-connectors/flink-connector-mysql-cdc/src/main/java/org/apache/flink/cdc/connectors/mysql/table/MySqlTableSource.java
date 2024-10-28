@@ -98,6 +98,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final Duration heartbeatInterval;
     private final String chunkKeyColumn;
     final boolean skipSnapshotBackFill;
+    final boolean parseGhOstSchemaChanges;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -135,7 +136,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             Properties jdbcProperties,
             Duration heartbeatInterval,
             @Nullable String chunkKeyColumn,
-            boolean skipSnapshotBackFill) {
+            boolean skipSnapshotBackFill,
+            boolean parseGhOstSchemaChanges) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -159,6 +161,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         this.closeIdleReaders = closeIdleReaders;
         this.jdbcProperties = jdbcProperties;
+        this.parseGhOstSchemaChanges = parseGhOstSchemaChanges;
         // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
@@ -220,6 +223,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .heartbeatInterval(heartbeatInterval)
                             .chunkKeyColumn(new ObjectPath(database, tableName), chunkKeyColumn)
                             .skipSnapshotBackfill(skipSnapshotBackFill)
+                            .parseGhOstSchemaChanges(parseGhOstSchemaChanges)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -305,7 +309,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         jdbcProperties,
                         heartbeatInterval,
                         chunkKeyColumn,
-                        skipSnapshotBackFill);
+                        skipSnapshotBackFill,
+                        parseGhOstSchemaChanges);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
