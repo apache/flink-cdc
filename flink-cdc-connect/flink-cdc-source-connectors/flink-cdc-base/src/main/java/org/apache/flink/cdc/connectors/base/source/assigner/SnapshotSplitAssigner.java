@@ -455,7 +455,10 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 }
             }
         }
-        LOG.info(
+        LOG.info("SnapshotSplitAssigner snapshotState on checkpoint {} with splitFinishedCheckpointIds size {}, finishedSplits size {}.",
+               checkpointId,
+                splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size(),
+                finishedSplits == null ? 0 : finishedSplits.size());
                 "snapshotShot, splitFinishedCheckpointIds size : {}, finishedSplits size:{}",
                 splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size(),
                 finishedSplits == null ? 0 : finishedSplits.size());
