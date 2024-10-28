@@ -268,6 +268,12 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** Whether to parse gh-ost utility generated schema change events. Defaults to false. */
+    public MySqlSourceBuilder<T> parseGhOstSchemaChanges(boolean parseGhOstSchemaChanges) {
+        this.configFactory.parseGhOstSchemaChanges(parseGhOstSchemaChanges);
+        return this;
+    }
+
     /**
      * Build the {@link MySqlSource}.
      *
