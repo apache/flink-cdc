@@ -130,7 +130,6 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     public void open() {
         this.enumeratorMetrics = new SourceEnumeratorMetrics(enumeratorContext.metricGroup());
 
-        LOG.info("HybridSplitAssigner open, isStreamSplitAssigned: {}", isStreamSplitAssigned);
         if (isStreamSplitAssigned) {
             enumeratorMetrics.enterStreamReading();
         } else {
@@ -209,6 +208,9 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                 // we don't store the split, but will re-create stream split later
                 isStreamSplitAssigned = false;
             }
+        }
+        if (!snapshotSplits.isEmpty()) {
+            enumeratorMetrics.exitStreamReading();
         }
         snapshotSplitAssigner.addSplits(snapshotSplits);
     }
