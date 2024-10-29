@@ -20,7 +20,6 @@ public class TiDBSourceConfig extends JdbcSourceConfig {
             String compatibleMode,
             StartupOptions startupOptions,
             List<String> databaseList,
-            List<String> schemaList,
             List<String> tableList,
             String pdAddresses,
             String hostMapping,
@@ -48,7 +47,7 @@ public class TiDBSourceConfig extends JdbcSourceConfig {
         super(
                 startupOptions,
                 databaseList,
-                schemaList,
+                null,
                 tableList,
                 splitSize,
                 splitMetaGroupSize,
