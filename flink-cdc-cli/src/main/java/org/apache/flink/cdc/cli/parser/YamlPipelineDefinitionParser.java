@@ -108,8 +108,11 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // UDFs are optional. We parse UDF first and remove it from the pipelineDefJsonNode since
         // it's not of plain data types and must be removed before calling toPipelineConfig.
         List<UdfDef> udfDefs = new ArrayList<>();
-        Optional.ofNullable(((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(UDF_KEY))
-                .ifPresent(node -> node.forEach(udf -> udfDefs.add(toUdfDef(udf))));
+        if (pipelineDefJsonNode.get(PIPELINE_KEY) != null) {
+            Optional.ofNullable(
+                            ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(UDF_KEY))
+                    .ifPresent(node -> node.forEach(udf -> udfDefs.add(toUdfDef(udf))));
+        }
 
         // Pipeline configs are optional
         Configuration userPipelineConfig = toPipelineConfig(pipelineDefJsonNode.get(PIPELINE_KEY));
