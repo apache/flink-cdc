@@ -44,6 +44,6 @@ public class FlinkPipelineExecution implements PipelineExecution {
         if (isBlocking) {
             jobClient.getJobExecutionResult().get();
         }
-        return new ExecutionInfo(jobClient.getJobID().toString(), jobName);
+        return new ExecutionInfo(jobClient.getJobID().toString(), jobName, jobClient);
     }
 }
