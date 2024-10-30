@@ -73,6 +73,7 @@ import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.PA
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_ENABLE_BATCH_MODE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_ENABLE_DELETE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.USERNAME;
+import static org.junit.Assert.fail;
 
 /** IT tests for {@link DorisMetadataApplier}. */
 @RunWith(Parameterized.class)
@@ -452,16 +453,25 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         .primaryKey("id")
                         .build();
 
-        List<Event> truncateTableTestingEvents =
+        List<Event> preparationTestingEvents =
                 Arrays.asList(
                         new CreateTableEvent(tableId, schema),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 1, 2.3, "Alice")),
-                        DataChangeEvent.insertEvent(tableId, generate(schema, 2, 3.4, "Bob")),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 2, 3.4, "Bob")));
+        runJobWithEvents(preparationTestingEvents);
+        waitAndVerify(
+                tableId,
+                3,
+                Arrays.asList("1 | 2.3 | Alice", "2 | 3.4 | Bob"),
+                DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
+
+        List<Event> truncateTestingEvents =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schema),
                         new TruncateTableEvent(tableId),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 3, 4.5, "Cecily")),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 4, 5.6, "Derrida")));
-        runJobWithEvents(truncateTableTestingEvents);
-
+        runJobWithEvents(truncateTestingEvents);
         assertEqualsInAnyOrder(
                 Arrays.asList("3 | 4.5 | Cecily", "4 | 5.6 | Derrida"),
                 fetchTableContent(tableId, 3));
@@ -488,8 +498,11 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         DataChangeEvent.insertEvent(tableId, generate(schema, 2, 3.4, "Bob")));
         runJobWithEvents(preparationTestingEvents);
 
-        assertEqualsInAnyOrder(
-                Arrays.asList("1 | 2.3 | Alice", "2 | 3.4 | Bob"), fetchTableContent(tableId, 3));
+        waitAndVerify(
+                tableId,
+                3,
+                Arrays.asList("1 | 2.3 | Alice", "2 | 3.4 | Bob"),
+                DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
 
         runJobWithEvents(
                 Arrays.asList(new CreateTableEvent(tableId, schema), new DropTableEvent(tableId)));
@@ -565,5 +578,27 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                                                         ? BinaryStringData.fromString((String) e)
                                                         : e)
                                 .toArray());
+    }
+
+    private void waitAndVerify(
+            TableId tableId, int numberOfColumns, List<String> expected, long timeoutMilliseconds)
+            throws Exception {
+        long timeout = System.currentTimeMillis() + timeoutMilliseconds;
+        while (System.currentTimeMillis() < timeout) {
+            List<String> actual = fetchTableContent(tableId, numberOfColumns);
+            if (expected.stream()
+                    .sorted()
+                    .collect(Collectors.toList())
+                    .equals(actual.stream().sorted().collect(Collectors.toList()))) {
+                return;
+            }
+            LOG.info(
+                    "Content of {} isn't ready.\nExpected: {}\nActual: {}",
+                    tableId,
+                    expected,
+                    actual);
+            Thread.sleep(1000L);
+        }
+        fail(String.format("Failed to verify content of %s.", tableId));
     }
 }
