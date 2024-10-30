@@ -23,7 +23,6 @@ import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 
-import com.starrocks.connector.flink.catalog.StarRocksCatalog;
 import com.starrocks.connector.flink.table.sink.SinkFunctionFactory;
 import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.starrocks.connector.flink.table.sink.v2.StarRocksSink;
@@ -71,8 +70,8 @@ public class StarRocksDataSink implements DataSink, Serializable {
 
     @Override
     public MetadataApplier getMetadataApplier() {
-        StarRocksCatalog catalog =
-                new StarRocksCatalog(
+        StarRocksEnrichedCatalog catalog =
+                new StarRocksEnrichedCatalog(
                         sinkOptions.getJdbcUrl(),
                         sinkOptions.getUsername(),
                         sinkOptions.getPassword());

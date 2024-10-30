@@ -21,10 +21,12 @@ import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
@@ -33,7 +35,6 @@ import org.apache.flink.cdc.common.sink.MetadataApplier;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
-import com.starrocks.connector.flink.catalog.StarRocksCatalog;
 import com.starrocks.connector.flink.catalog.StarRocksCatalogException;
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
 import com.starrocks.connector.flink.catalog.StarRocksTable;
@@ -53,14 +54,14 @@ public class StarRocksMetadataApplier implements MetadataApplier {
 
     private static final Logger LOG = LoggerFactory.getLogger(StarRocksMetadataApplier.class);
 
-    private final StarRocksCatalog catalog;
+    private final StarRocksEnrichedCatalog catalog;
     private final TableCreateConfig tableCreateConfig;
     private final SchemaChangeConfig schemaChangeConfig;
     private boolean isOpened;
     private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
     public StarRocksMetadataApplier(
-            StarRocksCatalog catalog,
+            StarRocksEnrichedCatalog catalog,
             TableCreateConfig tableCreateConfig,
             SchemaChangeConfig schemaChangeConfig) {
         this.catalog = catalog;
@@ -87,7 +88,9 @@ public class StarRocksMetadataApplier implements MetadataApplier {
         return Sets.newHashSet(
                 SchemaChangeEventType.CREATE_TABLE,
                 SchemaChangeEventType.ADD_COLUMN,
-                SchemaChangeEventType.DROP_COLUMN);
+                SchemaChangeEventType.DROP_COLUMN,
+                SchemaChangeEventType.DROP_TABLE,
+                SchemaChangeEventType.TRUNCATE_TABLE);
     }
 
     @Override
@@ -117,14 +120,16 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                     return null;
                 },
                 dropTableEvent -> {
-                    throw new UnsupportedSchemaChangeEventException(dropTableEvent);
+                    applyDropTable(dropTableEvent);
+                    return null;
                 },
                 renameColumnEvent -> {
                     applyRenameColumn(renameColumnEvent);
                     return null;
                 },
                 truncateTableEvent -> {
-                    throw new UnsupportedSchemaChangeEventException(truncateTableEvent);
+                    applyTruncateTable(truncateTableEvent);
+                    return null;
                 });
     }
 
@@ -314,5 +319,25 @@ public class StarRocksMetadataApplier implements MetadataApplier {
         // support
         // the alter after a discussion.
         throw new UnsupportedSchemaChangeEventException(alterColumnTypeEvent);
+    }
+
+    private void applyTruncateTable(TruncateTableEvent truncateTableEvent) {
+        try {
+            catalog.truncateTable(
+                    truncateTableEvent.tableId().getSchemaName(),
+                    truncateTableEvent.tableId().getTableName());
+        } catch (StarRocksCatalogException e) {
+            throw new SchemaEvolveException(truncateTableEvent, e.getMessage(), e);
+        }
+    }
+
+    private void applyDropTable(DropTableEvent dropTableEvent) {
+        try {
+            catalog.dropTable(
+                    dropTableEvent.tableId().getSchemaName(),
+                    dropTableEvent.tableId().getTableName());
+        } catch (StarRocksCatalogException e) {
+            throw new SchemaEvolveException(dropTableEvent, e.getMessage(), e);
+        }
     }
 }
