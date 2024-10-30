@@ -27,6 +27,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.apache.flink.util.CollectionUtil;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -156,7 +157,7 @@ public class StreamSplitAssigner implements SplitAssigner {
                         offsetFactory.createTimestampOffset(startupOptions.startupTimestampMillis);
                 break;
             case SPECIFIC_OFFSETS:
-                if (startupOptions.getOffset().isEmpty()) {
+                if (CollectionUtil.isNullOrEmpty(startupOptions.getOffset())) {
                     startingOffset =
                             offsetFactory.newOffset(
                                     startupOptions.specificOffsetFile,
