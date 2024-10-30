@@ -26,17 +26,21 @@ import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.paimon.sink.PaimonMetadataApplier;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
@@ -51,11 +55,12 @@ import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.UserCodeClassLoader;
 
+import org.apache.calcite.sql.validate.SqlValidatorException;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.sink.MultiTableCommittable;
 import org.apache.paimon.options.Options;
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -75,6 +80,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.common.types.DataTypes.STRING;
+
 /** An ITCase for {@link PaimonWriter} and {@link PaimonCommitter}. */
 public class PaimonSinkITCase {
 
@@ -86,9 +93,8 @@ public class PaimonSinkITCase {
 
     private String warehouse;
 
-    private TableId table1;
-
-    private BinaryRecordDataGenerator generator;
+    private final TableId table1 = TableId.tableId("test", "table1");
+    private final TableId table2 = TableId.tableId("test", "table2");
 
     private static int checkpointId = 1;
 
@@ -115,7 +121,6 @@ public class PaimonSinkITCase {
         catalogOptions.setString("metastore", metastore);
         catalogOptions.setString("warehouse", warehouse);
         catalogOptions.setString("cache-enabled", "false");
-        table1 = TableId.tableId("test", "table1");
         if ("hive".equals(metastore)) {
             catalogOptions.setString("hadoop-conf-dir", HADOOP_CONF_DIR);
             catalogOptions.setString("hive-conf-dir", HIVE_CONF_DIR);
@@ -145,8 +150,8 @@ public class PaimonSinkITCase {
         // create table
         Schema schema =
                 Schema.newBuilder()
-                        .physicalColumn("col1", DataTypes.STRING())
-                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col1", STRING())
+                        .physicalColumn("col2", STRING())
                         .primaryKey("col1")
                         .option("bucket", "1")
                         .option("deletion-vectors.enabled", String.valueOf(enableDeleteVectors))
@@ -156,27 +161,13 @@ public class PaimonSinkITCase {
         PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
         metadataApplier.applySchemaChange(createTableEvent);
 
-        generator =
-                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
         // insert
-        DataChangeEvent insertEvent1 =
-                DataChangeEvent.insertEvent(
-                        table1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("1")
-                                }));
-        testEvents.add(insertEvent1);
-        DataChangeEvent insertEvent2 =
-                DataChangeEvent.insertEvent(
-                        table1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("2")
-                                }));
-        testEvents.add(insertEvent2);
+        testEvents.add(
+                generateInsert(
+                        table1, Arrays.asList(Tuple2.of(STRING(), "1"), Tuple2.of(STRING(), "1"))));
+        testEvents.add(
+                generateInsert(
+                        table1, Arrays.asList(Tuple2.of(STRING(), "2"), Tuple2.of(STRING(), "2"))));
         return testEvents;
     }
 
@@ -193,96 +184,49 @@ public class PaimonSinkITCase {
         Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
 
         // insert
-        for (Event event : createTestEvents(enableDeleteVector)) {
-            writer.write(event, null);
-        }
-        writer.flush(false);
-        Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
-                writer.prepareCommit().stream()
-                        .map(this::correctCheckpointId)
-                        .map(MockCommitRequestImpl::new)
-                        .collect(Collectors.toList());
-        committer.commit(commitRequests);
-        List<Row> result = new ArrayList<>();
-        tEnv.sqlQuery("select * from paimon_catalog.test.table1")
-                .execute()
-                .collect()
-                .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Arrays.asList(
-                        Row.ofKind(RowKind.INSERT, "1", "1"), Row.ofKind(RowKind.INSERT, "2", "2")),
-                result);
+        writeAndCommit(writer, committer, createTestEvents(enableDeleteVector).toArray(new Event[0]));
+        Assertions.assertThat(fetchResults(table1))
+                .isEqualTo(
+                        Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, "1", "1"),
+                                Row.ofKind(RowKind.INSERT, "2", "2")));
 
         // delete
-        Event event =
-                DataChangeEvent.deleteEvent(
-                        table1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("1")
-                                }));
-        writer.write(event, null);
-        writer.flush(false);
-        commitRequests =
-                writer.prepareCommit().stream()
-                        .map(this::correctCheckpointId)
-                        .map(MockCommitRequestImpl::new)
-                        .collect(Collectors.toList());
-        committer.commit(commitRequests);
-        result = new ArrayList<>();
-        tEnv.sqlQuery("select * from paimon_catalog.test.table1")
-                .execute()
-                .collect()
-                .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Collections.singletonList(Row.ofKind(RowKind.INSERT, "2", "2")), result);
+        writeAndCommit(
+                writer,
+                committer,
+                generateDelete(
+                        table1, Arrays.asList(Tuple2.of(STRING(), "1"), Tuple2.of(STRING(), "1"))));
+
+        Assertions.assertThat(fetchResults(table1))
+                .isEqualTo(Collections.singletonList(Row.ofKind(RowKind.INSERT, "2", "2")));
 
         // update
-        event =
-                DataChangeEvent.updateEvent(
+        writeAndCommit(
+                writer,
+                committer,
+                generateUpdate(
                         table1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("2")
-                                }),
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("x")
-                                }));
-        writer.write(event, null);
-        writer.flush(false);
-        commitRequests =
-                writer.prepareCommit().stream()
-                        .map(this::correctCheckpointId)
-                        .map(MockCommitRequestImpl::new)
-                        .collect(Collectors.toList());
-        committer.commit(commitRequests);
-        result = new ArrayList<>();
-        tEnv.sqlQuery("select * from paimon_catalog.test.table1")
-                .execute()
-                .collect()
-                .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Collections.singletonList(Row.ofKind(RowKind.INSERT, "2", "x")), result);
+                        Arrays.asList(Tuple2.of(STRING(), "2"), Tuple2.of(STRING(), "2")),
+                        Arrays.asList(Tuple2.of(STRING(), "2"), Tuple2.of(STRING(), "x"))));
+        Assertions.assertThat(fetchResults(table1))
+                .isEqualTo(Collections.singletonList(Row.ofKind(RowKind.INSERT, "2", "x")));
 
-        result = new ArrayList<>();
-        tEnv.sqlQuery("select max_sequence_number from paimon_catalog.test.`table1$files`")
-                .execute()
-                .collect()
-                .forEachRemaining(result::add);
-        // Each commit will generate one sequence number(equal to checkpointId).
-        List<Row> expected =
-                enableDeleteVector
-                        ? Arrays.asList(
-                                Row.ofKind(RowKind.INSERT, 1L), Row.ofKind(RowKind.INSERT, 3L))
-                        : Arrays.asList(
-                                Row.ofKind(RowKind.INSERT, 1L),
-                                Row.ofKind(RowKind.INSERT, 2L),
-                                Row.ofKind(RowKind.INSERT, 3L));
-        Assertions.assertEquals(expected, result);
+        if (enableDeleteVector) {
+        Assertions.assertThat(fetchResults(
+                TableId.tableId("test", "`table1$files`")
+        )).containsExactly(
+                Row.ofKind(RowKind.INSERT, 1L), Row.ofKind(RowKind.INSERT, 3L)
+        );
+        } else {
+            Assertions.assertThat(fetchResults(
+                    TableId.tableId("test", "`table1$files`")
+            )).containsExactly(
+                    Row.ofKind(RowKind.INSERT, 1L),
+                    Row.ofKind(RowKind.INSERT, 2L),
+                    Row.ofKind(RowKind.INSERT, 3L)
+            );
+        }
     }
 
     @ParameterizedTest
@@ -292,142 +236,102 @@ public class PaimonSinkITCase {
                     Catalog.DatabaseNotExistException, SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
-                new PaimonSink(
+                new PaimonSink<>(
                         catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
 
         // 1. receive only DataChangeEvents during one checkpoint
-        for (Event event : createTestEvents(enableDeleteVector)) {
-            writer.write(event, null);
-        }
-        writer.flush(false);
-        Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
-                writer.prepareCommit().stream()
-                        .map(this::correctCheckpointId)
-                        .map(MockCommitRequestImpl::new)
-                        .collect(Collectors.toList());
-        committer.commit(commitRequests);
-        List<Row> result = new ArrayList<>();
-        tEnv.sqlQuery("select * from paimon_catalog.test.table1")
-                .execute()
-                .collect()
-                .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Arrays.asList(
-                        Row.ofKind(RowKind.INSERT, "1", "1"), Row.ofKind(RowKind.INSERT, "2", "2")),
-                result);
+        writeAndCommit(writer, committer, createTestEvents(enableDeleteVector).toArray(new Event[0]));
+        Assertions.assertThat(fetchResults(table1))
+                .isEqualTo(
+                        Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, "1", "1"),
+                                Row.ofKind(RowKind.INSERT, "2", "2")));
 
         // 2. receive DataChangeEvents and SchemaChangeEvents during one checkpoint
-        DataChangeEvent insertEvent3 =
-                DataChangeEvent.insertEvent(
-                        table1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("3"),
-                                    BinaryStringData.fromString("3")
-                                }));
-        writer.write(insertEvent3, null);
-        writer.flush(false);
+        writeAndCommit(
+                writer,
+                committer,
+                generateInsert(
+                        table1, Arrays.asList(Tuple2.of(STRING(), "3"), Tuple2.of(STRING(), "3"))));
 
         // add column
         AddColumnEvent.ColumnWithPosition columnWithPosition =
-                new AddColumnEvent.ColumnWithPosition(
-                        Column.physicalColumn("col3", DataTypes.STRING()));
+                new AddColumnEvent.ColumnWithPosition(Column.physicalColumn("col3", STRING()));
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(table1, Collections.singletonList(columnWithPosition));
         PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
         metadataApplier.applySchemaChange(addColumnEvent);
-        writer.write(addColumnEvent, null);
-        generator =
-                new BinaryRecordDataGenerator(
-                        RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
-        DataChangeEvent insertEvent4 =
-                DataChangeEvent.insertEvent(
+
+        writeAndCommit(
+                writer,
+                committer,
+                generateInsert(
                         table1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("4"),
-                                    BinaryStringData.fromString("4"),
-                                    BinaryStringData.fromString("4")
-                                }));
-        writer.write(insertEvent4, null);
-        writer.flush(false);
-        commitRequests =
-                writer.prepareCommit().stream()
-                        .map(this::correctCheckpointId)
-                        .map(MockCommitRequestImpl::new)
-                        .collect(Collectors.toList());
-        committer.commit(commitRequests);
-        result = new ArrayList<>();
-        tEnv.sqlQuery("select * from paimon_catalog.test.table1")
-                .execute()
-                .collect()
-                .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Arrays.asList(
-                        Row.ofKind(RowKind.INSERT, "1", "1", null),
-                        Row.ofKind(RowKind.INSERT, "2", "2", null),
-                        Row.ofKind(RowKind.INSERT, "3", "3", null),
-                        Row.ofKind(RowKind.INSERT, "4", "4", "4")),
-                result);
+                        Arrays.asList(
+                                Tuple2.of(STRING(), "4"),
+                                Tuple2.of(STRING(), "4"),
+                                Tuple2.of(STRING(), "4"))));
+
+        Assertions.assertThat(fetchResults(table1))
+                .isEqualTo(
+                        Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, "1", "1", null),
+                                Row.ofKind(RowKind.INSERT, "2", "2", null),
+                                Row.ofKind(RowKind.INSERT, "3", "3", null),
+                                Row.ofKind(RowKind.INSERT, "4", "4", "4")));
 
         // 2. receive DataChangeEvents and SchemaChangeEvents during one checkpoint
-        DataChangeEvent insertEvent5 =
-                DataChangeEvent.insertEvent(
+        writeAndCommit(
+                writer,
+                committer,
+                generateInsert(
                         table1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("5"),
-                                    BinaryStringData.fromString("5"),
-                                    BinaryStringData.fromString("5")
-                                }));
-        writer.write(insertEvent5, null);
-        writer.flush(false);
+                        Arrays.asList(
+                                Tuple2.of(STRING(), "5"),
+                                Tuple2.of(STRING(), "5"),
+                                Tuple2.of(STRING(), "5"))));
+
         // drop column
         DropColumnEvent dropColumnEvent =
                 new DropColumnEvent(table1, Collections.singletonList("col2"));
         metadataApplier.applySchemaChange(dropColumnEvent);
         writer.write(dropColumnEvent, null);
-        generator =
-                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
-        DataChangeEvent insertEvent6 =
-                DataChangeEvent.insertEvent(
-                        table1,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("6"),
-                                    BinaryStringData.fromString("6")
-                                }));
-        writer.write(insertEvent6, null);
-        writer.flush(false);
-        commitRequests =
-                writer.prepareCommit().stream()
-                        .map(this::correctCheckpointId)
-                        .map(MockCommitRequestImpl::new)
-                        .collect(Collectors.toList());
-        committer.commit(commitRequests);
-        result = new ArrayList<>();
-        tEnv.sqlQuery("select * from paimon_catalog.test.table1")
-                .execute()
-                .collect()
-                .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Arrays.asList(
-                        Row.ofKind(RowKind.INSERT, "1", null),
-                        Row.ofKind(RowKind.INSERT, "2", null),
-                        Row.ofKind(RowKind.INSERT, "3", null),
-                        Row.ofKind(RowKind.INSERT, "4", "4"),
-                        Row.ofKind(RowKind.INSERT, "5", "5"),
-                        Row.ofKind(RowKind.INSERT, "6", "6")),
-                result);
-        result = new ArrayList<>();
-        tEnv.sqlQuery("select min_sequence_number from paimon_catalog.test.`table1$files`")
-                .execute()
-                .collect()
-                .forEachRemaining(result::add);
-        Set<Row> deduplicated = new HashSet<>(result);
-        Assertions.assertEquals(result.size(), deduplicated.size());
+
+        writeAndCommit(
+                writer,
+                committer,
+                generateInsert(
+                        table1, Arrays.asList(Tuple2.of(STRING(), "6"), Tuple2.of(STRING(), "6"))));
+
+        Assertions.assertThat(fetchResults(table1))
+                .isEqualTo(
+                        Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, "1", null),
+                                Row.ofKind(RowKind.INSERT, "2", null),
+                                Row.ofKind(RowKind.INSERT, "3", null),
+                                Row.ofKind(RowKind.INSERT, "4", "4"),
+                                Row.ofKind(RowKind.INSERT, "5", "5"),
+                                Row.ofKind(RowKind.INSERT, "6", "6")));
+
+        TruncateTableEvent truncateTableEvent = new TruncateTableEvent(table1);
+        metadataApplier.applySchemaChange(truncateTableEvent);
+
+        writeAndCommit(
+                writer,
+                committer,
+                generateInsert(
+                        table1, Arrays.asList(Tuple2.of(STRING(), "7"), Tuple2.of(STRING(), "7"))));
+
+        Assertions.assertThat(fetchResults(table1))
+                .isEqualTo(Collections.singletonList(Row.ofKind(RowKind.INSERT, "7", "7")));
+
+        DropTableEvent dropTableEvent = new DropTableEvent(table1);
+        metadataApplier.applySchemaChange(dropTableEvent);
+        Assertions.assertThatThrownBy(() -> fetchResults(table1))
+                .hasRootCauseExactlyInstanceOf(SqlValidatorException.class)
+                .hasRootCauseMessage("Object 'table1' not found within 'paimon_catalog.test'");
     }
 
     @ParameterizedTest
@@ -443,11 +347,10 @@ public class PaimonSinkITCase {
         Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
         List<Event> testEvents = createTestEvents(enableDeleteVector);
         // create table
-        TableId table2 = TableId.tableId("test", "table2");
         Schema schema =
                 Schema.newBuilder()
-                        .physicalColumn("col1", DataTypes.STRING())
-                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col1", STRING())
+                        .physicalColumn("col2", STRING())
                         .primaryKey("col1")
                         .option("bucket", "1")
                         .build();
@@ -456,43 +359,79 @@ public class PaimonSinkITCase {
         PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
         metadataApplier.applySchemaChange(createTableEvent);
         // insert
-        DataChangeEvent insertEvent1 =
-                DataChangeEvent.insertEvent(
-                        table2,
-                        generator.generate(
-                                new Object[] {
-                                    BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("1")
-                                }));
-        testEvents.add(insertEvent1);
+        testEvents.add(
+                generateInsert(
+                        table2, Arrays.asList(Tuple2.of(STRING(), "1"), Tuple2.of(STRING(), "1"))));
 
         // insert
-        for (Event event : testEvents) {
-            writer.write(event, null);
-        }
-        writer.flush(false);
+        writeAndCommit(writer, committer, testEvents.toArray(new Event[0]));
+
+        Assertions.assertThat(fetchResults(table1))
+                .isEqualTo(
+                        Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, "1", "1"),
+                                Row.ofKind(RowKind.INSERT, "2", "2")));
+        Assertions.assertThat(fetchResults(table2))
+                .isEqualTo(Collections.singletonList(Row.ofKind(RowKind.INSERT, "1", "1")));
+    }
+
+    private static void commit(
+            PaimonWriter<Event> writer, Committer<MultiTableCommittable> committer)
+            throws IOException, InterruptedException {
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
                         .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
-        List<Row> result = new ArrayList<>();
-        tEnv.sqlQuery("select * from paimon_catalog.test.table1")
+    }
+
+    private static void writeAndCommit(
+            PaimonWriter<Event> writer, Committer<MultiTableCommittable> committer, Event... events)
+            throws IOException, InterruptedException {
+        for (Event event : events) {
+            writer.write(event, null);
+        }
+        writer.flush(false);
+        commit(writer, committer);
+    }
+
+    private List<Row> fetchResults(TableId tableId) {
+        List<Row> results = new ArrayList<>();
+        tEnv.sqlQuery("select * from paimon_catalog." + tableId.toString())
                 .execute()
                 .collect()
-                .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Arrays.asList(
-                        Row.ofKind(RowKind.INSERT, "1", "1"), Row.ofKind(RowKind.INSERT, "2", "2")),
-                result);
-        result = new ArrayList<>();
-        tEnv.sqlQuery("select * from paimon_catalog.test.table2")
-                .execute()
-                .collect()
-                .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Collections.singletonList(Row.ofKind(RowKind.INSERT, "1", "1")), result);
+                .forEachRemaining(results::add);
+        return results;
+    }
+
+    private BinaryRecordData generate(List<Tuple2<DataType, Object>> elements) {
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(elements.stream().map(e -> e.f0).toArray(DataType[]::new)));
+        return generator.generate(
+                elements.stream()
+                        .map(e -> e.f1)
+                        .map(o -> o instanceof String ? BinaryStringData.fromString((String) o) : o)
+                        .toArray(Object[]::new));
+    }
+
+    private DataChangeEvent generateInsert(
+            TableId tableId, List<Tuple2<DataType, Object>> elements) {
+        return DataChangeEvent.insertEvent(tableId, generate(elements));
+    }
+
+    private DataChangeEvent generateUpdate(
+            TableId tableId,
+            List<Tuple2<DataType, Object>> beforeElements,
+            List<Tuple2<DataType, Object>> afterElements) {
+        return DataChangeEvent.updateEvent(
+                tableId, generate(beforeElements), generate(afterElements));
+    }
+
+    private DataChangeEvent generateDelete(
+            TableId tableId, List<Tuple2<DataType, Object>> elements) {
+        return DataChangeEvent.deleteEvent(tableId, generate(elements));
     }
 
     @ParameterizedTest

@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /** Mock {@link StarRocksCatalog} for testing. */
-public class MockStarRocksCatalog extends StarRocksCatalog {
+public class MockStarRocksCatalog extends StarRocksEnrichedCatalog {
 
     /** database name -> table name -> table. */
     private final Map<String, Map<String, StarRocksTable>> tables;

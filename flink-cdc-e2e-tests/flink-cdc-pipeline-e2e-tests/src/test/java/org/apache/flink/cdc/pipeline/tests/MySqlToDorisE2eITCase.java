@@ -55,6 +55,7 @@ import java.util.stream.Stream;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 /** End-to-end tests for mysql cdc to Doris pipeline job. */
@@ -396,6 +397,244 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
         }
     }
 
+    @Test
+    public void testSchemaEvolution() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: doris\n"
+                                + "  fenodes: doris:8030\n"
+                                + "  benodes: doris:8040\n"
+                                + "  username: %s\n"
+                                + "  password: \"%s\"\n"
+                                + "  table.create.properties.replication_num: 1\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: evolve\n"
+                                + "  parallelism: %d",
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        DORIS.getUsername(),
+                        DORIS.getPassword(),
+                        parallelism);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path dorisCdcConnector = TestUtils.getResource("doris-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, dorisCdcConnector, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        validateSinkResult(
+                mysqlInventoryDatabase.getDatabaseName(),
+                "products",
+                7,
+                Arrays.asList(
+                        "101 | scooter | Small 2-wheel scooter | 3.14 | red | {\"key1\": \"value1\"} | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}",
+                        "102 | car battery | 12V car battery | 8.1 | white | {\"key2\": \"value2\"} | {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}",
+                        "103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 | 0.8 | red | {\"key3\": \"value3\"} | {\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0}",
+                        "104 | hammer | 12oz carpenter's hammer | 0.75 | white | {\"key4\": \"value4\"} | {\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0}",
+                        "105 | hammer | 14oz carpenter's hammer | 0.875 | red | {\"k1\": \"v1\", \"k2\": \"v2\"} | {\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0}",
+                        "106 | hammer | 16oz carpenter's hammer | 1.0 | null | null | null",
+                        "107 | rocks | box of assorted rocks | 5.3 | null | null | null",
+                        "108 | jacket | water resistent black wind breaker | 0.1 | null | null | null",
+                        "109 | spare tire | 24 inch spare tire | 22.2 | null | null | null"));
+
+        validateSinkResult(
+                mysqlInventoryDatabase.getDatabaseName(),
+                "customers",
+                4,
+                Arrays.asList(
+                        "101 | user_1 | Shanghai | 123567891234",
+                        "102 | user_2 | Shanghai | 123567891234",
+                        "103 | user_3 | Shanghai | 123567891234",
+                        "104 | user_4 | Shanghai | 123567891234"));
+
+        LOG.info("Begin incremental reading stage.");
+
+        // generate binlogs
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        mysqlInventoryDatabase.getDatabaseName());
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2, null, null, null);"); // 110
+
+            // Ensure we've entered binlog reading stage
+            validateSinkResult(
+                    mysqlInventoryDatabase.getDatabaseName(),
+                    "products",
+                    7,
+                    Arrays.asList(
+                            "101 | scooter | Small 2-wheel scooter | 3.14 | red | {\"key1\": \"value1\"} | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}",
+                            "102 | car battery | 12V car battery | 8.1 | white | {\"key2\": \"value2\"} | {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}",
+                            "103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 | 0.8 | red | {\"key3\": \"value3\"} | {\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0}",
+                            "104 | hammer | 12oz carpenter's hammer | 0.75 | white | {\"key4\": \"value4\"} | {\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0}",
+                            "105 | hammer | 14oz carpenter's hammer | 0.875 | red | {\"k1\": \"v1\", \"k2\": \"v2\"} | {\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0}",
+                            "106 | hammer | 16oz carpenter's hammer | 1.0 | null | null | null",
+                            "107 | rocks | box of assorted rocks | 5.3 | null | null | null",
+                            "108 | jacket | water resistent black wind breaker | 0.1 | null | null | null",
+                            "109 | spare tire | 24 inch spare tire | 22.2 | null | null | null",
+                            "110 | jacket | water resistent white wind breaker | 0.2 | null | null | null"));
+
+            // Schema change - Add Column
+            stat.execute("ALTER TABLE products ADD COLUMN extras INT;");
+            Thread.sleep(1000L);
+            stat.execute(
+                    "INSERT INTO products VALUES (default, 'blt', 'bacon, lettuce and tomato sandwich', 0.2, null, null, null, 17)"); // 111
+            validateSinkResult(
+                    mysqlInventoryDatabase.getDatabaseName(),
+                    "products",
+                    8,
+                    Arrays.asList(
+                            "101 | scooter | Small 2-wheel scooter | 3.14 | red | {\"key1\": \"value1\"} | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0} | null",
+                            "102 | car battery | 12V car battery | 8.1 | white | {\"key2\": \"value2\"} | {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0} | null",
+                            "103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 | 0.8 | red | {\"key3\": \"value3\"} | {\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0} | null",
+                            "104 | hammer | 12oz carpenter's hammer | 0.75 | white | {\"key4\": \"value4\"} | {\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0} | null",
+                            "105 | hammer | 14oz carpenter's hammer | 0.875 | red | {\"k1\": \"v1\", \"k2\": \"v2\"} | {\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0} | null",
+                            "106 | hammer | 16oz carpenter's hammer | 1.0 | null | null | null | null",
+                            "107 | rocks | box of assorted rocks | 5.3 | null | null | null | null",
+                            "108 | jacket | water resistent black wind breaker | 0.1 | null | null | null | null",
+                            "109 | spare tire | 24 inch spare tire | 22.2 | null | null | null | null",
+                            "110 | jacket | water resistent white wind breaker | 0.2 | null | null | null | null",
+                            "111 | blt | bacon, lettuce and tomato sandwich | 0.2 | null | null | null | 17"));
+
+            // Schema change - Rename Column
+            stat.execute("ALTER TABLE products RENAME COLUMN extras TO extra_col;");
+            Thread.sleep(1000L);
+            stat.execute(
+                    "INSERT INTO products VALUES (default, 'cheeseburger', 'meat patty, cheese slice and onions', 0.1, null, null, null, 18)"); // 112
+            validateSinkResult(
+                    mysqlInventoryDatabase.getDatabaseName(),
+                    "products",
+                    8,
+                    Arrays.asList(
+                            "101 | scooter | Small 2-wheel scooter | 3.14 | red | {\"key1\": \"value1\"} | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0} | null",
+                            "102 | car battery | 12V car battery | 8.1 | white | {\"key2\": \"value2\"} | {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0} | null",
+                            "103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 | 0.8 | red | {\"key3\": \"value3\"} | {\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0} | null",
+                            "104 | hammer | 12oz carpenter's hammer | 0.75 | white | {\"key4\": \"value4\"} | {\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0} | null",
+                            "105 | hammer | 14oz carpenter's hammer | 0.875 | red | {\"k1\": \"v1\", \"k2\": \"v2\"} | {\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0} | null",
+                            "106 | hammer | 16oz carpenter's hammer | 1.0 | null | null | null | null",
+                            "107 | rocks | box of assorted rocks | 5.3 | null | null | null | null",
+                            "108 | jacket | water resistent black wind breaker | 0.1 | null | null | null | null",
+                            "109 | spare tire | 24 inch spare tire | 22.2 | null | null | null | null",
+                            "110 | jacket | water resistent white wind breaker | 0.2 | null | null | null | null",
+                            "111 | blt | bacon, lettuce and tomato sandwich | 0.2 | null | null | null | 17",
+                            "112 | cheeseburger | meat patty, cheese slice and onions | 0.1 | null | null | null | 18"));
+
+            // Schema change - Alter Column Type
+            stat.execute("ALTER TABLE products MODIFY COLUMN extra_col double;");
+            Thread.sleep(1000L);
+            stat.execute(
+                    "INSERT INTO products VALUES (default, 'fries', 'potato and salt', 0.05, null, null, null, 19)"); // 113
+            validateSinkResult(
+                    mysqlInventoryDatabase.getDatabaseName(),
+                    "products",
+                    8,
+                    Arrays.asList(
+                            "101 | scooter | Small 2-wheel scooter | 3.14 | red | {\"key1\": \"value1\"} | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0} | null",
+                            "102 | car battery | 12V car battery | 8.1 | white | {\"key2\": \"value2\"} | {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0} | null",
+                            "103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 | 0.8 | red | {\"key3\": \"value3\"} | {\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0} | null",
+                            "104 | hammer | 12oz carpenter's hammer | 0.75 | white | {\"key4\": \"value4\"} | {\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0} | null",
+                            "105 | hammer | 14oz carpenter's hammer | 0.875 | red | {\"k1\": \"v1\", \"k2\": \"v2\"} | {\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0} | null",
+                            "106 | hammer | 16oz carpenter's hammer | 1.0 | null | null | null | null",
+                            "107 | rocks | box of assorted rocks | 5.3 | null | null | null | null",
+                            "108 | jacket | water resistent black wind breaker | 0.1 | null | null | null | null",
+                            "109 | spare tire | 24 inch spare tire | 22.2 | null | null | null | null",
+                            "110 | jacket | water resistent white wind breaker | 0.2 | null | null | null | null",
+                            "111 | blt | bacon, lettuce and tomato sandwich | 0.2 | null | null | null | 17.0",
+                            "112 | cheeseburger | meat patty, cheese slice and onions | 0.1 | null | null | null | 18.0",
+                            "113 | fries | potato and salt | 0.05 | null | null | null | 19.0"));
+
+            // Schema change - Drop Column
+            stat.execute("ALTER TABLE products DROP COLUMN extra_col;");
+            Thread.sleep(1000L);
+            stat.execute(
+                    "INSERT INTO products VALUES (default, 'mac', 'cheese', 0.025, null, null, null)"); // 114
+            validateSinkResult(
+                    mysqlInventoryDatabase.getDatabaseName(),
+                    "products",
+                    7,
+                    Arrays.asList(
+                            "101 | scooter | Small 2-wheel scooter | 3.14 | red | {\"key1\": \"value1\"} | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}",
+                            "102 | car battery | 12V car battery | 8.1 | white | {\"key2\": \"value2\"} | {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}",
+                            "103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 | 0.8 | red | {\"key3\": \"value3\"} | {\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0}",
+                            "104 | hammer | 12oz carpenter's hammer | 0.75 | white | {\"key4\": \"value4\"} | {\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0}",
+                            "105 | hammer | 14oz carpenter's hammer | 0.875 | red | {\"k1\": \"v1\", \"k2\": \"v2\"} | {\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0}",
+                            "106 | hammer | 16oz carpenter's hammer | 1.0 | null | null | null",
+                            "107 | rocks | box of assorted rocks | 5.3 | null | null | null",
+                            "108 | jacket | water resistent black wind breaker | 0.1 | null | null | null",
+                            "109 | spare tire | 24 inch spare tire | 22.2 | null | null | null",
+                            "110 | jacket | water resistent white wind breaker | 0.2 | null | null | null",
+                            "111 | blt | bacon, lettuce and tomato sandwich | 0.2 | null | null | null",
+                            "112 | cheeseburger | meat patty, cheese slice and onions | 0.1 | null | null | null",
+                            "113 | fries | potato and salt | 0.05 | null | null | null",
+                            "114 | mac | cheese | 0.025 | null | null | null"));
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("TRUNCATE TABLE products;");
+            Thread.sleep(1000L);
+            stat.execute(
+                    "INSERT INTO products VALUES (default, 'pasta', 'noodles', 0, null, null, null);"); // 1, because truncating resets auto_increment id
+        }
+
+        validateSinkResult(
+                mysqlInventoryDatabase.getDatabaseName(),
+                "products",
+                7,
+                Collections.singletonList("1 | pasta | noodles | 0.0 | null | null | null"));
+
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("DROP TABLE products;");
+        }
+        Thread.sleep(1000L);
+
+        SQLException thrown =
+                assertThrows(
+                        SQLException.class,
+                        () -> {
+                            try (Connection conn =
+                                            DriverManager.getConnection(
+                                                    DORIS.getJdbcUrl(
+                                                            mysqlInventoryDatabase
+                                                                    .getDatabaseName(),
+                                                            DORIS.getUsername()));
+                                    Statement stat = conn.createStatement()) {
+                                stat.executeQuery("SELECT * FROM products;");
+                            }
+                        });
+        assertTrue(
+                thrown.getMessage()
+                        .contains("errCode = 2, detailMessage = Unknown table 'products'"));
+    }
+
     public static void createDorisDatabase(String databaseName) {
         try {
             Container.ExecResult rs =
@@ -437,6 +676,16 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     private void validateSinkResult(
             String databaseName, String tableName, int columnCount, List<String> expected)
             throws Exception {
+        validateSqlResults(
+                databaseName,
+                String.format("SELECT * FROM `%s`.`%s`;", databaseName, tableName),
+                columnCount,
+                expected);
+    }
+
+    private void validateSqlResults(
+            String databaseName, String sql, int columnCount, List<String> expected)
+            throws Exception {
         long startWaitingTimestamp = System.currentTimeMillis();
         while (true) {
             if (System.currentTimeMillis() - startWaitingTimestamp
@@ -448,9 +697,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                             DriverManager.getConnection(
                                     DORIS.getJdbcUrl(databaseName, DORIS.getUsername()));
                     Statement stat = conn.createStatement()) {
-                ResultSet rs =
-                        stat.executeQuery(
-                                String.format("SELECT * FROM `%s`.`%s`;", databaseName, tableName));
+                ResultSet rs = stat.executeQuery(sql);
 
                 while (rs.next()) {
                     List<String> columns = new ArrayList<>();
