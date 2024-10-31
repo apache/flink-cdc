@@ -428,11 +428,16 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                 currentScn = rs.getLong("CURRENT_SCN");
             }
             LOG.info("Current Scn is {}", currentScn);
+        }
+
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
             // mock incremental data
             statement.execute(
                     String.format(
                             "INSERT INTO %s.%s VALUES (9999, 'user_offset', 'Shanghai', '123567891234')",
                             ORACLE_SCHEMA, "CUSTOMERS"));
+            LOG.info("mock incremental data success");
         }
 
         String sourceDDL =
