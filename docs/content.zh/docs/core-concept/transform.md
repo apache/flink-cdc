@@ -92,10 +92,10 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 |----------------------|-----------------------------|-----------------------------------------------------------------|
 | value1 = value2      | valueEquals(value1, value2) | Returns TRUE if value1 is equal to value2; returns FALSE if value1 or value2 is NULL. |
 | value1 <> value2     | !valueEquals(value1, value2) | Returns TRUE if value1 is not equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 > value2      | value1 > value2             | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL. |
-| value1 >= value2     | value1 >= value2            | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 < value2      | value1 < value2             | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL. |
-| value1 <= value2     | value1 <= value2            | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 > value2      | greater(value1, value2)     | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL. |
+| value1 >= value2     | greaterOrEqual(value1, value2) | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 < value2      | less(value1, value2)        | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL. |
+| value1 <= value2     | lessOrEqual(value1, value2) | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL. |
 | value IS NULL        | null == value               | Returns TRUE if value is NULL.                                  |
 | value IS NOT NULL    | null != value               | Returns TRUE if value is not NULL.                              |
 | value1 BETWEEN value2 AND value3 | betweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3. |

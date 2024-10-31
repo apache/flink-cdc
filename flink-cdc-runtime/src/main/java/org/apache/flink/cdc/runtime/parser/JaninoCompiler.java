@@ -272,7 +272,7 @@ public class JaninoCompiler {
             case GREATER_THAN:
             case LESS_THAN_OR_EQUAL:
             case GREATER_THAN_OR_EQUAL:
-                return generateBinaryOperation(sqlBasicCall, atoms, sqlBasicCall.getKind().sql);
+                return generateCompareOperation(sqlBasicCall, atoms);
             case CAST:
                 return generateCastOperation(sqlBasicCall, atoms);
             case OTHER:
@@ -311,6 +311,34 @@ public class JaninoCompiler {
         List<SqlNode> operandList = sqlBasicCall.getOperandList();
         SqlDataTypeSpec sqlDataTypeSpec = (SqlDataTypeSpec) operandList.get(1);
         return generateTypeConvertMethod(sqlDataTypeSpec, atoms);
+    }
+
+    private static Java.Rvalue generateCompareOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (atoms.length != 2) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        String compareMethodName;
+        switch (sqlBasicCall.getKind()) {
+            case LESS_THAN:
+                compareMethodName = "LESS";
+                break;
+            case GREATER_THAN:
+                compareMethodName = "GREATER";
+                break;
+            case LESS_THAN_OR_EQUAL:
+                compareMethodName = "LESS_OR_EQUAL";
+                break;
+            case GREATER_THAN_OR_EQUAL:
+                compareMethodName = "GREATER_OR_EQUAL";
+                break;
+            default:
+                throw new ParseException(
+                        "Unsupported binary relation operator: "
+                                + sqlBasicCall.getKind().toString());
+        }
+        return new Java.MethodInvocation(
+                Location.NOWHERE, null, StringUtils.convertToCamelCase(compareMethodName), atoms);
     }
 
     private static Java.Rvalue generateOtherOperation(

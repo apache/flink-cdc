@@ -276,6 +276,19 @@ public class PostTransformOperatorTest {
                     .primaryKey("col1")
                     .build();
 
+    private static final TableId COMPARE_TABLEID =
+            TableId.tableId("my_company", "my_branch", "compare_table");
+    private static final Schema COMPARE_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("numerical_equal", DataTypes.BOOLEAN())
+                    .physicalColumn("string_equal", DataTypes.BOOLEAN())
+                    .physicalColumn("time_equal", DataTypes.BOOLEAN())
+                    .physicalColumn("timestamp_equal", DataTypes.BOOLEAN())
+                    .physicalColumn("date_equal", DataTypes.BOOLEAN())
+                    .primaryKey("col1")
+                    .build();
+
     @Test
     void testDataChangeEventTransform() throws Exception {
         PostTransformOperator transform =
@@ -1959,6 +1972,107 @@ public class PostTransformOperatorTest {
                 .hasRootCauseInstanceOf(DateTimeParseException.class)
                 .hasRootCauseMessage("Text '1.0' could not be parsed at index 0");
         transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testCompareTransform() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                COMPARE_TABLEID.identifier(),
+                                "col1, 2.1 > CAST(1 AS DOUBLE) as numerical_equal,"
+                                        + " '2024-01-01 00:00:00' < '2024-08-01 00:00:00' as string_equal,"
+                                        + " LOCALTIME <= CURRENT_TIME as time_equal,"
+                                        + " TO_TIMESTAMP('2024-01-01 00:00:00') <= TO_TIMESTAMP('2024-08-01 00:00:00') as timestamp_equal,"
+                                        + " TO_DATE(DATE_FORMAT(LOCALTIMESTAMP, 'yyyy-MM-dd')) >= TO_DATE(DATE_FORMAT(LOCALTIMESTAMP, 'yyyy-MM-dd')) as date_equal",
+                                "2 > 1")
+                        .addTimezone("UTC")
+                        .build();
+        EventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(COMPARE_TABLEID, COMPARE_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) COMPARE_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        COMPARE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), null, null, null, null, null
+                                }));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        COMPARE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), true, true, true, true, true
+                                }));
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(new CreateTableEvent(COMPARE_TABLEID, COMPARE_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+    }
+
+    @Test
+    void testCompareErrorTransform() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                COMPARE_TABLEID.identifier(),
+                                "col1, 2.1 > 1 as numerical_equal,"
+                                        + " '2024-01-01 00:00:00' < '2024-08-01 00:00:00' as string_equal,"
+                                        + " LOCALTIME <= CURRENT_TIME as time_equal,"
+                                        + " TO_TIMESTAMP('2024-01-01 00:00:00') <= TO_TIMESTAMP('2024-08-01 00:00:00') as timestamp_equal,"
+                                        + " TO_DATE(DATE_FORMAT(LOCALTIMESTAMP, 'yyyy-MM-dd')) >= TO_DATE(DATE_FORMAT(LOCALTIMESTAMP, 'yyyy-MM-dd')) as date_equal",
+                                "2 > 1")
+                        .addTimezone("UTC")
+                        .build();
+        EventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(COMPARE_TABLEID, COMPARE_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) COMPARE_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        COMPARE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), null, null, null, null, null
+                                }));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        COMPARE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"), true, true, true, true, true
+                                }));
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(new CreateTableEvent(COMPARE_TABLEID, COMPARE_SCHEMA)));
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            transform.processElement(new StreamRecord<>(insertEvent));
+                        })
+                .isExactlyInstanceOf(RuntimeException.class)
+                .hasRootCauseInstanceOf(ClassCastException.class)
+                .hasRootCauseMessage("java.lang.Integer cannot be cast to java.lang.Double");
     }
 
     @Test

@@ -263,7 +263,7 @@ public class TransformParserTest {
                 "TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\", __time_zone__)");
         testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt, __time_zone__)");
         testFilterExpression("TIMESTAMP_DIFF('DAY', dt1, dt2)", "timestampDiff(\"DAY\", dt1, dt2)");
-        testFilterExpression("IF(a>b,a,b)", "a > b ? a : b");
+        testFilterExpression("IF(a>b,a,b)", "greater(a, b) ? a : b");
         testFilterExpression("NULLIF(a,b)", "nullif(a, b)");
         testFilterExpression("COALESCE(a,b,c)", "coalesce(a, b, c)");
         testFilterExpression("id + 2", "id + 2");
@@ -271,17 +271,17 @@ public class TransformParserTest {
         testFilterExpression("id * 2", "id * 2");
         testFilterExpression("id / 2", "id / 2");
         testFilterExpression("id % 2", "id % 2");
-        testFilterExpression("a < b", "a < b");
-        testFilterExpression("a <= b", "a <= b");
-        testFilterExpression("a > b", "a > b");
-        testFilterExpression("a >= b", "a >= b");
+        testFilterExpression("a < b", "less(a, b)");
+        testFilterExpression("a <= b", "lessOrEqual(a, b)");
+        testFilterExpression("a > b", "greater(a, b)");
+        testFilterExpression("a >= b", "greaterOrEqual(a, b)");
         testFilterExpression("__table_name__ = 'tb'", "valueEquals(__table_name__, \"tb\")");
         testFilterExpression("__schema_name__ = 'tb'", "valueEquals(__schema_name__, \"tb\")");
         testFilterExpression(
                 "__namespace_name__ = 'tb'", "valueEquals(__namespace_name__, \"tb\")");
         testFilterExpression("upper(lower(id))", "upper(lower(id))");
         testFilterExpression(
-                "abs(uniq_id) > 10 and id is not null", "abs(uniq_id) > 10 && null != id");
+                "abs(uniq_id) > 10 and id is not null", "greater(abs(uniq_id), 10) && null != id");
         testFilterExpression(
                 "case id when 1 then 'a' when 2 then 'b' else 'c' end",
                 "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");

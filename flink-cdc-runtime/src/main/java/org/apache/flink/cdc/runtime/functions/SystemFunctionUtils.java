@@ -867,4 +867,32 @@ public class SystemFunctionUtils {
         }
         return String.valueOf(object);
     }
+
+    public static boolean greater(Comparable comparable1, Comparable comparable2) {
+        if (comparable1 == null || comparable2 == null) {
+            return false;
+        }
+        return comparable1.compareTo(comparable2) > 0;
+    }
+
+    public static boolean greaterOrEqual(Comparable comparable1, Comparable comparable2) {
+        if (comparable1 == null || comparable2 == null) {
+            return false;
+        }
+        return comparable1.compareTo(comparable2) >= 0;
+    }
+
+    public static boolean less(Comparable comparable1, Comparable comparable2) {
+        if (comparable1 == null || comparable2 == null) {
+            return false;
+        }
+        return comparable1.compareTo(comparable2) < 0;
+    }
+
+    public static boolean lessOrEqual(Comparable comparable1, Comparable comparable2) {
+        if (comparable1 == null || comparable2 == null) {
+            return false;
+        }
+        return comparable1.compareTo(comparable2) <= 0;
+    }
 }
