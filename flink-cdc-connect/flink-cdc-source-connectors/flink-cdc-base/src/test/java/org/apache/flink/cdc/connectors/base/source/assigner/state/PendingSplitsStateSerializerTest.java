@@ -180,7 +180,6 @@ public class PendingSplitsStateSerializerTest {
                 Arrays.asList(TableId.parse("catalog2.schema2.table2")),
                 true,
                 true,
-                new HashMap<>(),
                 new HashMap<>());
     }
 

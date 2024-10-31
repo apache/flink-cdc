@@ -85,7 +85,6 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
 
     private SourceEnumeratorMetrics enumeratorMetrics;
     private final Map<String, Long> splitFinishedCheckpointIds;
-    private final Map<TableId, Set<String>> finishedSplits;
     private static final long UNDEFINED_CHECKPOINT_ID = -1;
 
     public SnapshotSplitAssigner(
@@ -109,7 +108,6 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 true,
                 dialect,
                 offsetFactory,
-                new ConcurrentHashMap<>(),
                 new ConcurrentHashMap<>());
     }
 
@@ -133,7 +131,6 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 checkpoint.isRemainingTablesCheckpointed(),
                 dialect,
                 offsetFactory,
-                new ConcurrentHashMap<>(),
                 new ConcurrentHashMap<>());
     }
 
@@ -151,8 +148,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             boolean isRemainingTablesCheckpointed,
             DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory,
-            Map<String, Long> splitFinishedCheckpointIds,
-            Map<TableId, Set<String>> finishedSplits) {
+            Map<String, Long> splitFinishedCheckpointIds) {
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
@@ -177,7 +173,6 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         this.dialect = dialect;
         this.offsetFactory = offsetFactory;
         this.splitFinishedCheckpointIds = splitFinishedCheckpointIds;
-        this.finishedSplits = finishedSplits;
     }
 
     @Override
@@ -302,10 +297,15 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                     .getTableMetrics(snapshotSplit.getTableId())
                     .addProcessedSplit(snapshotSplit.splitId());
         }
-        for (Map.Entry<TableId, Set<String>> tableFinishedSplits : finishedSplits.entrySet()) {
-            this.enumeratorMetrics
-                    .getTableMetrics(tableFinishedSplits.getKey())
-                    .addFinishedSplits(tableFinishedSplits.getValue());
+        for (String splitId : splitFinishedOffsets.keySet()) {
+            String[] splits = splitId.split(":");
+            if (splits.length == 2) {
+                TableId tableId = TableId.parse(splits[0]);
+                this.enumeratorMetrics.getTableMetrics(tableId).addFinishedSplit(splitId);
+            } else {
+                throw new IllegalArgumentException(
+                        "SplitId " + splitId + " is malformed, please refer to the documents");
+            }
         }
     }
 
@@ -437,10 +437,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                     .getTableMetrics(split.asSnapshotSplit().getTableId())
                     .reprocessSplit(split.splitId());
             TableId tableId = split.asSnapshotSplit().getTableId();
-            if (finishedSplits.containsKey(tableId)) {
-                finishedSplits.get(tableId).remove(split.splitId());
-                enumeratorMetrics.getTableMetrics(tableId).removeFinishedSplit(split.splitId());
-            }
+
+            enumeratorMetrics.getTableMetrics(tableId).removeFinishedSplit(split.splitId());
         }
     }
 
@@ -454,10 +452,10 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 }
             }
         }
-        LOG.info("SnapshotSplitAssigner snapshotState on checkpoint {} with splitFinishedCheckpointIds size {}, finishedSplits size {}.",
-               checkpointId,
-                splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size(),
-                finishedSplits == null ? 0 : finishedSplits.size());
+        LOG.info(
+                "SnapshotSplitAssigner snapshotState on checkpoint {} with splitFinishedCheckpointIds size {}.",
+                checkpointId,
+                splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size());
 
         SnapshotPendingSplitsState state =
                 new SnapshotPendingSplitsState(
@@ -470,8 +468,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                         remainingTables,
                         isTableIdCaseSensitive,
                         true,
-                        splitFinishedCheckpointIds,
-                        finishedSplits);
+                        splitFinishedCheckpointIds);
         // we need a complete checkpoint before mark this assigner to be finished, to wait for all
         // records of snapshot splits are completely processed
         if (checkpointIdToFinish == null
@@ -507,17 +504,13 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                     // record table-level splits metrics
                     TableId tableId = SnapshotSplit.parseTableId(splitId);
                     enumeratorMetrics.getTableMetrics(tableId).addFinishedSplit(splitId);
-                    finishedSplits.put(
-                            tableId,
-                            enumeratorMetrics.getTableMetrics(tableId).getFinishedSplitIds());
                     iterator.remove();
                 }
             }
             LOG.info(
-                    "Checkpoint completed on checkpoint {} with splitFinishedCheckpointIds size {}, finishedSplits size {}.",
+                    "Checkpoint completed on checkpoint {} with splitFinishedCheckpointIds size {}.",
                     checkpointId,
-                    splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size(),
-                    finishedSplits == null ? 0 : finishedSplits.size());
+                    splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size());
         }
     }
 
