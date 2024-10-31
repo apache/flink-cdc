@@ -419,7 +419,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         env.setRestartStrategy(RestartStrategies.noRestart());
 
         long currentScn = 0L;
-        try (Connection connection = getJdbcConnection();
+        try (Connection connection = getJdbcConnectionAsDBA();
                 Statement statement = connection.createStatement()) {
 
             // get current scn
