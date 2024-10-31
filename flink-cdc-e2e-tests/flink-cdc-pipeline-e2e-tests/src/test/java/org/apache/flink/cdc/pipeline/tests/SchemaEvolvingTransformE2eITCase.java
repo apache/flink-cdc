@@ -114,9 +114,8 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                 false,
                 false,
                 Collections.emptyList(),
-                Arrays.asList(
-                        "java.lang.IllegalStateException: Incompatible types: \"INT\" and \"DOUBLE\"",
-                        "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
+                Collections.singletonList(
+                        "java.lang.IllegalStateException: Incompatible types: \"INT\" and \"DOUBLE\""));
     }
 
     @Test
@@ -129,8 +128,7 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                 Collections.emptyList(),
                 Arrays.asList(
                         "Failed to apply schema change AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} to table %s.members. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
-                        "UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
-                        "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
+                        "UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}"));
     }
 
     @Test
@@ -232,7 +230,8 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: unexpected\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -310,7 +309,8 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: %s\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,

@@ -118,7 +118,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: ID, VERSION\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -201,7 +202,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "    filter: ID <= 1008\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -289,7 +291,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: ID, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEBETA) AS NAME\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -368,7 +371,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: \\*, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEBETA) AS NAME\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -450,7 +454,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -535,7 +540,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLE\\.*\n"
                                 + "    projection: \\*, ID + 1000 as UID, VERSION AS NEWVERSION\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -619,7 +625,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: ID, CAST(VERSION AS DOUBLE) + 100 AS VERSION, CAST(AGEBETA AS VARCHAR) || ' - ' || NAMEBETA AS IDENTIFIER\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -701,7 +708,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
-                                + "  local-time-zone: America/Los_Angeles",
+                                + "  local-time-zone: America/Los_Angeles\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -739,7 +747,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "    filter: ID > 1008\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
-                                + "  schema.change.behavior: evolve",
+                                + "  schema.change.behavior: evolve\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -838,7 +847,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "    filter: ID > 1008\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
-                                + "  schema.change.behavior: evolve",
+                                + "  schema.change.behavior: evolve\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -945,7 +955,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "    filter: ID > 1008\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
-                                + "  schema.change.behavior: evolve",
+                                + "  schema.change.behavior: evolve\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,

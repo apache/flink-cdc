@@ -104,7 +104,8 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                                 + "  type: values\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -213,6 +214,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s\n"
                                 + "  schema.change.behavior: evolve",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
@@ -386,6 +388,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s\n"
                                 + "  schema.change.behavior: evolve",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,

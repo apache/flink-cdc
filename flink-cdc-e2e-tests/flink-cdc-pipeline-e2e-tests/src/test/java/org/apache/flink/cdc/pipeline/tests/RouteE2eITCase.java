@@ -154,7 +154,8 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "  type: values\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -249,7 +250,8 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: %s.ALL\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -333,7 +335,8 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: NEW_%s.ALPHABET\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -431,7 +434,8 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: NEW_%s.BETAGAMM\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -539,7 +543,8 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: NEW_%s.TABLEC\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -652,7 +657,8 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: %s.ALL\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -739,7 +745,8 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    replace-symbol: <>\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,

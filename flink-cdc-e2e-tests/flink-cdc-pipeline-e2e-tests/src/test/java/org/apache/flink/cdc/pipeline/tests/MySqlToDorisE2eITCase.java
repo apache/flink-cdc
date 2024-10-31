@@ -194,7 +194,8 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                 + "  table.create.properties.replication_num: 1\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         mysqlInventoryDatabase.getDatabaseName(),
@@ -325,7 +326,8 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                 + "    projection: \\*, 'fine' AS FINE\n"
                                 + "    filter: id <> 3 AND id <> 4\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema-operator.rpc-timeout: 10s",
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         complexDataTypesDatabase.getDatabaseName(),
