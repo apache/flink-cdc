@@ -54,7 +54,7 @@ class PrePartitionOperatorTest {
                 createTestHarness()) {
             // Initialization
             testHarness.open();
-            testHarness.registerTableSchema(CUSTOMERS, CUSTOMERS_SCHEMA);
+            testHarness.registerTableSchema(CUSTOMERS, CUSTOMERS_SCHEMA, 0);
 
             // CreateTableEvent
             PrePartitionOperator operator = testHarness.getOperator();
@@ -72,13 +72,15 @@ class PrePartitionOperatorTest {
     void testBroadcastingFlushEvent() throws Exception {
         try (EventOperatorTestHarness<PrePartitionOperator, PartitioningEvent> testHarness =
                 createTestHarness()) {
+            long nonce = 123456789L;
+
             // Initialization
             testHarness.open();
-            testHarness.registerTableSchema(CUSTOMERS, CUSTOMERS_SCHEMA);
+            testHarness.registerTableSchema(CUSTOMERS, CUSTOMERS_SCHEMA, nonce);
 
             // FlushEvent
             PrePartitionOperator operator = testHarness.getOperator();
-            FlushEvent flushEvent = new FlushEvent(CUSTOMERS);
+            FlushEvent flushEvent = new FlushEvent(CUSTOMERS, nonce);
             operator.processElement(new StreamRecord<>(flushEvent));
             assertThat(testHarness.getOutputRecords()).hasSize(DOWNSTREAM_PARALLELISM);
             for (int i = 0; i < DOWNSTREAM_PARALLELISM; i++) {
@@ -94,7 +96,7 @@ class PrePartitionOperatorTest {
                 createTestHarness()) {
             // Initialization
             testHarness.open();
-            testHarness.registerTableSchema(CUSTOMERS, CUSTOMERS_SCHEMA);
+            testHarness.registerTableSchema(CUSTOMERS, CUSTOMERS_SCHEMA, 0L);
 
             // DataChangeEvent
             PrePartitionOperator operator = testHarness.getOperator();

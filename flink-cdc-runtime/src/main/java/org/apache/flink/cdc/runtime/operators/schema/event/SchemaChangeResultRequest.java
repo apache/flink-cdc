@@ -28,4 +28,33 @@ import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 public class SchemaChangeResultRequest implements CoordinationRequest {
 
     private static final long serialVersionUID = 1L;
+
+    /** Nonce code to distinguish between different events from different subTasks. */
+    private final long nonce;
+
+    public SchemaChangeResultRequest(long nonce) {
+        this.nonce = nonce;
+    }
+
+    public long getNonce() {
+        return nonce;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        SchemaChangeResultRequest that = (SchemaChangeResultRequest) o;
+        return nonce == that.nonce;
+    }
+
+    @Override
+    public int hashCode() {
+        return Long.hashCode(nonce);
+    }
 }

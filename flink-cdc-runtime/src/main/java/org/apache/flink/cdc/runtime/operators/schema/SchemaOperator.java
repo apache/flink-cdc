@@ -51,6 +51,7 @@ import org.apache.flink.cdc.runtime.operators.schema.event.SchemaChangeResultRes
 import org.apache.flink.cdc.runtime.operators.schema.metrics.SchemaOperatorMetrics;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.cdc.runtime.typeutils.NonceUtils;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
@@ -83,6 +84,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
@@ -127,6 +129,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     private transient SchemaOperatorMetrics schemaOperatorMetrics;
     private transient int subTaskId;
+
+    private transient AtomicInteger schemaEvolutionVersionCode;
 
     @VisibleForTesting
     public SchemaOperator(List<RouteRule> routingRules) {
@@ -177,6 +181,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 new SchemaOperatorMetrics(
                         getRuntimeContext().getMetricGroup(), schemaChangeBehavior);
         subTaskId = getRuntimeContext().getIndexOfThisSubtask();
+        schemaEvolutionVersionCode = new AtomicInteger();
     }
 
     @Override
@@ -439,16 +444,24 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                             schemaChangeEvent));
         }
 
+        long nonce =
+                NonceUtils.generateNonce(
+                        schemaEvolutionVersionCode.incrementAndGet(),
+                        subTaskId,
+                        tableId,
+                        schemaChangeEvent);
+
+        LOG.info("{}> Sending the FlushEvent for table {} (nonce: {}).", subTaskId, tableId, nonce);
+        output.collect(new StreamRecord<>(new FlushEvent(tableId, nonce)));
+
         // The request will block if another schema change event is being handled
-        SchemaChangeResponse response = requestSchemaChange(tableId, schemaChangeEvent);
+        SchemaChangeResponse response = requestSchemaChange(tableId, schemaChangeEvent, nonce);
         if (response.isAccepted()) {
-            LOG.info("{}> Sending the FlushEvent for table {}.", subTaskId, tableId);
-            output.collect(new StreamRecord<>(new FlushEvent(tableId)));
             List<SchemaChangeEvent> expectedSchemaChangeEvents = response.getSchemaChangeEvents();
             schemaOperatorMetrics.increaseSchemaChangeEvents(expectedSchemaChangeEvents.size());
 
             // The request will block until flushing finished in each sink writer
-            SchemaChangeResultResponse schemaEvolveResponse = requestSchemaChangeResult();
+            SchemaChangeResultResponse schemaEvolveResponse = requestSchemaChangeResult(nonce);
             List<SchemaChangeEvent> finishedSchemaChangeEvents =
                     schemaEvolveResponse.getFinishedSchemaChangeEvents();
 
@@ -470,37 +483,44 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     }
 
     private SchemaChangeResponse requestSchemaChange(
-            TableId tableId, SchemaChangeEvent schemaChangeEvent)
+            TableId tableId, SchemaChangeEvent schemaChangeEvent, long nonce)
             throws InterruptedException, TimeoutException {
         long schemaEvolveTimeOutMillis = System.currentTimeMillis() + rpcTimeOutInMillis;
         while (true) {
             SchemaChangeResponse response =
                     sendRequestToCoordinator(
-                            new SchemaChangeRequest(tableId, schemaChangeEvent, subTaskId));
-            if (response.isRegistryBusy()) {
-                if (System.currentTimeMillis() < schemaEvolveTimeOutMillis) {
+                            new SchemaChangeRequest(tableId, schemaChangeEvent, subTaskId, nonce));
+            if (System.currentTimeMillis() < schemaEvolveTimeOutMillis) {
+                if (response.isRegistryBusy()) {
                     LOG.info(
                             "{}> Schema Registry is busy now, waiting for next request...",
                             subTaskId);
                     Thread.sleep(1000);
+                } else if (response.isWaitingForFlush()) {
+                    LOG.info(
+                            "{}> Schema change event (with once {}) has not collected enough flush success events from writers, waiting...",
+                            subTaskId,
+                            nonce);
+                    Thread.sleep(1000);
                 } else {
-                    throw new TimeoutException("TimeOut when requesting schema change");
+                    return response;
                 }
             } else {
-                return response;
+                throw new TimeoutException("TimeOut when requesting schema change");
             }
         }
     }
 
-    private SchemaChangeResultResponse requestSchemaChangeResult()
+    private SchemaChangeResultResponse requestSchemaChangeResult(long nonce)
             throws InterruptedException, TimeoutException {
         CoordinationResponse coordinationResponse =
-                sendRequestToCoordinator(new SchemaChangeResultRequest());
+                sendRequestToCoordinator(new SchemaChangeResultRequest(nonce));
         long nextRpcTimeOutMillis = System.currentTimeMillis() + rpcTimeOutInMillis;
         while (coordinationResponse instanceof SchemaChangeProcessingResponse) {
             if (System.currentTimeMillis() < nextRpcTimeOutMillis) {
                 Thread.sleep(1000);
-                coordinationResponse = sendRequestToCoordinator(new SchemaChangeResultRequest());
+                coordinationResponse =
+                        sendRequestToCoordinator(new SchemaChangeResultRequest(nonce));
             } else {
                 throw new TimeoutException("TimeOut when requesting release upstream");
             }

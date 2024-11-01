@@ -27,8 +27,8 @@ public class BucketWrapperFlushEvent extends FlushEvent implements BucketWrapper
 
     private final int bucket;
 
-    public BucketWrapperFlushEvent(int bucket, TableId tableId) {
-        super(tableId);
+    public BucketWrapperFlushEvent(int bucket, TableId tableId, long nonce) {
+        super(tableId, nonce);
         this.bucket = bucket;
     }
 

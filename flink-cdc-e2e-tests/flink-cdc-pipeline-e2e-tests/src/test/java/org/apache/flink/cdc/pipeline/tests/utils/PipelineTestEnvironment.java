@@ -230,6 +230,10 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                 JobStatusMessage message = jobStatusMessages.iterator().next();
                 JobStatus jobStatus = message.getJobState();
                 if (jobStatus.isTerminalState()) {
+                    System.out.println("JM Log: ");
+                    System.out.println(jobManagerConsumer.toUtf8String());
+                    System.out.println("TM Log: ");
+                    System.out.println(taskManagerConsumer.toUtf8String());
                     throw new ValidationException(
                             String.format(
                                     "Job has been terminated! JobName: %s, JobID: %s, Status: %s",
