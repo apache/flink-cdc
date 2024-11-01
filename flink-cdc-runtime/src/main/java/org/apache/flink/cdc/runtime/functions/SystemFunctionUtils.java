@@ -868,31 +868,48 @@ public class SystemFunctionUtils {
         return String.valueOf(object);
     }
 
-    public static boolean greater(Comparable comparable1, Comparable comparable2) {
-        if (comparable1 == null || comparable2 == null) {
-            return false;
+    private static int universalCompares(Object lhs, Object rhs) {
+        Class<?> leftClass = lhs.getClass();
+        Class<?> rightClass = rhs.getClass();
+        if (leftClass.equals(rightClass) && Comparable.class.isAssignableFrom(leftClass)) {
+            return ((Comparable) lhs).compareTo(rhs);
+        } else if (Number.class.isAssignableFrom(leftClass)
+                && Number.class.isAssignableFrom(rightClass)) {
+            return Double.compare(((Number) lhs).doubleValue(), ((Number) rhs).doubleValue());
+        } else {
+            throw new RuntimeException(
+                    "Comparison of unsupported data types: "
+                            + leftClass.getName()
+                            + " and "
+                            + rightClass.getName());
         }
-        return comparable1.compareTo(comparable2) > 0;
     }
 
-    public static boolean greaterOrEqual(Comparable comparable1, Comparable comparable2) {
-        if (comparable1 == null || comparable2 == null) {
+    public static boolean greaterThan(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
             return false;
         }
-        return comparable1.compareTo(comparable2) >= 0;
+        return universalCompares(lhs, rhs) > 0;
     }
 
-    public static boolean less(Comparable comparable1, Comparable comparable2) {
-        if (comparable1 == null || comparable2 == null) {
+    public static boolean greaterThanOrEqual(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
             return false;
         }
-        return comparable1.compareTo(comparable2) < 0;
+        return universalCompares(lhs, rhs) >= 0;
     }
 
-    public static boolean lessOrEqual(Comparable comparable1, Comparable comparable2) {
-        if (comparable1 == null || comparable2 == null) {
+    public static boolean lessThan(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
             return false;
         }
-        return comparable1.compareTo(comparable2) <= 0;
+        return universalCompares(lhs, rhs) < 0;
+    }
+
+    public static boolean lessThanOrEqual(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) <= 0;
     }
 }

@@ -321,16 +321,16 @@ public class JaninoCompiler {
         String compareMethodName;
         switch (sqlBasicCall.getKind()) {
             case LESS_THAN:
-                compareMethodName = "LESS";
+                compareMethodName = "LESS_THAN";
                 break;
             case GREATER_THAN:
-                compareMethodName = "GREATER";
+                compareMethodName = "GREATER_THAN";
                 break;
             case LESS_THAN_OR_EQUAL:
-                compareMethodName = "LESS_OR_EQUAL";
+                compareMethodName = "LESS_THAN_OR_EQUAL";
                 break;
             case GREATER_THAN_OR_EQUAL:
-                compareMethodName = "GREATER_OR_EQUAL";
+                compareMethodName = "GREATER_THAN_OR_EQUAL";
                 break;
             default:
                 throw new ParseException(

@@ -263,7 +263,7 @@ public class TransformParserTest {
                 "TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\", __time_zone__)");
         testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt, __time_zone__)");
         testFilterExpression("TIMESTAMP_DIFF('DAY', dt1, dt2)", "timestampDiff(\"DAY\", dt1, dt2)");
-        testFilterExpression("IF(a>b,a,b)", "greater(a, b) ? a : b");
+        testFilterExpression("IF(a>b,a,b)", "greaterThan(a, b) ? a : b");
         testFilterExpression("NULLIF(a,b)", "nullif(a, b)");
         testFilterExpression("COALESCE(a,b,c)", "coalesce(a, b, c)");
         testFilterExpression("id + 2", "id + 2");
@@ -271,17 +271,18 @@ public class TransformParserTest {
         testFilterExpression("id * 2", "id * 2");
         testFilterExpression("id / 2", "id / 2");
         testFilterExpression("id % 2", "id % 2");
-        testFilterExpression("a < b", "less(a, b)");
-        testFilterExpression("a <= b", "lessOrEqual(a, b)");
-        testFilterExpression("a > b", "greater(a, b)");
-        testFilterExpression("a >= b", "greaterOrEqual(a, b)");
+        testFilterExpression("a < b", "lessThan(a, b)");
+        testFilterExpression("a <= b", "lessThanOrEqual(a, b)");
+        testFilterExpression("a > b", "greaterThan(a, b)");
+        testFilterExpression("a >= b", "greaterThanOrEqual(a, b)");
         testFilterExpression("__table_name__ = 'tb'", "valueEquals(__table_name__, \"tb\")");
         testFilterExpression("__schema_name__ = 'tb'", "valueEquals(__schema_name__, \"tb\")");
         testFilterExpression(
                 "__namespace_name__ = 'tb'", "valueEquals(__namespace_name__, \"tb\")");
         testFilterExpression("upper(lower(id))", "upper(lower(id))");
         testFilterExpression(
-                "abs(uniq_id) > 10 and id is not null", "greater(abs(uniq_id), 10) && null != id");
+                "abs(uniq_id) > 10 and id is not null",
+                "greaterThan(abs(uniq_id), 10) && null != id");
         testFilterExpression(
                 "case id when 1 then 'a' when 2 then 'b' else 'c' end",
                 "(valueEquals(id, 1) ? \"a\" : valueEquals(id, 2) ? \"b\" : \"c\")");
@@ -474,10 +475,10 @@ public class TransformParserTest {
                 "typeof(id % 2)", "__instanceOfTypeOfFunctionClass.eval(id % 2)");
         testFilterExpressionWithUdf(
                 "addone(addone(id)) > 4 OR typeof(id) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greater(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(id)) > 4 OR TYPEOF(id) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greater(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
     }
 
     @Test
