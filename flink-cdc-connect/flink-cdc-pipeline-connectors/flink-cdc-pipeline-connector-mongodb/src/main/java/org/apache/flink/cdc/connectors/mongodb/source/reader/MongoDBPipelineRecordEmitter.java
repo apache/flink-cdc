@@ -112,8 +112,9 @@ public class MongoDBPipelineRecordEmitter extends MongoDBRecordEmitter<Event> {
 
     private Schema getSchema(TableId tableId) {
         return Schema.newBuilder()
-                .physicalColumn("_id", DataTypes.STRING())
+                .physicalColumn("_id", DataTypes.STRING().notNull())
                 .physicalColumn("fullDocument", DataTypes.STRING())
+                .primaryKey(Collections.singletonList("_id"))
                 .build();
     }
 }

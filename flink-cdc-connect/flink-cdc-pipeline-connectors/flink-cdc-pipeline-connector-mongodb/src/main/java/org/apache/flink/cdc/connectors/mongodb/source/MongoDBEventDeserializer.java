@@ -90,10 +90,10 @@ public class MongoDBEventDeserializer extends SourceRecordEventDeserializer
     private final SchemaParseMode schemaParseMode;
 
     private static final RowType recordIdRowType =
-            DataTypes.ROW(DataTypes.FIELD("_id", DataTypes.STRING()));
+            DataTypes.ROW(DataTypes.FIELD("_id", DataTypes.STRING().notNull()));
     private static final RowType jsonRowType =
             DataTypes.ROW(
-                    DataTypes.FIELD("_id", DataTypes.STRING()),
+                    DataTypes.FIELD("_id", DataTypes.STRING().notNull()),
                     DataTypes.FIELD("fullDocument", DataTypes.STRING()));
 
     private static final Map<DataType, DeserializationRuntimeConverter> CONVERTERS =
