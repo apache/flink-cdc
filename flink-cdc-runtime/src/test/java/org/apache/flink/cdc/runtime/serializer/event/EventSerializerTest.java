@@ -47,9 +47,9 @@ public class EventSerializerTest extends SerializerTestBase<Event> {
     protected Event[] getTestData() {
         Event[] flushEvents =
                 new Event[] {
-                    new FlushEvent(TableId.tableId("table")),
-                    new FlushEvent(TableId.tableId("schema", "table")),
-                    new FlushEvent(TableId.tableId("namespace", "schema", "table"))
+                    new FlushEvent(TableId.tableId("table"), 1L),
+                    new FlushEvent(TableId.tableId("schema", "table"), 2L),
+                    new FlushEvent(TableId.tableId("namespace", "schema", "table"), 3L)
                 };
         Event[] dataChangeEvents = new DataChangeEventSerializerTest().getTestData();
         Event[] schemaChangeEvents = new SchemaChangeEventSerializerTest().getTestData();

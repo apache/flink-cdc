@@ -61,7 +61,9 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
     @Override
     public Event copy(Event from) {
         if (from instanceof FlushEvent) {
-            return new FlushEvent(tableIdSerializer.copy(((FlushEvent) from).getTableId()));
+            return new FlushEvent(
+                    tableIdSerializer.copy(((FlushEvent) from).getTableId()),
+                    ((FlushEvent) from).getNonce());
         } else if (from instanceof SchemaChangeEvent) {
             return schemaChangeEventSerializer.copy((SchemaChangeEvent) from);
         } else if (from instanceof DataChangeEvent) {
@@ -85,6 +87,7 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
         if (record instanceof FlushEvent) {
             enumSerializer.serialize(EventClass.FLUSH_EVENT, target);
             tableIdSerializer.serialize(((FlushEvent) record).getTableId(), target);
+            target.writeLong(((FlushEvent) record).getNonce());
         } else if (record instanceof SchemaChangeEvent) {
             enumSerializer.serialize(EventClass.SCHEME_CHANGE_EVENT, target);
             schemaChangeEventSerializer.serialize((SchemaChangeEvent) record, target);
@@ -101,7 +104,7 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
         EventClass eventClass = enumSerializer.deserialize(source);
         switch (eventClass) {
             case FLUSH_EVENT:
-                return new FlushEvent(tableIdSerializer.deserialize(source));
+                return new FlushEvent(tableIdSerializer.deserialize(source), source.readLong());
             case DATA_CHANGE_EVENT:
                 return dataChangeEventSerializer.deserialize(source);
             case SCHEME_CHANGE_EVENT:

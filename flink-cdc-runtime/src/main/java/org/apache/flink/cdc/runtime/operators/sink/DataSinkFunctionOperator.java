@@ -113,7 +113,7 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
     private void handleFlushEvent(FlushEvent event) throws Exception {
         userFunction.finish();
         schemaEvolutionClient.notifyFlushSuccess(
-                getRuntimeContext().getIndexOfThisSubtask(), event.getTableId());
+                getRuntimeContext().getIndexOfThisSubtask(), event.getTableId(), event.getNonce());
     }
 
     private void emitLatestSchema(TableId tableId) throws Exception {

@@ -180,13 +180,12 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                         if (event instanceof FlushSuccessEvent) {
                             FlushSuccessEvent flushSuccessEvent = (FlushSuccessEvent) event;
                             LOG.info(
-                                    "Sink subtask {} succeed flushing for table {}.",
+                                    "Sink subtask {} succeed flushing for table {} (nonce: {}).",
                                     flushSuccessEvent.getSubtask(),
-                                    flushSuccessEvent.getTableId().toString());
+                                    flushSuccessEvent.getTableId().toString(),
+                                    flushSuccessEvent.getNonce());
                             requestHandler.flushSuccess(
-                                    flushSuccessEvent.getTableId(),
-                                    flushSuccessEvent.getSubtask(),
-                                    currentParallelism);
+                                    flushSuccessEvent.getSubtask(), flushSuccessEvent.getNonce());
                         } else if (event instanceof SinkWriterRegisterEvent) {
                             requestHandler.registerSinkWriter(
                                     ((SinkWriterRegisterEvent) event).getSubtask());
@@ -273,7 +272,8 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
                             requestHandler.handleSchemaChangeRequest(
                                     schemaChangeRequest, responseFuture);
                         } else if (request instanceof SchemaChangeResultRequest) {
-                            requestHandler.getSchemaChangeResult(responseFuture);
+                            requestHandler.getSchemaChangeResult(
+                                    (SchemaChangeResultRequest) request, responseFuture);
                         } else if (request instanceof GetEvolvedSchemaRequest) {
                             handleGetEvolvedSchemaRequest(
                                     ((GetEvolvedSchemaRequest) request), responseFuture);

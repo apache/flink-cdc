@@ -57,6 +57,10 @@ public class SchemaChangeResponse implements CoordinationResponse {
         return new SchemaChangeResponse(Collections.emptyList(), ResponseCode.IGNORED);
     }
 
+    public static SchemaChangeResponse waitingForFlush() {
+        return new SchemaChangeResponse(Collections.emptyList(), ResponseCode.WAITING_FOR_FLUSH);
+    }
+
     private SchemaChangeResponse(
             List<SchemaChangeEvent> schemaChangeEvents, ResponseCode responseCode) {
         this.schemaChangeEvents = schemaChangeEvents;
@@ -77,6 +81,10 @@ public class SchemaChangeResponse implements CoordinationResponse {
 
     public boolean isIgnored() {
         return ResponseCode.IGNORED.equals(responseCode);
+    }
+
+    public boolean isWaitingForFlush() {
+        return ResponseCode.WAITING_FOR_FLUSH.equals(responseCode);
     }
 
     public List<SchemaChangeEvent> getSchemaChangeEvents() {
@@ -129,6 +137,7 @@ public class SchemaChangeResponse implements CoordinationResponse {
         ACCEPTED,
         BUSY,
         DUPLICATE,
-        IGNORED
+        IGNORED,
+        WAITING_FOR_FLUSH
     }
 }
