@@ -97,7 +97,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
 
     private final OperatorCoordinator.Context context;
 
-    private int parallelism;
+    private final int parallelism;
 
     public SchemaRegistryRequestHandler(
             MetadataApplier metadataApplier,
@@ -121,7 +121,9 @@ public class SchemaRegistryRequestHandler implements Closeable {
         this.schemaChangeStatus = RequestStatus.IDLE;
         this.schemaChangeRequestLock = new Object();
 
-        this.parallelism = context.currentParallelism();
+        // This check is meant to allow migration test pass since we don't have a valid
+        // `OperatorCoordinator.Context` in mocked environment.
+        this.parallelism = context != null ? context.currentParallelism() : 0;
     }
 
     /**
