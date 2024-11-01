@@ -151,7 +151,10 @@ public class MongoDBEventDeserializer extends SourceRecordEventDeserializer
             case UPDATE:
                 return Collections.singletonList(
                         DataChangeEvent.updateEvent(
-                                tableId, extractAfterDataRecord(fullDocument), extractAfterDataRecord(fullDocument), meta));
+                                tableId,
+                                extractAfterDataRecord(fullDocument),
+                                extractAfterDataRecord(fullDocument),
+                                meta));
             case REPLACE:
             case INVALIDATE:
             case DROP:
