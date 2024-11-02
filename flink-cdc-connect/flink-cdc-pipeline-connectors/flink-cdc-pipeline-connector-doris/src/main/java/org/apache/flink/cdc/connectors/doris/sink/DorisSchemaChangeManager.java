@@ -33,15 +33,15 @@ public class DorisSchemaChangeManager extends SchemaChangeManager {
 
     public boolean truncateTable(String databaseName, String tableName)
             throws IOException, IllegalArgumentException {
-        String createTableDDL =
+        String truncateTableDDL =
                 "TRUNCATE TABLE " + identifier(databaseName) + "." + identifier(tableName);
-        return this.execute(createTableDDL, databaseName);
+        return this.execute(truncateTableDDL, databaseName);
     }
 
     public boolean dropTable(String databaseName, String tableName)
             throws IOException, IllegalArgumentException {
-        String createTableDDL =
+        String dropTableDDL =
                 "DROP TABLE " + identifier(databaseName) + "." + identifier(tableName);
-        return this.execute(createTableDDL, databaseName);
+        return this.execute(dropTableDDL, databaseName);
     }
 }
