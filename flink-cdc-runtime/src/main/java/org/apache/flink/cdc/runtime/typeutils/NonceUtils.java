@@ -21,13 +21,27 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
 
-import java.util.Objects;
-
 /** Generates schema evolution nonce value. */
 public class NonceUtils {
+
+    /** Calculates a hashCode with Long type instead of Integer. */
+    public static long longHash(Object... a) {
+        if (a == null) {
+            return 0;
+        }
+
+        long result = 1;
+
+        for (Object element : a) {
+            result = 31L * result + (element == null ? 0 : element.hashCode());
+        }
+
+        return result;
+    }
+
     public static long generateNonce(
             int versionCode, int subTaskId, TableId tableId, Event schemaChangeEvent) {
-        return Objects.hash(versionCode, subTaskId, tableId, schemaChangeEvent);
+        return longHash(versionCode, subTaskId, tableId, schemaChangeEvent);
     }
 
     public static FlushEvent generateFlushEvent(
