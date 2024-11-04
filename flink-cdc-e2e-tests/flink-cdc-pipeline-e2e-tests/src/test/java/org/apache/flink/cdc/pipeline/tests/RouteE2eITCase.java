@@ -819,7 +819,27 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
     @Test
     public void testExtremeMergeTableRoute() throws Exception {
-        extremeRouteTestDatabase.createAndInitialize();
+        final String databaseName = extremeRouteTestDatabase.getDatabaseName();
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                MYSQL.getJdbcUrl(), MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute(String.format("CREATE DATABASE %s;", databaseName));
+            stat.execute(String.format("USE %s;", databaseName));
+            for (int i = 1; i <= 100; i++) {
+                stat.execute(String.format("DROP TABLE IF EXISTS TABLE%d;", i));
+                stat.execute(
+                        String.format(
+                                "CREATE TABLE TABLE%d (ID INT NOT NULL PRIMARY KEY,VERSION VARCHAR(17));",
+                                i));
+                stat.execute(String.format("INSERT INTO TABLE%d VALUES (%d, 'No.%d');", i, i, i));
+            }
+        } catch (SQLException e) {
+            LOG.error("Initialize table failed.", e);
+            throw e;
+        }
+        LOG.info("Table initialized successfully.");
+
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -840,7 +860,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
-                        extremeRouteTestDatabase.getDatabaseName(),
+                        databaseName,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -856,7 +876,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 i ->
                                         String.format(
                                                 "> CreateTableEvent{tableId=%s.TABLE%d, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                                                extremeRouteTestDatabase.getDatabaseName(), i))
+                                                databaseName, i))
                         .toArray(String[]::new));
 
         LOG.info("Verifying DataChangeEvents...");
@@ -867,10 +887,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 i ->
                                         String.format(
                                                 "> DataChangeEvent{tableId=%s.TABLE%d, before=[], after=[%d, No.%d], op=INSERT, meta=()}",
-                                                extremeRouteTestDatabase.getDatabaseName(),
-                                                i,
-                                                i,
-                                                i))
+                                                databaseName, i, i, i))
                         .toArray(String[]::new));
     }
 
