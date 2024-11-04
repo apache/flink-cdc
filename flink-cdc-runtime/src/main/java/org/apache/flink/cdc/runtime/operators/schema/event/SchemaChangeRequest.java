@@ -38,7 +38,10 @@ public class SchemaChangeRequest implements CoordinationRequest {
     private final SchemaChangeEvent schemaChangeEvent;
     /** The ID of subTask that initiated the request. */
     private final int subTaskId;
-    /** Nonce code to distinguish between different events from different subTasks. */
+    /**
+     * Nonce code to distinguish flush events corresponding to each schema change event from
+     * different subTasks.
+     */
     private final long nonce;
 
     public SchemaChangeRequest(

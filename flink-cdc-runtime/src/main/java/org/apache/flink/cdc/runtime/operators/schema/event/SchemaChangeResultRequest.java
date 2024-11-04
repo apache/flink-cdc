@@ -29,7 +29,10 @@ public class SchemaChangeResultRequest implements CoordinationRequest {
 
     private static final long serialVersionUID = 1L;
 
-    /** Nonce code to distinguish between different events from different subTasks. */
+    /**
+     * Nonce code to distinguish flush events corresponding to each schema change event from
+     * different subTasks.
+     */
     private final long nonce;
 
     public SchemaChangeResultRequest(long nonce) {

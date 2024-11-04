@@ -36,7 +36,10 @@ public class FlushSuccessEvent implements OperatorEvent {
     /** The schema changes from which table is executing it. */
     private final TableId tableId;
 
-    /** Nonce code to distinguish between different events from different subTasks. */
+    /**
+     * Nonce code to distinguish flush events corresponding to each schema change event from
+     * different subTasks.
+     */
     private final long nonce;
 
     public FlushSuccessEvent(int subtask, TableId tableId, long nonce) {

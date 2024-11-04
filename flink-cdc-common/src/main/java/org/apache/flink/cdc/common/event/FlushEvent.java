@@ -28,7 +28,10 @@ public class FlushEvent implements Event {
     /** The schema changes from which table. */
     private final TableId tableId;
 
-    /** Nonce code to distinguish between different events from different subTasks. */
+    /**
+     * Nonce code to distinguish flush events corresponding to each schema change event from
+     * different subTasks.
+     */
     private final long nonce;
 
     public FlushEvent(TableId tableId, long nonce) {
