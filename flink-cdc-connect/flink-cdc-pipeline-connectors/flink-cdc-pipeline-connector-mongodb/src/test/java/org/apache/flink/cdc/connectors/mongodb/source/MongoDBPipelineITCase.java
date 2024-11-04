@@ -23,10 +23,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
-import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.mongodb.factory.MongoDBDataSourceFactory;
 import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfigFactory;
@@ -52,7 +49,6 @@ import org.junit.runners.Parameterized;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -81,9 +77,9 @@ public class MongoDBPipelineITCase extends MongoDBSourceTestBase {
     public static Object[] parameters() {
         return new Object[][] {
             new Object[] {"6.0.16", true},
-//            new Object[] {"6.0.16", false},
-//            new Object[] {"7.0.12", true},
-//            new Object[] {"7.0.12", false}
+            //            new Object[] {"6.0.16", false},
+            //            new Object[] {"7.0.12", true},
+            //            new Object[] {"7.0.12", false}
         };
     }
 
@@ -132,7 +128,7 @@ public class MongoDBPipelineITCase extends MongoDBSourceTestBase {
         List<Event> expectedBinlog = new ArrayList<>();
         try (MongoClient client = mongodbClient) {
             MongoDatabase db = client.getDatabase(database);
-            RowType rowType =MongoDBSchemaUtils.getJsonSchemaRowType();
+            RowType rowType = MongoDBSchemaUtils.getJsonSchemaRowType();
             BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
             db.getCollection("products")
                     .insertMany(
@@ -207,9 +203,7 @@ public class MongoDBPipelineITCase extends MongoDBSourceTestBase {
     }
 
     private CreateTableEvent getProductsCreateTableEvent(TableId tableId) {
-        return new CreateTableEvent(
-                tableId,
-                MongoDBSchemaUtils.getJsonSchema());
+        return new CreateTableEvent(tableId, MongoDBSchemaUtils.getJsonSchema());
     }
 
     private List<Event> getSnapshotExpected(TableId tableId) {

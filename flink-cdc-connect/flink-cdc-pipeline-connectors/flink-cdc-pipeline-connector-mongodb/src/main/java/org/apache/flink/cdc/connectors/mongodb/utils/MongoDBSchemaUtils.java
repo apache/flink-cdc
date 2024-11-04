@@ -115,17 +115,17 @@ public class MongoDBSchemaUtils {
                 tableId.getSchemaName(), null, tableId.getTableName());
     }
 
-    public static RowType getRecordIdRowType(){
+    public static RowType getRecordIdRowType() {
         return DataTypes.ROW(DataTypes.FIELD("_id", DataTypes.STRING().notNull()));
     }
 
-    public static RowType getJsonSchemaRowType(){
+    public static RowType getJsonSchemaRowType() {
         return DataTypes.ROW(
                 DataTypes.FIELD("_id", DataTypes.STRING().notNull()),
                 DataTypes.FIELD("_fullDocument", DataTypes.STRING()));
     }
 
-    public static Schema getJsonSchema(){
+    public static Schema getJsonSchema() {
         return Schema.newBuilder()
                 .physicalColumn("_id", DataTypes.STRING().notNull())
                 .physicalColumn("_fullDocument", DataTypes.STRING())

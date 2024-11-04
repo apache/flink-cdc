@@ -21,7 +21,6 @@ import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.connectors.base.options.StartupMode;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
@@ -115,7 +114,7 @@ public class MongoDBPipelineRecordEmitter extends MongoDBRecordEmitter<Event> {
     }
 
     private Schema getSchema(TableId tableId) {
-        if (schemaParseMode == SchemaParseMode.SCHEMA_LESS){
+        if (schemaParseMode == SchemaParseMode.SCHEMA_LESS) {
             return MongoDBSchemaUtils.getJsonSchema();
         }
         throw new RuntimeException("Unsupported schema parse mode.");

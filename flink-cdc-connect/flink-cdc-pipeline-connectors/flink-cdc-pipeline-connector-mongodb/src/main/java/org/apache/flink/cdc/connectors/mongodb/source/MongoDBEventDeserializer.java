@@ -30,7 +30,6 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.types.DataField;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope;
@@ -278,7 +277,7 @@ public class MongoDBEventDeserializer extends SourceRecordEventDeserializer
             Object[] fields = new Object[arity];
 
             // Schemaless
-            if (rowType.equals(jsonRowType)){
+            if (rowType.equals(jsonRowType)) {
                 fields[0] = convertField(fieldConverters[0], document.get(fieldNames[0]));
                 fields[1] = BinaryStringData.fromString(document.toJson());
                 return generator.generate(fields);
@@ -286,9 +285,9 @@ public class MongoDBEventDeserializer extends SourceRecordEventDeserializer
 
             for (int i = 0; i < arity; i++) {
                 String fieldName = fieldNames[i];
-                if (!document.containsKey(fieldName)){
+                if (!document.containsKey(fieldName)) {
                     fields[i] = null;
-                }else {
+                } else {
                     BsonValue fieldValue = document.get(fieldName);
                     Object convertedField = convertField(fieldConverters[i], fieldValue);
                     fields[i] = convertedField;
@@ -303,8 +302,8 @@ public class MongoDBEventDeserializer extends SourceRecordEventDeserializer
     // -------------------------------------------------------------------------------------
 
     /**
-     * Runtime converter that converts objects of MongoDB Connect into objects of Flink CDC
-     * internal data structures.
+     * Runtime converter that converts objects of MongoDB Connect into objects of Flink CDC internal
+     * data structures.
      */
     @FunctionalInterface
     private interface DeserializationRuntimeConverter extends Serializable {
