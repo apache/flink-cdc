@@ -45,6 +45,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -116,10 +117,16 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
 
     @Before
     public void before() {
+        customerDatabase.createAndInitialize();
         TestValuesTableFactory.clearAllData();
         env.setParallelism(4);
         env.enableCheckpointing(2000);
         env.setRestartStrategy(RestartStrategies.noRestart());
+    }
+
+    @After
+    public void after() {
+        customerDatabase.dropDatabase();
     }
 
     private static void installGhOstCli(Container<?> container) {
@@ -156,7 +163,6 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
 
         LOG.info("Step 2: Start pipeline job");
         env.setParallelism(1);
-        customerDatabase.createAndInitialize();
         TableId tableId = TableId.tableId(customerDatabase.getDatabaseName(), "customers");
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
@@ -333,11 +339,10 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
 
     @Test
     public void testPtOscSchemaMigrationFromScratch() throws Exception {
-        LOG.info("Step 2: Start pipeline job");
-        //        Thread.sleep(5000000);
+        LOG.info("Step 1: Start pipeline job");
+
         env.setParallelism(1);
-        customerDatabase.createAndInitialize();
-        TableId tableId = TableId.tableId(customerDatabase.getDatabaseName(), "customers_1");
+        TableId tableId = TableId.tableId(customerDatabase.getDatabaseName(), "customers");
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
                         .hostname(MYSQL8_CONTAINER.getHost())
@@ -345,7 +350,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                         .username(TEST_USER)
                         .password(TEST_PASSWORD)
                         .databaseList(customerDatabase.getDatabaseName())
-                        .tableList(customerDatabase.getDatabaseName() + "\\.customers_1")
+                        .tableList(customerDatabase.getDatabaseName() + "\\.customers")
                         .startupOptions(StartupOptions.initial())
                         .serverId(getServerId(env.getParallelism()))
                         .serverTimeZone("UTC")
@@ -379,7 +384,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                 expected.stream().map(Object::toString).collect(Collectors.toList()),
                 actual.stream().map(Object::toString).collect(Collectors.toList()));
 
-        LOG.info("Step 3: Evolve schema with pt-osc - ADD COLUMN");
+        LOG.info("Step 2: Evolve schema with pt-osc - ADD COLUMN");
         execInContainer(
                 PERCONA_TOOLKIT_CONTAINER,
                 "evolve schema",
@@ -387,7 +392,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                 "--user=" + TEST_USER,
                 "--host=" + INTER_CONTAINER_MYSQL_ALIAS,
                 "--password=" + TEST_PASSWORD,
-                "P=3306,t=customers_1,D=" + customerDatabase.getDatabaseName(),
+                "P=3306,t=customers,D=" + customerDatabase.getDatabaseName(),
                 "--alter",
                 "add column ext int",
                 "--charset=utf8",
@@ -400,7 +405,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
             // The new column `ext` has been inserted now
             statement.execute(
                     String.format(
-                            "INSERT INTO `%s`.`customers_1` VALUES (10000, 'Alice', 'Beijing', '123567891234', 17);",
+                            "INSERT INTO `%s`.`customers` VALUES (10000, 'Alice', 'Beijing', '123567891234', 17);",
                             customerDatabase.getDatabaseName()));
         }
 
@@ -426,7 +431,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                                 generate(schemaV2, 10000, "Alice", "Beijing", "123567891234", 17))),
                 fetchResults(events, 2));
 
-        LOG.info("Step 4: Evolve schema with pt-osc - MODIFY COLUMN");
+        LOG.info("Step 3: Evolve schema with pt-osc - MODIFY COLUMN");
         execInContainer(
                 PERCONA_TOOLKIT_CONTAINER,
                 "evolve schema",
@@ -434,7 +439,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                 "--user=" + TEST_USER,
                 "--host=" + INTER_CONTAINER_MYSQL_ALIAS,
                 "--password=" + TEST_PASSWORD,
-                "P=3306,t=customers_1,D=" + customerDatabase.getDatabaseName(),
+                "P=3306,t=customers,D=" + customerDatabase.getDatabaseName(),
                 "--alter",
                 "modify column ext double",
                 "--charset=utf8",
@@ -446,7 +451,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     String.format(
-                            "INSERT INTO `%s`.`customers_1` VALUES (10001, 'Bob', 'Chongqing', '123567891234', 2.718281828);",
+                            "INSERT INTO `%s`.`customers` VALUES (10001, 'Bob', 'Chongqing', '123567891234', 2.718281828);",
                             customerDatabase.getDatabaseName()));
         }
 
@@ -475,7 +480,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                                         2.718281828))),
                 fetchResults(events, 2));
 
-        LOG.info("Step 5: Evolve schema with pt-osc - DROP COLUMN");
+        LOG.info("Step 4: Evolve schema with pt-osc - DROP COLUMN");
         execInContainer(
                 PERCONA_TOOLKIT_CONTAINER,
                 "evolve schema",
@@ -483,7 +488,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                 "--user=" + TEST_USER,
                 "--host=" + INTER_CONTAINER_MYSQL_ALIAS,
                 "--password=" + TEST_PASSWORD,
-                "P=3306,t=customers_1,D=" + customerDatabase.getDatabaseName(),
+                "P=3306,t=customers,D=" + customerDatabase.getDatabaseName(),
                 "--alter",
                 "drop column ext",
                 "--charset=utf8",
@@ -495,7 +500,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     String.format(
-                            "INSERT INTO `%s`.`customers_1` VALUES (10002, 'Cicada', 'Urumqi', '123567891234');",
+                            "INSERT INTO `%s`.`customers` VALUES (10002, 'Cicada', 'Urumqi', '123567891234');",
                             customerDatabase.getDatabaseName()));
         }
 
