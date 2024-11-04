@@ -66,7 +66,7 @@ public class MySqlSourceConfig implements Serializable {
     private final Properties jdbcProperties;
     private final Map<ObjectPath, String> chunkKeyColumns;
     private final boolean skipSnapshotBackfill;
-    private final boolean parseGhOstSchemaChanges;
+    private final boolean parseOnLineSchemaChanges;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -101,7 +101,7 @@ public class MySqlSourceConfig implements Serializable {
             Properties jdbcProperties,
             Map<ObjectPath, String> chunkKeyColumns,
             boolean skipSnapshotBackfill,
-            boolean parseGhOstSchemaChanges) {
+            boolean parseOnLineSchemaChanges) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -129,7 +129,7 @@ public class MySqlSourceConfig implements Serializable {
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
-        this.parseGhOstSchemaChanges = parseGhOstSchemaChanges;
+        this.parseOnLineSchemaChanges = parseOnLineSchemaChanges;
     }
 
     public String getHostname() {
@@ -213,8 +213,8 @@ public class MySqlSourceConfig implements Serializable {
         return closeIdleReaders;
     }
 
-    public boolean isParseGhOstSchemaChanges() {
-        return parseGhOstSchemaChanges;
+    public boolean isParseOnLineSchemaChanges() {
+        return parseOnLineSchemaChanges;
     }
 
     public Properties getDbzProperties() {

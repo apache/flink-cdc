@@ -32,9 +32,11 @@ import org.apache.flink.util.TestLogger;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Rule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
@@ -55,6 +57,8 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     protected static final int DEFAULT_PARALLELISM = 4;
     protected static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
     protected InMemoryReporter metricReporter = InMemoryReporter.createWithRetainedMetrics();
+    public static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
+    @ClassRule public static final Network NETWORK = Network.newNetwork();
 
     @Rule
     public final MiniClusterWithClientResource miniClusterResource =
@@ -96,6 +100,8 @@ public abstract class MySqlSourceTestBase extends TestLogger {
                         .withDatabaseName("flink-test")
                         .withUsername("flinkuser")
                         .withPassword("flinkpw")
+                        .withNetwork(NETWORK)
+                        .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
     }
 
