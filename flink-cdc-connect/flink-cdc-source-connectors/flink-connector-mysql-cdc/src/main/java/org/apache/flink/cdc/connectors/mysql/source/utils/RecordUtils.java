@@ -578,10 +578,13 @@ public class RecordUtils {
                             .get("ddl")
                             .asText()
                             .toLowerCase();
-            String tableName = value.getStruct(Envelope.FieldName.SOURCE).getString(TABLE_NAME_KEY);
-            Matcher matchingResult = OSC_TABLE_ID_PATTERN.matcher(tableName);
+            if (ddl.toLowerCase().startsWith("alter")) {
+                String tableName =
+                        value.getStruct(Envelope.FieldName.SOURCE).getString(TABLE_NAME_KEY);
+                return OSC_TABLE_ID_PATTERN.matcher(tableName).matches();
+            }
 
-            return ddl.toLowerCase().startsWith("alter") && matchingResult.matches();
+            return false;
         } catch (JsonProcessingException e) {
             return false;
         }
