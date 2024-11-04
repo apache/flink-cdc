@@ -26,6 +26,7 @@ import org.apache.flink.cdc.connectors.base.options.StartupMode;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
+import org.apache.flink.cdc.connectors.mongodb.source.SchemaParseMode;
 import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfig;
 import org.apache.flink.cdc.connectors.mongodb.utils.MongoDBSchemaUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -48,6 +49,7 @@ public class MongoDBPipelineRecordEmitter extends MongoDBRecordEmitter<Event> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoDBPipelineRecordEmitter.class);
 
+    private final SchemaParseMode schemaParseMode;
     private final MongoDBSourceConfig sourceConfig;
     // Used when startup mode is initial
     private Set<TableId> alreadySendCreateTableTables;
@@ -57,11 +59,13 @@ public class MongoDBPipelineRecordEmitter extends MongoDBRecordEmitter<Event> {
     private List<CreateTableEvent> createTableEventCache;
 
     public MongoDBPipelineRecordEmitter(
+            SchemaParseMode schemaParseMode,
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
             SourceReaderMetrics sourceReaderMetrics,
             MongoDBSourceConfig sourceConfig,
             OffsetFactory offsetFactory) {
         super(debeziumDeserializationSchema, sourceReaderMetrics, offsetFactory);
+        this.schemaParseMode = schemaParseMode;
         this.alreadySendCreateTableTables = new HashSet<>();
         this.sourceConfig = sourceConfig;
         this.createTableEventCache = Collections.emptyList();
@@ -111,10 +115,9 @@ public class MongoDBPipelineRecordEmitter extends MongoDBRecordEmitter<Event> {
     }
 
     private Schema getSchema(TableId tableId) {
-        return Schema.newBuilder()
-                .physicalColumn("_id", DataTypes.STRING().notNull())
-                .physicalColumn("fullDocument", DataTypes.STRING())
-                .primaryKey(Collections.singletonList("_id"))
-                .build();
+        if (schemaParseMode == SchemaParseMode.SCHEMA_LESS){
+            return MongoDBSchemaUtils.getJsonSchema();
+        }
+        throw new RuntimeException("Unsupported schema parse mode.");
     }
 }

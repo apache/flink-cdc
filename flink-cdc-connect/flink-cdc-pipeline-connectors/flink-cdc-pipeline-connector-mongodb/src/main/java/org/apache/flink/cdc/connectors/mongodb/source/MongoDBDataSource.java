@@ -47,6 +47,7 @@ public class MongoDBDataSource implements DataSource {
                         deserializer,
                         (sourceReaderMetrics, sourceConfig, offsetFactory) ->
                                 new MongoDBPipelineRecordEmitter(
+                                        SchemaParseMode.SCHEMA_LESS,
                                         deserializer,
                                         sourceReaderMetrics,
                                         sourceConfig,

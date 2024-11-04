@@ -30,12 +30,11 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.types.DataField;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope;
-import org.apache.flink.cdc.connectors.mongodb.table.DeserializationRuntimeConverter;
+import org.apache.flink.cdc.connectors.mongodb.utils.MongoDBSchemaUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.event.SourceRecordEventDeserializer;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
@@ -62,6 +61,7 @@ import org.bson.types.Decimal128;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.math.BigDecimal;
@@ -73,7 +73,6 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
@@ -89,12 +88,8 @@ public class MongoDBEventDeserializer extends SourceRecordEventDeserializer
 
     private final SchemaParseMode schemaParseMode;
 
-    private static final RowType recordIdRowType =
-            DataTypes.ROW(DataTypes.FIELD("_id", DataTypes.STRING().notNull()));
-    private static final RowType jsonRowType =
-            DataTypes.ROW(
-                    DataTypes.FIELD("_id", DataTypes.STRING().notNull()),
-                    DataTypes.FIELD("fullDocument", DataTypes.STRING()));
+    private static final RowType recordIdRowType = MongoDBSchemaUtils.getRecordIdRowType();
+    private static final RowType jsonRowType = MongoDBSchemaUtils.getJsonSchemaRowType();
 
     private static final Map<DataType, DeserializationRuntimeConverter> CONVERTERS =
             new ConcurrentHashMap<>();
@@ -152,7 +147,7 @@ public class MongoDBEventDeserializer extends SourceRecordEventDeserializer
                 return Collections.singletonList(
                         DataChangeEvent.updateEvent(
                                 tableId,
-                                extractAfterDataRecord(fullDocument),
+                                extractAfterDataRecord(documentKey),
                                 extractAfterDataRecord(fullDocument),
                                 meta));
             case REPLACE:
@@ -202,9 +197,6 @@ public class MongoDBEventDeserializer extends SourceRecordEventDeserializer
     }
 
     private DeserializationRuntimeConverter createConverter(DataType type) {
-        if (type.getTypeRoot().equals(DataTypeRoot.ROW) && schemaParseMode == SCHEMA_LESS) {
-            return wrapIntoNullableConverter(createSchemalessConverter(type));
-        }
         return wrapIntoNullableConverter(createNotNullConverter(type));
     }
 
@@ -222,13 +214,6 @@ public class MongoDBEventDeserializer extends SourceRecordEventDeserializer
                 return converter.convert(dbzObj);
             }
         };
-    }
-
-    protected DeserializationRuntimeConverter createSchemalessConverter(DataType type) {
-        if (Objects.requireNonNull(type.getTypeRoot()) == DataTypeRoot.ROW) {
-            return createJsonRowConverter((RowType) type);
-        }
-        return createNotNullConverter(type);
     }
 
     protected DeserializationRuntimeConverter createNotNullConverter(DataType type) {
@@ -291,48 +276,39 @@ public class MongoDBEventDeserializer extends SourceRecordEventDeserializer
             BsonDocument document = docObj.asDocument();
             int arity = fieldNames.length;
             Object[] fields = new Object[arity];
+
+            // Schemaless
+            if (rowType.equals(jsonRowType)){
+                fields[0] = convertField(fieldConverters[0], document.get(fieldNames[0]));
+                fields[1] = BinaryStringData.fromString(document.toJson());
+                return generator.generate(fields);
+            }
+
             for (int i = 0; i < arity; i++) {
                 String fieldName = fieldNames[i];
-                BsonValue fieldValue = document.get(fieldName);
-                Object convertedField = convertField(fieldConverters[i], fieldValue);
-                fields[i] = convertedField;
+                if (!document.containsKey(fieldName)){
+                    fields[i] = null;
+                }else {
+                    BsonValue fieldValue = document.get(fieldName);
+                    Object convertedField = convertField(fieldConverters[i], fieldValue);
+                    fields[i] = convertedField;
+                }
             }
             return generator.generate(fields);
         };
     }
 
-    private DeserializationRuntimeConverter createJsonRowConverter(RowType rowType) {
-        final DeserializationRuntimeConverter[] fieldConverters =
-                rowType.getFields().stream()
-                        .map(DataField::getType)
-                        .map(this::createConverter)
-                        .toArray(DeserializationRuntimeConverter[]::new);
-        final String[] fieldNames = rowType.getFieldNames().toArray(new String[0]);
-        if (fieldNames.length > 2) {
-            throw new RuntimeException();
-        }
-        BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
-        return (docObj) -> {
-            if (!docObj.isDocument()) {
-                throw new IllegalArgumentException(
-                        "Unable to convert to rowType from unexpected value '"
-                                + docObj
-                                + "' of type "
-                                + docObj.getBsonType());
-            }
-            BsonDocument document = docObj.asDocument();
-            int arity = fieldNames.length;
-            Object[] fields = new Object[arity];
-            for (int i = 0; i < arity; i++) {
-                String fieldName = fieldNames[i];
-                if (fieldName.equals(MongoDBEnvelope.FULL_DOCUMENT_FIELD)) {
-                    fields[i] = BinaryStringData.fromString(document.toJson());
-                } else {
-                    fields[i] = convertField(fieldConverters[i], document.get(fieldName));
-                }
-            }
-            return generator.generate(fields);
-        };
+    // -------------------------------------------------------------------------------------
+    // Runtime Converters
+    // -------------------------------------------------------------------------------------
+
+    /**
+     * Runtime converter that converts objects of MongoDB Connect into objects of Flink CDC
+     * internal data structures.
+     */
+    @FunctionalInterface
+    private interface DeserializationRuntimeConverter extends Serializable {
+        Object convert(BsonValue docObj) throws Exception;
     }
 
     private static Object convertField(

@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfig;
 import org.apache.flink.cdc.connectors.mongodb.source.utils.MongoUtils;
 
@@ -112,5 +113,23 @@ public class MongoDBSchemaUtils {
     public static io.debezium.relational.TableId toDbzTableId(TableId tableId) {
         return new io.debezium.relational.TableId(
                 tableId.getSchemaName(), null, tableId.getTableName());
+    }
+
+    public static RowType getRecordIdRowType(){
+        return DataTypes.ROW(DataTypes.FIELD("_id", DataTypes.STRING().notNull()));
+    }
+
+    public static RowType getJsonSchemaRowType(){
+        return DataTypes.ROW(
+                DataTypes.FIELD("_id", DataTypes.STRING().notNull()),
+                DataTypes.FIELD("_fullDocument", DataTypes.STRING()));
+    }
+
+    public static Schema getJsonSchema(){
+        return Schema.newBuilder()
+                .physicalColumn("_id", DataTypes.STRING().notNull())
+                .physicalColumn("_fullDocument", DataTypes.STRING())
+                .primaryKey(Collections.singletonList("_id"))
+                .build();
     }
 }
