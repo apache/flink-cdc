@@ -78,7 +78,7 @@ import static org.junit.Assert.assertEquals;
  * href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">doc/pt-osc</a> for
  * more details.
  */
-public class MySqlGhOstSchemaMigrationITCase extends MySqlSourceTestBase {
+public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
     private static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
 
@@ -170,7 +170,7 @@ public class MySqlGhOstSchemaMigrationITCase extends MySqlSourceTestBase {
                         .serverId(getServerId(env.getParallelism()))
                         .serverTimeZone("UTC")
                         .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue())
-                        .parseGhOstSchemaChanges(true);
+                        .parseOnLineSchemaChanges(true);
 
         FlinkSourceProvider sourceProvider =
                 (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();

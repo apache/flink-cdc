@@ -534,7 +534,7 @@ public class RecordUtils {
      * This utility method checks if given source record is a gh-ost/pt-osc initiated schema change
      * event by checking the "alter" ddl.
      */
-    public static boolean isGhostSchemaChangeEvent(SourceRecord record) {
+    public static boolean isOnLineSchemaChangeEvent(SourceRecord record) {
         if (!isSchemaChangeEvent(record)) {
             return false;
         }
@@ -579,7 +579,7 @@ public class RecordUtils {
                             .asText()
                             .toLowerCase();
             String tableName = value.getStruct(Envelope.FieldName.SOURCE).getString(TABLE_NAME_KEY);
-            Matcher matchingResult = GHOST_TABLE_ID_PATTERN.matcher(tableName);
+            Matcher matchingResult = OSC_TABLE_ID_PATTERN.matcher(tableName);
 
             return ddl.toLowerCase().startsWith("alter") && matchingResult.matches();
         } catch (JsonProcessingException e) {
@@ -587,11 +587,11 @@ public class RecordUtils {
         }
     }
 
-    private static final Pattern GHOST_TABLE_ID_PATTERN = Pattern.compile("^_(.*)_(gho|new)$");
+    private static final Pattern OSC_TABLE_ID_PATTERN = Pattern.compile("^_(.*)_(gho|new)$");
 
     /** This utility method peels out gh-ost/pt-osc mangled tableId to the original one. */
     public static TableId peelTableId(TableId tableId) {
-        Matcher matchingResult = GHOST_TABLE_ID_PATTERN.matcher(tableId.table());
+        Matcher matchingResult = OSC_TABLE_ID_PATTERN.matcher(tableId.table());
         if (matchingResult.matches()) {
             return new TableId(tableId.catalog(), tableId.schema(), matchingResult.group(1));
         }

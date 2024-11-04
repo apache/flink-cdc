@@ -102,8 +102,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 config.get(MySqlSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         boolean skipSnapshotBackFill =
                 config.get(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
-        boolean parseGhOstSchemaChanges =
-                config.get(MySqlSourceOptions.PARSE_GH_OST_SCHEMA_CHANGES);
+        boolean parseOnLineSchemaChanges =
+                config.get(MySqlSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES);
 
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
@@ -148,7 +148,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 heartbeatInterval,
                 chunkKeyColumn,
                 skipSnapshotBackFill,
-                parseGhOstSchemaChanges);
+                parseOnLineSchemaChanges);
     }
 
     @Override
@@ -194,7 +194,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.HEARTBEAT_INTERVAL);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
-        options.add(MySqlSourceOptions.PARSE_GH_OST_SCHEMA_CHANGES);
+        options.add(MySqlSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES);
         return options;
     }
 
