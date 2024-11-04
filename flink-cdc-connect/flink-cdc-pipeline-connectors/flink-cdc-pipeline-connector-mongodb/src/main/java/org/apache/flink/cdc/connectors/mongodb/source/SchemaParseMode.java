@@ -18,8 +18,7 @@
 package org.apache.flink.cdc.connectors.mongodb.source;
 
 /**
- * Behavior for handling schema changes. Enums are sorted from the most tolerant strategy (IGNORE)
- * to the most aggressive one (EXCEPTION).
+ * Behavior for parse mongodb schema.
  */
 public enum SchemaParseMode {
     // Not parse mongodb object.

@@ -43,7 +43,7 @@ import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isLowWatermarkEvent;
 
-/** The {@link RecordEmitter} implementation for pipeline mysql connector. */
+/** The {@link RecordEmitter} implementation for pipeline mongodb connector. */
 public class MongoDBPipelineRecordEmitter extends MongoDBRecordEmitter<Event> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoDBPipelineRecordEmitter.class);
@@ -85,7 +85,7 @@ public class MongoDBPipelineRecordEmitter extends MongoDBRecordEmitter<Event> {
         } else if (splitState.isStreamSplitState() && !alreadySendCreateTableForBinlogSplit) {
             alreadySendCreateTableForBinlogSplit = true;
             if (sourceConfig.getStartupOptions().startupMode.equals(StartupMode.INITIAL)) {
-                // In Snapshot -> Binlog transition of INITIAL startup mode, ensure all table
+                // In Snapshot -> Stream transition of INITIAL startup mode, ensure all table
                 // schemas have been sent to downstream. We use previously cached schema instead of
                 // re-request latest schema because there might be some pending schema change events
                 // in the queue, and that may accidentally emit evolved schema before corresponding
@@ -97,7 +97,7 @@ public class MongoDBPipelineRecordEmitter extends MongoDBRecordEmitter<Event> {
                                                 MongoDBSchemaUtils.toDbzTableId(event.tableId())))
                         .forEach(output::collect);
             } else {
-                // In Binlog only mode, we simply emit all schemas at once.
+                // In Stream only mode, we simply emit all schemas at once.
                 createTableEventCache.forEach(output::collect);
             }
         }

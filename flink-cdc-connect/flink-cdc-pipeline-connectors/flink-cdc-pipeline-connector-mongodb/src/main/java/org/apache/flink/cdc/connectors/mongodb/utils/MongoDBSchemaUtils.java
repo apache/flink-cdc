@@ -89,10 +89,7 @@ public class MongoDBSchemaUtils {
         // ----------------
         // READ TABLE NAMES
         // ----------------
-        // Get the list of table IDs for each database. We can't use a prepared statement with
-        // MySQL, so we have to build the SQL statement each time. Although in other cases this
-        // might lead to SQL injection, in our case we are reading the database names from the
-        // database and not taking them from the user ...
+        // Get the list of table IDs for each database.
         LOG.info("Read list of available tables in {}", db.getName());
         final List<TableId> tableIds = new ArrayList<>();
         db.listCollectionNames()
