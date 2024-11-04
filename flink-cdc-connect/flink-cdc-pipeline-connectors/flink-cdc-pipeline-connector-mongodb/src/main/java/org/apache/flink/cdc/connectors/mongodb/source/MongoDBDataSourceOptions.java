@@ -22,7 +22,7 @@ import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
 
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
-import static org.apache.flink.cdc.connectors.mongodb.source.SchemaParseMode.JSON;
+import static org.apache.flink.cdc.connectors.mongodb.source.SchemaParseMode.SCHEMA_LESS;
 
 /** Configurations for {@link MongoDBSource}. */
 public class MongoDBDataSourceOptions {
@@ -70,7 +70,7 @@ public class MongoDBDataSourceOptions {
     public static final ConfigOption<SchemaParseMode> SCHEMA_PARSE_MODE =
             ConfigOptions.key("schema.parse.mode")
                     .enumType(SchemaParseMode.class)
-                    .defaultValue(JSON)
+                    .defaultValue(SCHEMA_LESS)
                     .withDescription(
                             "Whether send schema change events, by default is true. If set to false, the schema changes will not be sent.");
 

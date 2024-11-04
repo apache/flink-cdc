@@ -23,8 +23,8 @@ package org.apache.flink.cdc.connectors.mongodb.source;
  */
 public enum SchemaParseMode {
     // Not parse mongodb object.
-    JSON,
+    SCHEMA_LESS,
     // Parse schema by user setting.
-    SCHEMA,
+    USER,
     SCHEMA_EVOLVE;
 }

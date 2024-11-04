@@ -17,8 +17,6 @@
 
 package org.apache.flink.cdc.connectors.mongodb.source;
 
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoDatabase;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -35,12 +33,13 @@ import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfig
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
-import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 import org.apache.flink.util.CloseableIterator;
+
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.Before;
@@ -49,8 +48,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import java.sql.Connection;
-import java.sql.Statement;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -62,9 +59,7 @@ import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLI
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Integration tests for MongoDB change stream event source.
- */
+/** Integration tests for MongoDB change stream event source. */
 @RunWith(Parameterized.class)
 public class MongoDBPipelineITCase extends MongoDBSourceTestBase {
     private final StreamExecutionEnvironment env =
@@ -72,8 +67,7 @@ public class MongoDBPipelineITCase extends MongoDBSourceTestBase {
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
-    @ClassRule
-    public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
     private final boolean parallelismSnapshot;
 
@@ -84,11 +78,11 @@ public class MongoDBPipelineITCase extends MongoDBSourceTestBase {
 
     @Parameterized.Parameters(name = "mongoVersion: {0} parallelismSnapshot: {1}")
     public static Object[] parameters() {
-        return new Object[][]{
-                new Object[]{"6.0.16", true},
-                new Object[]{"6.0.16", false},
-                new Object[]{"7.0.12", true},
-                new Object[]{"7.0.12", false}
+        return new Object[][] {
+            new Object[] {"6.0.16", true},
+            new Object[] {"6.0.16", false},
+            new Object[] {"7.0.12", true},
+            new Object[] {"7.0.12", false}
         };
     }
 
@@ -118,12 +112,13 @@ public class MongoDBPipelineITCase extends MongoDBSourceTestBase {
                 (FlinkSourceProvider) new MongoDBDataSource(configFactory).getEventSourceProvider();
 
         // set the source parallelism to 2
-        CloseableIterator<Event> events = env.fromSource(
-                        sourceProvider.getSource(),
-                        WatermarkStrategy.noWatermarks(),
-                        MongoDBDataSourceFactory.IDENTIFIER,
-                        new EventTypeInfo())
-                .executeAndCollect();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MongoDBDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
 
         TableId tableId = TableId.tableId(database, "products");
         CreateTableEvent createTableEvent = getProductsCreateTableEvent(tableId);
@@ -138,37 +133,42 @@ public class MongoDBPipelineITCase extends MongoDBSourceTestBase {
             MongoDatabase db = client.getDatabase(database);
             RowType rowType =
                     RowType.of(
-                            new DataType[]{
-                                    DataTypes.STRING().notNull(),
-                                    DataTypes.STRING()
-                            },
-                            new String[]{"_id", "fullDocument"});
+                            new DataType[] {DataTypes.STRING().notNull(), DataTypes.STRING()},
+                            new String[] {"_id", "fullDocument"});
             BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
-            db.getCollection("products").insertMany(Arrays.asList(
-                    productDocOf(
-                            "100000000000000000000110",
-                            "jacket",
-                            "water resistent white wind breaker",
-                            0.2),
-                    productDocOf("100000000000000000000111", "scooter", "Big 2-wheel scooter", 5.18)));
+            db.getCollection("products")
+                    .insertMany(
+                            Arrays.asList(
+                                    productDocOf(
+                                            "100000000000000000000110",
+                                            "jacket",
+                                            "water resistent white wind breaker",
+                                            0.2),
+                                    productDocOf(
+                                            "100000000000000000000111",
+                                            "scooter",
+                                            "Big 2-wheel scooter",
+                                            5.18)));
             expectedBinlog.add(
                     DataChangeEvent.insertEvent(
                             tableId,
                             generator.generate(
-                                    new Object[]{
-                                            BinaryStringData.fromString("100000000000000000000110"),
-                                            BinaryStringData.fromString("{\"_id\": {\"$oid\": \"100000000000000000000110\"}, \"name\": \"jacket\", \"description\": \"water resistent white wind breaker\", \"weight\": 0.2}")
+                                    new Object[] {
+                                        BinaryStringData.fromString("100000000000000000000110"),
+                                        BinaryStringData.fromString(
+                                                "{\"_id\": {\"$oid\": \"100000000000000000000110\"}, \"name\": \"jacket\", \"description\": \"water resistent white wind breaker\", \"weight\": 0.2}")
                                     })));
             expectedBinlog.add(
                     DataChangeEvent.insertEvent(
                             tableId,
                             generator.generate(
-                                    new Object[]{
-                                            BinaryStringData.fromString("100000000000000000000111"),
-                                            BinaryStringData.fromString("{\"_id\": {\"$oid\": \"100000000000000000000111\"}, \"name\": \"scooter\", \"description\": \"Big 2-wheel scooter\", \"weight\": 5.18}")
+                                    new Object[] {
+                                        BinaryStringData.fromString("100000000000000000000111"),
+                                        BinaryStringData.fromString(
+                                                "{\"_id\": {\"$oid\": \"100000000000000000000111\"}, \"name\": \"scooter\", \"description\": \"Big 2-wheel scooter\", \"weight\": 5.18}")
                                     })));
         }
-         // In this configuration, several subtasks might emit their corresponding CreateTableEvent
+        // In this configuration, several subtasks might emit their corresponding CreateTableEvent
         // to downstream. Since it is not possible to predict how many CreateTableEvents should we
         // expect, we simply filter them out from expected sets, and assert there's at least one.
         List<Event> actual =
@@ -221,10 +221,7 @@ public class MongoDBPipelineITCase extends MongoDBSourceTestBase {
     private List<Event> getSnapshotExpected(TableId tableId) {
         RowType rowType =
                 RowType.of(
-                        new DataType[] {
-                                DataTypes.STRING().notNull(),
-                                DataTypes.STRING()
-                        },
+                        new DataType[] {DataTypes.STRING().notNull(), DataTypes.STRING()},
                         new String[] {"_id", "fullDocument"});
         BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
         List<Event> snapshotExpected = new ArrayList<>();
@@ -233,73 +230,81 @@ public class MongoDBPipelineITCase extends MongoDBSourceTestBase {
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                        BinaryStringData.fromString("100000000000000000000101"),
-                                        BinaryStringData.fromString("{\"_id\": {\"$oid\": \"100000000000000000000101\"}, \"name\": \"scooter\", \"description\": \"Small 2-wheel scooter\", \"weight\": 3.14}")
+                                    BinaryStringData.fromString("100000000000000000000101"),
+                                    BinaryStringData.fromString(
+                                            "{\"_id\": {\"$oid\": \"100000000000000000000101\"}, \"name\": \"scooter\", \"description\": \"Small 2-wheel scooter\", \"weight\": 3.14}")
                                 })));
         snapshotExpected.add(
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                        BinaryStringData.fromString("100000000000000000000102"),
-                                        BinaryStringData.fromString("{\"_id\": {\"$oid\": \"100000000000000000000102\"}, \"name\": \"car battery\", \"description\": \"12V car battery\", \"weight\": 8.1}")
+                                    BinaryStringData.fromString("100000000000000000000102"),
+                                    BinaryStringData.fromString(
+                                            "{\"_id\": {\"$oid\": \"100000000000000000000102\"}, \"name\": \"car battery\", \"description\": \"12V car battery\", \"weight\": 8.1}")
                                 })));
         snapshotExpected.add(
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                        BinaryStringData.fromString("100000000000000000000103"),
-                                        BinaryStringData.fromString("{\"_id\": {\"$oid\": \"100000000000000000000103\"}, \"name\": \"12-pack drill bits\", \"description\": \"12-pack of drill bits with sizes ranging from #40 to #3\", \"weight\": 0.8}")
+                                    BinaryStringData.fromString("100000000000000000000103"),
+                                    BinaryStringData.fromString(
+                                            "{\"_id\": {\"$oid\": \"100000000000000000000103\"}, \"name\": \"12-pack drill bits\", \"description\": \"12-pack of drill bits with sizes ranging from #40 to #3\", \"weight\": 0.8}")
                                 })));
         snapshotExpected.add(
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                        BinaryStringData.fromString("100000000000000000000104"),
-                                        BinaryStringData.fromString("{\"_id\": {\"$oid\": \"100000000000000000000104\"}, \"name\": \"hammer\", \"description\": \"12oz carpenter''s hammer\", \"weight\": 0.75}")
+                                    BinaryStringData.fromString("100000000000000000000104"),
+                                    BinaryStringData.fromString(
+                                            "{\"_id\": {\"$oid\": \"100000000000000000000104\"}, \"name\": \"hammer\", \"description\": \"12oz carpenter''s hammer\", \"weight\": 0.75}")
                                 })));
         snapshotExpected.add(
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                        BinaryStringData.fromString("100000000000000000000105"),
-                                        BinaryStringData.fromString("{\"_id\": {\"$oid\": \"100000000000000000000105\"}, \"name\": \"hammer\", \"description\": \"12oz carpenter''s hammer\", \"weight\": 0.875}")
+                                    BinaryStringData.fromString("100000000000000000000105"),
+                                    BinaryStringData.fromString(
+                                            "{\"_id\": {\"$oid\": \"100000000000000000000105\"}, \"name\": \"hammer\", \"description\": \"12oz carpenter''s hammer\", \"weight\": 0.875}")
                                 })));
         snapshotExpected.add(
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                        BinaryStringData.fromString("100000000000000000000106"),
-                                        BinaryStringData.fromString("{\"_id\": {\"$oid\": \"100000000000000000000106\"}, \"name\": \"hammer\", \"description\": \"12oz carpenter''s hammer\", \"weight\": 1}")
+                                    BinaryStringData.fromString("100000000000000000000106"),
+                                    BinaryStringData.fromString(
+                                            "{\"_id\": {\"$oid\": \"100000000000000000000106\"}, \"name\": \"hammer\", \"description\": \"12oz carpenter''s hammer\", \"weight\": 1}")
                                 })));
         snapshotExpected.add(
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                        BinaryStringData.fromString("100000000000000000000107"),
-
-                                        BinaryStringData.fromString("{\"_id\": {\"$oid\": \"100000000000000000000107\"}, \"name\": \"rocks\", \"description\": \"box of assorted rocks\", \"weight\": 5.3}")
+                                    BinaryStringData.fromString("100000000000000000000107"),
+                                    BinaryStringData.fromString(
+                                            "{\"_id\": {\"$oid\": \"100000000000000000000107\"}, \"name\": \"rocks\", \"description\": \"box of assorted rocks\", \"weight\": 5.3}")
                                 })));
         snapshotExpected.add(
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                        BinaryStringData.fromString("100000000000000000000108"),
-                                        BinaryStringData.fromString("{\"_id\": {\"$oid\": \"100000000000000000000108\"}, \"name\": \"jacket\", \"description\": \"water resistent black wind breaker\", \"weight\": 0.1}")
+                                    BinaryStringData.fromString("100000000000000000000108"),
+                                    BinaryStringData.fromString(
+                                            "{\"_id\": {\"$oid\": \"100000000000000000000108\"}, \"name\": \"jacket\", \"description\": \"water resistent black wind breaker\", \"weight\": 0.1}")
                                 })));
         snapshotExpected.add(
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                        BinaryStringData.fromString("100000000000000000000109"),
-                                        BinaryStringData.fromString("{\"_id\": {\"$oid\": \"100000000000000000000109\"}, \"name\": \"spare tire\", \"description\": \"24 inch spare tire\", \"weight\": 22.2}")
+                                    BinaryStringData.fromString("100000000000000000000109"),
+                                    BinaryStringData.fromString(
+                                            "{\"_id\": {\"$oid\": \"100000000000000000000109\"}, \"name\": \"spare tire\", \"description\": \"24 inch spare tire\", \"weight\": 22.2}")
                                 })));
         return snapshotExpected;
     }

@@ -77,7 +77,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
-import static org.apache.flink.cdc.connectors.mongodb.source.SchemaParseMode.JSON;
+import static org.apache.flink.cdc.connectors.mongodb.source.SchemaParseMode.SCHEMA_LESS;
 
 /** Event deserializer for {@link MongoDBDataSource}. */
 @Internal
@@ -172,7 +172,7 @@ public class MongoDBEventDeserializer extends SourceRecordEventDeserializer
     }
 
     private RecordData extractAfterDataRecord(BsonDocument document) throws Exception {
-        RowType type = schemaParseMode == JSON ? jsonRowType : null;
+        RowType type = schemaParseMode == SCHEMA_LESS ? jsonRowType : null;
         return (RecordData) getOrCreateConverter(type).convert(document);
     }
 
@@ -202,7 +202,7 @@ public class MongoDBEventDeserializer extends SourceRecordEventDeserializer
     }
 
     private DeserializationRuntimeConverter createConverter(DataType type) {
-        if (type.getTypeRoot().equals(DataTypeRoot.ROW) && schemaParseMode == JSON) {
+        if (type.getTypeRoot().equals(DataTypeRoot.ROW) && schemaParseMode == SCHEMA_LESS) {
             return wrapIntoNullableConverter(createSchemalessConverter(type));
         }
         return wrapIntoNullableConverter(createNotNullConverter(type));

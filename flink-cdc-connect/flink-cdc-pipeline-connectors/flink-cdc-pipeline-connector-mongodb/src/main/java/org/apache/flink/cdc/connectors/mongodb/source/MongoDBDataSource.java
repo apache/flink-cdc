@@ -38,7 +38,8 @@ public class MongoDBDataSource implements DataSource {
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
-        MongoDBEventDeserializer deserializer = new MongoDBEventDeserializer(SchemaParseMode.JSON);
+        MongoDBEventDeserializer deserializer =
+                new MongoDBEventDeserializer(SchemaParseMode.SCHEMA_LESS);
 
         MongoDBSource<Event> source =
                 new MongoDBSource<>(
