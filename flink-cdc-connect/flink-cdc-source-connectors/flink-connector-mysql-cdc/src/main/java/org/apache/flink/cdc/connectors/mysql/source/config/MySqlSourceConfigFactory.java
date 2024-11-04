@@ -70,7 +70,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Properties dbzProperties;
     private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
     private boolean skipSnapshotBackfill = false;
-    private boolean parseGhOstSchemaChanges = false;
+    private boolean parseOnLineSchemaChanges = false;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -292,9 +292,9 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
-    /** Whether to parse gh-ost utility generated schema change events. Defaults to false. */
-    public MySqlSourceConfigFactory parseGhOstSchemaChanges(boolean parseGhOstSchemaChanges) {
-        this.parseGhOstSchemaChanges = parseGhOstSchemaChanges;
+    /** Whether to parse gh-ost/pt-osc utility generated schema change events. Defaults to false. */
+    public MySqlSourceConfigFactory parseOnLineSchemaChanges(boolean parseOnLineSchemaChanges) {
+        this.parseOnLineSchemaChanges = parseOnLineSchemaChanges;
         return this;
     }
 
@@ -392,6 +392,6 @@ public class MySqlSourceConfigFactory implements Serializable {
                 jdbcProperties,
                 chunkKeyColumns,
                 skipSnapshotBackfill,
-                parseGhOstSchemaChanges);
+                parseOnLineSchemaChanges);
     }
 }
