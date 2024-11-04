@@ -30,9 +30,12 @@ import java.util.List;
 /** {@link MetadataAccessor} for {@link MongoDBDataSource}. */
 public class MongoDBMetadataAccessor implements MetadataAccessor {
     private final MongoDBSourceConfig sourceConfig;
+    private final SchemaParseMode schemaParseMode;
 
-    public MongoDBMetadataAccessor(MongoDBSourceConfig sourceConfig) {
+    public MongoDBMetadataAccessor(
+            MongoDBSourceConfig sourceConfig, SchemaParseMode schemaParseMode) {
         this.sourceConfig = sourceConfig;
+        this.schemaParseMode = schemaParseMode;
     }
 
     @Override
@@ -52,6 +55,9 @@ public class MongoDBMetadataAccessor implements MetadataAccessor {
 
     @Override
     public Schema getTableSchema(TableId tableId) {
-        return MongoDBSchemaUtils.getTableSchema(sourceConfig, tableId);
+        if (schemaParseMode == SchemaParseMode.SCHEMA_LESS) {
+            return MongoDBSchemaUtils.getTableSchema(sourceConfig, tableId);
+        }
+        throw new RuntimeException("Unsupported yet.");
     }
 }

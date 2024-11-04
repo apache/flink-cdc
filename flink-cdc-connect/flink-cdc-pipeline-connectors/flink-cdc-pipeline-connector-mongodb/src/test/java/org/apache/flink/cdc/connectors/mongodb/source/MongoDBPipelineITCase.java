@@ -77,9 +77,9 @@ public class MongoDBPipelineITCase extends MongoDBSourceTestBase {
     public static Object[] parameters() {
         return new Object[][] {
             new Object[] {"6.0.16", true},
-            //            new Object[] {"6.0.16", false},
-            //            new Object[] {"7.0.12", true},
-            //            new Object[] {"7.0.12", false}
+            new Object[] {"6.0.16", false},
+            new Object[] {"7.0.12", true},
+            new Object[] {"7.0.12", false}
         };
     }
 

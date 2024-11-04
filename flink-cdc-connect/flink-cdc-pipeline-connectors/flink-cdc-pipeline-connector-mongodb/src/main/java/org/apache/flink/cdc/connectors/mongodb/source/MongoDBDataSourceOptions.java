@@ -59,20 +59,20 @@ public class MongoDBDataSourceOptions {
                             "Password to be used when connecting to MongoDB. "
                                     + "This is required only when MongoDB is configured to use authentication.");
 
-    public static final ConfigOption<String> COLLECTIONS =
-            ConfigOptions.key("collections")
+    public static final ConfigOption<String> TABLES =
+            ConfigOptions.key("tables")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
                             "Name of the collection in the database to watch for changes.");
 
     @Experimental
-    public static final ConfigOption<SchemaParseMode> SCHEMA_PARSE_MODE =
-            ConfigOptions.key("schema.parse.mode")
+    public static final ConfigOption<SchemaParseMode> SCHEMA_MODE =
+            ConfigOptions.key("schema.mode")
                     .enumType(SchemaParseMode.class)
                     .defaultValue(SCHEMA_LESS)
                     .withDescription(
-                            "Whether send schema change events, by default is true. If set to false, the schema changes will not be sent.");
+                            "MongoDB document schema parse mode, valid enumerations are SCHEMA_LESS, USER, SCHEMA_EVOLVE.");
 
     public static final ConfigOption<String> CONNECTION_OPTIONS =
             ConfigOptions.key("connection.options")
@@ -81,13 +81,6 @@ public class MongoDBDataSourceOptions {
                     .withDescription(
                             "The ampersand-separated MongoDB connection options. "
                                     + "eg. replicaSet=test&connectTimeoutMS=300000");
-
-    public static final ConfigOption<Integer> INITIAL_SNAPSHOTTING_QUEUE_SIZE =
-            ConfigOptions.key("initial.snapshotting.queue.size")
-                    .intType()
-                    .defaultValue(10240)
-                    .withDescription(
-                            "The max size of the queue to use when copying data. Defaults to 10240.");
 
     public static final ConfigOption<Integer> BATCH_SIZE =
             ConfigOptions.key("batch.size")
@@ -124,13 +117,6 @@ public class MongoDBDataSourceOptions {
                                     + "for low volume namespaces. Use 0 to disable. Defaults to 0.");
 
     @Experimental
-    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_ENABLED =
-            ConfigOptions.key("scan.incremental.snapshot.enabled")
-                    .booleanType()
-                    .defaultValue(false)
-                    .withDescription("Whether enable incremental snapshot. Defaults to false.");
-
-    @Experimental
     public static final ConfigOption<Integer> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB =
             ConfigOptions.key("scan.incremental.snapshot.chunk.size.mb")
                     .intType()
@@ -159,14 +145,6 @@ public class MongoDBDataSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "MongoDB server normally times out idle cursors after an inactivity period (10 minutes) to prevent excess memory use. Set this option to true to prevent that.");
-
-    public static final ConfigOption<String> SERVER_TIME_ZONE =
-            ConfigOptions.key("server-time-zone")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "The session time zone in database server. If not set, then "
-                                    + "ZoneId.systemDefault() is used to determine the server time zone.");
 
     public static final ConfigOption<String> SCAN_STARTUP_MODE =
             ConfigOptions.key("scan.startup.mode")

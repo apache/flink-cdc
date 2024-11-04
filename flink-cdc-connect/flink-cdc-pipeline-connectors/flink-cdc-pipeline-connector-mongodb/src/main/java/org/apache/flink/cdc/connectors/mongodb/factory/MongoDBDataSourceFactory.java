@@ -44,7 +44,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mongodb.source.MongoDBDataSourceOptions.BATCH_SIZE;
-import static org.apache.flink.cdc.connectors.mongodb.source.MongoDBDataSourceOptions.COLLECTIONS;
 import static org.apache.flink.cdc.connectors.mongodb.source.MongoDBDataSourceOptions.CONNECTION_OPTIONS;
 import static org.apache.flink.cdc.connectors.mongodb.source.MongoDBDataSourceOptions.FULL_DOCUMENT_PRE_POST_IMAGE;
 import static org.apache.flink.cdc.connectors.mongodb.source.MongoDBDataSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
@@ -60,6 +59,7 @@ import static org.apache.flink.cdc.connectors.mongodb.source.MongoDBDataSourceOp
 import static org.apache.flink.cdc.connectors.mongodb.source.MongoDBDataSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mongodb.source.MongoDBDataSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.mongodb.source.MongoDBDataSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
+import static org.apache.flink.cdc.connectors.mongodb.source.MongoDBDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.mongodb.source.MongoDBDataSourceOptions.USERNAME;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static org.apache.flink.cdc.debezium.utils.JdbcUrlUtils.PROPERTIES_PREFIX;
@@ -84,7 +84,7 @@ public class MongoDBDataSourceFactory implements DataSourceFactory {
 
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
-        String collections = config.get(COLLECTIONS);
+        String collections = config.get(TABLES);
 
         StartupOptions startupOptions = getStartupOptions(config);
 
@@ -159,7 +159,7 @@ public class MongoDBDataSourceFactory implements DataSourceFactory {
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(HOSTS);
-        options.add(COLLECTIONS);
+        options.add(TABLES);
         options.add(USERNAME);
         options.add(PASSWORD);
         return options;

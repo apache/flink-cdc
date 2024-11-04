@@ -58,6 +58,6 @@ public class MongoDBDataSource implements DataSource {
 
     @Override
     public MetadataAccessor getMetadataAccessor() {
-        return new MongoDBMetadataAccessor(sourceConfig);
+        return new MongoDBMetadataAccessor(sourceConfig, SchemaParseMode.SCHEMA_LESS);
     }
 }

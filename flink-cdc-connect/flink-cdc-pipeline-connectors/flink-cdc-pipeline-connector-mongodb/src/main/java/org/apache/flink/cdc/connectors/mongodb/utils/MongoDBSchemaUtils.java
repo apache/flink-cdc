@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.mongodb.utils;
 
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
@@ -37,8 +36,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.FULL_DOCUMENT_FIELD;
 
 /** Utilities for converting from debezium {@link Table} types to {@link Schema}. */
 public class MongoDBSchemaUtils {
@@ -73,13 +70,7 @@ public class MongoDBSchemaUtils {
     }
 
     public static Schema getTableSchema(MongoDBSourceConfig sourceConfig, TableId tableId) {
-        return Schema.newBuilder()
-                .setColumns(
-                        Collections.singletonList(
-                                Column.physicalColumn(
-                                        FULL_DOCUMENT_FIELD, DataTypes.STRING(), "fullDocument")))
-                .comment("")
-                .build();
+        return MongoDBSchemaUtils.getJsonSchema();
     }
 
     public static List<String> listDatabases(MongoClient client) throws SQLException {
