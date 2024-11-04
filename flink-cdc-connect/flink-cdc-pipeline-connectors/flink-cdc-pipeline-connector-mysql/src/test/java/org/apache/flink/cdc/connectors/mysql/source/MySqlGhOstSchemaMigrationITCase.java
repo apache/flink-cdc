@@ -51,6 +51,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Container;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
 import java.io.IOException;
@@ -71,12 +73,19 @@ import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtil
 import static org.junit.Assert.assertEquals;
 
 /**
- * IT case for Evolving MySQL schema with gh-ost utility. See <a
- * href="https://github.com/github/gh-ost">github/gh-ost</a> for more details.
+ * IT case for Evolving MySQL schema with gh-ost/pt-osc utility. See <a
+ * href="https://github.com/github/gh-ost">github/gh-ost</a>/<a
+ * href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">doc/pt-osc</a> for
+ * more details.
  */
 public class MySqlGhOstSchemaMigrationITCase extends MySqlSourceTestBase {
     private static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
+
+    private static final String PERCONA_TOOLKIT = "perconalab/percona-toolkit";
+
+    protected static final GenericContainer<?> PERCONA_TOOLKIT_CONTAINER =
+            createPerconaToolkitContainer();
 
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL8_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
@@ -93,6 +102,7 @@ public class MySqlGhOstSchemaMigrationITCase extends MySqlSourceTestBase {
     public static void beforeClass() {
         LOG.info("Starting MySql8 containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
+        Startables.deepStart(Stream.of(PERCONA_TOOLKIT_CONTAINER)).join();
         LOG.info("Container MySql8 is started.");
     }
 
@@ -100,6 +110,7 @@ public class MySqlGhOstSchemaMigrationITCase extends MySqlSourceTestBase {
     public static void afterClass() {
         LOG.info("Stopping MySql8 containers...");
         MYSQL8_CONTAINER.stop();
+        PERCONA_TOOLKIT_CONTAINER.stop();
         LOG.info("Container MySql8 is stopped.");
     }
 
@@ -126,6 +137,16 @@ public class MySqlGhOstSchemaMigrationITCase extends MySqlSourceTestBase {
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static GenericContainer<?> createPerconaToolkitContainer() {
+        GenericContainer<?> perconaToolkit =
+                new GenericContainer<>(PERCONA_TOOLKIT)
+                        // keep container alive
+                        .withCommand("tail", "-f", "/dev/null")
+                        .withNetwork(NETWORK)
+                        .withLogConsumer(new Slf4jLogConsumer(LOG));
+        return perconaToolkit;
     }
 
     @Test
@@ -289,6 +310,192 @@ public class MySqlGhOstSchemaMigrationITCase extends MySqlSourceTestBase {
             statement.execute(
                     String.format(
                             "INSERT INTO `%s`.`customers` VALUES (10002, 'Cicada', 'Urumqi', '123567891234');",
+                            customerDatabase.getDatabaseName()));
+        }
+
+        Schema schemaV4 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
+                        .physicalColumn("address", DataTypes.VARCHAR(1024))
+                        .physicalColumn("phone_number", DataTypes.VARCHAR(512))
+                        .primaryKey(Collections.singletonList("id"))
+                        .build();
+
+        assertEquals(
+                Arrays.asList(
+                        new DropColumnEvent(tableId, Collections.singletonList("ext")),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generate(schemaV4, 10002, "Cicada", "Urumqi", "123567891234"))),
+                fetchResults(events, 2));
+    }
+
+    @Test
+    public void testPtOscSchemaMigrationFromScratch() throws Exception {
+        LOG.info("Step 2: Start pipeline job");
+        //        Thread.sleep(5000000);
+        env.setParallelism(1);
+        customerDatabase.createAndInitialize();
+        TableId tableId = TableId.tableId(customerDatabase.getDatabaseName(), "customers_1");
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(MYSQL8_CONTAINER.getHost())
+                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(customerDatabase.getDatabaseName())
+                        .tableList(customerDatabase.getDatabaseName() + "\\.customers_1")
+                        .startupOptions(StartupOptions.initial())
+                        .serverId(getServerId(env.getParallelism()))
+                        .serverTimeZone("UTC")
+                        .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue())
+                        .parseOnLineSchemaChanges(true);
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(5_000);
+
+        List<Event> expected = new ArrayList<>();
+        Schema schemaV1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
+                        .physicalColumn("address", DataTypes.VARCHAR(1024))
+                        .physicalColumn("phone_number", DataTypes.VARCHAR(512))
+                        .primaryKey(Collections.singletonList("id"))
+                        .build();
+        expected.add(new CreateTableEvent(tableId, schemaV1));
+        expected.addAll(getSnapshotExpected(tableId, schemaV1));
+        List<Event> actual = fetchResults(events, expected.size());
+        assertEqualsInAnyOrder(
+                expected.stream().map(Object::toString).collect(Collectors.toList()),
+                actual.stream().map(Object::toString).collect(Collectors.toList()));
+
+        LOG.info("Step 3: Evolve schema with pt-osc - ADD COLUMN");
+        execInContainer(
+                PERCONA_TOOLKIT_CONTAINER,
+                "evolve schema",
+                "pt-online-schema-change",
+                "--user=" + TEST_USER,
+                "--host=" + INTER_CONTAINER_MYSQL_ALIAS,
+                "--password=" + TEST_PASSWORD,
+                "P=3306,t=customers_1,D=" + customerDatabase.getDatabaseName(),
+                "--alter",
+                "add column ext int",
+                "--charset=utf8",
+                "--recursion-method=NONE", // Do not look for slave nodes
+                "--print",
+                "--execute");
+
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            // The new column `ext` has been inserted now
+            statement.execute(
+                    String.format(
+                            "INSERT INTO `%s`.`customers_1` VALUES (10000, 'Alice', 'Beijing', '123567891234', 17);",
+                            customerDatabase.getDatabaseName()));
+        }
+
+        Schema schemaV2 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
+                        .physicalColumn("address", DataTypes.VARCHAR(1024))
+                        .physicalColumn("phone_number", DataTypes.VARCHAR(512))
+                        .physicalColumn("ext", DataTypes.INT())
+                        .primaryKey(Collections.singletonList("id"))
+                        .build();
+
+        assertEquals(
+                Arrays.asList(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                new PhysicalColumn("ext", DataTypes.INT(), null)))),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generate(schemaV2, 10000, "Alice", "Beijing", "123567891234", 17))),
+                fetchResults(events, 2));
+
+        LOG.info("Step 4: Evolve schema with pt-osc - MODIFY COLUMN");
+        execInContainer(
+                PERCONA_TOOLKIT_CONTAINER,
+                "evolve schema",
+                "pt-online-schema-change",
+                "--user=" + TEST_USER,
+                "--host=" + INTER_CONTAINER_MYSQL_ALIAS,
+                "--password=" + TEST_PASSWORD,
+                "P=3306,t=customers_1,D=" + customerDatabase.getDatabaseName(),
+                "--alter",
+                "modify column ext double",
+                "--charset=utf8",
+                "--recursion-method=NONE",
+                "--print",
+                "--execute");
+
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    String.format(
+                            "INSERT INTO `%s`.`customers_1` VALUES (10001, 'Bob', 'Chongqing', '123567891234', 2.718281828);",
+                            customerDatabase.getDatabaseName()));
+        }
+
+        Schema schemaV3 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
+                        .physicalColumn("address", DataTypes.VARCHAR(1024))
+                        .physicalColumn("phone_number", DataTypes.VARCHAR(512))
+                        .physicalColumn("ext", DataTypes.DOUBLE())
+                        .primaryKey(Collections.singletonList("id"))
+                        .build();
+
+        assertEquals(
+                Arrays.asList(
+                        new AlterColumnTypeEvent(
+                                tableId, Collections.singletonMap("ext", DataTypes.DOUBLE())),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generate(
+                                        schemaV3,
+                                        10001,
+                                        "Bob",
+                                        "Chongqing",
+                                        "123567891234",
+                                        2.718281828))),
+                fetchResults(events, 2));
+
+        LOG.info("Step 5: Evolve schema with pt-osc - DROP COLUMN");
+        execInContainer(
+                PERCONA_TOOLKIT_CONTAINER,
+                "evolve schema",
+                "pt-online-schema-change",
+                "--user=" + TEST_USER,
+                "--host=" + INTER_CONTAINER_MYSQL_ALIAS,
+                "--password=" + TEST_PASSWORD,
+                "P=3306,t=customers_1,D=" + customerDatabase.getDatabaseName(),
+                "--alter",
+                "drop column ext",
+                "--charset=utf8",
+                "--recursion-method=NONE",
+                "--print",
+                "--execute");
+
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    String.format(
+                            "INSERT INTO `%s`.`customers_1` VALUES (10002, 'Cicada', 'Urumqi', '123567891234');",
                             customerDatabase.getDatabaseName()));
         }
 
