@@ -213,7 +213,7 @@ public class StarRocksPipelineITCase extends StarRocksSinkTestBase {
         List<String> actual = fetchTableContent(tableId, 4);
         List<String> expected =
                 Arrays.asList(
-                        "17 | 6.28 | Doris Day | 2023-01-01 00:00:00.0",
+                        "17 | 6.28 | StarRocks | 2023-01-01 00:00:00.0",
                         "21 | 1.732 | Disenchanted | 2023-01-01 00:00:00.0");
 
         assertEqualsInAnyOrder(expected, actual);
