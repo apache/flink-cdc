@@ -63,10 +63,6 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("database.user", checkNotNull(username));
         props.setProperty("database.password", checkNotNull(password));
         props.setProperty("database.port", String.valueOf(port));
-        // props.setProperty("hostname", checkNotNull(hostname));
-        // props.setProperty("user", checkNotNull(username));
-        // props.setProperty("password", checkNotNull(password));
-        // props.setProperty("port", String.valueOf(port));
         props.setProperty("database.fetchSize", String.valueOf(fetchSize));
         props.setProperty("database.responseBuffering", "adaptive");
         props.setProperty("database.serverTimezone", serverTimeZone);
