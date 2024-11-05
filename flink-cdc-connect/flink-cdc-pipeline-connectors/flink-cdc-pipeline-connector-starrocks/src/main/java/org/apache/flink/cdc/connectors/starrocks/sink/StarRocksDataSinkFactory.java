@@ -122,6 +122,11 @@ public class StarRocksDataSinkFactory implements DataSinkFactory {
                                 sinkConfig.set(
                                         StarRocksSinkOptions.SINK_METRIC_HISTOGRAM_WINDOW_SIZE,
                                         config));
+
+        cdcConfig
+                .getOptional(StarRocksDataSinkOptions.SINK_VERSION)
+                .ifPresent(config -> sinkConfig.set(StarRocksSinkOptions.SINK_VERSION, config));
+
         // specified sink configurations for cdc scenario
         sinkConfig.set(StarRocksSinkOptions.DATABASE_NAME, "*");
         sinkConfig.set(StarRocksSinkOptions.TABLE_NAME, "*");
@@ -176,6 +181,7 @@ public class StarRocksDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(StarRocksDataSinkOptions.SINK_METRIC_HISTOGRAM_WINDOW_SIZE);
         optionalOptions.add(StarRocksDataSinkOptions.TABLE_CREATE_NUM_BUCKETS);
         optionalOptions.add(StarRocksDataSinkOptions.TABLE_SCHEMA_CHANGE_TIMEOUT);
+        optionalOptions.add(StarRocksDataSinkOptions.SINK_VERSION);
         return optionalOptions;
     }
 }

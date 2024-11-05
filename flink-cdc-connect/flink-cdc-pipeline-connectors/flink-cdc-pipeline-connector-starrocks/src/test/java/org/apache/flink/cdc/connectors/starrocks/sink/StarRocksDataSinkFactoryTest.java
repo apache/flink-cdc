@@ -150,4 +150,26 @@ public class StarRocksDataSinkFactoryTest {
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
         Assertions.assertThat(dataSink).isInstanceOf(StarRocksDataSink.class);
     }
+
+    @Test
+    void testSpecifiedSinkVersion() {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);
+
+        Configuration conf =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put("jdbc-url", "jdbc:mysql://127.0.0.1:9030")
+                                .put("load-url", "127.0.0.1:8030")
+                                .put("username", "root")
+                                .put("password", "")
+                                .put("sink.version", "V1")
+                                .build());
+        DataSink dataSink =
+                sinkFactory.createDataSink(
+                        new FactoryHelper.DefaultContext(
+                                conf, conf, Thread.currentThread().getContextClassLoader()));
+        Assertions.assertThat(dataSink).isInstanceOf(StarRocksDataSink.class);
+    }
 }

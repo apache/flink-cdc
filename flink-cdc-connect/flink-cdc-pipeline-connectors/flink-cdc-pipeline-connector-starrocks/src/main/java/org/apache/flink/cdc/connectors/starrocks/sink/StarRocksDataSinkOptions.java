@@ -119,6 +119,16 @@ public class StarRocksDataSinkOptions {
                     .defaultValue(100)
                     .withDescription("Window size of histogram metrics.");
 
+    public static final ConfigOption<String> SINK_VERSION =
+            ConfigOptions.key("sink.version")
+                    .stringType()
+                    .defaultValue(StarRocksSinkOptions.SINK_VERSION.defaultValue())
+                    .withDescription(
+                            "The interface used to load data. This parameter is supported from Flink connector version 1.2.4 onwards.\n"
+                                    + "V1: Use Stream Load interface to load data. Connectors before 1.2.4 only support this mode.\n"
+                                    + "V2: Use Transaction Stream Load interface to load data. It requires StarRocks to be at least version 2.4. Recommends V2 because it optimizes the memory usage and provides a more stable exactly-once implementation.\n"
+                                    + "AUTO: If the version of StarRocks supports transaction Stream Load, will choose V2 automatically, otherwise choose V1.");
+
     /** The prefix for stream load properties, such as sink.properties.timeout. */
     public static final String SINK_PROPERTIES_PREFIX = StarRocksSinkOptions.SINK_PROPERTIES_PREFIX;
 
