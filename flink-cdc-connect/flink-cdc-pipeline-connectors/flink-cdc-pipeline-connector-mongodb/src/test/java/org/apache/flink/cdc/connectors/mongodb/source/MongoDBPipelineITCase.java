@@ -108,7 +108,6 @@ public class MongoDBPipelineITCase extends MongoDBSourceTestBase {
         FlinkSourceProvider sourceProvider =
                 (FlinkSourceProvider) new MongoDBDataSource(configFactory).getEventSourceProvider();
 
-        // set the source parallelism to 2
         CloseableIterator<Event> events =
                 env.fromSource(
                                 sourceProvider.getSource(),

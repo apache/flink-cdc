@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mongodb.source;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
@@ -59,5 +60,10 @@ public class MongoDBDataSource implements DataSource {
     @Override
     public MetadataAccessor getMetadataAccessor() {
         return new MongoDBMetadataAccessor(sourceConfig, SchemaParseMode.SCHEMA_LESS);
+    }
+
+    @VisibleForTesting
+    public MongoDBSourceConfig getSourceConfig() {
+        return sourceConfig;
     }
 }

@@ -84,7 +84,7 @@ public class MongoDBDataSourceFactory implements DataSourceFactory {
 
         String username = config.get(USERNAME);
         String password = config.get(PASSWORD);
-        String collections = config.get(TABLES);
+        String tables = config.get(TABLES);
 
         StartupOptions startupOptions = getStartupOptions(config);
 
@@ -139,16 +139,14 @@ public class MongoDBDataSourceFactory implements DataSourceFactory {
         }
 
         if (scanChangeStreamNewlyAddedTableEnabled) {
-            String newTables = validateTableAndReturnDebeziumStyle(collections);
+            String newTables = validateTableAndReturnDebeziumStyle(tables);
             configFactory.collectionList(newTables);
-
         } else {
-            Selectors selectors =
-                    new Selectors.SelectorsBuilder().includeTables(collections).build();
+            Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
             List<String> capturedTables = getTableList(tableIds, selectors);
             if (capturedTables.isEmpty()) {
                 throw new IllegalArgumentException(
-                        "Cannot find any collection by the option 'collections' = " + collections);
+                        "Cannot find any collection by the option 'tables' = " + tables);
             }
             configFactory.collectionList(capturedTables.toArray(new String[0]));
         }
