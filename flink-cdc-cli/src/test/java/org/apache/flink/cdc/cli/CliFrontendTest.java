@@ -20,6 +20,7 @@ package org.apache.flink.cdc.cli;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.jobgraph.RestoreMode;
 
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
@@ -117,6 +118,11 @@ class CliFrontendTest {
                         "kubernetes-application",
                         "-n");
         assertThat(executor.getDeploymentTarget()).isEqualTo("kubernetes-application");
+
+        executor =
+                createExecutor(
+                        pipelineDef(), "--flink-home", flinkHome(), "-t", "yarn-application", "-n");
+        assertThat(executor.getDeploymentTarget()).isEqualTo("yarn-application");
     }
 
     @Test
@@ -126,7 +132,7 @@ class CliFrontendTest {
         CliExecutor executor =
                 createExecutor(
                         pipelineDef(), "--flink-home", flinkHome(), "--jar", aJar, "--jar", bJar);
-        assertThat(executor.getAdditionalJars()).contains(Paths.get(aJar), Paths.get(bJar));
+        assertThat(executor.getAdditionalJars()).contains(new Path(aJar), new Path(bJar));
     }
 
     @Test
@@ -140,7 +146,7 @@ class CliFrontendTest {
                         globalPipelineConfig());
         NoOpComposer composer = new NoOpComposer();
         executor.setComposer(composer);
-        PipelineExecution.ExecutionInfo executionInfo = executor.run();
+        PipelineExecution.ExecutionInfo executionInfo = executor.deployWithNoOpComposer();
         assertThat(executionInfo.getId()).isEqualTo("fake-id");
         assertThat(executionInfo.getDescription()).isEqualTo("fake-description");
     }
