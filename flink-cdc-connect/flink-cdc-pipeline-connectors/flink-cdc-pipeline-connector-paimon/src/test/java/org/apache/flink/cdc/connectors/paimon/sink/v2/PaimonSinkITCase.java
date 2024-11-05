@@ -84,7 +84,7 @@ public class PaimonSinkITCase {
 
     private BinaryRecordDataGenerator generator;
 
-    private static int checkpointId = 0;
+    private static int checkpointId = 1;
 
     public static final String TEST_DATABASE = "test";
     private static final String HADOOP_CONF_DIR =
