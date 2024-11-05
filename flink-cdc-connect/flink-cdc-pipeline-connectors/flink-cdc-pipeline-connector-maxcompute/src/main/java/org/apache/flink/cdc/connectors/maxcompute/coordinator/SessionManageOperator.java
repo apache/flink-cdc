@@ -194,7 +194,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
     }
 
     private void emitLatestSchema(TableId tableId) throws Exception {
-        Optional<Schema> schema = schemaEvolutionClient.getLatestSchema(tableId);
+        Optional<Schema> schema = schemaEvolutionClient.getLatestOriginalSchema(tableId);
         if (schema.isPresent()) {
             Schema latestSchema = schema.get();
             schemaMaps.put(tableId, latestSchema);
