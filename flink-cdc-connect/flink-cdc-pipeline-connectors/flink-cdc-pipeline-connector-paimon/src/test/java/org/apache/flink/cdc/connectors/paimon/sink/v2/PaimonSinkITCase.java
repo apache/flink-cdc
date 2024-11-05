@@ -492,8 +492,7 @@ public class PaimonSinkITCase {
                                     table1,
                                     generator.generate(
                                             new Object[] {
-                                                BinaryStringData.fromString(
-                                                        Integer.toString(i)),
+                                                BinaryStringData.fromString(Integer.toString(i)),
                                                 BinaryStringData.fromString(Integer.toString(i))
                                             })));
             Assertions.assertDoesNotThrow(
@@ -503,7 +502,7 @@ public class PaimonSinkITCase {
                         }
                     });
             writer.flush(false);
-            //Checkpoint id start from 1
+            // Checkpoint id start from 1
             long checkpointId = i;
             committer.commit(
                     writer.prepareCommit().stream()
