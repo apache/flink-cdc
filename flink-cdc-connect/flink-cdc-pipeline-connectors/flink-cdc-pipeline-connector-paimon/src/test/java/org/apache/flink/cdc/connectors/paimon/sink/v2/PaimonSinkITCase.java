@@ -84,6 +84,8 @@ public class PaimonSinkITCase {
 
     private BinaryRecordDataGenerator generator;
 
+    private static int checkpointId = 0;
+
     public static final String TEST_DATABASE = "test";
     private static final String HADOOP_CONF_DIR =
             Objects.requireNonNull(
@@ -188,6 +190,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -214,6 +217,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -243,6 +247,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -274,6 +279,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -324,6 +330,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -371,6 +378,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -433,6 +441,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -473,6 +482,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -503,19 +513,9 @@ public class PaimonSinkITCase {
                     });
             writer.flush(false);
             // Checkpoint id start from 1
-            long checkpointId = i;
             committer.commit(
                     writer.prepareCommit().stream()
-                            .map(
-                                    committable -> {
-                                        // update the right checkpointId for MultiTableCommittable
-                                        return new MultiTableCommittable(
-                                                committable.getDatabase(),
-                                                committable.getTable(),
-                                                checkpointId,
-                                                committable.kind(),
-                                                committable.wrappedCommittable());
-                                    })
+                            .map(this::correctCheckpointId)
                             .map(MockCommitRequestImpl::new)
                             .collect(Collectors.toList()));
         }
@@ -544,6 +544,16 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "7", "7"),
                         Row.ofKind(RowKind.INSERT, "8", "8")),
                 result);
+    }
+
+    private MultiTableCommittable correctCheckpointId(MultiTableCommittable committable) {
+        // update the right checkpointId for MultiTableCommittable
+        return new MultiTableCommittable(
+                committable.getDatabase(),
+                committable.getTable(),
+                checkpointId++,
+                committable.kind(),
+                committable.wrappedCommittable());
     }
 
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {
