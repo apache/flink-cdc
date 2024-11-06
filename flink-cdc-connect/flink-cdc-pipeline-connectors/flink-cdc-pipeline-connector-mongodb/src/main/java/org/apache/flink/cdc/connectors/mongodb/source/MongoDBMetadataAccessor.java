@@ -58,6 +58,6 @@ public class MongoDBMetadataAccessor implements MetadataAccessor {
         if (schemaParseMode == SchemaParseMode.SCHEMA_LESS) {
             return MongoDBSchemaUtils.getTableSchema(sourceConfig, tableId);
         }
-        throw new RuntimeException("Unsupported yet.");
+        throw new UnsupportedOperationException("Unsupported yet.");
     }
 }

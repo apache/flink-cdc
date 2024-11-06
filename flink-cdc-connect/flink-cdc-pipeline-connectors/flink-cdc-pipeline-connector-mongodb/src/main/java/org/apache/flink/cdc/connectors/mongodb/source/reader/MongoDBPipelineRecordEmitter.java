@@ -117,6 +117,6 @@ public class MongoDBPipelineRecordEmitter extends MongoDBRecordEmitter<Event> {
         if (schemaParseMode == SchemaParseMode.SCHEMA_LESS) {
             return MongoDBSchemaUtils.getJsonSchema();
         }
-        throw new RuntimeException("Unsupported schema parse mode.");
+        throw new UnsupportedOperationException("Unsupported schema parse mode.");
     }
 }
