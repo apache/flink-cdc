@@ -35,8 +35,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -130,83 +128,127 @@ public class SystemFunctionUtils {
         }
     }
 
-    public static int timestampDiff(
-            String symbol,
+    // Be compatible with the existing definition of Function TIMESTAMP_DIFF
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
             LocalZonedTimestampData fromTimestamp,
-            LocalZonedTimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getEpochMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, TimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, TimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, LocalZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, ZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, LocalZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, ZonedTimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, TimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, ZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(String symbol, long fromDate, long toDate) {
-        Calendar from = Calendar.getInstance();
-        from.setTime(new Date(fromDate));
-        Calendar to = Calendar.getInstance();
-        to.setTime(new Date(toDate));
-        Long second = (to.getTimeInMillis() - from.getTimeInMillis()) / 1000;
-        switch (symbol) {
-            case "SECOND":
-                return second.intValue();
-            case "MINUTE":
-                return second.intValue() / 60;
-            case "HOUR":
-                return second.intValue() / 3600;
-            case "DAY":
-                return second.intValue() / (24 * 3600);
-            case "MONTH":
-                return to.get(Calendar.YEAR) * 12
-                        + to.get(Calendar.MONDAY)
-                        - (from.get(Calendar.YEAR) * 12 + from.get(Calendar.MONDAY));
-            case "YEAR":
-                return to.get(Calendar.YEAR) - from.get(Calendar.YEAR);
-            default:
-                LOG.error("Unsupported timestamp diff: {}", symbol);
-                throw new RuntimeException("Unsupported timestamp diff: " + symbol);
+            LocalZonedTimestampData toTimestamp,
+            String timezone) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
         }
+        return DateTimeUtils.timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getEpochMillisecond(),
+                timezone,
+                toTimestamp.getEpochMillisecond(),
+                timezone);
+    }
+
+    // Be compatible with the existing definition of Function TIMESTAMP_DIFF
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            TimestampData toTimestamp,
+            String timezone) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return DateTimeUtils.timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getMillisecond(),
+                "UTC",
+                toTimestamp.getMillisecond(),
+                "UTC");
+    }
+
+    // Be compatible with the existing definition of Function TIMESTAMP_DIFF
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp,
+            String timezone) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return DateTimeUtils.timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getMillisecond(),
+                "UTC",
+                toTimestamp.getEpochMillisecond(),
+                timezone);
+    }
+
+    // Be compatible with the existing definition of Function TIMESTAMP_DIFF
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            TimestampData toTimestamp,
+            String timezone) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return DateTimeUtils.timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getEpochMillisecond(),
+                timezone,
+                toTimestamp.getMillisecond(),
+                "UTC");
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp,
+            String timezone) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp, timezone);
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            TimestampData toTimestamp,
+            String timezone) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp, timezone);
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp,
+            String timezone) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp, timezone);
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            TimestampData toTimestamp,
+            String timezone) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp, timezone);
+    }
+
+    public static LocalZonedTimestampData timestampadd(
+            String timeIntervalUnit,
+            Integer interval,
+            LocalZonedTimestampData timePoint,
+            String timezone) {
+        if (interval == null || timePoint == null) {
+            return null;
+        }
+        return LocalZonedTimestampData.fromEpochMillis(
+                DateTimeUtils.timestampAdd(
+                        timeIntervalUnit, interval, timePoint.getEpochMillisecond(), timezone));
+    }
+
+    public static TimestampData timestampadd(
+            String timeIntervalUnit, Integer interval, TimestampData timePoint, String timezone) {
+        if (interval == null || timePoint == null) {
+            return null;
+        }
+        return TimestampData.fromMillis(
+                DateTimeUtils.timestampAdd(
+                        timeIntervalUnit, interval, timePoint.getMillisecond(), "UTC"));
     }
 
     public static boolean betweenAsymmetric(String value, String minValue, String maxValue) {

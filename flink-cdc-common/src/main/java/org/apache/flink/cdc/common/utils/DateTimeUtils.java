@@ -25,6 +25,7 @@ import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.TimeZone;
 
@@ -197,5 +198,94 @@ public class DateTimeUtils {
         formatter.setTimeZone(timeZone);
         Date dateTime = new Date(ts);
         return formatter.format(dateTime);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Compare
+    // --------------------------------------------------------------------------------------------
+
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            long fromDate,
+            String fromTimezone,
+            long toDate,
+            String toTimezone) {
+        Calendar from = Calendar.getInstance(TimeZone.getTimeZone(fromTimezone));
+        from.setTime(new Date(fromDate));
+        Calendar to = Calendar.getInstance(TimeZone.getTimeZone(toTimezone));
+        to.setTime(new Date(toDate));
+        long second = (to.getTimeInMillis() - from.getTimeInMillis()) / 1000;
+        switch (timeIntervalUnit) {
+            case "SECOND":
+                if (second > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return (int) second;
+            case "MINUTE":
+                if (second > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return (int) second / 60;
+            case "HOUR":
+                if (second > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return (int) second / 3600;
+            case "DAY":
+                if (second > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return (int) second / (24 * 3600);
+            case "MONTH":
+                return to.get(Calendar.YEAR) * 12
+                        + to.get(Calendar.MONTH)
+                        - (from.get(Calendar.YEAR) * 12 + from.get(Calendar.MONTH));
+            case "YEAR":
+                return to.get(Calendar.YEAR) - from.get(Calendar.YEAR);
+            default:
+                throw new RuntimeException(
+                        String.format(
+                                "Unsupported timestamp interval unit %s. Supported units are: SECOND, MINUTE, HOUR, DAY, MONTH, YEAR",
+                                timeIntervalUnit));
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Add
+    // --------------------------------------------------------------------------------------------
+
+    public static long timestampAdd(
+            String timeIntervalUnit, int interval, long timePoint, String timezone) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeZone(TimeZone.getTimeZone(timezone));
+        calendar.setTime(new Date(timePoint));
+        int field;
+        switch (timeIntervalUnit) {
+            case "SECOND":
+                field = Calendar.SECOND;
+                break;
+            case "MINUTE":
+                field = Calendar.MINUTE;
+                break;
+            case "HOUR":
+                field = Calendar.HOUR;
+                break;
+            case "DAY":
+                field = Calendar.DATE;
+                break;
+            case "MONTH":
+                field = Calendar.MONTH;
+                break;
+            case "YEAR":
+                field = Calendar.YEAR;
+                break;
+            default:
+                throw new RuntimeException(
+                        String.format(
+                                "Unsupported timestamp interval unit %s. Supported units are: SECOND, MINUTE, HOUR, DAY, MONTH, YEAR",
+                                timeIntervalUnit));
+        }
+        calendar.add(field, interval);
+        return calendar.getTimeInMillis();
     }
 }

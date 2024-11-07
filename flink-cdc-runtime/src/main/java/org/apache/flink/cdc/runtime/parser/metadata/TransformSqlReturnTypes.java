@@ -188,4 +188,7 @@ public class TransformSqlReturnTypes {
             return opBinding.getTypeFactory().leastRestrictive(types);
         }
     }
+
+    public static final SqlReturnTypeInference ARG2_TIMESTAMP_FORCE_NULLABLE =
+            new OrdinalReturnTypeInference(2) {};
 }
