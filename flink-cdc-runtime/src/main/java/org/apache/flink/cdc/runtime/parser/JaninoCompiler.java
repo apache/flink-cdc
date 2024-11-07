@@ -68,7 +68,13 @@ public class JaninoCompiler {
             Arrays.asList("DATE_FORMAT");
 
     private static final List<String> TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS =
-            Arrays.asList("TO_DATE", "TO_TIMESTAMP", "FROM_UNIXTIME");
+            Arrays.asList(
+                    "TO_DATE",
+                    "TO_TIMESTAMP",
+                    "FROM_UNIXTIME",
+                    "TIMESTAMPADD",
+                    "TIMESTAMPDIFF",
+                    "TIMESTAMP_DIFF");
 
     public static final String DEFAULT_EPOCH_TIME = "__epoch_time__";
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
@@ -123,13 +129,14 @@ public class JaninoCompiler {
 
     private static Java.Rvalue translateSqlIdentifier(SqlIdentifier sqlIdentifier) {
         String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
-        if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(columnName)) {
+        if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(columnName.toUpperCase())) {
             return generateTimezoneFreeTemporalFunctionOperation(columnName);
-        } else if (TIMEZONE_REQUIRED_TEMPORAL_FUNCTIONS.contains(columnName)) {
+        } else if (TIMEZONE_REQUIRED_TEMPORAL_FUNCTIONS.contains(columnName.toUpperCase())) {
             return generateTimezoneRequiredTemporalFunctionOperation(columnName);
-        } else if (TIMEZONE_FREE_TEMPORAL_CONVERSION_FUNCTIONS.contains(columnName)) {
+        } else if (TIMEZONE_FREE_TEMPORAL_CONVERSION_FUNCTIONS.contains(columnName.toUpperCase())) {
             return generateTimezoneFreeTemporalConversionFunctionOperation(columnName);
-        } else if (TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS.contains(columnName)) {
+        } else if (TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS.contains(
+                columnName.toUpperCase())) {
             return generateTimezoneRequiredTemporalConversionFunctionOperation(columnName);
         } else {
             return new Java.AmbiguousName(Location.NOWHERE, new String[] {columnName});
@@ -165,14 +172,15 @@ public class JaninoCompiler {
         for (SqlNode sqlNode : operandList) {
             translateSqlNodeToAtoms(sqlNode, atoms, udfDescriptors);
         }
-        if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(sqlBasicCall.getOperator().getName())) {
+        if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(
+                sqlBasicCall.getOperator().getName().toUpperCase())) {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_EPOCH_TIME}));
         } else if (TIMEZONE_REQUIRED_TEMPORAL_FUNCTIONS.contains(
-                sqlBasicCall.getOperator().getName())) {
+                sqlBasicCall.getOperator().getName().toUpperCase())) {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_EPOCH_TIME}));
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
         } else if (TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS.contains(
-                sqlBasicCall.getOperator().getName())) {
+                sqlBasicCall.getOperator().getName().toUpperCase())) {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
         }
         return sqlBasicCallToJaninoRvalue(
@@ -275,6 +283,10 @@ public class JaninoCompiler {
                 return generateCompareOperation(sqlBasicCall, atoms);
             case CAST:
                 return generateCastOperation(sqlBasicCall, atoms);
+            case TIMESTAMP_DIFF:
+                return generateTimestampDiffOperation(sqlBasicCall, atoms);
+            case TIMESTAMP_ADD:
+                return generateTimestampAddOperation(sqlBasicCall, atoms);
             case OTHER:
                 return generateOtherOperation(sqlBasicCall, atoms);
             default:
@@ -339,6 +351,75 @@ public class JaninoCompiler {
         }
         return new Java.MethodInvocation(
                 Location.NOWHERE, null, StringUtils.convertToCamelCase(compareMethodName), atoms);
+    }
+
+    private static Java.Rvalue generateTimestampDiffOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (atoms.length != 4) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        String timeIntervalUnit = atoms[0].toString().toUpperCase();
+        switch (timeIntervalUnit) {
+            case "\"SECOND\"":
+            case "\"MINUTE\"":
+            case "\"HOUR\"":
+            case "\"DAY\"":
+            case "\"MONTH\"":
+            case "\"YEAR\"":
+                break;
+            default:
+                throw new ParseException(
+                        "Unsupported time interval unit in timestamp diff function: "
+                                + timeIntervalUnit);
+        }
+        List<Java.Rvalue> timestampDiffFunctionParam = new ArrayList<>();
+        timestampDiffFunctionParam.add(
+                new Java.AmbiguousName(Location.NOWHERE, new String[] {timeIntervalUnit}));
+        timestampDiffFunctionParam.add(atoms[1]);
+        timestampDiffFunctionParam.add(atoms[2]);
+        timestampDiffFunctionParam.add(atoms[3]);
+        return new Java.MethodInvocation(
+                Location.NOWHERE,
+                null,
+                StringUtils.convertToCamelCase(sqlBasicCall.getOperator().getName()),
+                timestampDiffFunctionParam.toArray(new Java.Rvalue[0]));
+    }
+
+    private static Java.Rvalue generateTimestampAddOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (atoms.length != 4) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        String timeIntervalUnit = atoms[0].toString().toUpperCase();
+        switch (timeIntervalUnit) {
+            case "\"SECOND\"":
+            case "\"MINUTE\"":
+            case "\"HOUR\"":
+            case "\"DAY\"":
+            case "\"MONTH\"":
+            case "\"YEAR\"":
+                break;
+            default:
+                throw new ParseException(
+                        "Unsupported time interval unit in timestamp add function: "
+                                + timeIntervalUnit);
+        }
+        List<Java.Rvalue> timestampDiffFunctionParam = new ArrayList<>();
+        timestampDiffFunctionParam.add(
+                new Java.AmbiguousName(Location.NOWHERE, new String[] {timeIntervalUnit}));
+        timestampDiffFunctionParam.add(atoms[1]);
+        timestampDiffFunctionParam.add(atoms[2]);
+        timestampDiffFunctionParam.add(atoms[3]);
+        return new Java.MethodInvocation(
+                Location.NOWHERE,
+                null,
+                StringUtils.convertToCamelCase(sqlBasicCall.getOperator().getName()),
+                timestampDiffFunctionParam.toArray(new Java.Rvalue[0]));
+    }
+
+    private static Java.Rvalue generateCharLengthOperation(Java.Rvalue[] atoms) {
+        return new Java.MethodInvocation(
+                Location.NOWHERE, null, StringUtils.convertToCamelCase("CHAR_LENGTH"), atoms);
     }
 
     private static Java.Rvalue generateOtherOperation(
