@@ -116,9 +116,21 @@ public class SystemFunctionUtils {
                 symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getEpochMillisecond());
     }
 
+    public static int timestampdiff(
+            String symbol,
+            LocalZonedTimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp, toTimestamp);
+    }
+
     public static int timestampDiff(
             String symbol, TimestampData fromTimestamp, TimestampData toTimestamp) {
         return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
+    }
+
+    public static int timestampdiff(
+            String symbol, TimestampData fromTimestamp, TimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp, toTimestamp);
     }
 
     public static int timestampDiff(
@@ -127,15 +139,30 @@ public class SystemFunctionUtils {
                 symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
     }
 
+    public static int timestampdiff(
+            String symbol, TimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp, toTimestamp);
+    }
+
     public static int timestampDiff(
             String symbol, LocalZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
         return timestampDiff(
                 symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
     }
 
+    public static int timestampdiff(
+            String symbol, LocalZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp, toTimestamp);
+    }
+
     public static int timestampDiff(
             String symbol, ZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
         return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
+    }
+
+    public static int timestampdiff(
+            String symbol, ZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp, toTimestamp);
     }
 
     public static int timestampDiff(
@@ -144,10 +171,20 @@ public class SystemFunctionUtils {
                 symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
     }
 
+    public static int timestampdiff(
+            String symbol, LocalZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp, toTimestamp);
+    }
+
     public static int timestampDiff(
             String symbol, ZonedTimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
         return timestampDiff(
                 symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
+    }
+
+    public static int timestampdiff(
+            String symbol, ZonedTimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp, toTimestamp);
     }
 
     public static int timestampDiff(
@@ -155,9 +192,19 @@ public class SystemFunctionUtils {
         return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
     }
 
+    public static int timestampdiff(
+            String symbol, TimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp, toTimestamp);
+    }
+
     public static int timestampDiff(
             String symbol, ZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
         return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
+    }
+
+    public static int timestampdiff(
+            String symbol, ZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
+        return timestampDiff(symbol, fromTimestamp, toTimestamp);
     }
 
     public static int timestampDiff(String symbol, long fromDate, long toDate) {
@@ -185,6 +232,53 @@ public class SystemFunctionUtils {
                 LOG.error("Unsupported timestamp diff: {}", symbol);
                 throw new RuntimeException("Unsupported timestamp diff: " + symbol);
         }
+    }
+
+    public static TimestampData timestampadd(
+            String timeintervalunit, int interval, LocalZonedTimestampData timepoint) {
+        return timestampadd(timeintervalunit, interval, timepoint.getEpochMillisecond());
+    }
+
+    public static TimestampData timestampadd(
+            String timeintervalunit, int interval, ZonedTimestampData timepoint) {
+        return timestampadd(timeintervalunit, interval, timepoint.getMillisecond());
+    }
+
+    public static TimestampData timestampadd(
+            String timeintervalunit, int interval, TimestampData timepoint) {
+        return timestampadd(timeintervalunit, interval, timepoint.getMillisecond());
+    }
+
+    public static TimestampData timestampadd(
+            String timeintervalunit, int interval, long timepoint) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(new Date(timepoint));
+        int field;
+        switch (timeintervalunit) {
+            case "SECOND":
+                field = Calendar.SECOND;
+                break;
+            case "MINUTE":
+                field = Calendar.MINUTE;
+                break;
+            case "HOUR":
+                field = Calendar.HOUR;
+                break;
+            case "DAY":
+                field = Calendar.DAY_OF_YEAR;
+                break;
+            case "MONTH":
+                field = Calendar.MONTH;
+                break;
+            case "YEAR":
+                field = Calendar.YEAR;
+                break;
+            default:
+                LOG.error("Unsupported timestamp add: {}", timeintervalunit);
+                throw new RuntimeException("Unsupported timestamp add: " + timeintervalunit);
+        }
+        calendar.add(field, interval);
+        return TimestampData.fromMillis(calendar.getTimeInMillis());
     }
 
     public static boolean betweenAsymmetric(String value, String minValue, String maxValue) {
