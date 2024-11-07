@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.pipeline.tests;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -36,6 +37,7 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
@@ -210,7 +212,8 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                                 + "  type: values\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + "  schema.change.behavior: evolve",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -329,6 +332,84 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.products, before=[], after=[114, evangelion, Eva, 2.1728, null, null, null], op=INSERT, meta=()}",
                 "TruncateTableEvent{tableId=%s.products}",
                 "DropTableEvent{tableId=%s.products}");
+    }
+
+    @Test
+    public void testDanglingDropTableEventInBinlog() throws Exception {
+        // Create a new table for later deletion
+        try (Connection connection = mysqlInventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE live_fast(ID INT PRIMARY KEY);");
+        }
+
+        String logFileName = null;
+        Long logPosition = null;
+
+        try (Connection connection = mysqlInventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            ResultSet rs = statement.executeQuery("SHOW BINARY LOGS;");
+            while (rs.next()) {
+                logFileName = rs.getString("Log_name");
+                logPosition = rs.getLong("File_size");
+            }
+        }
+
+        // We start reading binlog from the tail of current position and file to avoid reading
+        // previous events. The next DDL event (DROP TABLE) will push binlog position forward.
+        Preconditions.checkNotNull(logFileName, "Log file name must not be null");
+        Preconditions.checkNotNull(logPosition, "Log position name must not be null");
+        LOG.info("Trying to restore from {} @ {}...", logFileName, logPosition);
+
+        try (Connection connection = mysqlInventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("DROP TABLE live_fast;");
+        }
+
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "  scan.startup.mode: specific-offset\n"
+                                + "  scan.startup.specific-offset.file: %s\n"
+                                + "  scan.startup.specific-offset.pos: %d\n"
+                                + "  scan.binlog.newly-added-table.enabled: true\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d\n"
+                                + "  schema.change.behavior: evolve",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        logFileName,
+                        logPosition,
+                        parallelism);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+        waitUntilSpecificEvent(
+                String.format(
+                        "Table %s.live_fast received SchemaChangeEvent DropTableEvent{tableId=%s.live_fast} and start to be blocked.",
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        mysqlInventoryDatabase.getDatabaseName()));
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "Schema change event DropTableEvent{tableId=%s.live_fast} has been handled in another subTask already.",
+                        mysqlInventoryDatabase.getDatabaseName()));
     }
 
     private void validateResult(String... expectedEvents) throws Exception {

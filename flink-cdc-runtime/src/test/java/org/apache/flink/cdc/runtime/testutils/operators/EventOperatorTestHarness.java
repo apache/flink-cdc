@@ -38,7 +38,6 @@ import org.apache.flink.cdc.runtime.testutils.schema.TestingSchemaRegistryGatewa
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
-import org.apache.flink.runtime.operators.coordination.MockOperatorCoordinatorContext;
 import org.apache.flink.runtime.operators.testutils.DummyEnvironment;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
@@ -56,6 +55,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Set;
+import java.util.concurrent.Executors;
 
 import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.unwrap;
 
@@ -81,6 +81,7 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
     private final SchemaRegistry schemaRegistry;
     private final TestingSchemaRegistryGateway schemaRegistryGateway;
     private final LinkedList<StreamRecord<E>> outputRecords = new LinkedList<>();
+    private final MockedOperatorCoordinatorContext mockedContext;
 
     public EventOperatorTestHarness(OP operator, int numOutputs) {
         this(operator, numOutputs, null, SchemaChangeBehavior.EVOLVE);
@@ -94,11 +95,14 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
             OP operator, int numOutputs, Duration duration, SchemaChangeBehavior behavior) {
         this.operator = operator;
         this.numOutputs = numOutputs;
+        this.mockedContext =
+                new MockedOperatorCoordinatorContext(
+                        SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader());
         schemaRegistry =
                 new SchemaRegistry(
                         "SchemaOperator",
-                        new MockOperatorCoordinatorContext(
-                                SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
+                        mockedContext,
+                        Executors.newFixedThreadPool(1),
                         new CollectingMetadataApplier(duration),
                         new ArrayList<>(),
                         behavior);
@@ -113,11 +117,14 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
             Set<SchemaChangeEventType> enabledEventTypes) {
         this.operator = operator;
         this.numOutputs = numOutputs;
+        this.mockedContext =
+                new MockedOperatorCoordinatorContext(
+                        SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader());
         schemaRegistry =
                 new SchemaRegistry(
                         "SchemaOperator",
-                        new MockOperatorCoordinatorContext(
-                                SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
+                        mockedContext,
+                        Executors.newFixedThreadPool(1),
                         new CollectingMetadataApplier(duration, enabledEventTypes),
                         new ArrayList<>(),
                         behavior);
@@ -133,11 +140,14 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
             Set<SchemaChangeEventType> errorsOnEventTypes) {
         this.operator = operator;
         this.numOutputs = numOutputs;
+        this.mockedContext =
+                new MockedOperatorCoordinatorContext(
+                        SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader());
         schemaRegistry =
                 new SchemaRegistry(
                         "SchemaOperator",
-                        new MockOperatorCoordinatorContext(
-                                SCHEMA_OPERATOR_ID, Thread.currentThread().getContextClassLoader()),
+                        mockedContext,
+                        Executors.newFixedThreadPool(1),
                         new CollectingMetadataApplier(
                                 duration, enabledEventTypes, errorsOnEventTypes),
                         new ArrayList<>(),
@@ -164,7 +174,7 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
 
     public void registerTableSchema(TableId tableId, Schema schema) {
         schemaRegistry.handleCoordinationRequest(
-                new SchemaChangeRequest(tableId, new CreateTableEvent(tableId, schema)));
+                new SchemaChangeRequest(tableId, new CreateTableEvent(tableId, schema), 0));
         schemaRegistry.handleApplyEvolvedSchemaChangeRequest(new CreateTableEvent(tableId, schema));
     }
 
@@ -194,6 +204,14 @@ public class EventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E ex
                                         .get()))
                 .getSchema()
                 .orElse(null);
+    }
+
+    public boolean isJobFailed() {
+        return mockedContext.isJobFailed();
+    }
+
+    public Throwable getJobFailureCause() {
+        return mockedContext.getFailureCause();
     }
 
     @Override
