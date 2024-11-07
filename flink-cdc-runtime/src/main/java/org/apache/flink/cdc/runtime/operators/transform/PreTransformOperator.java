@@ -260,7 +260,6 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private Optional<SchemaChangeEvent> cacheChangeSchema(SchemaChangeEvent event) {
         TableId tableId = event.tableId();
         PreTransformChangeInfo tableChangeInfo = preTransformChangeInfoMap.get(tableId);
-
         Schema originalSchema =
                 SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getSourceSchema(), event);
         Schema preTransformedSchema = tableChangeInfo.getPreTransformedSchema();
@@ -270,8 +269,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             // If this TableId is asterisk-ful, we should use the latest upstream schema as
             // referenced columns to perform schema evolution, not of the original ones generated
             // when creating tables. If hasAsteriskMap has no entry for this TableId, it means that
-            // this TableId has not been captured by any transform rules, and should be regarded as
-            // asterisk-ful by default.
+            // this TableId has not been referenced by any transform rules, and should be regarded
+            // as asterisk-ful by default.
             schemaChangeEvent =
                     SchemaUtils.transformSchemaChangeEvent(
                             true, tableChangeInfo.getSourceSchema().getColumnNames(), event);
