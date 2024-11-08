@@ -247,10 +247,10 @@ public class LogMinerStreamingChangeEventSource
                                 retryAttempts++;
                             } else {
                                 retryAttempts = 1;
-                                startScn = processor.process(partition, startScn, endScn);
                                 streamingMetrics.setCurrentBatchProcessingTime(
                                         Duration.between(start, Instant.now()));
                                 captureSessionMemoryStatistics(jdbcConnection);
+                                startScn = processor.process(partition, startScn, endScn);
                             }
                             pauseBetweenMiningSessions();
                         }
