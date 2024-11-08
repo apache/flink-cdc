@@ -120,31 +120,25 @@ public class MysqlDebeziumTimeConverter
                     try {
                         return convertDateObject(field, value, columnType);
                     } catch (Exception e) {
-                        printConvertDateErrorClassLogs(field, registration, value);
+                        logConvertDateError(field, value);
                         throw new RuntimeException("MysqlDebeziumConverter error", e);
                     }
                 });
     }
 
-    private void printConvertDateErrorClassLogs(
-            RelationalColumn field,
-            ConverterRegistration<SchemaBuilder> registration,
-            Object value) {
-        boolean useDefaultValueConvert = (value == null);
+    private void logConvertDateError(RelationalColumn field, Object value) {
         String fieldName = field.name();
         String fieldType = field.typeName().toUpperCase();
         String defaultValue = "null";
-        if (field.hasDefaultValue()) {
-            if (field.defaultValue() != null) {
-                defaultValue = field.defaultValue().toString();
-            }
+        if (field.hasDefaultValue() && field.defaultValue() != null) {
+            defaultValue = field.defaultValue().toString();
         }
-        log.warn(
+        log.error(
                 "Find schema need to change dateType, but failed. Field name:{}, field type:{}, "
-                        + "useDefaultValueConvert:{}, field default value:{}",
+                        + "field value:{}, field default value:{}",
                 fieldName,
                 fieldType,
-                useDefaultValueConvert,
+                value == null ? "null" : value,
                 defaultValue);
     }
 
