@@ -26,14 +26,12 @@ import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlDatabaseSchema;
 import io.debezium.connector.mysql.MySqlSystemVariables;
-import io.debezium.connector.mysql.MySqlTextProtocolFieldReader;
 import io.debezium.connector.mysql.MySqlTopicSelector;
 import io.debezium.connector.mysql.MySqlValueConverters;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.jdbc.JdbcValueConverters;
 import io.debezium.jdbc.TemporalPrecisionMode;
 import io.debezium.relational.TableId;
-import io.debezium.relational.history.AbstractDatabaseHistory;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
 
@@ -46,15 +44,8 @@ public class MySqlConnectionUtils {
 
     /** Creates a new {@link MySqlConnection}, but not open the connection. */
     public static MySqlConnection createMySqlConnection(Configuration dbzConfiguration) {
-        final MySqlConnectorConfig connectorConfig =
-                new MySqlConnectorConfig(
-                        dbzConfiguration
-                                .edit()
-                                .with(AbstractDatabaseHistory.INTERNAL_PREFER_DDL, true)
-                                .build());
         return new MySqlConnection(
-                new MySqlConnection.MySqlConnectionConfiguration(dbzConfiguration),
-                new MySqlTextProtocolFieldReader(connectorConfig));
+                new MySqlConnection.MySqlConnectionConfiguration(dbzConfiguration));
     }
 
     /** Creates a new {@link BinaryLogClient} for consuming mysql binlog. */

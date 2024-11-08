@@ -85,7 +85,6 @@ public class MySqlSourceConfigFactory extends JdbcSourceConfigFactory {
         // but it'll cause lose of precise when the value is larger than 2^63,
         // so use "precise" mode to avoid it.
         props.put("bigint.unsigned.handling.mode", "precise");
-        props.put("transaction.topic", "transaction_topic");
 
         if (serverIdRange != null) {
             props.setProperty("database.server.id.range", String.valueOf(serverIdRange));
