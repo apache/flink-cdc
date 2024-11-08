@@ -29,6 +29,7 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
@@ -73,7 +74,16 @@ public class OracleSourceTestBase extends TestLogger {
 
     public static final OracleContainer ORACLE_CONTAINER =
             new OracleContainer(
-                            DockerImageName.parse("goodboy008/oracle-19.3.0-ee").withTag("non-cdb"))
+                            DockerImageName.parse("goodboy008/oracle-19.3.0-ee")
+                                    .withTag(
+                                            DockerClientFactory.instance()
+                                                            .client()
+                                                            .versionCmd()
+                                                            .exec()
+                                                            .getArch()
+                                                            .equals("amd64")
+                                                    ? "non-cdb"
+                                                    : "arm-non-cdb"))
                     .withUsername(CONNECTOR_USER)
                     .withPassword(CONNECTOR_PWD)
                     .withDatabaseName(ORACLE_DATABASE)

@@ -15,18 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.event;
+package org.apache.flink.cdc.common.event.visitor;
 
-import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
-import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 
-/**
- * The response from {@link SchemaRegistry} to {@link SchemaOperator} to request apply original
- * schema changes, the evolved schema changes come from original schema changes with different
- * schema evolution strategy.
- */
-public class ApplyEvolvedSchemaChangeResponse implements CoordinationResponse {
-
-    private static final long serialVersionUID = 1L;
+/** Visitor for {@link DropTableEvent}s. */
+@Internal
+@FunctionalInterface
+public interface DropTableEventVisitor<T, E extends Throwable> {
+    T visit(DropTableEvent event) throws E;
 }

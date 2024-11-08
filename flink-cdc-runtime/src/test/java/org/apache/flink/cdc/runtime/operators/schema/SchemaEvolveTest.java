@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -249,7 +250,9 @@ public class SchemaEvolveTest {
             List<Event> alterColumnTypeEvents =
                     Arrays.asList(
                             new AlterColumnTypeEvent(
-                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)),
+                                    tableId,
+                                    ImmutableMap.of("score", BIGINT, "toshi", FLOAT),
+                                    ImmutableMap.of("score", INT, "toshi", SMALLINT)),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -504,7 +507,9 @@ public class SchemaEvolveTest {
             List<Event> alterColumnTypeEvents =
                     Arrays.asList(
                             new AlterColumnTypeEvent(
-                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)),
+                                    tableId,
+                                    ImmutableMap.of("score", BIGINT, "toshi", FLOAT),
+                                    ImmutableMap.of("score", INT, "toshi", SMALLINT)),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1035,9 +1040,16 @@ public class SchemaEvolveTest {
                                         new AddColumnEvent.ColumnWithPosition(
                                                 Column.physicalColumn(
                                                         "height", DOUBLE, "Height data")))));
-        Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents))
-                .isExactlyInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Failed to apply schema change");
+        processEvent(schemaOperator, addColumnEvents);
+        Assertions.assertThat(harness.isJobFailed()).isEqualTo(true);
+        Assertions.assertThat(harness.getJobFailureCause())
+                .cause()
+                .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
+                .matches(
+                        e ->
+                                ((UnsupportedSchemaChangeEventException) e)
+                                        .getExceptionMessage()
+                                        .equals("Sink doesn't support such schema change event."));
         harness.close();
     }
 
@@ -1828,7 +1840,9 @@ public class SchemaEvolveTest {
                                                     Column.physicalColumn(
                                                             "toshi", SMALLINT, null)))),
                             new AlterColumnTypeEvent(
-                                    tableId, Collections.singletonMap("name", STRING)),
+                                    tableId,
+                                    Collections.singletonMap("name", STRING),
+                                    Collections.singletonMap("name", STRING.notNull())),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1906,7 +1920,9 @@ public class SchemaEvolveTest {
             List<Event> alterColumnTypeEvents =
                     Arrays.asList(
                             new AlterColumnTypeEvent(
-                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)),
+                                    tableId,
+                                    ImmutableMap.of("score", BIGINT, "toshi", FLOAT),
+                                    ImmutableMap.of("score", INT, "toshi", SMALLINT)),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1923,7 +1939,9 @@ public class SchemaEvolveTest {
             List<Event> lenientAlterColumnTypeEvents =
                     Arrays.asList(
                             new AlterColumnTypeEvent(
-                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)),
+                                    tableId,
+                                    ImmutableMap.of("score", BIGINT, "toshi", FLOAT),
+                                    ImmutableMap.of("score", INT, "toshi", SMALLINT)),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -2106,7 +2124,9 @@ public class SchemaEvolveTest {
             List<Event> lenientDropColumnEvents =
                     Arrays.asList(
                             new AlterColumnTypeEvent(
-                                    tableId, Collections.singletonMap("name", STRING)),
+                                    tableId,
+                                    Collections.singletonMap("name", STRING),
+                                    Collections.singletonMap("name", STRING.notNull())),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -2311,7 +2331,9 @@ public class SchemaEvolveTest {
                                             new AddColumnEvent.ColumnWithPosition(
                                                     Column.physicalColumn("yina", INT)))),
                             new AlterColumnTypeEvent(
-                                    tableId, Collections.singletonMap("iina", INT)),
+                                    tableId,
+                                    Collections.singletonMap("iina", INT),
+                                    Collections.singletonMap("iina", INT.notNull())),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(

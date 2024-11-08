@@ -585,4 +585,26 @@ public class TransformParser {
             return filter;
         }
     }
+
+    public static boolean hasAsterisk(@Nullable String projection) {
+        if (isNullOrWhitespaceOnly(projection)) {
+            return false;
+        }
+        return parseProjectionExpression(projection).getOperandList().stream()
+                .anyMatch(TransformParser::hasAsterisk);
+    }
+
+    private static boolean hasAsterisk(SqlNode sqlNode) {
+        if (sqlNode instanceof SqlIdentifier) {
+            return ((SqlIdentifier) sqlNode).isStar();
+        } else if (sqlNode instanceof SqlBasicCall) {
+            SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
+            return sqlBasicCall.getOperandList().stream().anyMatch(TransformParser::hasAsterisk);
+        } else if (sqlNode instanceof SqlNodeList) {
+            SqlNodeList sqlNodeList = (SqlNodeList) sqlNode;
+            return sqlNodeList.getList().stream().anyMatch(TransformParser::hasAsterisk);
+        } else {
+            return false;
+        }
+    }
 }

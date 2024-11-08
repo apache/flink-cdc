@@ -15,13 +15,23 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.event;
+package org.apache.flink.cdc.common.event;
 
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistryRequestHandler;
-import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
+import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.common.schema.Schema;
 
-/** Request to refresh the pendingSchemaChanges of {@link SchemaRegistryRequestHandler}. */
-public class RefreshPendingListsRequest implements CoordinationRequest {
+/** A {@link SchemaChangeEvent} that supports appending schema before change event. */
+@PublicEvolving
+public interface SchemaChangeEventWithPreSchema extends SchemaChangeEvent {
 
-    private static final long serialVersionUID = 1L;
+    /** Describes if this event already has schema before change info. */
+    boolean hasPreSchema();
+
+    /** Append schema before change info to this event. */
+    void fillPreSchema(Schema oldSchema);
+
+    /** Check if this event contains redundant schema change request only. */
+    default boolean trimRedundantChanges() {
+        return false;
+    }
 }
