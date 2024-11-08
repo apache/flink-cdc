@@ -59,8 +59,7 @@ public class MySqlUtils {
         // accurate than COUNT(*), but is more efficient for large table.
         final String useDatabaseStatement = String.format("USE %s;", quote(tableId.catalog()));
         final String rowCountQuery = String.format("SHOW TABLE STATUS LIKE '%s';", tableId.table());
-        // jdbc.executeWithoutCommitting(useDatabaseStatement);
-        jdbc.execute(useDatabaseStatement);
+        jdbc.executeWithoutCommitting(useDatabaseStatement);
         return jdbc.queryAndMap(
                 rowCountQuery,
                 rs -> {

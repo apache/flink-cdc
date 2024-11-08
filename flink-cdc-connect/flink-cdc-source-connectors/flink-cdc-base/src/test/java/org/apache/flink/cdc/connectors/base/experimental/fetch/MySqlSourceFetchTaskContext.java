@@ -119,7 +119,7 @@ public class MySqlSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                 new MySqlTaskContextImpl(connectorConfig, databaseSchema, binaryLogClient);
         final int queueSize =
                 sourceSplitBase.isSnapshotSplit()
-                        ? 8092
+                        ? Integer.MAX_VALUE
                         : getSourceConfig().getDbzConnectorConfig().getMaxQueueSize();
         this.queue =
                 new ChangeEventQueue.Builder<DataChangeEvent>()
