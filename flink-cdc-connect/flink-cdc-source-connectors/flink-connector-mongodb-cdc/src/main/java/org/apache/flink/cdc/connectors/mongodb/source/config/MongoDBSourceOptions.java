@@ -84,8 +84,28 @@ public class MongoDBSourceOptions {
             ConfigOptions.key("initial.snapshotting.queue.size")
                     .intType()
                     .defaultValue(10240)
+                    .withDeprecatedKeys("copy.existing.queue.size")
                     .withDescription(
                             "The max size of the queue to use when copying data. Defaults to 10240.");
+
+    public static final ConfigOption<Integer> INITIAL_SNAPSHOTTING_MAX_THREADS =
+            ConfigOptions.key("initial.snapshotting.max.threads")
+                    .intType()
+                    .noDefaultValue()
+                    .withDeprecatedKeys("copy.existing.max.threads")
+                    .withDescription(
+                            "The number of threads to use when performing the data copy."
+                                    + " Defaults to the number of processors.");
+
+    public static final ConfigOption<String> INITIAL_SNAPSHOTTING_PIPELINE =
+            ConfigOptions.key("initial.snapshotting.pipeline")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDeprecatedKeys("copy.existing.pipeline")
+                    .withDescription(
+                            "An array of JSON objects describing the pipeline operations "
+                                    + "to run when copying existing data. "
+                                    + "This can improve the use of indexes by the copying manager and make copying more efficient.");
 
     public static final ConfigOption<Integer> BATCH_SIZE =
             ConfigOptions.key("batch.size")
