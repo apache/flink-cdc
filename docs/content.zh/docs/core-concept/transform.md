@@ -126,7 +126,8 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 | LOWER(string) | lower(string) | Returns string in lowercase. |
 | TRIM(string1) | trim('BOTH',string1) | Returns a string that removes whitespaces at both sides. |
 | REGEXP_REPLACE(string1, string2, string3) | regexpReplace(string1, string2, string3) | Returns a string from STRING1 with all the substrings that match a regular expression STRING2 consecutively being replaced with STRING3. E.g., 'foobar'.regexpReplace('oo\|ar', '') returns "fb". |
-| SUBSTRING(string FROM integer1 [ FOR integer2 ]) | substring(string,integer1,integer2) | Returns a substring of STRING starting from position INT1 with length INT2 (to the end by default). |
+| SUBSTR(string, integer1[, integer2]) | substr(string,integer1,integer2) | Returns a substring of STRING starting from position integer1 with length integer2 (to the end by default). |
+| SUBSTRING(string FROM integer1 [ FOR integer2 ]) | substring(string,integer1,integer2) | Returns a substring of STRING starting from position integer1 with length integer2 (to the end by default). |
 | CONCAT(string1, string2,…) | concat(string1, string2,…) | Returns a string that concatenates string1, string2, …. E.g., CONCAT('AA', 'BB', 'CC') returns 'AABBCC'. |
 
 ## Temporal Functions
@@ -152,6 +153,23 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 | CASE WHEN condition1 THEN result1 (WHEN condition2 THEN result2)* (ELSE result_z) END | Nested ternary expression | Returns resultX when the first conditionX is met. When no condition is met, returns result_z if it is provided and returns NULL otherwise. |
 | COALESCE(value1 [, value2]*) | coalesce(Object... objects) | Returns the first argument that is not NULL.If all arguments are NULL, it returns NULL as well. The return type is the least restrictive, common type of all of its arguments. The return type is nullable if all arguments are nullable as well. |
 | IF(condition, true_value, false_value)   | condition ? true_value : false_value | Returns the true_value if condition is met, otherwise false_value. E.g., IF(5 > 3, 5, 3) returns 5. |
+
+## Casting Functions
+
+You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXPR>` to a specific type `<T>`. Possible conversion paths are:
+
+| Source Type                         | Target Type | Notes                                                                                      |
+|-------------------------------------|-------------|--------------------------------------------------------------------------------------------|
+| ANY                                 | STRING      | All types can be cast to STRING.                                                           |
+| NUMERIC, STRING                     | BOOLEAN     | Any non-zero numerics will be evaluated to `TRUE`.                                         |
+| NUMERIC                             | BYTE        | Value must be in the range of Byte (-128 ~ 127).                                           |
+| NUMERIC                             | SHORT       | Value must be in the range of Short (-32768 ~ 32767).                                      |
+| NUMERIC                             | INTEGER     | Value must be in the range of Integer (-2147483648 ~ 2147483647).                          |
+| NUMERIC                             | LONG        | Value must be in the range of Long (-9223372036854775808 ~ 9223372036854775807).           |
+| NUMERIC                             | FLOAT       | Value must be in the range of Float (1.40239846e-45f ~ 3.40282347e+38f).                   |
+| NUMERIC                             | DOUBLE      | Value must be in the range of Double (4.94065645841246544e-324 ~ 1.79769313486231570e+308) |
+| NUMERIC                             | DECIMAL     | Value must be in the range of BigDecimal(10, 0).                                           |
+| STRING, TIMESTAMP_TZ, TIMESTAMP_LTZ | TIMESTAMP   | String type value must be a valid `ISO_LOCAL_DATE_TIME` string.                            |
 
 # Example
 ## Add computed columns

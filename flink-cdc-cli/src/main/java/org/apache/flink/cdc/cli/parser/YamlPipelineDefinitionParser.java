@@ -179,6 +179,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private SinkDef toSinkDef(JsonNode sinkNode, SchemaChangeBehavior schemaChangeBehavior) {
         List<String> includedSETypes = new ArrayList<>();
         List<String> excludedSETypes = new ArrayList<>();
+        boolean excludedFieldNotPresent = sinkNode.get(EXCLUDE_SCHEMA_EVOLUTION_TYPES) == null;
 
         Optional.ofNullable(sinkNode.get(INCLUDE_SCHEMA_EVOLUTION_TYPES))
                 .ifPresent(e -> e.forEach(tag -> includedSETypes.add(tag.asText())));
@@ -194,8 +195,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                     .forEach(includedSETypes::add);
         }
 
-        if (excludedSETypes.isEmpty()
-                && SchemaChangeBehavior.LENIENT.equals(schemaChangeBehavior)) {
+        if (excludedFieldNotPresent && SchemaChangeBehavior.LENIENT.equals(schemaChangeBehavior)) {
             // In lenient mode, we exclude DROP_TABLE and TRUNCATE_TABLE by default. This could be
             // overridden by manually specifying excluded types.
             Stream.of(SchemaChangeEventType.DROP_TABLE, SchemaChangeEventType.TRUNCATE_TABLE)
