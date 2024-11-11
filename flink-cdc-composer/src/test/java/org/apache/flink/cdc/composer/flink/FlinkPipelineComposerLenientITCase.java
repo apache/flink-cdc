@@ -71,6 +71,8 @@ class FlinkPipelineComposerLenientITCase {
 
     private static final int MAX_PARALLELISM = 4;
 
+    private static final String LINE_SEPARATOR = System.lineSeparator();
+
     // Always use parent-first classloader for CDC classes.
     // The reason is that ValuesDatabase uses static field for holding data, we need to make sure
     // the class is loaded by AppClassloader so that we can verify data in the test case.
@@ -156,7 +158,7 @@ class FlinkPipelineComposerLenientITCase {
                         "default_namespace.default_schema.table1:col1=3;col2=3;col3=;newCol2=;newCol3=");
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
@@ -167,6 +169,66 @@ class FlinkPipelineComposerLenientITCase {
                         "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`newCol2` STRING, position=LAST, existedColumnName=null}, ColumnWithPosition{column=`newCol3` STRING, position=LAST, existedColumnName=null}]}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, null, null, null, 1], after=[], op=DELETE, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, null, null, null, ], after=[2, null, null, null, x], op=UPDATE, meta=()}");
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testSingleSplitSingleTableWithDefaultValue(ValuesDataSink.SinkApi sinkApi)
+            throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_SINGLE_TABLE_WITH_DEFAULT_VALUE);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check result in ValuesDatabase
+        List<String> results = ValuesDatabase.getResults(TABLE_1);
+        assertThat(results)
+                .containsExactlyInAnyOrder(
+                        "default_namespace.default_schema.table1:col1=2;col2=;col3=;newCol2=;newCol3=x;colWithDefault=;newColWithDefault=",
+                        "default_namespace.default_schema.table1:col1=3;col2=3;col3=;newCol2=;newCol3=;colWithDefault=;newColWithDefault=");
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[3, 3], op=INSERT, meta=()}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=LAST, existedColumnName=null}]}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`newCol2` STRING, position=LAST, existedColumnName=null}, ColumnWithPosition{column=`newCol3` STRING, position=LAST, existedColumnName=null}]}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, null, null, null, 1], after=[], op=DELETE, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, null, null, null, ], after=[2, null, null, null, x], op=UPDATE, meta=()}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`colWithDefault` STRING 'flink', position=LAST, existedColumnName=null}]}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`newColWithDefault` STRING 'flink', position=LAST, existedColumnName=null}]}");
     }
 
     @ParameterizedTest
@@ -219,7 +281,7 @@ class FlinkPipelineComposerLenientITCase {
                         "default_namespace.default_schema.table2:col1=3;col2=3");
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
@@ -328,7 +390,7 @@ class FlinkPipelineComposerLenientITCase {
         execution.execute();
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING}, primaryKeys=col1, partitionKeys=col12, options=({key1=value1})}",
@@ -388,7 +450,7 @@ class FlinkPipelineComposerLenientITCase {
         execution.execute();
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING,`rk` STRING}, primaryKeys=col1, partitionKeys=col12, options=({key1=value1})}",
@@ -456,7 +518,7 @@ class FlinkPipelineComposerLenientITCase {
         execution.execute();
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`col12` STRING}, primaryKeys=col1, partitionKeys=col12, options=({key1=value1})}",
@@ -524,7 +586,7 @@ class FlinkPipelineComposerLenientITCase {
                         "default_namespace.default_schema.routed2:col1=3;col2=3");
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.routed1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
@@ -597,7 +659,7 @@ class FlinkPipelineComposerLenientITCase {
                         "default_namespace.default_schema.table2:col1=3;col2=3");
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
@@ -791,7 +853,7 @@ class FlinkPipelineComposerLenientITCase {
                                 .physicalColumn("gender", DataTypes.STRING())
                                 .primaryKey("id")
                                 .build());
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.merged, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
@@ -998,7 +1060,7 @@ class FlinkPipelineComposerLenientITCase {
                                 .physicalColumn("gender", DataTypes.STRING())
                                 .primaryKey("id")
                                 .build());
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.merged, schema=columns={`id` INT,`name` STRING,`age` INT,`last_name` STRING}, primaryKeys=id, options=()}",
@@ -1057,7 +1119,7 @@ class FlinkPipelineComposerLenientITCase {
         execution.execute();
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split(LINE_SEPARATOR);
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=replaced_namespace.replaced_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
