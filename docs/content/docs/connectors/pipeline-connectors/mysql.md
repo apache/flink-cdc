@@ -403,7 +403,10 @@ source:
         DOUBLE UNSIGNED ZEROFILL<br>
         DOUBLE PRECISION<br>
         DOUBLE PRECISION UNSIGNED<br>
-        DOUBLE PRECISION UNSIGNED ZEROFILL
+        DOUBLE PRECISION UNSIGNED ZEROFILL<br>
+        FLOAT(p, s)<br>
+        REAL(p, s)<br>
+        DOUBLE(p, s)
       </td>
       <td>DOUBLE</td>
       <td></td>
