@@ -366,7 +366,8 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 new SchemaOperatorTranslator(
                         SchemaChangeBehavior.EVOLVE,
                         "$$_schema_operator_$$",
-                        DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT);
+                        DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT,
+                        "UTC");
 
         OperatorIDGenerator schemaOperatorIDGenerator =
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
