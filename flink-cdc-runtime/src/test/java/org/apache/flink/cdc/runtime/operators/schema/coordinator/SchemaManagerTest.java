@@ -94,7 +94,10 @@ class SchemaManagerTest {
                         new AddColumnEvent.ColumnWithPosition(
                                 Column.physicalColumn("append_before_phone", DataTypes.BIGINT()),
                                 AddColumnEvent.ColumnPosition.BEFORE,
-                                "phone"));
+                                "phone"),
+                        new AddColumnEvent.ColumnWithPosition(
+                                Column.physicalColumn(
+                                        "col_with_default", DataTypes.BIGINT(), null, "10")));
 
         schemaManager.applyEvolvedSchemaChange(new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
         schemaManager.applyEvolvedSchemaChange(new AddColumnEvent(CUSTOMERS, newColumns));
@@ -108,6 +111,7 @@ class SchemaManagerTest {
                                 .physicalColumn("append_before_phone", DataTypes.BIGINT())
                                 .physicalColumn("phone", DataTypes.BIGINT())
                                 .physicalColumn("append_last", DataTypes.BIGINT())
+                                .physicalColumn("col_with_default", DataTypes.BIGINT(), null, "10")
                                 .primaryKey("id")
                                 .build());
     }

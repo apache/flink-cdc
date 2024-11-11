@@ -41,6 +41,8 @@ public class ValuesDataSourceOptions {
                                                     text(
                                                             "SINGLE_SPLIT_SINGLE_TABLE: Default and predetermined case. Creating schema changes of single table and put them into one split."),
                                                     text(
+                                                            "SINGLE_SPLIT_SINGLE_TABLE_WITH_DEFAULT_VALUE: A predetermined case. Creating schema changes of single table (some columns have default value) and put them into one split."),
+                                                    text(
                                                             "SINGLE_SPLIT_MULTI_TABLES: A predetermined case. Creating schema changes of multiple tables and put them into one split."),
                                                     text(
                                                             "MULTI_SPLITS_SINGLE_TABLE: A predetermined case. Creating schema changes of single table and put them into multiple splits."),
