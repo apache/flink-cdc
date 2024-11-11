@@ -353,39 +353,66 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
     private void cachePreTransformProcessor(TableId tableId, Schema tableSchema) {
         LinkedHashSet<Column> referencedColumnsSet = new LinkedHashSet<>();
+        boolean hasMatchTransform = false;
         for (PreTransformer transform : transforms) {
-            Selectors selectors = transform.getSelectors();
-            if (selectors.isMatch(tableId) && transform.getProjection().isPresent()) {
+            if (!transform.getSelectors().isMatch(tableId)) {
+                continue;
+            }
+            if (!transform.getProjection().isPresent()) {
+                processProjectionTransform(tableId, tableSchema, referencedColumnsSet, null);
+                hasMatchTransform = true;
+            } else {
                 TransformProjection transformProjection = transform.getProjection().get();
-                TransformFilter transformFilter = transform.getFilter().orElse(null);
                 if (transformProjection.isValid()) {
-                    List<Column> referencedColumns =
-                            TransformParser.generateReferencedColumns(
-                                    transformProjection.getProjection(),
-                                    transformFilter != null
-                                            ? transformFilter.getExpression()
-                                            : null,
-                                    tableSchema.getColumns());
-                    boolean hasAsterisk =
-                            TransformParser.hasAsterisk(transformProjection.getProjection());
-                    hasAsteriskMap.put(tableId, hasAsterisk);
-                    // update referenced columns of other projections of the same tableId, if any
-                    referencedColumnsSet.addAll(referencedColumns);
-                    referencedColumnsMap.put(
-                            tableId,
-                            referencedColumnsSet.stream()
-                                    .map(Column::getName)
-                                    .collect(Collectors.toList()));
-                    PreTransformChangeInfo tableChangeInfo =
-                            PreTransformChangeInfo.of(
-                                    tableId,
-                                    tableSchema,
-                                    tableSchema.copy(new ArrayList<>(referencedColumnsSet)));
-                    preTransformProcessorMap.put(
-                            tableId, new PreTransformProcessor(tableChangeInfo));
+                    processProjectionTransform(
+                            tableId, tableSchema, referencedColumnsSet, transform);
+                    hasMatchTransform = true;
                 }
             }
         }
+        if (!hasMatchTransform) {
+            processProjectionTransform(tableId, tableSchema, referencedColumnsSet, null);
+        }
+    }
+
+    public void processProjectionTransform(
+            TableId tableId,
+            Schema tableSchema,
+            LinkedHashSet<Column> referencedColumnsSet,
+            @Nullable PreTransformer transform) {
+        // If this TableId isn't presented in any transform block, it should behave like a "*"
+        // projection and should be regarded as asterisk-ful.
+        if (transform == null) {
+            referencedColumnsSet.addAll(tableSchema.getColumns());
+            hasAsteriskMap.put(tableId, true);
+        } else {
+            TransformProjection transformProjection = transform.getProjection().get();
+            boolean hasAsterisk = TransformParser.hasAsterisk(transformProjection.getProjection());
+            if (hasAsterisk) {
+                referencedColumnsSet.addAll(tableSchema.getColumns());
+                hasAsteriskMap.put(tableId, true);
+            } else {
+                TransformFilter transformFilter = transform.getFilter().orElse(null);
+                List<Column> referencedColumns =
+                        TransformParser.generateReferencedColumns(
+                                transformProjection.getProjection(),
+                                transformFilter != null ? transformFilter.getExpression() : null,
+                                tableSchema.getColumns());
+                // update referenced columns of other projections of the same tableId, if any
+                referencedColumnsSet.addAll(referencedColumns);
+                hasAsteriskMap.put(tableId, false);
+            }
+        }
+
+        referencedColumnsMap.put(
+                tableId,
+                referencedColumnsSet.stream().map(Column::getName).collect(Collectors.toList()));
+        PreTransformChangeInfo tableChangeInfo =
+                PreTransformChangeInfo.of(
+                        tableId,
+                        tableSchema,
+                        tableSchema.copy(new ArrayList<>(referencedColumnsSet)));
+        preTransformProcessorMap.put(tableId, new PreTransformProcessor(tableChangeInfo));
     }
 
     private Schema transformSchemaMetaData(

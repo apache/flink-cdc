@@ -255,6 +255,39 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, OLD], after=[], op=DELETE, meta=()}"));
     }
 
+    @ParameterizedTest
+    @EnumSource
+    void testMultipleTransformWithDiffRefColumn(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        runGenericTransformTest(
+                sinkApi,
+                Arrays.asList(
+                        new TransformDef(
+                                "default_namespace.default_schema.\\.*",
+                                "id,age,'Juvenile' AS roleName",
+                                "age < 18",
+                                null,
+                                null,
+                                null,
+                                null),
+                        new TransformDef(
+                                "default_namespace.default_schema.\\.*",
+                                "id,age,name AS roleName",
+                                "age >= 18",
+                                null,
+                                null,
+                                null,
+                                null)),
+                Arrays.asList(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`age` INT,`roleName` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, 18, Alice], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, 20, Bob], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, 20, Bob], after=[2, 30, Bob], op=UPDATE, meta=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT,`age` TINYINT,`roleName` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, 15, Juvenile], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, 25, Derrida], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, 25, Derrida], after=[], op=DELETE, meta=()}"));
+    }
+
     /** This tests if transform generates metadata info correctly. */
     @ParameterizedTest
     @EnumSource
