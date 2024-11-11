@@ -168,6 +168,7 @@ public class SchemaRegistry implements OperatorCoordinator, CoordinationRequestH
     @Override
     public void close() throws Exception {
         LOG.info("SchemaRegistry for {} closed.", operatorName);
+        coordinatorExecutor.shutdown();
         requestHandler.close();
     }
 
