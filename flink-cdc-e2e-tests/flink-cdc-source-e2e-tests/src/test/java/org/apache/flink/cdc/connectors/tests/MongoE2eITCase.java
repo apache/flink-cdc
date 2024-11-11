@@ -44,6 +44,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Stream;
@@ -66,8 +67,6 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
 
     private MongoClient mongoClient;
 
-    public static final String[] MONGO_VERSIONS = {"6.0.16", "7.0.12"};
-
     @Parameterized.Parameter(1)
     public String mongoVersion;
 
@@ -77,6 +76,15 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
     @Parameterized.Parameter(3)
     public boolean scanFullChangelog;
 
+    public static List<String> getMongoVersions() {
+        String specifiedMongoVersion = System.getProperty("specifiedMongoVersion");
+        if (specifiedMongoVersion != null) {
+            return Collections.singletonList(specifiedMongoVersion);
+        } else {
+            return Arrays.asList("6.0.16", "7.0.12");
+        }
+    }
+
     @Parameterized.Parameters(
             name =
                     "flinkVersion: {0}, mongoVersion: {1}, parallelismSnapshot: {2}, scanFullChangelog: {3}")
@@ -84,7 +92,7 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
         final List<String> flinkVersions = getFlinkVersion();
         List<Object[]> params = new ArrayList<>();
         for (String flinkVersion : flinkVersions) {
-            for (String mongoVersion : MONGO_VERSIONS) {
+            for (String mongoVersion : getMongoVersions()) {
                 params.add(new Object[] {flinkVersion, mongoVersion, true, true});
                 params.add(new Object[] {flinkVersion, mongoVersion, true, false});
                 params.add(new Object[] {flinkVersion, mongoVersion, false, true});
@@ -99,7 +107,7 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
         super.before();
 
         container =
-                new MongoDBContainer("mongo:6.0.9")
+                new MongoDBContainer("mongo:" + mongoVersion)
                         .withSharding()
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_MONGO_ALIAS)
