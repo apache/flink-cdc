@@ -30,6 +30,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -149,5 +150,37 @@ public class StarRocksDataSinkFactoryTest {
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
         Assertions.assertThat(dataSink).isInstanceOf(StarRocksDataSink.class);
+    }
+
+    @Test
+    void testCreateDataSinkWithSpecificedTimeZone() {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);
+
+        Configuration factoryConfiguration =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put("jdbc-url", "jdbc:mysql://127.0.0.1:9030")
+                                .put("load-url", "127.0.0.1:8030")
+                                .put("username", "root")
+                                .put("password", "")
+                                .build());
+        Configuration pipelineConfiguration =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put("local-time-zone", "America/Los_Angeles")
+                                .build());
+        DataSink dataSink =
+                sinkFactory.createDataSink(
+                        new FactoryHelper.DefaultContext(
+                                factoryConfiguration,
+                                pipelineConfiguration,
+                                Thread.currentThread().getContextClassLoader()));
+        Assertions.assertThat(dataSink).isInstanceOf(StarRocksDataSink.class);
+
+        ZoneId zoneId = ((StarRocksDataSink) dataSink).getZoneId();
+        ZoneId expectedZondId = ZoneId.of("America/Los_Angeles");
+        Assertions.assertThat(zoneId).isEqualTo(expectedZondId);
     }
 }
