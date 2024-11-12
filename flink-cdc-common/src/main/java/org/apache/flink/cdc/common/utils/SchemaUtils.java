@@ -226,30 +226,10 @@ public class SchemaUtils {
             mergedType = DataTypes.DECIMAL(resultIntDigits + resultScale, resultScale);
         } else if (lType instanceof DecimalType && rType.is(DataTypeFamily.EXACT_NUMERIC)) {
             // Merge decimal and int
-            DecimalType lhsDecimal = (DecimalType) lType;
-            int resultPrecision =
-                    Math.max(
-                            lhsDecimal.getPrecision(),
-                            lhsDecimal.getScale() + getNumericPrecision(rType));
-            Preconditions.checkArgument(
-                    resultPrecision <= DecimalType.MAX_PRECISION,
-                    String.format(
-                            "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
-                            lType, rType, resultPrecision, DecimalType.MAX_PRECISION));
-            mergedType = DataTypes.DECIMAL(resultPrecision, lhsDecimal.getScale());
+            mergedType = mergeExactNumericsIntoDecimal((DecimalType) lType, rType);
         } else if (rType instanceof DecimalType && lType.is(DataTypeFamily.EXACT_NUMERIC)) {
             // Merge decimal and int
-            DecimalType rhsDecimal = (DecimalType) rType;
-            int resultPrecision =
-                    Math.max(
-                            rhsDecimal.getPrecision(),
-                            rhsDecimal.getScale() + getNumericPrecision(lType));
-            Preconditions.checkArgument(
-                    resultPrecision <= DecimalType.MAX_PRECISION,
-                    String.format(
-                            "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
-                            lType, rType, resultPrecision, DecimalType.MAX_PRECISION));
-            mergedType = DataTypes.DECIMAL(resultPrecision, rhsDecimal.getScale());
+            mergedType = mergeExactNumericsIntoDecimal((DecimalType) rType, lType);
         } else {
             throw new IllegalStateException(
                     String.format("Incompatible types: \"%s\" and \"%s\"", lType, rType));
@@ -260,6 +240,20 @@ public class SchemaUtils {
         } else {
             return mergedType.notNull();
         }
+    }
+
+    private static DataType mergeExactNumericsIntoDecimal(
+            DecimalType decimalType, DataType otherType) {
+        int resultPrecision =
+                Math.max(
+                        decimalType.getPrecision(),
+                        decimalType.getScale() + getNumericPrecision(otherType));
+        Preconditions.checkArgument(
+                resultPrecision <= DecimalType.MAX_PRECISION,
+                String.format(
+                        "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
+                        decimalType, otherType, resultPrecision, DecimalType.MAX_PRECISION));
+        return DataTypes.DECIMAL(resultPrecision, decimalType.getScale());
     }
 
     @VisibleForTesting
