@@ -400,7 +400,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                                 tableSchema.getColumns());
                 // update referenced columns of other projections of the same tableId, if any
                 referencedColumnsSet.addAll(referencedColumns);
-                hasAsteriskMap.put(tableId, false);
+                hasAsteriskMap.putIfAbsent(tableId, false);
             }
         }
 
@@ -438,23 +438,20 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
     private DataChangeEvent processDataChangeEvent(DataChangeEvent dataChangeEvent) {
         if (!transforms.isEmpty()) {
-            return processProjection(dataChangeEvent);
-        }
-        return dataChangeEvent;
-    }
-
-    private DataChangeEvent processProjection(DataChangeEvent dataChangeEvent) {
-        PreTransformProcessor preTransformProcessor =
-                preTransformProcessorMap.get(dataChangeEvent.tableId());
-        BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
-        BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
-        if (before != null) {
-            BinaryRecordData projectedBefore = preTransformProcessor.processFillDataField(before);
-            dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
-        }
-        if (after != null) {
-            BinaryRecordData projectedAfter = preTransformProcessor.processFillDataField(after);
-            dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
+            PreTransformProcessor preTransformProcessor =
+                    preTransformProcessorMap.get(dataChangeEvent.tableId());
+            BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
+            BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
+            if (before != null) {
+                BinaryRecordData projectedBefore =
+                        preTransformProcessor.processFillDataField(before);
+                dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
+            }
+            if (after != null) {
+                BinaryRecordData projectedAfter = preTransformProcessor.processFillDataField(after);
+                dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
+            }
+            return dataChangeEvent;
         }
         return dataChangeEvent;
     }
