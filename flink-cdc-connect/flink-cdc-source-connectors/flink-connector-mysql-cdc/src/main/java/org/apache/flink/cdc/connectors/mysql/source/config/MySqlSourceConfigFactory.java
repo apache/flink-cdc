@@ -278,8 +278,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     }
 
     /**
-     * Whether to use legacy json format. The default value is true, which means
-     * there is no whitespace before value and after comma in json format.
+     * Whether to use legacy json format. The default value is true, which means there is no
+     * whitespace before value and after comma in json format.
      */
     public MySqlSourceConfigFactory useLegacyJsonFormat(boolean useLegacyJsonFormat) {
         this.useLegacyJsonFormat = useLegacyJsonFormat;

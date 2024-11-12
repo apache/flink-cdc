@@ -254,8 +254,8 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
-     * Whether to use legacy json format. The default value is true, which means
-     * there is no whitespace before value and after comma in json format.
+     * Whether to use legacy json format. The default value is true, which means there is no
+     * whitespace before value and after comma in json format.
      */
     public MySqlSourceBuilder<T> useLegacyJsonFormat(boolean useLegacyJsonFormat) {
         this.configFactory.useLegacyJsonFormat(useLegacyJsonFormat);
