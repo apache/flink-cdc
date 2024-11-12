@@ -612,7 +612,7 @@ and the table option `scan.incremental.snapshot.chunk.size` value is `25`, the t
  [100, +∞)
 ```
 
-For other primary key column type, MySQL CDC Source executes the statement in the form of `SELECT MAX(STR_ID) AS chunk_high FROM (SELECT * FROM TestTable WHERE STR_ID > 'uuid-001' limit 25)` to get the low and high value for each chunk, 
+For other primary key column type, MySQL CDC Source executes the statement in the form of `SELECT MAX(STR_ID) AS chunk_high FROM (SELECT * FROM TestTable WHERE STR_ID > 'uuid-001' ORDER BY STR_ID ASC LIMIT 25)` to get the low and high value for each chunk, 
 the splitting chunks set would be like:
 
  ```
