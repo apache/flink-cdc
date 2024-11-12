@@ -269,37 +269,20 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
         List<String> expected =
                 Stream.of(
-                                "+I("
-                                        + tenant
-                                        + ",%s,products,101,scooter,Small 2-wheel scooter,3.1400000000)",
-                                "+I("
-                                        + tenant
-                                        + ",%s,products,102,car battery,12V car battery,8.1000000000)",
-                                "+I("
-                                        + tenant
-                                        + ",%s,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
-                                "+I("
-                                        + tenant
-                                        + ",%s,products,104,hammer,12oz carpenter's hammer,0.7500000000)",
-                                "+I("
-                                        + tenant
-                                        + ",%s,products,105,hammer,14oz carpenter's hammer,0.8750000000)",
-                                "+I("
-                                        + tenant
-                                        + ",%s,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
-                                "+I("
-                                        + tenant
-                                        + ",%s,products,107,rocks,box of assorted rocks,5.3000000000)",
-                                "+I("
-                                        + tenant
-                                        + ",%s,products,108,jacket,water resistent black wind breaker,0.1000000000)",
-                                "+I("
-                                        + tenant
-                                        + ",%s,products,109,spare tire,24 inch spare tire,22.2000000000)",
-                                "+U("
-                                        + tenant
-                                        + ",%s,products,106,hammer,18oz carpenter hammer,1.0000000000)")
-                        .map(line -> String.format(line, inventoryDatabase.getDatabaseName()))
+                                "+I(%s,%s,products,101,scooter,Small 2-wheel scooter,3.1400000000)",
+                                "+I(%s,%s,products,102,car battery,12V car battery,8.1000000000)",
+                                "+I(%s,%s,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
+                                "+I(%s,%s,products,104,hammer,12oz carpenter's hammer,0.7500000000)",
+                                "+I(%s,%s,products,105,hammer,14oz carpenter's hammer,0.8750000000)",
+                                "+I(%s,%s,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
+                                "+I(%s,%s,products,107,rocks,box of assorted rocks,5.3000000000)",
+                                "+I(%s,%s,products,108,jacket,water resistent black wind breaker,0.1000000000)",
+                                "+I(%s,%s,products,109,spare tire,24 inch spare tire,22.2000000000)",
+                                "+U(%s,%s,products,106,hammer,18oz carpenter hammer,1.0000000000)")
+                        .map(
+                                line ->
+                                        String.format(
+                                                line, tenant, inventoryDatabase.getDatabaseName()))
                         .collect(Collectors.toList());
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertContainsInAnyOrder(expected, actual);
