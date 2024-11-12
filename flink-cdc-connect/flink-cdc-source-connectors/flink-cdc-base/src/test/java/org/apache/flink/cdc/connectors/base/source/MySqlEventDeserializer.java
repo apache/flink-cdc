@@ -40,6 +40,7 @@ import java.util.Map;
 
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getHistoryRecord;
 
+/** Event deserializer for {@link MySqlDataSource}. */
 @Internal
 public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
