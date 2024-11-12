@@ -19,7 +19,7 @@ on:
   workflow_call:
 
 jobs:
-  migration_test_ut:
+  unit_test:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
@@ -35,7 +35,7 @@ jobs:
       - name: Run migration tests
         run: cd flink-cdc-migration-tests && mvn clean verify
 
-  pipeline_migration_test:
+  pipeline:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -74,7 +74,7 @@ jobs:
         run: cd conf && docker compose down
         working-directory: ./tools/mig-test
 
-  data_stream_migration_test:
+  datastream:
     runs-on: ubuntu-latest
     strategy:
       matrix:

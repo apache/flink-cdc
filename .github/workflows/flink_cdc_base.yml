@@ -95,7 +95,7 @@ env:
   flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 
 jobs:
-  compile_and_test:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
