@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
@@ -394,9 +395,6 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             }
         }
 
-        referencedColumnsMap.put(
-                tableId,
-                referencedColumnsSet.stream().map(Column::getName).collect(Collectors.toList()));
         PreTransformChangeInfo tableChangeInfo =
                 PreTransformChangeInfo.of(
                         tableId,
