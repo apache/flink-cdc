@@ -55,6 +55,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
     protected static final long EVENT_DEFAULT_TIMEOUT = 60000L;
+    protected static final int TEST_TABLE_NUMBER = 100;
 
     @ClassRule
     public static final MySqlContainer MYSQL =
@@ -826,7 +827,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                 Statement stat = conn.createStatement()) {
             stat.execute(String.format("CREATE DATABASE %s;", databaseName));
             stat.execute(String.format("USE %s;", databaseName));
-            for (int i = 1; i <= 100; i++) {
+            for (int i = 1; i <= TEST_TABLE_NUMBER; i++) {
                 stat.execute(String.format("DROP TABLE IF EXISTS TABLE%d;", i));
                 stat.execute(
                         String.format(
@@ -871,7 +872,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
         LOG.info("Verifying CreateTableEvents...");
         validateResult(
                 180_000L,
-                IntStream.rangeClosed(1, 100)
+                IntStream.rangeClosed(1, TEST_TABLE_NUMBER)
                         .mapToObj(
                                 i ->
                                         String.format(
@@ -882,7 +883,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
         LOG.info("Verifying DataChangeEvents...");
         validateResult(
                 180_000L,
-                IntStream.rangeClosed(1, 100)
+                IntStream.rangeClosed(1, TEST_TABLE_NUMBER)
                         .mapToObj(
                                 i ->
                                         String.format(
