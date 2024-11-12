@@ -31,6 +31,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
@@ -69,6 +70,26 @@ public class SchemaEvolveTest {
     private static final TableId CUSTOMERS_TABLE_ID =
             TableId.tableId("my_company", "my_branch", "customers");
 
+    /**
+     * A mocked schema operator that always yields predictable nonce with incrementing timestamp.
+     */
+    public static class MockedSchemaOperator extends SchemaOperator {
+
+        public MockedSchemaOperator(
+                List<RouteRule> routingRules,
+                Duration rpcTimeOut,
+                SchemaChangeBehavior schemaChangeBehavior) {
+            super(routingRules, rpcTimeOut, schemaChangeBehavior);
+        }
+
+        private int i = 0;
+
+        @Override
+        protected int getCurrentTimestamp() {
+            return ++i;
+        }
+    }
+
     /** Tests common evolve schema changes without exceptions. */
     @Test
     public void testEvolveSchema() throws Exception {
@@ -84,7 +105,7 @@ public class SchemaEvolveTest {
         SchemaChangeBehavior behavior = SchemaChangeBehavior.EVOLVE;
 
         SchemaOperator schemaOperator =
-                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+                new MockedSchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
         EventOperatorTestHarness<SchemaOperator, Event> harness =
                 new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
         harness.open();
@@ -354,7 +375,7 @@ public class SchemaEvolveTest {
         SchemaChangeBehavior behavior = SchemaChangeBehavior.TRY_EVOLVE;
 
         SchemaOperator schemaOperator =
-                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+                new MockedSchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
         EventOperatorTestHarness<SchemaOperator, Event> harness =
                 new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
         harness.open();
@@ -624,7 +645,7 @@ public class SchemaEvolveTest {
         SchemaChangeBehavior behavior = SchemaChangeBehavior.EXCEPTION;
 
         SchemaOperator schemaOperator =
-                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+                new MockedSchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
         EventOperatorTestHarness<SchemaOperator, Event> harness =
                 new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
         harness.open();
@@ -738,7 +759,7 @@ public class SchemaEvolveTest {
         SchemaChangeBehavior behavior = SchemaChangeBehavior.IGNORE;
 
         SchemaOperator schemaOperator =
-                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+                new MockedSchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
         EventOperatorTestHarness<SchemaOperator, Event> harness =
                 new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
         harness.open();
@@ -1023,7 +1044,7 @@ public class SchemaEvolveTest {
         SchemaChangeBehavior behavior = SchemaChangeBehavior.EVOLVE;
 
         SchemaOperator schemaOperator =
-                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+                new MockedSchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
         EventOperatorTestHarness<SchemaOperator, Event> harness =
                 new EventOperatorTestHarness<>(
                         schemaOperator,
@@ -1107,7 +1128,7 @@ public class SchemaEvolveTest {
         SchemaChangeBehavior behavior = SchemaChangeBehavior.TRY_EVOLVE;
 
         SchemaOperator schemaOperator =
-                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+                new MockedSchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
 
         // All types of schema change events will be sent to the sink
         // AddColumn and RenameColumn events will always fail
@@ -1427,7 +1448,7 @@ public class SchemaEvolveTest {
         SchemaChangeBehavior behavior = SchemaChangeBehavior.EVOLVE;
 
         SchemaOperator schemaOperator =
-                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+                new MockedSchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
 
         // All types of schema change events will be sent to the sink
         // AddColumn and RenameColumn events will always fail
@@ -1748,7 +1769,7 @@ public class SchemaEvolveTest {
         SchemaChangeBehavior behavior = SchemaChangeBehavior.LENIENT;
 
         SchemaOperator schemaOperator =
-                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+                new MockedSchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
         EventOperatorTestHarness<SchemaOperator, Event> harness =
                 new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
         harness.open();
@@ -2134,7 +2155,7 @@ public class SchemaEvolveTest {
         SchemaChangeBehavior behavior = SchemaChangeBehavior.LENIENT;
 
         SchemaOperator schemaOperator =
-                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+                new MockedSchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
         EventOperatorTestHarness<SchemaOperator, Event> harness =
                 new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
         harness.open();

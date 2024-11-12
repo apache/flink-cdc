@@ -76,6 +76,7 @@ import javax.annotation.Nullable;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -84,7 +85,6 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
@@ -129,8 +129,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     private transient SchemaOperatorMetrics schemaOperatorMetrics;
     private transient int subTaskId;
-
-    private transient AtomicInteger schemaEvolutionVersionCode;
 
     @VisibleForTesting
     public SchemaOperator(List<RouteRule> routingRules) {
@@ -181,7 +179,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 new SchemaOperatorMetrics(
                         getRuntimeContext().getMetricGroup(), schemaChangeBehavior);
         subTaskId = getRuntimeContext().getIndexOfThisSubtask();
-        schemaEvolutionVersionCode = new AtomicInteger();
     }
 
     @Override
@@ -432,6 +429,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         return TableId.parse(route.f1);
     }
 
+    @VisibleForTesting
+    protected int getCurrentTimestamp() {
+        return (int) Instant.now().getEpochSecond();
+    }
+
     private void handleSchemaChangeEvent(TableId tableId, SchemaChangeEvent schemaChangeEvent)
             throws InterruptedException, TimeoutException {
 
@@ -446,10 +448,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
         long nonce =
                 NonceUtils.generateNonce(
-                        schemaEvolutionVersionCode.incrementAndGet(),
-                        subTaskId,
-                        tableId,
-                        schemaChangeEvent);
+                        getCurrentTimestamp(), subTaskId, tableId, schemaChangeEvent);
 
         LOG.info("{}> Sending the FlushEvent for table {} (nonce: {}).", subTaskId, tableId, nonce);
         output.collect(new StreamRecord<>(new FlushEvent(tableId, nonce)));

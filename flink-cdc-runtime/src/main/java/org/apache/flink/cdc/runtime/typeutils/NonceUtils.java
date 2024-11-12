@@ -17,36 +17,36 @@
 
 package org.apache.flink.cdc.runtime.typeutils;
 
+import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
 
-/** Generates schema evolution nonce value. */
+import java.util.Objects;
+
+/**
+ * Generates schema evolution nonce value and corresponding {@link FlushEvent}s. It is guaranteed to
+ * be unique by combining epoch timestamp, subTaskId, Table ID and schema change event into a long
+ * hashCode.
+ */
+@PublicEvolving
 public class NonceUtils {
 
-    /** Calculates a hashCode with Long type instead of Integer. */
-    public static long longHash(Object... a) {
-        if (a == null) {
-            return 0;
-        }
-
-        long result = 1;
-
-        for (Object element : a) {
-            result = 31L * result + (element == null ? 0 : element.hashCode());
-        }
-
-        return result;
-    }
-
+    /**
+     * Generating a nonce value with current @{code timestamp}, {@code subTaskId}, {@code tableId},
+     * and {@code schemaChangeEvent}. The higher 32 bits are current UTC timestamp in epoch seconds,
+     * and the lower 32 bits are Java hashCode of the rest parameters.
+     */
     public static long generateNonce(
-            int versionCode, int subTaskId, TableId tableId, Event schemaChangeEvent) {
-        return longHash(versionCode, subTaskId, tableId, schemaChangeEvent);
+            int timestamp, int subTaskId, TableId tableId, Event schemaChangeEvent) {
+        return (long) timestamp << 32
+                | Integer.toUnsignedLong(Objects.hash(subTaskId, tableId, schemaChangeEvent));
     }
 
+    /** Generating a {@link FlushEvent} carrying a nonce. */
     public static FlushEvent generateFlushEvent(
-            int versionCode, int subTaskId, TableId tableId, Event schemaChangeEvent) {
+            int timestamp, int subTaskId, TableId tableId, Event schemaChangeEvent) {
         return new FlushEvent(
-                tableId, generateNonce(versionCode, subTaskId, tableId, schemaChangeEvent));
+                tableId, generateNonce(timestamp, subTaskId, tableId, schemaChangeEvent));
     }
 }
