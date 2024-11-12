@@ -67,7 +67,9 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     @Parameterized.Parameter public String flinkVersion;
 
-    public Integer parallelism = 4;
+    // TODO: E2e cases with multiple parallelism has been temporarily disabled until we close
+    // FLINK-36690.
+    public Integer parallelism = 1;
 
     // ------------------------------------------------------------------------------------------
     // Flink Variables
