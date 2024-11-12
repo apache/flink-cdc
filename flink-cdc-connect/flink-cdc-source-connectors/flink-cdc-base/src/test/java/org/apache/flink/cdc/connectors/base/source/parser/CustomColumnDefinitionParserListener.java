@@ -17,12 +17,6 @@
 
 package org.apache.flink.cdc.connectors.base.source.parser;
 
-import java.sql.Types;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
 import io.debezium.antlr.AntlrDdlParser;
 import io.debezium.antlr.DataTypeResolver;
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
@@ -37,6 +31,12 @@ import io.debezium.util.Strings;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.sql.Types;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /** Parser listener that is parsing column definition part of MySQL statements. */
 public class CustomColumnDefinitionParserListener extends MySqlParserBaseListener {

@@ -17,12 +17,13 @@
 
 package org.apache.flink.cdc.connectors.base.source;
 
-import io.debezium.data.geometry.Geometry;
-import io.debezium.data.geometry.Point;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.debezium.event.DebeziumSchemaDataTypeInference;
+
+import io.debezium.data.geometry.Geometry;
+import io.debezium.data.geometry.Point;
 import org.apache.kafka.connect.data.Schema;
 
 /** {@link DataType} inference for MySQL debezium {@link Schema}. */

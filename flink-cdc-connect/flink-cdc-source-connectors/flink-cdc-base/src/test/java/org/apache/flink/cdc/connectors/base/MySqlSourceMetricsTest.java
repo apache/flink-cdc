@@ -17,19 +17,6 @@
 
 package org.apache.flink.cdc.connectors.base;
 
-import java.sql.SQLException;
-import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import io.debezium.connector.mysql.MySqlConnection;
-import io.debezium.jdbc.JdbcConnection;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -57,6 +44,9 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.CloseableIterator;
+
+import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.jdbc.JdbcConnection;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -66,13 +56,22 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
+import java.sql.SQLException;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-/**
- * MySQL Source Metrics Tests.
- */
+/** MySQL Source Metrics Tests. */
 public class MySqlSourceMetricsTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceMetricsTest.class);
@@ -140,16 +139,16 @@ public class MySqlSourceMetricsTest {
                         .setParallelism(1)
                         .executeAndCollect(); // collect record
         String[] snapshotExpectedRecords =
-                new String[]{
-                        "+I[101, Tom, 3]",
-                        "+I[102, Jack, 5]",
-                        "+I[103, Allen, 10]",
-                        "+I[104, Andrew, 13]",
-                        "+I[105, Arnold, 15]",
-                        "+I[106, Claud, 19]",
-                        "+I[107, Howard, 37]",
-                        "+I[108, Jacob, 46]",
-                        "+I[109, Lionel, 58]"
+                new String[] {
+                    "+I[101, Tom, 3]",
+                    "+I[102, Jack, 5]",
+                    "+I[103, Allen, 10]",
+                    "+I[104, Andrew, 13]",
+                    "+I[105, Arnold, 15]",
+                    "+I[106, Claud, 19]",
+                    "+I[107, Howard, 37]",
+                    "+I[108, Jacob, 46]",
+                    "+I[109, Lionel, 58]"
                 };
 
         // step-1: consume snapshot data
@@ -167,13 +166,13 @@ public class MySqlSourceMetricsTest {
         makeDdlEvents(getConnection(), tableId);
 
         String[] binlogExpectedRecords =
-                new String[]{
-                        "-U[103, Allen, 10]",
-                        "+U[103, Oswald, 10]",
-                        "+I[110, Terence, 78]",
-                        "-D[110, Terence, 78]",
-                        "-U[103, Oswald, 10]",
-                        "+U[103, Marry, 10]"
+                new String[] {
+                    "-U[103, Allen, 10]",
+                    "+U[103, Oswald, 10]",
+                    "+I[110, Terence, 78]",
+                    "-D[110, Terence, 78]",
+                    "-U[103, Oswald, 10]",
+                    "+U[103, Marry, 10]"
                 };
 
         // step-3: consume binlog change events
@@ -239,13 +238,13 @@ public class MySqlSourceMetricsTest {
                                 .intValue());
                 Assert.assertTrue(
                         ((Gauge<Long>) enumeratorMetrics.get("snapshotEndTime"))
-                                .getValue()
-                                .longValue()
+                                        .getValue()
+                                        .longValue()
                                 > 0);
                 Assert.assertTrue(
                         ((Gauge<Long>) enumeratorMetrics.get("snapshotStartTime"))
-                                .getValue()
-                                .longValue()
+                                        .getValue()
+                                        .longValue()
                                 > 0);
             } else {
                 Assert.assertEquals(
@@ -281,8 +280,7 @@ public class MySqlSourceMetricsTest {
 
     private MySqlEventDeserializer buildRowDataDebeziumDeserializeSchema() {
         MySqlEventDeserializer deserializer =
-                new MySqlEventDeserializer(
-                        DebeziumChangelogMode.ALL, true);
+                new MySqlEventDeserializer(DebeziumChangelogMode.ALL, true);
         return deserializer;
     }
 
@@ -290,36 +288,38 @@ public class MySqlSourceMetricsTest {
         RowRowConverter rowRowConverter = RowRowConverter.create(dataType);
         rowRowConverter.open(Thread.currentThread().getContextClassLoader());
         return records.stream()
-                .flatMap(item -> {
-                    DataChangeEvent changeEvent = ((DataChangeEvent) item);
-                    RecordData before = changeEvent.before();
-                    RecordData after = changeEvent.after();
+                .flatMap(
+                        item -> {
+                            DataChangeEvent changeEvent = ((DataChangeEvent) item);
+                            RecordData before = changeEvent.before();
+                            RecordData after = changeEvent.after();
 
-                    switch (changeEvent.op()) {
-                        case INSERT:
-                            GenericRowData insertData = new GenericRowData(3);
-                            insertData.setRowKind(RowKind.INSERT);
-                            convertData(changeEvent.after(), insertData);
-                            return Arrays.stream(new GenericRowData[]{insertData});
-                        case DELETE:
-                            GenericRowData deleteData = null;
-                            deleteData = new GenericRowData(3);
-                            deleteData.setRowKind(RowKind.DELETE);
-                            convertData(before, deleteData);
-                            return Arrays.stream(new GenericRowData[]{deleteData});
-                        case UPDATE:
-                        case REPLACE:
-                            GenericRowData beforeData = new GenericRowData(3);
-                            beforeData.setRowKind(RowKind.UPDATE_BEFORE);
-                            convertData(before, beforeData);
+                            switch (changeEvent.op()) {
+                                case INSERT:
+                                    GenericRowData insertData = new GenericRowData(3);
+                                    insertData.setRowKind(RowKind.INSERT);
+                                    convertData(changeEvent.after(), insertData);
+                                    return Arrays.stream(new GenericRowData[] {insertData});
+                                case DELETE:
+                                    GenericRowData deleteData = null;
+                                    deleteData = new GenericRowData(3);
+                                    deleteData.setRowKind(RowKind.DELETE);
+                                    convertData(before, deleteData);
+                                    return Arrays.stream(new GenericRowData[] {deleteData});
+                                case UPDATE:
+                                case REPLACE:
+                                    GenericRowData beforeData = new GenericRowData(3);
+                                    beforeData.setRowKind(RowKind.UPDATE_BEFORE);
+                                    convertData(before, beforeData);
 
-                            GenericRowData afterData = new GenericRowData(3);
-                            afterData.setRowKind(RowKind.UPDATE_AFTER);
-                            convertData(after, afterData);
-                            return Stream.of(beforeData, afterData).filter(row -> row != null);
-                    }
-                    return Stream.empty();
-                })
+                                    GenericRowData afterData = new GenericRowData(3);
+                                    afterData.setRowKind(RowKind.UPDATE_AFTER);
+                                    convertData(after, afterData);
+                                    return Stream.of(beforeData, afterData)
+                                            .filter(row -> row != null);
+                            }
+                            return Stream.empty();
+                        })
                 .map(rowRowConverter::toExternal)
                 .map(Object::toString)
                 .collect(Collectors.toList());
@@ -351,9 +351,7 @@ public class MySqlSourceMetricsTest {
             // make binlog events
             connection.execute(
                     "UPDATE " + tableId + " SET name = 'Oswald' where id = 103",
-                    "INSERT INTO "
-                            + tableId
-                            + " VALUES(110,'Terence',78)",
+                    "INSERT INTO " + tableId + " VALUES(110,'Terence',78)",
                     "DELETE FROM " + tableId + " where id = 110",
                     "UPDATE " + tableId + " SET name = 'Marry' where id = 103");
             connection.commit();
