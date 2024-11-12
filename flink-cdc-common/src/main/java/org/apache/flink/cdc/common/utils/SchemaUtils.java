@@ -372,6 +372,25 @@ public class SchemaUtils {
         return oldSchema.copy(columns);
     }
 
+    /**
+     * This function determines if the given schema change event {@code event} should be sent to
+     * downstream based on if the given transform rule has asterisk, and what columns are
+     * referenced.
+     *
+     * <p>For example, if {@code hasAsterisk} is false, then all {@code AddColumnEvent} and {@code
+     * DropColumnEvent} should be ignored since asterisk-less transform should not emit schema
+     * change events that change number of downstream columns.
+     *
+     * <p>Also, {@code referencedColumns} will be used to determine if the schema change event
+     * affects any referenced columns, since if a column has been projected out of downstream, its
+     * corresponding schema change events should not be emitted, either.
+     *
+     * <p>For the case when {@code hasAsterisk} is true, things will be cleaner since we don't have
+     * to filter out any schema change events. All we need to do is to change {@code
+     * AddColumnEvent}'s inserting position, and replacing `FIRST` / `LAST` with column-relative
+     * position indicators. This is necessary since extra calculated columns might be added, and
+     * `FIRST` / `LAST` position might differ.
+     */
     public static Optional<SchemaChangeEvent> transformSchemaChangeEvent(
             boolean hasAsterisk, List<String> referencedColumns, SchemaChangeEvent event) {
         Optional<SchemaChangeEvent> evolvedSchemaChangeEvent = Optional.empty();
