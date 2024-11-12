@@ -67,10 +67,14 @@ import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContex
 import org.apache.flink.util.ExceptionUtils;
 import org.junit.Test;
 
+<<<<<<< Updated upstream
 /**
  * Test for {@link PostgreSQLTableSource} created by
  * {@link PostgreSQLTableFactory}.
  */
+=======
+/** Test for {@link PostgreSQLTableSource} created by {@link PostgreSQLTableFactory}. */
+>>>>>>> Stashed changes
 public class PostgreSQLTableFactoryTest {
 
         private static final ResolvedSchema SCHEMA = new ResolvedSchema(
@@ -93,6 +97,7 @@ public class PostgreSQLTableFactoryTest {
                         new ArrayList<>(),
                         null);
 
+<<<<<<< Updated upstream
         private static final ResolvedSchema SCHEMA_WITH_METADATA = new ResolvedSchema(
                         Arrays.asList(
                                         Column.physical("id", DataTypes.BIGINT().notNull()),
@@ -106,6 +111,22 @@ public class PostgreSQLTableFactoryTest {
                                         Column.metadata("row_kind", DataTypes.STRING(), "row_kind", true)),
                         Collections.emptyList(),
                         UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
+=======
+    private static final ResolvedSchema SCHEMA_WITH_METADATA =
+            new ResolvedSchema(
+                    Arrays.asList(
+                            Column.physical("id", DataTypes.BIGINT().notNull()),
+                            Column.physical("name", DataTypes.STRING()),
+                            Column.physical("count", DataTypes.DECIMAL(38, 18)),
+                            Column.metadata("time", DataTypes.TIMESTAMP_LTZ(3), "op_ts", true),
+                            Column.metadata("row_kind", DataTypes.STRING(), "row_kind", true),
+                            Column.metadata(
+                                    "database_name", DataTypes.STRING(), "database_name", true),
+                            Column.metadata("schema_name", DataTypes.STRING(), "schema_name", true),
+                            Column.metadata("table_name", DataTypes.STRING(), "table_name", true)),
+                    Collections.emptyList(),
+                    UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
+>>>>>>> Stashed changes
 
         private static final String MY_LOCALHOST = "localhost";
         private static final String MY_USERNAME = "flinkuser";
@@ -122,6 +143,7 @@ public class PostgreSQLTableFactoryTest {
         public void testCommonProperties() {
                 Map<String, String> properties = getAllOptions();
 
+<<<<<<< Updated upstream
                 // validation for source
                 DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
                 PostgreSQLTableSource expectedSource = new PostgreSQLTableSource(
@@ -154,6 +176,245 @@ public class PostgreSQLTableFactoryTest {
                                 SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                                 SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
                 assertEquals(expectedSource, actualSource);
+=======
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        PostgreSQLTableSource expectedSource =
+                new PostgreSQLTableSource(
+                        SCHEMA,
+                        5432,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_SCHEMA,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        "decoderbufs",
+                        MY_SLOT_NAME,
+                        DebeziumChangelogMode.ALL,
+                        PROPERTIES,
+                        false,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        HEARTBEAT_INTERVAL.defaultValue(),
+                        StartupOptions.initial(),
+                        null,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
+    public void testOptionalProperties() {
+        Map<String, String> options = getAllOptions();
+        options.put("port", "5444");
+        options.put("decoding.plugin.name", "wal2json");
+        options.put("debezium.snapshot.mode", "never");
+        options.put("changelog-mode", "upsert");
+        options.put("scan.incremental.snapshot.backfill.skip", "true");
+        options.put("scan.newly-added-table.enabled", "true");
+
+        DynamicTableSource actualSource = createTableSource(options);
+        Properties dbzProperties = new Properties();
+        dbzProperties.put("snapshot.mode", "never");
+        PostgreSQLTableSource expectedSource =
+                new PostgreSQLTableSource(
+                        SCHEMA,
+                        5444,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_SCHEMA,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        "wal2json",
+                        MY_SLOT_NAME,
+                        DebeziumChangelogMode.UPSERT,
+                        dbzProperties,
+                        false,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        HEARTBEAT_INTERVAL.defaultValue(),
+                        StartupOptions.initial(),
+                        null,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
+                        true,
+                        true,
+                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
+    public void testMetadataColumns() {
+        Map<String, String> properties = getAllOptions();
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
+        PostgreSQLTableSource postgreSQLTableSource = (PostgreSQLTableSource) actualSource;
+        postgreSQLTableSource.applyReadableMetadata(
+                Arrays.asList("row_kind", "op_ts", "database_name", "schema_name", "table_name"),
+                SCHEMA_WITH_METADATA.toSourceRowDataType());
+        actualSource = postgreSQLTableSource.copy();
+        PostgreSQLTableSource expectedSource =
+                new PostgreSQLTableSource(
+                        ResolvedSchemaUtils.getPhysicalSchema(SCHEMA_WITH_METADATA),
+                        5432,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_SCHEMA,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        "decoderbufs",
+                        MY_SLOT_NAME,
+                        DebeziumChangelogMode.ALL,
+                        new Properties(),
+                        false,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
+                        SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
+                        CONNECT_TIMEOUT.defaultValue(),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        HEARTBEAT_INTERVAL.defaultValue(),
+                        StartupOptions.initial(),
+                        null,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
+        expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
+        expectedSource.metadataKeys =
+                Arrays.asList("row_kind", "op_ts", "database_name", "schema_name", "table_name");
+
+        assertEquals(expectedSource, actualSource);
+
+        ScanTableSource.ScanRuntimeProvider provider =
+                postgreSQLTableSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
+        DebeziumSourceFunction<RowData> debeziumSourceFunction =
+                (DebeziumSourceFunction<RowData>)
+                        ((SourceFunctionProvider) provider).createSourceFunction();
+        assertProducedTypeOfSourceFunction(debeziumSourceFunction, expectedSource.producedDataType);
+    }
+
+    @Test
+    public void testEnableParallelReadSource() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.incremental.snapshot.enabled", "true");
+        properties.put("scan.incremental.snapshot.chunk.size", "8000");
+        properties.put("scan.snapshot.fetch.size", "100");
+        properties.put("connect.timeout", "45s");
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+        PostgreSQLTableSource expectedSource =
+                new PostgreSQLTableSource(
+                        SCHEMA,
+                        5432,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_SCHEMA,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        "decoderbufs",
+                        MY_SLOT_NAME,
+                        DebeziumChangelogMode.ALL,
+                        PROPERTIES,
+                        true,
+                        8000,
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
+                        100,
+                        Duration.ofSeconds(45),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        HEARTBEAT_INTERVAL.defaultValue(),
+                        StartupOptions.initial(),
+                        null,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
+    public void testStartupFromLatestOffset() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.incremental.snapshot.enabled", "true");
+        properties.put("scan.incremental.snapshot.chunk.size", "8000");
+        properties.put("scan.snapshot.fetch.size", "100");
+        properties.put("connect.timeout", "45s");
+        properties.put("scan.startup.mode", "latest-offset");
+
+        // validation for source
+        DynamicTableSource actualSource = createTableSource(properties);
+        PostgreSQLTableSource expectedSource =
+                new PostgreSQLTableSource(
+                        SCHEMA,
+                        5432,
+                        MY_LOCALHOST,
+                        MY_DATABASE,
+                        MY_SCHEMA,
+                        MY_TABLE,
+                        MY_USERNAME,
+                        MY_PASSWORD,
+                        "decoderbufs",
+                        MY_SLOT_NAME,
+                        DebeziumChangelogMode.ALL,
+                        PROPERTIES,
+                        true,
+                        8000,
+                        CHUNK_META_GROUP_SIZE.defaultValue(),
+                        100,
+                        Duration.ofSeconds(45),
+                        CONNECT_MAX_RETRIES.defaultValue(),
+                        CONNECTION_POOL_SIZE.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        HEARTBEAT_INTERVAL.defaultValue(),
+                        StartupOptions.latest(),
+                        null,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
+        assertEquals(expectedSource, actualSource);
+    }
+
+    @Test
+    public void testValidation() {
+        // validate illegal port
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("port", "123b");
+
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t, "Could not parse value '123b' for key 'port'.")
+                            .isPresent());
+>>>>>>> Stashed changes
         }
 
         @Test

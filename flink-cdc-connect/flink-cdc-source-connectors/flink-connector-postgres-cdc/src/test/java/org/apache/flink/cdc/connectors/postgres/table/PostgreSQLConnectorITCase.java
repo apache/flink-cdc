@@ -486,12 +486,37 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 parallelismSnapshot,
                                 getSlotName());
 
+<<<<<<< Updated upstream
                 String sinkDDL = "CREATE TABLE sink ("
                                 + " database_name STRING,"
                                 + " schema_name STRING,"
                                 + " table_name STRING,"
                                 + " row_kind STRING,"
                                 + " id INT,"
+=======
+        List<String> expected =
+                Arrays.asList(
+                        "+I(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})",
+                        "-D(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})",
+                        "+I(1,[50],0,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})");
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        assertEquals(expected, actual);
+
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testMetadataColumns() throws Throwable {
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source  ("
+                                + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
+                                + " schema_name STRING METADATA VIRTUAL,"
+                                + " table_name STRING METADATA VIRTUAL,"
+                                + " row_kind STRING METADATA 'row_kind' FROM VIRTUAL,"
+                                + " id INT NOT NULL,"
+>>>>>>> Stashed changes
                                 + " name STRING,"
                                 + " description STRING,"
                                 + " weight DECIMAL(10,3),"
@@ -504,8 +529,29 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                 tEnv.executeSql(sourceDDL);
                 tEnv.executeSql(sinkDDL);
 
+<<<<<<< Updated upstream
                 // sync submit job
                 TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+=======
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " database_name STRING,"
+                        + " schema_name STRING,"
+                        + " table_name STRING,"
+                        + " row_kind STRING,"
+                        + " id INT,"
+                        + " name STRING,"
+                        + " description STRING,"
+                        + " weight DECIMAL(10,3),"
+                        + " PRIMARY KEY (id) NOT ENFORCED"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '20'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+>>>>>>> Stashed changes
 
                 waitForSnapshotStarted("sink");
                 // wait a bit to make sure the replication slot is ready
@@ -588,6 +634,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                 result.getJobClient().get().cancel().get();
         }
 
+<<<<<<< Updated upstream
         @Test
         public void testUpsertMode() throws Exception {
                 initializePostgresTable(POSTGRES_CONTAINER, "replica_identity");
@@ -622,6 +669,76 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 parallelismSnapshot,
                                 "upsert");
                 String sinkDDL = "CREATE TABLE sink ("
+=======
+        // waiting for change events finished.
+        waitForSinkSize("sink", 16);
+        String databaseName = POSTGRES_CONTAINER.getDatabaseName();
+
+        List<String> expected =
+                Arrays.asList(
+                        "+I("
+                                + databaseName
+                                + ",inventory,products,+I,101,scooter,Small 2-wheel scooter,3.140)",
+                        "+I("
+                                + databaseName
+                                + ",inventory,products,+I,102,car battery,12V car battery,8.100)",
+                        "+I("
+                                + databaseName
+                                + ",inventory,products,+I,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.800)",
+                        "+I("
+                                + databaseName
+                                + ",inventory,products,+I,104,hammer,12oz carpenter's hammer,0.750)",
+                        "+I("
+                                + databaseName
+                                + ",inventory,products,+I,105,hammer,14oz carpenter's hammer,0.875)",
+                        "+I("
+                                + databaseName
+                                + ",inventory,products,+I,106,hammer,16oz carpenter's hammer,1.000)",
+                        "+I("
+                                + databaseName
+                                + ",inventory,products,+I,107,rocks,box of assorted rocks,5.300)",
+                        "+I("
+                                + databaseName
+                                + ",inventory,products,+I,108,jacket,water resistent black wind breaker,0.100)",
+                        "+I("
+                                + databaseName
+                                + ",inventory,products,+I,109,spare tire,24 inch spare tire,22.200)",
+                        "+I("
+                                + databaseName
+                                + ",inventory,products,+I,110,jacket,water resistent white wind breaker,0.200)",
+                        "+I("
+                                + databaseName
+                                + ",inventory,products,+I,111,scooter,Big 2-wheel scooter ,5.180)",
+                        "+U("
+                                + databaseName
+                                + ",inventory,products,+U,106,hammer,18oz carpenter hammer,1.000)",
+                        "+U("
+                                + databaseName
+                                + ",inventory,products,+U,107,rocks,box of assorted rocks,5.100)",
+                        "+U("
+                                + databaseName
+                                + ",inventory,products,+U,110,jacket,new water resistent white wind breaker,0.500)",
+                        "+U("
+                                + databaseName
+                                + ",inventory,products,+U,111,scooter,Big 2-wheel scooter ,5.170)",
+                        "-D("
+                                + databaseName
+                                + ",inventory,products,-D,111,scooter,Big 2-wheel scooter ,5.170)");
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        Collections.sort(actual);
+        Collections.sort(expected);
+        assertEquals(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
+
+    @Test
+    public void testUpsertMode() throws Exception {
+        initializePostgresTable(POSTGRES_CONTAINER, "replica_identity");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " id INT NOT NULL,"
+>>>>>>> Stashed changes
                                 + " name STRING,"
                                 + " weightSum DECIMAL(10,3),"
                                 + " PRIMARY KEY (name) NOT ENFORCED"
