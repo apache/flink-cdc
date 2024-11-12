@@ -17,17 +17,18 @@
 
 package org.apache.flink.cdc.connectors.base.source.parser;
 
-import java.sql.Types;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 
 import io.debezium.antlr.AntlrDdlParserListener;
 import io.debezium.antlr.DataTypeResolver;
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.ddl.parser.mysql.generated.MySqlParser;
-import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+
+import java.sql.Types;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 
 /** A ddl parser that will use custom listener. */
 public class CustomMySqlAntlrDdlParser extends MySqlAntlrDdlParser {

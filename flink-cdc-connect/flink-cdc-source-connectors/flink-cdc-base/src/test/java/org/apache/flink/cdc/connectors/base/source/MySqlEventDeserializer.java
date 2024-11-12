@@ -17,15 +17,6 @@
 
 package org.apache.flink.cdc.connectors.base.source;
 
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.debezium.data.Envelope;
-import io.debezium.relational.Tables;
-import io.debezium.relational.history.HistoryRecord;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -33,9 +24,19 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.connectors.base.source.parser.CustomMySqlAntlrDdlParser;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.debezium.data.Envelope;
+import io.debezium.relational.Tables;
+import io.debezium.relational.history.HistoryRecord;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getHistoryRecord;
 
@@ -116,7 +117,7 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     protected Object convertToString(Object dbzObj, Schema schema) {
         // the Geometry datatype in MySQL will be converted to
         // a String with Json format
-        //if (Point.LOGICAL_NAME.equals(schema.name())
+        // if (Point.LOGICAL_NAME.equals(schema.name())
         //        || Geometry.LOGICAL_NAME.equals(schema.name())) {
         //    try {
         //        Struct geometryStruct = (Struct) dbzObj;
@@ -139,9 +140,9 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
         //        throw new IllegalArgumentException(
         //                String.format("Failed to convert %s to geometry JSON.", dbzObj), e);
         //    }
-        //} else {
+        // } else {
         //    return BinaryStringData.fromString(dbzObj.toString());
-        //}
+        // }
         return BinaryStringData.fromString(dbzObj.toString());
     }
 }

@@ -17,11 +17,7 @@
 
 package org.apache.flink.cdc.connectors.base.source.parser;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 
 import io.debezium.antlr.AntlrDdlParserListener;
 import io.debezium.antlr.ProxyParseTreeListenerUtil;
@@ -46,7 +42,12 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.antlr.v4.runtime.tree.TerminalNode;
-import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Copied from {@link MySqlAntlrDdlParserListener} in Debezium 1.9.8.final.

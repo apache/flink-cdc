@@ -17,23 +17,6 @@
 
 package org.apache.flink.cdc.connectors.base.source.parser;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
-import io.debezium.connector.mysql.antlr.listener.AlterTableParserListener;
-import io.debezium.ddl.parser.mysql.generated.MySqlParser;
-import io.debezium.ddl.parser.mysql.generated.MySqlParserBaseListener;
-import io.debezium.relational.Column;
-import io.debezium.relational.ColumnEditor;
-import io.debezium.relational.TableEditor;
-import io.debezium.relational.TableId;
-import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -46,14 +29,30 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
+
+import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
+import io.debezium.connector.mysql.antlr.listener.AlterTableParserListener;
+import io.debezium.ddl.parser.mysql.generated.MySqlParser;
+import io.debezium.ddl.parser.mysql.generated.MySqlParserBaseListener;
+import io.debezium.relational.Column;
+import io.debezium.relational.ColumnEditor;
+import io.debezium.relational.TableEditor;
+import io.debezium.relational.TableId;
+import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import static org.apache.flink.cdc.connectors.base.experimental.utils.MySqlTypeUtils.fromDbzColumn;
 
-/**
- * Copied from {@link AlterTableParserListener} in Debezium 1.9.8.Final.
- */
+/** Copied from {@link AlterTableParserListener} in Debezium 1.9.8.Final. */
 public class CustomAlterTableParserListener extends MySqlParserBaseListener {
 
     private static final int STARTING_INDEX = 1;
