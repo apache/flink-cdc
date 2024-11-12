@@ -133,7 +133,7 @@ pipeline:
 ```
 
 You need to modify the configuration file according to your needs.
-Finally, submit job to Flink Standalone cluster using Cli.
+Finally, submit job to Flink Yarn Session cluster using Cli.
 
 ```bash
 cd /path/flink-cdc-*
