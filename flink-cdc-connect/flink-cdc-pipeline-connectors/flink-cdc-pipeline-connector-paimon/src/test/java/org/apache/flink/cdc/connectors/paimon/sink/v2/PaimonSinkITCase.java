@@ -258,6 +258,19 @@ public class PaimonSinkITCase {
                 .forEachRemaining(result::add);
         Assertions.assertEquals(
                 Collections.singletonList(Row.ofKind(RowKind.INSERT, "2", "x")), result);
+
+        result = new ArrayList<>();
+        tEnv.sqlQuery("select max_sequence_number from paimon_catalog.test.`table1$files`")
+                .execute()
+                .collect()
+                .forEachRemaining(result::add);
+        // Each commit will generate one sequence number(equal to checkpointId).
+        Assertions.assertEquals(
+                Arrays.asList(
+                        Row.ofKind(RowKind.INSERT, 1L),
+                        Row.ofKind(RowKind.INSERT, 2L),
+                        Row.ofKind(RowKind.INSERT, 3L)),
+                result);
     }
 
     @ParameterizedTest
