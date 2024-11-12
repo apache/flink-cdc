@@ -99,6 +99,7 @@ public class PostgreSQLTableFactoryTest {
                             Column.physical("name", DataTypes.STRING()),
                             Column.physical("count", DataTypes.DECIMAL(38, 18)),
                             Column.metadata("time", DataTypes.TIMESTAMP_LTZ(3), "op_ts", true),
+                            Column.metadata("row_kind", DataTypes.STRING(), "row_kind", true),
                             Column.metadata(
                                     "database_name", DataTypes.STRING(), "database_name", true),
                             Column.metadata("schema_name", DataTypes.STRING(), "schema_name", true),
@@ -210,7 +211,7 @@ public class PostgreSQLTableFactoryTest {
         DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
         PostgreSQLTableSource postgreSQLTableSource = (PostgreSQLTableSource) actualSource;
         postgreSQLTableSource.applyReadableMetadata(
-                Arrays.asList("op_ts", "database_name", "schema_name", "table_name"),
+                Arrays.asList("row_kind", "op_ts", "database_name", "schema_name", "table_name"),
                 SCHEMA_WITH_METADATA.toSourceRowDataType());
         actualSource = postgreSQLTableSource.copy();
         PostgreSQLTableSource expectedSource =
@@ -245,7 +246,7 @@ public class PostgreSQLTableFactoryTest {
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
-                Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
+                Arrays.asList("row_kind", "op_ts", "database_name", "schema_name", "table_name");
 
         assertEquals(expectedSource, actualSource);
 
