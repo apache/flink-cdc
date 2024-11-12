@@ -23,6 +23,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Base64;
 
+import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig.useLegacyJsonFormat;
+
 /**
  * Copied from mysql-binlog-connector-java 0.27.2 to add whitespace before value and after comma.
  *
@@ -103,7 +105,11 @@ public class JsonStringFormatter implements JsonFormatter {
     public void name(String name) {
         sb.append('"');
         appendString(name);
-        sb.append("\": ");
+        if (useLegacyJsonFormat) {
+            sb.append("\":");
+        } else {
+            sb.append("\": ");
+        }
     }
 
     @Override
@@ -205,7 +211,11 @@ public class JsonStringFormatter implements JsonFormatter {
 
     @Override
     public void nextEntry() {
-        sb.append(", ");
+        if (useLegacyJsonFormat) {
+            sb.append(",");
+        } else {
+            sb.append(", ");
+        }
     }
 
     /**
