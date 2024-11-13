@@ -411,8 +411,9 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         }
 
         expectedSnapshot[30] = null;
-        // The json string from binlog will remove useless space
-        expectedSnapshot[44] = BinaryStringData.fromString("{\"key1\": \"value1\"}");
+        // Default value of useLegacyJsonFormat option is true, so the json string will be formatted with legacy format.
+        // Legacy format remove useless space in json string from binlog
+        expectedSnapshot[44] = BinaryStringData.fromString("{\"key1\":\"value1\"}");
         Object[] expectedStreamRecord = expectedSnapshot;
 
         List<Event> streamResults =

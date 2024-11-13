@@ -695,7 +695,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + "404.4443, 404.4444, 404.4445, 123.4567, 123.4568, 123.4569, 346, 34567892.1, false, true, true,"
                             + " 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, "
                             + "ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, [a, b], "
-                            + "{\"key1\": \"value1\"}, "
+                            + "{\"key1\":\"value1\"}, "
                             + expectedPointJsonText
                             + ", "
                             + expectedGeometryJsonText
@@ -718,7 +718,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + " false, true, true,"
                             + " 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22, "
                             + "ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, [a, b], "
-                            + "{\"key1\": \"value1\"}, "
+                            + "{\"key1\":\"value1\"}, "
                             + expectedPointJsonText
                             + ", "
                             + expectedGeometryJsonText
@@ -741,7 +741,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + " false, true, true,"
                             + " 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:33:22, "
                             + "ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=, [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, [a, b], "
-                            + "{\"key1\": \"value1\"}, "
+                            + "{\"key1\":\"value1\"}, "
                             + expectedPointJsonText
                             + ", "
                             + expectedGeometryJsonText
