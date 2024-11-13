@@ -19,7 +19,7 @@ on:
   workflow_call:
 
 jobs:
-  unit_test:
+  misc_test:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
