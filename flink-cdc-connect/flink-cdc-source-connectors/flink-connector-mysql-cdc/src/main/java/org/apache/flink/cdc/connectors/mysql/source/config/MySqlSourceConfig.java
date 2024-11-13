@@ -66,7 +66,7 @@ public class MySqlSourceConfig implements Serializable {
     private final Properties jdbcProperties;
     private final Map<ObjectPath, String> chunkKeyColumns;
     private final boolean skipSnapshotBackfill;
-    public static boolean useLegacyJsonFormat;
+    public static boolean useLegacyJsonFormat = true;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
