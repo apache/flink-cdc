@@ -95,6 +95,8 @@ public class ElasticsearchDataSink<InputT> implements DataSink, Serializable {
         return FlinkSinkProvider.of(
                 new Elasticsearch6SinkBuilder<Event>()
                         .setHosts(hosts)
+                        .setConnectionUsername(elasticsearchOptions.getUsername())
+                        .setConnectionPassword(elasticsearchOptions.getPassword())
                         .setEmitter(
                                 (element, context, indexer) -> {
                                     BulkOperationVariant operation =
@@ -132,6 +134,8 @@ public class ElasticsearchDataSink<InputT> implements DataSink, Serializable {
         return FlinkSinkProvider.of(
                 new Elasticsearch6SinkBuilder<Event>()
                         .setHosts(hosts)
+                        .setConnectionUsername(elasticsearchOptions.getUsername())
+                        .setConnectionPassword(elasticsearchOptions.getPassword())
                         .setEmitter(
                                 (element, context, indexer) -> {
                                     BulkOperationVariant operation =
@@ -158,6 +162,8 @@ public class ElasticsearchDataSink<InputT> implements DataSink, Serializable {
                                 elasticsearchOptions
                                         .getHosts()
                                         .toArray(new org.apache.http.HttpHost[0]))
+                        .setUsername(elasticsearchOptions.getUsername())
+                        .setPassword(elasticsearchOptions.getPassword())
                         .setElementConverter(new ElasticsearchEventSerializer(zoneId))
                         .setMaxBatchSize(elasticsearchOptions.getMaxBatchSize())
                         .setMaxInFlightRequests(elasticsearchOptions.getMaxInFlightRequests())
