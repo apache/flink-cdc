@@ -22,10 +22,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
-
-import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,23 +40,9 @@ import java.util.List;
  */
 public class PreTransformProcessor {
     private PreTransformChangeInfo tableChangeInfo;
-    private TransformProjection transformProjection;
-    private @Nullable TransformFilter transformFilter;
-    private List<Boolean> cachedProjectionColumnsState;
 
-    public PreTransformProcessor(
-            PreTransformChangeInfo tableChangeInfo,
-            TransformProjection transformProjection,
-            @Nullable TransformFilter transformFilter) {
+    public PreTransformProcessor(PreTransformChangeInfo tableChangeInfo) {
         this.tableChangeInfo = tableChangeInfo;
-        this.transformProjection = transformProjection;
-        this.transformFilter = transformFilter;
-        this.cachedProjectionColumnsState =
-                cacheIsProjectionColumnMap(tableChangeInfo, transformProjection);
-    }
-
-    public boolean hasTableChangeInfo() {
-        return this.tableChangeInfo != null;
     }
 
     /**
@@ -69,32 +52,24 @@ public class PreTransformProcessor {
      * will be sent to downstream, and (D, E) column along with corresponding data will be trimmed.
      */
     public CreateTableEvent preTransformCreateTableEvent(CreateTableEvent createTableEvent) {
-        List<Column> preTransformColumns =
-                TransformParser.generateReferencedColumns(
-                        transformProjection.getProjection(),
-                        transformFilter != null ? transformFilter.getExpression() : null,
-                        createTableEvent.getSchema().getColumns());
-        Schema schema = createTableEvent.getSchema().copy(preTransformColumns);
+        Schema schema =
+                createTableEvent
+                        .getSchema()
+                        .copy(tableChangeInfo.getPreTransformedSchema().getColumns());
         return new CreateTableEvent(createTableEvent.tableId(), schema);
     }
 
     public BinaryRecordData processFillDataField(BinaryRecordData data) {
         List<Object> valueList = new ArrayList<>();
         List<Column> columns = tableChangeInfo.getPreTransformedSchema().getColumns();
-
         for (int i = 0; i < columns.size(); i++) {
-            if (cachedProjectionColumnsState.get(i)) {
-                valueList.add(null);
-            } else {
-                valueList.add(
-                        getValueFromBinaryRecordData(
-                                columns.get(i).getName(),
-                                data,
-                                tableChangeInfo.getSourceSchema().getColumns(),
-                                tableChangeInfo.getSourceFieldGetters()));
-            }
+            valueList.add(
+                    getValueFromBinaryRecordData(
+                            columns.get(i).getName(),
+                            data,
+                            tableChangeInfo.getSourceSchema().getColumns(),
+                            tableChangeInfo.getSourceFieldGetters()));
         }
-
         return tableChangeInfo
                 .getPreTransformedRecordDataGenerator()
                 .generate(valueList.toArray(new Object[0]));
@@ -112,27 +87,5 @@ public class PreTransformProcessor {
             }
         }
         return null;
-    }
-
-    private List<Boolean> cacheIsProjectionColumnMap(
-            PreTransformChangeInfo tableChangeInfo, TransformProjection transformProjection) {
-        List<Boolean> cachedMap = new ArrayList<>();
-        if (!hasTableChangeInfo()) {
-            return cachedMap;
-        }
-
-        for (Column column : tableChangeInfo.getPreTransformedSchema().getColumns()) {
-            boolean isProjectionColumn = false;
-            for (ProjectionColumn projectionColumn : transformProjection.getProjectionColumns()) {
-                if (column.getName().equals(projectionColumn.getColumnName())
-                        && projectionColumn.isValidTransformedProjectionColumn()) {
-                    isProjectionColumn = true;
-                    break;
-                }
-            }
-            cachedMap.add(isProjectionColumn);
-        }
-
-        return cachedMap;
     }
 }
