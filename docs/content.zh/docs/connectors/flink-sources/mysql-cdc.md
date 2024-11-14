@@ -581,7 +581,7 @@ MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认
  [100, +∞)
 ```
 
-对于其他主键列类型， MySQL CDC Source 将以下形式执行语句： `SELECT MAX(STR_ID) AS chunk_high FROM (SELECT * FROM TestTable WHERE STR_ID > 'uuid-001' limit 25)` 来获得每个区块的低值和高值，
+对于其他主键列类型， MySQL CDC Source 将以下形式执行语句： `SELECT MAX(STR_ID) AS chunk_high FROM (SELECT * FROM TestTable WHERE STR_ID > 'uuid-001' ORDER BY STR_ID ASC LIMIT 25)` 来获得每个区块的低值和高值，
 分割块集如下所示：
 
  ```
