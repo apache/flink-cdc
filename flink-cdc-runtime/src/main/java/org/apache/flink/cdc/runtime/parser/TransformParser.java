@@ -588,7 +588,8 @@ public class TransformParser {
 
     public static boolean hasAsterisk(@Nullable String projection) {
         if (isNullOrWhitespaceOnly(projection)) {
-            return false;
+            // Providing an empty projection expression is equivalent to writing `*` explicitly.
+            return true;
         }
         return parseProjectionExpression(projection).getOperandList().stream()
                 .anyMatch(TransformParser::hasAsterisk);
