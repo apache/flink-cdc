@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.schema;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
@@ -40,6 +41,7 @@ import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeFamily;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
+import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
@@ -74,6 +76,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -611,14 +614,42 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 } else if (originalField instanceof Integer) {
                     // INT
                     return ((Integer) originalField).longValue();
+                } else if (originalField instanceof Long) {
+                    // BIGINT
+                    return originalField;
                 } else {
                     return fail(
                             new IllegalArgumentException(
                                     String.format(
                                             "Cannot fit type \"%s\" into a BIGINT column. "
-                                                    + "Currently only TINYINT / SMALLINT / INT can be accepted by a BIGINT column",
+                                                    + "Currently only TINYINT / SMALLINT / INT / LONG can be accepted by a BIGINT column",
                                             originalField.getClass())));
                 }
+            } else if (destinationType instanceof DecimalType) {
+                DecimalType decimalType = (DecimalType) destinationType;
+                BigDecimal decimalValue;
+                if (originalField instanceof Byte) {
+                    decimalValue = BigDecimal.valueOf(((Byte) originalField).longValue(), 0);
+                } else if (originalField instanceof Short) {
+                    decimalValue = BigDecimal.valueOf(((Short) originalField).longValue(), 0);
+                } else if (originalField instanceof Integer) {
+                    decimalValue = BigDecimal.valueOf(((Integer) originalField).longValue(), 0);
+                } else if (originalField instanceof Long) {
+                    decimalValue = BigDecimal.valueOf((Long) originalField, 0);
+                } else if (originalField instanceof DecimalData) {
+                    decimalValue = ((DecimalData) originalField).toBigDecimal();
+                } else {
+                    return fail(
+                            new IllegalArgumentException(
+                                    String.format(
+                                            "Cannot fit type \"%s\" into a DECIMAL column. "
+                                                    + "Currently only BYTE / SHORT / INT / LONG / DECIMAL can be accepted by a DECIMAL column",
+                                            originalField.getClass())));
+                }
+                return decimalValue != null
+                        ? DecimalData.fromBigDecimal(
+                                decimalValue, decimalType.getPrecision(), decimalType.getScale())
+                        : null;
             } else if (destinationType.is(DataTypeFamily.APPROXIMATE_NUMERIC)) {
                 if (originalField instanceof Float) {
                     // FLOAT
