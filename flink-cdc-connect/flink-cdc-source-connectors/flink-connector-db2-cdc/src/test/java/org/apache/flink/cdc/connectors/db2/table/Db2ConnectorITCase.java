@@ -209,7 +209,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
                     "spare tire,22.200"
                 };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         cancelJobIfRunning(result);
@@ -373,7 +373,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
         String[] expected =
                 new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         cancelJobIfRunning(result);

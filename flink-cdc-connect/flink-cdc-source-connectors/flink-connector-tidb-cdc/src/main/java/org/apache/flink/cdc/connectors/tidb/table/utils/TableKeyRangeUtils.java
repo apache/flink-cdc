@@ -19,7 +19,7 @@ package org.apache.flink.cdc.connectors.tidb.table.utils;
 
 import org.apache.flink.util.Preconditions;
 
-import org.apache.flink.shaded.guava32.com.google.common.collect.ImmutableList;
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
 
 import org.tikv.common.key.RowKey;
 import org.tikv.common.util.KeyRangeUtils;

@@ -22,7 +22,7 @@ import org.apache.flink.cdc.common.configuration.ConfigOptions;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.table.api.ValidationException;
 
-import org.apache.flink.shaded.guava32.com.google.common.collect.Sets;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;

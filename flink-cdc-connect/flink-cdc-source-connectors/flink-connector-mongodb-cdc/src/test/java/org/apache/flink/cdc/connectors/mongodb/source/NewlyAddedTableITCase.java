@@ -798,7 +798,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
             waitForUpsertSinkSize("sink", fetchedDataList.size());
             MongoDBAssertUtils.assertEqualsInAnyOrder(
-                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
             // step 3: make some changelog data for this round
             makeFirstPartOplogForAddressCollection(
@@ -843,7 +843,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
             // checkpoint to wait retract old record and send new record
             Thread.sleep(1000);
             MongoDBAssertUtils.assertEqualsInAnyOrder(
-                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
             // step 6: trigger savepoint
             if (round != captureAddressCollections.length - 1) {
@@ -1023,7 +1023,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     protected static int upsertSinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
+                return TestValuesTableFactory.getResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;

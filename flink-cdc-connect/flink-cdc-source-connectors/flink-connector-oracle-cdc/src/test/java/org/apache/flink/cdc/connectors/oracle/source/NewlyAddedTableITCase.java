@@ -687,7 +687,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
             waitForUpsertSinkSize("sink", fetchedDataList.size());
             assertEqualsInAnyOrder(
-                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
             // step 3: make some redo log data for this round
             makeFirstPartRedoLogForAddressTable(newlyAddedTable);
@@ -729,7 +729,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
             // checkpoint to wait retract old record and send new record
             Thread.sleep(1000);
             assertEqualsInAnyOrder(
-                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
             // step 6: trigger savepoint
             if (round != captureAddressTables.length - 1) {

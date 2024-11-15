@@ -193,7 +193,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "spare tire,22.200"
                 };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -266,7 +266,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         String[] expected =
                 new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -707,7 +707,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "spare tire,22.200"
                 };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();

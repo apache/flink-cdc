@@ -141,7 +141,7 @@ public class VitessConnectorITCase extends VitessTestBase {
                         "+I[jacket, 0.600]",
                         "+I[spare tire, 22.200]");
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }

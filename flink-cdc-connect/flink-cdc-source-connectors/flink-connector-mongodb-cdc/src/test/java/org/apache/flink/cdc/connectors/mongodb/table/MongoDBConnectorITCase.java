@@ -221,7 +221,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                     "spare tire,22.200"
                 };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -300,7 +300,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
 
         String[] expected = new String[] {"jacket,0.200", "scooter,5.180"};
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();

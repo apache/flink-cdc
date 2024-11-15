@@ -326,8 +326,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         operator.getOperatorIdFuture(),
                         serializer,
                         accumulatorName,
-                        env.getCheckpointConfig(),
-                        0);
+                        env.getCheckpointConfig());
         CollectStreamSink<RowData> sink = new CollectStreamSink(source, factory);
         sink.name("Data stream collect sink");
         env.addOperator(sink.getTransformation());
@@ -808,8 +807,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         operator.getOperatorIdFuture(),
                         serializer,
                         accumulatorName,
-                        env.getCheckpointConfig(),
-                        0);
+                        env.getCheckpointConfig());
         CollectStreamSink<T> sink = new CollectStreamSink<>(stream, factory);
         sink.name("Data stream collect sink");
         env.addOperator(sink.getTransformation());

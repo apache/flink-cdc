@@ -199,7 +199,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                     "spare tire,22.200"
                 };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -275,7 +275,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                     "113,scooter,Big 3-wheel scooter,5.200"
                 };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();

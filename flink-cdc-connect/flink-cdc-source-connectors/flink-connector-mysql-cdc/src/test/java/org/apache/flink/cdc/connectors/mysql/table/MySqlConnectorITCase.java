@@ -39,7 +39,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.ExceptionUtils;
 
-import org.apache.flink.shaded.guava32.com.google.common.collect.Lists;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -271,7 +271,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[spare tire, 22.200]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
         result.getJobClient().get().cancel().get();
     }
@@ -410,7 +410,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                             "+I[110, jacket, new water resistent white wind breaker, 0.500]"
                         };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
         result.getJobClient().get().cancel().get();
     }
@@ -1744,7 +1744,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
@@ -1845,7 +1845,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
@@ -1925,7 +1925,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[110, jacket, new water resistent white wind breaker, 0.500]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
@@ -2000,7 +2000,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();

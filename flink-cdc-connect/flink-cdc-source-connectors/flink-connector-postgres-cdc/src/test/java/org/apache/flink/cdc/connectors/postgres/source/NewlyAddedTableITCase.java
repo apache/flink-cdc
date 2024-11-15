@@ -722,7 +722,7 @@ public class NewlyAddedTableITCase extends PostgresTestBase {
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
             PostgresTestUtils.waitForUpsertSinkSize("sink", fetchedDataList.size());
             assertEqualsInAnyOrder(
-                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
             // step 3: make some wal log data for this round
             makeFirstPartWalLogForAddressTable(getConnection(), newlyAddedTable);
@@ -764,7 +764,7 @@ public class NewlyAddedTableITCase extends PostgresTestBase {
             // checkpoint to wait retract old record and send new record
             Thread.sleep(1000);
             assertEqualsInAnyOrder(
-                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
             // step 6: trigger savepoint
             if (round != captureAddressTables.length - 1) {

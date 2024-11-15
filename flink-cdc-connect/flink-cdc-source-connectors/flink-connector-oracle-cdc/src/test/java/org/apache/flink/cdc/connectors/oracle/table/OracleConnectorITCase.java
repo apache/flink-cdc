@@ -23,8 +23,8 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 
-import org.apache.flink.shaded.guava32.com.google.common.collect.Lists;
-import org.apache.flink.shaded.guava32.com.google.common.util.concurrent.RateLimiter;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
+import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.RateLimiter;
 
 import org.junit.After;
 import org.junit.Assume;
@@ -218,7 +218,7 @@ public class OracleConnectorITCase {
                     "+I[spare tire, 22.200]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
@@ -350,7 +350,7 @@ public class OracleConnectorITCase {
                     "+I[spare tire, 22.200]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
@@ -445,7 +445,7 @@ public class OracleConnectorITCase {
                     "+I[spare tire, 22.200]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         LOG.info("actual:{}", actual);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
@@ -618,7 +618,7 @@ public class OracleConnectorITCase {
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -835,7 +835,7 @@ public class OracleConnectorITCase {
                             + "</name>\n]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Collections.sort(actual);
         assertEquals(Arrays.asList(expected), actual);
         result.getJobClient().get().cancel().get();
@@ -894,7 +894,7 @@ public class OracleConnectorITCase {
         waitForSinkSize("sink", RECORDS_COUNT);
 
         List<Integer> actual =
-                TestValuesTableFactory.getRawResultsAsStrings("sink").stream()
+                TestValuesTableFactory.getResultsAsStrings("sink").stream()
                         .map(s -> s.replaceFirst("\\+I\\[(\\d+).+", "$1"))
                         .map(Integer::parseInt)
                         .sorted()
