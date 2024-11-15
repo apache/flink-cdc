@@ -81,7 +81,8 @@ public enum PostgreSQLReadableMetadata {
             }),
 
     /**
-     * It indicates the time that the change was made in the database. If the record is read from
+     * It indicates the time that the change was made in the database. If the record
+     * is read from
      * snapshot of the table instead of the change stream, the value is always 0.
      */
     OP_TS(
@@ -100,7 +101,8 @@ public enum PostgreSQLReadableMetadata {
             }),
 
     /**
-     * It indicates the row kind of the changelog. '+I' means INSERT message, '-D' means DELETE
+     * It indicates the row kind of the changelog. '+I' means INSERT message, '-D'
+     * means DELETE
      * message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message
      */
     ROW_KIND(
