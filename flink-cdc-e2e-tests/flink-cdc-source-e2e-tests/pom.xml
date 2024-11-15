@@ -244,36 +244,6 @@ limitations under the License.
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
                             <artifactId>flink-connector-jdbc</artifactId>
-                            <version>${flink-1.16}</version>
-                            <destFileName>jdbc-connector_${flink-1.16}.jar</destFileName>
-                            <type>jar</type>
-                            <outputDirectory>${project.build.directory}/dependencies
-                            </outputDirectory>
-                        </artifactItem>
-
-                        <artifactItem>
-                            <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-connector-jdbc</artifactId>
-                            <version>${jdbc.version-1.17}</version>
-                            <destFileName>jdbc-connector_${flink-1.17}.jar</destFileName>
-                            <type>jar</type>
-                            <outputDirectory>${project.build.directory}/dependencies
-                            </outputDirectory>
-                        </artifactItem>
-
-                        <artifactItem>
-                            <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-connector-jdbc</artifactId>
-                            <version>${jdbc.version-1.18}</version>
-                            <destFileName>jdbc-connector_${flink-1.18}.jar</destFileName>
-                            <type>jar</type>
-                            <outputDirectory>${project.build.directory}/dependencies
-                            </outputDirectory>
-                        </artifactItem>
-
-                        <artifactItem>
-                            <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-connector-jdbc</artifactId>
                             <version>${jdbc.version-1.19}</version>
                             <destFileName>jdbc-connector_${flink-1.19}.jar</destFileName>
                             <type>jar</type>
