@@ -42,6 +42,8 @@ import org.apache.flink.cdc.connectors.paimon.sink.PaimonMetadataApplier;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
+import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
+import org.apache.flink.runtime.metrics.groups.InternalSinkCommitterMetricGroup;
 import org.apache.flink.streaming.runtime.operators.sink.committables.CommitRequestImpl;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
@@ -574,7 +576,10 @@ public class PaimonSinkITCase {
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {
 
         protected MockCommitRequestImpl(CommT committable) {
-            super(committable, null);
+            super(
+                    committable,
+                    InternalSinkCommitterMetricGroup.wrap(
+                            UnregisteredMetricsGroup.createOperatorMetricGroup()));
         }
     }
 
