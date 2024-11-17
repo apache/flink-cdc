@@ -164,14 +164,22 @@ public class PaimonMetadataApplier implements MetadataApplier {
                                             LogicalTypeConversion.toDataType(
                                                     DataTypeUtils.toFlinkDataType(column.getType())
                                                             .getLogicalType())));
-            builder.primaryKey(schema.primaryKeys().toArray(new String[0]));
+            List<String> partitionKeys = new ArrayList<>();
+            List<String> primaryKeys = schema.primaryKeys();
             if (partitionMaps.containsKey(event.tableId())) {
-                builder.partitionKeys(partitionMaps.get(event.tableId()));
+                partitionKeys.addAll(partitionMaps.get(event.tableId()));
             } else if (schema.partitionKeys() != null && !schema.partitionKeys().isEmpty()) {
-                builder.partitionKeys(schema.partitionKeys());
+                partitionKeys.addAll(schema.partitionKeys());
             }
-            builder.options(tableOptions);
-            builder.options(schema.options());
+            for (String partitionColumn : partitionKeys) {
+                if (!primaryKeys.contains(partitionColumn)) {
+                    primaryKeys.add(partitionColumn);
+                }
+            }
+            builder.partitionKeys(partitionKeys)
+                    .primaryKey(primaryKeys)
+                    .options(tableOptions)
+                    .options(schema.options());
             catalog.createTable(
                     new Identifier(event.tableId().getSchemaName(), event.tableId().getTableName()),
                     builder.build(),

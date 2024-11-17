@@ -117,52 +117,65 @@ public class MysqlDebeziumTimeConverter
         registration.register(
                 SchemaBuilder.string().name(schemaName).optional(),
                 value -> {
-                    log.debug(
-                            "find schema need to change dateType, field name:{} ,field type:{} ,field value:{} ,field "
-                                    + "default:{}",
-                            field.name(),
-                            columnType,
-                            value == null ? "null" : value,
-                            field.hasDefaultValue() ? field.defaultValue() : "null");
-                    if (value == null) {
-                        return convertDateDefaultValue(field);
-                    }
-                    switch (columnType.toUpperCase(Locale.ROOT)) {
-                        case DATE:
-                            if (value instanceof Integer) {
-                                return this.convertToDate(
-                                        columnType, LocalDate.ofEpochDay((Integer) value));
-                            }
-                            return this.convertToDate(columnType, value);
-                        case TIME:
-                            if (value instanceof Long) {
-                                long l =
-                                        Math.multiplyExact(
-                                                (Long) value, TimeUnit.MICROSECONDS.toNanos(1));
-                                return this.convertToTime(columnType, LocalTime.ofNanoOfDay(l));
-                            }
-                            return this.convertToTime(columnType, value);
-                        case DATETIME:
-                            if (value instanceof Long) {
-                                if (getTimePrecision(field) <= 3) {
-                                    return this.convertToTimestamp(
-                                            columnType,
-                                            Conversions.toInstantFromMillis((Long) value));
-                                }
-                                if (getTimePrecision(field) <= 6) {
-                                    return this.convertToTimestamp(
-                                            columnType,
-                                            Conversions.toInstantFromMicros((Long) value));
-                                }
-                            }
-                            return this.convertToTimestamp(columnType, value);
-                        case TIMESTAMP:
-                            return this.convertToTimestampWithTimezone(columnType, value);
-                        default:
-                            throw new IllegalArgumentException(
-                                    "Unknown field type  " + columnType.toUpperCase(Locale.ROOT));
+                    try {
+                        return convertDateObject(field, value, columnType);
+                    } catch (Exception e) {
+                        logConvertDateError(field, value);
+                        throw new RuntimeException("MysqlDebeziumConverter error", e);
                     }
                 });
+    }
+
+    private void logConvertDateError(RelationalColumn field, Object value) {
+        String fieldName = field.name();
+        String fieldType = field.typeName().toUpperCase();
+        String defaultValue = "null";
+        if (field.hasDefaultValue() && field.defaultValue() != null) {
+            defaultValue = field.defaultValue().toString();
+        }
+        log.error(
+                "Find schema need to change dateType, but failed. Field name:{}, field type:{}, "
+                        + "field value:{}, field default value:{}",
+                fieldName,
+                fieldType,
+                value == null ? "null" : value,
+                defaultValue);
+    }
+
+    private Object convertDateObject(RelationalColumn field, Object value, String columnType) {
+        if (value == null) {
+            return convertDateDefaultValue(field);
+        }
+        switch (columnType.toUpperCase(Locale.ROOT)) {
+            case "DATE":
+                if (value instanceof Integer) {
+                    return this.convertToDate(columnType, LocalDate.ofEpochDay((Integer) value));
+                }
+                return this.convertToDate(columnType, value);
+            case "TIME":
+                if (value instanceof Long) {
+                    long l = Math.multiplyExact((Long) value, TimeUnit.MICROSECONDS.toNanos(1));
+                    return this.convertToTime(columnType, LocalTime.ofNanoOfDay(l));
+                }
+                return this.convertToTime(columnType, value);
+            case "DATETIME":
+                if (value instanceof Long) {
+                    if (getTimePrecision(field) <= 3) {
+                        return this.convertToTimestamp(
+                                columnType, Conversions.toInstantFromMillis((Long) value));
+                    }
+                    if (getTimePrecision(field) <= 6) {
+                        return this.convertToTimestamp(
+                                columnType, Conversions.toInstantFromMicros((Long) value));
+                    }
+                }
+                return this.convertToTimestamp(columnType, value);
+            case "TIMESTAMP":
+                return this.convertToTimestampWithTimezone(columnType, value);
+            default:
+                throw new IllegalArgumentException(
+                        "Unknown field type  " + columnType.toUpperCase(Locale.ROOT));
+        }
     }
 
     private Object convertToTimestampWithTimezone(String columnType, Object timestamp) {
@@ -178,11 +191,12 @@ public class MysqlDebeziumTimeConverter
             ZonedDateTime zonedDateTime = value.toInstant().atZone(zoneId);
             return ConvertTimeBceUtil.resolveEra(value, zonedDateTime.format(timestampFormatter));
         } else if (timestamp instanceof OffsetDateTime) {
-            OffsetDateTime value = (OffsetDateTime) timestamp;
+            OffsetDateTime value =
+                    ((OffsetDateTime) timestamp).toInstant().atZone(zoneId).toOffsetDateTime();
             return ConvertTimeBceUtil.resolveEra(
                     value.toLocalDate(), value.format(timestampFormatter));
         } else if (timestamp instanceof ZonedDateTime) {
-            ZonedDateTime zonedDateTime = (ZonedDateTime) timestamp;
+            ZonedDateTime zonedDateTime = ((ZonedDateTime) timestamp).toInstant().atZone(zoneId);
             return ConvertTimeBceUtil.resolveEra(
                     zonedDateTime.toLocalDate(), zonedDateTime.format(timestampFormatter));
         } else if (timestamp instanceof Instant) {

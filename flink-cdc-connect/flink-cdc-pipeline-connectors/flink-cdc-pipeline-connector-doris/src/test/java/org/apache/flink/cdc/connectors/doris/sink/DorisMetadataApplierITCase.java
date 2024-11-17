@@ -193,6 +193,21 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         tableId, Collections.singletonMap("name", DataTypes.VARCHAR(19))));
     }
 
+    private List<Event> generateAlterColumnTypeWithDefaultValueEvents(TableId tableId) {
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null, "2.71828"))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null, "Alice"))
+                        .primaryKey("id")
+                        .build();
+
+        return Arrays.asList(
+                new CreateTableEvent(tableId, schema),
+                new AlterColumnTypeEvent(
+                        tableId, Collections.singletonMap("name", DataTypes.VARCHAR(19))));
+    }
+
     private List<Event> generateNarrowingAlterColumnTypeEvents(TableId tableId) {
         Schema schema =
                 Schema.newBuilder()
@@ -386,6 +401,25 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
+    @Test
+    public void testDorisAlterColumnTypeWithDefaultValue() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
+
+        runJobWithEvents(generateAlterColumnTypeWithDefaultValueEvents(tableId));
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | INT | Yes | true | null",
+                        "number | DOUBLE | Yes | false | 2.71828",
+                        "name | VARCHAR(57) | Yes | false | Alice");
+
+        assertEqualsInOrder(expected, actual);
+    }
+
     @Test(expected = JobExecutionException.class)
     public void testDorisNarrowingAlterColumnType() throws Exception {
         TableId tableId =
@@ -417,7 +451,8 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 new SchemaOperatorTranslator(
                         SchemaChangeBehavior.EVOLVE,
                         "$$_schema_operator_$$",
-                        DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT);
+                        DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT,
+                        "UTC");
 
         OperatorIDGenerator schemaOperatorIDGenerator =
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());

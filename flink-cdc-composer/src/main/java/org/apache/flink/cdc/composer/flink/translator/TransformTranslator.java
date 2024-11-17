@@ -44,15 +44,13 @@ public class TransformTranslator {
         PreTransformOperator.Builder preTransformFunctionBuilder =
                 PreTransformOperator.newBuilder();
         for (TransformDef transform : transforms) {
-            if (transform.isValidProjection()) {
-                preTransformFunctionBuilder.addTransform(
-                        transform.getSourceTable(),
-                        transform.getProjection().orElse(null),
-                        transform.getFilter().orElse(null),
-                        transform.getPrimaryKeys(),
-                        transform.getPartitionKeys(),
-                        transform.getTableOptions());
-            }
+            preTransformFunctionBuilder.addTransform(
+                    transform.getSourceTable(),
+                    transform.getProjection().orElse(null),
+                    transform.getFilter().orElse(null),
+                    transform.getPrimaryKeys(),
+                    transform.getPartitionKeys(),
+                    transform.getTableOptions());
         }
         preTransformFunctionBuilder.addUdfFunctions(
                 udfFunctions.stream()

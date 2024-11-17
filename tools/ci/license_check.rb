@@ -113,7 +113,7 @@ def check_jar_license(jar_file)
   Zip::File.open(jar_file) do |jar|
     jar.filter { |e| e.ftype == :file }
        .filter { |e| !File.basename(e.name).downcase.end_with?(*BINARY_FILE_EXTENSIONS) }
-       .filter { |e| !File.basename(e.name).downcase.start_with? 'license', 'dependencies', 'notice' }
+       .filter { |e| !File.basename(e.name).downcase.start_with? 'license', 'dependencies', 'notice', 'third-party' }
        .filter { |e| EXCEPTION_PACKAGES.none? { |ex| e.name.include? ex } }
        .map do |e|
          content = e.get_input_stream.read.force_encoding('UTF-8')

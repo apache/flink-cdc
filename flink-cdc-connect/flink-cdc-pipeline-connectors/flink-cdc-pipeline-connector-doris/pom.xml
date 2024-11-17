@@ -27,7 +27,7 @@ limitations under the License.
     <name>flink-cdc-pipeline-connector-doris</name>
 
     <properties>
-        <doris.connector.version>1.6.2</doris.connector.version>
+        <doris.connector.version>24.0.1</doris.connector.version>
     </properties>
 
     <dependencies>

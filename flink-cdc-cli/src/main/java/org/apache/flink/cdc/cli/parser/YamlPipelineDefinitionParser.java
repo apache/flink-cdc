@@ -108,8 +108,11 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // UDFs are optional. We parse UDF first and remove it from the pipelineDefJsonNode since
         // it's not of plain data types and must be removed before calling toPipelineConfig.
         List<UdfDef> udfDefs = new ArrayList<>();
-        Optional.ofNullable(((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(UDF_KEY))
-                .ifPresent(node -> node.forEach(udf -> udfDefs.add(toUdfDef(udf))));
+        if (pipelineDefJsonNode.get(PIPELINE_KEY) != null) {
+            Optional.ofNullable(
+                            ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(UDF_KEY))
+                    .ifPresent(node -> node.forEach(udf -> udfDefs.add(toUdfDef(udf))));
+        }
 
         // Pipeline configs are optional
         Configuration userPipelineConfig = toPipelineConfig(pipelineDefJsonNode.get(PIPELINE_KEY));
@@ -176,6 +179,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private SinkDef toSinkDef(JsonNode sinkNode, SchemaChangeBehavior schemaChangeBehavior) {
         List<String> includedSETypes = new ArrayList<>();
         List<String> excludedSETypes = new ArrayList<>();
+        boolean excludedFieldNotPresent = sinkNode.get(EXCLUDE_SCHEMA_EVOLUTION_TYPES) == null;
 
         Optional.ofNullable(sinkNode.get(INCLUDE_SCHEMA_EVOLUTION_TYPES))
                 .ifPresent(e -> e.forEach(tag -> includedSETypes.add(tag.asText())));
@@ -191,8 +195,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                     .forEach(includedSETypes::add);
         }
 
-        if (excludedSETypes.isEmpty()
-                && SchemaChangeBehavior.LENIENT.equals(schemaChangeBehavior)) {
+        if (excludedFieldNotPresent && SchemaChangeBehavior.LENIENT.equals(schemaChangeBehavior)) {
             // In lenient mode, we exclude DROP_TABLE and TRUNCATE_TABLE by default. This could be
             // overridden by manually specifying excluded types.
             Stream.of(SchemaChangeEventType.DROP_TABLE, SchemaChangeEventType.TRUNCATE_TABLE)

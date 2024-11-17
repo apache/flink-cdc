@@ -133,7 +133,7 @@ pipeline:
 ```
 
 你可以按需修改配置文件。
-最后，通过 Cli 将作业提交至 Flink Standalone 集群。
+最后，通过 Cli 将作业提交至 Flink Yarn Session 集群。
 
 ```bash
 cd /path/flink-cdc-*

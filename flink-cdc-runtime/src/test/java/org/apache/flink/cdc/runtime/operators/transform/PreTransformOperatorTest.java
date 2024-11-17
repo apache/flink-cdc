@@ -164,6 +164,23 @@ public class PreTransformOperatorTest {
                     .primaryKey("sid")
                     .build();
 
+    private static final Schema MULTITRANSFORM_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.INT())
+                    .physicalColumn("age", DataTypes.INT())
+                    .physicalColumn("name", DataTypes.STRING())
+                    .physicalColumn("sex", DataTypes.STRING())
+                    .primaryKey("id")
+                    .build();
+
+    private static final Schema EXPECTED_MULTITRANSFORM_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.INT())
+                    .physicalColumn("age", DataTypes.INT())
+                    .physicalColumn("name", DataTypes.STRING())
+                    .primaryKey("id")
+                    .build();
+
     @Test
     void testEventTransform() throws Exception {
         PreTransformOperator transform =
@@ -525,5 +542,109 @@ public class PreTransformOperatorTest {
                 .isEqualTo(
                         new StreamRecord<>(
                                 new CreateTableEvent(METADATA_TABLEID, EXPECTED_METADATA_SCHEMA)));
+    }
+
+    @Test
+    void testMultiTransformWithDiffRefColumns() throws Exception {
+        PreTransformOperator transform =
+                PreTransformOperator.newBuilder()
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "id, 'Juvenile' as roleName",
+                                "age < 18",
+                                "id",
+                                null,
+                                null)
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "id, name as roleName",
+                                "age >= 18",
+                                "id",
+                                null,
+                                null)
+                        .build();
+        EventOperatorTestHarness<PreTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(CUSTOMERS_TABLEID, MULTITRANSFORM_SCHEMA);
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(
+                                        CUSTOMERS_TABLEID, EXPECTED_MULTITRANSFORM_SCHEMA)));
+    }
+
+    @Test
+    void testMultiTransformWithAsterisk() throws Exception {
+        PreTransformOperator transform =
+                PreTransformOperator.newBuilder()
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "*, 'Juvenile' as roleName",
+                                "age < 18",
+                                "id",
+                                null,
+                                null)
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "id, age, name, sex, 'Juvenile' as roleName",
+                                "age >= 18",
+                                "id",
+                                null,
+                                null)
+                        .build();
+        EventOperatorTestHarness<PreTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(CUSTOMERS_TABLEID, MULTITRANSFORM_SCHEMA);
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(CUSTOMERS_TABLEID, MULTITRANSFORM_SCHEMA)));
+    }
+
+    @Test
+    void testMultiTransformMissingProjection() throws Exception {
+        PreTransformOperator transform =
+                PreTransformOperator.newBuilder()
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(), null, "age < 18", "id", null, null)
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "id, age, UPPER(name) as name, sex",
+                                "age >= 18",
+                                "id",
+                                null,
+                                null)
+                        .build();
+        EventOperatorTestHarness<PreTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(CUSTOMERS_TABLEID, MULTITRANSFORM_SCHEMA);
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(CUSTOMERS_TABLEID, MULTITRANSFORM_SCHEMA)));
     }
 }

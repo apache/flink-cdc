@@ -51,7 +51,7 @@ public class StarRocksDataSinkFactory implements DataSinkFactory {
                 TableCreateConfig.from(context.getFactoryConfiguration());
         SchemaChangeConfig schemaChangeConfig =
                 SchemaChangeConfig.from(context.getFactoryConfiguration());
-        String zoneStr = context.getFactoryConfiguration().get(PIPELINE_LOCAL_TIME_ZONE);
+        String zoneStr = context.getPipelineConfiguration().get(PIPELINE_LOCAL_TIME_ZONE);
         ZoneId zoneId =
                 PIPELINE_LOCAL_TIME_ZONE.defaultValue().equals(zoneStr)
                         ? ZoneId.systemDefault()

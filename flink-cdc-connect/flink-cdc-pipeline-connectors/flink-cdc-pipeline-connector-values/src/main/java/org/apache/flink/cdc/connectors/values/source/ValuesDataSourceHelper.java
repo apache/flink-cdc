@@ -50,6 +50,7 @@ public class ValuesDataSourceHelper {
      */
     public enum EventSetId {
         SINGLE_SPLIT_SINGLE_TABLE,
+        SINGLE_SPLIT_SINGLE_TABLE_WITH_DEFAULT_VALUE,
         SINGLE_SPLIT_MULTI_TABLES,
         MULTI_SPLITS_SINGLE_TABLE,
         CUSTOM_SOURCE_EVENTS,
@@ -93,6 +94,11 @@ public class ValuesDataSourceHelper {
             case SINGLE_SPLIT_SINGLE_TABLE:
                 {
                     sourceEvents = singleSplitSingleTable();
+                    break;
+                }
+            case SINGLE_SPLIT_SINGLE_TABLE_WITH_DEFAULT_VALUE:
+                {
+                    sourceEvents = singleSplitSingleTableWithDefaultValue();
                     break;
                 }
             case SINGLE_SPLIT_MULTI_TABLES:
@@ -211,6 +217,30 @@ public class ValuesDataSourceHelper {
 
         eventOfSplits.add(split1);
         return eventOfSplits;
+    }
+
+    public static List<List<Event>> singleSplitSingleTableWithDefaultValue() {
+        List<List<Event>> eventOfSplits = singleSplitSingleTable();
+        // add column with default value
+        eventOfSplits.get(0).add(addColumnWithDefaultValue(TABLE_1));
+        // rename column with default value
+        eventOfSplits.get(0).add(renameColumnWithDefaultValue(TABLE_1));
+
+        return eventOfSplits;
+    }
+
+    private static AddColumnEvent addColumnWithDefaultValue(TableId tableId) {
+        AddColumnEvent.ColumnWithPosition columnWithPositionWithDefault =
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("colWithDefault", DataTypes.STRING(), null, "flink"));
+        return new AddColumnEvent(
+                tableId, Collections.singletonList(columnWithPositionWithDefault));
+    }
+
+    private static RenameColumnEvent renameColumnWithDefaultValue(TableId tableId) {
+        Map<String, String> nameMapping = new HashMap<>();
+        nameMapping.put("colWithDefault", "newColWithDefault");
+        return new RenameColumnEvent(tableId, nameMapping);
     }
 
     public static List<List<Event>> singleSplitMultiTables() {

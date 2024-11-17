@@ -156,11 +156,10 @@ public class TableSchemaInfoTest {
                                 Timestamp.valueOf("2023-01-01 00:00:00.000")),
                         org.apache.flink.table.data.TimestampData.fromTimestamp(
                                 Timestamp.valueOf("2023-01-01 00:00:00")),
-                        // plus 8 hours.
                         org.apache.flink.table.data.TimestampData.fromInstant(
-                                Instant.parse("2023-01-01T08:00:00.000Z")),
+                                Instant.parse("2023-01-01T00:00:00.000Z")),
                         org.apache.flink.table.data.TimestampData.fromInstant(
-                                Instant.parse("2023-01-01T08:00:00.000Z")),
+                                Instant.parse("2023-01-01T00:00:00.000Z")),
                         null),
                 tableSchemaInfo.getRowDataFromRecordData(recordData, false));
     }

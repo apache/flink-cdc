@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.starrocks.sink;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
@@ -77,5 +78,10 @@ public class StarRocksDataSink implements DataSink, Serializable {
                         sinkOptions.getUsername(),
                         sinkOptions.getPassword());
         return new StarRocksMetadataApplier(catalog, tableCreateConfig, schemaChangeConfig);
+    }
+
+    @VisibleForTesting
+    public ZoneId getZoneId() {
+        return zoneId;
     }
 }

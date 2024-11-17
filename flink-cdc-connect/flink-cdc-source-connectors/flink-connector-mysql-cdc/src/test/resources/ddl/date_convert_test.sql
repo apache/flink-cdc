@@ -33,4 +33,5 @@ INSERT INTO date_convert_test (id,test_timestamp, test_datetime, test_date, test
 VALUES
 (1,'2023-04-01 14:23:00', '2023-04-01 14:24:00', '2023-04-01', '14:25:00'),
 (2,'2024-04-23 00:00:00', DEFAULT, NULL ,'00:00:00'),
-(3,'2024-04-23 00:00:00', DEFAULT, NULL ,120);
+(3,'2024-04-23 00:00:00', DEFAULT, NULL ,120),
+(4,20240612150400, DEFAULT, NULL ,110);
