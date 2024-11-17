@@ -391,6 +391,18 @@ During a snapshot operation, the connector will query each included table to pro
           hex: The binary data type is converted to a hexadecimal string and transmitted.
       The default value is none. Depending on your requirements and data types, you can choose the appropriate processing mode. If your database contains a large number of binary data types, it is recommended to use base64 or hex mode to make it easier to handle during transmission.</td> 
     </tr>
+    <tr>
+      <td>use.legacy.json.format</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Whether to use legacy JSON format to cast JSON type data in binlog. <br>
+          It determines whether to use the legacy JSON format when retrieving JSON type data in binlog. 
+          If the user configures 'use.legacy.json.format' = 'true', whitespace before values and after commas in the JSON type data is removed. For example,
+          JSON type data {"key1": "value1", "key2": "value2"} in binlog would be converted to {"key1":"value1","key2":"value2"}.
+          When 'use.legacy.json.format' = 'false', the data would be converted to {"key1": "value1", "key2": "value2"}, with whitespace before values and after commas preserved.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
