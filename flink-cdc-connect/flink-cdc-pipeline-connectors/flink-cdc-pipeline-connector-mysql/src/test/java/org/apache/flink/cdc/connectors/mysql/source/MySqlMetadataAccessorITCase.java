@@ -210,7 +210,8 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     private void testAccessDatabaseAndTable(UniqueDatabase database) {
         database.createAndInitialize();
 
-        String[] tables = new String[] {"common_types", "time_types", "precision_types"};
+        String[] tables =
+                new String[] {"common_types", "time_types", "precision_types", "json_types"};
         MySqlMetadataAccessor metadataAccessor = getMetadataAccessor(tables, database);
 
         assertThatThrownBy(metadataAccessor::listNamespaces)
