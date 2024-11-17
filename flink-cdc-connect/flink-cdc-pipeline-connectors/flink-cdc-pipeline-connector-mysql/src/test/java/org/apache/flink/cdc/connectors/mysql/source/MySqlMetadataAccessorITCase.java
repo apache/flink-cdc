@@ -224,18 +224,14 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                         .fromRowDataType(
                                 RowType.of(
                                         new DataType[] {
-                                                DataTypes.DECIMAL(20, 0).notNull(),
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING(),
-                                                DataTypes.INT()
+                                            DataTypes.DECIMAL(20, 0).notNull(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.INT()
                                         },
                                         new String[] {
-                                                "id",
-                                                "json_c0",
-                                                "json_c1",
-                                                "json_c2",
-                                                "int_c",
+                                            "id", "json_c0", "json_c1", "json_c2", "int_c",
                                         }))
                         .build();
         assertThat(actualSchema).isEqualTo(expectedSchema);
@@ -258,18 +254,14 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                         .fromRowDataType(
                                 RowType.of(
                                         new DataType[] {
-                                                DataTypes.DECIMAL(20, 0).notNull(),
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING(),
-                                                DataTypes.STRING(),
-                                                DataTypes.INT()
+                                            DataTypes.DECIMAL(20, 0).notNull(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.INT()
                                         },
                                         new String[] {
-                                                "id",
-                                                "json_c0",
-                                                "json_c1",
-                                                "json_c2",
-                                                "int_c",
+                                            "id", "json_c0", "json_c1", "json_c2", "int_c",
                                         }))
                         .build();
         assertThat(actualSchema).isEqualTo(expectedSchema);
