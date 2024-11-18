@@ -19,19 +19,18 @@ package org.apache.flink.cdc.connectors.sqlserver.source.utils;
 
 import org.apache.flink.cdc.connectors.base.utils.ObjectUtils;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 /** Unit test for {@link SqlServerUtils.SQLServerUUIDComparator}. * */
-public class SQLServerUUIDComparatorTest {
+class SQLServerUUIDComparatorTest {
 
     @Test
-    public void testComparator() {
+    void testComparator() {
         SqlServerUtils.SQLServerUUIDComparator comparator =
                 new SqlServerUtils.SQLServerUUIDComparator();
         // Create an ArrayList and fill it with Guid values.
@@ -43,12 +42,12 @@ public class SQLServerUUIDComparatorTest {
         // Sort the Guids.
         guidList.sort(ObjectUtils::compare);
 
-        assertEquals(
-                guidList.get(0).toString().toUpperCase(), "1AAAAAAA-BBBB-CCCC-DDDD-3EEEEEEEEEEE");
-        assertEquals(
-                guidList.get(1).toString().toUpperCase(), "2AAAAAAA-BBBB-CCCC-DDDD-1EEEEEEEEEEE");
-        assertEquals(
-                guidList.get(2).toString().toUpperCase(), "3AAAAAAA-BBBB-CCCC-DDDD-2EEEEEEEEEEE");
+        Assertions.assertThat(guidList.get(0).toString().toUpperCase())
+                .isEqualTo("1AAAAAAA-BBBB-CCCC-DDDD-3EEEEEEEEEEE");
+        Assertions.assertThat(guidList.get(1).toString().toUpperCase())
+                .isEqualTo("2AAAAAAA-BBBB-CCCC-DDDD-1EEEEEEEEEEE");
+        Assertions.assertThat(guidList.get(2).toString().toUpperCase())
+                .isEqualTo("3AAAAAAA-BBBB-CCCC-DDDD-2EEEEEEEEEEE");
 
         // Create an ArrayList of SqlGuids.
         List<UUID> sqlGuidList = new ArrayList<>();
@@ -62,14 +61,11 @@ public class SQLServerUUIDComparatorTest {
 
         // Display the sorted SqlGuids. The sorted SqlGuid values are ordered
         // differently than the Guid values.
-        assertEquals(
-                sqlGuidList.get(0).toString().toUpperCase(),
-                "2AAAAAAA-BBBB-CCCC-DDDD-1EEEEEEEEEEE");
-        assertEquals(
-                sqlGuidList.get(1).toString().toUpperCase(),
-                "3AAAAAAA-BBBB-CCCC-DDDD-2EEEEEEEEEEE");
-        assertEquals(
-                sqlGuidList.get(2).toString().toUpperCase(),
-                "1AAAAAAA-BBBB-CCCC-DDDD-3EEEEEEEEEEE");
+        Assertions.assertThat(sqlGuidList.get(0).toString().toUpperCase())
+                .isEqualTo("2AAAAAAA-BBBB-CCCC-DDDD-1EEEEEEEEEEE");
+        Assertions.assertThat(sqlGuidList.get(1).toString().toUpperCase())
+                .isEqualTo("3AAAAAAA-BBBB-CCCC-DDDD-2EEEEEEEEEEE");
+        Assertions.assertThat(sqlGuidList.get(2).toString().toUpperCase())
+                .isEqualTo("1AAAAAAA-BBBB-CCCC-DDDD-3EEEEEEEEEEE");
     }
 }

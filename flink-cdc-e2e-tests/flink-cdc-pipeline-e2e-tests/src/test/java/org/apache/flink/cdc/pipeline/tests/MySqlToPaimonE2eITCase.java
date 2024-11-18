@@ -24,11 +24,10 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
 import org.assertj.core.api.Assertions;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
@@ -52,7 +51,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** End-to-end tests for mysql cdc to Paimon pipeline job. */
-public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
+class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToPaimonE2eITCase.class);
 
     public static final Duration TESTCASE_TIMEOUT = Duration.ofMinutes(3);
@@ -63,8 +62,8 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_TEST_USER = "mysqluser";
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
 
-    @ClassRule
-    public static final MySqlContainer MYSQL =
+    @org.testcontainers.junit.jupiter.Container
+    static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
                                     MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
@@ -80,14 +79,14 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
     protected final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL, "paimon_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
-    @BeforeClass
-    public static void initializeContainers() {
+    @BeforeAll
+    static void initializeContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL)).join();
         LOG.info("Containers are started.");
     }
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         super.before();
         inventoryDatabase.createAndInitialize();
@@ -100,14 +99,14 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                 sharedVolume.toString() + "/flink-shade-hadoop.jar");
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         inventoryDatabase.dropDatabase();
     }
 
     @Test
-    public void testSyncWholeDatabase() throws Exception {
+    void testSyncWholeDatabase() throws Exception {
         String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
         String database = inventoryDatabase.getDatabaseName();
         String pipelineJob =

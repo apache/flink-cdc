@@ -25,11 +25,10 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 
 import com.mongodb.client.MongoDatabase;
+import org.assertj.core.api.Assertions;
 import org.bson.Document;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 
@@ -37,12 +36,9 @@ import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLI
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSinkSize;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSnapshotStarted;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertThat;
 
 /** Integration tests to check mongodb-cdc works well under namespace.regex. */
-@RunWith(Parameterized.class)
-public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
+class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -50,25 +46,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    private final boolean parallelismSnapshot;
-
-    public MongoDBRegexFilterITCase(String mongoVersion, boolean parallelismSnapshot) {
-        super(mongoVersion);
-        this.parallelismSnapshot = parallelismSnapshot;
-    }
-
-    @Parameterized.Parameters(name = "mongoVersion: {0} parallelismSnapshot: {1}")
-    public static Object[] parameters() {
-        return new Object[][] {
-            new Object[] {"6.0.16", true},
-            new Object[] {"6.0.16", false},
-            new Object[] {"7.0.12", true},
-            new Object[] {"7.0.12", false}
-        };
-    }
-
-    @Before
-    public void before() {
+    void setup(boolean parallelismSnapshot) {
         TestValuesTableFactory.clearAllData();
         if (parallelismSnapshot) {
             env.setParallelism(DEFAULT_PARALLELISM);
@@ -79,17 +57,19 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
     }
 
     /** match multiple databases and collections: collection = ^(db0|db1)\.coll_a\d?$ . */
-    @Test
-    public void testMatchMultipleDatabasesAndCollections() throws Exception {
+    @ParameterizedTest(name = "parallelismSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMatchMultipleDatabasesAndCollections(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db0 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db0 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
         // db1: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db1 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db1 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
 
         // 2. Test match: collection = ^(db0|db1)\.coll_a\d?$
         String collectionRegex = String.format("^(%s|%s)\\.coll_a\\d?$", db0, db1);
-        TableResult result = submitTestCase(null, collectionRegex);
+        TableResult result = submitTestCase(null, collectionRegex, parallelismSnapshot);
 
         // 3. Wait snapshot finished
         waitForSinkSize("mongodb_sink", 4);
@@ -115,26 +95,28 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
                     String.format("+I[%s, coll_a2, A202]", db1)
                 };
 
-        List<String> actual = TestValuesTableFactory.getResultsAsStrings("mongodb_sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("mongodb_sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
     /** match multiple databases: database = db0|db1 . */
-    @Test
-    public void testMatchMultipleDatabases() throws Exception {
+    @ParameterizedTest(name = "parallelismSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMatchMultipleDatabases(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db0 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db0 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
         // db1: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db1 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db1 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
         // db2: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db2 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db2 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
 
         // 2. Test match database: ^(db0|db1)$
         String databaseRegex = String.format("%s|%s", db0, db1);
-        TableResult result = submitTestCase(databaseRegex, null);
+        TableResult result = submitTestCase(databaseRegex, null, parallelismSnapshot);
 
         // 3. Wait snapshot finished
         waitForSinkSize("mongodb_sink", 8);
@@ -169,24 +151,26 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
                     String.format("+I[%s, coll_b2, B202]", db1),
                 };
 
-        List<String> actual = TestValuesTableFactory.getResultsAsStrings("mongodb_sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("mongodb_sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
     /** match single database and multiple collections: collection = ^db0\.coll_b\d?$ . */
-    @Test
-    public void testMatchSingleQualifiedCollectionPattern() throws Exception {
+    @ParameterizedTest(name = "parallelismSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMatchSingleQualifiedCollectionPattern(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db0 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db0 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
         // db1: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db1 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db1 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
 
         // 2. Test match: collection ^(db0|db1)\.coll_a\d?$
         String collectionRegex = String.format("^%s\\.coll_b\\d?$", db0);
-        TableResult result = submitTestCase(null, collectionRegex);
+        TableResult result = submitTestCase(null, collectionRegex, parallelismSnapshot);
 
         // 3. Wait snapshot finished
         waitForSinkSize("mongodb_sink", 2);
@@ -208,24 +192,27 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
                     String.format("+I[%s, coll_b2, B202]", db0)
                 };
 
-        List<String> actual = TestValuesTableFactory.getResultsAsStrings("mongodb_sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("mongodb_sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
     /** match single database and multiple collections: database = db0 collection = .*coll_b\d? . */
-    @Test
-    public void testMatchSingleDatabaseWithCollectionPattern() throws Exception {
+    @ParameterizedTest(name = "parallelismSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMatchSingleDatabaseWithCollectionPattern(boolean parallelismSnapshot)
+            throws Exception {
+        setup(parallelismSnapshot);
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db0 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db0 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
         // db1: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db1 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db1 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
 
         // 2. Test match: collection .*coll_b\d?
         String collectionRegex = ".*coll_b\\d?";
-        TableResult result = submitTestCase(db0, collectionRegex);
+        TableResult result = submitTestCase(db0, collectionRegex, parallelismSnapshot);
 
         // 3. Wait snapshot finished
         waitForSinkSize("mongodb_sink", 2);
@@ -247,19 +234,21 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
                     String.format("+I[%s, coll_b2, B202]", db0)
                 };
 
-        List<String> actual = TestValuesTableFactory.getResultsAsStrings("mongodb_sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("mongodb_sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testMatchDatabaseAndCollectionContainsDash() throws Exception {
+    @ParameterizedTest(name = "parallelismSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMatchDatabaseAndCollectionContainsDash(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         // 1. Given collections:
         // db0: [coll-a1, coll-a2, coll-b1, coll-b2]
-        String db0 = mongoContainer.executeCommandFileInSeparateDatabase("ns-regex");
+        String db0 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns-regex");
 
-        TableResult result = submitTestCase(db0, "coll-a1");
+        TableResult result = submitTestCase(db0, "coll-a1", parallelismSnapshot);
 
         // 2. Wait change stream records come
         waitForSinkSize("mongodb_sink", 1);
@@ -267,19 +256,21 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         // 3. Check results
         String[] expected = new String[] {String.format("+I[%s, coll-a1, A101]", db0)};
 
-        List<String> actual = TestValuesTableFactory.getResultsAsStrings("mongodb_sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("mongodb_sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testMatchCollectionWithDots() throws Exception {
+    @ParameterizedTest(name = "parallelismSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMatchCollectionWithDots(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         // 1. Given colllections:
         // db: [coll.name]
-        String db = mongoContainer.executeCommandFileInSeparateDatabase("ns-dotted");
+        String db = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns-dotted");
 
-        TableResult result = submitTestCase(db, db + "[.]coll[.]name");
+        TableResult result = submitTestCase(db, db + "[.]coll[.]name", parallelismSnapshot);
 
         // 2. Wait change stream records come
         waitForSinkSize("mongodb_sink", 3);
@@ -292,13 +283,14 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
                     String.format("+I[%s, coll.name, A103]", db)
                 };
 
-        List<String> actual = TestValuesTableFactory.getResultsAsStrings("mongodb_sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("mongodb_sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    private TableResult submitTestCase(String database, String collection) throws Exception {
+    private TableResult submitTestCase(
+            String database, String collection, boolean parallelismSnapshot) throws Exception {
         String sourceDDL =
                 "CREATE TABLE mongodb_source ("
                         + " _id STRING NOT NULL,"
@@ -307,7 +299,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
                         + " coll_name STRING METADATA FROM 'collection_name' VIRTUAL,"
                         + " PRIMARY KEY (_id) NOT ENFORCED"
                         + ") WITH ("
-                        + ignoreIfNull("hosts", mongoContainer.getHostAndPort())
+                        + ignoreIfNull("hosts", MONGO_CONTAINER.getHostAndPort())
                         + ignoreIfNull("username", FLINK_USER)
                         + ignoreIfNull("password", FLINK_USER_PASSWORD)
                         + ignoreIfNull("database", database)

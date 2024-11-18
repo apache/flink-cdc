@@ -29,13 +29,13 @@ import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryArrayWriter;
 import org.apache.flink.testutils.DeeplyEqualsChecker;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** A test for the {@link ArrayDataSerializer}. */
 class ArrayDataSerializerTest extends SerializerTestBase<ArrayData> {
@@ -103,7 +103,7 @@ class ArrayDataSerializerTest extends SerializerTestBase<ArrayData> {
     }
 
     @Test
-    public void testToBinaryArrayWithNestedTypes() {
+    void testToBinaryArrayWithNestedTypes() {
         // Create a nested ArrayData
         Map<BinaryStringData, BinaryStringData> map = new HashMap<>();
         map.put(BinaryStringData.fromString("key1"), BinaryStringData.fromString("value1"));
@@ -119,11 +119,11 @@ class ArrayDataSerializerTest extends SerializerTestBase<ArrayData> {
 
         // Verify the conversion
         MapData mapData = binaryArrayData.getMap(0);
-        Assertions.assertEquals(2, mapData.size());
+        Assertions.assertThat(mapData.size()).isEqualTo(2);
     }
 
     @Test
-    public void testToBinaryArrayWithDeeplyNestedTypes() {
+    void testToBinaryArrayWithDeeplyNestedTypes() {
         // Create a nested structure: MapData containing ArrayData elements
         Map<BinaryStringData, ArrayData> nestedMap = new HashMap<>();
         nestedMap.put(
@@ -144,7 +144,7 @@ class ArrayDataSerializerTest extends SerializerTestBase<ArrayData> {
 
         // Verify the conversion
         MapData mapData = binaryArrayData.getMap(0);
-        assertEquals(2, mapData.size());
+        assertThat(mapData.size()).isEqualTo(2);
 
         // Check nested arrays in map
         ArrayData keys = mapData.keyArray();
@@ -153,13 +153,13 @@ class ArrayDataSerializerTest extends SerializerTestBase<ArrayData> {
         // Check the first key-value pair
         int keyIndex = keys.getString(0).toString().equals("key1") ? 0 : 1;
         ArrayData arrayData1 = values.getArray(keyIndex);
-        assertEquals(42, arrayData1.getInt(0));
-        assertEquals(43, arrayData1.getInt(1));
+        assertThat(arrayData1.getInt(0)).isEqualTo(42);
+        assertThat(arrayData1.getInt(1)).isEqualTo(43);
 
         // Check the second key-value pair
         keyIndex = keys.getString(0).toString().equals("key2") ? 0 : 1;
         ArrayData arrayData2 = values.getArray(keyIndex);
-        assertEquals(44, arrayData2.getInt(0));
-        assertEquals(45, arrayData2.getInt(1));
+        assertThat(arrayData2.getInt(0)).isEqualTo(44);
+        assertThat(arrayData2.getInt(1)).isEqualTo(45);
     }
 }

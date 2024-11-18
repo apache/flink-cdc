@@ -38,11 +38,11 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
@@ -71,7 +71,7 @@ import static org.apache.flink.cdc.common.utils.TestCaseUtils.DEFAULT_TIMEOUT;
  * href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">doc/pt-osc</a> for
  * more details.
  */
-public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
+class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
     private static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
 
@@ -97,32 +97,32 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                     ? "https://github.com/github/gh-ost/releases/download/v1.1.6/gh-ost-binary-linux-amd64-20231207144046.tar.gz"
                     : "https://github.com/github/gh-ost/releases/download/v1.1.6/gh-ost-binary-linux-arm64-20231207144046.tar.gz";
 
-    @BeforeClass
-    public static void beforeClass() {
+    @BeforeAll
+    static void beforeClass() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         Startables.deepStart(Stream.of(PERCONA_TOOLKIT_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
-    @AfterClass
-    public static void afterClass() {
+    @AfterAll
+    static void afterClass() {
         LOG.info("Stopping containers...");
         MYSQL8_CONTAINER.stop();
         PERCONA_TOOLKIT_CONTAINER.close();
         LOG.info("Containers are stopped.");
     }
 
-    @Before
-    public void before() {
+    @BeforeEach
+    void before() {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(200);
         customerDatabase.createAndInitialize();
     }
 
-    @After
-    public void after() {
+    @AfterEach
+    void after() {
         customerDatabase.dropDatabase();
     }
 
@@ -154,7 +154,7 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testGhOstSchemaMigrationFromScratch() throws Exception {
+    void testGhOstSchemaMigrationFromScratch() throws Exception {
         LOG.info("Step 1: Install gh-ost command line utility");
         installGhOstCli(MYSQL8_CONTAINER);
 
@@ -326,7 +326,7 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testPtOscSchemaMigrationFromScratch() throws Exception {
+    void testPtOscSchemaMigrationFromScratch() throws Exception {
         LOG.info("Step 1: Start pipeline job");
         String sourceDDL =
                 String.format(
