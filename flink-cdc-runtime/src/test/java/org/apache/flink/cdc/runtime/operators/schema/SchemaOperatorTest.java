@@ -32,7 +32,7 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -48,7 +48,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit tests for the {@link SchemaOperator}. */
-public class SchemaOperatorTest {
+class SchemaOperatorTest {
 
     private static final TableId CUSTOMERS =
             TableId.tableId("my_company", "my_branch", "customers");
@@ -117,12 +117,12 @@ public class SchemaOperatorTest {
         EventOperatorTestHarness<SchemaOperator, Event> harness =
                 new EventOperatorTestHarness<>(schemaOperator, 1, Duration.ofSeconds(3));
         harness.open();
-        Assertions.assertThrowsExactly(
-                TimeoutException.class,
-                () ->
-                        schemaOperator.processElement(
-                                new StreamRecord<>(
-                                        new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))));
+        Assertions.assertThatThrownBy(
+                        () ->
+                                schemaOperator.processElement(
+                                        new StreamRecord<>(
+                                                new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))))
+                .isExactlyInstanceOf(TimeoutException.class);
         harness.close();
     }
 
@@ -133,11 +133,12 @@ public class SchemaOperatorTest {
         EventOperatorTestHarness<SchemaOperator, Event> harness =
                 new EventOperatorTestHarness<>(schemaOperator, 1, Duration.ofSeconds(3));
         harness.open();
-        Assertions.assertDoesNotThrow(
-                () ->
-                        schemaOperator.processElement(
-                                new StreamRecord<>(
-                                        new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))));
+        Assertions.assertThatCode(
+                        () ->
+                                schemaOperator.processElement(
+                                        new StreamRecord<>(
+                                                new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))))
+                .doesNotThrowAnyException();
         harness.close();
     }
 

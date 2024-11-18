@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.migration.tests;
 
-import org.junit.Assert;
+import org.assertj.core.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,11 +111,11 @@ public class MigrationTestBase {
         Class<?> toVersionMockClass = getMockClass(toVersion, caseName);
         Object toVersionMockObject = toVersionMockClass.newInstance();
 
-        Assert.assertTrue(
-                (boolean)
+        Assertions.assertThat(
                         toVersionMockClass
                                 .getDeclaredMethod(
                                         "deserializeAndCheckObject", int.class, byte[].class)
-                                .invoke(toVersionMockObject, serializerVersion, serializedObject));
+                                .invoke(toVersionMockObject, serializerVersion, serializedObject))
+                .isEqualTo(true);
     }
 }

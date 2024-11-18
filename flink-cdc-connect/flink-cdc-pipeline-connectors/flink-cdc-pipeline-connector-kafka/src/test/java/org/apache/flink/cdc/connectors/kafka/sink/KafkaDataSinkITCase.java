@@ -264,7 +264,7 @@ class KafkaDataSinkITCase extends TestLogger {
         final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
                 drainAllRecordsFromTopic(topic, false, 0);
         final long recordsCount = 5;
-        assertThat(recordsCount).isEqualTo(collectedRecords.size());
+        assertThat(collectedRecords.size()).isEqualTo(recordsCount);
         ObjectMapper mapper =
                 JacksonMapperFactory.createObjectMapper()
                         .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
@@ -326,7 +326,7 @@ class KafkaDataSinkITCase extends TestLogger {
         final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
                 drainAllRecordsFromTopic(topic, false, 0);
         final long recordsCount = 5;
-        assertThat(recordsCount).isEqualTo(collectedRecords.size());
+        assertThat(collectedRecords.size()).isEqualTo(recordsCount);
         for (ConsumerRecord<byte[], byte[]> consumerRecord : collectedRecords) {
             assertThat(
                             consumerRecord
@@ -399,7 +399,7 @@ class KafkaDataSinkITCase extends TestLogger {
         final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
                 drainAllRecordsFromTopic(topic, false);
         final long recordsCount = 5;
-        assertThat(recordsCount).isEqualTo(collectedRecords.size());
+        assertThat(collectedRecords.size()).isEqualTo(recordsCount);
         for (ConsumerRecord<byte[], byte[]> consumerRecord : collectedRecords) {
             assertThat(
                             consumerRecord
@@ -495,7 +495,7 @@ class KafkaDataSinkITCase extends TestLogger {
         final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
                 drainAllRecordsFromTopic("test_topic", false, 0);
         final long recordsCount = 5;
-        assertThat(recordsCount).isEqualTo(collectedRecords.size());
+        assertThat(collectedRecords.size()).isEqualTo(recordsCount);
         for (ConsumerRecord<byte[], byte[]> consumerRecord : collectedRecords) {
             assertThat(
                             new String(

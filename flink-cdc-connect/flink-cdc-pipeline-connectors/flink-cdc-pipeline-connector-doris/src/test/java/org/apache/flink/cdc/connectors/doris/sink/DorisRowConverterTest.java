@@ -27,8 +27,8 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -40,10 +40,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /** A test for {@link org.apache.flink.cdc.connectors.doris.sink.DorisRowConverter} . */
-public class DorisRowConverterTest {
+class DorisRowConverterTest {
 
     @Test
-    public void testExternalConvert() {
+    void testExternalConvert() {
         List<Column> columns =
                 Arrays.asList(
                         Column.physicalColumn("f2", DataTypes.BOOLEAN()),
@@ -65,7 +65,7 @@ public class DorisRowConverterTest {
                         Column.physicalColumn("f22", DataTypes.TIMESTAMP_LTZ()));
 
         List<DataType> dataTypes =
-                columns.stream().map(v -> v.getType()).collect(Collectors.toList());
+                columns.stream().map(Column::getType).collect(Collectors.toList());
         LocalDateTime time1 =
                 LocalDateTime.ofInstant(Instant.parse("2021-01-01T08:00:00Z"), ZoneId.of("Z"));
         LocalDate date1 = LocalDate.of(2021, 1, 1);
@@ -105,17 +105,17 @@ public class DorisRowConverterTest {
                             LocalZonedTimestampData.fromInstant(f21),
                             LocalZonedTimestampData.fromInstant(f22),
                         });
-        List row = new ArrayList();
+        List<Object> row = new ArrayList<>();
         for (int i = 0; i < recordData.getArity(); i++) {
             DorisRowConverter.SerializationConverter converter =
                     DorisRowConverter.createNullableExternalConverter(
                             columns.get(i).getType(), ZoneId.of("GMT+08:00"));
             row.add(converter.serialize(i, recordData));
         }
-        Assert.assertEquals(
-                "[true, 1.2, 1.2345, 1, 32, 64, 128, 2021-01-01 08:00:00.000000, 2021-01-01, a, doris, 2021-01-01 "
-                        + "08:01:11.000000, 2021-01-01 08:01:11.123000, 2021-01-01 08:01:11.123456, 2021-01-01 "
-                        + "16:01:11.000000, 2021-01-01 16:01:11.123000, 2021-01-01 16:01:11.123456]",
-                row.toString());
+        Assertions.assertThat(row)
+                .hasToString(
+                        "[true, 1.2, 1.2345, 1, 32, 64, 128, 2021-01-01 08:00:00.000000, 2021-01-01, a, doris, 2021-01-01 "
+                                + "08:01:11.000000, 2021-01-01 08:01:11.123000, 2021-01-01 08:01:11.123456, 2021-01-01 "
+                                + "16:01:11.000000, 2021-01-01 16:01:11.123000, 2021-01-01 16:01:11.123456]");
     }
 }

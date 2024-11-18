@@ -35,15 +35,13 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.Document;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,7 +55,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.lang.String.format;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
@@ -65,27 +62,18 @@ import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLI
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests to cover various newly added collections during capture process. */
-@RunWith(Parameterized.class)
-public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
-
-    @Rule public final Timeout timeoutPerTest = Timeout.seconds(500);
+@Timeout(500)
+class NewlyAddedTableITCase extends MongoDBSourceTestBase {
 
     private String customerDatabase;
     protected static final int DEFAULT_PARALLELISM = 4;
 
-    public NewlyAddedTableITCase(String mongoVersion) {
-        super(mongoVersion);
-    }
-
-    @Parameterized.Parameters(name = "mongoVersion: {0}")
-    public static Object[] parameters() {
-        return Stream.of(getMongoVersions()).map(e -> new Object[] {e}).toArray();
-    }
+    @TempDir private static Path tempDir;
 
     private final ScheduledExecutorService mockChangelogExecutor =
             Executors.newScheduledThreadPool(1);
 
-    @Before
+    @BeforeEach
     public void before() throws SQLException {
         customerDatabase = "customer_" + Integer.toUnsignedString(new Random().nextInt(), 36);
         TestValuesTableFactory.clearAllData();
@@ -110,7 +98,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                 TimeUnit.MICROSECONDS);
     }
 
-    @After
+    @AfterEach
     public void after() {
         mockChangelogExecutor.shutdown();
         MongoDatabase mongoDatabase = mongodbClient.getDatabase(customerDatabase);
@@ -118,7 +106,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedCollectionForExistsPipelineOnce() throws Exception {
+    void testNewlyAddedCollectionForExistsPipelineOnce() throws Exception {
         testNewlyAddedCollectionOneByOne(
                 1,
                 MongoDBTestUtils.FailoverType.NONE,
@@ -129,7 +117,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedCollectionForExistsPipelineOnceWithAheadOplog() throws Exception {
+    void testNewlyAddedCollectionForExistsPipelineOnceWithAheadOplog() throws Exception {
         testNewlyAddedCollectionOneByOne(
                 1,
                 MongoDBTestUtils.FailoverType.NONE,
@@ -140,7 +128,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedCollectionForExistsPipelineTwice() throws Exception {
+    void testNewlyAddedCollectionForExistsPipelineTwice() throws Exception {
         testNewlyAddedCollectionOneByOne(
                 DEFAULT_PARALLELISM,
                 MongoDBTestUtils.FailoverType.NONE,
@@ -152,7 +140,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedCollectionForExistsPipelineTwiceWithAheadOplog() throws Exception {
+    void testNewlyAddedCollectionForExistsPipelineTwiceWithAheadOplog() throws Exception {
         testNewlyAddedCollectionOneByOne(
                 DEFAULT_PARALLELISM,
                 MongoDBTestUtils.FailoverType.NONE,
@@ -164,7 +152,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedCollectionForExistsPipelineTwiceWithAheadOplogAndAutoCloseReader()
+    void testNewlyAddedCollectionForExistsPipelineTwiceWithAheadOplogAndAutoCloseReader()
             throws Exception {
         Map<String, String> otherOptions = new HashMap<>();
         otherOptions.put("scan.incremental.close-idle-reader.enabled", "true");
@@ -180,7 +168,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedCollectionForExistsPipelineThrice() throws Exception {
+    void testNewlyAddedCollectionForExistsPipelineThrice() throws Exception {
         testNewlyAddedCollectionOneByOne(
                 DEFAULT_PARALLELISM,
                 MongoDBTestUtils.FailoverType.NONE,
@@ -193,7 +181,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedCollectionForExistsPipelineThriceWithAheadOplog() throws Exception {
+    void testNewlyAddedCollectionForExistsPipelineThriceWithAheadOplog() throws Exception {
         testNewlyAddedCollectionOneByOne(
                 DEFAULT_PARALLELISM,
                 MongoDBTestUtils.FailoverType.NONE,
@@ -206,7 +194,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedCollectionForExistsPipelineSingleParallelism() throws Exception {
+    void testNewlyAddedCollectionForExistsPipelineSingleParallelism() throws Exception {
         testNewlyAddedCollectionOneByOne(
                 1,
                 MongoDBTestUtils.FailoverType.NONE,
@@ -217,7 +205,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedCollectionForExistsPipelineSingleParallelismWithAheadOplog()
+    void testNewlyAddedCollectionForExistsPipelineSingleParallelismWithAheadOplog()
             throws Exception {
         testNewlyAddedCollectionOneByOne(
                 1,
@@ -229,7 +217,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverForNewlyAddedCollection() throws Exception {
+    void testJobManagerFailoverForNewlyAddedCollection() throws Exception {
         testNewlyAddedCollectionOneByOne(
                 DEFAULT_PARALLELISM,
                 MongoDBTestUtils.FailoverType.JM,
@@ -240,7 +228,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverForNewlyAddedCollectionWithAheadOplog() throws Exception {
+    void testJobManagerFailoverForNewlyAddedCollectionWithAheadOplog() throws Exception {
         testNewlyAddedCollectionOneByOne(
                 DEFAULT_PARALLELISM,
                 MongoDBTestUtils.FailoverType.JM,
@@ -251,7 +239,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverForNewlyAddedCollection() throws Exception {
+    void testTaskManagerFailoverForNewlyAddedCollection() throws Exception {
         testNewlyAddedCollectionOneByOne(
                 1,
                 MongoDBTestUtils.FailoverType.TM,
@@ -262,7 +250,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverForNewlyAddedCollectionWithAheadOplog() throws Exception {
+    void testTaskManagerFailoverForNewlyAddedCollectionWithAheadOplog() throws Exception {
         testNewlyAddedCollectionOneByOne(
                 1,
                 MongoDBTestUtils.FailoverType.TM,
@@ -273,7 +261,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverForRemoveCollectionSingleParallelism() throws Exception {
+    void testJobManagerFailoverForRemoveCollectionSingleParallelism() throws Exception {
         testRemoveCollectionsOneByOne(
                 1,
                 MongoDBTestUtils.FailoverType.JM,
@@ -284,7 +272,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverForRemoveCollection() throws Exception {
+    void testJobManagerFailoverForRemoveCollection() throws Exception {
         testRemoveCollectionsOneByOne(
                 DEFAULT_PARALLELISM,
                 MongoDBTestUtils.FailoverType.JM,
@@ -295,7 +283,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverForRemoveCollectionSingleParallelism() throws Exception {
+    void testTaskManagerFailoverForRemoveCollectionSingleParallelism() throws Exception {
         testRemoveCollectionsOneByOne(
                 1,
                 MongoDBTestUtils.FailoverType.TM,
@@ -306,7 +294,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverForRemoveCollection() throws Exception {
+    void testTaskManagerFailoverForRemoveCollection() throws Exception {
         testRemoveCollectionsOneByOne(
                 DEFAULT_PARALLELISM,
                 MongoDBTestUtils.FailoverType.TM,
@@ -317,7 +305,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testRemoveCollectionSingleParallelism() throws Exception {
+    void testRemoveCollectionSingleParallelism() throws Exception {
         testRemoveCollectionsOneByOne(
                 1,
                 MongoDBTestUtils.FailoverType.NONE,
@@ -328,7 +316,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testRemoveCollection() throws Exception {
+    void testRemoveCollection() throws Exception {
         testRemoveCollectionsOneByOne(
                 DEFAULT_PARALLELISM,
                 MongoDBTestUtils.FailoverType.NONE,
@@ -339,7 +327,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     }
 
     @Test
-    public void testRemoveAndAddCollectionsOneByOne() throws Exception {
+    void testRemoveAndAddCollectionsOneByOne() throws Exception {
         testRemoveAndAddCollectionsOneByOne(
                 1, "address_hangzhou", "address_beijing", "address_shanghai", "address_shenzhen");
     }
@@ -351,9 +339,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
         // step 1: create mongodb collections with all collections included
         initialAddressCollections(database, captureAddressCollections);
 
-        final TemporaryFolder temporaryFolder = new TemporaryFolder();
-        temporaryFolder.create();
-        final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
+        final String savepointDirectory = tempDir.toString();
 
         // get all expected data
         List<String> fetchedDataList = new ArrayList<>();
@@ -532,9 +518,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
         initialAddressCollections(
                 mongodbClient.getDatabase(customerDatabase), captureAddressCollections);
 
-        final TemporaryFolder temporaryFolder = new TemporaryFolder();
-        temporaryFolder.create();
-        final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
+        final String savepointDirectory = tempDir.toString();
 
         // get all expected data
         List<String> fetchedDataList = new ArrayList<>();
@@ -585,7 +569,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                 MongoDBTestUtils.triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
+                        miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
             }
             MongoDBTestUtils.waitForSinkSize("sink", fetchedDataList.size());
@@ -670,7 +654,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                 MongoDBTestUtils.triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
+                        miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
             }
 
@@ -716,18 +700,14 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
         initialAddressCollections(
                 mongodbClient.getDatabase(customerDatabase), captureAddressCollections);
 
-        final TemporaryFolder temporaryFolder = new TemporaryFolder();
-        temporaryFolder.create();
-        final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
+        final String savepointDirectory = tempDir.toString();
 
         // test newly added collection one by one
         String finishedSavePointPath = null;
         List<String> fetchedDataList = new ArrayList<>();
         for (int round = 0; round < captureAddressCollections.length; round++) {
             String[] captureCollectionsThisRound =
-                    Arrays.asList(captureAddressCollections)
-                            .subList(0, round + 1)
-                            .toArray(new String[0]);
+                    Arrays.copyOf(captureAddressCollections, round + 1);
             String newlyAddedCollection = captureAddressCollections[round];
             if (makeOplogBeforeCapture) {
                 makeOplogBeforeCaptureForAddressCollection(
@@ -792,7 +772,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                 MongoDBTestUtils.triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
+                        miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
             }
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
@@ -807,7 +787,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                 MongoDBTestUtils.triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
+                        miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
             }
             makeSecondPartOplogForAddressCollections(

@@ -21,15 +21,17 @@ import org.apache.flink.cdc.common.test.utils.JdbcProxy;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.MSSQLServerContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.lifecycle.Startables;
 
 import java.net.URL;
@@ -41,7 +43,6 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -49,10 +50,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertNotNull;
-
 /** End-to-end tests for sqlserver-cdc connector uber jar. */
-public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
+@Testcontainers
+class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(SqlServerE2eITCase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
@@ -62,22 +62,8 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
     public static final String MSSQL_SERVER_IMAGE = "mcr.microsoft.com/mssql/server:2019-latest";
 
-    @Parameterized.Parameter(1)
-    public boolean parallelismSnapshot;
-
-    @Parameterized.Parameters(name = "flinkVersion: {0}, parallelismSnapshot: {1}")
-    public static List<Object[]> parameters() {
-        final List<String> flinkVersions = getFlinkVersion();
-        List<Object[]> params = new ArrayList<>();
-        for (String flinkVersion : flinkVersions) {
-            params.add(new Object[] {flinkVersion, true});
-            params.add(new Object[] {flinkVersion, false});
-        }
-        return params;
-    }
-
-    @Rule
-    public MSSQLServerContainer sqlServer =
+    @Container
+    public MSSQLServerContainer<?> sqlServer =
             new MSSQLServerContainer<>(MSSQL_SERVER_IMAGE)
                     .withPassword("Password!")
                     .withEnv("MSSQL_AGENT_ENABLED", "true")
@@ -86,7 +72,7 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
                     .withNetworkAliases(INTER_CONTAINER_SQL_SERVER_ALIAS)
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @Before
+    @BeforeEach
     public void before() {
         super.before();
         LOG.info("Starting containers...");
@@ -95,7 +81,7 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
         initializeSqlServerTable("sqlserver_inventory");
     }
 
-    @After
+    @AfterEach
     public void after() {
         if (sqlServer != null) {
             sqlServer.stop();
@@ -103,8 +89,9 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
         super.after();
     }
 
-    @Test
-    public void testSqlServerCDC() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testSqlServerCDC(boolean parallelismSnapshot) throws Exception {
         List<String> sqlLines =
                 Arrays.asList(
                         "SET 'execution.checkpointing.interval' = '3s';",
@@ -198,7 +185,7 @@ public class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
     private void initializeSqlServerTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = SqlServerE2eITCase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = getSqlServerJdbcConnection();
                 Statement statement = connection.createStatement()) {
             final List<String> statements =

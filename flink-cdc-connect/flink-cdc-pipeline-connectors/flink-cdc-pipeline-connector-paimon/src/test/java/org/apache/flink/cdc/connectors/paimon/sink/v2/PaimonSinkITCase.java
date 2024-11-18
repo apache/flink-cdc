@@ -55,7 +55,7 @@ import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.sink.MultiTableCommittable;
 import org.apache.paimon.options.Options;
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -76,7 +76,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /** An ITCase for {@link PaimonWriter} and {@link PaimonCommitter}. */
-public class PaimonSinkITCase {
+class PaimonSinkITCase {
 
     @TempDir public static java.nio.file.Path temporaryFolder;
 
@@ -181,7 +181,7 @@ public class PaimonSinkITCase {
 
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
-    public void testSinkWithDataChange(String metastore)
+    void testSinkWithDataChange(String metastore)
             throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
                     Catalog.DatabaseNotExistException, SchemaEvolveException {
         initialize(metastore);
@@ -207,10 +207,11 @@ public class PaimonSinkITCase {
                 .execute()
                 .collect()
                 .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Arrays.asList(
-                        Row.ofKind(RowKind.INSERT, "1", "1"), Row.ofKind(RowKind.INSERT, "2", "2")),
-                result);
+        Assertions.assertThat(result)
+                .isEqualTo(
+                        Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, "1", "1"),
+                                Row.ofKind(RowKind.INSERT, "2", "2")));
 
         // delete
         Event event =
@@ -234,8 +235,8 @@ public class PaimonSinkITCase {
                 .execute()
                 .collect()
                 .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Collections.singletonList(Row.ofKind(RowKind.INSERT, "2", "2")), result);
+        Assertions.assertThat(result)
+                .isEqualTo(Collections.singletonList(Row.ofKind(RowKind.INSERT, "2", "2")));
 
         // update
         event =
@@ -264,8 +265,8 @@ public class PaimonSinkITCase {
                 .execute()
                 .collect()
                 .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Collections.singletonList(Row.ofKind(RowKind.INSERT, "2", "x")), result);
+        Assertions.assertThat(result)
+                .isEqualTo(Collections.singletonList(Row.ofKind(RowKind.INSERT, "2", "x")));
 
         result = new ArrayList<>();
         tEnv.sqlQuery("select max_sequence_number from paimon_catalog.test.`table1$files`")
@@ -273,22 +274,22 @@ public class PaimonSinkITCase {
                 .collect()
                 .forEachRemaining(result::add);
         // Each commit will generate one sequence number(equal to checkpointId).
-        Assertions.assertEquals(
-                Arrays.asList(
-                        Row.ofKind(RowKind.INSERT, 1L),
-                        Row.ofKind(RowKind.INSERT, 2L),
-                        Row.ofKind(RowKind.INSERT, 3L)),
-                result);
+        Assertions.assertThat(result)
+                .isEqualTo(
+                        Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, 1L),
+                                Row.ofKind(RowKind.INSERT, 2L),
+                                Row.ofKind(RowKind.INSERT, 3L)));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
-    public void testSinkWithSchemaChange(String metastore)
+    void testSinkWithSchemaChange(String metastore)
             throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
                     Catalog.DatabaseNotExistException, SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
-                new PaimonSink(
+                new PaimonSink<>(
                         catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
         PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
         Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
@@ -309,10 +310,11 @@ public class PaimonSinkITCase {
                 .execute()
                 .collect()
                 .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Arrays.asList(
-                        Row.ofKind(RowKind.INSERT, "1", "1"), Row.ofKind(RowKind.INSERT, "2", "2")),
-                result);
+        Assertions.assertThat(result)
+                .isEqualTo(
+                        Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, "1", "1"),
+                                Row.ofKind(RowKind.INSERT, "2", "2")));
 
         // 2. receive DataChangeEvents and SchemaChangeEvents during one checkpoint
         DataChangeEvent insertEvent3 =
@@ -360,13 +362,13 @@ public class PaimonSinkITCase {
                 .execute()
                 .collect()
                 .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Arrays.asList(
-                        Row.ofKind(RowKind.INSERT, "1", "1", null),
-                        Row.ofKind(RowKind.INSERT, "2", "2", null),
-                        Row.ofKind(RowKind.INSERT, "3", "3", null),
-                        Row.ofKind(RowKind.INSERT, "4", "4", "4")),
-                result);
+        Assertions.assertThat(result)
+                .isEqualTo(
+                        Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, "1", "1", null),
+                                Row.ofKind(RowKind.INSERT, "2", "2", null),
+                                Row.ofKind(RowKind.INSERT, "3", "3", null),
+                                Row.ofKind(RowKind.INSERT, "4", "4", "4")));
 
         // 2. receive DataChangeEvents and SchemaChangeEvents during one checkpoint
         DataChangeEvent insertEvent5 =
@@ -408,27 +410,27 @@ public class PaimonSinkITCase {
                 .execute()
                 .collect()
                 .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Arrays.asList(
-                        Row.ofKind(RowKind.INSERT, "1", null),
-                        Row.ofKind(RowKind.INSERT, "2", null),
-                        Row.ofKind(RowKind.INSERT, "3", null),
-                        Row.ofKind(RowKind.INSERT, "4", "4"),
-                        Row.ofKind(RowKind.INSERT, "5", "5"),
-                        Row.ofKind(RowKind.INSERT, "6", "6")),
-                result);
+        Assertions.assertThat(result)
+                .isEqualTo(
+                        Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, "1", null),
+                                Row.ofKind(RowKind.INSERT, "2", null),
+                                Row.ofKind(RowKind.INSERT, "3", null),
+                                Row.ofKind(RowKind.INSERT, "4", "4"),
+                                Row.ofKind(RowKind.INSERT, "5", "5"),
+                                Row.ofKind(RowKind.INSERT, "6", "6")));
         result = new ArrayList<>();
         tEnv.sqlQuery("select min_sequence_number from paimon_catalog.test.`table1$files`")
                 .execute()
                 .collect()
                 .forEachRemaining(result::add);
         Set<Row> deduplicated = new HashSet<>(result);
-        Assertions.assertEquals(result.size(), deduplicated.size());
+        Assertions.assertThat(result).hasSameSizeAs(deduplicated);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
-    public void testSinkWithMultiTables(String metastore)
+    void testSinkWithMultiTables(String metastore)
             throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
                     Catalog.DatabaseNotExistException, SchemaEvolveException {
         initialize(metastore);
@@ -478,22 +480,23 @@ public class PaimonSinkITCase {
                 .execute()
                 .collect()
                 .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Arrays.asList(
-                        Row.ofKind(RowKind.INSERT, "1", "1"), Row.ofKind(RowKind.INSERT, "2", "2")),
-                result);
+        Assertions.assertThat(result)
+                .isEqualTo(
+                        Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, "1", "1"),
+                                Row.ofKind(RowKind.INSERT, "2", "2")));
         result = new ArrayList<>();
         tEnv.sqlQuery("select * from paimon_catalog.test.table2")
                 .execute()
                 .collect()
                 .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Collections.singletonList(Row.ofKind(RowKind.INSERT, "1", "1")), result);
+        Assertions.assertThat(result)
+                .isEqualTo(Collections.singletonList(Row.ofKind(RowKind.INSERT, "1", "1")));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
-    public void testDuplicateCommitAfterRestore(String metastore)
+    void testDuplicateCommitAfterRestore(String metastore)
             throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
                     Catalog.DatabaseNotExistException, SchemaEvolveException {
         initialize(metastore);
@@ -525,7 +528,7 @@ public class PaimonSinkITCase {
             // CommitterOperator will try to re-commit recovered transactions.
             committer.commit(commitRequests);
             List<DataChangeEvent> events =
-                    Arrays.asList(
+                    Collections.singletonList(
                             DataChangeEvent.insertEvent(
                                     table1,
                                     generator.generate(
@@ -533,12 +536,13 @@ public class PaimonSinkITCase {
                                                 BinaryStringData.fromString(Integer.toString(i)),
                                                 BinaryStringData.fromString(Integer.toString(i))
                                             })));
-            Assertions.assertDoesNotThrow(
-                    () -> {
-                        for (Event event : events) {
-                            writer.write(event, null);
-                        }
-                    });
+            Assertions.assertThatCode(
+                            () -> {
+                                for (Event event : events) {
+                                    writer.write(event, null);
+                                }
+                            })
+                    .doesNotThrowAnyException();
             writer.flush(false);
             // Checkpoint id start from 1
             committer.commit(
@@ -554,24 +558,24 @@ public class PaimonSinkITCase {
                 .collect()
                 .forEachRemaining(result::add);
         // 8 APPEND and 1 COMPACT
-        Assertions.assertEquals(result.size(), 9);
+        Assertions.assertThat(result).hasSize(9);
         result.clear();
 
         tEnv.sqlQuery("select * from paimon_catalog.test.`table1`")
                 .execute()
                 .collect()
                 .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Arrays.asList(
-                        Row.ofKind(RowKind.INSERT, "1", "1"),
-                        Row.ofKind(RowKind.INSERT, "2", "2"),
-                        Row.ofKind(RowKind.INSERT, "3", "3"),
-                        Row.ofKind(RowKind.INSERT, "4", "4"),
-                        Row.ofKind(RowKind.INSERT, "5", "5"),
-                        Row.ofKind(RowKind.INSERT, "6", "6"),
-                        Row.ofKind(RowKind.INSERT, "7", "7"),
-                        Row.ofKind(RowKind.INSERT, "8", "8")),
-                result);
+        Assertions.assertThat(result)
+                .isEqualTo(
+                        Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, "1", "1"),
+                                Row.ofKind(RowKind.INSERT, "2", "2"),
+                                Row.ofKind(RowKind.INSERT, "3", "3"),
+                                Row.ofKind(RowKind.INSERT, "4", "4"),
+                                Row.ofKind(RowKind.INSERT, "5", "5"),
+                                Row.ofKind(RowKind.INSERT, "6", "6"),
+                                Row.ofKind(RowKind.INSERT, "7", "7"),
+                                Row.ofKind(RowKind.INSERT, "8", "8")));
     }
 
     private MultiTableCommittable correctCheckpointId(MultiTableCommittable committable) {

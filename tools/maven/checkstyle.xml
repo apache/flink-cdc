@@ -226,7 +226,36 @@ This file is based on the checkstyle file of Apache Beam.
 			<property name="illegalPkgs" value="com.google.common"/>
 			<message key="import.illegal" value="{0}; Use flink-shaded-guava instead."/>
 		</module>
-
+		<module name="IllegalImport">
+			<property name="regexp" value="true"/>
+			<!-- Reject any org.junit import that's not also org.junit.jupiter: -->
+			<property name="illegalClasses" value="^org\.junit\.(?!jupiter\.).+"/>
+			<message key="import.illegal" value="{0}; Please use JUnit 5 Jupiter API instead."/>
+		</module>
+		<module name="IllegalImport">
+			<property name="regexp" value="true"/>
+			<!-- Reject any org.junit import that's not also org.junit.jupiter: -->
+			<property name="illegalClasses" value="^org\.junit\.jupiter\.api\.Assertions\.*"/>
+			<message key="import.illegal" value="{0}; Prefer using org.assertj.core.api.Assertions instead."/>
+		</module>
+		<module name="IllegalImport">
+			<property name="regexp" value="true"/>
+			<!-- Reject any org.junit import that's not also org.junit.jupiter: -->
+			<property name="illegalClasses" value="^org\.junit\.jupiter\.api\.Assumptions\.*"/>
+			<message key="import.illegal" value="{0}; Prefer using org.assertj.core.api.Assumptions instead."/>
+		</module>
+		<module name="IllegalImport">
+            <property name="illegalPkgs" value="org.junit.jupiter.api.Assertions"/>
+            <message key="import.illegal" value="Prefer using org.assertj.core.api.Assertions instead."/>
+        </module>
+		<module name="IllegalImport">
+            <property name="illegalPkgs" value="org.junit.jupiter.api.Assumptions"/>
+            <message key="import.illegal" value="Prefer using org.assertj.core.api.Assumptions instead."/>
+        </module>
+		<module name="IllegalImport">
+            <property name="illegalPkgs" value="org.hamcrest"/>
+            <message key="import.illegal" value="Prefer using org.assertj.core.api.Assertions instead."/>
+        </module>
 		<module name="RedundantModifier">
 			<!-- Checks for redundant modifiers on various symbol definitions.
 			  See: http://checkstyle.sourceforge.net/config_modifier.html#RedundantModifier
