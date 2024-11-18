@@ -21,51 +21,47 @@ import com.jayway.jsonpath.JsonPath;
 import com.mongodb.client.model.changestream.OperationType;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.assertj.core.api.Assertions;
 
 import java.util.List;
-import java.util.stream.Collectors;
-
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
 /** MongoDB test assert utils. */
 public class MongoDBAssertUtils {
 
     public static void assertObjectIdEquals(String expect, SourceRecord actual) {
         String actualOid = ((Struct) actual.value()).getString("documentKey");
-        assertEquals(expect, JsonPath.read(actualOid, "$._id.$oid"));
+        Assertions.assertThat(JsonPath.<String>read(actualOid, "$._id.$oid")).isEqualTo(expect);
     }
 
     public static void assertInsert(SourceRecord record, boolean keyExpected) {
         if (keyExpected) {
-            assertNotNull(record.key());
-            assertNotNull(record.keySchema());
+            Assertions.assertThat(record.key()).isNotNull();
+            Assertions.assertThat(record.keySchema()).isNotNull();
         } else {
-            assertNull(record.key());
-            assertNull(record.keySchema());
+            Assertions.assertThat(record.key()).isNull();
+            Assertions.assertThat(record.keySchema()).isNull();
         }
 
-        assertNotNull(record.valueSchema());
+        Assertions.assertThat(record.valueSchema()).isNotNull();
         Struct value = (Struct) record.value();
-        assertNotNull(value);
-        assertEquals(OperationType.INSERT.getValue(), value.getString("operationType"));
-        assertNotNull(value.get("fullDocument"));
-        assertNotNull(value.get("documentKey"));
+        Assertions.assertThat(value).isNotNull();
+        Assertions.assertThat(value.getString("operationType"))
+                .isEqualTo(OperationType.INSERT.getValue());
+        Assertions.assertThat(value.get("fullDocument")).isNotNull();
+        Assertions.assertThat(value.get("documentKey")).isNotNull();
     }
 
     public static void assertUpdate(SourceRecord record) {
-        assertNotNull(record.key());
-        assertNotNull(record.keySchema());
+        Assertions.assertThat(record.key()).isNotNull();
+        Assertions.assertThat(record.keySchema()).isNotNull();
 
-        assertNotNull(record.valueSchema());
+        Assertions.assertThat(record.valueSchema()).isNotNull();
         Struct value = (Struct) record.value();
-        assertNotNull(value);
-        assertEquals(OperationType.UPDATE.getValue(), value.getString("operationType"));
-        assertNotNull(value.get("documentKey"));
-        assertNotNull(value.get("fullDocument"));
+        Assertions.assertThat(value).isNotNull();
+        Assertions.assertThat(value.getString("operationType"))
+                .isEqualTo(OperationType.UPDATE.getValue());
+        Assertions.assertThat(value.get("documentKey")).isNotNull();
+        Assertions.assertThat(value.get("fullDocument")).isNotNull();
     }
 
     public static void assertUpdate(SourceRecord record, String idValue) {
@@ -74,15 +70,16 @@ public class MongoDBAssertUtils {
     }
 
     public static void assertReplace(SourceRecord record) {
-        assertNotNull(record.key());
-        assertNotNull(record.keySchema());
+        Assertions.assertThat(record.key()).isNotNull();
+        Assertions.assertThat(record.keySchema()).isNotNull();
 
-        assertNotNull(record.valueSchema());
+        Assertions.assertThat(record.valueSchema()).isNotNull();
         Struct value = (Struct) record.value();
-        assertNotNull(value);
-        assertEquals(OperationType.REPLACE.getValue(), value.getString("operationType"));
-        assertNotNull(value.get("documentKey"));
-        assertNotNull(value.get("fullDocument"));
+        Assertions.assertThat(value).isNotNull();
+        Assertions.assertThat(value.getString("operationType"))
+                .isEqualTo(OperationType.REPLACE.getValue());
+        Assertions.assertThat(value.get("documentKey")).isNotNull();
+        Assertions.assertThat(value.get("fullDocument")).isNotNull();
     }
 
     public static void assertReplace(SourceRecord record, String idValue) {
@@ -91,14 +88,15 @@ public class MongoDBAssertUtils {
     }
 
     public static void assertDelete(SourceRecord record) {
-        assertNotNull(record.key());
-        assertNotNull(record.keySchema());
+        Assertions.assertThat(record.key()).isNotNull();
+        Assertions.assertThat(record.keySchema()).isNotNull();
 
-        assertNotNull(record.valueSchema());
+        Assertions.assertThat(record.valueSchema()).isNotNull();
         Struct value = (Struct) record.value();
-        assertNotNull(value);
-        assertEquals(OperationType.DELETE.getValue(), value.getString("operationType"));
-        assertNotNull(value.get("documentKey"));
+        Assertions.assertThat(value).isNotNull();
+        Assertions.assertThat(value.getString("operationType"))
+                .isEqualTo(OperationType.DELETE.getValue());
+        Assertions.assertThat(value.get("documentKey")).isNotNull();
     }
 
     public static void assertDelete(SourceRecord record, String idValue) {
@@ -107,15 +105,6 @@ public class MongoDBAssertUtils {
     }
 
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
-    }
-
-    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
     }
 }

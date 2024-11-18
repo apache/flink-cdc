@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.postgres.testutils;
 
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 
+import org.assertj.core.api.Assertions;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.net.URL;
@@ -33,8 +34,6 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import static org.junit.Assert.assertNotNull;
 
 /**
  * Create and populate a unique instance of a PostgreSQL database for each run of JUnit test. A user
@@ -120,7 +119,7 @@ public class UniqueDatabase {
     public void createAndInitialize() {
         final String ddlFile = String.format("ddl/%s.sql", templateName);
         final URL ddlTestFile = UniqueDatabase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
 
         try {
             createDatabase(databaseName);

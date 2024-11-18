@@ -36,10 +36,10 @@ import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,14 +49,14 @@ import java.util.List;
  * different enumeration situations of {@link
  * org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper}.
  */
-public class ValuesDataSourceITCase {
+class ValuesDataSourceITCase {
 
-    @Before
+    @BeforeEach
     public void before() {
         ValuesDatabase.clear();
     }
 
-    @After
+    @AfterEach
     public void after() {
         ValuesDatabase.clear();
     }
@@ -89,40 +89,40 @@ public class ValuesDataSourceITCase {
     }
 
     @Test
-    public void testSingleSplitSingleTable() throws Exception {
+    void testSingleSplitSingleTable() throws Exception {
         executeDataStreamJob(ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_SINGLE_TABLE);
         List<String> results = new ArrayList<>();
         results.add("default_namespace.default_schema.table1:col1=2;newCol3=x");
         results.add("default_namespace.default_schema.table1:col1=3;newCol3=");
-        Assert.assertEquals(
-                results,
-                ValuesDatabase.getResults(
-                        TableId.parse("default_namespace.default_schema.table1")));
+        Assertions.assertThat(
+                        ValuesDatabase.getResults(
+                                TableId.parse("default_namespace.default_schema.table1")))
+                .isEqualTo(results);
     }
 
     @Test
-    public void testSingleSplitMultiTables() throws Exception {
+    void testSingleSplitMultiTables() throws Exception {
         executeDataStreamJob(ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_MULTI_TABLES);
         List<String> results = new ArrayList<>();
         results.add("default_namespace.default_schema.table1:col1=2;newCol3=x");
         results.add("default_namespace.default_schema.table1:col1=3;newCol3=");
-        Assert.assertEquals(
-                results,
-                ValuesDatabase.getResults(
-                        TableId.parse("default_namespace.default_schema.table1")));
+        Assertions.assertThat(
+                        ValuesDatabase.getResults(
+                                TableId.parse("default_namespace.default_schema.table1")))
+                .isEqualTo(results);
 
         results.clear();
         results.add("default_namespace.default_schema.table2:col1=1;col2=1");
         results.add("default_namespace.default_schema.table2:col1=2;col2=2");
         results.add("default_namespace.default_schema.table2:col1=3;col2=3");
-        Assert.assertEquals(
-                results,
-                ValuesDatabase.getResults(
-                        TableId.parse("default_namespace.default_schema.table2")));
+        Assertions.assertThat(
+                        ValuesDatabase.getResults(
+                                TableId.parse("default_namespace.default_schema.table2")))
+                .isEqualTo(results);
     }
 
     @Test
-    public void testCustomSourceEvents() throws Exception {
+    void testCustomSourceEvents() throws Exception {
         List<List<Event>> splits = new ArrayList<>();
         List<Event> split1 = new ArrayList<>();
         TableId table1 = TableId.tableId("default_namespace", "default_schema", "table1");
@@ -161,22 +161,22 @@ public class ValuesDataSourceITCase {
         List<String> results = new ArrayList<>();
         results.add("default_namespace.default_schema.table1:col1=1;col2=1");
         results.add("default_namespace.default_schema.table1:col1=2;col2=2");
-        Assert.assertEquals(
-                results,
-                ValuesDatabase.getResults(
-                        TableId.parse("default_namespace.default_schema.table1")));
+        Assertions.assertThat(
+                        ValuesDatabase.getResults(
+                                TableId.parse("default_namespace.default_schema.table1")))
+                .isEqualTo(results);
     }
 
     @Test
-    public void testMultiSplitsSingleTable() throws Exception {
+    void testMultiSplitsSingleTable() throws Exception {
         executeDataStreamJob(ValuesDataSourceHelper.EventSetId.MULTI_SPLITS_SINGLE_TABLE);
         List<String> results = new ArrayList<>();
         results.add("default_namespace.default_schema.table1:col1=1;col2=1;col3=x");
         results.add("default_namespace.default_schema.table1:col1=3;col2=3;col3=x");
         results.add("default_namespace.default_schema.table1:col1=5;col2=5;col3=");
-        Assert.assertEquals(
-                results,
-                ValuesDatabase.getResults(
-                        TableId.parse("default_namespace.default_schema.table1")));
+        Assertions.assertThat(
+                        ValuesDatabase.getResults(
+                                TableId.parse("default_namespace.default_schema.table1")))
+                .isEqualTo(results);
     }
 }

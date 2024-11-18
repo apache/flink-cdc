@@ -21,14 +21,16 @@ import org.apache.flink.cdc.common.test.utils.JdbcProxy;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.net.URL;
@@ -48,11 +50,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertNotNull;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** End-to-end tests for postgres-cdc connector uber jar. */
-public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
+@Testcontainers
+class PostgresE2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(PostgresE2eITCase.class);
     private static final String PG_TEST_USER = "postgres";
@@ -76,7 +78,7 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                             "parallelism.default: 1",
                             "execution.checkpointing.interval: 10000"));
 
-    @ClassRule
+    @Container
     public static final PostgreSQLContainer<?> POSTGRES =
             new PostgreSQLContainer<>(PG_IMAGE)
                     .withDatabaseName("postgres")
@@ -96,14 +98,14 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                             "max_replication_slots=20")
                     .withReuse(true);
 
-    @Before
+    @BeforeEach
     public void before() {
         super.before();
         initializePostgresTable("postgres_inventory");
         overrideFlinkProperties(FLINK_PROPERTIES);
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
     }
@@ -135,7 +137,7 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                     "SELECT * FROM products_source;");
 
     @Test
-    public void testPostgresCdcIncremental() throws Exception {
+    void testPostgresCdcIncremental() throws Exception {
         try (Connection conn = getPgJdbcConnection();
                 Statement statement = conn.createStatement()) {
             // gather the initial statistics of the table for splitting
@@ -172,7 +174,7 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
     }
 
     @Test
-    public void testPostgresCdcNonIncremental() throws Exception {
+    void testPostgresCdcNonIncremental() throws Exception {
         List<String> sourceSql =
                 Arrays.asList(
                         "SET 'execution.checkpointing.interval' = '3s';",
@@ -202,7 +204,7 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
         testPostgresCDC(sqlLines);
     }
 
-    public void testPostgresCDC(List<String> sqlLines) throws Exception {
+    void testPostgresCDC(List<String> sqlLines) throws Exception {
 
         submitSQLJob(sqlLines, postgresCdcJar, jdbcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
@@ -266,7 +268,7 @@ public class PostgresE2eITCase extends FlinkContainerTestEnvironment {
     private void initializePostgresTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = PostgresE2eITCase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try {
             Class.forName(PG_DRIVER_CLASS);
         } catch (ClassNotFoundException e) {
