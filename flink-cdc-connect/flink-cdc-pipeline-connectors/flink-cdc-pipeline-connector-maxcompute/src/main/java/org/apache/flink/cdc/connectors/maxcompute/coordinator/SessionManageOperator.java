@@ -80,7 +80,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(SessionManageOperator.class);
 
-    /** a tricky way to get an Operator from sink. */
+    /** TODO: a tricky way to get an Operator from sink. */
     public static SessionManageOperator instance;
 
     private final MaxComputeOptions options;
