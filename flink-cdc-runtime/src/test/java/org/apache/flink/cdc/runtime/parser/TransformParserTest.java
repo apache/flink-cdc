@@ -303,7 +303,7 @@ public class TransformParserTest {
         testFilterExpression("cast(1 as bigint)", "castToLong(1)");
         testFilterExpression("cast(1 as float)", "castToFloat(1)");
         testFilterExpression("cast(1 as double)", "castToDouble(1)");
-        testFilterExpression("cast(1 as decimal)", "castToBigDecimal(1, 10, 0)");
+        testFilterExpression("cast(1 as decimal)", "castToDecimalData(1, 10, 0)");
         testFilterExpression("cast(1 as char)", "castToString(1)");
         testFilterExpression("cast(1 as varchar)", "castToString(1)");
         testFilterExpression("cast(null as int)", "castToInteger(null)");
@@ -314,7 +314,7 @@ public class TransformParserTest {
         testFilterExpression("cast(null as bigint)", "castToLong(null)");
         testFilterExpression("cast(null as float)", "castToFloat(null)");
         testFilterExpression("cast(null as double)", "castToDouble(null)");
-        testFilterExpression("cast(null as decimal)", "castToBigDecimal(null, 10, 0)");
+        testFilterExpression("cast(null as decimal)", "castToDecimalData(null, 10, 0)");
         testFilterExpression("cast(null as char)", "castToString(null)");
         testFilterExpression("cast(null as varchar)", "castToString(null)");
         testFilterExpression(
@@ -328,15 +328,18 @@ public class TransformParserTest {
         List<Column> testColumns =
                 Arrays.asList(
                         Column.physicalColumn("id", DataTypes.INT(), "id"),
-                        Column.physicalColumn("name", DataTypes.STRING(), "string"),
+                        Column.physicalColumn("name", DataTypes.STRING(), "name"),
                         Column.physicalColumn("age", DataTypes.INT(), "age"),
-                        Column.physicalColumn("address", DataTypes.STRING(), "address"),
+                        Column.physicalColumn(
+                                "createTime", DataTypes.TIMESTAMP(3), "newCreateTime"),
+                        Column.physicalColumn("address", DataTypes.VARCHAR(50), "newAddress"),
+                        Column.physicalColumn("deposit", DataTypes.DECIMAL(10, 2), "deposit"),
                         Column.physicalColumn("weight", DataTypes.DOUBLE(), "weight"),
                         Column.physicalColumn("height", DataTypes.DOUBLE(), "height"));
 
         List<ProjectionColumn> result =
                 TransformParser.generateProjectionColumns(
-                        "id, upper(name) as name, age + 1 as newage, weight / (height * height) as bmi",
+                        "id, upper(name) as name, age + 1 as newage, createTime as newCreateTime, address as newAddress, deposit as deposits, weight / (height * height) as bmi",
                         testColumns,
                         Collections.emptyList(),
                         new SupportedMetadataColumn[0]);
@@ -346,6 +349,9 @@ public class TransformParserTest {
                         "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='id', originalColumnNames=[id], transformExpressionKey=null}",
                         "ProjectionColumn{column=`name` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper(name)', originalColumnNames=[name], transformExpressionKey=null}",
                         "ProjectionColumn{column=`newage` INT, expression='`TB`.`age` + 1', scriptExpression='age + 1', originalColumnNames=[age], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`newCreateTime` TIMESTAMP(3) 'newCreateTime', expression='createTime', scriptExpression='createTime', originalColumnNames=[createTime], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`newAddress` VARCHAR(50) 'newAddress', expression='address', scriptExpression='address', originalColumnNames=[address], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`deposits` DECIMAL(10, 2) 'deposit', expression='deposit', scriptExpression='deposit', originalColumnNames=[deposit], transformExpressionKey=null}",
                         "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='weight / height * height', originalColumnNames=[weight, height, height], transformExpressionKey=null}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
 
@@ -359,9 +365,11 @@ public class TransformParserTest {
         List<String> metadataExpected =
                 Arrays.asList(
                         "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='id', originalColumnNames=[id], transformExpressionKey=null}",
-                        "ProjectionColumn{column=`name` STRING 'string', expression='name', scriptExpression='name', originalColumnNames=[name], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`name` STRING 'name', expression='name', scriptExpression='name', originalColumnNames=[name], transformExpressionKey=null}",
                         "ProjectionColumn{column=`age` INT 'age', expression='age', scriptExpression='age', originalColumnNames=[age], transformExpressionKey=null}",
-                        "ProjectionColumn{column=`address` STRING 'address', expression='address', scriptExpression='address', originalColumnNames=[address], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`createTime` TIMESTAMP(3) 'newCreateTime', expression='createTime', scriptExpression='createTime', originalColumnNames=[createTime], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`address` VARCHAR(50) 'newAddress', expression='address', scriptExpression='address', originalColumnNames=[address], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`deposit` DECIMAL(10, 2) 'deposit', expression='deposit', scriptExpression='deposit', originalColumnNames=[deposit], transformExpressionKey=null}",
                         "ProjectionColumn{column=`weight` DOUBLE 'weight', expression='weight', scriptExpression='weight', originalColumnNames=[weight], transformExpressionKey=null}",
                         "ProjectionColumn{column=`height` DOUBLE 'height', expression='height', scriptExpression='height', originalColumnNames=[height], transformExpressionKey=null}",
                         "ProjectionColumn{column=`__namespace_name__` STRING NOT NULL, expression='__namespace_name__', scriptExpression='__namespace_name__', originalColumnNames=[__namespace_name__], transformExpressionKey=null}",
@@ -382,6 +390,42 @@ public class TransformParserTest {
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage(
                         "Unrecognized projection expression: 1 + 1. Should be <EXPR> AS <IDENTIFIER>");
+    }
+
+    @Test
+    public void testGenerateProjectionColumnsWithPrecision() {
+        List<Column> testColumns =
+                Arrays.asList(
+                        Column.physicalColumn("id", DataTypes.INT(), "id"),
+                        Column.physicalColumn("name", DataTypes.VARCHAR(50), "name"),
+                        Column.physicalColumn("sex", DataTypes.CHAR(1), "sex"),
+                        Column.physicalColumn("address", DataTypes.BINARY(50), "address"),
+                        Column.physicalColumn("phone", DataTypes.VARBINARY(50), "phone"),
+                        Column.physicalColumn("deposit", DataTypes.DECIMAL(10, 2), "deposit"),
+                        Column.physicalColumn("birthday", DataTypes.TIMESTAMP(3), "birthday"),
+                        Column.physicalColumn(
+                                "birthday_ltz", DataTypes.TIMESTAMP_LTZ(3), "birthday_ltz"),
+                        Column.physicalColumn("update_time", DataTypes.TIME(3), "update_time"));
+
+        List<ProjectionColumn> result =
+                TransformParser.generateProjectionColumns(
+                        "id, UPPER(name) as name2, UPPER(sex) as sex2, COALESCE(address,address) as address2, COALESCE(phone,phone) as phone2, COALESCE(deposit,deposit) as deposit2, COALESCE(birthday,birthday) as birthday2, COALESCE(birthday_ltz,birthday_ltz) as birthday_ltz2, COALESCE(update_time,update_time) as update_time2",
+                        testColumns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        List<String> expected =
+                Arrays.asList(
+                        "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='id', originalColumnNames=[id], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`name2` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper(name)', originalColumnNames=[name], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`sex2` STRING, expression='UPPER(`TB`.`sex`)', scriptExpression='upper(sex)', originalColumnNames=[sex], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`address2` BINARY(50), expression='CASE WHEN `TB`.`address` IS NOT NULL THEN `TB`.`address` ELSE `TB`.`address` END', scriptExpression='(null != address ? address : address)', originalColumnNames=[address, address, address], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`phone2` VARBINARY(50), expression='CASE WHEN `TB`.`phone` IS NOT NULL THEN `TB`.`phone` ELSE `TB`.`phone` END', scriptExpression='(null != phone ? phone : phone)', originalColumnNames=[phone, phone, phone], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`deposit2` DECIMAL(10, 2), expression='CASE WHEN `TB`.`deposit` IS NOT NULL THEN `TB`.`deposit` ELSE `TB`.`deposit` END', scriptExpression='(null != deposit ? deposit : deposit)', originalColumnNames=[deposit, deposit, deposit], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`birthday2` TIMESTAMP(3), expression='CASE WHEN `TB`.`birthday` IS NOT NULL THEN `TB`.`birthday` ELSE `TB`.`birthday` END', scriptExpression='(null != birthday ? birthday : birthday)', originalColumnNames=[birthday, birthday, birthday], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='(null != birthday_ltz ? birthday_ltz : birthday_ltz)', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='(null != update_time ? update_time : update_time)', originalColumnNames=[update_time, update_time, update_time], transformExpressionKey=null}");
+        Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
     }
 
     @Test
