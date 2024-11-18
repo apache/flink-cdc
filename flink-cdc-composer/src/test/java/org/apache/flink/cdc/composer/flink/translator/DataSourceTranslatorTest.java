@@ -27,7 +27,7 @@ import org.apache.flink.cdc.composer.utils.factory.DataSourceFactory1;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** A test for the {@link DataSourceTranslator}. */
@@ -55,8 +55,9 @@ class DataSourceTranslatorTest {
                                 new Configuration(),
                                 Thread.currentThread().getContextClassLoader()));
 
-        Assertions.assertTrue(dataSource instanceof DataSourceFactory1.TestDataSource);
-        Assertions.assertEquals(
-                "0.0.0.0", ((DataSourceFactory1.TestDataSource) dataSource).getHost());
+        Assertions.assertThat(dataSource)
+                .isExactlyInstanceOf(DataSourceFactory1.TestDataSource.class);
+        Assertions.assertThat(((DataSourceFactory1.TestDataSource) dataSource).getHost())
+                .isEqualTo("0.0.0.0");
     }
 }

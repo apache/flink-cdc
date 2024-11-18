@@ -31,14 +31,15 @@ import com.aliyun.odps.Instance;
 import com.aliyun.odps.Odps;
 import com.aliyun.odps.data.Record;
 import com.aliyun.odps.task.SQLTask;
-import org.junit.Assert;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.OutputStream;
@@ -52,15 +53,16 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /** End-to-end tests for maxcompute cdc pipeline job. */
-public class MaxComputeE2eITCase extends PipelineTestEnvironment {
+class MaxComputeE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MaxComputeE2eITCase.class);
 
     public static final DockerImageName MAXCOMPUTE_IMAGE =
             DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.7");
 
-    @ClassRule
-    public static GenericContainer<?> maxcompute =
+    private static final GenericContainer<?> MAXCOMPUTE_CONTAINER =
             new GenericContainer<>(MAXCOMPUTE_IMAGE)
                     .withExposedPorts(8080)
                     .waitingFor(
@@ -72,8 +74,18 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
                     .withTunnelEndpoint(getEndpoint())
                     .build();
 
+    @BeforeAll
+    static void startContainers() {
+        Startables.deepStart(MAXCOMPUTE_CONTAINER).join();
+    }
+
+    @AfterAll
+    static void stopContainers() {
+        MAXCOMPUTE_CONTAINER.stop();
+    }
+
     @Test
-    public void testSingleSplitSingleTable() throws Exception {
+    void testSingleSplitSingleTable() throws Exception {
         startTest("SINGLE_SPLIT_SINGLE_TABLE");
         Instance instance =
                 SQLTask.run(
@@ -82,13 +94,13 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
         instance.waitForSuccess();
         List<Record> result = SQLTask.getResult(instance);
         LOG.info("{}", result);
-        Assert.assertEquals(2, result.size());
+        assertThat(result).hasSize(2);
         // 2,x
-        Assert.assertEquals("2", result.get(0).get(0));
-        Assert.assertEquals("x", result.get(0).get(1));
+        assertThat(result.get(0).get(0)).isEqualTo("2");
+        assertThat(result.get(0).get(1)).isEqualTo("x");
         // 3, NULL (MaxCompute Emulator use 'NULL' instead of null)
-        Assert.assertEquals("3", result.get(1).get(0));
-        Assert.assertEquals("NULL", result.get(1).get(1));
+        assertThat(result.get(1).get(0)).isEqualTo("3");
+        assertThat(result.get(1).get(1)).isEqualTo("NULL");
     }
 
     private void startTest(String testSet) throws Exception {
@@ -132,16 +144,16 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
 
     private String getEndpoint() {
         String ip;
-        if (maxcompute.getHost().equals("localhost")) {
+        if (MAXCOMPUTE_CONTAINER.getHost().equals("localhost")) {
             try {
                 ip = InetAddress.getLocalHost().getHostAddress();
             } catch (UnknownHostException e) {
                 ip = "127.0.0.1";
             }
         } else {
-            ip = maxcompute.getHost();
+            ip = MAXCOMPUTE_CONTAINER.getHost();
         }
-        return "http://" + ip + ":" + maxcompute.getFirstMappedPort();
+        return "http://" + ip + ":" + MAXCOMPUTE_CONTAINER.getFirstMappedPort();
     }
 
     public static void sendPOST(String postUrl, String postData) throws Exception {

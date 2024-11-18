@@ -29,28 +29,25 @@ import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
 import org.apache.flink.table.api.ValidationException;
 
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.lifecycle.Startables;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.mysql.MySqlTestUtils.basicSourceBuilder;
@@ -58,27 +55,16 @@ import static org.apache.flink.cdc.connectors.mysql.MySqlTestUtils.setupSource;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion.V5_5;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion.V5_7;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /** Test for the {@link MySqlValidator}. */
-@RunWith(Parameterized.class)
 public class MySqlValidatorTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlValidatorTest.class);
 
-    private static TemporaryFolder tempFolder;
+    private Path tempFolder;
     private static File resourceFolder;
 
-    @Parameterized.Parameter public boolean runIncrementalSnapshot;
-
-    @Parameterized.Parameters(name = "runIncrementalSnapshot = {0}")
-    public static List<Boolean> parameters() {
-        return Arrays.asList(true, false);
-    }
-
-    @BeforeClass
+    @BeforeAll
     public static void setup() throws Exception {
         resourceFolder =
                 Paths.get(
@@ -88,28 +74,28 @@ public class MySqlValidatorTest {
                                                         .getResource("."))
                                         .toURI())
                         .toFile();
-        tempFolder = new TemporaryFolder(resourceFolder);
-        tempFolder.create();
     }
 
-    @AfterClass
-    public static void tearDown() {
-        tempFolder.delete();
+    @BeforeEach
+    public void prepareTempFolder() throws IOException {
+        tempFolder = Files.createTempDirectory(resourceFolder.toPath(), "mysql-config");
     }
 
-    @Ignore("The jdbc driver used in this module cannot connect to MySQL 5.5")
-    @Test
-    public void testValidateVersion() {
+    @Disabled("The jdbc driver used in this module cannot connect to MySQL 5.5")
+    @ParameterizedTest(name = "incrementalSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testValidateVersion(boolean incrementalSnapshot) {
         MySqlVersion version = V5_5;
         String message =
                 String.format(
                         "Currently Flink MySql CDC connector only supports MySql whose version is larger or equal to 5.6, but actual is %s.",
                         version);
-        doValidate(version, "docker/server/my.cnf", message);
+        doValidate(version, "docker/server/my.cnf", message, incrementalSnapshot);
     }
 
-    @Test
-    public void testValidateBinlogFormat() {
+    @ParameterizedTest(name = "incrementalSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testValidateBinlogFormat(boolean incrementalSnapshot) {
         String mode = "STATEMENT";
         String message =
                 String.format(
@@ -117,11 +103,16 @@ public class MySqlValidatorTest {
                                 + "connector to work properly. Change the MySQL configuration to use a binlog_format=ROW "
                                 + "and restart the connector.",
                         mode);
-        doValidate(V5_7, buildMySqlConfigFile("[mysqld]\nbinlog_format = " + mode), message);
+        doValidate(
+                V5_7,
+                buildMySqlConfigFile("[mysqld]\nbinlog_format = " + mode),
+                message,
+                incrementalSnapshot);
     }
 
-    @Test
-    public void testValidateBinlogRowImage() {
+    @ParameterizedTest(name = "incrementalSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testValidateBinlogRowImage(boolean incrementalSnapshot) {
         String mode = "MINIMAL";
         String message =
                 String.format(
@@ -132,11 +123,13 @@ public class MySqlValidatorTest {
         doValidate(
                 V5_7,
                 buildMySqlConfigFile("[mysqld]\nbinlog_format = ROW\nbinlog_row_image = " + mode),
-                message);
+                message,
+                incrementalSnapshot);
     }
 
-    @Test
-    public void testValidateTimezone() {
+    @ParameterizedTest(name = "incrementalSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testValidateTimezone(boolean incrementalSnapshot) {
         String message =
                 String.format(
                         "The MySQL server has a timezone offset (%d seconds ahead of UTC) which does not match "
@@ -145,10 +138,18 @@ public class MySqlValidatorTest {
                         45240, // +12:34 is 45240 seconds ahead of UTC
                         "UTC",
                         SERVER_TIME_ZONE.key());
-        doValidate(V5_7, buildMySqlConfigFile("[mysqld]\ndefault-time-zone=+12:34"), message);
+        doValidate(
+                V5_7,
+                buildMySqlConfigFile("[mysqld]\ndefault-time-zone=+12:34"),
+                message,
+                incrementalSnapshot);
     }
 
-    private void doValidate(MySqlVersion version, String configPath, String exceptionMessage) {
+    private void doValidate(
+            MySqlVersion version,
+            String configPath,
+            String exceptionMessage,
+            boolean incrementalSnapshot) {
         try (MySqlContainer container =
                 new MySqlContainer(version).withConfigurationOverride(configPath)) {
 
@@ -163,17 +164,14 @@ public class MySqlValidatorTest {
                             container.getUsername(),
                             container.getPassword());
 
-            try {
-                startSource(database);
-                fail("Should fail.");
-            } catch (Exception e) {
-                assertTrue(e instanceof ValidationException);
-                assertEquals(exceptionMessage, e.getMessage());
-            }
+            Assertions.assertThatThrownBy(() -> startSource(database, incrementalSnapshot))
+                    .isExactlyInstanceOf(ValidationException.class)
+                    .hasMessage(exceptionMessage);
         }
     }
 
-    private void startSource(UniqueDatabase database) throws Exception {
+    private void startSource(UniqueDatabase database, boolean runIncrementalSnapshot)
+            throws Exception {
         if (runIncrementalSnapshot) {
             MySqlSource<SourceRecord> mySqlSource =
                     MySqlSource.<SourceRecord>builder()
@@ -200,8 +198,7 @@ public class MySqlValidatorTest {
 
     private String buildMySqlConfigFile(String content) {
         try {
-            File folder = tempFolder.newFolder(String.valueOf(UUID.randomUUID()));
-            Path cnf = Files.createFile(Paths.get(folder.getPath(), "my.cnf"));
+            Path cnf = Files.createFile(Paths.get(tempFolder.toString(), "my.cnf"));
             Files.write(
                     cnf,
                     Collections.singleton(content),

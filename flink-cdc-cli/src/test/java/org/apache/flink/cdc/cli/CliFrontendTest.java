@@ -54,14 +54,14 @@ class CliFrontendTest {
     @Test
     void testNoArgument() throws Exception {
         CliFrontend.main(new String[] {});
-        assertThat(out.toString()).isEqualTo(HELP_MESSAGE);
+        assertThat(out).hasToString(HELP_MESSAGE);
         assertThat(err.toString()).isEmpty();
     }
 
     @Test
     void testGeneratingHelpMessage() throws Exception {
         CliFrontend.main(new String[] {"--help"});
-        assertThat(out.toString()).isEqualTo(HELP_MESSAGE);
+        assertThat(out).hasToString(HELP_MESSAGE);
         assertThat(err.toString()).isEmpty();
     }
 
@@ -84,9 +84,9 @@ class CliFrontendTest {
                         flinkHome(),
                         "--global-config",
                         globalPipelineConfig());
-        assertThat(executor.getGlobalPipelineConfig().toMap().get("parallelism")).isEqualTo("1");
-        assertThat(executor.getGlobalPipelineConfig().toMap().get("schema.change.behavior"))
-                .isEqualTo("ignore");
+        assertThat(executor.getGlobalPipelineConfig().toMap())
+                .containsEntry("parallelism", "1")
+                .containsEntry("schema.change.behavior", "ignore");
     }
 
     @Test

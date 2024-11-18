@@ -23,7 +23,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 
 /** A test for the {@link DataFieldSerializer}. */
-public class DataFieldSerializerTest extends SerializerTestBase<DataField> {
+class DataFieldSerializerTest extends SerializerTestBase<DataField> {
     @Override
     protected TypeSerializer<DataField> createSerializer() {
         return DataFieldSerializer.INSTANCE;
