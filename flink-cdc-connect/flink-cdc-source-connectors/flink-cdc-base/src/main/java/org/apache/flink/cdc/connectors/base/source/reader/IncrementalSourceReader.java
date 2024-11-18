@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.base.source.reader;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.cdc.common.annotation.Experimental;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.DataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.meta.events.FinishedSnapshotSplitsAckEvent;
@@ -261,13 +262,14 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
         for (SourceSplitBase split : splits) {
             if (split.isSnapshotSplit()) {
                 SnapshotSplit snapshotSplit = split.asSnapshotSplit();
-                if (snapshotSplit.isSnapshotReadFinished()) {
-                    finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
-                } else if (dialect.isIncludeDataCollection(
-                        sourceConfig, snapshotSplit.getTableId())) {
-                    unfinishedSplits.add(split);
+                if (dialect.isIncludeDataCollection(sourceConfig, snapshotSplit.getTableId())) {
+                    if (snapshotSplit.isSnapshotReadFinished()) {
+                        finishedUnackedSplits.put(snapshotSplit.splitId(), snapshotSplit);
+                    } else {
+                        unfinishedSplits.add(split);
+                    }
                 } else {
-                    LOG.debug(
+                    LOG.info(
                             "The subtask {} is skipping split {} because it does not match new table filter.",
                             subtaskId,
                             split.splitId());
@@ -320,8 +322,9 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
         // add all un-finished splits (including binlog split) to SourceReaderBase
         if (!unfinishedSplits.isEmpty()) {
             super.addSplits(unfinishedSplits);
-        } else if (suspendedStreamSplit
-                != null) { // only request new snapshot split if the stream split is suspended
+        } else if (suspendedStreamSplit != null
+                || getNumberOfCurrentlyAssignedSplits()
+                        <= 1) { // only request new snapshot split if the stream split is suspended
             context.sendSplitRequest();
         }
     }
@@ -540,5 +543,10 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
             Offset offset = split.asStreamSplit().getStartingOffset();
             LOG.info("Stream split offset on checkpoint {}: {}", checkpointId, offset);
         }
+    }
+
+    @VisibleForTesting
+    public Map<String, SnapshotSplit> getFinishedUnackedSplits() {
+        return finishedUnackedSplits;
     }
 }
