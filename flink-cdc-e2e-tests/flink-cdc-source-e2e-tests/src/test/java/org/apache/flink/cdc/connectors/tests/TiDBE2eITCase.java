@@ -21,14 +21,16 @@ import org.apache.flink.cdc.common.test.utils.JdbcProxy;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.lifecycle.Startables;
 
 import java.net.URL;
@@ -48,11 +50,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-
 /** End-to-end tests for tidb-cdc connector uber jar. */
-public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
+@Testcontainers
+class TiDBE2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(TiDBE2eITCase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
@@ -71,7 +71,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
     private static final Path tidbCdcJar = TestUtils.getResource("tidb-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    @ClassRule
+    @Container
     public static final GenericContainer<?> PD =
             new GenericContainer<>("pingcap/pd:v6.1.0")
                     .withExposedPorts(PD_PORT)
@@ -92,7 +92,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @ClassRule
+    @Container
     public static final GenericContainer<?> TIKV =
             new GenericContainer<>("pingcap/tikv:v6.1.0")
                     .withExposedPorts(TIKV_PORT)
@@ -110,7 +110,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @ClassRule
+    @Container
     public static final GenericContainer<?> TIDB =
             new GenericContainer<>("pingcap/tidb:v6.1.0")
                     .withExposedPorts(TIDB_PORT)
@@ -126,7 +126,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @Before
+    @BeforeEach
     public void before() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(PD, TIKV, TIDB)).join();
@@ -135,7 +135,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
         initializeTidbTable("tidb_inventory");
     }
 
-    @After
+    @AfterEach
     public void after() {
         LOG.info("Stopping containers...");
         Stream.of(TIDB, TIKV, PD).forEach(GenericContainer::stop);
@@ -144,7 +144,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
     }
 
     @Test
-    public void testTIDBCDC() throws Exception {
+    void testTIDBCDC() throws Exception {
         List<String> sqlLines =
                 Arrays.asList(
                         "CREATE TABLE tidb_source (",
@@ -202,7 +202,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
             while (resultSet.next()) {
                 recordCount = resultSet.getInt(1);
             }
-            assertEquals(recordCount, 10);
+            Assertions.assertThat(recordCount).isEqualTo(10);
         } catch (SQLException e) {
             LOG.error("Update table for CDC failed.", e);
             throw e;
@@ -256,7 +256,7 @@ public class TiDBE2eITCase extends FlinkContainerTestEnvironment {
     protected void initializeTidbTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = TiDBE2eITCase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = getTidbJdbcConnection("");
                 Statement statement = connection.createStatement()) {
             final List<String> statements =

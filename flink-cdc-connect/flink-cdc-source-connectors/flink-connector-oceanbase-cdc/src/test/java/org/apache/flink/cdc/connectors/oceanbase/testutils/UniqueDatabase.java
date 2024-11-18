@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.testutils;
 
+import org.assertj.core.api.Assertions;
+
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -31,8 +33,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.junit.Assert.assertNotNull;
 
 /**
  * Create and populate a unique instance of an OceanBase database for each run of JUnit test. A user
@@ -102,7 +102,7 @@ public class UniqueDatabase {
     /** Creates the database and populates it with initialization SQL script. */
     public void createAndInitializeWithDdlFile(String ddlFile) {
         final URL ddlTestFile = UniqueDatabase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try {
             try (Connection connection =
                             DriverManager.getConnection(

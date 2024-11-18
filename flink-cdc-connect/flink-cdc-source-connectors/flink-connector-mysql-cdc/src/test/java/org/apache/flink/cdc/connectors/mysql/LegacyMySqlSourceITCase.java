@@ -30,7 +30,8 @@ import org.apache.flink.util.CloseableIterator;
 
 import com.alibaba.fastjson.JSONObject;
 import org.apache.kafka.connect.json.JsonConverterConfig;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -46,26 +47,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import static org.junit.Assert.assertTrue;
-
 /** Integration tests for the legacy {@link MySqlSource}. */
-public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
+class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
 
     private final UniqueDatabase fullTypesDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", "mysqluser", "mysqlpw");
 
     @Test
-    public void testConsumingAllEventsWithJsonFormatIncludeSchema() throws Exception {
+    void testConsumingAllEventsWithJsonFormatIncludeSchema() throws Exception {
         testConsumingAllEventsWithJsonFormat(true);
     }
 
     @Test
-    public void testConsumingAllEventsWithJsonFormatExcludeSchema() throws Exception {
+    void testConsumingAllEventsWithJsonFormatExcludeSchema() throws Exception {
         testConsumingAllEventsWithJsonFormat(false);
     }
 
     @Test
-    public void testConsumingAllEventsWithJsonFormatWithNumericDecimal() throws Exception {
+    void testConsumingAllEventsWithJsonFormatWithNumericDecimal() throws Exception {
         Map<String, Object> customConverterConfigs = new HashMap<>();
         customConverterConfigs.put(JsonConverterConfig.DECIMAL_FORMAT_CONFIG, "numeric");
         testConsumingAllEventsWithJsonFormat(
@@ -110,9 +109,11 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
         // check the snapshot result
         CloseableIterator<Row> snapshot = result.collect();
         waitForSnapshotStarted(snapshot);
-        assertTrue(
-                dataInJsonIsEquals(
-                        fetchRows(snapshot, 1).get(0).toString(), expectSnapshot.toString()));
+        Assertions.assertThat(
+                        dataInJsonIsEquals(
+                                fetchRows(snapshot, 1).get(0).toString(),
+                                expectSnapshot.toString()))
+                .isTrue();
         try (Connection connection = fullTypesDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
@@ -122,9 +123,10 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
         // check the binlog result
         CloseableIterator<Row> binlog = result.collect();
         JSONObject expectBinlog = expected.getJSONObject("expected_binlog");
-        assertTrue(
-                dataInJsonIsEquals(
-                        fetchRows(binlog, 1).get(0).toString(), expectBinlog.toString()));
+        Assertions.assertThat(
+                        dataInJsonIsEquals(
+                                fetchRows(binlog, 1).get(0).toString(), expectBinlog.toString()))
+                .isTrue();
         result.getJobClient().get().cancel().get();
     }
 

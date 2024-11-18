@@ -17,16 +17,17 @@
 
 package org.apache.flink.cdc.connectors.polardbx;
 
+import org.apache.flink.cdc.connectors.utils.AbstractTestBaseProxy;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.PortBinding;
 import com.github.dockerjava.api.model.Ports;
 import org.apache.commons.lang3.StringUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -55,13 +56,9 @@ import java.util.stream.Stream;
 
 import static java.lang.String.format;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 /** Basic class for testing Database Polardbx which supported the mysql protocol. */
-public abstract class PolardbxSourceTestBase extends AbstractTestBase {
+public abstract class PolardbxSourceTestBase extends AbstractTestBaseProxy {
     private static final Logger LOG = LoggerFactory.getLogger(PolardbxSourceTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     protected static final Integer PORT = 8527;
@@ -84,8 +81,8 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBase {
                                                     Ports.Binding.bindPort(PORT),
                                                     new ExposedPort(PORT))));
 
-    @BeforeClass
-    public static void startContainers() throws InterruptedException {
+    @BeforeAll
+    static void startContainers() throws Exception {
         // no need to start container when the port 8527 is listening
         if (!checkConnection()) {
             LOG.info("Polardbx connection is not valid, so try to start containers...");
@@ -96,8 +93,8 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBase {
         }
     }
 
-    @AfterClass
-    public static void stopContainers() {
+    @AfterAll
+    static void stopContainers() {
         LOG.info("Stopping Polardbx containers...");
         POLARDBX_CONTAINER.stop();
         LOG.info("Polardbx containers are stopped.");
@@ -129,7 +126,7 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBase {
             String databaseName, Function<String, Boolean> filter) throws InterruptedException {
         final String ddlFile = String.format("ddl/%s.sql", databaseName);
         final URL ddlTestFile = PolardbxSourceTestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         // need to sleep 1s, make sure the jdbc connection can be created
         Thread.sleep(1000);
         try (Connection connection = getJdbcConnection();
@@ -209,15 +206,10 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBase {
     }
 
     protected static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     protected static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+        Assertions.assertThat(actual).containsExactlyElementsOf(expected);
     }
 }

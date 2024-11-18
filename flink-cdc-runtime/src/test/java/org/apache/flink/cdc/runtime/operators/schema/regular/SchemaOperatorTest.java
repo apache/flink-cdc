@@ -33,6 +33,7 @@ import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -50,7 +51,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 
 /** Unit tests for the {@link SchemaOperator}. */
-public class SchemaOperatorTest {
+class SchemaOperatorTest {
 
     private static final TableId CUSTOMERS =
             TableId.tableId("my_company", "my_branch", "customers");
