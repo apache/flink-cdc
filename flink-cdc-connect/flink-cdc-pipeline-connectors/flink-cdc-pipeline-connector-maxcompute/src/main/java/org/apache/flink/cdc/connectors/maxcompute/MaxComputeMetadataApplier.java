@@ -22,8 +22,10 @@ import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.connectors.maxcompute.common.UncheckedOdpsException;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
@@ -100,6 +102,12 @@ public class MaxComputeMetadataApplier implements MetadataApplier {
                         maxComputeOptions,
                         addColumnEvent.tableId(),
                         addColumnEvent.getAddedColumns());
+            } else if (schemaChangeEvent instanceof DropTableEvent) {
+                DropTableEvent dropTableEvent = (DropTableEvent) schemaChangeEvent;
+                SchemaEvolutionUtils.dropTable(maxComputeOptions, dropTableEvent.tableId());
+            } else if (schemaChangeEvent instanceof TruncateTableEvent) {
+                TruncateTableEvent truncateTableEvent = (TruncateTableEvent) schemaChangeEvent;
+                SchemaEvolutionUtils.truncateTable(maxComputeOptions, truncateTableEvent.tableId());
             } else {
                 throw new UnsupportedOperationException(
                         "Unsupported schema change event: "

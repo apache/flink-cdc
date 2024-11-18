@@ -29,6 +29,7 @@ import org.apache.flink.util.CollectionUtil;
 import com.aliyun.odps.Instance;
 import com.aliyun.odps.Odps;
 import com.aliyun.odps.OdpsException;
+import com.aliyun.odps.Table;
 import com.aliyun.odps.TableSchema;
 import com.aliyun.odps.Tables;
 import com.aliyun.odps.task.SQLTask;
@@ -234,19 +235,33 @@ public class SchemaEvolutionUtils {
         }
     }
 
+    public static void dropTable(MaxComputeOptions options, TableId tableId) throws OdpsException {
+        Odps odps = MaxComputeUtils.getOdps(options);
+        Table table = MaxComputeUtils.getTable(options, tableId);
+        odps.tables().delete(table.getProject(), table.getSchemaName(), table.getName(), false);
+    }
+
+    public static void truncateTable(MaxComputeOptions options, TableId tableId)
+            throws OdpsException {
+        Table table = MaxComputeUtils.getTable(options, tableId);
+        table.truncate();
+    }
+
     private static String getFullTableName(MaxComputeOptions options, TableId tableId) {
         if (options.isSupportSchema()) {
             if (StringUtils.isNullOrWhitespaceOnly(tableId.getNamespace())) {
-                return options.getProject() + ".default." + tableId.getTableName();
+                return "`" + options.getProject() + "`.`default`.`" + tableId.getTableName() + "`";
             } else {
-                return options.getProject()
-                        + "."
+                return "`"
+                        + options.getProject()
+                        + "`.`"
                         + tableId.getNamespace()
-                        + "."
-                        + tableId.getTableName();
+                        + "`.`"
+                        + tableId.getTableName()
+                        + "`";
             }
         } else {
-            return options.getProject() + "." + tableId.getTableName();
+            return "`" + options.getProject() + "`.`" + tableId.getTableName() + "`";
         }
     }
 

@@ -58,6 +58,7 @@ import org.apache.flink.cdc.connectors.maxcompute.utils.TypeConvertUtils;
 import org.apache.flink.cdc.connectors.maxcompute.writer.MaxComputeWriter;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
+import org.apache.flink.util.Preconditions;
 
 import com.aliyun.odps.data.ArrayRecord;
 import org.slf4j.Logger;
@@ -146,6 +147,9 @@ public class MaxComputeEventWriter implements SinkWriter<Event> {
     @Override
     public void flush(boolean endOfInput) throws IOException, InterruptedException {
         SessionManageOperator operator = SessionManageOperator.instance;
+        Preconditions.checkNotNull(
+                operator,
+                "SessionManageOperator cannot be null, please setting 'pipeline.operator-chaining' to true to avoid this issue.");
         LOG.info("Sink writer {} start to flush.", context.getSubtaskId());
         List<Future<CoordinationResponse>> responces = new ArrayList<>(writerMap.size() + 1);
         writerMap.entrySet().stream()
