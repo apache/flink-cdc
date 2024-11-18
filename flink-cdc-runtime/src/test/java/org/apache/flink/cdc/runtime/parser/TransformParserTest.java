@@ -316,12 +316,13 @@ public class TransformParserTest {
                         Column.physicalColumn("name", DataTypes.STRING(), "string"),
                         Column.physicalColumn("age", DataTypes.INT(), "age"),
                         Column.physicalColumn("address", DataTypes.STRING(), "address"),
+                        Column.physicalColumn("deposit", DataTypes.DECIMAL(10, 2), "deposit"),
                         Column.physicalColumn("weight", DataTypes.DOUBLE(), "weight"),
                         Column.physicalColumn("height", DataTypes.DOUBLE(), "height"));
 
         List<ProjectionColumn> result =
                 TransformParser.generateProjectionColumns(
-                        "id, upper(name) as name, age + 1 as newage, weight / (height * height) as bmi",
+                        "id, upper(name) as name, age + 1 as newage, deposit as deposits, weight / (height * height) as bmi",
                         testColumns,
                         Collections.emptyList());
 
@@ -330,6 +331,7 @@ public class TransformParserTest {
                         "ProjectionColumn{column=`id` INT, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
                         "ProjectionColumn{column=`name` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper(name)', originalColumnNames=[name], transformExpressionKey=null}",
                         "ProjectionColumn{column=`newage` INT, expression='`TB`.`age` + 1', scriptExpression='age + 1', originalColumnNames=[age], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`deposits` DECIMAL(10, 2), expression='TB.deposit', scriptExpression='deposit', originalColumnNames=[deposit], transformExpressionKey=null}",
                         "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='weight / height * height', originalColumnNames=[weight, height, height], transformExpressionKey=null}");
         Assertions.assertThat(result.toString()).isEqualTo("[" + String.join(", ", expected) + "]");
 
@@ -345,6 +347,7 @@ public class TransformParserTest {
                         "ProjectionColumn{column=`name` STRING, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
                         "ProjectionColumn{column=`age` INT, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
                         "ProjectionColumn{column=`address` STRING, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
+                        "ProjectionColumn{column=`deposit` DECIMAL(10, 2), expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
                         "ProjectionColumn{column=`weight` DOUBLE, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
                         "ProjectionColumn{column=`height` DOUBLE, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
                         "ProjectionColumn{column=`__namespace_name__` STRING NOT NULL, expression='__namespace_name__', scriptExpression='__namespace_name__', originalColumnNames=[__namespace_name__], transformExpressionKey=null}",
