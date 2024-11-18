@@ -24,35 +24,35 @@ import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.SourceInfo;
 import io.debezium.connector.postgresql.connection.Lsn;
 import io.debezium.pipeline.spi.OffsetContext;
-import org.junit.Before;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import static io.debezium.connector.postgresql.Utils.lastKnownLsn;
-import static org.junit.Assert.assertEquals;
 
 /** Unit test for {@link PostgresSourceFetchTaskContext}. */
-public class PostgresSourceFetchTaskContextTest {
+class PostgresSourceFetchTaskContextTest {
 
     private PostgresConnectorConfig connectorConfig;
     private OffsetContext.Loader<PostgresOffsetContext> offsetLoader;
 
-    @Before
+    @BeforeEach
     public void beforeEach() {
         this.connectorConfig = new PostgresConnectorConfig(TestHelper.defaultConfig().build());
         this.offsetLoader = new PostgresOffsetContext.Loader(this.connectorConfig);
     }
 
     @Test
-    public void shouldNotResetLsnWhenLastCommitLsnIsNull() {
+    void shouldNotResetLsnWhenLastCommitLsnIsNull() {
         final Map<String, Object> offsetValues = new HashMap<>();
         offsetValues.put(SourceInfo.LSN_KEY, 12345L);
         offsetValues.put(SourceInfo.TIMESTAMP_USEC_KEY, 67890L);
         offsetValues.put(PostgresOffsetContext.LAST_COMMIT_LSN_KEY, null);
 
         final PostgresOffsetContext offsetContext = offsetLoader.load(offsetValues);
-        assertEquals(lastKnownLsn(offsetContext), Lsn.valueOf(12345L));
+        Assertions.assertThat(lastKnownLsn(offsetContext)).isEqualTo(Lsn.valueOf(12345L));
     }
 }

@@ -27,7 +27,7 @@ import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 import java.util.Collections;
 
 /** A test for the {@link CreateTableEventSerializer}. */
-public class CreateTableEventSerializerTest extends SerializerTestBase<CreateTableEvent> {
+class CreateTableEventSerializerTest extends SerializerTestBase<CreateTableEvent> {
     @Override
     protected TypeSerializer<CreateTableEvent> createSerializer() {
         return CreateTableEventSerializer.INSTANCE;
