@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.catalog;
 
+import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.connectors.oceanbase.sink.OceanBaseUtils;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 
@@ -35,6 +37,8 @@ import java.util.stream.Collectors;
 public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
 
     private static final String RENAME_DDL = "ALTER TABLE `%s`.`%s` RENAME COLUMN `%s` TO `%s`";
+    private static final String ALTER_COLUMN_TYPE_DDL =
+            "ALTER TABLE `%s`.`%s` MODIFY COLUMN `%s` %s;";
 
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseMySQLCatalog.class);
 
@@ -97,6 +101,29 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                             "Failed to create database %s, ignoreIfExists: %s",
                             databaseName, ignoreIfExists),
                     e);
+        }
+    }
+
+    @Override
+    public boolean tableExists(String databaseName, String tableName)
+            throws OceanBaseCatalogException {
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(databaseName),
+                "database name cannot be null or empty.");
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(tableName),
+                "table name cannot be null or empty.");
+        String querySql =
+                String.format(
+                        "SELECT `TABLE_NAME` FROM `INFORMATION_SCHEMA`.`TABLES` WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s';",
+                        databaseName, tableName);
+        try {
+            List<String> dbList = executeSingleColumnStatement(querySql);
+            return !dbList.isEmpty();
+        } catch (Exception e) {
+            LOG.error("Failed to check table exist, table: {}, sql: {}", tableName, querySql, e);
+            throw new OceanBaseCatalogException(
+                    String.format("Failed to check table exist, table: %s", tableName), e);
         }
     }
 
@@ -167,6 +194,88 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
     }
 
     @Override
+    public void alterDropColumns(String databaseName, String tableName, List<String> dropColumns) {
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(databaseName),
+                "database name cannot be null or empty.");
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(tableName),
+                "table name cannot be null or empty.");
+        Preconditions.checkArgument(!dropColumns.isEmpty(), "Drop columns should not be empty.");
+
+        String alterSql = buildAlterDropColumnsSql(databaseName, tableName, dropColumns);
+        try {
+            long startTimeMillis = System.currentTimeMillis();
+            executeUpdateStatement(alterSql);
+            LOG.info(
+                    "Success to drop columns from {}.{}, duration: {}ms, sql: {}",
+                    databaseName,
+                    tableName,
+                    System.currentTimeMillis() - startTimeMillis,
+                    alterSql);
+        } catch (Exception e) {
+            LOG.error(
+                    "Failed to drop columns from {}.{}, sql: {}",
+                    databaseName,
+                    tableName,
+                    alterSql);
+            throw new OceanBaseCatalogException(
+                    String.format("Failed to drop columns from %s.%s ", databaseName, tableName),
+                    e);
+        }
+    }
+
+    @Override
+    public void alterColumnType(
+            String databaseName, String tableName, String columnName, DataType dataType) {
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(databaseName),
+                "database name cannot be null or empty.");
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(tableName),
+                "table name cannot be null or empty.");
+
+        OceanBaseUtils.CdcDataTypeTransformer cdcDataTypeTransformer =
+                new OceanBaseUtils.CdcDataTypeTransformer(false, new OceanBaseColumn.Builder());
+        OceanBaseColumn oceanBaseColumn =
+                dataType.accept(cdcDataTypeTransformer).setColumnName(columnName).build();
+        String alterTypeSql =
+                String.format(
+                        ALTER_COLUMN_TYPE_DDL,
+                        databaseName,
+                        tableName,
+                        columnName,
+                        oceanBaseColumn.getDataType());
+
+        try {
+            long startTimeMillis = System.currentTimeMillis();
+            executeUpdateStatement(alterTypeSql);
+            LOG.info(
+                    "Success to alter table {}.{} column {} to type {}, duration: {}ms, sql: {}",
+                    databaseName,
+                    tableName,
+                    columnName,
+                    oceanBaseColumn.getDataType(),
+                    System.currentTimeMillis() - startTimeMillis,
+                    alterTypeSql);
+        } catch (Exception e) {
+            LOG.error(
+                    "Failed to alter table {}.{} column {} to type {}, sql: {}",
+                    databaseName,
+                    tableName,
+                    columnName,
+                    oceanBaseColumn.getDataType(),
+                    alterTypeSql,
+                    e);
+            throw new OceanBaseCatalogException(
+                    String.format(
+                            "Failed to alter table %s.%s column %s to type %s ",
+                            databaseName, tableName, columnName, oceanBaseColumn.getDataType()),
+                    e);
+        }
+    }
+
+    @Override
     public void renameColumn(
             String schemaName, String tableName, String oldColumnName, String newColumnName) {
         String renameColumnSql =
@@ -194,6 +303,69 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                             "Failed to rename %s column from %s to %s ",
                             String.format("%s.%s", schemaName, tableName), schemaName, tableName),
                     e);
+        }
+    }
+
+    @Override
+    public void dropTable(String databaseName, String tableName) {
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(databaseName),
+                "database name cannot be null or empty.");
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(tableName),
+                "table name cannot be null or empty.");
+
+        String dropTableDDL =
+                String.format("DROP TABLE IF EXISTS `%s`.`%s`", databaseName, tableName);
+        try {
+            long startTimeMillis = System.currentTimeMillis();
+            executeUpdateStatement(dropTableDDL);
+            LOG.info(
+                    "Success to drop table {}.{}, duration: {}ms, sql: {}",
+                    databaseName,
+                    tableName,
+                    System.currentTimeMillis() - startTimeMillis,
+                    dropTableDDL);
+        } catch (Exception e) {
+            LOG.error(
+                    "Failed to drop table {}.{}, sql: {}",
+                    databaseName,
+                    tableName,
+                    dropTableDDL,
+                    e);
+            throw new OceanBaseCatalogException(
+                    String.format("Failed to drop table %s.%s ", databaseName, tableName), e);
+        }
+    }
+
+    @Override
+    public void truncateTable(String databaseName, String tableName) {
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(databaseName),
+                "database name cannot be null or empty.");
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(tableName),
+                "table name cannot be null or empty.");
+
+        String dropTableDDL = String.format("TRUNCATE TABLE `%s`.`%s`", databaseName, tableName);
+        try {
+            long startTimeMillis = System.currentTimeMillis();
+            executeUpdateStatement(dropTableDDL);
+            LOG.info(
+                    "Success to truncate table {}.{}, duration: {}ms, sql: {}",
+                    databaseName,
+                    tableName,
+                    System.currentTimeMillis() - startTimeMillis,
+                    dropTableDDL);
+        } catch (Exception e) {
+            LOG.error(
+                    "Failed to truncate table {}.{}, sql: {}",
+                    databaseName,
+                    tableName,
+                    dropTableDDL,
+                    e);
+            throw new OceanBaseCatalogException(
+                    String.format("Failed to truncate table %s.%s ", databaseName, tableName), e);
         }
     }
 
@@ -246,6 +418,19 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         return builder.toString();
     }
 
+    private String buildAlterDropColumnsSql(
+            String databaseName, String tableName, List<String> dropColumns) {
+        StringBuilder builder = new StringBuilder();
+        builder.append(String.format("ALTER TABLE `%s`.`%s` ", databaseName, tableName));
+        String columnsStmt =
+                dropColumns.stream()
+                        .map(col -> String.format("DROP COLUMN `%s`", col))
+                        .collect(Collectors.joining(", "));
+        builder.append(columnsStmt);
+        builder.append(";");
+        return builder.toString();
+    }
+
     protected String buildColumnStmt(OceanBaseColumn column) {
         StringBuilder builder = new StringBuilder();
         builder.append("`");
@@ -253,7 +438,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         builder.append("` ");
         builder.append(
                 getFullColumnType(
-                        column.getDataType(), column.getColumnSize(), column.getDecimalDigits()));
+                        column.getDataType(), column.getColumnSize(), column.getNumericScale()));
         builder.append(" ");
         builder.append(column.isNullable() ? "NULL" : "NOT NULL");
         if (column.getDefaultValue().isPresent()) {

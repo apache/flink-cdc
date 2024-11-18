@@ -46,17 +46,16 @@ public class OceanBaseColumn implements Serializable {
     @Nullable private final String defaultValue;
 
     /**
-     * The column size. COLUMN_SIZE in information_schema.COLUMNS. For numeric data, this is the
-     * maximum precision. For character data, this is the length in characters. For other data
-     * types, this is null.
+     * The column size. For numeric data, this is the maximum precision. For character data, this is
+     * the length in characters. For other data types, this is null.
      */
     @Nullable private final Integer columnSize;
 
     /**
      * The number of fractional digits for numeric data. This is null for other data types.
-     * DECIMAL_DIGITS in information_schema.COLUMNS.
+     * NUMBER_SCALE in information_schema.COLUMNS.
      */
-    @Nullable private final Integer decimalDigits;
+    @Nullable private final Integer numericScale;
 
     /** The column comment. COLUMN_COMMENT in information_schema.COLUMNS. */
     @Nullable private final String columnComment;
@@ -68,7 +67,7 @@ public class OceanBaseColumn implements Serializable {
             boolean isNullable,
             @Nullable String defaultValue,
             @Nullable Integer columnSize,
-            @Nullable Integer decimalDigits,
+            @Nullable Integer numericScale,
             @Nullable String columnComment) {
         this.columnName = checkNotNull(columnName);
         this.ordinalPosition = ordinalPosition;
@@ -76,7 +75,7 @@ public class OceanBaseColumn implements Serializable {
         this.isNullable = isNullable;
         this.defaultValue = defaultValue;
         this.columnSize = columnSize;
-        this.decimalDigits = decimalDigits;
+        this.numericScale = numericScale;
         this.columnComment = columnComment;
     }
 
@@ -104,8 +103,8 @@ public class OceanBaseColumn implements Serializable {
         return Optional.ofNullable(columnSize);
     }
 
-    public Optional<Integer> getDecimalDigits() {
-        return Optional.ofNullable(decimalDigits);
+    public Optional<Integer> getNumericScale() {
+        return Optional.ofNullable(numericScale);
     }
 
     public Optional<String> getColumnComment() {
@@ -130,8 +129,8 @@ public class OceanBaseColumn implements Serializable {
                 + '\''
                 + ", columnSize="
                 + columnSize
-                + ", decimalDigits="
-                + decimalDigits
+                + ", numericScale="
+                + numericScale
                 + ", columnComment='"
                 + columnComment
                 + '\''
@@ -153,7 +152,7 @@ public class OceanBaseColumn implements Serializable {
                 && dataType.equalsIgnoreCase(column.dataType)
                 && Objects.equals(defaultValue, column.defaultValue)
                 && Objects.equals(columnSize, column.columnSize)
-                && Objects.equals(decimalDigits, column.decimalDigits)
+                && Objects.equals(numericScale, column.numericScale)
                 && Objects.equals(columnComment, column.columnComment);
     }
 
@@ -166,7 +165,7 @@ public class OceanBaseColumn implements Serializable {
         private boolean isNullable = true;
         private String defaultValue;
         private Integer columnSize;
-        private Integer decimalDigits;
+        private Integer numericScale;
         private String columnComment;
 
         public OceanBaseColumn.Builder setColumnName(String columnName) {
@@ -199,8 +198,8 @@ public class OceanBaseColumn implements Serializable {
             return this;
         }
 
-        public OceanBaseColumn.Builder setDecimalDigits(Integer decimalDigits) {
-            this.decimalDigits = decimalDigits;
+        public OceanBaseColumn.Builder setNumericScale(Integer numericScale) {
+            this.numericScale = numericScale;
             return this;
         }
 
@@ -217,7 +216,7 @@ public class OceanBaseColumn implements Serializable {
                     isNullable,
                     defaultValue,
                     columnSize,
-                    decimalDigits,
+                    numericScale,
                     columnComment);
         }
     }

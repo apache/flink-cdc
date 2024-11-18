@@ -79,14 +79,6 @@ public class OceanBaseDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(OceanBaseDataSinkOptions.MEMSTORE_THRESHOLD);
         optionalOptions.add(OceanBaseDataSinkOptions.MEMSTORE_CHECK_INTERVAL);
         optionalOptions.add(OceanBaseDataSinkOptions.PARTITION_ENABLED);
-        optionalOptions.add(OceanBaseDataSinkOptions.DIRECT_LOAD_ENABLED);
-        optionalOptions.add(OceanBaseDataSinkOptions.DIRECT_LOAD_HOST);
-        optionalOptions.add(OceanBaseDataSinkOptions.DIRECT_LOAD_PORT);
-        optionalOptions.add(OceanBaseDataSinkOptions.DIRECT_LOAD_PARALLEL);
-        optionalOptions.add(OceanBaseDataSinkOptions.DIRECT_LOAD_MAX_ERROR_ROWS);
-        optionalOptions.add(OceanBaseDataSinkOptions.DIRECT_LOAD_DUP_ACTION);
-        optionalOptions.add(OceanBaseDataSinkOptions.DIRECT_LOAD_TIMEOUT);
-        optionalOptions.add(OceanBaseDataSinkOptions.DIRECT_LOAD_HEARTBEAT_TIMEOUT);
         optionalOptions.add(OceanBaseDataSinkOptions.SYNC_WRITE);
         optionalOptions.add(OceanBaseDataSinkOptions.BUFFER_FLUSH_INTERVAL);
         optionalOptions.add(OceanBaseDataSinkOptions.BUFFER_SIZE);

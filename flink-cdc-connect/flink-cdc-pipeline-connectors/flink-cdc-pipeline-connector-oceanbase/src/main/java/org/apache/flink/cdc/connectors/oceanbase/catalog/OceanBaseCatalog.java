@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.catalog;
 
+import org.apache.flink.cdc.common.types.DataType;
+
 import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
 import com.oceanbase.connector.flink.connection.OceanBaseConnectionProvider;
 import org.apache.commons.compress.utils.Lists;
@@ -37,7 +39,7 @@ public abstract class OceanBaseCatalog implements Serializable {
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseCatalog.class);
 
-    private OceanBaseConnectionProvider connectionProvider;
+    protected OceanBaseConnectionProvider connectionProvider;
     private final OceanBaseConnectorOptions connectorOptions;
 
     public OceanBaseCatalog(OceanBaseConnectorOptions connectorOptions) {
@@ -76,14 +78,27 @@ public abstract class OceanBaseCatalog implements Serializable {
     public abstract void createDatabase(String databaseName, boolean ignoreIfExists)
             throws OceanBaseCatalogException;
 
+    public abstract boolean tableExists(String databaseName, String tableName)
+            throws OceanBaseCatalogException;
+
     public abstract void createTable(OceanBaseTable table, boolean ignoreIfExists)
             throws OceanBaseCatalogException;
 
     public abstract void alterAddColumns(
             String databaseName, String tableName, List<OceanBaseColumn> addColumns);
 
+    public abstract void alterDropColumns(
+            String schemaName, String tableName, List<String> dropColumns);
+
+    public abstract void alterColumnType(
+            String schemaName, String tableName, String columnName, DataType dataType);
+
     public abstract void renameColumn(
             String schemaName, String tableName, String oldColumnName, String newColumnName);
+
+    public abstract void dropTable(String schemaName, String tableName);
+
+    public abstract void truncateTable(String schemaName, String tableName);
 
     public void close() {
         LOG.info("Close OceanBase catalog");

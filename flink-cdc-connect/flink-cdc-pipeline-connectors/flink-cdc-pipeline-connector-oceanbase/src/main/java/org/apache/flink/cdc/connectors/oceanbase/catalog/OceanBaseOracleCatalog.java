@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.catalog;
 
+import org.apache.flink.cdc.common.types.DataType;
+
 import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +51,13 @@ public class OceanBaseOracleCatalog extends OceanBaseCatalog {
     }
 
     @Override
+    public boolean tableExists(String databaseName, String tableName)
+            throws OceanBaseCatalogException {
+        throw new OceanBaseCatalogException(
+                "This operation under oracle tenant is not supported currently.");
+    }
+
+    @Override
     public void createTable(OceanBaseTable table, boolean ignoreIfExists)
             throws OceanBaseCatalogException {
         throw new OceanBaseCatalogException(
@@ -63,8 +72,33 @@ public class OceanBaseOracleCatalog extends OceanBaseCatalog {
     }
 
     @Override
+    public void alterDropColumns(String schemaName, String tableName, List<String> dropColumns) {
+        throw new OceanBaseCatalogException(
+                "This operation under oracle tenant is not supported currently.");
+    }
+
+    @Override
+    public void alterColumnType(
+            String schemaName, String tableName, String columnName, DataType dataType) {
+        throw new OceanBaseCatalogException(
+                "This operation under oracle tenant is not supported currently.");
+    }
+
+    @Override
     public void renameColumn(
             String schemaName, String tableName, String oldColumnName, String newColumnName) {
+        throw new OceanBaseCatalogException(
+                "This operation under oracle tenant is not supported currently.");
+    }
+
+    @Override
+    public void dropTable(String schemaName, String tableName) {
+        throw new OceanBaseCatalogException(
+                "This operation under oracle tenant is not supported currently.");
+    }
+
+    @Override
+    public void truncateTable(String schemaName, String tableName) {
         throw new OceanBaseCatalogException(
                 "This operation under oracle tenant is not supported currently.");
     }

@@ -21,12 +21,17 @@ import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalog;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogException;
@@ -60,22 +65,36 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
 
     @Override
     public void applySchemaChange(SchemaChangeEvent event) {
-        try {
-            if (event instanceof CreateTableEvent) {
-                applyCreateTableEvent((CreateTableEvent) event);
-            } else if (event instanceof AddColumnEvent) {
-                applyAddColumnEvent((AddColumnEvent) event);
-            } else if (event instanceof DropColumnEvent) {
-                applyDropColumnEvent((DropColumnEvent) event);
-            } else if (event instanceof RenameColumnEvent) {
-                applyRenameColumnEvent((RenameColumnEvent) event);
-            } else if (event instanceof AlterColumnTypeEvent) {
-                throw new RuntimeException("Unsupported schema change event, " + event);
-            }
-        } catch (Exception ex) {
-            throw new RuntimeException(
-                    "Failed to schema change, " + event + ", reason: " + ex.getMessage());
-        }
+        SchemaChangeEventVisitor.<Void, SchemaEvolveException>visit(
+                event,
+                addColumnEvent -> {
+                    applyAddColumnEvent(addColumnEvent);
+                    return null;
+                },
+                alterColumnTypeEvent -> {
+                    applyAlterColumnTypeEvent(alterColumnTypeEvent);
+                    return null;
+                },
+                createTableEvent -> {
+                    applyCreateTableEvent(createTableEvent);
+                    return null;
+                },
+                dropColumnEvent -> {
+                    applyDropColumnEvent(dropColumnEvent);
+                    return null;
+                },
+                dropTableEvent -> {
+                    applyDropTableEvent(dropTableEvent);
+                    return null;
+                },
+                renameColumnEvent -> {
+                    applyRenameColumnEvent(renameColumnEvent);
+                    return null;
+                },
+                truncateTableEvent -> {
+                    applyTruncateTableEvent(truncateTableEvent);
+                    return null;
+                });
     }
 
     private void applyCreateTableEvent(CreateTableEvent createTableEvent)
@@ -123,9 +142,24 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
     }
 
     private void applyDropColumnEvent(DropColumnEvent dropColumnEvent) {
-        // TODO The `DropColumnEvent` in OceanBase is classified as an offline DDL operation,
-        //  and currently, this pipeline connector does not support offline DDL actions.
-        throw new UnsupportedOperationException("Drop column is not supported currently");
+        List<String> dropColumns = dropColumnEvent.getDroppedColumnNames();
+        catalog.alterDropColumns(
+                dropColumnEvent.tableId().getSchemaName(),
+                dropColumnEvent.tableId().getTableName(),
+                dropColumns);
+    }
+
+    private void applyAlterColumnTypeEvent(AlterColumnTypeEvent alterColumnTypeEvent) {
+        TableId tableId = alterColumnTypeEvent.tableId();
+        Map<String, DataType> typeMapping = alterColumnTypeEvent.getTypeMapping();
+
+        for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
+            catalog.alterColumnType(
+                    tableId.getSchemaName(),
+                    tableId.getTableName(),
+                    entry.getKey(),
+                    entry.getValue());
+        }
     }
 
     private void applyRenameColumnEvent(RenameColumnEvent renameColumnEvent) {
@@ -137,6 +171,25 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
                     tableId.getTableName(),
                     entry.getKey(),
                     entry.getValue());
+        }
+    }
+
+    private void applyDropTableEvent(DropTableEvent dropTableEvent) {
+        TableId tableId = dropTableEvent.tableId();
+        catalog.dropTable(tableId.getSchemaName(), tableId.getTableName());
+    }
+
+    private void applyTruncateTableEvent(TruncateTableEvent truncateTableEvent) {
+        TableId tableId = truncateTableEvent.tableId();
+
+        // check table exists
+        if (catalog.tableExists(tableId.getSchemaName(), tableId.getTableName())) {
+            catalog.truncateTable(tableId.getSchemaName(), tableId.getTableName());
+        } else {
+            throw new OceanBaseCatalogException(
+                    String.format(
+                            "Failed to truncate table %s.%s, because the table not exist",
+                            tableId.getSchemaName(), tableId.getTableName()));
         }
     }
 }

@@ -35,8 +35,10 @@ import org.apache.flink.cdc.common.types.SmallIntType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.TinyIntType;
 import org.apache.flink.cdc.common.types.VarCharType;
+import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogException;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseColumn;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseTable;
+import org.apache.flink.cdc.connectors.oceanbase.utils.ListUtils;
 
 import org.apache.commons.collections.CollectionUtils;
 
@@ -51,15 +53,26 @@ public class OceanBaseUtils {
 
         List<Column> columns = schema.getColumns();
         List<String> primaryKeys = schema.primaryKeys();
+        List<String> partitionKeys = schema.partitionKeys();
         List<OceanBaseColumn> oceanBaseColumns = new ArrayList<>();
         for (int i = 0; i < columns.size(); i++) {
             Column column = columns.get(i);
+            // Since OceanBase partition tables are not yet supported, we first use
+            // partitionKeys as part of primaryKeys.
+            boolean isPrimaryKeys =
+                    primaryKeys.contains(column.getName())
+                            || partitionKeys.contains(column.getName());
+            // All parts of a PRIMARY KEY must be NOT NULL. if you need NULL in a key, use UNIQUE
+            // instead.
+            checkPrimaryKeyNotNull(isPrimaryKeys, column.getType().isNullable());
+
             OceanBaseColumn.Builder builder =
                     new OceanBaseColumn.Builder()
                             .setColumnName(column.getName())
                             .setOrdinalPosition(i)
+                            .setDefaultValue(column.getDefaultValueExpression())
                             .setColumnComment(column.getComment());
-            toOceanBaseDataType(column, primaryKeys.contains(column.getName()), builder);
+            toOceanBaseDataType(column, isPrimaryKeys, builder);
             oceanBaseColumns.add(builder.build());
         }
 
@@ -68,11 +81,13 @@ public class OceanBaseUtils {
                         .setDatabaseName(tableId.getSchemaName())
                         .setTableName(tableId.getTableName())
                         .setTableType(
-                                CollectionUtils.isNotEmpty(schema.primaryKeys())
+                                CollectionUtils.isNotEmpty(primaryKeys)
                                         ? OceanBaseTable.TableType.PRIMARY_KEY
                                         : OceanBaseTable.TableType.DUPLICATE_KEY)
                         .setColumns(oceanBaseColumns)
-                        .setTableKeys(schema.primaryKeys())
+                        // Since OceanBase partition tables are not yet supported, we first use
+                        // partitionKeys as part of primaryKeys.
+                        .setTableKeys(ListUtils.union(primaryKeys, partitionKeys))
                         .setPartitionKeys(schema.partitionKeys())
                         .setComment(schema.comment());
         return tableBuilder.build();
@@ -179,7 +194,7 @@ public class OceanBaseUtils {
         public OceanBaseColumn.Builder visit(DecimalType decimalType) {
             builder.setDataType(DECIMAL);
             builder.setColumnSize(decimalType.getPrecision());
-            builder.setDecimalDigits(decimalType.getScale());
+            builder.setNumericScale(decimalType.getScale());
             builder.setNullable(decimalType.isNullable());
             return builder;
         }
@@ -209,6 +224,8 @@ public class OceanBaseUtils {
             // case for string type to avoid row size too large
             if (varCharType.getLength() == VarCharType.MAX_LENGTH) {
                 builder.setDataType(TEXT);
+                // A text column can't have a default value in OceanBase.
+                builder.setDefaultValue(null);
             }
             return builder;
         }
@@ -239,6 +256,14 @@ public class OceanBaseUtils {
         @Override
         protected OceanBaseColumn.Builder defaultMethod(DataType dataType) {
             throw new UnsupportedOperationException("Unsupported CDC data type " + dataType);
+        }
+    }
+
+    private static void checkPrimaryKeyNotNull(boolean isPrimaryKeys, boolean dataTypeNullable) {
+        if (isPrimaryKeys && dataTypeNullable) {
+            throw new OceanBaseCatalogException(
+                    "All parts of a PRIMARY KEY must be NOT NULL in OceanBase. "
+                            + "if you need NULL in a key, use UNIQUE instead.");
         }
     }
 }
