@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Testcases for {@link UserDefinedFunctionDescriptor}. */
-public class UserDefinedFunctionDescriptorTest {
+class UserDefinedFunctionDescriptorTest {
 
     /** This is a plain Flink CDC UDF. */
     public static class CdcUdf implements UserDefinedFunction {}

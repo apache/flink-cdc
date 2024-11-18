@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 
 import org.apache.flink.shaded.curator5.com.google.common.io.Resources;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -31,9 +32,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Unit test for {@link org.apache.flink.cdc.cli.utils.ConfigurationUtils}. */
 class ConfigurationUtilsTest {
@@ -81,8 +79,9 @@ class ConfigurationUtilsTest {
         for (Map.Entry<ConfigOption<?>, Object> entry : CONFIG_OPTIONS.entrySet()) {
             String key = entry.getKey().key();
             Object expectedValue = entry.getValue();
-            assertTrue(configMap.containsKey(key));
-            assertEquals(expectedValue, configMap.get(key));
+            Assertions.assertThat(configMap)
+                    .containsKey(key)
+                    .containsEntry(key, (String) expectedValue);
         }
     }
 }

@@ -62,9 +62,7 @@ class SchemaManagerTest {
     void testHandlingCreateTableEvent() {
         SchemaManager schemaManager = new SchemaManager();
         schemaManager.applyEvolvedSchemaChange(new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA));
-        assertThat(schemaManager.getLatestEvolvedSchema(CUSTOMERS))
-                .isPresent()
-                .contains(CUSTOMERS_SCHEMA);
+        assertThat(schemaManager.getLatestEvolvedSchema(CUSTOMERS)).contains(CUSTOMERS_SCHEMA);
 
         assertThatCode(
                         () ->
