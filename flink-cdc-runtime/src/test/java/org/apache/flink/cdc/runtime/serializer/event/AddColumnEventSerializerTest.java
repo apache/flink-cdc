@@ -27,7 +27,7 @@ import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 import java.util.Arrays;
 
 /** A test for the {@link AddColumnEventSerializer}. */
-public class AddColumnEventSerializerTest extends SerializerTestBase<AddColumnEvent> {
+class AddColumnEventSerializerTest extends SerializerTestBase<AddColumnEvent> {
     @Override
     protected TypeSerializer<AddColumnEvent> createSerializer() {
         return AddColumnEventSerializer.INSTANCE;

@@ -42,7 +42,7 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import com.oceanbase.connector.flink.table.Record;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -53,17 +53,16 @@ import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Objects;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link OceanBaseEventSerializationSchema}. */
-public class OceanBaseEventSerializationSchemaTest {
+class OceanBaseEventSerializationSchemaTest {
 
     private static final OceanBaseEventSerializationSchema serializer =
             new OceanBaseEventSerializationSchema(ZoneId.of("+08"));
 
     @Test
-    public void testMixedSchemaAndDataChanges() throws Exception {
+    void testMixedSchemaAndDataChanges() throws Exception {
         // 1. create table1, and insert/delete/update data
         TableId table1 = TableId.parse("test.tbl1");
         Schema schema1 =
@@ -74,7 +73,7 @@ public class OceanBaseEventSerializationSchemaTest {
                         .primaryKey("col1")
                         .build();
         CreateTableEvent createTableEvent1 = new CreateTableEvent(table1, schema1);
-        assertNull(serializer.serialize(createTableEvent1));
+        assertThat(serializer.serialize(createTableEvent1)).isNull();
 
         BinaryRecordDataGenerator generator1 =
                 new BinaryRecordDataGenerator(
@@ -135,7 +134,7 @@ public class OceanBaseEventSerializationSchemaTest {
                         .primaryKey("col1")
                         .build();
         CreateTableEvent createTableEvent2 = new CreateTableEvent(table2, schema2);
-        assertNull(serializer.serialize(createTableEvent2));
+        assertThat(serializer.serialize(createTableEvent2)).isNull();
 
         BinaryRecordDataGenerator generator2 =
                 new BinaryRecordDataGenerator(
@@ -168,7 +167,7 @@ public class OceanBaseEventSerializationSchemaTest {
         BinaryRecordDataGenerator newGenerator1 =
                 new BinaryRecordDataGenerator(
                         newSchema1.getColumnDataTypes().toArray(new DataType[0]));
-        assertNull(serializer.serialize(addColumnEvent));
+        assertThat(serializer.serialize(addColumnEvent)).isNull();
 
         DataChangeEvent deleteEvent2 =
                 DataChangeEvent.deleteEvent(
@@ -197,7 +196,7 @@ public class OceanBaseEventSerializationSchemaTest {
         BinaryRecordDataGenerator newGenerator2 =
                 new BinaryRecordDataGenerator(
                         newSchema2.getColumnDataTypes().toArray(new DataType[0]));
-        assertNull(serializer.serialize(dropColumnEvent));
+        assertThat(serializer.serialize(dropColumnEvent)).isNull();
 
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
@@ -210,10 +209,10 @@ public class OceanBaseEventSerializationSchemaTest {
 
     private void verifySerializeResult(TableId expectTable, String expectRow, Record record)
             throws Exception {
-        assertEquals(expectTable.getSchemaName(), record.getTableId().getSchemaName());
-        assertEquals(expectTable.getTableName(), record.getTableId().getTableName());
+        assertThat(record.getTableId().getSchemaName()).isEqualTo(expectTable.getSchemaName());
+        assertThat(record.getTableId().getTableName()).isEqualTo(expectTable.getTableName());
         int start = record.toString().indexOf('[');
         int end = record.toString().indexOf(']');
-        assertEquals(expectRow, record.toString().substring(start, end + 1));
+        assertThat(record.toString().substring(start, end + 1)).isEqualTo(expectRow);
     }
 }

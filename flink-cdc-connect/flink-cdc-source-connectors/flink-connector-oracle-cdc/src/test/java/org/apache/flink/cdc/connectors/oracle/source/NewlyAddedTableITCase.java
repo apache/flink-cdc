@@ -30,14 +30,14 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -60,13 +60,15 @@ import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.w
 import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.waitForUpsertSinkSize;
 
 /** IT tests to cover various newly added tables during capture process. */
-public class NewlyAddedTableITCase extends OracleSourceTestBase {
-    @Rule public final Timeout timeoutPerTest = Timeout.seconds(600);
+@Timeout(value = 600, unit = TimeUnit.SECONDS)
+class NewlyAddedTableITCase extends OracleSourceTestBase {
 
     private final ScheduledExecutorService mockRedoLogExecutor =
             Executors.newScheduledThreadPool(1);
 
-    @BeforeClass
+    @TempDir private static Path tempFolder;
+
+    @BeforeAll
     public static void beforeClass() throws SQLException {
         try (Connection dbaConnection = getJdbcConnectionAsDBA();
                 Statement dbaStatement = dbaConnection.createStatement()) {
@@ -74,7 +76,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
         }
     }
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         TestValuesTableFactory.clearAllData();
         createAndInitialize("customer.sql");
@@ -106,7 +108,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
         }
     }
 
-    @After
+    @AfterEach
     public void after() throws Exception {
         mockRedoLogExecutor.shutdown();
         // sleep 1000ms to wait until connections are closed.
@@ -114,7 +116,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineOnce() throws Exception {
+    void testNewlyAddedTableForExistsPipelineOnce() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.NONE,
@@ -125,7 +127,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineOnceWithAheadRedoLog() throws Exception {
+    void testNewlyAddedTableForExistsPipelineOnceWithAheadRedoLog() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.NONE,
@@ -136,7 +138,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineTwice() throws Exception {
+    void testNewlyAddedTableForExistsPipelineTwice() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
@@ -148,7 +150,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineTwiceWithAheadRedoLog() throws Exception {
+    void testNewlyAddedTableForExistsPipelineTwiceWithAheadRedoLog() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
@@ -160,7 +162,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineTwiceWithAheadRedoLogAndAutoCloseReader()
+    void testNewlyAddedTableForExistsPipelineTwiceWithAheadRedoLogAndAutoCloseReader()
             throws Exception {
         Map<String, String> otherOptions = new HashMap<>();
         otherOptions.put("scan.incremental.close-idle-reader.enabled", "true");
@@ -176,7 +178,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineThrice() throws Exception {
+    void testNewlyAddedTableForExistsPipelineThrice() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
@@ -189,7 +191,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineThriceWithAheadRedoLog() throws Exception {
+    void testNewlyAddedTableForExistsPipelineThriceWithAheadRedoLog() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
@@ -202,7 +204,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineSingleParallelism() throws Exception {
+    void testNewlyAddedTableForExistsPipelineSingleParallelism() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.NONE,
@@ -213,8 +215,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineSingleParallelismWithAheadRedoLog()
-            throws Exception {
+    void testNewlyAddedTableForExistsPipelineSingleParallelismWithAheadRedoLog() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.NONE,
@@ -225,7 +226,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverForNewlyAddedTable() throws Exception {
+    void testJobManagerFailoverForNewlyAddedTable() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.JM,
@@ -236,7 +237,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverForNewlyAddedTableWithAheadRedoLog() throws Exception {
+    void testJobManagerFailoverForNewlyAddedTableWithAheadRedoLog() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.JM,
@@ -247,7 +248,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverForNewlyAddedTable() throws Exception {
+    void testTaskManagerFailoverForNewlyAddedTable() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.TM,
@@ -258,7 +259,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverForNewlyAddedTableWithAheadRedoLog() throws Exception {
+    void testTaskManagerFailoverForNewlyAddedTableWithAheadRedoLog() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.TM,
@@ -269,7 +270,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverForRemoveTableSingleParallelism() throws Exception {
+    void testJobManagerFailoverForRemoveTableSingleParallelism() throws Exception {
         testRemoveTablesOneByOne(
                 1,
                 FailoverType.JM,
@@ -280,7 +281,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverForRemoveTable() throws Exception {
+    void testJobManagerFailoverForRemoveTable() throws Exception {
         testRemoveTablesOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.JM,
@@ -291,7 +292,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverForRemoveTableSingleParallelism() throws Exception {
+    void testTaskManagerFailoverForRemoveTableSingleParallelism() throws Exception {
         testRemoveTablesOneByOne(
                 1,
                 FailoverType.TM,
@@ -302,7 +303,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverForRemoveTable() throws Exception {
+    void testTaskManagerFailoverForRemoveTable() throws Exception {
         testRemoveTablesOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.TM,
@@ -313,7 +314,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testRemoveTableSingleParallelism() throws Exception {
+    void testRemoveTableSingleParallelism() throws Exception {
         testRemoveTablesOneByOne(
                 1,
                 FailoverType.NONE,
@@ -324,7 +325,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testRemoveTable() throws Exception {
+    void testRemoveTable() throws Exception {
         testRemoveTablesOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
@@ -335,7 +336,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testRemoveAndAddTablesOneByOne() throws Exception {
+    void testRemoveAndAddTablesOneByOne() throws Exception {
         testRemoveAndAddTablesOneByOne(
                 1, "ADDRESS_HANGZHOU", "ADDRESS_BEIJING", "ADDRESS_SHANGHAI");
     }
@@ -347,9 +348,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
         // step 1: create tables with all tables included
         initialAddressTables(connection, captureAddressTables);
 
-        final TemporaryFolder temporaryFolder = new TemporaryFolder();
-        temporaryFolder.create();
-        final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
+        final String savepointDirectory = tempFolder.toString();
 
         // get all expected data
         List<String> fetchedDataList = new ArrayList<>();
@@ -438,9 +437,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
         // step 1: create oracle tables with all tables included
         initialAddressTables(getJdbcConnection(), captureAddressTables);
 
-        final TemporaryFolder temporaryFolder = new TemporaryFolder();
-        temporaryFolder.create();
-        final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
+        final String savepointDirectory = tempFolder.toString();
 
         // get all expected data
         List<String> fetchedDataList = new ArrayList<>();
@@ -489,7 +486,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
+                        miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
             }
             waitForSinkSize("sink", fetchedDataList.size());
@@ -566,7 +563,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
+                        miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
             }
 
@@ -610,9 +607,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
         // step 1: create oracle tables with initial data
         initialAddressTables(getJdbcConnection(), captureAddressTables);
 
-        final TemporaryFolder temporaryFolder = new TemporaryFolder();
-        temporaryFolder.create();
-        final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
+        final String savepointDirectory = tempFolder.toString();
 
         // test newly added table one by one
         String finishedSavePointPath = null;
@@ -683,7 +678,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
+                        miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
             }
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
@@ -697,7 +692,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
+                        miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
             }
             makeSecondPartRedoLogForAddressTable(newlyAddedTable);

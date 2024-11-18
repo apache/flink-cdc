@@ -34,8 +34,9 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
 import com.starrocks.connector.flink.catalog.StarRocksTable;
-import org.junit.Before;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,16 +45,14 @@ import java.util.List;
 
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.TABLE_CREATE_NUM_BUCKETS;
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.TABLE_SCHEMA_CHANGE_TIMEOUT;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 /** Tests for {@link StarRocksMetadataApplier}. */
-public class StarRocksMetadataApplierTest {
+class StarRocksMetadataApplierTest {
 
     private MockStarRocksCatalog catalog;
     private StarRocksMetadataApplier metadataApplier;
 
-    @Before
+    @BeforeEach
     public void setup() {
         Configuration configuration =
                 Configuration.fromMap(
@@ -70,7 +69,7 @@ public class StarRocksMetadataApplierTest {
     }
 
     @Test
-    public void testCreateTable() throws Exception {
+    void testCreateTable() throws Exception {
         TableId tableId = TableId.parse("test.tbl1");
         Schema schema =
                 Schema.newBuilder()
@@ -84,7 +83,7 @@ public class StarRocksMetadataApplierTest {
 
         StarRocksTable actualTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
-        assertNotNull(actualTable);
+        Assertions.assertThat(actualTable).isNotNull();
 
         List<StarRocksColumn> columns = new ArrayList<>();
         columns.add(
@@ -119,11 +118,11 @@ public class StarRocksMetadataApplierTest {
                         .setNumBuckets(10)
                         .setTableProperties(Collections.singletonMap("replication_num", "5"))
                         .build();
-        assertEquals(expectTable, actualTable);
+        Assertions.assertThat(actualTable).isEqualTo(expectTable);
     }
 
     @Test
-    public void testAddColumn() throws Exception {
+    void testAddColumn() throws Exception {
         TableId tableId = TableId.parse("test.tbl2");
         Schema schema =
                 Schema.newBuilder()
@@ -145,7 +144,7 @@ public class StarRocksMetadataApplierTest {
 
         StarRocksTable actualTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
-        assertNotNull(actualTable);
+        Assertions.assertThat(actualTable).isNotNull();
 
         List<StarRocksColumn> columns = new ArrayList<>();
         columns.add(
@@ -182,11 +181,11 @@ public class StarRocksMetadataApplierTest {
                         .setNumBuckets(10)
                         .setTableProperties(Collections.singletonMap("replication_num", "5"))
                         .build();
-        assertEquals(expectTable, actualTable);
+        Assertions.assertThat(actualTable).isEqualTo(expectTable);
     }
 
     @Test
-    public void testDropColumn() throws Exception {
+    void testDropColumn() throws Exception {
         TableId tableId = TableId.parse("test.tbl3");
         Schema schema =
                 Schema.newBuilder()
@@ -204,7 +203,7 @@ public class StarRocksMetadataApplierTest {
 
         StarRocksTable actualTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
-        assertNotNull(actualTable);
+        Assertions.assertThat(actualTable).isNotNull();
 
         List<StarRocksColumn> columns = new ArrayList<>();
         columns.add(
@@ -225,6 +224,6 @@ public class StarRocksMetadataApplierTest {
                         .setNumBuckets(10)
                         .setTableProperties(Collections.singletonMap("replication_num", "5"))
                         .build();
-        assertEquals(expectTable, actualTable);
+        Assertions.assertThat(actualTable).isEqualTo(expectTable);
     }
 }

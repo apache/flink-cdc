@@ -31,7 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /** A test for the {@link DataChangeEventSerializer}. */
-public class DataChangeEventSerializerTest extends SerializerTestBase<DataChangeEvent> {
+class DataChangeEventSerializerTest extends SerializerTestBase<DataChangeEvent> {
     @Override
     protected TypeSerializer<DataChangeEvent> createSerializer() {
         return DataChangeEventSerializer.INSTANCE;

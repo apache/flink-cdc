@@ -28,13 +28,9 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
@@ -44,15 +40,11 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
-import java.util.stream.Stream;
 
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 
 /** Integration tests for MySQL Table source. */
-@RunWith(Parameterized.class)
 public class MySqlJsonArrayAsKeyIndexITCase extends MySqlSourceTestBase {
-
-    private static final Logger LOG = LoggerFactory.getLogger(MySqlJsonArrayAsKeyIndexITCase.class);
 
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
@@ -63,44 +55,21 @@ public class MySqlJsonArrayAsKeyIndexITCase extends MySqlSourceTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @Parameterized.Parameters(name = "incrementalSnapshot: {0}")
-    public static Object[] parameters() {
-        // MySQL 8.0.17 brought the `CAST(JSON_EXTRACT AS ARRAY)` syntax firstly, and originates the
-        // "extra 0 byte" bug.
-        // MySQL 8.0.18 changed the TYPED_ARRAY internal enum value from 244 to 20, but didn't fix
-        // the bug.
-        // MySQL 8.0.19 fixed this issue (eventually).
-        return new Object[][] {
-            new Object[] {MySqlVersion.V8_0_17},
-            new Object[] {MySqlVersion.V8_0_18},
-            new Object[] {MySqlVersion.V8_0_19}
-        };
-    }
+    private MySqlContainer container;
 
-    private final MySqlVersion version;
-    private final MySqlContainer container;
-
-    public MySqlJsonArrayAsKeyIndexITCase(MySqlVersion version) {
-        this.version = version;
-        this.container = createMySqlContainer(version, "docker/server-gtids/expire-seconds/my.cnf");
-    }
-
-    @Before
-    public void before() {
-        LOG.info("Starting MySQL {} containers...", version);
-        Startables.deepStart(Stream.of(container)).join();
-        LOG.info("Container MySQL {} is started.", version);
-    }
-
-    @After
+    @AfterEach
     public void after() {
-        LOG.info("Stopping MySQL {} containers...", version);
-        container.stop();
-        LOG.info("Container MySQL {} is stopped.", version);
+        if (container != null) {
+            container.stop();
+        }
     }
 
-    @Test
-    public void testJsonArrayAsKeyIndex() {
+    @ParameterizedTest
+    @EnumSource
+    public void testJsonArrayAsKeyIndex(MySqlVersion version) {
+        this.container = createMySqlContainer(version, "docker/server-gtids/expire-seconds/my.cnf");
+        Startables.deepStart(container).join();
+
         UniqueDatabase jaakiDatabase =
                 new UniqueDatabase(container, "json_array_as_key", TEST_USER, TEST_PASSWORD);
         jaakiDatabase.createAndInitialize();

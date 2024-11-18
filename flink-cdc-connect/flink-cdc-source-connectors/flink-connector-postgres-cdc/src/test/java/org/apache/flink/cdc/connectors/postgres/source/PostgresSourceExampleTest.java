@@ -21,6 +21,7 @@ import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
+import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
@@ -40,9 +41,9 @@ import org.apache.flink.util.CloseableIterator;
 
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.connector.postgresql.spi.SlotState;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -56,7 +57,7 @@ import java.util.stream.Collectors;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Tests for Postgres Source based on incremental snapshot framework . */
-public class PostgresSourceExampleTest extends PostgresTestBase {
+class PostgresSourceExampleTest extends PostgresTestBase {
 
     private static final String DB_NAME_PREFIX = "postgres";
     private static final String SCHEMA_NAME = "inventory";
@@ -68,15 +69,16 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
 
     private static final int DEFAULT_PARALLELISM = 2;
 
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .build());
+    @RegisterExtension
+    public final ExternalResourceProxy<MiniClusterWithClientResource> miniClusterResource =
+            new ExternalResourceProxy<>(
+                    new MiniClusterWithClientResource(
+                            new MiniClusterResourceConfiguration.Builder()
+                                    .setNumberTaskManagers(1)
+                                    .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                                    .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                                    .withHaLeadershipControl()
+                                    .build()));
 
     // 9 records in the inventory.products table
     private final UniqueDatabase inventoryDatabase =
@@ -88,8 +90,8 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
                     POSTGRES_CONTAINER.getPassword());
 
     @Test
-    @Ignore("Test ignored because it won't stop and is used for manual test")
-    public void testConsumingScanEvents() throws Exception {
+    @Disabled("Test ignored because it won't stop and is used for manual test")
+    void testConsumingScanEvents() throws Exception {
 
         inventoryDatabase.createAndInitialize();
 
@@ -127,8 +129,8 @@ public class PostgresSourceExampleTest extends PostgresTestBase {
     }
 
     @Test
-    @Ignore
-    public void testConsumingAllEvents() throws Exception {
+    @Disabled
+    void testConsumingAllEvents() throws Exception {
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),

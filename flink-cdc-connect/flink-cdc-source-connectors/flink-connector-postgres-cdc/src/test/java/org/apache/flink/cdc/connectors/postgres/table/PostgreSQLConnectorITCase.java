@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.postgres.table;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
+import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -28,32 +29,24 @@ import org.apache.flink.table.utils.LegacyRowResource;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
-import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Integration tests for PostgreSQL Table source. */
-@RunWith(Parameterized.class)
-public class PostgreSQLConnectorITCase extends PostgresTestBase {
+class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -61,21 +54,11 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    @RegisterExtension
+    public static StaticExternalResourceProxy<LegacyRowResource> usesLegacyRows =
+            new StaticExternalResourceProxy<>(LegacyRowResource.INSTANCE);
 
-    private final boolean parallelismSnapshot;
-
-    public PostgreSQLConnectorITCase(boolean parallelismSnapshot) {
-        this.parallelismSnapshot = parallelismSnapshot;
-    }
-
-    @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
-    public static Object[] parameters() {
-        return new Object[][] {new Object[] {true}, new Object[] {false}};
-    }
-
-    @Before
-    public void before() {
+    void setup(boolean parallelismSnapshot) {
         TestValuesTableFactory.clearAllData();
         env.setRestartStrategy(RestartStrategies.noRestart());
         if (parallelismSnapshot) {
@@ -86,9 +69,11 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         }
     }
 
-    @Test
-    public void testConsumingAllEvents()
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testConsumingAllEvents(boolean parallelismSnapshot)
             throws SQLException, ExecutionException, InterruptedException {
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
         String sourceDDL =
                 String.format(
@@ -198,16 +183,15 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testStartupFromLatestOffset() throws Exception {
-        if (!parallelismSnapshot) {
-            return;
-        }
+    @ParameterizedTest
+    @ValueSource(booleans = {true})
+    void testStartupFromLatestOffset(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
         String sourceDDL =
                 String.format(
@@ -272,13 +256,15 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                 new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testExceptionForReplicaIdentity() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testExceptionForReplicaIdentity(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "replica_identity");
         String sourceDDL =
                 String.format(
@@ -347,20 +333,16 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
 
-        try {
-            result.await();
-        } catch (Exception e) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    e,
-                                    "The \"before\" field of UPDATE/DELETE message is null, "
-                                            + "please check the Postgres table has been set REPLICA IDENTITY to FULL level.")
-                            .isPresent());
-        }
+        Assertions.assertThatThrownBy(result::await)
+                .hasStackTraceContaining(
+                        "The \"before\" field of UPDATE/DELETE message is null, "
+                                + "please check the Postgres table has been set REPLICA IDENTITY to FULL level.");
     }
 
-    @Test
-    public void testAllTypes() throws Throwable {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testAllTypes(boolean parallelismSnapshot) throws Throwable {
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "column_type_test");
 
         String sourceDDL =
@@ -460,13 +442,15 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "-D(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})",
                         "+I(1,[50],0,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})");
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
-        assertEquals(expected, actual);
+        Assertions.assertThat(actual).isEqualTo(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testMetadataColumns() throws Throwable {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testMetadataColumns(boolean parallelismSnapshot) throws Throwable {
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
         String sourceDDL =
                 String.format(
@@ -600,14 +584,14 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + databaseName
                                 + ",inventory,products,-D,111,scooter,Big 2-wheel scooter ,5.170)");
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
-        Collections.sort(actual);
-        Collections.sort(expected);
-        assertEquals(expected, actual);
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testUpsertMode() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testUpsertMode(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "replica_identity");
         String sourceDDL =
                 String.format(
@@ -719,13 +703,15 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testUniqueIndexIncludingFunction() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testUniqueIndexIncludingFunction(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         // Clear the influence of usesLegacyRows which set USE_LEGACY_TO_STRING = true.
         // In this test, print +I,-U, +U to see more clearly.
         RowUtils.USE_LEGACY_TO_STRING = false;

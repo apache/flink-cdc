@@ -58,7 +58,7 @@ public class TestHelper {
                         PostgresConnectorConfig.SecureConnectionMode.DISABLED);
         final String testNetworkTimeout =
                 System.getProperty(TEST_PROPERTY_PREFIX + "network.timeout");
-        if (testNetworkTimeout != null && testNetworkTimeout.length() != 0) {
+        if (testNetworkTimeout != null && !testNetworkTimeout.isEmpty()) {
             builder.with(
                     PostgresConnectorConfig.STATUS_UPDATE_INTERVAL_MS,
                     Integer.parseInt(testNetworkTimeout));
