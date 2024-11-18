@@ -20,7 +20,7 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2;
 import org.apache.flink.streaming.api.connector.sink2.CommittableWithLineage;
 
 import org.apache.paimon.flink.sink.MultiTableCommittable;
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -34,7 +34,7 @@ import java.util.Set;
 public class TestMultiTableCommittableChannelComputer {
 
     @Test
-    public void testChannel() {
+    void testChannel() {
         MultiTableCommittableChannelComputer computer = new MultiTableCommittableChannelComputer();
         computer.setup(4);
         List<MultiTableCommittable> commits =
@@ -59,14 +59,14 @@ public class TestMultiTableCommittableChannelComputer {
                     set.add(commit.getTable());
                     map.put(channel, set);
                 });
-        Set<String> actualtables = new HashSet<>();
+        Set<String> actualTables = new HashSet<>();
         for (Map.Entry<Integer, Set<String>> entry : map.entrySet()) {
-            actualtables.addAll(entry.getValue());
+            actualTables.addAll(entry.getValue());
         }
         Set<String> expectedTables =
                 new HashSet<>(
                         Arrays.asList("table1", "table2", "table3", "table5", "table8", "table9"));
         // Not a table is appeared in more than one channel.
-        Assertions.assertEquals(actualtables, expectedTables);
+        Assertions.assertThat(actualTables).isEqualTo(expectedTables);
     }
 }

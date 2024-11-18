@@ -22,7 +22,8 @@ import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetKind;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -30,17 +31,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-
 /** Unit test for {@link org.apache.flink.cdc.connectors.mysql.source.utils.SerializerUtils}. */
-public class SerializerUtilsTest {
+class SerializerUtilsTest {
 
     @Test
-    public void testBinlogOffsetSerde() throws Exception {
+    void testBinlogOffsetSerde() throws Exception {
         for (BinlogOffset offset : createBinlogOffsets()) {
             byte[] serialized = serializeBinlogOffset(offset);
             BinlogOffset deserialized = deserializeBinlogOffset(serialized);
-            assertEquals(offset, deserialized);
+            Assertions.assertThat(deserialized).isEqualTo(offset);
         }
     }
 
@@ -49,14 +48,14 @@ public class SerializerUtilsTest {
      * the backward compatibility.
      */
     @Test
-    public void testDeserializeFromBinlogOffsetWithoutKind() throws Exception {
+    void testDeserializeFromBinlogOffsetWithoutKind() throws Exception {
         // Create the INITIAL offset in earlier versions
         Map<String, String> initialOffsetMap = new HashMap<>();
         initialOffsetMap.put(BinlogOffset.BINLOG_FILENAME_OFFSET_KEY, "");
         initialOffsetMap.put(BinlogOffset.BINLOG_POSITION_OFFSET_KEY, "0");
         BinlogOffset initialOffset = new BinlogOffset(initialOffsetMap);
         BinlogOffset deserialized = deserializeBinlogOffset(serializeBinlogOffset(initialOffset));
-        assertEquals(BinlogOffset.ofEarliest(), deserialized);
+        Assertions.assertThat(deserialized).isEqualTo(BinlogOffset.ofEarliest());
 
         // Create the NON_STOPPING offset in earlier versions
         Map<String, String> nonStoppingOffsetMap = new HashMap<>();
@@ -65,7 +64,7 @@ public class SerializerUtilsTest {
                 BinlogOffset.BINLOG_POSITION_OFFSET_KEY, Long.toString(Long.MIN_VALUE));
         BinlogOffset nonStoppingOffset = new BinlogOffset(nonStoppingOffsetMap);
         deserialized = deserializeBinlogOffset(serializeBinlogOffset(nonStoppingOffset));
-        assertEquals(BinlogOffset.ofNonStopping(), deserialized);
+        Assertions.assertThat(deserialized).isEqualTo(BinlogOffset.ofNonStopping());
 
         // Create a specific offset in earlier versions
         Map<String, String> specificOffsetMap = new HashMap<>();
@@ -78,15 +77,15 @@ public class SerializerUtilsTest {
         specificOffsetMap.put(BinlogOffset.ROWS_TO_SKIP_OFFSET_KEY, "18613");
         BinlogOffset specificOffset = new BinlogOffset(specificOffsetMap);
         deserialized = deserializeBinlogOffset(serializeBinlogOffset(specificOffset));
-        assertEquals(
-                BinlogOffset.builder()
-                        .setBinlogFilePosition("mysql-bin.000001", 4L)
-                        .setGtidSet("24DA167-0C0C-11E8-8442-00059A3C7B00:1-19")
-                        .setTimestampSec(1668690384L)
-                        .setSkipEvents(15213L)
-                        .setSkipRows(18613L)
-                        .build(),
-                deserialized);
+        Assertions.assertThat(deserialized)
+                .isEqualTo(
+                        BinlogOffset.builder()
+                                .setBinlogFilePosition("mysql-bin.000001", 4L)
+                                .setGtidSet("24DA167-0C0C-11E8-8442-00059A3C7B00:1-19")
+                                .setTimestampSec(1668690384L)
+                                .setSkipEvents(15213L)
+                                .setSkipRows(18613L)
+                                .build());
     }
 
     private List<BinlogOffset> createBinlogOffsets() {

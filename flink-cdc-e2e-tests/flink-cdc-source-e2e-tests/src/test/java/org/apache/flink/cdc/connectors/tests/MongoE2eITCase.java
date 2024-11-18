@@ -31,10 +31,9 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.Document;
 import org.bson.types.ObjectId;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -42,10 +41,9 @@ import org.testcontainers.lifecycle.Startables;
 
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.stream.Stream;
 
@@ -55,7 +53,7 @@ import static org.apache.flink.cdc.connectors.mongodb.LegacyMongoDBContainer.FLI
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.MONGODB_PORT;
 
 /** End-to-end tests for mongodb-cdc connector uber jar. */
-public class MongoE2eITCase extends FlinkContainerTestEnvironment {
+class MongoE2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoE2eITCase.class);
     private static final String INTER_CONTAINER_MONGO_ALIAS = "mongodb";
@@ -67,45 +65,16 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
 
     private MongoClient mongoClient;
 
-    @Parameterized.Parameter(1)
-    public String mongoVersion;
-
-    @Parameterized.Parameter(2)
-    public boolean parallelismSnapshot;
-
-    @Parameterized.Parameter(3)
-    public boolean scanFullChangelog;
-
-    public static List<String> getMongoVersions() {
+    public static String getMongoVersion() {
         String specifiedMongoVersion = System.getProperty("specifiedMongoVersion");
-        if (specifiedMongoVersion != null) {
-            return Collections.singletonList(specifiedMongoVersion);
-        } else {
-            return Arrays.asList("6.0.16", "7.0.12");
+        if (Objects.isNull(specifiedMongoVersion)) {
+            throw new IllegalArgumentException(
+                    "No MongoDB version specified to run this test. Please use -DspecifiedMongoVersion to pass one.");
         }
+        return specifiedMongoVersion;
     }
 
-    @Parameterized.Parameters(
-            name =
-                    "flinkVersion: {0}, mongoVersion: {1}, parallelismSnapshot: {2}, scanFullChangelog: {3}")
-    public static List<Object[]> parameters() {
-        final List<String> flinkVersions = getFlinkVersion();
-        List<Object[]> params = new ArrayList<>();
-        for (String flinkVersion : flinkVersions) {
-            for (String mongoVersion : getMongoVersions()) {
-                params.add(new Object[] {flinkVersion, mongoVersion, true, true});
-                params.add(new Object[] {flinkVersion, mongoVersion, true, false});
-                params.add(new Object[] {flinkVersion, mongoVersion, false, true});
-                params.add(new Object[] {flinkVersion, mongoVersion, false, false});
-            }
-        }
-        return params;
-    }
-
-    @Before
-    public void before() {
-        super.before();
-
+    void setup(String mongoVersion, boolean parallelismSnapshot, boolean scanFullChangelog) {
         container =
                 new MongoDBContainer("mongo:" + mongoVersion)
                         .withSharding()
@@ -129,7 +98,7 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
         mongoClient = MongoClients.create(settings);
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         if (mongoClient != null) {
@@ -140,8 +109,21 @@ public class MongoE2eITCase extends FlinkContainerTestEnvironment {
         }
     }
 
-    @Test
-    public void testMongoDbCDC() throws Exception {
+    @ParameterizedTest(
+            name = "MongoDB Version: {0}, boolean parallelismSnapshot: {1}, scanFullChangelog: {2}")
+    @CsvSource({
+        "6.0.16, true, true",
+        "6.0.16, true, false",
+        "6.0.16, false, true",
+        "6.0.16, false, false",
+        "7.0.12, true, true",
+        "7.0.12, true, false",
+        "7.0.12, false, true",
+        "7.0.12, false, false"
+    })
+    void testMongoDbCDC(String mongoVersion, boolean parallelismSnapshot, boolean scanFullChangelog)
+            throws Exception {
+        setup(mongoVersion, parallelismSnapshot, scanFullChangelog);
         String dbName =
                 container.executeCommandFileInDatabase(
                         "mongo_inventory",
