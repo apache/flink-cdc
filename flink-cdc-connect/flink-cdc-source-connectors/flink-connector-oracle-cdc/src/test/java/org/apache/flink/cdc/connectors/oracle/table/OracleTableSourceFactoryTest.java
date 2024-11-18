@@ -33,9 +33,9 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -45,12 +45,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 /** Test for {@link OracleTableSource} created by {@link OracleTableSourceFactory}. */
-public class OracleTableSourceFactoryTest {
+class OracleTableSourceFactoryTest {
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
                     Arrays.asList(
@@ -87,7 +83,7 @@ public class OracleTableSourceFactoryTest {
     private static final Properties PROPERTIES = new Properties();
 
     @Test
-    public void testRequiredProperties() {
+    void testRequiredProperties() {
         Map<String, String> properties = getAllRequiredOptions();
 
         // validation for source
@@ -120,11 +116,11 @@ public class OracleTableSourceFactoryTest {
                         JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testCommonProperties() {
+    void testCommonProperties() {
         Map<String, String> properties = getAllRequiredOptionsWithHost();
 
         // validation for source
@@ -157,11 +153,11 @@ public class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testOptionalProperties() {
+    void testOptionalProperties() {
         Map<String, String> options = getAllRequiredOptions();
         options.put("port", "1521");
         options.put("hostname", MY_LOCALHOST);
@@ -199,11 +195,11 @@ public class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         true);
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testScanIncrementalProperties() {
+    void testScanIncrementalProperties() {
         Map<String, String> options = getAllRequiredOptions();
         int chunkSize = 4096;
         int splitMetaGroupSize = 2048;
@@ -267,11 +263,11 @@ public class OracleTableSourceFactoryTest {
                         true,
                         true,
                         true);
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testStartupFromInitial() {
+    void testStartupFromInitial() {
         Map<String, String> properties = getAllRequiredOptionsWithHost();
         properties.put("scan.startup.mode", "initial");
 
@@ -305,11 +301,11 @@ public class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testStartupFromLatestOffset() {
+    void testStartupFromLatestOffset() {
         Map<String, String> properties = getAllRequiredOptionsWithHost();
         properties.put("scan.startup.mode", "latest-offset");
 
@@ -343,11 +339,11 @@ public class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testMetadataColumns() {
+    void testMetadataColumns() {
         Map<String, String> properties = getAllRequiredOptions();
 
         // validation for source
@@ -389,24 +385,19 @@ public class OracleTableSourceFactoryTest {
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");
 
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testValidation() {
+    void testValidation() {
         // validate illegal port
-        try {
-            Map<String, String> properties = getAllRequiredOptionsWithHost();
-            properties.put("port", "123b");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "Could not parse value '123b' for key 'port'.")
-                            .isPresent());
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllRequiredOptionsWithHost();
+                            properties.put("port", "123b");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining("Could not parse value '123b' for key 'port'.");
 
         // validate missing required
         Factory factory = new OracleTableSourceFactory();
@@ -414,46 +405,31 @@ public class OracleTableSourceFactoryTest {
             Map<String, String> properties = getAllRequiredOptionsWithHost();
             properties.remove(requiredOption.key());
 
-            try {
-                createTableSource(properties);
-                fail("exception expected");
-            } catch (Throwable t) {
-                assertTrue(
-                        ExceptionUtils.findThrowableWithMessage(
-                                        t,
-                                        "Missing required options are:\n\n" + requiredOption.key())
-                                .isPresent());
-            }
+            Assertions.assertThatThrownBy(() -> createTableSource(properties))
+                    .hasStackTraceContaining(
+                            "Missing required options are:\n\n" + requiredOption.key());
         }
 
         // validate unsupported option
-        try {
-            Map<String, String> properties = getAllRequiredOptionsWithHost();
-            properties.put("unknown", "abc");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
-                            .isPresent());
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllRequiredOptionsWithHost();
+                            properties.put("unknown", "abc");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining("Unsupported options:\n\nunknown");
 
         // validate unsupported option
-        try {
-            Map<String, String> properties = getAllRequiredOptionsWithHost();
-            properties.put("scan.startup.mode", "abc");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            String msg =
-                    "Invalid value for option 'scan.startup.mode'. Supported values are "
-                            + "[initial, snapshot, latest-offset], "
-                            + "but was: abc";
-
-            assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllRequiredOptionsWithHost();
+                            properties.put("scan.startup.mode", "abc");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        "Invalid value for option 'scan.startup.mode'. Supported values are "
+                                + "[initial, snapshot, latest-offset], "
+                                + "but was: abc");
     }
 
     private Map<String, String> getAllRequiredOptions() {

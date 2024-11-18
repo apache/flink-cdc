@@ -37,10 +37,10 @@ import java.util.List;
 import java.util.Map;
 
 /** A test for the {@link org.apache.flink.cdc.common.utils.SchemaUtils}. */
-public class SchemaUtilsTest {
+class SchemaUtilsTest {
 
     @Test
-    public void testApplyColumnSchemaChangeEvent() {
+    void testApplyColumnSchemaChangeEvent() {
         TableId tableId = TableId.parse("default.default.table1");
         Schema schema =
                 Schema.newBuilder()
@@ -165,7 +165,7 @@ public class SchemaUtilsTest {
     }
 
     @Test
-    public void testGetNumericPrecision() {
+    void testGetNumericPrecision() {
         Assertions.assertThat(SchemaUtils.getNumericPrecision(DataTypes.TINYINT())).isEqualTo(3);
         Assertions.assertThat(SchemaUtils.getNumericPrecision(DataTypes.SMALLINT())).isEqualTo(5);
         Assertions.assertThat(SchemaUtils.getNumericPrecision(DataTypes.INT())).isEqualTo(10);
@@ -180,7 +180,7 @@ public class SchemaUtilsTest {
     }
 
     @Test
-    public void testInferWiderType() {
+    void testInferWiderType() {
         Assertions.assertThat(
                         SchemaUtils.inferWiderType(DataTypes.BINARY(17), DataTypes.BINARY(17)))
                 .isEqualTo(DataTypes.BINARY(17));
@@ -353,7 +353,7 @@ public class SchemaUtilsTest {
     }
 
     @Test
-    public void testInferWiderColumn() {
+    void testInferWiderColumn() {
         // Test normal merges
         Assertions.assertThat(
                         SchemaUtils.inferWiderColumn(
@@ -385,7 +385,7 @@ public class SchemaUtilsTest {
     }
 
     @Test
-    public void testInferWiderSchema() {
+    void testInferWiderSchema() {
         // Test normal merges
         Assertions.assertThat(
                         SchemaUtils.inferWiderSchema(

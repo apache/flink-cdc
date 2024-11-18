@@ -24,20 +24,20 @@ import org.apache.flink.cdc.connectors.db2.source.Db2SourceBuilder.Db2Incrementa
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import static org.testcontainers.containers.Db2Container.DB2_PORT;
 
 /** Example Tests for {@link Db2IncrementalSource}. */
-public class Db2ParallelSourceExampleTest extends Db2TestBase {
+class Db2ParallelSourceExampleTest extends Db2TestBase {
 
     @Test
-    @Ignore("Test ignored because it won't stop and is used for manual test")
-    public void testDb2ExampleSource() throws Exception {
+    @Disabled("Test ignored because it won't stop and is used for manual test")
+    void testDb2ExampleSource() throws Exception {
         initializeDb2Table("customers", "CUSTOMERS");
         Db2IncrementalSource<String> sqlServerSource =
-                new Db2SourceBuilder()
+                new Db2SourceBuilder<String>()
                         .hostname(DB2_CONTAINER.getHost())
                         .port(DB2_CONTAINER.getMappedPort(DB2_PORT))
                         .databaseList(DB2_CONTAINER.getDatabaseName())

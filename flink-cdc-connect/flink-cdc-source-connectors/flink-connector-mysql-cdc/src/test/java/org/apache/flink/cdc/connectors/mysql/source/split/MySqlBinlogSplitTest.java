@@ -25,8 +25,8 @@ import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges;
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,10 +35,10 @@ import java.util.List;
 import java.util.Map;
 
 /** Unit tests for {@link MySqlBinlogSplit}. */
-public class MySqlBinlogSplitTest {
+class MySqlBinlogSplitTest {
 
     @Test
-    public void filterOutdatedSplitInfos() {
+    void filterOutdatedSplitInfos() {
         Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
 
         // mock table1
@@ -75,8 +75,7 @@ public class MySqlBinlogSplitTest {
                 MySqlBinlogSplit.filterOutdatedSplitInfos(binlogSplit, currentTableFilter);
         Map<TableId, TableChanges.TableChange> filterTableSchemas =
                 mySqlBinlogSplit.getTableSchemas();
-        Assert.assertEquals(1, filterTableSchemas.size());
-        Assert.assertEquals(tableChange1, filterTableSchemas.get(tableId1));
+        Assertions.assertThat(filterTableSchemas).hasSize(1).containsEntry(tableId1, tableChange1);
 
         // case 2: include all tables
         currentTableFilter = tableId -> tableId.table().startsWith("table");
@@ -84,9 +83,10 @@ public class MySqlBinlogSplitTest {
         mySqlBinlogSplit =
                 MySqlBinlogSplit.filterOutdatedSplitInfos(binlogSplit, currentTableFilter);
         filterTableSchemas = mySqlBinlogSplit.getTableSchemas();
-        Assert.assertEquals(2, filterTableSchemas.size());
-        Assert.assertEquals(tableChange1, filterTableSchemas.get(tableId1));
-        Assert.assertEquals(tableChange2, filterTableSchemas.get(tableId2));
+        Assertions.assertThat(filterTableSchemas)
+                .hasSize(2)
+                .containsEntry(tableId1, tableChange1)
+                .containsEntry(tableId2, tableChange2);
     }
 
     /** A mock implementation for {@link Table} which is used for unit tests. */

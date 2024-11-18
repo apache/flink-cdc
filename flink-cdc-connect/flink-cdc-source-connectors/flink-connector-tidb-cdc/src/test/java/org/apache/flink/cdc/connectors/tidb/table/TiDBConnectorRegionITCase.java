@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.tidb.table;
 
 import org.apache.flink.cdc.connectors.tidb.TiDBTestBase;
+import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -25,9 +26,9 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 /** Integration tests for TiDB change stream event SQL source. */
-public class TiDBConnectorRegionITCase extends TiDBTestBase {
+class TiDBConnectorRegionITCase extends TiDBTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(TiDBConnectorRegionITCase.class);
     private final StreamExecutionEnvironment env =
@@ -45,16 +46,18 @@ public class TiDBConnectorRegionITCase extends TiDBTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    @RegisterExtension
+    public static StaticExternalResourceProxy<LegacyRowResource> usesLegacyRows =
+            new StaticExternalResourceProxy<>(LegacyRowResource.INSTANCE);
 
-    @Before
+    @BeforeEach
     public void before() {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(1);
     }
 
     @Test
-    public void testRegionChange() throws Exception {
+    void testRegionChange() throws Exception {
         initializeTidbTable("region_switch_test");
         String sourceDDL =
                 String.format(

@@ -22,17 +22,15 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFact
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 
 import io.debezium.connector.mysql.MySqlConnection;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.ZoneId;
-import java.util.Arrays;
 import java.util.Properties;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils}. */
-public class DebeziumUtilsTest {
+class DebeziumUtilsTest {
     @Test
     void testCreateMySqlConnection() {
         // test without set useSSL
@@ -88,9 +86,7 @@ public class DebeziumUtilsTest {
     private void assertJdbcUrl(String expected, String actual) {
         // Compare after splitting to avoid the orderless jdbc parameters in jdbc url at Java 11
         String[] expectedParam = expected.split("&");
-        Arrays.sort(expectedParam);
         String[] actualParam = actual.split("&");
-        Arrays.sort(actualParam);
-        assertArrayEquals(expectedParam, actualParam);
+        Assertions.assertThat(actualParam).containsExactlyInAnyOrder(expectedParam);
     }
 }

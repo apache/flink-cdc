@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import org.apache.flink.cdc.connectors.oracle.source.OracleSourceBuilder;
 import org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase;
+import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
@@ -29,16 +30,16 @@ import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
 
 /** Example Tests for {@link JdbcIncrementalSource}. */
-public class OracleChangeEventSourceExampleTest extends OracleSourceTestBase {
+class OracleChangeEventSourceExampleTest extends OracleSourceTestBase {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(OracleChangeEventSourceExampleTest.class);
@@ -46,20 +47,21 @@ public class OracleChangeEventSourceExampleTest extends OracleSourceTestBase {
     private static final int DEFAULT_PARALLELISM = 4;
     private static final long DEFAULT_CHECKPOINT_INTERVAL = 1000;
 
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .setConfiguration(new Configuration())
-                            .withHaLeadershipControl()
-                            .build());
+    @RegisterExtension
+    public final ExternalResourceProxy<MiniClusterWithClientResource> miniClusterResource =
+            new ExternalResourceProxy<>(
+                    new MiniClusterWithClientResource(
+                            new MiniClusterResourceConfiguration.Builder()
+                                    .setNumberTaskManagers(1)
+                                    .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                                    .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                                    .setConfiguration(new Configuration())
+                                    .withHaLeadershipControl()
+                                    .build()));
 
     @Test
-    @Ignore("Test ignored because it won't stop and is used for manual test")
-    public void testConsumingAllEvents() throws Exception {
+    @Disabled("Test ignored because it won't stop and is used for manual test")
+    void testConsumingAllEvents() throws Exception {
 
         createAndInitialize("product.sql");
 
