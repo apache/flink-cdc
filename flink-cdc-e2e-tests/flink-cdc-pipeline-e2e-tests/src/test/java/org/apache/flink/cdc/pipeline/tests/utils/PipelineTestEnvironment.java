@@ -104,7 +104,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         LOG.info("Starting containers...");
         jobManagerConsumer = new ToStringConsumer();
 
-        String flinkProperties = getFlinkProperties(flinkVersion);
+        String flinkProperties = getFlinkProperties();
 
         jobManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
@@ -257,19 +257,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                 versionParts.get(0), versionParts.get(1), versionParts.get(2), null, null, null);
     }
 
-    private static String getFlinkProperties(String flinkVersion) {
-        // this is needed for oracle-cdc tests.
-        // see https://stackoverflow.com/a/47062742/4915129
-        String javaOptsConfig;
-        Version version = parseVersion(flinkVersion);
-        if (version.compareTo(parseVersion("1.17.0")) >= 0) {
-            // Flink 1.17 renames `env.java.opts` to `env.java.opts.all`
-            javaOptsConfig = "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false";
-        } else {
-            // Legacy Flink version, might drop their support in near future
-            javaOptsConfig = "env.java.opts: -Doracle.jdbc.timezoneAsRegion=false";
-        }
-
+    private static String getFlinkProperties() {
         return String.join(
                 "\n",
                 Arrays.asList(
@@ -278,6 +266,6 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                         "taskmanager.numberOfTaskSlots: 10",
                         "parallelism.default: 4",
                         "execution.checkpointing.interval: 300",
-                        javaOptsConfig));
+                        "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false"));
     }
 }
