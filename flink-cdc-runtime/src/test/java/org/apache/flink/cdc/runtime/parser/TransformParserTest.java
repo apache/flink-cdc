@@ -319,12 +319,13 @@ public class TransformParserTest {
                         Column.physicalColumn("name", DataTypes.STRING(), "string"),
                         Column.physicalColumn("age", DataTypes.INT(), "age"),
                         Column.physicalColumn("address", DataTypes.STRING(), "address"),
+                        Column.physicalColumn("deposit", DataTypes.DECIMAL(10, 2), "deposit"),
                         Column.physicalColumn("weight", DataTypes.DOUBLE(), "weight"),
                         Column.physicalColumn("height", DataTypes.DOUBLE(), "height"));
 
         List<ProjectionColumn> result =
                 TransformParser.generateProjectionColumns(
-                        "id, upper(name) as name, age + 1 as newage, weight / (height * height) as bmi",
+                        "id, upper(name) as name, age + 1 as newage, deposit as deposits, weight / (height * height) as bmi",
                         testColumns,
                         Collections.emptyList(),
                         new SupportedMetadataColumn[0]);
@@ -334,6 +335,7 @@ public class TransformParserTest {
                         "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='id', originalColumnNames=[id], transformExpressionKey=null}",
                         "ProjectionColumn{column=`name` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper(name)', originalColumnNames=[name], transformExpressionKey=null}",
                         "ProjectionColumn{column=`newage` INT, expression='`TB`.`age` + 1', scriptExpression='age + 1', originalColumnNames=[age], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`deposits` DECIMAL(10, 2), expression='TB.deposit', scriptExpression='deposit', originalColumnNames=[deposit], transformExpressionKey=null}",
                         "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='weight / height * height', originalColumnNames=[weight, height, height], transformExpressionKey=null}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
 
