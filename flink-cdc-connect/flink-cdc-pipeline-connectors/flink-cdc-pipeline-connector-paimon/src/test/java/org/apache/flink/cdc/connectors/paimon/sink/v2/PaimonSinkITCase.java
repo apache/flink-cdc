@@ -18,6 +18,8 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobInfo;
+import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.serialization.SerializationSchema;
@@ -40,6 +42,8 @@ import org.apache.flink.cdc.connectors.paimon.sink.PaimonMetadataApplier;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
+import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
+import org.apache.flink.runtime.metrics.groups.InternalSinkCommitterMetricGroup;
 import org.apache.flink.streaming.runtime.operators.sink.committables.CommitRequestImpl;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
@@ -572,7 +576,10 @@ public class PaimonSinkITCase {
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {
 
         protected MockCommitRequestImpl(CommT committable) {
-            super(committable);
+            super(
+                    committable,
+                    InternalSinkCommitterMetricGroup.wrap(
+                            UnregisteredMetricsGroup.createOperatorMetricGroup()));
         }
     }
 
@@ -631,6 +638,16 @@ public class PaimonSinkITCase {
         }
 
         public JobID getJobId() {
+            return null;
+        }
+
+        @Override
+        public JobInfo getJobInfo() {
+            return null;
+        }
+
+        @Override
+        public TaskInfo getTaskInfo() {
             return null;
         }
     }

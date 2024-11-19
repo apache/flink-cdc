@@ -180,7 +180,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                         "+U(110,jacket,new water resistent white wind breaker,0.5000000000)",
                         "+U(111,scooter,Big 2-wheel scooter ,5.1700000000)",
                         "-D(111,scooter,Big 2-wheel scooter ,5.1700000000)");
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertContainsInAnyOrder(expected, actual);
 
         result.getJobClient().get().cancel().get();
@@ -276,7 +276,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                         "+U("
                                 + tenant
                                 + ",inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)");
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertContainsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }
@@ -456,7 +456,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                         "+I(1,false,true,true,127,255,32767,65535,8388607,16777215,2147483647,2147483647,4294967295,9223372036854775807,18446744073709551615,123.102,123.102,404.4443,123.4567,346,34567892.1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,abc,Hello World,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=,[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2022,[a, b],red,{\"key1\": \"value1\"})",
                         "+U(1,false,true,true,127,255,32767,65535,8388607,16777215,2147483647,2147483647,4294967295,9223372036854775807,18446744073709551615,123.102,123.102,404.4443,123.4567,346,34567892.1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,abc,Hello World,ZRrvv70IOQ9I77+977+977+9Nu+/vT57dAA=,[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2022,[a, b],red,{\"key1\": \"value1\"})");
 
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertContainsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }
@@ -536,7 +536,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                         "+I(1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22)",
                         "+U(1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22)");
 
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertContainsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }
@@ -591,7 +591,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                         "+I(107,rocks,box of assorted rocks,5.3000000000)",
                         "+I(108,jacket,water resistent black wind breaker,0.1000000000)",
                         "+I(109,spare tire,24 inch spare tire,22.2000000000)");
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertContainsInAnyOrder(expected, actual);
     }
 }

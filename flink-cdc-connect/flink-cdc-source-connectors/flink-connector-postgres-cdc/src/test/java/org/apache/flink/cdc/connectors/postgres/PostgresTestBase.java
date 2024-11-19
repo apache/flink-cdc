@@ -169,11 +169,11 @@ public abstract class PostgresTestBase extends AbstractTestBase {
 
     protected void waitForSinkResult(String sinkName, List<String> expected)
             throws InterruptedException {
-        List<String> actual = TestValuesTableFactory.getResults(sinkName);
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings(sinkName);
         actual = actual.stream().sorted().collect(Collectors.toList());
         while (actual.size() != expected.size() || !actual.equals(expected)) {
             actual =
-                    TestValuesTableFactory.getResults(sinkName).stream()
+                    TestValuesTableFactory.getResultsAsStrings(sinkName).stream()
                             .sorted()
                             .collect(Collectors.toList());
             Thread.sleep(1000);
@@ -189,7 +189,7 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     protected int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
+                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;
