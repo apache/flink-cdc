@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.composer.flink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
@@ -61,6 +62,7 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -1216,6 +1218,88 @@ class FlinkPipelineComposerITCase {
         assertThat(outputEvents).containsExactlyInAnyOrder(expected);
     }
 
+    @ParameterizedTest
+    @EnumSource
+    void testMergingDecimalWithVariousPrecisions(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        List<Event> events = generateDecimalColumnEvents("default_table_");
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.singletonList(
+                                new RouteDef(
+                                        "default_namespace.default_schema.default_table_\\.*",
+                                        "default_namespace.default_schema.default_everything_merged",
+                                        null,
+                                        "Merge all decimal columns with different precision")),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+
+        String[] expected =
+                Stream.of(
+                                "CreateTableEvent{tableId={}, schema=columns={`id` INT,`name` STRING,`age` INT,`fav_num` TINYINT}, primaryKeys=id, options=()}",
+                                "DataChangeEvent{tableId={}, before=[], after=[1, Alice, 17, 1], op=INSERT, meta=()}",
+                                "AlterColumnTypeEvent{tableId={}, typeMapping={fav_num=BIGINT}, oldTypeMapping={fav_num=TINYINT}}",
+                                "DataChangeEvent{tableId={}, before=[], after=[2, Alice, 17, 22], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId={}, before=[], after=[3, Alice, 17, 3333], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId={}, before=[], after=[4, Alice, 17, 44444444], op=INSERT, meta=()}",
+                                "AlterColumnTypeEvent{tableId={}, typeMapping={fav_num=DECIMAL(19, 0)}, oldTypeMapping={fav_num=BIGINT}}",
+                                "DataChangeEvent{tableId={}, before=[], after=[5, Alice, 17, 555555555555555], op=INSERT, meta=()}",
+                                "AlterColumnTypeEvent{tableId={}, typeMapping={fav_num=DECIMAL(24, 5)}, oldTypeMapping={fav_num=DECIMAL(19, 0)}}",
+                                "DataChangeEvent{tableId={}, before=[], after=[6, Alice, 17, 66666.66666], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId={}, before=[], after=[7, Alice, 17, 77777777.17000], op=INSERT, meta=()}",
+                                "AlterColumnTypeEvent{tableId={}, typeMapping={fav_num=DECIMAL(38, 19)}, oldTypeMapping={fav_num=DECIMAL(24, 5)}}",
+                                "DataChangeEvent{tableId={}, before=[], after=[8, Alice, 17, 888888888.8888888888888888888], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId={}, before=[], after=[101, Zen, 19, 1.0000000000000000000], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId={}, before=[], after=[102, Zen, 19, 22.0000000000000000000], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId={}, before=[], after=[103, Zen, 19, 3333.0000000000000000000], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId={}, before=[], after=[104, Zen, 19, 44444444.0000000000000000000], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId={}, before=[], after=[105, Zen, 19, 555555555555555.0000000000000000000], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId={}, before=[], after=[106, Zen, 19, 66666.6666600000000000000], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId={}, before=[], after=[107, Zen, 19, 77777777.1700000000000000000], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId={}, before=[], after=[108, Zen, 19, 888888888.8888888888888888888], op=INSERT, meta=()}")
+                        .map(
+                                s ->
+                                        s.replace(
+                                                "{}",
+                                                "default_namespace.default_schema.default_everything_merged"))
+                        .toArray(String[]::new);
+
+        assertThat(outputEvents).containsExactlyInAnyOrder(expected);
+    }
+
     private List<Event> generateTemporalColumnEvents(String tableNamePrefix) {
         List<Event> events = new ArrayList<>();
 
@@ -1256,6 +1340,83 @@ class FlinkPipelineComposerITCase {
                                                 .physicalColumn("name", DataTypes.STRING())
                                                 .physicalColumn("age", DataTypes.INT())
                                                 .physicalColumn("birthday", temporalColumnType)
+                                                .primaryKey("id")
+                                                .build())
+                        .collect(Collectors.toList());
+
+        for (int i = 0; i < names.size(); i++) {
+            TableId generatedTableId =
+                    TableId.tableId(
+                            "default_namespace", "default_schema", tableNamePrefix + names.get(i));
+            Schema generatedSchema = schemas.get(i);
+            events.add(new CreateTableEvent(generatedTableId, generatedSchema));
+            events.add(
+                    DataChangeEvent.insertEvent(
+                            generatedTableId,
+                            generate(generatedSchema, 1 + i, "Alice", 17, values.get(i))));
+        }
+
+        for (int i = 0; i < names.size(); i++) {
+            TableId generatedTableId =
+                    TableId.tableId(
+                            "default_namespace", "default_schema", tableNamePrefix + names.get(i));
+            Schema generatedSchema = schemas.get(i);
+            events.add(
+                    DataChangeEvent.insertEvent(
+                            generatedTableId,
+                            generate(generatedSchema, 101 + i, "Zen", 19, values.get(i))));
+        }
+
+        return events;
+    }
+
+    private List<Event> generateDecimalColumnEvents(String tableNamePrefix) {
+        List<Event> events = new ArrayList<>();
+
+        // Initialize schemas
+        List<String> names =
+                Arrays.asList(
+                        "tiny",
+                        "small",
+                        "vanilla",
+                        "big",
+                        "dec_15_0",
+                        "decimal_10_10",
+                        "decimal_16_2",
+                        "decimal_29_19");
+
+        List<DataType> types =
+                Arrays.asList(
+                        DataTypes.TINYINT(),
+                        DataTypes.SMALLINT(),
+                        DataTypes.INT(),
+                        DataTypes.BIGINT(),
+                        DataTypes.DECIMAL(15, 0),
+                        DataTypes.DECIMAL(10, 5),
+                        DataTypes.DECIMAL(16, 2),
+                        DataTypes.DECIMAL(29, 19));
+
+        List<Object> values =
+                Arrays.asList(
+                        (byte) 1,
+                        (short) 22,
+                        3333,
+                        (long) 44444444,
+                        DecimalData.fromBigDecimal(new BigDecimal("555555555555555"), 15, 0),
+                        DecimalData.fromBigDecimal(new BigDecimal("66666.66666"), 10, 5),
+                        DecimalData.fromBigDecimal(new BigDecimal("77777777.17"), 16, 2),
+                        DecimalData.fromBigDecimal(
+                                new BigDecimal("888888888.8888888888888888888"), 29, 19));
+
+        List<Schema> schemas =
+                types.stream()
+                        .map(
+                                temporalColumnType ->
+                                        Schema.newBuilder()
+                                                .physicalColumn("id", DataTypes.INT())
+                                                .physicalColumn("name", DataTypes.STRING())
+                                                .physicalColumn("age", DataTypes.INT())
+                                                .physicalColumn("fav_num", temporalColumnType)
                                                 .primaryKey("id")
                                                 .build())
                         .collect(Collectors.toList());

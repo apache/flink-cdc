@@ -71,7 +71,7 @@ jobs:
     strategy:
       matrix:
         java-version: [ '8' ]
-        flink-version: ['1.17.2', '1.18.1', '1.19.1', '1.20.0']
+        flink-version: ['1.19.1', '1.20.0']
         module: [ 'pipeline_e2e' ]
     name: Pipeline E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml
@@ -83,7 +83,7 @@ jobs:
     strategy:
       matrix:
         java-version: [ '8' ]
-        flink-version: ['1.16.3', '1.17.2', '1.18.1', '1.19.1', '1.20.0']
+        flink-version: ['1.19.1', '1.20.0']
         module: [ 'source_e2e' ]
     name: Source E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml

@@ -188,7 +188,7 @@ public class SqlServerTimezoneITCase extends SqlServerTestBase {
 
             waitForSnapshotStarted("sink");
 
-            List<String> actual = TestValuesTableFactory.getRawResults("sink");
+            List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
 
             result.getJobClient().get().cancel().get();
             return actual;

@@ -47,6 +47,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.BENODES;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.FENODES;
@@ -62,6 +63,7 @@ public class DorisPipelineITCase extends DorisSinkTestBase {
             StreamExecutionEnvironment.getExecutionEnvironment();
 
     private static final int DATABASE_OPERATION_TIMEOUT_SECONDS = 5;
+    private static final int DATA_FETCHING_TIMEOUT = 30;
 
     @BeforeClass
     public static void before() {
@@ -242,13 +244,21 @@ public class DorisPipelineITCase extends DorisSinkTestBase {
 
         env.execute("Values to Doris Sink");
 
-        List<String> actual = fetchTableContent(tableId, 4);
-
         List<String> expected =
                 Arrays.asList(
                         "17 | 6.28 | Doris Day | 2023-01-01 00:00:00",
                         "21 | 1.732 | Disenchanted | 2023-01-01 00:00:00");
+        long timeout = System.currentTimeMillis() + DATA_FETCHING_TIMEOUT * 1000;
 
-        assertEqualsInAnyOrder(expected, actual);
+        while (System.currentTimeMillis() < timeout) {
+            List<String> actual = fetchTableContent(tableId, 4);
+            if (actual.size() < expected.size()) {
+                Thread.sleep(1000L);
+                continue;
+            }
+            assertEqualsInAnyOrder(expected, actual);
+            return;
+        }
+        throw new TimeoutException("Failed to fetch enough records in time.");
     }
 }
