@@ -63,9 +63,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -108,6 +110,7 @@ public class PaimonSinkITCase {
         catalogOptions = new Options();
         catalogOptions.setString("metastore", metastore);
         catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
         table1 = TableId.tableId("test", "table1");
         if ("hive".equals(metastore)) {
             catalogOptions.setString("hadoop-conf-dir", HADOOP_CONF_DIR);
@@ -119,13 +122,14 @@ public class PaimonSinkITCase {
                                     + "'warehouse'='%s', "
                                     + "'metastore'='hive', "
                                     + "'hadoop-conf-dir'='%s', "
-                                    + "'hive-conf-dir'='%s' "
+                                    + "'hive-conf-dir'='%s', "
+                                    + "'cache-enabled'='false' "
                                     + ")",
                             warehouse, HADOOP_CONF_DIR, HIVE_CONF_DIR));
         } else {
             tEnv.executeSql(
                     String.format(
-                            "CREATE CATALOG paimon_catalog WITH ('type'='paimon', 'warehouse'='%s')",
+                            "CREATE CATALOG paimon_catalog WITH ('type'='paimon', 'warehouse'='%s', 'cache-enabled'='false')",
                             warehouse));
         }
         FlinkCatalogFactory.createPaimonCatalog(catalogOptions)
@@ -325,8 +329,8 @@ public class PaimonSinkITCase {
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(table1, Collections.singletonList(columnWithPosition));
         PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
-        writer.write(addColumnEvent, null);
         metadataApplier.applySchemaChange(addColumnEvent);
+        writer.write(addColumnEvent, null);
         generator =
                 new BinaryRecordDataGenerator(
                         RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
@@ -409,6 +413,13 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "5", "5"),
                         Row.ofKind(RowKind.INSERT, "6", "6")),
                 result);
+        result = new ArrayList<>();
+        tEnv.sqlQuery("select min_sequence_number from paimon_catalog.test.`table1$files`")
+                .execute()
+                .collect()
+                .forEachRemaining(result::add);
+        Set<Row> deduplicated = new HashSet<>(result);
+        Assertions.assertEquals(result.size(), deduplicated.size());
     }
 
     @ParameterizedTest
