@@ -196,7 +196,7 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
                 new String[] {
                     "+I[1, 1]", "+I[2, 0]", "+I[3, 1]", "+I[4, 0]", "+I[5, 1]", "+I[6, 0]",
                 };
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
         result.getJobClient().get().cancel().get();
     }
