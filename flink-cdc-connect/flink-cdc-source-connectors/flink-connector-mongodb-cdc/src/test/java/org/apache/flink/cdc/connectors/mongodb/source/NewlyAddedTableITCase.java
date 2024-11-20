@@ -80,7 +80,7 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
         // prepare initial data for given collection
         String collectionName = "produce_changelog";
         // enable system-level fulldoc pre & post image feature
-        mongoContainer.executeCommand(
+        MONGO_CONTAINER.executeCommand(
                 "use admin; db.runCommand({ setClusterParameter: { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 'off' } } } })");
 
         // mock continuous changelog during the newly added collections capturing process
@@ -101,8 +101,11 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
     @AfterEach
     public void after() {
         mockChangelogExecutor.shutdown();
-        MongoDatabase mongoDatabase = mongodbClient.getDatabase(customerDatabase);
-        mongoDatabase.drop();
+        if (mongodbClient != null) {
+            MongoDatabase mongoDatabase = mongodbClient.getDatabase(customerDatabase);
+            mongoDatabase.drop();
+        }
+        miniClusterResource.get().cancelAllJobs();
     }
 
     @Test
@@ -839,7 +842,7 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
             // make initial data for given collection.
             String cityName = collectionName.split("_")[1];
             // B - enable collection-level fulldoc pre & post image for change capture collection
-            mongoContainer.executeCommandInDatabase(
+            MONGO_CONTAINER.executeCommandInDatabase(
                     String.format(
                             "db.createCollection('%s'); db.runCommand({ collMod: '%s', changeStreamPreAndPostImages: { enabled: true } })",
                             collectionName, collectionName),
@@ -976,7 +979,7 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                         + " 'scan.newly-added-table.enabled' = 'true'"
                         + " %s"
                         + ")",
-                mongoContainer.getHostAndPort(),
+                MONGO_CONTAINER.getHostAndPort(),
                 FLINK_USER,
                 FLINK_USER_PASSWORD,
                 customerDatabase,

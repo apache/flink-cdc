@@ -63,9 +63,9 @@ class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         setup(parallelismSnapshot);
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db0 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db0 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
         // db1: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db1 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db1 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
 
         // 2. Test match: collection = ^(db0|db1)\.coll_a\d?$
         String collectionRegex = String.format("^(%s|%s)\\.coll_a\\d?$", db0, db1);
@@ -108,11 +108,11 @@ class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         setup(parallelismSnapshot);
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db0 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db0 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
         // db1: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db1 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db1 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
         // db2: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db2 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db2 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
 
         // 2. Test match database: ^(db0|db1)$
         String databaseRegex = String.format("%s|%s", db0, db1);
@@ -164,9 +164,9 @@ class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         setup(parallelismSnapshot);
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db0 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db0 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
         // db1: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db1 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db1 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
 
         // 2. Test match: collection ^(db0|db1)\.coll_a\d?$
         String collectionRegex = String.format("^%s\\.coll_b\\d?$", db0);
@@ -206,9 +206,9 @@ class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         setup(parallelismSnapshot);
         // 1. Given collections:
         // db0: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db0 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db0 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
         // db1: [coll_a1, coll_a2, coll_b1, coll_b2]
-        String db1 = mongoContainer.executeCommandFileInSeparateDatabase("ns_regex");
+        String db1 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns_regex");
 
         // 2. Test match: collection .*coll_b\d?
         String collectionRegex = ".*coll_b\\d?";
@@ -246,7 +246,7 @@ class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         setup(parallelismSnapshot);
         // 1. Given collections:
         // db0: [coll-a1, coll-a2, coll-b1, coll-b2]
-        String db0 = mongoContainer.executeCommandFileInSeparateDatabase("ns-regex");
+        String db0 = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns-regex");
 
         TableResult result = submitTestCase(db0, "coll-a1", parallelismSnapshot);
 
@@ -268,7 +268,7 @@ class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         setup(parallelismSnapshot);
         // 1. Given colllections:
         // db: [coll.name]
-        String db = mongoContainer.executeCommandFileInSeparateDatabase("ns-dotted");
+        String db = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns-dotted");
 
         TableResult result = submitTestCase(db, db + "[.]coll[.]name", parallelismSnapshot);
 
@@ -299,7 +299,7 @@ class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
                         + " coll_name STRING METADATA FROM 'collection_name' VIRTUAL,"
                         + " PRIMARY KEY (_id) NOT ENFORCED"
                         + ") WITH ("
-                        + ignoreIfNull("hosts", mongoContainer.getHostAndPort())
+                        + ignoreIfNull("hosts", MONGO_CONTAINER.getHostAndPort())
                         + ignoreIfNull("username", FLINK_USER)
                         + ignoreIfNull("password", FLINK_USER_PASSWORD)
                         + ignoreIfNull("database", database)

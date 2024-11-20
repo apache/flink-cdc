@@ -80,7 +80,7 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
     void testGetMongoDBVersion() {
         MongoDBSourceConfig config =
                 new MongoDBSourceConfigFactory()
-                        .hosts(mongoContainer.getHostAndPort())
+                        .hosts(MONGO_CONTAINER.getHostAndPort())
                         .splitSizeMB(1)
                         .samplesPerChunk(10)
                         .pollAwaitTimeMillis(500)
@@ -492,16 +492,16 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                 "customer_" + Integer.toUnsignedString(new Random().nextInt(), 36);
 
         // A - enable system-level fulldoc pre & post image feature
-        mongoContainer.executeCommand(
+        MONGO_CONTAINER.executeCommand(
                 "use admin; db.runCommand({ setClusterParameter: { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 'off' } } } })");
 
         // B - enable collection-level fulldoc pre & post image for change capture collection
-        mongoContainer.executeCommandInDatabase(
+        MONGO_CONTAINER.executeCommandInDatabase(
                 String.format(
                         "db.createCollection('%s'); db.runCommand({ collMod: '%s', changeStreamPreAndPostImages: { enabled: true } })",
                         "customers", "customers"),
                 customerDatabase);
-        mongoContainer.executeCommandFileInDatabase("customer", customerDatabase);
+        MONGO_CONTAINER.executeCommandFileInDatabase("customer", customerDatabase);
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(1000);
@@ -519,7 +519,7 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         TestTable customerTable = new TestTable(customerDatabase, "customers", customersSchema);
         MongoDBSource<RowData> source =
                 new MongoDBSourceBuilder<RowData>()
-                        .hosts(mongoContainer.getHostAndPort())
+                        .hosts(MONGO_CONTAINER.getHostAndPort())
                         .databaseList(customerDatabase)
                         .username(FLINK_USER)
                         .password(FLINK_USER_PASSWORD)
@@ -618,12 +618,12 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                 "customer_" + Integer.toUnsignedString(new Random().nextInt(), 36);
 
         // A - enable system-level fulldoc pre & post image feature
-        mongoContainer.executeCommand(
+        MONGO_CONTAINER.executeCommand(
                 "use admin; db.runCommand({ setClusterParameter: { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 'off' } } } })");
 
         // B - enable collection-level fulldoc pre & post image for change capture collection
         for (String collectionName : captureCustomerCollections) {
-            mongoContainer.executeCommandInDatabase(
+            MONGO_CONTAINER.executeCommandInDatabase(
                     String.format(
                             "db.createCollection('%s'); db.runCommand({ collMod: '%s', changeStreamPreAndPostImages: { enabled: true } })",
                             collectionName, collectionName),
@@ -659,14 +659,14 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
                                 + ")",
                         parallelismSnapshot ? "true" : "false",
-                        mongoContainer.getHostAndPort(),
+                        MONGO_CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         customerDatabase,
                         getCollectionNameRegex(customerDatabase, captureCustomerCollections),
                         skipSnapshotBackfill);
 
-        mongoContainer.executeCommandFileInDatabase("customer", customerDatabase);
+        MONGO_CONTAINER.executeCommandFileInDatabase("customer", customerDatabase);
 
         // first step: check the snapshot data
         String[] snapshotForSingleTable =

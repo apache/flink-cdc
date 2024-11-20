@@ -33,20 +33,16 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.Objects;
-import java.util.stream.Stream;
 
 /** MongoDBSourceTestBase for MongoDB >= 5.0.3. */
+@Testcontainers
 public class MongoDBSourceTestBase {
 
-    public MongoDBSourceTestBase() {
-        this.mongoContainer =
-                new MongoDBContainer("mongo:" + getMongoVersion())
-                        .withSharding()
-                        .withLogConsumer(new Slf4jLogConsumer(LOG));
-    }
+    private static final Logger LOG = LoggerFactory.getLogger(MongoDBSourceTestBase.class);
 
     public static String getMongoVersion() {
         String specifiedMongoVersion = System.getProperty("specifiedMongoVersion");
@@ -59,7 +55,11 @@ public class MongoDBSourceTestBase {
 
     protected static final int DEFAULT_PARALLELISM = 4;
 
-    public final MongoDBContainer mongoContainer;
+    @Container
+    public static final MongoDBContainer MONGO_CONTAINER =
+            new MongoDBContainer("mongo:" + getMongoVersion())
+                    .withSharding()
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     protected MongoClient mongodbClient;
 
@@ -75,32 +75,20 @@ public class MongoDBSourceTestBase {
                                     .build()));
 
     @BeforeEach
-    public void startContainers() {
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(mongoContainer)).join();
-
+    public void createClients() {
         MongoClientSettings settings =
                 MongoClientSettings.builder()
                         .applyConnectionString(
-                                new ConnectionString(mongoContainer.getConnectionString()))
+                                new ConnectionString(MONGO_CONTAINER.getConnectionString()))
                         .build();
         mongodbClient = MongoClients.create(settings);
-
-        LOG.info("Containers are started.");
     }
 
     @AfterEach
-    public void stopContainers() {
-        LOG.info("Stopping containers...");
-        if (mongoContainer != null) {
-            mongoContainer.close();
-        }
+    public void destroyClients() {
         if (mongodbClient != null) {
             mongodbClient.close();
             mongodbClient = null;
         }
-        LOG.info("Containers are stopped.");
     }
-
-    private static final Logger LOG = LoggerFactory.getLogger(MongoDBSourceTestBase.class);
 }

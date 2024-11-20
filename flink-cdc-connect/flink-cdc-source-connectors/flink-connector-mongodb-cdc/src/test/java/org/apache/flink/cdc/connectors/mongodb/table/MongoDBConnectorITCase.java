@@ -79,7 +79,7 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
     void testConsumingAllEvents(boolean parallelismSnapshot)
             throws ExecutionException, InterruptedException {
         setup(parallelismSnapshot);
-        String database = mongoContainer.executeCommandFileInSeparateDatabase("inventory");
+        String database = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         String sourceDDL =
                 String.format(
@@ -100,7 +100,7 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'heartbeat.interval.ms' = '1000'"
                                 + ")",
-                        mongoContainer.getHostAndPort(),
+                        MONGO_CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,
@@ -214,7 +214,7 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
     @ValueSource(booleans = {true, false})
     void testStartupFromTimestamp(boolean parallelismSnapshot) throws Exception {
         setup(parallelismSnapshot);
-        String database = mongoContainer.executeCommandFileInSeparateDatabase("inventory");
+        String database = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         // Unfortunately we have to sleep here to differ initial and later-generating changes in
         // oplog by timestamp
@@ -243,7 +243,7 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                                 + "',"
                                 + " 'heartbeat.interval.ms' = '1000'"
                                 + ")",
-                        mongoContainer.getHostAndPort(),
+                        MONGO_CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,
@@ -295,7 +295,7 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
     @ValueSource(booleans = {true, false})
     void testAllTypes(boolean parallelismSnapshot) throws Throwable {
         setup(parallelismSnapshot);
-        String database = mongoContainer.executeCommandFileInSeparateDatabase("column_type_test");
+        String database = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("column_type_test");
 
         String sourceDDL =
                 String.format(
@@ -338,7 +338,7 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                                 + " 'database' = '%s',"
                                 + " 'collection' = '%s'"
                                 + ")",
-                        mongoContainer.getHostAndPort(),
+                        MONGO_CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,
@@ -460,7 +460,7 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
     @ValueSource(booleans = {true, false})
     void testMetadataColumns(boolean parallelismSnapshot) throws Exception {
         setup(parallelismSnapshot);
-        String database = mongoContainer.executeCommandFileInSeparateDatabase("inventory");
+        String database = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         String sourceDDL =
                 String.format(
@@ -482,7 +482,7 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                                 + " 'collection' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s'"
                                 + ")",
-                        mongoContainer.getHostAndPort(),
+                        MONGO_CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         database,

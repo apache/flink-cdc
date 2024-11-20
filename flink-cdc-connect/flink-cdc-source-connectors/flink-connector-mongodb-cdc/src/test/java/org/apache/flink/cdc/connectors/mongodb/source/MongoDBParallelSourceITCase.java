@@ -404,7 +404,7 @@ class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     private List<String> testBackfillWhenWritingEvents(
             boolean skipBackFill, int fetchSize, int hookType, StartupOptions startupOptions)
             throws Exception {
-        String customerDatabase = mongoContainer.executeCommandFileInSeparateDatabase("customer");
+        String customerDatabase = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("customer");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(1000);
         env.setParallelism(1);
@@ -421,7 +421,7 @@ class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
         TestTable customerTable = new TestTable(customerDatabase, "customers", customersSchema);
         MongoDBSource<RowData> source =
                 new MongoDBSourceBuilder<RowData>()
-                        .hosts(mongoContainer.getHostAndPort())
+                        .hosts(MONGO_CONTAINER.getHostAndPort())
                         .databaseList(customerDatabase)
                         .username(FLINK_USER)
                         .password(FLINK_USER_PASSWORD)
@@ -514,7 +514,7 @@ class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
             boolean skipSnapshotBackfill)
             throws Exception {
 
-        String customerDatabase = mongoContainer.executeCommandFileInSeparateDatabase("customer");
+        String customerDatabase = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("customer");
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
@@ -542,7 +542,7 @@ class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
                                 + " 'heartbeat.interval.ms' = '500',"
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
                                 + ")",
-                        mongoContainer.getHostAndPort(),
+                        MONGO_CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         customerDatabase,

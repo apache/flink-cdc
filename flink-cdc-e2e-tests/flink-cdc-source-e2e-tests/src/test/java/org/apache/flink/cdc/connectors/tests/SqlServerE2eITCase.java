@@ -63,7 +63,7 @@ class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
     public static final String MSSQL_SERVER_IMAGE = "mcr.microsoft.com/mssql/server:2019-latest";
 
     @Container
-    public MSSQLServerContainer<?> sqlServer =
+    public static final MSSQLServerContainer<?> SQL_SERVER_CONTAINER =
             new MSSQLServerContainer<>(MSSQL_SERVER_IMAGE)
                     .withPassword("Password!")
                     .withEnv("MSSQL_AGENT_ENABLED", "true")
@@ -76,15 +76,15 @@ class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
     public void before() {
         super.before();
         LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(sqlServer)).join();
+        Startables.deepStart(Stream.of(SQL_SERVER_CONTAINER)).join();
         LOG.info("Containers are started.");
         initializeSqlServerTable("sqlserver_inventory");
     }
 
     @AfterEach
     public void after() {
-        if (sqlServer != null) {
-            sqlServer.stop();
+        if (SQL_SERVER_CONTAINER != null) {
+            SQL_SERVER_CONTAINER.stop();
         }
         super.after();
     }
@@ -104,9 +104,9 @@ class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
                         ") WITH (",
                         " 'connector' = 'sqlserver-cdc',",
                         " 'hostname' = '" + INTER_CONTAINER_SQL_SERVER_ALIAS + "',",
-                        " 'port' = '" + sqlServer.MS_SQL_SERVER_PORT + "',",
-                        " 'username' = '" + sqlServer.getUsername() + "',",
-                        " 'password' = '" + sqlServer.getPassword() + "',",
+                        " 'port' = '" + SQL_SERVER_CONTAINER.MS_SQL_SERVER_PORT + "',",
+                        " 'username' = '" + SQL_SERVER_CONTAINER.getUsername() + "',",
+                        " 'password' = '" + SQL_SERVER_CONTAINER.getPassword() + "',",
                         " 'database-name' = 'inventory',",
                         " 'table-name' = 'dbo.products',",
                         " 'scan.incremental.snapshot.enabled' = '" + parallelismSnapshot + "',",
@@ -212,6 +212,8 @@ class SqlServerE2eITCase extends FlinkContainerTestEnvironment {
 
     private Connection getSqlServerJdbcConnection() throws SQLException {
         return DriverManager.getConnection(
-                sqlServer.getJdbcUrl(), sqlServer.getUsername(), sqlServer.getPassword());
+                SQL_SERVER_CONTAINER.getJdbcUrl(),
+                SQL_SERVER_CONTAINER.getUsername(),
+                SQL_SERVER_CONTAINER.getPassword());
     }
 }

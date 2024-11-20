@@ -84,11 +84,11 @@ class MongoDBStreamSplitReaderTest extends MongoDBSourceTestBase {
 
     @BeforeEach
     public void before() {
-        database = mongoContainer.executeCommandFileInSeparateDatabase("chunk_test");
+        database = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("chunk_test");
 
         MongoDBSourceConfigFactory configFactory =
                 new MongoDBSourceConfigFactory()
-                        .hosts(mongoContainer.getHostAndPort())
+                        .hosts(MONGO_CONTAINER.getHostAndPort())
                         .databaseList(database)
                         .collectionList(database + ".shopping_cart")
                         .username(FLINK_USER)
