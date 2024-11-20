@@ -463,9 +463,11 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                 return String.format("DECIMAL(%d, %s)", columnSize.get(), decimalDigits.get());
             case "CHAR":
             case "VARCHAR":
+            case "VARBINARY":
                 Preconditions.checkArgument(
                         columnSize.isPresent(), type + " type must have column size");
                 return String.format("%s(%d)", dataType, columnSize.get());
+            case "DATETIME":
             case "TIMESTAMP":
                 return columnSize
                         .map(size -> String.format("%s(%d)", dataType, size))

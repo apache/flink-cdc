@@ -50,7 +50,7 @@ public class OceanBaseTestMySQLCatalog extends OceanBaseMySQLCatalog {
                 "table name cannot be null or empty.");
 
         final String tableSchemaQuery =
-                "SELECT `COLUMN_NAME`, `DATA_TYPE`, `ORDINAL_POSITION`, `NUMERIC_SCALE`, "
+                "SELECT `COLUMN_NAME`, `DATA_TYPE`, `ORDINAL_POSITION`, `NUMERIC_SCALE`, `NUMERIC_PRECISION`, "
                         + "`IS_NULLABLE`, `COLUMN_KEY`, `COLUMN_COMMENT` FROM `information_schema`.`COLUMNS` "
                         + "WHERE `TABLE_SCHEMA`=? AND `TABLE_NAME`=?;";
 
@@ -70,6 +70,10 @@ public class OceanBaseTestMySQLCatalog extends OceanBaseMySQLCatalog {
                         if (resultSet.wasNull()) {
                             scale = null;
                         }
+                        Integer precision = null;
+                        if ("decimal".equalsIgnoreCase(resultSet.getString("DATA_TYPE"))) {
+                            precision = resultSet.getInt("NUMERIC_PRECISION");
+                        }
                         String isNullable = resultSet.getString("IS_NULLABLE");
                         String comment = resultSet.getString("COLUMN_COMMENT");
                         OceanBaseColumn column =
@@ -78,6 +82,7 @@ public class OceanBaseTestMySQLCatalog extends OceanBaseMySQLCatalog {
                                         .setOrdinalPosition(position - 1)
                                         .setDataType(type)
                                         .setNumericScale(scale)
+                                        .setColumnSize(precision)
                                         .setNullable(
                                                 isNullable == null
                                                         || !isNullable.equalsIgnoreCase("NO"))

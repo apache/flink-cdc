@@ -166,10 +166,10 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                 customerList,
                 Matchers.containsInAnyOrder(
                         Stream.of(
-                                        "101,user_1,Shanghai,123567891234,2023-12-12 11:00:11.0",
-                                        "102,user_2,Shanghai,123567891234,2023-12-12 11:00:11.0",
-                                        "103,user_3,Shanghai,123567891234,2023-12-12 11:00:11.0",
-                                        "104,user_4,Shanghai,123567891234,2023-12-12 11:00:11.0")
+                                        "101,user_1,Shanghai,123567891234,2023-12-12T11:00:11",
+                                        "102,user_2,Shanghai,123567891234,2023-12-12T11:00:11",
+                                        "103,user_3,Shanghai,123567891234,2023-12-12T11:00:11",
+                                        "104,user_4,Shanghai,123567891234,2023-12-12T11:00:11")
                                 .toArray()));
 
         // generate binlogs

@@ -29,6 +29,8 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 
+import org.apache.flink.shaded.guava31.com.google.common.cache.Cache;
+import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import com.oceanbase.connector.flink.table.DataChangeRecord;
@@ -41,10 +43,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 /** A serializer for Event to Record. */
 public class OceanBaseEventSerializationSchema implements RecordSerializationSchema<Event> {
 
+    private final Cache<Schema, List<OceanBaseRowConvert.SerializationConverter>> cache =
+            CacheBuilder.newBuilder().build();
     private final Map<TableId, Schema> schemaMaps = new HashMap<>();
 
     /** ZoneId from pipeline config to support timestamp with local time zone. */
@@ -128,11 +134,26 @@ public class OceanBaseEventSerializationSchema implements RecordSerializationSch
                 "Column size does not match the data size");
         Object[] values = new Object[columns.size()];
 
+        List<OceanBaseRowConvert.SerializationConverter> converters = null;
+        try {
+            converters =
+                    cache.get(
+                            schema,
+                            () ->
+                                    columns.stream()
+                                            .map(
+                                                    column ->
+                                                            OceanBaseRowConvert
+                                                                    .createNullableExternalConverter(
+                                                                            column.getType(),
+                                                                            pipelineZoneId))
+                                            .collect(Collectors.toList()));
+        } catch (ExecutionException e) {
+            throw new RuntimeException("Failed to obtain SerializationConverter cache", e);
+        }
+
         for (int i = 0; i < recordData.getArity(); i++) {
-            OceanBaseRowConvert.SerializationConverter converter =
-                    OceanBaseRowConvert.createNullableExternalConverter(
-                            columns.get(i).getType(), pipelineZoneId);
-            Object field = converter.serialize(i, recordData);
+            Object field = converters.get(i).serialize(i, recordData);
             values[i] = field;
         }
 

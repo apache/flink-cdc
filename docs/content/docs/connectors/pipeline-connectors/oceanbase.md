@@ -231,6 +231,21 @@ pipeline:
       <td></td>
     </tr>
     <tr>
+      <td>BINARY</td>
+      <td>BINARY</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>VARBINARY(n) when n <= 1048576 </td>
+      <td>VARBINARY(n)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>VARBINARY(n) when n > 1048576 </td>
+      <td>LONGBLOB</td>
+      <td></td>
+    </tr>
+    <tr>
       <td>FLOAT</td>
       <td>FLOAT</td>
       <td></td>
@@ -253,10 +268,20 @@ pipeline:
     <tr>
       <td>DATE</td>
       <td>DATE</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>TIME</td>
+      <td>TIME</td>
       <td></td>
     </tr>
     <tr>
       <td>TIMESTAMP</td>
+      <td>DATETIME</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>TIMESTAMP_TZ</td>
       <td>TIMESTAMP</td>
       <td></td>
     </tr>
@@ -276,8 +301,13 @@ pipeline:
       <td></td>
     </tr>
     <tr>
+      <td>VARCHAR(n) where n <= 262144</td>
       <td>VARCHAR(n)</td>
-      <td>VARCHAR(n)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>VARCHAR(n) where n > 262144</td>
+      <td>TEXT</td>
       <td></td>
     </tr>
     </tbody>

@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.IntType;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils;
@@ -126,7 +127,7 @@ public class OceanBaseMetadataApplierTest {
                 new OceanBaseColumn.Builder()
                         .setColumnName("col3")
                         .setOrdinalPosition(2)
-                        .setDataType("datetime")
+                        .setDataType("timestamp")
                         .setNullable(true)
                         .build());
         OceanBaseTable expectTable =
@@ -138,8 +139,211 @@ public class OceanBaseMetadataApplierTest {
                         .setTableKeys(schema.primaryKeys())
                         .build();
 
-        System.out.println(expectTable);
-        System.out.println(actualTable);
+        assertEquals(expectTable, actualTable);
+    }
+
+    @Test
+    public void testCreateTableWithAllType() {
+        TableId tableId = TableId.parse("test.tbl6");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", new IntType(false))
+                        .physicalColumn("col2", DataTypes.BOOLEAN())
+                        .physicalColumn("col3", DataTypes.TIMESTAMP_LTZ())
+                        .physicalColumn("col4", DataTypes.BYTES())
+                        .physicalColumn("col5", DataTypes.TINYINT())
+                        .physicalColumn("col6", DataTypes.SMALLINT())
+                        .physicalColumn("col7", DataTypes.BIGINT())
+                        .physicalColumn("col8", DataTypes.FLOAT())
+                        .physicalColumn("col9", DataTypes.DOUBLE())
+                        .physicalColumn("col10", DataTypes.DECIMAL(6, 3))
+                        .physicalColumn("col11", DataTypes.CHAR(5))
+                        .physicalColumn("col12", DataTypes.VARCHAR(10))
+                        .physicalColumn("col13", DataTypes.STRING())
+                        .physicalColumn("col14", DataTypes.DATE())
+                        .physicalColumn("col15", DataTypes.TIME())
+                        .physicalColumn("col16", DataTypes.TIME(6))
+                        .physicalColumn("col17", DataTypes.TIMESTAMP())
+                        .physicalColumn("col18", DataTypes.TIMESTAMP(3))
+                        .physicalColumn("col19", DataTypes.TIMESTAMP_LTZ(3))
+                        .physicalColumn("col20", DataTypes.TIMESTAMP_TZ())
+                        .physicalColumn("col21", DataTypes.TIMESTAMP_TZ(3))
+                        .primaryKey("col1")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        OceanBaseTable actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        assertNotNull(actualTable);
+
+        List<OceanBaseColumn> columns = new ArrayList<>();
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col1")
+                        .setOrdinalPosition(0)
+                        .setDataType("int")
+                        .setNumericScale(0)
+                        .setNullable(false)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col2")
+                        .setOrdinalPosition(1)
+                        .setDataType("tinyint")
+                        .setNumericScale(0)
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col3")
+                        .setOrdinalPosition(2)
+                        .setDataType("timestamp")
+                        .setNullable(true)
+                        .build());
+
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col4")
+                        .setOrdinalPosition(3)
+                        .setDataType("longblob")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col5")
+                        .setOrdinalPosition(4)
+                        .setDataType("tinyint")
+                        .setNumericScale(0)
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col6")
+                        .setOrdinalPosition(5)
+                        .setDataType("smallint")
+                        .setNumericScale(0)
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col7")
+                        .setOrdinalPosition(6)
+                        .setDataType("bigint")
+                        .setNumericScale(0)
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col8")
+                        .setOrdinalPosition(7)
+                        .setDataType("float")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col9")
+                        .setOrdinalPosition(8)
+                        .setDataType("double")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col10")
+                        .setOrdinalPosition(9)
+                        .setDataType("decimal")
+                        .setNumericScale(3)
+                        .setColumnSize(6)
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col11")
+                        .setOrdinalPosition(10)
+                        .setDataType("char")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col12")
+                        .setOrdinalPosition(11)
+                        .setDataType("varchar")
+                        .setNullable(true)
+                        .build());
+
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col13")
+                        .setOrdinalPosition(12)
+                        .setDataType("text")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col14")
+                        .setOrdinalPosition(13)
+                        .setDataType("date")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col15")
+                        .setOrdinalPosition(14)
+                        .setDataType("time")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col16")
+                        .setOrdinalPosition(15)
+                        .setDataType("time")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col17")
+                        .setOrdinalPosition(16)
+                        .setDataType("datetime")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col18")
+                        .setOrdinalPosition(17)
+                        .setDataType("datetime")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col19")
+                        .setOrdinalPosition(18)
+                        .setDataType("timestamp")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col20")
+                        .setOrdinalPosition(19)
+                        .setDataType("timestamp")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new OceanBaseColumn.Builder()
+                        .setColumnName("col21")
+                        .setOrdinalPosition(20)
+                        .setDataType("timestamp")
+                        .setNullable(true)
+                        .build());
+
+        OceanBaseTable expectTable =
+                new OceanBaseTable.Builder()
+                        .setDatabaseName(tableId.getSchemaName())
+                        .setTableName(tableId.getTableName())
+                        .setTableType(OceanBaseTable.TableType.PRIMARY_KEY)
+                        .setColumns(columns)
+                        .setTableKeys(schema.primaryKeys())
+                        .build();
+
         assertEquals(expectTable, actualTable);
     }
 
@@ -247,8 +451,6 @@ public class OceanBaseMetadataApplierTest {
         OceanBaseTable changeTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
 
-        System.out.println(actualTable);
-        System.out.println(changeTable);
         Assert.assertNotEquals(
                 actualTable.getColumn("col2").getDataType(),
                 changeTable.getColumn("col2").getDataType());

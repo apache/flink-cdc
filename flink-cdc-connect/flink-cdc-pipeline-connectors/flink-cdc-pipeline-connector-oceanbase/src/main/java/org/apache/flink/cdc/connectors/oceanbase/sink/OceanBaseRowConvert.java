@@ -34,8 +34,10 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import java.io.IOException;
 import java.io.Serializable;
 import java.sql.Date;
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.HashMap;
@@ -100,6 +102,9 @@ public class OceanBaseRowConvert implements Serializable {
                 return (index, val) -> val.getDouble(index);
             case DATE:
                 return (index, val) -> Date.valueOf(LocalDate.ofEpochDay(val.getInt(index)));
+            case TIME_WITHOUT_TIME_ZONE:
+                return (index, val) ->
+                        Time.valueOf(LocalTime.ofSecondOfDay(val.getInt(index) / 1000));
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return (index, val) ->
                         val.getTimestamp(index, DataTypeChecks.getPrecision(type)).toTimestamp();
