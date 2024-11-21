@@ -48,7 +48,7 @@ public class TransformRule implements Serializable {
             @Nullable String postTransformConverter,
             SupportedMetadataColumn[] supportedMetadataColumns) {
         this.tableInclusions = tableInclusions;
-        this.projection = projection;
+        this.projection = StringUtils.isNullOrWhitespaceOnly(projection) ? "*" : projection;
         this.filter = normalizeFilter(projection, filter);
         this.primaryKey = primaryKey;
         this.partitionKey = partitionKey;
