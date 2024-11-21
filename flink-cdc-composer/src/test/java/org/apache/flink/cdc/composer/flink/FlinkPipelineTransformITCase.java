@@ -77,6 +77,7 @@ import java.util.stream.Stream;
 
 import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Integration test for {@link FlinkPipelineComposer}. */
 class FlinkPipelineTransformITCase {
@@ -368,6 +369,93 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, DERRIDA, 25, student], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, DERRIDA, 25, student], after=[], op=DELETE, meta=()}"));
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testMultiTransformSchemaColumnsCompatibility(ValuesDataSink.SinkApi sinkApi) {
+        TransformDef nullProjection =
+                new TransformDef(
+                        "default_namespace.default_schema.mytable2",
+                        null,
+                        "age < 18",
+                        null,
+                        null,
+                        null,
+                        null);
+
+        TransformDef emptyProjection =
+                new TransformDef(
+                        "default_namespace.default_schema.mytable2",
+                        "",
+                        "age < 18",
+                        null,
+                        null,
+                        null,
+                        null);
+
+        TransformDef asteriskProjection =
+                new TransformDef(
+                        "default_namespace.default_schema.mytable2",
+                        "*",
+                        "age < 18",
+                        null,
+                        null,
+                        null,
+                        null);
+
+        List<TransformDef> transformDefList =
+                Arrays.asList(nullProjection, emptyProjection, asteriskProjection);
+
+        for (TransformDef transformDef : transformDefList) {
+            assertThatThrownBy(
+                            () ->
+                                    runGenericTransformTest(
+                                            sinkApi,
+                                            Arrays.asList(
+                                                    transformDef,
+                                                    new TransformDef(
+                                                            "default_namespace.default_schema.mytable2",
+                                                            // reference part column
+                                                            "id,UPPER(name) AS name",
+                                                            "age >= 18",
+                                                            null,
+                                                            null,
+                                                            null,
+                                                            null)),
+                                            Collections.emptyList()))
+                    .rootCause()
+                    .hasMessage(
+                            "Unable to merge schema columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=() "
+                                    + "and columns={`id` BIGINT,`name` STRING}, primaryKeys=id, options=() with different column counts.");
+        }
+
+        for (TransformDef transformDef : transformDefList) {
+            assertThatThrownBy(
+                    () ->
+                            runGenericTransformTest(
+                                    sinkApi,
+                                    Arrays.asList(
+                                            transformDef,
+                                            new TransformDef(
+                                                    "default_namespace.default_schema.mytable2",
+                                                    // reference all column
+                                                    "id,UPPER(name) AS name,age,description",
+                                                    "age >= 18",
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null)),
+                                    Arrays.asList(
+                                            "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
+                                            "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
+                                            "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20], op=INSERT, meta=()}",
+                                            "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20], after=[2, Bob, 30], op=UPDATE, meta=()}",
+                                            "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT,`name` STRING,`age` TINYINT,`description` STRING}, primaryKeys=id, options=()}",
+                                            "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student], op=INSERT, meta=()}",
+                                            "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, DERRIDA, 25, student], op=INSERT, meta=()}",
+                                            "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, DERRIDA, 25, student], after=[], op=DELETE, meta=()}")));
+        }
     }
 
     /** This tests if transform generates metadata info correctly. */
