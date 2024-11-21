@@ -19,12 +19,15 @@ package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
+
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -35,8 +38,13 @@ import java.util.stream.Collectors;
  */
 public class TransformTranslator {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     public DataStream<Event> translatePreTransform(
-            DataStream<Event> input, List<TransformDef> transforms, List<UdfDef> udfFunctions) {
+            DataStream<Event> input,
+            List<TransformDef> transforms,
+            List<UdfDef> udfFunctions,
+            List<ModelDef> models) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -52,9 +60,14 @@ public class TransformTranslator {
                     transform.getPartitionKeys(),
                     transform.getTableOptions());
         }
+
         preTransformFunctionBuilder.addUdfFunctions(
                 udfFunctions.stream()
-                        .map(udf -> Tuple2.of(udf.getName(), udf.getClasspath()))
+                        .map(this::udfDefToNameAndClasspathTuple)
+                        .collect(Collectors.toList()));
+        preTransformFunctionBuilder.addUdfFunctions(
+                models.stream()
+                        .map(this::modelToNameAndClasspathTuple)
                         .collect(Collectors.toList()));
         return input.transform(
                 "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
@@ -64,7 +77,8 @@ public class TransformTranslator {
             DataStream<Event> input,
             List<TransformDef> transforms,
             String timezone,
-            List<UdfDef> udfFunctions) {
+            List<UdfDef> udfFunctions,
+            List<ModelDef> models) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -85,9 +99,27 @@ public class TransformTranslator {
         postTransformFunctionBuilder.addTimezone(timezone);
         postTransformFunctionBuilder.addUdfFunctions(
                 udfFunctions.stream()
-                        .map(udf -> Tuple2.of(udf.getName(), udf.getClasspath()))
+                        .map(this::udfDefToNameAndClasspathTuple)
+                        .collect(Collectors.toList()));
+        postTransformFunctionBuilder.addUdfFunctions(
+                models.stream()
+                        .map(this::modelToNameAndClasspathTuple)
                         .collect(Collectors.toList()));
         return input.transform(
                 "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build());
+    }
+
+    private Tuple2<String, String> modelToNameAndClasspathTuple(ModelDef model) {
+        try {
+            // A tricky way to pass parameters to UDF
+            String serializedParams = objectMapper.writeValueAsString(model.getParameters());
+            return Tuple2.of(serializedParams, model.getModel());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("ModelDef is illegal, ModelDef is " + model, e);
+        }
+    }
+
+    private Tuple2<String, String> udfDefToNameAndClasspathTuple(UdfDef udf) {
+        return Tuple2.of(udf.getName(), udf.getClasspath());
     }
 }

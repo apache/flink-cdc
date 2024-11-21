@@ -20,6 +20,7 @@ package org.apache.flink.cdc.cli.parser;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
@@ -39,6 +40,7 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Set;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
@@ -344,6 +346,17 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     "add new uniq_id for each row")),
                     Collections.emptyList(),
+                    Collections.singletonList(
+                            new ModelDef(
+                                    "GET_EMBEDDING",
+                                    "OpenAIEmbeddingModel",
+                                    new LinkedHashMap<>(
+                                            ImmutableMap.<String, String>builder()
+                                                    .put("name", "GET_EMBEDDING")
+                                                    .put("model", "OpenAIEmbeddingModel")
+                                                    .put("host", "https://xxxx")
+                                                    .put("key", "abcd1234")
+                                                    .build()))),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -397,7 +410,12 @@ class YamlPipelineDefinitionParserTest {
                         + "  name: source-database-sync-pipe\n"
                         + "  parallelism: 4\n"
                         + "  schema.change.behavior: evolve\n"
-                        + "  schema-operator.rpc-timeout: 1 h";
+                        + "  schema-operator.rpc-timeout: 1 h\n"
+                        + "  models:\n"
+                        + "    - name: GET_EMBEDDING\n"
+                        + "      model: OpenAIEmbeddingModel\n"
+                        + "      host: https://xxxx\n"
+                        + "      key: abcd1234";
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef = parser.parse(pipelineDefText, new Configuration());
         assertThat(pipelineDef).isEqualTo(fullDef);
@@ -459,6 +477,17 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     "add new uniq_id for each row")),
                     Collections.emptyList(),
+                    Collections.singletonList(
+                            new ModelDef(
+                                    "GET_EMBEDDING",
+                                    "OpenAIEmbeddingModel",
+                                    new LinkedHashMap<>(
+                                            ImmutableMap.<String, String>builder()
+                                                    .put("name", "GET_EMBEDDING")
+                                                    .put("model", "OpenAIEmbeddingModel")
+                                                    .put("host", "https://xxxx")
+                                                    .put("key", "abcd1234")
+                                                    .build()))),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")

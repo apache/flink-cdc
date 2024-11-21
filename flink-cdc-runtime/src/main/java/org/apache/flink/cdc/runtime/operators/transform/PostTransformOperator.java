@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -30,6 +31,7 @@ import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.model.BuiltInModel;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -539,6 +541,10 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                             // into UserDefinedFunction interface, thus the provided UDF classes
                             // might not be compatible with the interface definition in CDC common.
                             Object udfInstance = udfFunctionInstances.get(udf.getName());
+                            if (udfInstance instanceof BuiltInModel) {
+                                ((BuiltInModel) udfInstance)
+                                        .configure(Configuration.fromMap(udf.getParameters()));
+                            }
                             udfInstance.getClass().getMethod("open").invoke(udfInstance);
                         } else {
                             // Do nothing, Flink-style UDF lifecycle hooks are not supported

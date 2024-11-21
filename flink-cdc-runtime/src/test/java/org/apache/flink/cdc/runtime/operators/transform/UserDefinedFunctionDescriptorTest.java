@@ -20,9 +20,17 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
+import org.apache.flink.cdc.runtime.model.OpenAIEmbeddingModel;
 import org.apache.flink.table.functions.ScalarFunction;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,7 +56,7 @@ public class UserDefinedFunctionDescriptorTest {
     public static class NotUDF {}
 
     @Test
-    void testUserDefinedFunctionDescriptor() {
+    void testUserDefinedFunctionDescriptor() throws JsonProcessingException {
 
         assertThat(new UserDefinedFunctionDescriptor("cdc_udf", CdcUdf.class.getName()))
                 .extracting("name", "className", "classpath", "returnTypeHint", "isCdcPipelineUdf")
@@ -93,5 +101,26 @@ public class UserDefinedFunctionDescriptorTest {
                                         "not_even_exist", "not.a.valid.class.path"))
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Failed to instantiate UDF not_even_exist@not.a.valid.class.path");
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        Map<String, String> parameters =
+                new LinkedHashMap<>(
+                        ImmutableMap.<String, String>builder()
+                                .put("name", "GET_EMBEDDING")
+                                .put("model", "OpenAIEmbeddingModel")
+                                .put("host", "https://xxxx")
+                                .put("key", "abcd1234")
+                                .build());
+        String name = objectMapper.writeValueAsString(parameters);
+        assertThat(
+                        new UserDefinedFunctionDescriptor(
+                                name, OpenAIEmbeddingModel.class.getSimpleName()))
+                .extracting("name", "className", "classpath", "returnTypeHint", "isCdcPipelineUdf")
+                .containsExactly(
+                        "GET_EMBEDDING",
+                        "OpenAIEmbeddingModel",
+                        "org.apache.flink.cdc.runtime.model.OpenAIEmbeddingModel",
+                        DataTypes.ARRAY(DataTypes.FLOAT()),
+                        true);
     }
 }

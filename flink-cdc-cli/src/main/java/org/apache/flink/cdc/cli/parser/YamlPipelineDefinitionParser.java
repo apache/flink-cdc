@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.utils.StringUtils;
+import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
@@ -57,6 +58,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String ROUTE_KEY = "route";
     private static final String TRANSFORM_KEY = "transform";
     private static final String PIPELINE_KEY = "pipeline";
+    private static final String MODEL_KEY = "models";
 
     // Source / sink keys
     private static final String TYPE_KEY = "type";
@@ -80,6 +82,11 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String UDF_KEY = "user-defined-function";
     private static final String UDF_FUNCTION_NAME_KEY = "name";
     private static final String UDF_CLASSPATH_KEY = "classpath";
+
+    // Model related keys
+    private static final String MODEL_NAME_KEY = "name";
+
+    private static final String MODEL_MODEL_KEY = "model";
 
     public static final String TRANSFORM_PRIMARY_KEY_KEY = "primary-keys";
 
@@ -108,10 +115,15 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // UDFs are optional. We parse UDF first and remove it from the pipelineDefJsonNode since
         // it's not of plain data types and must be removed before calling toPipelineConfig.
         List<UdfDef> udfDefs = new ArrayList<>();
+        final List<ModelDef> modelDefs = new ArrayList<>();
         if (pipelineDefJsonNode.get(PIPELINE_KEY) != null) {
             Optional.ofNullable(
                             ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(UDF_KEY))
                     .ifPresent(node -> node.forEach(udf -> udfDefs.add(toUdfDef(udf))));
+
+            Optional.ofNullable(
+                            ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(MODEL_KEY))
+                    .ifPresent(node -> modelDefs.addAll(parseModels(node)));
         }
 
         // Pipeline configs are optional
@@ -156,7 +168,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         pipelineConfig.addAll(userPipelineConfig);
 
         return new PipelineDef(
-                sourceDef, sinkDef, routeDefs, transformDefs, udfDefs, pipelineConfig);
+                sourceDef, sinkDef, routeDefs, transformDefs, udfDefs, modelDefs, pipelineConfig);
     }
 
     private SourceDef toSourceDef(JsonNode sourceNode) {
@@ -322,5 +334,28 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 mapper.convertValue(
                         pipelineConfigNode, new TypeReference<Map<String, String>>() {});
         return Configuration.fromMap(pipelineConfigMap);
+    }
+
+    private List<ModelDef> parseModels(JsonNode modelsNode) {
+        List<ModelDef> modelDefs = new ArrayList<>();
+        if (modelsNode != null && modelsNode.isArray()) {
+            for (JsonNode modelNode : modelsNode) {
+                String name =
+                        checkNotNull(
+                                        modelNode.get(MODEL_NAME_KEY),
+                                        "Missing required field \"%s\" in Model",
+                                        MODEL_NAME_KEY)
+                                .asText();
+                String model =
+                        checkNotNull(
+                                        modelNode.get(MODEL_MODEL_KEY),
+                                        "Missing required field \"%s\" in Model",
+                                        MODEL_MODEL_KEY)
+                                .asText();
+                Map<String, String> properties = mapper.convertValue(modelNode, Map.class);
+                modelDefs.add(new ModelDef(name, model, properties));
+            }
+        }
+        return modelDefs;
     }
 }

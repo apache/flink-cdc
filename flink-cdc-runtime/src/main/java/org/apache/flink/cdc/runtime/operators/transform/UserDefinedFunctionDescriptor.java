@@ -21,9 +21,14 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -39,12 +44,34 @@ public class UserDefinedFunctionDescriptor implements Serializable {
     private final DataType returnTypeHint;
     private final boolean isCdcPipelineUdf;
 
+    private final Map<String, String> parameters;
+
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    /** Package of {@link org.apache.flink.cdc.runtime.model.BuiltInModel}. */
+    public static final String PREFIX_CLASSPATH_MODEL = "org.apache.flink.cdc.runtime.model.";
+
+    private static final String MODEL_NAME_KEY = "name";
+
     public UserDefinedFunctionDescriptor(String name, String classpath) {
-        this.name = name;
-        this.classpath = classpath;
-        this.className = classpath.substring(classpath.lastIndexOf('.') + 1);
+        if (classpath.contains(".")) {
+            this.parameters = new HashMap<>();
+            this.name = name;
+            this.className = classpath.substring(classpath.lastIndexOf('.') + 1);
+            this.classpath = classpath;
+        } else {
+            // The UserDefinedFunction is a built-in Model.
+            try {
+                parameters = objectMapper.readValue(name, Map.class);
+            } catch (JsonProcessingException e) {
+                throw new IllegalArgumentException(e);
+            }
+            this.name = parameters.get(MODEL_NAME_KEY);
+            this.className = classpath;
+            this.classpath = PREFIX_CLASSPATH_MODEL + classpath;
+        }
         try {
-            Class<?> clazz = Class.forName(classpath);
+            Class<?> clazz = Class.forName(this.classpath);
             isCdcPipelineUdf = isCdcPipelineUdf(clazz);
             if (isCdcPipelineUdf) {
                 // We use reflection to invoke UDF methods since we may add more methods
@@ -105,6 +132,10 @@ public class UserDefinedFunctionDescriptor implements Serializable {
 
     public String getClassName() {
         return className;
+    }
+
+    public Map<String, String> getParameters() {
+        return parameters;
     }
 
     @Override
