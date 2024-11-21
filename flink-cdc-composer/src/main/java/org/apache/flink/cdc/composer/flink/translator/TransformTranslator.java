@@ -46,8 +46,8 @@ public class TransformTranslator {
         for (TransformDef transform : transforms) {
             preTransformFunctionBuilder.addTransform(
                     transform.getSourceTable(),
-                    transform.getProjection().orElse(null),
-                    transform.getFilter().orElse(null),
+                    transform.getProjection(),
+                    transform.getFilter(),
                     transform.getPrimaryKeys(),
                     transform.getPartitionKeys(),
                     transform.getTableOptions());
@@ -75,8 +75,8 @@ public class TransformTranslator {
             if (transform.isValidProjection() || transform.isValidFilter()) {
                 postTransformFunctionBuilder.addTransform(
                         transform.getSourceTable(),
-                        transform.isValidProjection() ? transform.getProjection().get() : null,
-                        transform.isValidFilter() ? transform.getFilter().get() : null,
+                        transform.getProjection(),
+                        transform.getFilter(),
                         transform.getPrimaryKeys(),
                         transform.getPartitionKeys(),
                         transform.getTableOptions());
