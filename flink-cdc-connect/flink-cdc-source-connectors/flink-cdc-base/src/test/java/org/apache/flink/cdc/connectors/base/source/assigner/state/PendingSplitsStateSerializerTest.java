@@ -24,8 +24,6 @@ import org.apache.flink.cdc.connectors.base.source.assigner.state.version5.Snaps
 import org.apache.flink.cdc.connectors.base.source.assigner.state.version6.HybridPendingSplitsStateVersion6;
 import org.apache.flink.cdc.connectors.base.source.assigner.state.version6.PendingSplitsStateSerializerVersion6;
 import org.apache.flink.cdc.connectors.base.source.assigner.state.version6.SnapshotPendingSplitsStateVersion6;
-import org.apache.flink.cdc.connectors.base.source.assigner.state.version7.HybridPendingSplitsStateVersion7;
-import org.apache.flink.cdc.connectors.base.source.assigner.state.version7.PendingSplitsStateSerializerVersion7;
 import org.apache.flink.cdc.connectors.base.source.assigner.state.version7.SnapshotPendingSplitsStateVersion7;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
@@ -99,7 +97,7 @@ public class PendingSplitsStateSerializerTest {
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
                         5,
                         PendingSplitsStateSerializerVersion5.serialize(
-                                constructSnapshotPendingSplitsStateVersion4(false)));
+                                constructSnapshotPendingSplitsStateVersion5(false)));
         Assert.assertEquals(expectedSnapshotSplitsState, snapshotPendingSplitsStateAfter);
 
         HybridPendingSplitsState expectedHybridPendingSplitsState =
@@ -112,7 +110,7 @@ public class PendingSplitsStateSerializerTest {
                         5,
                         PendingSplitsStateSerializerVersion5.serialize(
                                 new HybridPendingSplitsStateVersion5(
-                                        constructSnapshotPendingSplitsStateVersion4(true), false)));
+                                        constructSnapshotPendingSplitsStateVersion5(true), false)));
         Assert.assertEquals(expectedHybridPendingSplitsState, hybridPendingSplitsStateAfter);
     }
 
@@ -135,7 +133,7 @@ public class PendingSplitsStateSerializerTest {
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
                         6,
                         PendingSplitsStateSerializerVersion6.serialize(
-                                constructSnapshotPendingSplitsStateVersion5(AssignerStatus.INITIAL_ASSIGNING)));
+                                constructSnapshotPendingSplitsStateVersion6(AssignerStatus.INITIAL_ASSIGNING)));
         Assert.assertEquals(expectedSnapshotSplitsState, snapshotPendingSplitsStateAfter);
 
         HybridPendingSplitsState expectedHybridPendingSplitsState =
@@ -148,7 +146,7 @@ public class PendingSplitsStateSerializerTest {
                         6,
                         PendingSplitsStateSerializerVersion6.serialize(
                                 new HybridPendingSplitsStateVersion6(
-                                        constructSnapshotPendingSplitsStateVersion5(AssignerStatus.INITIAL_ASSIGNING_FINISHED), false)));
+                                        constructSnapshotPendingSplitsStateVersion6(AssignerStatus.INITIAL_ASSIGNING_FINISHED), false)));
         Assert.assertEquals(expectedHybridPendingSplitsState, hybridPendingSplitsStateAfter);
     }
 
@@ -225,7 +223,7 @@ public class PendingSplitsStateSerializerTest {
                 new HashMap<>());
     }
 
-    private SnapshotPendingSplitsStateVersion5 constructSnapshotPendingSplitsStateVersion4(
+    private SnapshotPendingSplitsStateVersion5 constructSnapshotPendingSplitsStateVersion5(
             boolean isAssignerFinished) {
         SchemalessSnapshotSplit schemalessSnapshotSplit = constuctSchemalessSnapshotSplit();
         Map<String, SchemalessSnapshotSplit> assignedSplits = new HashMap<>();
@@ -247,7 +245,7 @@ public class PendingSplitsStateSerializerTest {
                 true);
     }
 
-    private SnapshotPendingSplitsStateVersion6 constructSnapshotPendingSplitsStateVersion5(
+    private SnapshotPendingSplitsStateVersion6 constructSnapshotPendingSplitsStateVersion6(
             AssignerStatus assignerStatus) {
         SchemalessSnapshotSplit schemalessSnapshotSplit = constuctSchemalessSnapshotSplit();
         Map<String, SchemalessSnapshotSplit> assignedSplits = new HashMap<>();
