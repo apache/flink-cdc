@@ -18,9 +18,11 @@
 package org.apache.flink.cdc.connectors.base.source.assigner.state;
 
 import org.apache.flink.cdc.connectors.base.source.assigner.AssignerStatus;
-import org.apache.flink.cdc.connectors.base.source.assigner.state.version5.HybridPendingSplitsStateVersion5;
-import org.apache.flink.cdc.connectors.base.source.assigner.state.version5.PendingSplitsStateSerializerVersion5;
 import org.apache.flink.cdc.connectors.base.source.assigner.state.version5.SnapshotPendingSplitsStateVersion5;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.version6.PendingSplitsStateSerializerVersion6;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.version7.HybridPendingSplitsStateVersion7;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.version7.PendingSplitsStateSerializerVersion7;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.version7.SnapshotPendingSplitsStateVersion7;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
@@ -55,7 +57,7 @@ public class PendingSplitsStateSerializerTest {
                 new PendingSplitsStateSerializer(constructSourceSplitSerializer());
         PendingSplitsState streamSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        7, pendingSplitsStateSerializer.serialize(streamPendingSplitsStateBefore));
+                        6, pendingSplitsStateSerializer.serialize(streamPendingSplitsStateBefore));
         Assert.assertEquals(streamPendingSplitsStateBefore, streamSplitsStateAfter);
 
         SnapshotPendingSplitsState snapshotPendingSplitsStateBefore =
@@ -70,7 +72,7 @@ public class PendingSplitsStateSerializerTest {
                 new HybridPendingSplitsState(snapshotPendingSplitsStateBefore, false);
         PendingSplitsState hybridPendingSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        6, pendingSplitsStateSerializer.serialize(hybridPendingSplitsStateBefore));
+                        7, pendingSplitsStateSerializer.serialize(hybridPendingSplitsStateBefore));
         Assert.assertEquals(hybridPendingSplitsStateBefore, hybridPendingSplitsStateAfter);
     }
 
@@ -82,8 +84,8 @@ public class PendingSplitsStateSerializerTest {
                 new PendingSplitsStateSerializer(constructSourceSplitSerializer());
         PendingSplitsState streamSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        5,
-                        PendingSplitsStateSerializerVersion5.serialize(
+                        6,
+                        PendingSplitsStateSerializerVersion6.serialize(
                                 streamPendingSplitsStateBefore));
         Assert.assertEquals(streamPendingSplitsStateBefore, streamSplitsStateAfter);
 
@@ -91,9 +93,10 @@ public class PendingSplitsStateSerializerTest {
                 constructSnapshotPendingSplitsState(AssignerStatus.INITIAL_ASSIGNING);
         PendingSplitsState snapshotPendingSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        5,
-                        PendingSplitsStateSerializerVersion5.serialize(
-                                constructSnapshotPendingSplitsStateVersion4(false)));
+                        7,
+                        PendingSplitsStateSerializerVersion7.serialize(
+                                constructSnapshotPendingSplitsStateVersion7(
+                                        AssignerStatus.INITIAL_ASSIGNING)));
         Assert.assertEquals(expectedSnapshotSplitsState, snapshotPendingSplitsStateAfter);
 
         HybridPendingSplitsState expectedHybridPendingSplitsState =
@@ -103,10 +106,12 @@ public class PendingSplitsStateSerializerTest {
                         false);
         PendingSplitsState hybridPendingSplitsStateAfter =
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        5,
-                        PendingSplitsStateSerializerVersion5.serialize(
-                                new HybridPendingSplitsStateVersion5(
-                                        constructSnapshotPendingSplitsStateVersion4(true), false)));
+                        7,
+                        PendingSplitsStateSerializerVersion7.serialize(
+                                new HybridPendingSplitsStateVersion7(
+                                        constructSnapshotPendingSplitsStateVersion7(
+                                                AssignerStatus.INITIAL_ASSIGNING_FINISHED),
+                                        false)));
         Assert.assertEquals(expectedHybridPendingSplitsState, hybridPendingSplitsStateAfter);
     }
 
@@ -203,6 +208,29 @@ public class PendingSplitsStateSerializerTest {
                 Arrays.asList(TableId.parse("catalog2.schema2.table2")),
                 true,
                 true);
+    }
+
+    private SnapshotPendingSplitsStateVersion7 constructSnapshotPendingSplitsStateVersion7(
+            AssignerStatus assignerStatus) {
+        SchemalessSnapshotSplit schemalessSnapshotSplit = constuctSchemalessSnapshotSplit();
+        Map<String, SchemalessSnapshotSplit> assignedSplits = new HashMap<>();
+        assignedSplits.put(tableId.toQuotedString('`'), schemalessSnapshotSplit);
+        Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
+        tableSchemas.put(
+                tableId,
+                new TableChanges.TableChange(
+                        TableChanges.TableChangeType.CREATE, createTable(tableId)));
+        return new SnapshotPendingSplitsStateVersion7(
+                Arrays.asList(tableId),
+                Arrays.asList(schemalessSnapshotSplit),
+                assignedSplits,
+                tableSchemas,
+                new HashMap<>(),
+                assignerStatus,
+                Arrays.asList(TableId.parse("catalog2.schema2.table2")),
+                true,
+                true,
+                new HashMap<>());
     }
 
     private static Table createTable(TableId id) {

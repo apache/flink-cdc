@@ -451,11 +451,11 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                     splitFinishedCheckpointId.setValue(checkpointId);
                 }
             }
+            LOG.info(
+                    "SnapshotSplitAssigner snapshotState on checkpoint {} with splitFinishedCheckpointIds size {}.",
+                    checkpointId,
+                    splitFinishedCheckpointIds.size());
         }
-        LOG.info(
-                "SnapshotSplitAssigner snapshotState on checkpoint {} with splitFinishedCheckpointIds size {}.",
-                checkpointId,
-                splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size());
 
         SnapshotPendingSplitsState state =
                 new SnapshotPendingSplitsState(
@@ -510,7 +510,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             LOG.info(
                     "Checkpoint completed on checkpoint {} with splitFinishedCheckpointIds size {}.",
                     checkpointId,
-                    splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size());
+                    splitFinishedCheckpointIds.size());
         }
     }
 
