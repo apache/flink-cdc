@@ -81,6 +81,7 @@ public class IncrementalSourceEnumerator
     private Boundedness boundedness;
 
     @Nullable protected Integer streamSplitTaskId = null;
+    private boolean isStreamSplitUpdateRequestAlreadySent = false;
 
     public IncrementalSourceEnumerator(
             SplitEnumeratorContext<SourceSplitBase> context,
@@ -272,7 +273,9 @@ public class IncrementalSourceEnumerator
     }
 
     private void requestStreamSplitUpdateIfNeed() {
-        if (isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())) {
+        if (!isStreamSplitUpdateRequestAlreadySent
+                && isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())) {
+            isStreamSplitUpdateRequestAlreadySent = true;
             // If enumerator knows which reader is assigned stream split, just send to this reader,
             // nor sends to all registered readers.
             if (streamSplitTaskId != null) {
