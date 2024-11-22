@@ -31,9 +31,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The 5th version of PendingSplitsStateSerializer. The modification of the 6th version: Change
- * isAssignerFinished(boolean) to assignStatus in SnapshotPendingSplitsState to represent a more
- * comprehensive assignment status.
+ * The 6th version of PendingSplitsStateSerializer. The modification of the 7th version: Add
+ * splitFinishedCheckpointIds variables.
  */
 public class SnapshotPendingSplitsStateVersion6 extends PendingSplitsState {
 

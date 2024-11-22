@@ -36,11 +36,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-/**
- * The 5th version of PendingSplitsStateSerializer. The modification of the 6th version: Change
- * isAssignerFinished(boolean) to assignStatus in SnapshotPendingSplitsState to represent a more
- * comprehensive assignment status.
- */
+/** The 6th version of PendingSplitsStateSerializer. */
 public class PendingSplitsStateSerializerVersion6 {
 
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =

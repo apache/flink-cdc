@@ -19,11 +19,7 @@ package org.apache.flink.cdc.connectors.base.source.assigner.state.version6;
 
 import org.apache.flink.cdc.connectors.base.source.assigner.state.PendingSplitsState;
 
-/**
- * The 5th version of HybridPendingSplitsState. The modification of the 6th version: Change
- * isAssignerFinished(boolean) to assignStatus in SnapshotPendingSplitsState to represent a more
- * comprehensive assignment status.
- */
+/** The 6th version of HybridPendingSplitsState. */
 public class HybridPendingSplitsStateVersion6 extends PendingSplitsState {
     private final SnapshotPendingSplitsStateVersion6 snapshotPendingSplits;
     private final boolean isStreamSplitAssigned;

@@ -132,7 +132,8 @@ public class PendingSplitsStateSerializerTest {
                 pendingSplitsStateSerializer.deserializePendingSplitsState(
                         6,
                         PendingSplitsStateSerializerVersion6.serialize(
-                                constructSnapshotPendingSplitsStateVersion6(AssignerStatus.INITIAL_ASSIGNING)));
+                                constructSnapshotPendingSplitsStateVersion6(
+                                        AssignerStatus.INITIAL_ASSIGNING)));
         Assert.assertEquals(expectedSnapshotSplitsState, snapshotPendingSplitsStateAfter);
 
         HybridPendingSplitsState expectedHybridPendingSplitsState =
@@ -145,7 +146,9 @@ public class PendingSplitsStateSerializerTest {
                         6,
                         PendingSplitsStateSerializerVersion6.serialize(
                                 new HybridPendingSplitsStateVersion6(
-                                        constructSnapshotPendingSplitsStateVersion6(AssignerStatus.INITIAL_ASSIGNING_FINISHED), false)));
+                                        constructSnapshotPendingSplitsStateVersion6(
+                                                AssignerStatus.INITIAL_ASSIGNING_FINISHED),
+                                        false)));
         Assert.assertEquals(expectedHybridPendingSplitsState, hybridPendingSplitsStateAfter);
     }
 
