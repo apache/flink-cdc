@@ -52,7 +52,7 @@ public class PendingSplitsStateSerializerVersion6 {
 
     public static byte[] serialize(PendingSplitsState state) throws IOException {
         final DataOutputSerializer out = SERIALIZER_CACHE.get();
-        out.writeInt(6);
+        out.writeInt(5);
 
         if (state instanceof SnapshotPendingSplitsStateVersion6) {
             out.writeInt(SNAPSHOT_PENDING_SPLITS_STATE_FLAG);

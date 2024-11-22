@@ -81,8 +81,7 @@ public class SnapshotPendingSplitsStateVersion6 extends PendingSplitsState {
             AssignerStatus assignerStatus,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
-            boolean isRemainingTablesCheckpointed,
-            Map<String, Long> splitFinishedCheckpointIds) {
+            boolean isRemainingTablesCheckpointed) {
         this.alreadyProcessedTables = alreadyProcessedTables;
         this.remainingSplits = remainingSplits;
         this.assignedSplits = assignedSplits;
