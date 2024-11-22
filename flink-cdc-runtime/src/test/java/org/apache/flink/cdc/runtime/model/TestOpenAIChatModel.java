@@ -28,9 +28,9 @@ public class TestOpenAIChatModel {
     public void testEval() throws Exception {
         OpenAIChatModel openAIChatModel = new OpenAIChatModel();
         Configuration configuration = new Configuration();
-        configuration.set(ModelOptions.HOST, "http://langchain4j.dev/demo/openai/v1");
-        configuration.set(ModelOptions.API_KEY, "demo");
-        configuration.set(ModelOptions.MODEL_NAME, "gpt-4o-mini");
+        configuration.set(ModelOptions.OPENAI_HOST, "http://langchain4j.dev/demo/openai/v1");
+        configuration.set(ModelOptions.OPENAI_API_KEY, "demo");
+        configuration.set(ModelOptions.OPENAI_MODEL_NAME, "gpt-4o-mini");
         openAIChatModel.configure(configuration);
         openAIChatModel.open();
         String response = openAIChatModel.eval("Who invented the electric light?");

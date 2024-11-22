@@ -34,9 +34,9 @@ import org.slf4j.LoggerFactory;
 import java.util.Collections;
 import java.util.List;
 
-import static org.apache.flink.cdc.runtime.model.ModelOptions.API_KEY;
-import static org.apache.flink.cdc.runtime.model.ModelOptions.HOST;
-import static org.apache.flink.cdc.runtime.model.ModelOptions.MODEL_NAME;
+import static org.apache.flink.cdc.runtime.model.ModelOptions.OPENAI_API_KEY;
+import static org.apache.flink.cdc.runtime.model.ModelOptions.OPENAI_HOST;
+import static org.apache.flink.cdc.runtime.model.ModelOptions.OPENAI_MODEL_NAME;
 
 /**
  * A {@link BuiltInModel} that use Model defined by OpenAI to generate vector data, refer to <a
@@ -55,12 +55,12 @@ public class OpenAIEmbeddingModel implements BuiltInModel, UserDefinedFunction {
     private OpenAiEmbeddingModel embeddingModel;
 
     public void configure(Configuration modelOptions) {
-        this.modelName = modelOptions.get(MODEL_NAME);
+        this.modelName = modelOptions.get(OPENAI_MODEL_NAME);
         if (modelName == null) {
             modelName = "text-embedding-ada-002";
         }
-        this.host = modelOptions.get(HOST);
-        this.apiKey = modelOptions.get(API_KEY);
+        this.host = modelOptions.get(OPENAI_HOST);
+        this.apiKey = modelOptions.get(OPENAI_API_KEY);
     }
 
     public ArrayData eval(String input) {

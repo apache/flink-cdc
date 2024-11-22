@@ -30,9 +30,9 @@ public class TestOpenAIEmbeddingModel {
     public void testEval() throws Exception {
         OpenAIEmbeddingModel openAIEmbeddingModel = new OpenAIEmbeddingModel();
         Configuration configuration = new Configuration();
-        configuration.set(ModelOptions.HOST, "http://langchain4j.dev/demo/openai/v1");
-        configuration.set(ModelOptions.API_KEY, "demo");
-        configuration.set(ModelOptions.MODEL_NAME, "text-embedding-3-small");
+        configuration.set(ModelOptions.OPENAI_HOST, "http://langchain4j.dev/demo/openai/v1");
+        configuration.set(ModelOptions.OPENAI_API_KEY, "demo");
+        configuration.set(ModelOptions.OPENAI_MODEL_NAME, "text-embedding-3-small");
         openAIEmbeddingModel.configure(configuration);
         openAIEmbeddingModel.open();
         ArrayData arrayData =

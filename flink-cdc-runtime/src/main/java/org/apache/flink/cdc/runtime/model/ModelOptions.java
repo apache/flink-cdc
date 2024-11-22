@@ -24,21 +24,27 @@ import org.apache.flink.cdc.common.configuration.ConfigOptions;
 public class ModelOptions {
 
     // Options for Open AI Model.
-    public static final ConfigOption<String> MODEL_NAME =
+    public static final ConfigOption<String> OPENAI_MODEL_NAME =
             ConfigOptions.key("OpenAI.model-name")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Name of model to be called.");
 
-    public static final ConfigOption<String> HOST =
+    public static final ConfigOption<String> OPENAI_HOST =
             ConfigOptions.key("OpenAI.host")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("Host of the Model server.");
+                    .withDescription("Host of the Model server to be connected.");
 
-    public static final ConfigOption<String> API_KEY =
+    public static final ConfigOption<String> OPENAI_API_KEY =
             ConfigOptions.key("OpenAI.apiKey")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Api Key for verification of the Model server.");
+
+    public static final ConfigOption<String> OPENAI_CHAT_PROMOTE =
+            ConfigOptions.key("OpenAI.chat.promote")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription("Promote for chat using OpenAI.");
 }

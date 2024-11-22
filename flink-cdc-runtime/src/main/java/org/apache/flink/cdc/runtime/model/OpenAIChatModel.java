@@ -29,9 +29,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 
-import static org.apache.flink.cdc.runtime.model.ModelOptions.API_KEY;
-import static org.apache.flink.cdc.runtime.model.ModelOptions.HOST;
-import static org.apache.flink.cdc.runtime.model.ModelOptions.MODEL_NAME;
+import static org.apache.flink.cdc.runtime.model.ModelOptions.OPENAI_API_KEY;
+import static org.apache.flink.cdc.runtime.model.ModelOptions.OPENAI_CHAT_PROMOTE;
+import static org.apache.flink.cdc.runtime.model.ModelOptions.OPENAI_HOST;
+import static org.apache.flink.cdc.runtime.model.ModelOptions.OPENAI_MODEL_NAME;
 
 /**
  * A {@link BuiltInModel} that use Model defined by OpenAI to generate text, refer to <a
@@ -41,18 +42,21 @@ public class OpenAIChatModel implements BuiltInModel, UserDefinedFunction {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenAIChatModel.class);
 
+    private OpenAiChatModel chatModel;
+
     private String host;
 
     private String apiKey;
 
     private String modelName;
 
-    private OpenAiChatModel chatModel;
+    private String promote;
 
     public void configure(Configuration modelOptions) {
-        this.modelName = modelOptions.get(MODEL_NAME);
-        this.host = modelOptions.get(HOST);
-        this.apiKey = modelOptions.get(API_KEY);
+        this.modelName = modelOptions.get(OPENAI_MODEL_NAME);
+        this.host = modelOptions.get(OPENAI_HOST);
+        this.apiKey = modelOptions.get(OPENAI_API_KEY);
+        this.promote = modelOptions.get(OPENAI_CHAT_PROMOTE);
     }
 
     public String eval(String input) {
@@ -64,7 +68,9 @@ public class OpenAIChatModel implements BuiltInModel, UserDefinedFunction {
             LOG.warn("Empty or null input provided for embedding.");
             return "";
         }
-
+        if (promote != null) {
+            input = promote + ": " + input;
+        }
         return chatModel
                 .generate(Collections.singletonList(new UserMessage(input)))
                 .content()
