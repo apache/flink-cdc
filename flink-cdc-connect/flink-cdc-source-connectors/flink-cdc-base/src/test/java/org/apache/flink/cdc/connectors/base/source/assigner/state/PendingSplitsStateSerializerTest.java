@@ -24,7 +24,6 @@ import org.apache.flink.cdc.connectors.base.source.assigner.state.version5.Snaps
 import org.apache.flink.cdc.connectors.base.source.assigner.state.version6.HybridPendingSplitsStateVersion6;
 import org.apache.flink.cdc.connectors.base.source.assigner.state.version6.PendingSplitsStateSerializerVersion6;
 import org.apache.flink.cdc.connectors.base.source.assigner.state.version6.SnapshotPendingSplitsStateVersion6;
-import org.apache.flink.cdc.connectors.base.source.assigner.state.version7.SnapshotPendingSplitsStateVersion7;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
@@ -265,29 +264,6 @@ public class PendingSplitsStateSerializerTest {
                 Arrays.asList(TableId.parse("catalog2.schema2.table2")),
                 true,
                 true);
-    }
-
-    private SnapshotPendingSplitsStateVersion7 constructSnapshotPendingSplitsStateVersion7(
-            AssignerStatus assignerStatus) {
-        SchemalessSnapshotSplit schemalessSnapshotSplit = constuctSchemalessSnapshotSplit();
-        Map<String, SchemalessSnapshotSplit> assignedSplits = new HashMap<>();
-        assignedSplits.put(tableId.toQuotedString('`'), schemalessSnapshotSplit);
-        Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
-        tableSchemas.put(
-                tableId,
-                new TableChanges.TableChange(
-                        TableChanges.TableChangeType.CREATE, createTable(tableId)));
-        return new SnapshotPendingSplitsStateVersion7(
-                Arrays.asList(tableId),
-                Arrays.asList(schemalessSnapshotSplit),
-                assignedSplits,
-                tableSchemas,
-                new HashMap<>(),
-                assignerStatus,
-                Arrays.asList(TableId.parse("catalog2.schema2.table2")),
-                true,
-                true,
-                new HashMap<>());
     }
 
     private static Table createTable(TableId id) {
