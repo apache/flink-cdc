@@ -850,7 +850,7 @@ public class FlinkPipelineUdfITCase {
         TransformDef transformDef =
                 new TransformDef(
                         "default_namespace.default_schema.table1",
-                        "*, CHAT(col1) AS fmt",
+                        "*, ENBEDDING(col1) AS emb",
                         null,
                         "col1",
                         null,
@@ -871,17 +871,17 @@ public class FlinkPipelineUdfITCase {
                         new ArrayList<>(),
                         Arrays.asList(
                                 new ModelDef(
-                                        "GET_EMBEDDING",
-                                        "OpenAIChatModel",
+                                        "ENBEDDING",
+                                        "OpenAIEmbeddingModel",
                                         new LinkedHashMap<>(
                                                 ImmutableMap.<String, String>builder()
-                                                        .put("name", "CHAT")
-                                                        .put("model", "OpenAIChatModel")
-                                                        .put("OpenAI.model-name", "gpt-4o-mini")
                                                         .put(
-                                                                "OpenAI.host",
+                                                                "openai.model",
+                                                                "text-embedding-3-small")
+                                                        .put(
+                                                                "openai.host",
                                                                 "http://langchain4j.dev/demo/openai/v1")
-                                                        .put("OpenAI.apiKey", "demo")
+                                                        .put("openai.apikey", "demo")
                                                         .build()))),
                         pipelineConfig);
 
@@ -893,9 +893,9 @@ public class FlinkPipelineUdfITCase {
         String[] outputEvents = outCaptor.toString().trim().split("\n");
         assertThat(outputEvents)
                 .contains(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`fmt` STRING}, primaryKeys=col1, options=({key1=value1})}");
-        // The result of transform by model is not fixed.
-        assertThat(outputEvents.length).isEqualTo(9);
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`emb` ARRAY<FLOAT>}, primaryKeys=col1, options=({key1=value1})}")
+                // The result of transform by model is not fixed.
+                .hasSize(9);
     }
 
     private static Stream<Arguments> testParams() {

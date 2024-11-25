@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
@@ -58,7 +59,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String ROUTE_KEY = "route";
     private static final String TRANSFORM_KEY = "transform";
     private static final String PIPELINE_KEY = "pipeline";
-    private static final String MODEL_KEY = "models";
+    private static final String MODEL_KEY = "model";
 
     // Source / sink keys
     private static final String TYPE_KEY = "type";
@@ -84,9 +85,9 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String UDF_CLASSPATH_KEY = "classpath";
 
     // Model related keys
-    private static final String MODEL_NAME_KEY = "name";
+    private static final String MODEL_NAME_KEY = "model-name";
 
-    private static final String MODEL_MODEL_KEY = "model";
+    private static final String MODEL_CLASS_NAME_KEY = "class-name";
 
     public static final String TRANSFORM_PRIMARY_KEY_KEY = "primary-keys";
 
@@ -338,24 +339,31 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     private List<ModelDef> parseModels(JsonNode modelsNode) {
         List<ModelDef> modelDefs = new ArrayList<>();
-        if (modelsNode != null && modelsNode.isArray()) {
+        Preconditions.checkNotNull(modelsNode, "`model` in `pipeline` should not be empty.");
+        if (modelsNode.isArray()) {
             for (JsonNode modelNode : modelsNode) {
-                String name =
-                        checkNotNull(
-                                        modelNode.get(MODEL_NAME_KEY),
-                                        "Missing required field \"%s\" in Model",
-                                        MODEL_NAME_KEY)
-                                .asText();
-                String model =
-                        checkNotNull(
-                                        modelNode.get(MODEL_MODEL_KEY),
-                                        "Missing required field \"%s\" in Model",
-                                        MODEL_MODEL_KEY)
-                                .asText();
-                Map<String, String> properties = mapper.convertValue(modelNode, Map.class);
-                modelDefs.add(new ModelDef(name, model, properties));
+                modelDefs.add(convertJsonNodeToModelDef(modelNode));
             }
+        } else {
+            modelDefs.add(convertJsonNodeToModelDef(modelsNode));
         }
         return modelDefs;
+    }
+
+    private ModelDef convertJsonNodeToModelDef(JsonNode modelNode) {
+        String name =
+                checkNotNull(
+                                modelNode.get(MODEL_NAME_KEY),
+                                "Missing required field \"%s\" in `model`",
+                                MODEL_NAME_KEY)
+                        .asText();
+        String model =
+                checkNotNull(
+                                modelNode.get(MODEL_CLASS_NAME_KEY),
+                                "Missing required field \"%s\" in `model`",
+                                MODEL_CLASS_NAME_KEY)
+                        .asText();
+        Map<String, String> properties = mapper.convertValue(modelNode, Map.class);
+        return new ModelDef(name, model, properties);
     }
 }

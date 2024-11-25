@@ -23,6 +23,8 @@ import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
+import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
+import org.apache.flink.cdc.common.utils.Preconditions;
 
 import dev.langchain4j.data.document.Metadata;
 import dev.langchain4j.data.embedding.Embedding;
@@ -39,29 +41,18 @@ import static org.apache.flink.cdc.runtime.model.ModelOptions.OPENAI_HOST;
 import static org.apache.flink.cdc.runtime.model.ModelOptions.OPENAI_MODEL_NAME;
 
 /**
- * A {@link BuiltInModel} that use Model defined by OpenAI to generate vector data, refer to <a
- * href="https://docs.langchain4j.dev/integrations/language-models/open-ai/">docs</a>}.
+ * A {@link UserDefinedFunction} that use Model defined by OpenAI to generate vector data, refer to
+ * <a href="https://docs.langchain4j.dev/integrations/language-models/open-ai/">docs</a>}.
  */
-public class OpenAIEmbeddingModel implements BuiltInModel, UserDefinedFunction {
+public class OpenAIEmbeddingModel implements UserDefinedFunction {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpenAIEmbeddingModel.class);
 
-    private String host;
-
-    private String apiKey;
-
     private String modelName;
 
-    private OpenAiEmbeddingModel embeddingModel;
+    private String host;
 
-    public void configure(Configuration modelOptions) {
-        this.modelName = modelOptions.get(OPENAI_MODEL_NAME);
-        if (modelName == null) {
-            modelName = "text-embedding-ada-002";
-        }
-        this.host = modelOptions.get(OPENAI_HOST);
-        this.apiKey = modelOptions.get(OPENAI_API_KEY);
-    }
+    private OpenAiEmbeddingModel embeddingModel;
 
     public ArrayData eval(String input) {
         return getEmbedding(input);
@@ -94,13 +85,25 @@ public class OpenAIEmbeddingModel implements BuiltInModel, UserDefinedFunction {
     }
 
     @Override
-    public void open() throws Exception {
-        LOG.info("Opening ModelUdf: {}", modelName);
+    public void open(UserDefinedFunctionContext userDefinedFunctionContext) {
+        Configuration modelOptions = userDefinedFunctionContext.configuration();
+        this.modelName = modelOptions.get(OPENAI_MODEL_NAME);
+        Preconditions.checkNotNull(modelName, OPENAI_MODEL_NAME.key() + " should not be empty.");
+        this.host = modelOptions.get(OPENAI_HOST);
+        Preconditions.checkNotNull(host, OPENAI_HOST.key() + " should not be empty.");
+        String apiKey = modelOptions.get(OPENAI_API_KEY);
+        Preconditions.checkNotNull(apiKey, OPENAI_API_KEY.key() + " should not be empty.");
+        LOG.info("Opening OpenAIEmbeddingModel " + modelName + " " + host);
         this.embeddingModel =
                 OpenAiEmbeddingModel.builder()
                         .apiKey(apiKey)
                         .baseUrl(host)
                         .modelName(modelName)
                         .build();
+    }
+
+    @Override
+    public void close() {
+        LOG.info("Closed OpenAIEmbeddingModel " + modelName + " " + host);
     }
 }

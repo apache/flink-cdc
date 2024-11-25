@@ -21,6 +21,7 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.state.OperatorStateStore;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -69,7 +70,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private final Map<TableId, PreTransformChangeInfo> preTransformChangeInfoMap;
     private final List<Tuple2<Selectors, SchemaMetadataTransform>> schemaMetadataTransformers;
     private transient ListState<byte[]> state;
-    private final List<Tuple2<String, String>> udfFunctions;
+    private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
     private List<UserDefinedFunctionDescriptor> udfDescriptors;
     private Map<TableId, PreTransformProcessor> preTransformProcessorMap;
     private Map<TableId, Boolean> hasAsteriskMap;
@@ -82,7 +83,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     public static class Builder {
         private final List<TransformRule> transformRules = new ArrayList<>();
 
-        private final List<Tuple2<String, String>> udfFunctions = new ArrayList<>();
+        private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
+                new ArrayList<>();
 
         public PreTransformOperator.Builder addTransform(
                 String tableInclusions, @Nullable String projection, @Nullable String filter) {
@@ -109,7 +111,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         }
 
         public PreTransformOperator.Builder addUdfFunctions(
-                List<Tuple2<String, String>> udfFunctions) {
+                List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
             this.udfFunctions.addAll(udfFunctions);
             return this;
         }
@@ -120,7 +122,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     }
 
     private PreTransformOperator(
-            List<TransformRule> transformRules, List<Tuple2<String, String>> udfFunctions) {
+            List<TransformRule> transformRules,
+            List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
         this.transformRules = transformRules;
         this.preTransformChangeInfoMap = new ConcurrentHashMap<>();
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
@@ -137,7 +140,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         super.setup(containingTask, config, output);
         this.udfDescriptors =
                 this.udfFunctions.stream()
-                        .map(udf -> new UserDefinedFunctionDescriptor(udf.f0, udf.f1))
+                        .map(udf -> new UserDefinedFunctionDescriptor(udf.f0, udf.f1, udf.f2))
                         .collect(Collectors.toList());
 
         // Initialize data fields in advance because they might be accessed in

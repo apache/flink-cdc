@@ -359,21 +359,28 @@ transform:
 ## Embedding AI Model
 
 Embedding AI Model can be used in transform rules.
+To use Embedding AI Model, you need to download the jar of build-in model, and then add `--jar {$BUILD_IN_MODEL_PATH}` to your flink-cdc.sh command.
 
 How to define a Embedding AI Model:
 
 ```yaml
 pipeline:
-  models:
-    - name: GET_EMBEDDING
-      model: OpenAIEmbeddingModel
-      OpenAI.host: https://xxxx
-      OpenAI.apiKey: abcd1234
+  model:
+    - model-name: CHAT
+      class-name: OpenAIChatModel
+      openai.model: text-embedding-3-small
+      openai.host: https://xxxx
+      openai.apiKey: abcd1234
+    - model-name: GET_EMBEDDING
+      class-name: OpenAIEmbeddingModel
+      openai.model: text-embedding-3-small
+      openai.host: https://xxxx
+      openai.apiKey: abcd1234
 ```
 Note:
-* `name` is a required parameter, which represent the function name called in `projection` or `filter`.
-* `model` is a required parameter, available values can be found in [All Support models](#all-support-models).
-* `OpenAI.host` and `OpenAI.apiKey` is option parameters that defined in specific model.
+* `model-name` is a common required parameter, which represent the function name called in `projection` or `filter`.
+* `class-name` is a common required parameter, available values can be found in [All Support models](#all-support-models).
+* `openai.model` and `openai.host` and `openai.apiKey` is option parameters that defined in specific model.
 
 How to use a Embedding AI Model:
 
@@ -383,6 +390,7 @@ transform:
     projection: "*, inc(inc(inc(id))) as inc_id, GET_EMBEDDING(page) as summary"
     filter: inc(id) < 100
 ```
+Here, GET_EMBEDDING is defined though `model-name` already.
 
 ### All Support models
 
@@ -392,18 +400,19 @@ The following built-in models are provided:
 
 | parameter           | type   | optional/required | meaning                                       |
 |---------------------|--------|-------------------|-----------------------------------------------|
-| OpenAI.model-name   | STRING | required          | Name of model to be called.                   |
-| OpenAI.host         | STRING | required          | Host of the Model server to be connected.     |
-| OpenAI.apiKey       | STRING | required          | Api Key for verification of the Model server. |
-| OpenAI.chat.promote | STRING | optional          | Promote for chatting with OpenAI.             |
+| openai.model        | STRING | required          | Name of model to be called.                   |
+| openai.host         | STRING | required          | Host of the Model server to be connected.     |
+| openai.apiKey       | STRING | required          | Api Key for verification of the Model server. |
+| openai.chat.promote | STRING | optional          | Promote for chatting with OpenAI.             |
 
 #### OpenAIEmbeddingModel
 
-| parameter           | type   | optional/required | meaning                                       |
-|---------------------|--------|-------------------|-----------------------------------------------|
-| OpenAI.model-name   | STRING | required          | Name of model to be called.                   |
-| OpenAI.host         | STRING | required          | Host of the Model server to be connected.     |
-| OpenAI.apiKey       | STRING | required          | Api Key for verification of the Model server. |
+| parameter     | type   | optional/required | meaning                                       |
+|---------------|--------|-------------------|-----------------------------------------------|
+| openai.model  | STRING | required          | Name of model to be called.                   |
+| openai.host   | STRING | required          | Host of the Model server to be connected.     |
+| openai.apiKey | STRING | required          | Api Key for verification of the Model server. |
+
 
 # Known limitations
 * Currently, transform doesn't work with route rules. It will be supported in future versions.

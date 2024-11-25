@@ -17,25 +17,10 @@
 
 package org.apache.flink.cdc.common.udf;
 
-import org.apache.flink.cdc.common.annotation.PublicEvolving;
-import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.configuration.Configuration;
 
-/**
- * Base interface for creating a UDF in transform projection and filtering expressions. You should
- * define at least one {@code eval} method.
- */
-@PublicEvolving
-public interface UserDefinedFunction {
-    default DataType getReturnType() {
-        return null;
-    }
+/** Context for initialization of {@link UserDefinedFunction}. */
+public interface UserDefinedFunctionContext {
 
-    /** This will be invoked every time when a UDF got created. */
-    default void open() throws Exception {}
-
-    /** This will be invoked every time when a UDF got created. */
-    default void open(UserDefinedFunctionContext context) throws Exception {}
-
-    /** This will be invoked before a UDF got destroyed. */
-    default void close() throws Exception {}
+    Configuration configuration();
 }

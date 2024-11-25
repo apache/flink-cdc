@@ -18,22 +18,26 @@
 package org.apache.flink.cdc.runtime.model;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** A test for {@link OpenAIChatModel}. */
-public class TestOpenAIChatModel {
+/** A test for {@link OpenAIEmbeddingModel}. */
+public class TestOpenAIEmbeddingModel {
+
     @Test
-    public void testEval() throws Exception {
-        OpenAIChatModel openAIChatModel = new OpenAIChatModel();
+    public void testEval() {
+        OpenAIEmbeddingModel openAIEmbeddingModel = new OpenAIEmbeddingModel();
         Configuration configuration = new Configuration();
         configuration.set(ModelOptions.OPENAI_HOST, "http://langchain4j.dev/demo/openai/v1");
         configuration.set(ModelOptions.OPENAI_API_KEY, "demo");
-        configuration.set(ModelOptions.OPENAI_MODEL_NAME, "gpt-4o-mini");
-        openAIChatModel.configure(configuration);
-        openAIChatModel.open();
-        String response = openAIChatModel.eval("Who invented the electric light?");
-        Assertions.assertFalse(response.isEmpty());
+        configuration.set(ModelOptions.OPENAI_MODEL_NAME, "text-embedding-3-small");
+        UserDefinedFunctionContext userDefinedFunctionContext = () -> configuration;
+        openAIEmbeddingModel.open(userDefinedFunctionContext);
+        ArrayData arrayData =
+                openAIEmbeddingModel.eval("Flink CDC is a streaming data integration tool");
+        Assertions.assertNotNull(arrayData);
     }
 }

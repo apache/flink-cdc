@@ -57,8 +57,9 @@ pipeline:
   parallelism: 4
   schema.change.behavior: evolve
   schema-operator.rpc-timeout: 1 h
-  models:
-    - name: GET_EMBEDDING
-      model: OpenAIEmbeddingModel
-      host: https://xxxx
-      key: abcd1234
+  model:
+    model-name: GET_EMBEDDING
+    class-name: OpenAIEmbeddingModel
+    openai.model: text-embedding-3-small
+    openai.host: https://xxxx
+    openai.key: abcd1234

@@ -37,6 +37,7 @@ import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.VarBinaryType;
 
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
 
 import java.math.BigDecimal;
@@ -51,6 +52,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /** A data type converter. */
 public class DataTypeConverter {
@@ -108,46 +110,59 @@ public class DataTypeConverter {
         }
     }
 
-    public static SqlTypeName convertCalciteType(DataType dataType) {
+    public static RelDataType convertCalciteType(
+            RelDataTypeFactory typeFactory, DataType dataType) {
         switch (dataType.getTypeRoot()) {
             case BOOLEAN:
-                return SqlTypeName.BOOLEAN;
+                return typeFactory.createSqlType(SqlTypeName.BOOLEAN);
             case TINYINT:
-                return SqlTypeName.TINYINT;
+                return typeFactory.createSqlType(SqlTypeName.TINYINT);
             case SMALLINT:
-                return SqlTypeName.SMALLINT;
+                return typeFactory.createSqlType(SqlTypeName.SMALLINT);
             case INTEGER:
-                return SqlTypeName.INTEGER;
+                return typeFactory.createSqlType(SqlTypeName.INTEGER);
             case BIGINT:
-                return SqlTypeName.BIGINT;
+                return typeFactory.createSqlType(SqlTypeName.BIGINT);
             case DATE:
-                return SqlTypeName.DATE;
+                return typeFactory.createSqlType(SqlTypeName.DATE);
             case TIME_WITHOUT_TIME_ZONE:
-                return SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE;
+                return typeFactory.createSqlType(SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE);
             case TIMESTAMP_WITHOUT_TIME_ZONE:
-                return SqlTypeName.TIMESTAMP;
+                return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE;
+                return typeFactory.createSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
             case FLOAT:
-                return SqlTypeName.FLOAT;
+                return typeFactory.createSqlType(SqlTypeName.FLOAT);
             case DOUBLE:
-                return SqlTypeName.DOUBLE;
+                return typeFactory.createSqlType(SqlTypeName.DOUBLE);
             case CHAR:
-                return SqlTypeName.CHAR;
+                return typeFactory.createSqlType(SqlTypeName.CHAR);
             case VARCHAR:
-                return SqlTypeName.VARCHAR;
+                return typeFactory.createSqlType(SqlTypeName.VARCHAR);
             case BINARY:
-                return SqlTypeName.BINARY;
+                return typeFactory.createSqlType(SqlTypeName.BINARY);
             case VARBINARY:
-                return SqlTypeName.VARBINARY;
+                return typeFactory.createSqlType(SqlTypeName.VARBINARY);
             case DECIMAL:
-                return SqlTypeName.DECIMAL;
+                return typeFactory.createSqlType(SqlTypeName.DECIMAL);
             case ROW:
-                return SqlTypeName.ROW;
+                List<RelDataType> dataTypes =
+                        ((RowType) dataType)
+                                .getFieldTypes().stream()
+                                        .map((type) -> convertCalciteType(typeFactory, type))
+                                        .collect(Collectors.toList());
+                return typeFactory.createStructType(
+                        dataTypes, ((RowType) dataType).getFieldNames());
             case ARRAY:
-                return SqlTypeName.ARRAY;
+                DataType elementType = ((ArrayType) dataType).getElementType();
+                return typeFactory.createArrayType(
+                        convertCalciteType(typeFactory, elementType), -1);
             case MAP:
-                return SqlTypeName.MAP;
+                RelDataType keyType =
+                        convertCalciteType(typeFactory, ((MapType) dataType).getKeyType());
+                RelDataType valueType =
+                        convertCalciteType(typeFactory, ((MapType) dataType).getValueType());
+                return typeFactory.createMapType(keyType, valueType);
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + dataType);
         }

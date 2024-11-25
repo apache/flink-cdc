@@ -19,7 +19,6 @@ package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.schema.Column;
-import org.apache.flink.cdc.common.types.ArrayType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
@@ -128,18 +127,7 @@ public class TransformParser {
                             o -> {
                                 RelDataTypeFactory typeFactory = o.getTypeFactory();
                                 DataType returnTypeHint = udf.getReturnTypeHint();
-
-                                if (returnTypeHint instanceof ArrayType) {
-                                    DataType elementTypeHint =
-                                            ((ArrayType) returnTypeHint).getElementType();
-                                    RelDataType elementType =
-                                            typeFactory.createSqlType(
-                                                    convertCalciteType(elementTypeHint));
-                                    return typeFactory.createArrayType(elementType, -1);
-                                }
-
-                                return typeFactory.createSqlType(
-                                        convertCalciteType(returnTypeHint));
+                                return convertCalciteType(typeFactory, returnTypeHint);
                             };
                 } else {
                     // Infer it from eval method return type

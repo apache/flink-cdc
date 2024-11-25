@@ -18,13 +18,23 @@
 package org.apache.flink.cdc.runtime.model;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 
-/**
- * Model that can be used to transform the record into text or vector. The lifecycle of
- * BuiltInModel: configure => open => eval => close.
- */
-public interface BuiltInModel {
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-    /** Client may need to be initialized with some parameters. */
-    void configure(Configuration modelOptions);
+/** A test for {@link OpenAIChatModel}. */
+public class TestOpenAIChatModel {
+    @Test
+    public void testEval() {
+        OpenAIChatModel openAIChatModel = new OpenAIChatModel();
+        Configuration configuration = new Configuration();
+        configuration.set(ModelOptions.OPENAI_HOST, "http://langchain4j.dev/demo/openai/v1");
+        configuration.set(ModelOptions.OPENAI_API_KEY, "demo");
+        configuration.set(ModelOptions.OPENAI_MODEL_NAME, "gpt-4o-mini");
+        UserDefinedFunctionContext userDefinedFunctionContext = () -> configuration;
+        openAIChatModel.open(userDefinedFunctionContext);
+        String response = openAIChatModel.eval("Who invented the electric light?");
+        Assertions.assertFalse(response.isEmpty());
+    }
 }

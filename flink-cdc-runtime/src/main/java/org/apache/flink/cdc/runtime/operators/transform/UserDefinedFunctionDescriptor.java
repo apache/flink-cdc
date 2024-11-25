@@ -21,9 +21,6 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
@@ -46,30 +43,29 @@ public class UserDefinedFunctionDescriptor implements Serializable {
 
     private final Map<String, String> parameters;
 
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private final boolean isModel;
 
-    /** Package of {@link org.apache.flink.cdc.runtime.model.BuiltInModel}. */
-    public static final String PREFIX_CLASSPATH_MODEL = "org.apache.flink.cdc.runtime.model.";
-
-    private static final String MODEL_NAME_KEY = "name";
+    /** Package of embedding model. */
+    public static final String PREFIX_CLASSPATH_BUILD_IN_MODEL =
+            "org.apache.flink.cdc.runtime.model.";
 
     public UserDefinedFunctionDescriptor(String name, String classpath) {
+        this(name, classpath, new HashMap<>());
+    }
+
+    public UserDefinedFunctionDescriptor(
+            String name, String classpath, Map<String, String> parameters) {
         if (classpath.contains(".")) {
-            this.parameters = new HashMap<>();
-            this.name = name;
+            this.isModel = false;
             this.className = classpath.substring(classpath.lastIndexOf('.') + 1);
             this.classpath = classpath;
         } else {
-            // The UserDefinedFunction is a built-in Model.
-            try {
-                parameters = objectMapper.readValue(name, Map.class);
-            } catch (JsonProcessingException e) {
-                throw new IllegalArgumentException(e);
-            }
-            this.name = parameters.get(MODEL_NAME_KEY);
+            this.isModel = true;
             this.className = classpath;
-            this.classpath = PREFIX_CLASSPATH_MODEL + classpath;
+            this.classpath = PREFIX_CLASSPATH_BUILD_IN_MODEL + classpath;
         }
+        this.name = name;
+        this.parameters = parameters;
         try {
             Class<?> clazz = Class.forName(this.classpath);
             isCdcPipelineUdf = isCdcPipelineUdf(clazz);
@@ -138,6 +134,10 @@ public class UserDefinedFunctionDescriptor implements Serializable {
         return parameters;
     }
 
+    public boolean isModel() {
+        return isModel;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -146,13 +146,20 @@ public class UserDefinedFunctionDescriptor implements Serializable {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        UserDefinedFunctionDescriptor context = (UserDefinedFunctionDescriptor) o;
-        return Objects.equals(name, context.name) && Objects.equals(classpath, context.classpath);
+        UserDefinedFunctionDescriptor that = (UserDefinedFunctionDescriptor) o;
+        return isCdcPipelineUdf == that.isCdcPipelineUdf
+                && isModel == that.isModel
+                && Objects.equals(name, that.name)
+                && Objects.equals(classpath, that.classpath)
+                && Objects.equals(className, that.className)
+                && Objects.equals(returnTypeHint, that.returnTypeHint)
+                && Objects.equals(parameters, that.parameters);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, classpath);
+        return Objects.hash(
+                name, classpath, className, returnTypeHint, isCdcPipelineUdf, parameters, isModel);
     }
 
     @Override
@@ -164,6 +171,17 @@ public class UserDefinedFunctionDescriptor implements Serializable {
                 + ", classpath='"
                 + classpath
                 + '\''
+                + ", className='"
+                + className
+                + '\''
+                + ", returnTypeHint="
+                + returnTypeHint
+                + ", isCdcPipelineUdf="
+                + isCdcPipelineUdf
+                + ", parameters="
+                + parameters
+                + ", isModel="
+                + isModel
                 + '}';
     }
 }

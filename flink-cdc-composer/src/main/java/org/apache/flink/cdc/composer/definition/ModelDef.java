@@ -26,31 +26,31 @@ import java.util.Objects;
  * <p>A transformation definition contains:
  *
  * <ul>
- *   <li>name: The name of function.
- *   <li>name: The model to transform data.
- *   <li>properties: The parameters that used to configure the model.
+ *   <li>modelName: The name of function.
+ *   <li>className: The model to transform data.
+ *   <li>parameters: The parameters that used to configure the model.
  * </ul>
  */
 public class ModelDef {
 
-    private final String name;
+    private final String modelName;
 
-    private final String model;
+    private final String className;
 
     private final Map<String, String> parameters;
 
-    public ModelDef(String name, String model, Map<String, String> parameters) {
-        this.name = name;
-        this.model = model;
+    public ModelDef(String modelName, String className, Map<String, String> parameters) {
+        this.modelName = modelName;
+        this.className = className;
         this.parameters = parameters;
     }
 
-    public String getName() {
-        return name;
+    public String getModelName() {
+        return modelName;
     }
 
-    public String getModel() {
-        return model;
+    public String getClassName() {
+        return className;
     }
 
     public Map<String, String> getParameters() {
@@ -66,24 +66,24 @@ public class ModelDef {
             return false;
         }
         ModelDef modelDef = (ModelDef) o;
-        return Objects.equals(name, modelDef.name)
-                && Objects.equals(model, modelDef.model)
+        return Objects.equals(modelName, modelDef.modelName)
+                && Objects.equals(className, modelDef.className)
                 && Objects.equals(parameters, modelDef.parameters);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, model, parameters);
+        return Objects.hash(modelName, className, parameters);
     }
 
     @Override
     public String toString() {
         return "ModelDef{"
                 + "name='"
-                + name
+                + modelName
                 + '\''
                 + ", model='"
-                + model
+                + className
                 + '\''
                 + ", parameters="
                 + parameters

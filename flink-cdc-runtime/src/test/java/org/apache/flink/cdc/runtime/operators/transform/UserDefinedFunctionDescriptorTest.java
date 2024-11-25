@@ -23,14 +23,8 @@ import org.apache.flink.cdc.common.udf.UserDefinedFunction;
 import org.apache.flink.cdc.runtime.model.OpenAIEmbeddingModel;
 import org.apache.flink.table.functions.ScalarFunction;
 
-import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -101,17 +95,7 @@ public class UserDefinedFunctionDescriptorTest {
                                         "not_even_exist", "not.a.valid.class.path"))
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Failed to instantiate UDF not_even_exist@not.a.valid.class.path");
-
-        ObjectMapper objectMapper = new ObjectMapper();
-        Map<String, String> parameters =
-                new LinkedHashMap<>(
-                        ImmutableMap.<String, String>builder()
-                                .put("name", "GET_EMBEDDING")
-                                .put("model", "OpenAIEmbeddingModel")
-                                .put("host", "https://xxxx")
-                                .put("key", "abcd1234")
-                                .build());
-        String name = objectMapper.writeValueAsString(parameters);
+        String name = "GET_EMBEDDING";
         assertThat(
                         new UserDefinedFunctionDescriptor(
                                 name, OpenAIEmbeddingModel.class.getSimpleName()))
