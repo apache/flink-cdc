@@ -316,16 +316,18 @@ public class TransformParserTest {
         List<Column> testColumns =
                 Arrays.asList(
                         Column.physicalColumn("id", DataTypes.INT(), "id"),
-                        Column.physicalColumn("name", DataTypes.STRING(), "string"),
+                        Column.physicalColumn("name", DataTypes.STRING(), "name"),
                         Column.physicalColumn("age", DataTypes.INT(), "age"),
-                        Column.physicalColumn("address", DataTypes.STRING(), "address"),
+                        Column.physicalColumn(
+                                "createTime", DataTypes.TIMESTAMP(3), "newCreateTime"),
+                        Column.physicalColumn("address", DataTypes.VARCHAR(50), "newAddress"),
                         Column.physicalColumn("deposit", DataTypes.DECIMAL(10, 2), "deposit"),
                         Column.physicalColumn("weight", DataTypes.DOUBLE(), "weight"),
                         Column.physicalColumn("height", DataTypes.DOUBLE(), "height"));
 
         List<ProjectionColumn> result =
                 TransformParser.generateProjectionColumns(
-                        "id, upper(name) as name, age + 1 as newage, deposit as deposits, weight / (height * height) as bmi",
+                        "id, upper(name) as name, age + 1 as newage, createTime as newCreateTime, address as newAddress, deposit as deposits, weight / (height * height) as bmi",
                         testColumns,
                         Collections.emptyList(),
                         new SupportedMetadataColumn[0]);
@@ -335,6 +337,8 @@ public class TransformParserTest {
                         "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='id', originalColumnNames=[id], transformExpressionKey=null}",
                         "ProjectionColumn{column=`name` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper(name)', originalColumnNames=[name], transformExpressionKey=null}",
                         "ProjectionColumn{column=`newage` INT, expression='`TB`.`age` + 1', scriptExpression='age + 1', originalColumnNames=[age], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`newCreateTime` TIMESTAMP(3), expression='TB.createTime', scriptExpression='createTime', originalColumnNames=[createTime], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`newAddress` STRING, expression='TB.address', scriptExpression='address', originalColumnNames=[address], transformExpressionKey=null}",
                         "ProjectionColumn{column=`deposits` DECIMAL(10, 2), expression='TB.deposit', scriptExpression='deposit', originalColumnNames=[deposit], transformExpressionKey=null}",
                         "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='weight / height * height', originalColumnNames=[weight, height, height], transformExpressionKey=null}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
