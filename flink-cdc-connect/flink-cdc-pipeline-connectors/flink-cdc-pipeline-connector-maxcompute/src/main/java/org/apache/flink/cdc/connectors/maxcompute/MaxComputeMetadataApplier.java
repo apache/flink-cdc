@@ -26,8 +26,8 @@ import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
-import org.apache.flink.cdc.connectors.maxcompute.common.UncheckedOdpsException;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.SchemaEvolutionUtils;
@@ -114,7 +114,7 @@ public class MaxComputeMetadataApplier implements MetadataApplier {
                                 + schemaChangeEvent.getClass().getName());
             }
         } catch (OdpsException e) {
-            throw new UncheckedOdpsException(e);
+            throw new SchemaEvolveException(schemaChangeEvent, e.getMessage(), e);
         }
     }
 }
