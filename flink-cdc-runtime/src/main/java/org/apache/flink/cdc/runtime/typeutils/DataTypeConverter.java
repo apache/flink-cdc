@@ -197,9 +197,9 @@ public class DataTypeConverter {
             case VARCHAR:
                 return DataTypes.STRING();
             case BINARY:
-                return DataTypes.BINARY(BinaryType.MAX_LENGTH);
+                return DataTypes.BINARY(relDataType.getPrecision());
             case VARBINARY:
-                return DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH);
+                return DataTypes.VARBINARY(relDataType.getPrecision());
             case DECIMAL:
                 return DataTypes.DECIMAL(relDataType.getPrecision(), relDataType.getScale());
             case ARRAY:
