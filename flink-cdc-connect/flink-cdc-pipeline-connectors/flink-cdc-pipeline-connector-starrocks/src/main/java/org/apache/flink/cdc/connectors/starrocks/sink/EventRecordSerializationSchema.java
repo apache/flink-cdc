@@ -98,7 +98,7 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
         for (int i = 0; i < newSchema.getColumnCount(); i++) {
             tableInfo.fieldGetters[i] =
                     StarRocksUtils.createFieldGetter(
-                            newSchema.getColumns().get(i).getType(), i, zoneId);
+                            newSchema.getColumns().get(i).getType(), i, zoneId, tableId);
         }
         tableInfoMap.put(tableId, tableInfo);
     }

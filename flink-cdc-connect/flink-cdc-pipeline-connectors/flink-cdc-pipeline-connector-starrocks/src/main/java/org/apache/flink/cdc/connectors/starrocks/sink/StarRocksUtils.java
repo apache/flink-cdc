@@ -132,7 +132,7 @@ public class StarRocksUtils {
      *     </code>
      */
     public static RecordData.FieldGetter createFieldGetter(
-            DataType fieldType, int fieldPos, ZoneId zoneId) {
+            DataType fieldType, int fieldPos, ZoneId zoneId, TableId tableId) {
         final RecordData.FieldGetter fieldGetter;
         // ordered by type root definition
         switch (fieldType.getTypeRoot()) {
@@ -195,7 +195,9 @@ public class StarRocksUtils {
                 break;
             default:
                 throw new UnsupportedOperationException(
-                        "Don't support data type " + fieldType.getTypeRoot());
+                        String.format(
+                                "Don't support data type %s in table: %s, field pos: %d",
+                                fieldType.getTypeRoot(), tableId, fieldPos));
         }
         if (!fieldType.isNullable()) {
             return fieldGetter;
