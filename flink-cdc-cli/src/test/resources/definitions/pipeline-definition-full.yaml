@@ -62,4 +62,4 @@ pipeline:
     class-name: OpenAIEmbeddingModel
     openai.model: text-embedding-3-small
     openai.host: https://xxxx
-    openai.key: abcd1234
+    openai.apikey: abcd1234

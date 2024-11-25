@@ -871,13 +871,13 @@ public class FlinkPipelineUdfITCase {
                         new ArrayList<>(),
                         Arrays.asList(
                                 new ModelDef(
-                                        "ENBEDDING",
-                                        "OpenAIEmbeddingModel",
+                                        "CHAT",
+                                        "OpenAIChatModel",
                                         new LinkedHashMap<>(
                                                 ImmutableMap.<String, String>builder()
                                                         .put(
                                                                 "openai.model",
-                                                                "text-embedding-3-small")
+                                                                "gpt-4o-mini")
                                                         .put(
                                                                 "openai.host",
                                                                 "http://langchain4j.dev/demo/openai/v1")
@@ -893,7 +893,7 @@ public class FlinkPipelineUdfITCase {
         String[] outputEvents = outCaptor.toString().trim().split("\n");
         assertThat(outputEvents)
                 .contains(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`emb` ARRAY<FLOAT>}, primaryKeys=col1, options=({key1=value1})}")
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING,`emb` STRING}, primaryKeys=col1, options=({key1=value1})}")
                 // The result of transform by model is not fixed.
                 .hasSize(9);
     }

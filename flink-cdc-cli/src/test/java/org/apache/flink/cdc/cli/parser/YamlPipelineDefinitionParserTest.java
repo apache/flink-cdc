@@ -356,7 +356,7 @@ class YamlPipelineDefinitionParserTest {
                                                     .put("class-name", "OpenAIEmbeddingModel")
                                                     .put("openai.model", "text-embedding-3-small")
                                                     .put("openai.host", "https://xxxx")
-                                                    .put("openai.key", "abcd1234")
+                                                    .put("openai.apikey", "abcd1234")
                                                     .build()))),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
@@ -417,7 +417,7 @@ class YamlPipelineDefinitionParserTest {
                         + "      class-name: OpenAIEmbeddingModel\n"
                         + "      openai.model: text-embedding-3-small\n"
                         + "      openai.host: https://xxxx\n"
-                        + "      openai.key: abcd1234";
+                        + "      openai.apikey: abcd1234";
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef = parser.parse(pipelineDefText, new Configuration());
         assertThat(pipelineDef).isEqualTo(fullDef);
@@ -489,7 +489,7 @@ class YamlPipelineDefinitionParserTest {
                                                     .put("class-name", "OpenAIEmbeddingModel")
                                                     .put("openai.model", "text-embedding-3-small")
                                                     .put("openai.host", "https://xxxx")
-                                                    .put("openai.key", "abcd1234")
+                                                    .put("openai.apikey", "abcd1234")
                                                     .build()))),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
