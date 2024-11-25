@@ -43,8 +43,6 @@ public class UserDefinedFunctionDescriptor implements Serializable {
 
     private final Map<String, String> parameters;
 
-    private final boolean isModel;
-
     /** Package of embedding model. */
     public static final String PREFIX_CLASSPATH_BUILT_IN_MODEL =
             "org.apache.flink.cdc.runtime.model.";
@@ -56,11 +54,9 @@ public class UserDefinedFunctionDescriptor implements Serializable {
     public UserDefinedFunctionDescriptor(
             String name, String classpath, Map<String, String> parameters) {
         if (classpath.contains(".")) {
-            this.isModel = false;
             this.className = classpath.substring(classpath.lastIndexOf('.') + 1);
             this.classpath = classpath;
         } else {
-            this.isModel = true;
             this.className = classpath;
             this.classpath = PREFIX_CLASSPATH_BUILT_IN_MODEL + classpath;
         }
@@ -132,10 +128,6 @@ public class UserDefinedFunctionDescriptor implements Serializable {
 
     public Map<String, String> getParameters() {
         return parameters;
-    }
-
-    public boolean isModel() {
-        return isModel;
     }
 
     @Override

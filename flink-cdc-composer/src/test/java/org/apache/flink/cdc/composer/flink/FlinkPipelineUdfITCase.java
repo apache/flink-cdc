@@ -875,9 +875,7 @@ public class FlinkPipelineUdfITCase {
                                         "OpenAIChatModel",
                                         new LinkedHashMap<>(
                                                 ImmutableMap.<String, String>builder()
-                                                        .put(
-                                                                "openai.model",
-                                                                "gpt-4o-mini")
+                                                        .put("openai.model", "gpt-4o-mini")
                                                         .put(
                                                                 "openai.host",
                                                                 "http://langchain4j.dev/demo/openai/v1")

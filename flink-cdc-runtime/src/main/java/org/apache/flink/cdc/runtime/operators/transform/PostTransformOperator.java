@@ -540,16 +540,12 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                             // into UserDefinedFunction interface, thus the provided UDF classes
                             // might not be compatible with the interface definition in CDC common.
                             Object udfInstance = udfFunctionInstances.get(udf.getName());
-                            if (udf.isModel()) {
-                                UserDefinedFunctionContext userDefinedFunctionContext =
-                                        () -> Configuration.fromMap(udf.getParameters());
-                                udfInstance
-                                        .getClass()
-                                        .getMethod("open", UserDefinedFunctionContext.class)
-                                        .invoke(udfInstance, userDefinedFunctionContext);
-                            } else {
-                                udfInstance.getClass().getMethod("open").invoke(udfInstance);
-                            }
+                            UserDefinedFunctionContext userDefinedFunctionContext =
+                                    () -> Configuration.fromMap(udf.getParameters());
+                            udfInstance
+                                    .getClass()
+                                    .getMethod("open", UserDefinedFunctionContext.class)
+                                    .invoke(udfInstance, userDefinedFunctionContext);
                         } else {
                             // Do nothing, Flink-style UDF lifecycle hooks are not supported
                         }
