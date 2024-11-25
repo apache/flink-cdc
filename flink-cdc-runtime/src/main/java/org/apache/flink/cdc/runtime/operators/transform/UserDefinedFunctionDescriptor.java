@@ -43,7 +43,7 @@ public class UserDefinedFunctionDescriptor implements Serializable {
 
     private final Map<String, String> parameters;
 
-    /** Package of embedding model. */
+    /** Package of built-in model. */
     public static final String PREFIX_CLASSPATH_BUILT_IN_MODEL =
             "org.apache.flink.cdc.runtime.model.";
 
@@ -132,15 +132,10 @@ public class UserDefinedFunctionDescriptor implements Serializable {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
         UserDefinedFunctionDescriptor that = (UserDefinedFunctionDescriptor) o;
         return isCdcPipelineUdf == that.isCdcPipelineUdf
-                && isModel == that.isModel
                 && Objects.equals(name, that.name)
                 && Objects.equals(classpath, that.classpath)
                 && Objects.equals(className, that.className)
@@ -151,7 +146,7 @@ public class UserDefinedFunctionDescriptor implements Serializable {
     @Override
     public int hashCode() {
         return Objects.hash(
-                name, classpath, className, returnTypeHint, isCdcPipelineUdf, parameters, isModel);
+                name, classpath, className, returnTypeHint, isCdcPipelineUdf, parameters);
     }
 
     @Override
@@ -172,8 +167,6 @@ public class UserDefinedFunctionDescriptor implements Serializable {
                 + isCdcPipelineUdf
                 + ", parameters="
                 + parameters
-                + ", isModel="
-                + isModel
                 + '}';
     }
 }

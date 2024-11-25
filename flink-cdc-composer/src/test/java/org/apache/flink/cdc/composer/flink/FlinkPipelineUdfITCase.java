@@ -850,7 +850,7 @@ public class FlinkPipelineUdfITCase {
         TransformDef transformDef =
                 new TransformDef(
                         "default_namespace.default_schema.table1",
-                        "*, ENBEDDING(col1) AS emb",
+                        "*, CHAT(col1) AS emb",
                         null,
                         "col1",
                         null,
