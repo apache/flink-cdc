@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
@@ -192,7 +193,8 @@ public class PreTransformOperatorTest {
                                 "col2",
                                 "col12",
                                 "key1=value1,key2=value2",
-                                null)
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -303,7 +305,8 @@ public class PreTransformOperatorTest {
                                 "id",
                                 "id",
                                 "key1=value1,key2=value2",
-                                null)
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -334,7 +337,8 @@ public class PreTransformOperatorTest {
                                 "id",
                                 "id",
                                 "key1=value1,key2=value2",
-                                null)
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -442,7 +446,8 @@ public class PreTransformOperatorTest {
                                 "id",
                                 "id",
                                 "key1=value1,key2=value2",
-                                null)
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -559,7 +564,8 @@ public class PreTransformOperatorTest {
                                 "id",
                                 null,
                                 null,
-                                null)
+                                null,
+                                new SupportedMetadataColumn[0])
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
                                 "id, name as roleName",
@@ -567,7 +573,8 @@ public class PreTransformOperatorTest {
                                 "id",
                                 null,
                                 null,
-                                null)
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -598,7 +605,8 @@ public class PreTransformOperatorTest {
                                 "id",
                                 null,
                                 null,
-                                null)
+                                null,
+                                new SupportedMetadataColumn[0])
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
                                 "id, age, name, sex, 'Juvenile' as roleName",
@@ -606,7 +614,8 @@ public class PreTransformOperatorTest {
                                 "id",
                                 null,
                                 null,
-                                null)
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -636,7 +645,8 @@ public class PreTransformOperatorTest {
                                 "id",
                                 null,
                                 null,
-                                null)
+                                null,
+                                new SupportedMetadataColumn[0])
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
                                 "id, age, UPPER(name) as name, sex",
@@ -644,7 +654,8 @@ public class PreTransformOperatorTest {
                                 "id",
                                 null,
                                 null,
-                                null)
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =

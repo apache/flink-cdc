@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
@@ -83,6 +84,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.common.utils.StringUtils.isNullOrWhitespaceOnly;
 import static org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns.METADATA_COLUMNS;
@@ -106,8 +108,10 @@ public class TransformParser {
     private static RelNode sqlToRel(
             List<Column> columns,
             SqlNode sqlNode,
-            List<UserDefinedFunctionDescriptor> udfDescriptors) {
-        List<Column> columnsWithMetadata = copyFillMetadataColumn(columns);
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        List<Column> columnsWithMetadata =
+                copyFillMetadataColumn(columns, supportedMetadataColumns);
         CalciteSchema rootSchema = CalciteSchema.createRootSchema(true);
         SchemaPlus schema = rootSchema.plus();
         Map<String, Object> operand = new HashMap<>();
@@ -265,7 +269,8 @@ public class TransformParser {
     public static List<ProjectionColumn> generateProjectionColumns(
             String projectionExpression,
             List<Column> columns,
-            List<UserDefinedFunctionDescriptor> udfDescriptors) {
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         if (isNullOrWhitespaceOnly(projectionExpression)) {
             return new ArrayList<>();
         }
@@ -273,8 +278,9 @@ public class TransformParser {
         if (sqlSelect.getSelectList().isEmpty()) {
             return new ArrayList<>();
         }
+
         expandWildcard(sqlSelect, columns);
-        RelNode relNode = sqlToRel(columns, sqlSelect, udfDescriptors);
+        RelNode relNode = sqlToRel(columns, sqlSelect, udfDescriptors, supportedMetadataColumns);
         Map<String, RelDataType> relDataTypeMap =
                 relNode.getRowType().getFieldList().stream()
                         .collect(
@@ -305,7 +311,7 @@ public class TransformParser {
                 String columnName = aliasNode.names.get(aliasNode.names.size() - 1);
 
                 Preconditions.checkArgument(
-                        !isMetadataColumn(columnName),
+                        !isMetadataColumn(columnName, supportedMetadataColumns),
                         "Column name %s is reserved and shading it is not allowed.",
                         columnName);
 
@@ -320,7 +326,11 @@ public class TransformParser {
                             identifierExprNode.names.get(identifierExprNode.names.size() - 1);
                     projectionColumn =
                             resolveProjectionColumnFromIdentifier(
-                                    relDataTypeMap, originalColumnMap, originalName, columnName);
+                                    relDataTypeMap,
+                                    originalColumnMap,
+                                    originalName,
+                                    columnName,
+                                    supportedMetadataColumns);
                 } else {
                     projectionColumn =
                             ProjectionColumn.ofCalculated(
@@ -339,7 +349,11 @@ public class TransformParser {
                 String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
                 projectionColumn =
                         resolveProjectionColumnFromIdentifier(
-                                relDataTypeMap, originalColumnMap, columnName, columnName);
+                                relDataTypeMap,
+                                originalColumnMap,
+                                columnName,
+                                columnName,
+                                supportedMetadataColumns);
             } else {
                 throw new ParseException("Unrecognized projection: " + sqlNode.toString());
             }
@@ -366,8 +380,9 @@ public class TransformParser {
             Map<String, RelDataType> relDataTypeMap,
             Map<String, Column> originalColumnMap,
             String identifier,
-            String projectedColumnName) {
-        if (isMetadataColumn(identifier)) {
+            String projectedColumnName,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        if (isMetadataColumn(identifier, supportedMetadataColumns)) {
             // For a metadata column, we simply generate a projection column with the same
             return ProjectionColumn.ofCalculated(
                     projectedColumnName,
@@ -406,7 +421,8 @@ public class TransformParser {
         return JaninoCompiler.translateSqlNodeToJaninoExpression(where, udfDescriptors);
     }
 
-    public static List<String> parseComputedColumnNames(String projection) {
+    public static List<String> parseComputedColumnNames(
+            String projection, SupportedMetadataColumn[] supportedMetadataColumns) {
         List<String> columnNames = new ArrayList<>();
         if (isNullOrWhitespaceOnly(projection)) {
             return columnNames;
@@ -436,7 +452,8 @@ public class TransformParser {
                 }
             } else if (sqlNode instanceof SqlIdentifier) {
                 String columnName = sqlNode.toString();
-                if (isMetadataColumn(columnName) && !columnNames.contains(columnName)) {
+                if (isMetadataColumn(columnName, supportedMetadataColumns)
+                        && !columnNames.contains(columnName)) {
                     columnNames.add(columnName);
                 }
             } else {
@@ -499,17 +516,24 @@ public class TransformParser {
         return parseSelect(statement.toString());
     }
 
-    private static List<Column> copyFillMetadataColumn(List<Column> columns) {
+    private static List<Column> copyFillMetadataColumn(
+            List<Column> columns, SupportedMetadataColumn[] supportedMetadataColumns) {
         // Add metaColumn for SQLValidator.validate
         List<Column> columnsWithMetadata = new ArrayList<>(columns);
         METADATA_COLUMNS.stream()
                 .map(col -> Column.physicalColumn(col.f0, col.f1))
                 .forEach(columnsWithMetadata::add);
+        Stream.of(supportedMetadataColumns)
+                .map(sCol -> Column.physicalColumn(sCol.getName(), sCol.getType()))
+                .forEach(columnsWithMetadata::add);
         return columnsWithMetadata;
     }
 
-    private static boolean isMetadataColumn(String columnName) {
-        return METADATA_COLUMNS.stream().anyMatch(col -> col.f0.equals(columnName));
+    private static boolean isMetadataColumn(
+            String columnName, SupportedMetadataColumn[] supportedMetadataColumns) {
+        return METADATA_COLUMNS.stream().anyMatch(col -> col.f0.equals(columnName))
+                || Stream.of(supportedMetadataColumns)
+                        .anyMatch(col -> col.getName().equals(columnName));
     }
 
     public static SqlSelect parseFilterExpression(String filterExpression) {

@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverter;
 
 import javax.annotation.Nullable;
@@ -27,6 +28,7 @@ import java.util.Optional;
 /** Post-Transformation rule used by {@link PostTransformOperator}. */
 public class PostTransformer {
     private final Selectors selectors;
+    private final SupportedMetadataColumn[] supportedMetadataColumns;
 
     private final Optional<TransformProjection> projection;
     private final Optional<TransformFilter> filter;
@@ -36,11 +38,13 @@ public class PostTransformer {
             Selectors selectors,
             @Nullable TransformProjection projection,
             @Nullable TransformFilter filter,
-            Optional<PostTransformConverter> postTransformConverter) {
+            Optional<PostTransformConverter> postTransformConverter,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         this.selectors = selectors;
         this.projection = projection != null ? Optional.of(projection) : Optional.empty();
         this.filter = filter != null ? Optional.of(filter) : Optional.empty();
         this.postTransformConverter = postTransformConverter;
+        this.supportedMetadataColumns = supportedMetadataColumns;
     }
 
     public Selectors getSelectors() {
@@ -57,5 +61,9 @@ public class PostTransformer {
 
     public Optional<PostTransformConverter> getPostTransformConverter() {
         return postTransformConverter;
+    }
+
+    public SupportedMetadataColumn[] getSupportedMetadataColumns() {
+        return supportedMetadataColumns;
     }
 }
