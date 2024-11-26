@@ -31,6 +31,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
@@ -101,7 +102,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                 @Nullable String filter,
                 String primaryKey,
                 String partitionKey,
-                String tableOptions) {
+                String tableOptions,
+                SupportedMetadataColumn[] supportedMetadataColumns) {
             transformRules.add(
                     new TransformRule(
                             tableInclusions,
@@ -109,13 +111,22 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                             filter,
                             primaryKey,
                             partitionKey,
-                            tableOptions));
+                            tableOptions,
+                            supportedMetadataColumns));
             return this;
         }
 
         public PostTransformOperator.Builder addTransform(
                 String tableInclusions, @Nullable String projection, @Nullable String filter) {
-            transformRules.add(new TransformRule(tableInclusions, projection, filter, "", "", ""));
+            transformRules.add(
+                    new TransformRule(
+                            tableInclusions,
+                            projection,
+                            filter,
+                            "",
+                            "",
+                            "",
+                            new SupportedMetadataColumn[0]));
             return this;
         }
 
@@ -183,6 +194,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                                     .build();
                                     return new PostTransformer(
                                             selectors,
+                                            tuple3.getSupportedMetadataColumns(),
                                             TransformProjection.of(projection).orElse(null),
                                             TransformFilter.of(filterExpression, udfDescriptors)
                                                     .orElse(null));
@@ -258,7 +270,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                                             .map(TransformProjection::getProjection)
                                                             .orElse(null),
                                                     createTableEvent.getSchema().getColumns(),
-                                                    udfDescriptors)
+                                                    udfDescriptors,
+                                                    rule.getSupportedMetadataColumns())
                                                     .stream())
                             .map(ProjectionColumn::getColumnName)
                             .collect(Collectors.toSet());
@@ -344,13 +357,16 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                         transformProjection,
                                         timezone,
                                         udfDescriptors,
-                                        getUdfFunctionInstances()));
+                                        getUdfFunctionInstances(),
+                                        transform.getSupportedMetadataColumns()));
                     }
                     TransformProjectionProcessor postTransformProcessor =
                             transformProjectionProcessorMap.get(
                                     Tuple2.of(tableId, transformProjection));
                     // update the columns of projection and add the column of projection into Schema
-                    newSchemas.add(postTransformProcessor.processSchemaChangeEvent(schema));
+                    newSchemas.add(
+                            postTransformProcessor.processSchemaChangeEvent(
+                                    schema, transform.getSupportedMetadataColumns()));
                 }
             }
         }
@@ -394,7 +410,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                         transformFilter,
                                         timezone,
                                         udfDescriptors,
-                                        getUdfFunctionInstances()));
+                                        getUdfFunctionInstances(),
+                                        transform.getSupportedMetadataColumns()));
                     }
                     TransformFilterProcessor transformFilterProcessor =
                             transformFilterProcessorMap.get(Tuple2.of(tableId, transformFilter));
@@ -420,7 +437,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                         transformProjection,
                                         timezone,
                                         udfDescriptors,
-                                        getUdfFunctionInstances()));
+                                        getUdfFunctionInstances(),
+                                        transform.getSupportedMetadataColumns()));
                     }
                     TransformProjectionProcessor postTransformProcessor =
                             transformProjectionProcessorMap.get(
@@ -455,17 +473,18 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             throws Exception {
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
+        Map<String, String> meta = dataChangeEvent.meta();
         // insert and update event only process afterData, delete only process beforeData
         if (after != null) {
             if (transformFilterProcessor.process(
-                    after, epochTime, opTypeToRowKind(dataChangeEvent.op(), '+'))) {
+                    after, epochTime, opTypeToRowKind(dataChangeEvent.op(), '+'), meta)) {
                 return Optional.of(dataChangeEvent);
             } else {
                 return Optional.empty();
             }
         } else if (before != null) {
             if (transformFilterProcessor.process(
-                    before, epochTime, opTypeToRowKind(dataChangeEvent.op(), '-'))) {
+                    before, epochTime, opTypeToRowKind(dataChangeEvent.op(), '-'), meta)) {
                 return Optional.of(dataChangeEvent);
             } else {
                 return Optional.empty();
@@ -483,13 +502,19 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         if (before != null) {
             BinaryRecordData projectedBefore =
                     postTransformProcessor.processData(
-                            before, epochTime, opTypeToRowKind(dataChangeEvent.op(), '-'));
+                            before,
+                            epochTime,
+                            opTypeToRowKind(dataChangeEvent.op(), '-'),
+                            dataChangeEvent.meta());
             dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
         }
         if (after != null) {
             BinaryRecordData projectedAfter =
                     postTransformProcessor.processData(
-                            after, epochTime, opTypeToRowKind(dataChangeEvent.op(), '+'));
+                            after,
+                            epochTime,
+                            opTypeToRowKind(dataChangeEvent.op(), '+'),
+                            dataChangeEvent.meta());
             dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
         }
         return Optional.of(dataChangeEvent);
