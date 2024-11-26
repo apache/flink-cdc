@@ -96,9 +96,7 @@ public class UserDefinedFunctionDescriptorTest {
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Failed to instantiate UDF not_even_exist@not.a.valid.class.path");
         String name = "GET_EMBEDDING";
-        assertThat(
-                        new UserDefinedFunctionDescriptor(
-                                name, OpenAIEmbeddingModel.class.getSimpleName()))
+        assertThat(new UserDefinedFunctionDescriptor(name, OpenAIEmbeddingModel.class.getName()))
                 .extracting("name", "className", "classpath", "returnTypeHint", "isCdcPipelineUdf")
                 .containsExactly(
                         "GET_EMBEDDING",
