@@ -27,24 +27,23 @@ import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.ArrayType;
-import org.apache.flink.cdc.common.types.ArrayType;
-import org.apache.flink.cdc.common.types.BigIntType;
 import org.apache.flink.cdc.common.types.BinaryType;
+import org.apache.flink.cdc.common.types.CharType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DecimalType;
-import org.apache.flink.cdc.common.types.MapType;
-import org.apache.flink.cdc.common.types.DoubleType;
-import org.apache.flink.cdc.common.types.FloatType;
-import org.apache.flink.cdc.common.types.IntType;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.MapType;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.common.types.TimeType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.VarBinaryType;
+import org.apache.flink.cdc.common.types.VarCharType;
+import org.apache.flink.cdc.common.types.ZonedTimestampType;
 
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
 import org.apache.calcite.sql.type.SqlTypeName;
 
 import java.math.BigDecimal;
@@ -117,6 +116,19 @@ public class DataTypeConverter {
         }
     }
 
+    public static RelDataType convertCalciteRelDataType(
+            RelDataTypeFactory relDataTypeFactory, List<Column> columns) {
+        RelDataTypeFactory.Builder fieldInfoBuilder = relDataTypeFactory.builder();
+        for (int i = 0; i < columns.size(); i++) {
+            fieldInfoBuilder.add(
+                    new RelDataTypeFieldImpl(
+                            columns.get(i).getName(),
+                            i,
+                            convertCalciteType(relDataTypeFactory, columns.get(i).getType())));
+        }
+        return fieldInfoBuilder.build();
+    }
+
     public static RelDataType convertCalciteType(
             RelDataTypeFactory typeFactory, DataType dataType) {
         switch (dataType.getTypeRoot()) {
@@ -133,12 +145,10 @@ public class DataTypeConverter {
             case DATE:
                 return typeFactory.createSqlType(SqlTypeName.DATE);
             case TIME_WITHOUT_TIME_ZONE:
-                return typeFactory.createSqlType(SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE);
                 TimeType timeType = (TimeType) dataType;
                 return typeFactory.createSqlType(
                         SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE, timeType.getPrecision());
             case TIMESTAMP_WITHOUT_TIME_ZONE:
-                return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
                 TimestampType timestampType = (TimestampType) dataType;
                 return typeFactory.createSqlType(
                         SqlTypeName.TIMESTAMP, timestampType.getPrecision());
@@ -147,7 +157,6 @@ public class DataTypeConverter {
                 return typeFactory.createSqlType(
                         SqlTypeName.TIMESTAMP, zonedTimestampType.getPrecision());
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return typeFactory.createSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
                 LocalZonedTimestampType localZonedTimestampType =
                         (LocalZonedTimestampType) dataType;
                 return typeFactory.createSqlType(
@@ -158,23 +167,18 @@ public class DataTypeConverter {
             case DOUBLE:
                 return typeFactory.createSqlType(SqlTypeName.DOUBLE);
             case CHAR:
-                return typeFactory.createSqlType(SqlTypeName.CHAR);
                 CharType charType = (CharType) dataType;
                 return typeFactory.createSqlType(SqlTypeName.CHAR, charType.getLength());
             case VARCHAR:
-                return typeFactory.createSqlType(SqlTypeName.VARCHAR);
                 VarCharType varCharType = (VarCharType) dataType;
                 return typeFactory.createSqlType(SqlTypeName.VARCHAR, varCharType.getLength());
             case BINARY:
-                return typeFactory.createSqlType(SqlTypeName.BINARY);
                 BinaryType binaryType = (BinaryType) dataType;
                 return typeFactory.createSqlType(SqlTypeName.BINARY, binaryType.getLength());
             case VARBINARY:
-                return typeFactory.createSqlType(SqlTypeName.VARBINARY);
                 VarBinaryType varBinaryType = (VarBinaryType) dataType;
                 return typeFactory.createSqlType(SqlTypeName.VARBINARY, varBinaryType.getLength());
             case DECIMAL:
-                return typeFactory.createSqlType(SqlTypeName.DECIMAL);
                 DecimalType decimalType = (DecimalType) dataType;
                 return typeFactory.createSqlType(
                         SqlTypeName.DECIMAL, decimalType.getPrecision(), decimalType.getScale());
