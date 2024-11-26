@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
@@ -34,6 +36,7 @@ public class TransformRule implements Serializable {
     private final String partitionKey;
     private final String tableOption;
     private final @Nullable String postTransformConverter;
+    private final SupportedMetadataColumn[] supportedMetadataColumns;
 
     public TransformRule(
             String tableInclusions,
@@ -42,7 +45,8 @@ public class TransformRule implements Serializable {
             String primaryKey,
             String partitionKey,
             String tableOption,
-            @Nullable String postTransformConverter) {
+            @Nullable String postTransformConverter,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         this.tableInclusions = tableInclusions;
         this.projection = projection;
         this.filter = normalizeFilter(projection, filter);
@@ -50,6 +54,7 @@ public class TransformRule implements Serializable {
         this.partitionKey = partitionKey;
         this.tableOption = tableOption;
         this.postTransformConverter = postTransformConverter;
+        this.supportedMetadataColumns = supportedMetadataColumns;
     }
 
     public String getTableInclusions() {
@@ -81,5 +86,9 @@ public class TransformRule implements Serializable {
     @Nullable
     public String getPostTransformConverter() {
         return postTransformConverter;
+    }
+
+    public SupportedMetadataColumn[] getSupportedMetadataColumns() {
+        return supportedMetadataColumns;
     }
 }

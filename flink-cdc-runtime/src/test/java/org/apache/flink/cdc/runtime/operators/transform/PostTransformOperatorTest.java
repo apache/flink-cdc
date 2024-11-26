@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
@@ -435,7 +436,14 @@ public class PostTransformOperatorTest {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
                         .addTransform(
-                                DATATYPE_TABLEID.identifier(), "*", null, null, null, null, null)
+                                DATATYPE_TABLEID.identifier(),
+                                "*",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
         EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =

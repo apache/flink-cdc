@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.source.MetadataAccessor;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEmitter;
@@ -66,5 +67,10 @@ public class MySqlDataSource implements DataSource {
     @VisibleForTesting
     public MySqlSourceConfig getSourceConfig() {
         return sourceConfig;
+    }
+
+    @Override
+    public SupportedMetadataColumn[] supportedMetadataColumns() {
+        return new SupportedMetadataColumn[] {new OpTsMetadataColumn()};
     }
 }

@@ -17,23 +17,24 @@
 
 package org.apache.flink.cdc.common.source;
 
-import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.common.annotation.Experimental;
+import org.apache.flink.cdc.common.types.DataType;
 
-/**
- * {@code DataSource} is used to access metadata and read change data from external systems. It can
- * read data from multiple tables simultaneously.
- */
-@PublicEvolving
-public interface DataSource {
+import java.io.Serializable;
+import java.util.Map;
 
-    /** Get the {@link EventSourceProvider} for reading events from external systems. */
-    EventSourceProvider getEventSourceProvider();
+/** A metadata column that the source supports. */
+@Experimental
+public interface SupportedMetadataColumn extends Serializable {
+    /** Column name. */
+    String getName();
 
-    /** Get the {@link MetadataAccessor} for accessing metadata from external systems. */
-    MetadataAccessor getMetadataAccessor();
+    /** The data type of this column in Flink CDC. */
+    DataType getType();
 
-    /** Get the {@link SupportedMetadataColumn}s of the source. */
-    default SupportedMetadataColumn[] supportedMetadataColumns() {
-        return new SupportedMetadataColumn[0];
-    }
+    /** The returned java class of the reader. */
+    Class<?> getJavaClass();
+
+    /** Read the metadata from the dataChangeEvent. */
+    Object read(Map<String, String> metadata);
 }

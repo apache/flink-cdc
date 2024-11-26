@@ -26,6 +26,7 @@ import java.util.List;
 
 /** Contains all supported metadata columns that could be used in transform expressions. */
 public class MetadataColumns {
+
     public static final String DEFAULT_NAMESPACE_NAME = "__namespace_name__";
     public static final String DEFAULT_SCHEMA_NAME = "__schema_name__";
     public static final String DEFAULT_TABLE_NAME = "__table_name__";
