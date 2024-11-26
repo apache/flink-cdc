@@ -38,6 +38,10 @@ import java.util.stream.Collectors;
  */
 public class TransformTranslator {
 
+    /** Package of built-in model. */
+    public static final String PREFIX_CLASSPATH_BUILT_IN_MODEL =
+            "org.apache.flink.cdc.runtime.model.";
+
     public DataStream<Event> translatePreTransform(
             DataStream<Event> input,
             List<TransformDef> transforms,
@@ -100,7 +104,10 @@ public class TransformTranslator {
     }
 
     private Tuple3<String, String, Map<String, String>> modelToUDFTuple(ModelDef model) {
-        return Tuple3.of(model.getModelName(), model.getClassName(), model.getParameters());
+        return Tuple3.of(
+                model.getModelName(),
+                PREFIX_CLASSPATH_BUILT_IN_MODEL + model.getClassName(),
+                model.getParameters());
     }
 
     private Tuple3<String, String, Map<String, String>> udfDefToUDFTuple(UdfDef udf) {

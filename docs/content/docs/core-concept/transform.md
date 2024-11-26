@@ -415,7 +415,7 @@ The following built-in models are provided:
 | parameter          | type   | optional/required | meaning                                                                                                                              |
 |--------------------|--------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------|
 | openai.model       | STRING | required          | Name of model to be called, for example: "gpt-4o-mini", Available options are "gpt-4o-mini", "gpt-4o", "gpt-4-32k", "gpt-3.5-turbo". |
-| openai.host        | STRING | required          | Host of the Model server to be connected, for example: "http://langchain4j.dev/demo/openai/v1".                                      |
+| openai.host        | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                      |
 | openai.apikey      | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                   |
 | openai.chat.prompt | STRING | optional          | Prompt for chatting with OpenAI, for example: "Please summary this ".                                                                |
 
@@ -424,7 +424,7 @@ The following built-in models are provided:
 | parameter     | type   | optional/required | meaning                                                                                                                                                                |
 |---------------|--------|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | openai.model  | STRING | required          | Name of model to be called, for example: "text-embedding-3-small", Available options are "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002". |
-| openai.host   | STRING | required          | Host of the Model server to be connected, for example: "http://langchain4j.dev/demo/openai/v1".                                                                        |
+| openai.host   | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                                                        |
 | openai.apikey | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                                                     |
 
 

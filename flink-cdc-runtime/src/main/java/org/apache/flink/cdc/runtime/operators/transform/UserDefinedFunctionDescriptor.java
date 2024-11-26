@@ -40,12 +40,7 @@ public class UserDefinedFunctionDescriptor implements Serializable {
     private final String className;
     private final DataType returnTypeHint;
     private final boolean isCdcPipelineUdf;
-
     private final Map<String, String> parameters;
-
-    /** Package of built-in model. */
-    public static final String PREFIX_CLASSPATH_BUILT_IN_MODEL =
-            "org.apache.flink.cdc.runtime.model.";
 
     public UserDefinedFunctionDescriptor(String name, String classpath) {
         this(name, classpath, new HashMap<>());
@@ -53,17 +48,12 @@ public class UserDefinedFunctionDescriptor implements Serializable {
 
     public UserDefinedFunctionDescriptor(
             String name, String classpath, Map<String, String> parameters) {
-        if (classpath.contains(".")) {
-            this.className = classpath.substring(classpath.lastIndexOf('.') + 1);
-            this.classpath = classpath;
-        } else {
-            this.className = classpath;
-            this.classpath = PREFIX_CLASSPATH_BUILT_IN_MODEL + classpath;
-        }
         this.name = name;
         this.parameters = parameters;
+        this.classpath = classpath;
+        this.className = classpath.substring(classpath.lastIndexOf('.') + 1);
         try {
-            Class<?> clazz = Class.forName(this.classpath);
+            Class<?> clazz = Class.forName(classpath);
             isCdcPipelineUdf = isCdcPipelineUdf(clazz);
             if (isCdcPipelineUdf) {
                 // We use reflection to invoke UDF methods since we may add more methods

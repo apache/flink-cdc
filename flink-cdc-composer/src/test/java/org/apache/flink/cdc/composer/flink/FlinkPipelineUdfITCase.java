@@ -829,7 +829,7 @@ public class FlinkPipelineUdfITCase {
 
     @ParameterizedTest
     @MethodSource("testParams")
-    void testTransformWithModel(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
+    void testTransformWithModel(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
