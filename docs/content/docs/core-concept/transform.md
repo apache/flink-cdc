@@ -370,13 +370,13 @@ pipeline:
       class-name: OpenAIChatModel
       openai.model: text-embedding-3-small
       openai.host: https://xxxx
-      openai.apiKey: abcd1234
+      openai.apikey: abcd1234
       openai.chat.prompt: please summary this
     - model-name: GET_EMBEDDING
       class-name: OpenAIEmbeddingModel
       openai.model: text-embedding-3-small
       openai.host: https://xxxx
-      openai.apiKey: abcd1234
+      openai.apikey: abcd1234
 ```
 Note:
 * `model-name` is a common required parameter for all support models, which represent the function name called in `projection` or `filter`.
@@ -388,7 +388,7 @@ How to use a Embedding AI Model:
 ```yaml
 transform:
   - source-table: db.\.*
-    projection: "*, inc(inc(inc(id))) as inc_id, GET_EMBEDDING(page) as summary"
+    projection: "*, inc(inc(inc(id))) as inc_id, GET_EMBEDDING(page) as emb, CHAT(page) as summary"
     filter: inc(id) < 100
 pipeline:
   model:
@@ -396,13 +396,13 @@ pipeline:
       class-name: OpenAIChatModel
       openai.model: gpt-4o-mini
       openai.host: http://langchain4j.dev/demo/openai/v1
-      openai.apiKey: demo
+      openai.apikey: demo
       openai.chat.prompt: please summary this
     - model-name: GET_EMBEDDING
       class-name: OpenAIEmbeddingModel
       openai.model: text-embedding-3-small
       openai.host: http://langchain4j.dev/demo/openai/v1
-      openai.apiKey: demo
+      openai.apikey: demo
 ```
 Here, GET_EMBEDDING is defined though `model-name` in `pipeline`.
 
