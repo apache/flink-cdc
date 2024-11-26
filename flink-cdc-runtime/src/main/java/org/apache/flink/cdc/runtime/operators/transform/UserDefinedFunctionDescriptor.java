@@ -132,8 +132,12 @@ public class UserDefinedFunctionDescriptor implements Serializable {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         UserDefinedFunctionDescriptor that = (UserDefinedFunctionDescriptor) o;
         return isCdcPipelineUdf == that.isCdcPipelineUdf
                 && Objects.equals(name, that.name)
