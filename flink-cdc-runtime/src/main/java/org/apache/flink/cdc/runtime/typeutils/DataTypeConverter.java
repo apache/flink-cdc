@@ -27,10 +27,17 @@ import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.ArrayType;
+import org.apache.flink.cdc.common.types.ArrayType;
+import org.apache.flink.cdc.common.types.BigIntType;
 import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DecimalType;
+import org.apache.flink.cdc.common.types.MapType;
+import org.apache.flink.cdc.common.types.DoubleType;
+import org.apache.flink.cdc.common.types.FloatType;
+import org.apache.flink.cdc.common.types.IntType;
+import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.MapType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.types.TimestampType;
@@ -98,7 +105,7 @@ public class DataTypeConverter {
             case VARBINARY:
                 return byte[].class;
             case DECIMAL:
-                return BigDecimal.class;
+                return DecimalData.class;
             case ROW:
                 return Object.class;
             case ARRAY:
@@ -127,24 +134,50 @@ public class DataTypeConverter {
                 return typeFactory.createSqlType(SqlTypeName.DATE);
             case TIME_WITHOUT_TIME_ZONE:
                 return typeFactory.createSqlType(SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE);
+                TimeType timeType = (TimeType) dataType;
+                return typeFactory.createSqlType(
+                        SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE, timeType.getPrecision());
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
+                TimestampType timestampType = (TimestampType) dataType;
+                return typeFactory.createSqlType(
+                        SqlTypeName.TIMESTAMP, timestampType.getPrecision());
+            case TIMESTAMP_WITH_TIME_ZONE:
+                ZonedTimestampType zonedTimestampType = (ZonedTimestampType) dataType;
+                return typeFactory.createSqlType(
+                        SqlTypeName.TIMESTAMP, zonedTimestampType.getPrecision());
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return typeFactory.createSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
+                LocalZonedTimestampType localZonedTimestampType =
+                        (LocalZonedTimestampType) dataType;
+                return typeFactory.createSqlType(
+                        SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE,
+                        localZonedTimestampType.getPrecision());
             case FLOAT:
                 return typeFactory.createSqlType(SqlTypeName.FLOAT);
             case DOUBLE:
                 return typeFactory.createSqlType(SqlTypeName.DOUBLE);
             case CHAR:
                 return typeFactory.createSqlType(SqlTypeName.CHAR);
+                CharType charType = (CharType) dataType;
+                return typeFactory.createSqlType(SqlTypeName.CHAR, charType.getLength());
             case VARCHAR:
                 return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+                VarCharType varCharType = (VarCharType) dataType;
+                return typeFactory.createSqlType(SqlTypeName.VARCHAR, varCharType.getLength());
             case BINARY:
                 return typeFactory.createSqlType(SqlTypeName.BINARY);
+                BinaryType binaryType = (BinaryType) dataType;
+                return typeFactory.createSqlType(SqlTypeName.BINARY, binaryType.getLength());
             case VARBINARY:
                 return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+                VarBinaryType varBinaryType = (VarBinaryType) dataType;
+                return typeFactory.createSqlType(SqlTypeName.VARBINARY, varBinaryType.getLength());
             case DECIMAL:
                 return typeFactory.createSqlType(SqlTypeName.DECIMAL);
+                DecimalType decimalType = (DecimalType) dataType;
+                return typeFactory.createSqlType(
+                        SqlTypeName.DECIMAL, decimalType.getPrecision(), decimalType.getScale());
             case ROW:
                 List<RelDataType> dataTypes =
                         ((RowType) dataType)

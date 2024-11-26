@@ -455,7 +455,7 @@ public class JaninoCompiler {
             return String.format(
                     "(%s) __instanceOf%s.eval",
                     DataTypeConverter.convertOriginalClass(udfFunction.getReturnTypeHint())
-                            .getName(),
+                            .getCanonicalName(),
                     udfFunction.getClassName());
         } else {
             return String.format("__instanceOf%s.eval", udfFunction.getClassName());
