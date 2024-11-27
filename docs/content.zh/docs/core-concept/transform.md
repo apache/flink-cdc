@@ -368,7 +368,7 @@ pipeline:
   model:
     - model-name: CHAT
       class-name: OpenAIChatModel
-      openai.model: text-embedding-3-small
+      openai.model: gpt-4o-mini
       openai.host: https://xxxx
       openai.apikey: abcd1234
       openai.chat.prompt: please summary this
@@ -376,7 +376,7 @@ pipeline:
       class-name: OpenAIEmbeddingModel
       openai.model: text-embedding-3-small
       openai.host: https://xxxx
-      openai.apiKky: abcd1234
+      openai.apikey: abcd1234
 ```
 Note:
 * `model-name` is a common required parameter for all support models, which represent the function name called in `projection` or `filter`.
