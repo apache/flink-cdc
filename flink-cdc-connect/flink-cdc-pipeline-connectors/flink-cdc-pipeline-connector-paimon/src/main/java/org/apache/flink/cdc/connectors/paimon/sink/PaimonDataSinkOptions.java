@@ -47,7 +47,7 @@ public class PaimonDataSinkOptions {
     public static final ConfigOption<String> METASTORE =
             key("catalog.properties.metastore")
                     .stringType()
-                    .defaultValue("filesystem")
+                    .noDefaultValue()
                     .withDescription("Metastore of paimon catalog, supports filesystem and hive.");
 
     public static final ConfigOption<String> URI =

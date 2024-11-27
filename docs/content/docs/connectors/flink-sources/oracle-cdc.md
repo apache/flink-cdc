@@ -41,9 +41,9 @@ In order to setup the Oracle CDC connector, the following table provides depende
 
 **Download link is available only for stable releases.**
 
-Download [flink-sql-connector-oracle-cdc-3.0.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-oracle-cdc/3.0.1/flink-sql-connector-oracle-cdc-3.0.1.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-oracle-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oracle-cdc/3.1.0/flink-sql-connector-oracle-cdc-3.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** Refer to [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-oracle-cdc), more released versions will be available in the Maven central warehouse.
+**Note:** Refer to [flink-sql-connector-oracle-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oracle-cdc), more released versions will be available in the Maven central warehouse.
 
 
 Since Oracle Connector's FUTC license is incompatible with Flink CDC project, we can't provide Oracle connector in prebuilt connector jar packages.
@@ -235,7 +235,7 @@ Overall, the steps for configuring CDB database is quite similar to non-CDB data
      exit
    ```
    
-See more about the [Setting up Oracle](https://debezium.io/documentation/reference/2.0/connectors/oracle.html#setting-up-oracle)
+See more about the [Setting up Oracle](https://debezium.io/documentation/reference/1.9/connectors/oracle.html#setting-up-oracle)
 
 How to create an Oracle CDC table
 ----------------
@@ -402,7 +402,7 @@ Connector Options
       <td>String</td>
       <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from Oracle server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/2.0/connectors/oracle.html#oracle-connector-properties">Debezium's Oracle Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/oracle.html#oracle-connector-properties">Debezium's Oracle Connector properties</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -510,7 +510,7 @@ Features
 
 ### Exactly-Once Processing
 
-The Oracle CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/2.0/connectors/oracle.html#how-the-oracle-connector-works).
+The Oracle CDC connector is a Flink Source connector which will read database snapshot first and then continues to read change events with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/oracle.html#how-the-oracle-connector-works).
 
 ### Startup Reading Position
 

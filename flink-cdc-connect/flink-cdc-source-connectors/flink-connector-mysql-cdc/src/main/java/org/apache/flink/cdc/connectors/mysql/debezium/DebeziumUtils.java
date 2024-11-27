@@ -193,7 +193,9 @@ public class DebeziumUtils {
 
         final List<TableId> capturedTableIds;
         try {
-            capturedTableIds = TableDiscoveryUtils.listTables(jdbc, sourceConfig.getTableFilters());
+            capturedTableIds =
+                    TableDiscoveryUtils.listTables(
+                            jdbc, sourceConfig.getDatabaseFilter(), sourceConfig.getTableFilter());
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Failed to discover captured tables", e);
         }
@@ -240,12 +242,15 @@ public class DebeziumUtils {
         return variables;
     }
 
-    public static BinlogOffset findBinlogOffset(long targetMs, MySqlConnection connection) {
+    public static BinlogOffset findBinlogOffset(
+            long targetMs, MySqlConnection connection, MySqlSourceConfig mySqlSourceConfig) {
         MySqlConnection.MySqlConnectionConfiguration config = connection.connectionConfig();
         BinaryLogClient client =
                 new BinaryLogClient(
                         config.hostname(), config.port(), config.username(), config.password());
-
+        if (mySqlSourceConfig.getServerIdRange() != null) {
+            client.setServerId(mySqlSourceConfig.getServerIdRange().getStartServerId());
+        }
         List<String> binlogFiles = new ArrayList<>();
         JdbcConnection.ResultSetConsumer rsc =
                 rs -> {

@@ -28,6 +28,7 @@ import org.apache.flink.runtime.client.JobStatusMessage;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.TestLogger;
 
+import com.fasterxml.jackson.core.Version;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -52,8 +53,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkState;
@@ -65,23 +68,14 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     @Parameterized.Parameter public String flinkVersion;
 
+    public Integer parallelism = 4;
+
     // ------------------------------------------------------------------------------------------
     // Flink Variables
     // ------------------------------------------------------------------------------------------
     public static final int JOB_MANAGER_REST_PORT = 8081;
     public static final String INTER_CONTAINER_JM_ALIAS = "jobmanager";
     public static final String INTER_CONTAINER_TM_ALIAS = "taskmanager";
-    public static final String FLINK_PROPERTIES =
-            String.join(
-                    "\n",
-                    Arrays.asList(
-                            "jobmanager.rpc.address: jobmanager",
-                            "taskmanager.numberOfTaskSlots: 10",
-                            "parallelism.default: 4",
-                            "execution.checkpointing.interval: 300",
-                            // this is needed for oracle-cdc tests.
-                            // see https://stackoverflow.com/a/47062742/4915129
-                            "env.java.opts: -Doracle.jdbc.timezoneAsRegion=false"));
 
     @ClassRule public static final Network NETWORK = Network.newNetwork();
 
@@ -97,30 +91,36 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     @Parameterized.Parameters(name = "flinkVersion: {0}")
     public static List<String> getFlinkVersion() {
-        return Arrays.asList("1.17.1", "1.18.0");
+        String flinkVersion = System.getProperty("specifiedFlinkVersion");
+        if (flinkVersion != null) {
+            return Collections.singletonList(flinkVersion);
+        } else {
+            return Arrays.asList("1.19.1", "1.20.0");
+        }
     }
 
     @Before
     public void before() throws Exception {
         LOG.info("Starting containers...");
         jobManagerConsumer = new ToStringConsumer();
+
+        String flinkProperties = getFlinkProperties();
+
         jobManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
                         .withCommand("jobmanager")
                         .withNetwork(NETWORK)
-                        .withExtraHost("host.docker.internal", "host-gateway")
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
-                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                        .withEnv("FLINK_PROPERTIES", flinkProperties)
                         .withLogConsumer(jobManagerConsumer);
         taskManagerConsumer = new ToStringConsumer();
         taskManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
                         .withCommand("taskmanager")
-                        .withExtraHost("host.docker.internal", "host-gateway")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
-                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                        .withEnv("FLINK_PROPERTIES", flinkProperties)
                         .dependsOn(jobManager)
                         .withLogConsumer(taskManagerConsumer);
 
@@ -245,5 +245,27 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     protected String getFlinkDockerImageTag() {
         return String.format("flink:%s-scala_2.12", flinkVersion);
+    }
+
+    private static Version parseVersion(String version) {
+        List<Integer> versionParts =
+                Arrays.stream(version.split("\\."))
+                        .map(Integer::valueOf)
+                        .limit(3)
+                        .collect(Collectors.toList());
+        return new Version(
+                versionParts.get(0), versionParts.get(1), versionParts.get(2), null, null, null);
+    }
+
+    private static String getFlinkProperties() {
+        return String.join(
+                "\n",
+                Arrays.asList(
+                        "restart-strategy.type: off",
+                        "jobmanager.rpc.address: jobmanager",
+                        "taskmanager.numberOfTaskSlots: 10",
+                        "parallelism.default: 4",
+                        "execution.checkpointing.interval: 300",
+                        "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false"));
     }
 }

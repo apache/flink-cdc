@@ -107,6 +107,7 @@ public class MySqlTypeUtils {
     private static final String MULTIPOLYGON = "MULTIPOLYGON";
     private static final String MULTILINESTRING = "MULTILINESTRING";
     private static final String UNKNOWN = "UNKNOWN";
+    private static final int FLOAT_LENGTH_UNSPECIFIED_FLAG = -1;
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
     public static DataType fromDbzColumn(Column column) {
@@ -164,7 +165,12 @@ public class MySqlTypeUtils {
             case FLOAT:
             case FLOAT_UNSIGNED:
             case FLOAT_UNSIGNED_ZEROFILL:
-                return DataTypes.FLOAT();
+                if (column.length() != FLOAT_LENGTH_UNSPECIFIED_FLAG) {
+                    // For FLOAT types with length provided explicitly, treat it like DOUBLE
+                    return DataTypes.DOUBLE();
+                } else {
+                    return DataTypes.FLOAT();
+                }
             case REAL:
             case REAL_UNSIGNED:
             case REAL_UNSIGNED_ZEROFILL:
@@ -236,7 +242,7 @@ public class MySqlTypeUtils {
                 return DataTypes.ARRAY(DataTypes.STRING());
             default:
                 throw new UnsupportedOperationException(
-                        String.format("Don't support MySQL type '%s' yet.", typeName));
+                        String.format("MySQL type '%s' is not supported yet.", typeName));
         }
     }
 

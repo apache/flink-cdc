@@ -27,14 +27,14 @@ import org.apache.flink.cdc.composer.utils.factory.DataSinkFactory1;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /** A test for the {@link FlinkPipelineComposer}. */
-public class FlinkPipelineComposerTest {
+class FlinkPipelineComposerTest {
 
     @Test
-    public void testCreateDataSinkFromSinkDef() {
+    void testCreateDataSinkFromSinkDef() {
         SinkDef sinkDef =
                 new SinkDef(
                         "data-sink-factory-1",
@@ -55,7 +55,7 @@ public class FlinkPipelineComposerTest {
                                 new Configuration(),
                                 Thread.currentThread().getContextClassLoader()));
 
-        Assert.assertTrue(dataSink instanceof DataSinkFactory1.TestDataSink);
-        Assert.assertEquals("0.0.0.0", ((DataSinkFactory1.TestDataSink) dataSink).getHost());
+        Assertions.assertTrue(dataSink instanceof DataSinkFactory1.TestDataSink);
+        Assertions.assertEquals("0.0.0.0", ((DataSinkFactory1.TestDataSink) dataSink).getHost());
     }
 }

@@ -50,6 +50,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
     private List<String> schemaList;
 
+    private int lsnCommitCheckpointsDelay;
+
     /** Creates a new {@link PostgresSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public PostgresSourceConfig create(int subtaskId) {
@@ -100,7 +102,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
         // The PostgresSource will do snapshot according to its StartupMode.
         // Do not need debezium to do the snapshot work.
-        props.put("snapshot.mode", "never");
+        props.setProperty("snapshot.mode", "never");
 
         Configuration dbzConfiguration = Configuration.from(props);
         return new PostgresSourceConfig(
@@ -129,7 +131,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 connectionPoolSize,
                 chunkKeyColumn,
                 skipSnapshotBackfill,
-                scanNewlyAddedTableEnabled);
+                scanNewlyAddedTableEnabled,
+                lsnCommitCheckpointsDelay);
     }
 
     /**
@@ -172,5 +175,10 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     /** The interval of heartbeat events. */
     public void heartbeatInterval(Duration heartbeatInterval) {
         this.heartbeatInterval = heartbeatInterval;
+    }
+
+    /** The lsn commit checkpoints delay for Postgres. */
+    public void setLsnCommitCheckpointsDelay(int lsnCommitCheckpointsDelay) {
+        this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
     }
 }

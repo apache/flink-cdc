@@ -21,13 +21,13 @@ import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.kafka.json.ChangeLogJsonFormatFactory;
 import org.apache.flink.cdc.connectors.kafka.json.JsonSerializationType;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.DeliveryGuarantee;
-import org.apache.flink.streaming.connectors.kafka.partitioner.FlinkFixedPartitioner;
 
 import java.time.ZoneId;
 import java.util.HashSet;
@@ -36,7 +36,13 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.KEY_FORMAT;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.PARTITION_STRATEGY;
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.PROPERTIES_PREFIX;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_ADD_TABLEID_TO_HEADER_ENABLED;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_CUSTOM_HEADER;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.TOPIC;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.VALUE_FORMAT;
 
 /** A dummy {@link DataSinkFactory} to create {@link KafkaDataSink}. */
 public class KafkaDataSinkFactory implements DataSinkFactory {
@@ -45,6 +51,8 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
 
     @Override
     public DataSink createDataSink(Context context) {
+        FactoryHelper.createFactoryHelper(this, context).validateExcept(PROPERTIES_PREFIX);
+
         Configuration configuration =
                 Configuration.fromMap(context.getFactoryConfiguration().toMap());
         DeliveryGuarantee deliveryGuarantee =
@@ -58,11 +66,14 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
                             context.getPipelineConfiguration()
                                     .get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
         }
+        KeyFormat keyFormat = context.getFactoryConfiguration().get(KEY_FORMAT);
+        SerializationSchema<Event> keySerialization =
+                KeySerializationFactory.createSerializationSchema(configuration, keyFormat, zoneId);
         JsonSerializationType jsonSerializationType =
                 context.getFactoryConfiguration().get(KafkaDataSinkOptions.VALUE_FORMAT);
         SerializationSchema<Event> valueSerialization =
                 ChangeLogJsonFormatFactory.createSerializationSchema(
-                        configuration, jsonSerializationType);
+                        configuration, jsonSerializationType, zoneId);
         final Properties kafkaProperties = new Properties();
         Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
         allOptions.keySet().stream()
@@ -79,11 +90,14 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
                         .get(KafkaDataSinkOptions.SINK_ADD_TABLEID_TO_HEADER_ENABLED);
         String customHeaders =
                 context.getFactoryConfiguration().get(KafkaDataSinkOptions.SINK_CUSTOM_HEADER);
+        PartitionStrategy partitionStrategy =
+                context.getFactoryConfiguration().get(KafkaDataSinkOptions.PARTITION_STRATEGY);
         return new KafkaDataSink(
                 deliveryGuarantee,
                 kafkaProperties,
-                new FlinkFixedPartitioner<>(),
+                partitionStrategy,
                 zoneId,
+                keySerialization,
                 valueSerialization,
                 topic,
                 addTableToHeaderEnabled,
@@ -97,15 +111,19 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
 
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
-        return null;
+        return new HashSet<>();
     }
 
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(KEY_FORMAT);
+        options.add(VALUE_FORMAT);
+        options.add(PARTITION_STRATEGY);
+        options.add(TOPIC);
+        options.add(SINK_ADD_TABLEID_TO_HEADER_ENABLED);
+        options.add(SINK_CUSTOM_HEADER);
         options.add(KafkaDataSinkOptions.DELIVERY_GUARANTEE);
-        options.add(KafkaDataSinkOptions.TOPIC);
-        options.add(KafkaDataSinkOptions.SINK_ADD_TABLEID_TO_HEADER_ENABLED);
         return options;
     }
 }

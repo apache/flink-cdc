@@ -267,6 +267,9 @@ public class MySqlTableSourceFactoryTest {
         options.put("server-time-zone", "Asia/Shanghai");
         options.put("scan.newly-added-table.enabled", "true");
         options.put("debezium.snapshot.mode", "never");
+        options.put("debezium.offset.flush.interval.ms", "3000");
+        options.put("debezium.tombstones.on.delete", "true");
+        options.put("debezium.test", "test");
         options.put("jdbc.properties.useSSL", "false");
         options.put("heartbeat.interval", "15213ms");
         options.put("scan.incremental.snapshot.chunk.key-column", "testCol");
@@ -276,6 +279,9 @@ public class MySqlTableSourceFactoryTest {
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
         dbzProperties.put("snapshot.mode", "never");
+        dbzProperties.put("offset.flush.interval.ms", "3000");
+        dbzProperties.put("tombstones.on.delete", "true");
+        dbzProperties.put("test", "test");
         Properties jdbcProperties = new Properties();
         jdbcProperties.setProperty("useSSL", "false");
         MySqlTableSource expectedSource =
@@ -307,6 +313,14 @@ public class MySqlTableSourceFactoryTest {
                         "testCol",
                         true);
         assertEquals(expectedSource, actualSource);
+        assertTrue(actualSource instanceof MySqlTableSource);
+        MySqlTableSource actualMySqlTableSource = (MySqlTableSource) actualSource;
+        Properties parellelProperties = new Properties();
+        parellelProperties.put("test", "test");
+        assertEquals(
+                parellelProperties,
+                actualMySqlTableSource.getParallelDbzProperties(
+                        actualMySqlTableSource.getDbzProperties()));
     }
 
     @Test
@@ -587,6 +601,22 @@ public class MySqlTableSourceFactoryTest {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
                                     t, "The server id 123b is not a valid numeric.")
+                            .isPresent());
+        }
+
+        // validate illegal connect.timeout
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.incremental.snapshot.enabled", "true");
+            properties.put("connect.timeout", "240ms");
+
+            createTableSource(properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    "The value of option 'connect.timeout' cannot be less than PT0.25S, but actual is PT0.24S")
                             .isPresent());
         }
 

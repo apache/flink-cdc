@@ -23,10 +23,11 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSource;
-import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.ServerIdRange;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -35,12 +36,17 @@ import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 import org.apache.flink.cdc.connectors.mysql.utils.OptionUtils;
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.ObjectPath;
 
+import io.debezium.relational.Tables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -58,8 +64,11 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
@@ -75,7 +84,9 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
+import static org.apache.flink.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static org.apache.flink.cdc.debezium.utils.JdbcUrlUtils.PROPERTIES_PREFIX;
 import static org.apache.flink.cdc.debezium.utils.JdbcUrlUtils.getJdbcProperties;
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -89,6 +100,9 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
     @Override
     public DataSource createDataSource(Context context) {
+        FactoryHelper.createFactoryHelper(this, context)
+                .validateExcept(PROPERTIES_PREFIX, DEBEZIUM_OPTIONS_PREFIX);
+
         final Configuration config = context.getFactoryConfiguration();
         String hostname = config.get(HOSTNAME);
         int port = config.get(PORT);
@@ -117,6 +131,9 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
+        boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
+        boolean scanBinlogNewlyAddedTableEnabled =
+                config.get(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -152,28 +169,71 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .closeIdleReaders(closeIdleReaders)
                         .includeSchemaChanges(includeSchemaChanges)
                         .debeziumProperties(getDebeziumProperties(configMap))
-                        .jdbcProperties(getJdbcProperties(configMap));
+                        .jdbcProperties(getJdbcProperties(configMap))
+                        .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
 
-        Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
-        List<String> capturedTables = getTableList(configFactory.createConfig(0), selectors);
-        if (capturedTables.isEmpty()) {
+        List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
+
+        if (scanBinlogNewlyAddedTableEnabled && scanNewlyAddedTableEnabled) {
             throw new IllegalArgumentException(
-                    "Cannot find any table by the option 'tables' = " + tables);
+                    "If both scan.binlog.newly-added-table.enabled and scan.newly-added-table.enabled are true, data maybe duplicate after restore");
         }
-        if (tablesExclude != null) {
-            Selectors selectExclude =
-                    new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
-            List<String> excludeTables = getTableList(configFactory.createConfig(0), selectExclude);
-            if (!excludeTables.isEmpty()) {
-                capturedTables.removeAll(excludeTables);
-            }
+
+        if (scanBinlogNewlyAddedTableEnabled) {
+            String newTables = validateTableAndReturnDebeziumStyle(tables);
+            configFactory.tableList(newTables);
+            configFactory.excludeTableList(tablesExclude);
+
+        } else {
+            Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
+            List<String> capturedTables = getTableList(tableIds, selectors);
             if (capturedTables.isEmpty()) {
                 throw new IllegalArgumentException(
-                        "Cannot find any table with by the option 'tables.exclude'  = "
-                                + tablesExclude);
+                        "Cannot find any table by the option 'tables' = " + tables);
             }
+            if (tablesExclude != null) {
+                Selectors selectExclude =
+                        new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
+                List<String> excludeTables = getTableList(tableIds, selectExclude);
+                if (!excludeTables.isEmpty()) {
+                    capturedTables.removeAll(excludeTables);
+                }
+                if (capturedTables.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "Cannot find any table with by the option 'tables.exclude'  = "
+                                    + tablesExclude);
+                }
+            }
+            configFactory.tableList(capturedTables.toArray(new String[0]));
         }
-        configFactory.tableList(capturedTables.toArray(new String[0]));
+
+        String chunkKeyColumns = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
+        if (chunkKeyColumns != null) {
+            Map<ObjectPath, String> chunkKeyColumnMap = new HashMap<>();
+
+            for (String chunkKeyColumn : chunkKeyColumns.split(";")) {
+                String[] splits = chunkKeyColumn.split(":");
+                if (splits.length == 2) {
+                    Selectors chunkKeySelector =
+                            new Selectors.SelectorsBuilder().includeTables(splits[0]).build();
+                    List<ObjectPath> tableList =
+                            getChunkKeyColumnTableList(tableIds, chunkKeySelector);
+                    for (ObjectPath table : tableList) {
+                        chunkKeyColumnMap.put(table, splits[1]);
+                    }
+                } else {
+                    throw new IllegalArgumentException(
+                            SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key()
+                                    + " = "
+                                    + chunkKeyColumns
+                                    + " failed to be parsed in this part '"
+                                    + chunkKeyColumn
+                                    + "'.");
+                }
+            }
+            LOG.info("Add chunkKeyColumn {}.", chunkKeyColumnMap);
+            configFactory.chunkKeyColumn(chunkKeyColumnMap);
+        }
 
         return new MySqlDataSource(configFactory);
     }
@@ -192,26 +252,30 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PORT);
-        options.add(SERVER_TIME_ZONE);
+        options.add(TABLES_EXCLUDE);
+        options.add(SCHEMA_CHANGE_ENABLED);
         options.add(SERVER_ID);
+        options.add(SERVER_TIME_ZONE);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
+        options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(SCAN_STARTUP_MODE);
+        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS);
         options.add(SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS);
-        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
-        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
-        options.add(CHUNK_META_GROUP_SIZE);
-        options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(CONNECT_TIMEOUT);
+        options.add(CONNECT_MAX_RETRIES);
         options.add(CONNECTION_POOL_SIZE);
+        options.add(HEARTBEAT_INTERVAL);
+        options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
+        options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
+        options.add(CHUNK_META_GROUP_SIZE);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
-        options.add(CONNECT_MAX_RETRIES);
-        options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
-        options.add(HEARTBEAT_INTERVAL);
-        options.add(SCHEMA_CHANGE_ENABLED);
+        options.add(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
         return options;
     }
 
@@ -228,10 +292,19 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     private static final String SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSET = "specific-offset";
     private static final String SCAN_STARTUP_MODE_VALUE_TIMESTAMP = "timestamp";
 
-    private static List<String> getTableList(MySqlSourceConfig sourceConfig, Selectors selectors) {
-        return MySqlSchemaUtils.listTables(sourceConfig, null).stream()
+    private static List<String> getTableList(
+            @Nullable List<TableId> tableIdList, Selectors selectors) {
+        return tableIdList.stream()
                 .filter(selectors::isMatch)
                 .map(TableId::toString)
+                .collect(Collectors.toList());
+    }
+
+    private static List<ObjectPath> getChunkKeyColumnTableList(
+            List<TableId> tableIds, Selectors selectors) {
+        return tableIds.stream()
+                .filter(selectors::isMatch)
+                .map(tableId -> new ObjectPath(tableId.getSchemaName(), tableId.getTableName()))
                 .collect(Collectors.toList());
     }
 
@@ -356,6 +429,33 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         0.0d,
                         1.0d,
                         distributionFactorLower));
+    }
+
+    /**
+     * Currently, The supported regular syntax is not exactly the same in {@link Selectors} and
+     * {@link Tables.TableFilter}.
+     *
+     * <p>The main distinction are :
+     *
+     * <p>1) {@link Selectors} use `,` to split table names and {@link Tables.TableFilter} use use
+     * `|` to split table names.
+     *
+     * <p>2) If there is a need to use a dot (.) in a regular expression to match any character, it
+     * is necessary to escape the dot with a backslash, refer to {@link
+     * MySqlDataSourceOptions#TABLES}.
+     */
+    private String validateTableAndReturnDebeziumStyle(String tables) {
+        // MySQL table names are not allowed to have `,` character.
+        if (tables.contains(",")) {
+            throw new IllegalArgumentException(
+                    "the `,` in "
+                            + tables
+                            + " is not supported when "
+                            + SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED
+                            + " was enabled.");
+        }
+
+        return tables.replace("\\.", ".");
     }
 
     /** Replaces the default timezone placeholder with session timezone, if applicable. */

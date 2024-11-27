@@ -46,7 +46,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
    <groupId>org.apache.flink</groupId>
    <artifactId>flink-connector-mysql-cdc</artifactId>
    <!--  请使用已发布的版本依赖，snapshot 版本的依赖需要本地自行编译。 -->
-   <version>3.2-SNAPSHOT</version>
+   <version>3.3-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -54,9 +54,9 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
-下载 [flink-sql-connector-mysql-cdc-3.0.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mysql-cdc/3.0.1/flink-sql-connector-mysql-cdc-3.0.1.jar) 到 `<FLINK_HOME>/lib/` 目录下。
+下载 [flink-sql-connector-mysql-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.1.0/flink-sql-connector-mysql-cdc-3.1.0.jar) 到 `<FLINK_HOME>/lib/` 目录下。
 
-**注意:** 参考 [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
+**注意:** 参考 [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
 由于 MySQL Connector 采用的 GPLv2 协议与 Flink CDC 项目不兼容，我们无法在 jar 包中提供 MySQL 连接器。
 您可能需要手动配置以下依赖：
@@ -102,7 +102,7 @@ mysql> GRANT SELECT, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.
 mysql> FLUSH PRIVILEGES;
 ```
 
-查看更多用户权限问题请参考 [权限说明](https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-creating-user).
+查看更多用户权限问题请参考 [权限说明](https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-creating-user).
 
 
 注意事项
@@ -261,7 +261,7 @@ Flink SQL> SELECT * FROM orders;
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td> MySQL CDC 消费者可选的启动模式，
-         合法的模式为 "initial"，"earliest-offset"，"latest-offset"，"specific-offset" 和 "timestamp"。
+         合法的模式为 "initial"，"earliest-offset"，"latest-offset"，"specific-offset"，"timestamp" 和 "snapshot"。
            请查阅 <a href="#a-name-id-002-a">启动模式</a> 章节了解更多详细信息。</td>
     </tr>
     <tr>
@@ -286,6 +286,13 @@ Flink SQL> SELECT * FROM orders;
       <td>在 "specific-offset" 启动模式下，启动位点的 GTID 集合。</td>
     </tr>
     <tr>
+      <td>scan.startup.timestamp-millis</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>Long</td>
+      <td>在 "timestamp" 启动模式下，启动位点的毫秒时间戳。</td>
+    </tr>
+    <tr>
       <td>scan.startup.specific-offset.skip-events</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -306,7 +313,7 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td>数据库服务器中的会话时区， 例如： "Asia/Shanghai". 
           它控制 MYSQL 中的时间戳类型如何转换为字符串。
-          更多请参考 <a href="https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-temporal-types"> 这里</a>.
+          更多请参考 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types"> 这里</a>.
           如果没有设置，则使用ZoneId.systemDefault()来确定服务器时区。
       </td>
     </tr>
@@ -324,7 +331,7 @@ Flink SQL> SELECT * FROM orders;
           <td>optional</td>
           <td style="word-wrap: break-word;">30s</td>
           <td>Duration</td>
-          <td>连接器在尝试连接到 MySQL 数据库服务器后超时前应等待的最长时间。</td>
+          <td>连接器在尝试连接到 MySQL 数据库服务器后超时前应等待的最长时间。该时长不能少于250毫秒。</td>
     </tr>    
     <tr>
           <td>connect.max-retries</td>
@@ -361,7 +368,7 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          查看更多关于 <a href="https://debezium.io/documentation/reference/2.0/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
+          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -493,7 +500,7 @@ CREATE TABLE products (
 * （3）在快照读取之前，Source 不需要数据库锁权限。
 
 如果希望 source 并行运行，则每个并行 reader 都应该具有唯一的 server id，因此`server id`的范围必须类似于 `5400-6400`，
-且范围必须大于并行度。在增量快照读取过程中，MySQL CDC Source 首先通过表的主键将表划分成多个块（chunk），
+且范围必须大于并行度。在增量快照读取过程中，MySQL CDC Source 源首先会根据您指定的表块键将表分块(chunk）
 然后 MySQL CDC Source 将多个块分配给多个 reader 以并行读取表的数据。
 
 #### 并发读取
@@ -543,7 +550,7 @@ MySQL 集群中你监控的服务器出现故障后, 你只需将受监视的服
 
 当 MySQL CDC Source 启动时，它并行读取表的快照，然后以单并行度的方式读取表的 binlog。
 
-在快照阶段，根据表的主键和表行的大小将快照切割成多个快照块。
+在快照阶段，快照会根据表的分块键和表行的大小切割成多个快照块。
 快照块被分配给多个快照读取器。每个快照读取器使用 [区块读取算法](#snapshot-chunk-reading) 并将读取的数据发送到下游。
 Source 会管理块的进程状态（完成或未完成），因此快照阶段的 Source 可以支持块级别的 checkpoint。
 如果发生故障，可以恢复 Source 并继续从最后完成的块中读取块。
@@ -558,7 +565,9 @@ Flink 定期为 Source 执行 checkpoint，在故障转移的情况下，作业�
 
 在执行增量快照读取时，MySQL CDC source 需要一个用于分片的的算法。
 MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认情况下，MySQL CDC source 会识别表的主键列，并使用主键中的第一列作为用作分片列。
-如果表中没有主键， 增量快照读取将失败，你可以禁用 `scan.incremental.snapshot.enabled` 来回退到旧的快照读取机制。
+如果表中没有主键，用户必须指定 `scan.incremental.snapshot.chunk.key-column`、
+否则增量快照读取将失败，你可以禁用 `scan.incremental.snapshot.enabled` 恢复到旧的快照读取机制。
+请注意，使用不在主键中的列作为分块键可能会降低表的查询性能。
 
 对于数值和自动增量拆分列，MySQL CDC Source 按固定步长高效地拆分块。
 例如，如果你有一个主键列为`id`的表，它是自动增量 BIGINT 类型，最小值为`0`，最大值为`100`，
@@ -572,7 +581,7 @@ MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认
  [100, +∞)
 ```
 
-对于其他主键列类型， MySQL CDC Source 将以下形式执行语句： `SELECT MAX(STR_ID) AS chunk_high FROM (SELECT * FROM TestTable WHERE STR_ID > 'uuid-001' limit 25)` 来获得每个区块的低值和高值，
+对于其他主键列类型， MySQL CDC Source 将以下形式执行语句： `SELECT MAX(STR_ID) AS chunk_high FROM (SELECT * FROM TestTable WHERE STR_ID > 'uuid-001' ORDER BY STR_ID ASC LIMIT 25)` 来获得每个区块的低值和高值，
 分割块集如下所示：
 
  ```
@@ -622,6 +631,7 @@ MySQLSource.builder()
     .startupOptions(StartupOptions.specificOffset("mysql-bin.000003", 4L) // 从指定 binlog 文件名和位置启动
     .startupOptions(StartupOptions.specificOffset("24DA167-0C0C-11E8-8442-00059A3C7B00:1-19")) // 从 GTID 集合启动
     .startupOptions(StartupOptions.timestamp(1667232000000L) // 从时间戳启动
+    .startupOptions(StartupOptions.snapshot()) // 仅读取快照
     ...
     .build()
 ```
@@ -635,6 +645,7 @@ CREATE TABLE mysql_source (...) WITH (
     'scan.startup.mode' = 'latest-offset', -- 从最晚位点启动
     'scan.startup.mode' = 'specific-offset', -- 从特定位点启动
     'scan.startup.mode' = 'timestamp', -- 从特定位点启动
+    'scan.startup.mode' = 'snapshot', -- 仅读取快照
     'scan.startup.specific-offset.file' = 'mysql-bin.000003', -- 在特定位点启动模式下指定 binlog 文件名
     'scan.startup.specific-offset.pos' = '4', -- 在特定位点启动模式下指定 binlog 位置
     'scan.startup.specific-offset.gtid-set' = '24DA167-0C0C-11E8-8442-00059A3C7B00:1-19', -- 在特定位点启动模式下指定 GTID 集合

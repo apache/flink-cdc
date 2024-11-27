@@ -98,15 +98,15 @@ public class Selectors {
                     Predicates.setOf(
                             tableInclusions, Predicates.RegExSplitterByComma::split, (str) -> str);
             for (String tableSplit : tableSplitSet) {
-                Set<String> tableIdSet =
-                        Predicates.setOf(
+                List<String> tableIdList =
+                        Predicates.listOf(
                                 tableSplit, Predicates.RegExSplitterByDot::split, (str) -> str);
-                Iterator<String> iterator = tableIdSet.iterator();
-                if (tableIdSet.size() == 1) {
+                Iterator<String> iterator = tableIdList.iterator();
+                if (tableIdList.size() == 1) {
                     selectors.add(new Selector(null, null, iterator.next()));
-                } else if (tableIdSet.size() == 2) {
+                } else if (tableIdList.size() == 2) {
                     selectors.add(new Selector(null, iterator.next(), iterator.next()));
-                } else if (tableIdSet.size() == 3) {
+                } else if (tableIdList.size() == 3) {
                     selectors.add(new Selector(iterator.next(), iterator.next(), iterator.next()));
                 } else {
                     throw new IllegalArgumentException(

@@ -40,6 +40,8 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.time.ZoneId;
+
 /** Tests for {@link DebeziumJsonSerializationSchema}. */
 public class DebeziumJsonSerializationSchemaTest {
 
@@ -53,7 +55,9 @@ public class DebeziumJsonSerializationSchemaTest {
                         .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
         SerializationSchema<Event> serializationSchema =
                 ChangeLogJsonFormatFactory.createSerializationSchema(
-                        new Configuration(), JsonSerializationType.DEBEZIUM_JSON);
+                        new Configuration(),
+                        JsonSerializationType.DEBEZIUM_JSON,
+                        ZoneId.systemDefault());
         serializationSchema.open(new MockInitializationContext());
         // create table
         Schema schema =
@@ -77,7 +81,7 @@ public class DebeziumJsonSerializationSchemaTest {
                                 }));
         JsonNode expected =
                 mapper.readTree(
-                        "{\"before\":null,\"after\":{\"col1\":\"1\",\"col2\":\"1\"},\"op\":\"c\"}");
+                        "{\"before\":null,\"after\":{\"col1\":\"1\",\"col2\":\"1\"},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}");
         JsonNode actual = mapper.readTree(serializationSchema.serialize(insertEvent1));
         Assertions.assertEquals(expected, actual);
         DataChangeEvent insertEvent2 =
@@ -90,7 +94,7 @@ public class DebeziumJsonSerializationSchemaTest {
                                 }));
         expected =
                 mapper.readTree(
-                        "{\"before\":null,\"after\":{\"col1\":\"2\",\"col2\":\"2\"},\"op\":\"c\"}");
+                        "{\"before\":null,\"after\":{\"col1\":\"2\",\"col2\":\"2\"},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}");
         actual = mapper.readTree(serializationSchema.serialize(insertEvent2));
         Assertions.assertEquals(expected, actual);
         DataChangeEvent deleteEvent =
@@ -103,7 +107,7 @@ public class DebeziumJsonSerializationSchemaTest {
                                 }));
         expected =
                 mapper.readTree(
-                        "{\"before\":{\"col1\":\"2\",\"col2\":\"2\"},\"after\":null,\"op\":\"d\"}");
+                        "{\"before\":{\"col1\":\"2\",\"col2\":\"2\"},\"after\":null,\"op\":\"d\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}");
         actual = mapper.readTree(serializationSchema.serialize(deleteEvent));
         Assertions.assertEquals(expected, actual);
         DataChangeEvent updateEvent =
@@ -121,7 +125,7 @@ public class DebeziumJsonSerializationSchemaTest {
                                 }));
         expected =
                 mapper.readTree(
-                        "{\"before\":{\"col1\":\"1\",\"col2\":\"1\"},\"after\":{\"col1\":\"1\",\"col2\":\"x\"},\"op\":\"u\"}");
+                        "{\"before\":{\"col1\":\"1\",\"col2\":\"1\"},\"after\":{\"col1\":\"1\",\"col2\":\"x\"},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}");
         actual = mapper.readTree(serializationSchema.serialize(updateEvent));
         Assertions.assertEquals(expected, actual);
     }

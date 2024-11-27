@@ -17,23 +17,34 @@
 
 package org.apache.flink.cdc.connectors.mysql.source;
 
+import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
+import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.ObjectPath;
 
 import org.junit.Test;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
+import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,6 +71,26 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
         MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
         assertThat(dataSource.getSourceConfig().getTableList())
                 .isEqualTo(Arrays.asList(inventoryDatabase.getDatabaseName() + ".products"));
+    }
+
+    @Test
+    public void testCreateSourceScanBinlogNewlyAddedTableEnabled() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        options.put(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
+        options.put(SCAN_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "If both scan.binlog.newly-added-table.enabled and scan.newly-added-table.enabled are true, data maybe duplicate after restore");
     }
 
     @Test
@@ -100,6 +131,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                 .isEqualTo(
                         Arrays.asList(
                                 inventoryDatabase.getDatabaseName() + ".customers",
+                                inventoryDatabase.getDatabaseName() + ".multi_max_table",
                                 inventoryDatabase.getDatabaseName() + ".products"));
     }
 
@@ -122,6 +154,148 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                 .hasMessageContaining(
                         "Cannot find any table with by the option 'tables.exclude'  = "
                                 + tableExclude);
+    }
+
+    @Test
+    public void testDatabaseAndTableWithTheSameName() throws SQLException {
+        inventoryDatabase.createAndInitialize();
+        // create a table with the same name of database
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            String createSameNameTableSql =
+                    String.format(
+                            "CREATE TABLE IF NOT EXISTS `%s`.`%s` (\n"
+                                    + "  id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,\n"
+                                    + "  name VARCHAR(255) NOT NULL DEFAULT 'flink',\n"
+                                    + "  description VARCHAR(512)\n"
+                                    + ");",
+                            inventoryDatabase.getDatabaseName(),
+                            inventoryDatabase.getDatabaseName());
+
+            statement.execute(createSameNameTableSql);
+        }
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(
+                TABLES.key(),
+                inventoryDatabase.getDatabaseName() + "." + inventoryDatabase.getDatabaseName());
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+        assertThat(dataSource.getSourceConfig().getTableList())
+                .isEqualTo(
+                        Arrays.asList(
+                                inventoryDatabase.getDatabaseName()
+                                        + "."
+                                        + inventoryDatabase.getDatabaseName()));
+    }
+
+    @Test
+    public void testLackRequireOption() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        List<String> requireKeys =
+                factory.requiredOptions().stream()
+                        .map(ConfigOption::key)
+                        .collect(Collectors.toList());
+        for (String requireKey : requireKeys) {
+            Map<String, String> remainingOptions = new HashMap<>(options);
+            remainingOptions.remove(requireKey);
+            Factory.Context context = new MockContext(Configuration.fromMap(remainingOptions));
+
+            assertThatThrownBy(() -> factory.createDataSource(context))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining(
+                            String.format(
+                                    "One or more required options are missing.\n\n"
+                                            + "Missing required options are:\n\n"
+                                            + "%s",
+                                    requireKey));
+        }
+    }
+
+    @Test
+    public void testUnsupportedOption() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        options.put("unsupported_key", "unsupported_value");
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining(
+                        "Unsupported options found for 'mysql'.\n\n"
+                                + "Unsupported options:\n\n"
+                                + "unsupported_key");
+    }
+
+    @Test
+    public void testPrefixRequireOption() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        options.put("jdbc.properties.requireSSL", "true");
+        options.put("debezium.snapshot.mode", "initial");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+        assertThat(dataSource.getSourceConfig().getTableList())
+                .isEqualTo(Arrays.asList(inventoryDatabase.getDatabaseName() + ".products"));
+    }
+
+    @Test
+    public void testAddChunkKeyColumns() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".\\.*");
+        options.put(
+                SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key(),
+                inventoryDatabase.getDatabaseName()
+                        + ".multi_max_\\.*:order_id;"
+                        + inventoryDatabase.getDatabaseName()
+                        + ".products:id;");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+        ObjectPath multiMaxTable =
+                new ObjectPath(inventoryDatabase.getDatabaseName(), "multi_max_table");
+        ObjectPath productsTable = new ObjectPath(inventoryDatabase.getDatabaseName(), "products");
+
+        assertThat(dataSource.getSourceConfig().getChunkKeyColumns())
+                .isNotEmpty()
+                .isEqualTo(
+                        new HashMap<ObjectPath, String>() {
+                            {
+                                put(multiMaxTable, "order_id");
+                                put(productsTable, "id");
+                            }
+                        });
     }
 
     class MockContext implements Factory.Context {

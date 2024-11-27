@@ -119,7 +119,7 @@ public class MySqlSourceOptions {
                     .durationType()
                     .defaultValue(Duration.ofSeconds(30))
                     .withDescription(
-                            "The maximum time that the connector should wait after trying to connect to the MySQL database server before timing out.");
+                            "The maximum time that the connector should wait after trying to connect to the MySQL database server before timing out. This value cannot be less than 250ms.");
 
     public static final ConfigOption<Integer> CONNECTION_POOL_SIZE =
             ConfigOptions.key("connection.pool.size")
@@ -243,8 +243,7 @@ public class MySqlSourceOptions {
                     .noDefaultValue()
                     .withDescription(
                             "The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table."
-                                    + "By default, the chunk key is the first column of the primary key."
-                                    + "This column must be a column of the primary key.");
+                                    + "By default, the chunk key is the first column of the primary key.");
 
     @Experimental
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED =

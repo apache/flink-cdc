@@ -22,7 +22,6 @@ import org.apache.flink.cdc.cli.utils.FlinkEnvironmentUtils;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.composer.PipelineExecution;
-import org.apache.flink.runtime.jobgraph.RestoreMode;
 import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
 
@@ -34,8 +33,7 @@ import org.apache.commons.cli.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
-import java.nio.file.Files;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -83,13 +81,9 @@ public class CliFrontend {
                     "Missing pipeline definition file path in arguments. ");
         }
 
-        // Take the first unparsed argument as the pipeline definition file
         Path pipelineDefPath = Paths.get(unparsedArgs.get(0));
-        if (!Files.exists(pipelineDefPath)) {
-            throw new FileNotFoundException(
-                    String.format("Cannot find pipeline definition file \"%s\"", pipelineDefPath));
-        }
-
+        // Take the first unparsed argument as the pipeline definition file
+        LOG.info("Real Path pipelineDefPath {}", pipelineDefPath);
         // Global pipeline configuration
         Configuration globalPipelineConfig = getGlobalConfig(commandLine);
 
@@ -111,6 +105,7 @@ public class CliFrontend {
 
         // Build executor
         return new CliExecutor(
+                commandLine,
                 pipelineDefPath,
                 flinkConfig,
                 globalPipelineConfig,
@@ -125,18 +120,43 @@ public class CliFrontend {
             String savepointPath = commandLine.getOptionValue(SAVEPOINT_PATH_OPTION.getOpt());
             boolean allowNonRestoredState =
                     commandLine.hasOption(SAVEPOINT_ALLOW_NON_RESTORED_OPTION.getOpt());
-            final RestoreMode restoreMode;
+            final Object restoreMode;
             if (commandLine.hasOption(SAVEPOINT_CLAIM_MODE)) {
                 restoreMode =
                         org.apache.flink.configuration.ConfigurationUtils.convertValue(
                                 commandLine.getOptionValue(SAVEPOINT_CLAIM_MODE),
-                                RestoreMode.class);
+                                ConfigurationUtils.getClaimModeClass());
             } else {
                 restoreMode = SavepointConfigOptions.RESTORE_MODE.defaultValue();
             }
             // allowNonRestoredState is always false because all operators are predefined.
-            return SavepointRestoreSettings.forPath(
-                    savepointPath, allowNonRestoredState, restoreMode);
+
+            return (SavepointRestoreSettings)
+                    Arrays.stream(SavepointRestoreSettings.class.getMethods())
+                            .filter(
+                                    method ->
+                                            method.getName().equals("forPath")
+                                                    && method.getParameterCount() == 3)
+                            .findFirst()
+                            .map(
+                                    method -> {
+                                        try {
+                                            return method.invoke(
+                                                    null,
+                                                    savepointPath,
+                                                    allowNonRestoredState,
+                                                    restoreMode);
+                                        } catch (IllegalAccessException
+                                                | InvocationTargetException e) {
+                                            throw new RuntimeException(
+                                                    "Failed to invoke SavepointRestoreSettings#forPath nethod.",
+                                                    e);
+                                        }
+                                    })
+                            .orElseThrow(
+                                    () ->
+                                            new RuntimeException(
+                                                    "Failed to resolve SavepointRestoreSettings#forPath method."));
         } else {
             return SavepointRestoreSettings.none();
         }

@@ -17,66 +17,100 @@
 
 package org.apache.flink.cdc.composer.flink.translator;
 
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
-import org.apache.flink.cdc.runtime.operators.transform.TransformDataOperator;
-import org.apache.flink.cdc.runtime.operators.transform.TransformSchemaOperator;
+import org.apache.flink.cdc.composer.definition.UdfDef;
+import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
+import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
-import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * Translator used to build {@link TransformSchemaOperator} and {@link TransformDataOperator} for
- * event transform.
+ * Translator used to build {@link PreTransformOperator} and {@link PostTransformOperator} for event
+ * transform.
  */
 public class TransformTranslator {
 
-    public DataStream<Event> translateSchema(
-            DataStream<Event> input, List<TransformDef> transforms) {
+    /** Package of built-in model. */
+    public static final String PREFIX_CLASSPATH_BUILT_IN_MODEL =
+            "org.apache.flink.cdc.runtime.model.";
+
+    public DataStream<Event> translatePreTransform(
+            DataStream<Event> input,
+            List<TransformDef> transforms,
+            List<UdfDef> udfFunctions,
+            List<ModelDef> models) {
         if (transforms.isEmpty()) {
             return input;
         }
 
-        TransformSchemaOperator.Builder transformSchemaFunctionBuilder =
-                TransformSchemaOperator.newBuilder();
+        PreTransformOperator.Builder preTransformFunctionBuilder =
+                PreTransformOperator.newBuilder();
         for (TransformDef transform : transforms) {
-            if (transform.isValidProjection()) {
-                transformSchemaFunctionBuilder.addTransform(
+            preTransformFunctionBuilder.addTransform(
+                    transform.getSourceTable(),
+                    transform.getProjection().orElse(null),
+                    transform.getFilter().orElse(null),
+                    transform.getPrimaryKeys(),
+                    transform.getPartitionKeys(),
+                    transform.getTableOptions());
+        }
+
+        preTransformFunctionBuilder.addUdfFunctions(
+                udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
+        preTransformFunctionBuilder.addUdfFunctions(
+                models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
+        return input.transform(
+                "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
+    }
+
+    public DataStream<Event> translatePostTransform(
+            DataStream<Event> input,
+            List<TransformDef> transforms,
+            String timezone,
+            List<UdfDef> udfFunctions,
+            List<ModelDef> models) {
+        if (transforms.isEmpty()) {
+            return input;
+        }
+
+        PostTransformOperator.Builder postTransformFunctionBuilder =
+                PostTransformOperator.newBuilder();
+        for (TransformDef transform : transforms) {
+            if (transform.isValidProjection() || transform.isValidFilter()) {
+                postTransformFunctionBuilder.addTransform(
                         transform.getSourceTable(),
-                        transform.getProjection().get(),
+                        transform.isValidProjection() ? transform.getProjection().get() : null,
+                        transform.isValidFilter() ? transform.getFilter().get() : null,
                         transform.getPrimaryKeys(),
                         transform.getPartitionKeys(),
                         transform.getTableOptions());
             }
         }
+        postTransformFunctionBuilder.addTimezone(timezone);
+        postTransformFunctionBuilder.addUdfFunctions(
+                udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
+        postTransformFunctionBuilder.addUdfFunctions(
+                models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
         return input.transform(
-                "Transform:Schema", new EventTypeInfo(), transformSchemaFunctionBuilder.build());
+                "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build());
     }
 
-    public DataStream<Event> translateData(
-            DataStream<Event> input,
-            List<TransformDef> transforms,
-            OperatorID schemaOperatorID,
-            String timezone) {
-        if (transforms.isEmpty()) {
-            return input;
-        }
+    private Tuple3<String, String, Map<String, String>> modelToUDFTuple(ModelDef model) {
+        return Tuple3.of(
+                model.getModelName(),
+                PREFIX_CLASSPATH_BUILT_IN_MODEL + model.getClassName(),
+                model.getParameters());
+    }
 
-        TransformDataOperator.Builder transformDataFunctionBuilder =
-                TransformDataOperator.newBuilder();
-        for (TransformDef transform : transforms) {
-            if (transform.isValidProjection() || transform.isValidFilter()) {
-                transformDataFunctionBuilder.addTransform(
-                        transform.getSourceTable(),
-                        transform.isValidProjection() ? transform.getProjection().get() : null,
-                        transform.isValidFilter() ? transform.getFilter().get() : null);
-            }
-        }
-        transformDataFunctionBuilder.addSchemaOperatorID(schemaOperatorID);
-        transformDataFunctionBuilder.addTimezone(timezone);
-        return input.transform(
-                "Transform:Data", new EventTypeInfo(), transformDataFunctionBuilder.build());
+    private Tuple3<String, String, Map<String, String>> udfDefToUDFTuple(UdfDef udf) {
+        return Tuple3.of(udf.getName(), udf.getClasspath(), new HashMap<>());
     }
 }

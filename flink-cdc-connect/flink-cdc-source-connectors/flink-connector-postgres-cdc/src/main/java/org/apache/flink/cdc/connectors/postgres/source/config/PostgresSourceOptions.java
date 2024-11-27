@@ -78,4 +78,14 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                     .defaultValue(Duration.ofSeconds(30))
                     .withDescription(
                             "Optional interval of sending heartbeat event for tracing the latest available replication slot offsets");
+
+    public static final ConfigOption<Integer> SCAN_LSN_COMMIT_CHECKPOINTS_DELAY =
+            ConfigOptions.key("scan.lsn-commit.checkpoints-num-delay")
+                    .intType()
+                    .defaultValue(3)
+                    .withDescription(
+                            "The number of checkpoint delays before starting to commit the LSN offsets.\n"
+                                    + "By setting this to higher value, the offset that is consumed by global slot will be "
+                                    + "committed after multiple checkpoint delays instead of after each checkpoint completion.\n"
+                                    + "This allows continuous recycle of log files in stream phase.");
 }

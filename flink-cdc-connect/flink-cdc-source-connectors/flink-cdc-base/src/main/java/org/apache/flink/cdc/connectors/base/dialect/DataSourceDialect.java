@@ -27,6 +27,8 @@ import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +39,7 @@ import java.util.Map;
  * @param <C> The source config of data source.
  */
 @Experimental
-public interface DataSourceDialect<C extends SourceConfig> extends Serializable {
+public interface DataSourceDialect<C extends SourceConfig> extends Serializable, Closeable {
 
     /** Get the name of dialect. */
     String getName();
@@ -78,4 +80,7 @@ public interface DataSourceDialect<C extends SourceConfig> extends Serializable 
 
     /** Check if the tableId is included in SourceConfig. */
     boolean isIncludeDataCollection(C sourceConfig, TableId tableId);
+
+    @Override
+    default void close() throws IOException {}
 }

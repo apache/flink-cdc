@@ -218,7 +218,7 @@ public class OracleConnectorITCase {
                     "+I[spare tire, 22.200]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
@@ -350,7 +350,7 @@ public class OracleConnectorITCase {
                     "+I[spare tire, 22.200]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
@@ -445,7 +445,7 @@ public class OracleConnectorITCase {
                     "+I[spare tire, 22.200]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         LOG.info("actual:{}", actual);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
@@ -547,7 +547,7 @@ public class OracleConnectorITCase {
                         "+U[ORCLCDB, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]",
                         "-D[ORCLCDB, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]");
 
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         Collections.sort(expected);
         Collections.sort(actual);
         assertEquals(expected, actual);
@@ -618,7 +618,7 @@ public class OracleConnectorITCase {
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -719,7 +719,7 @@ public class OracleConnectorITCase {
                         "+I[11000000000, false, 98, 9998, 987654320, 20000000000000000000, 987654321.12345678, 2147483647, 1024.955, 1024.955]",
                         "+I[11000000001, true, 99, 9999, 987654321, 20000000000000000001, 987654321.87654321, 2147483648, 1024.965, 1024.965]");
 
-        List<String> actual = TestValuesTableFactory.getRawResults("test_numeric_sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("test_numeric_sink");
         Collections.sort(actual);
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
@@ -835,7 +835,7 @@ public class OracleConnectorITCase {
                             + "</name>\n]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Collections.sort(actual);
         assertEquals(Arrays.asList(expected), actual);
         result.getJobClient().get().cancel().get();
@@ -843,6 +843,9 @@ public class OracleConnectorITCase {
 
     @Test
     public void testSnapshotToStreamingSwitchPendingTransactions() throws Exception {
+
+        createAndInitialize("product.sql");
+
         Assume.assumeFalse(parallelismSnapshot);
 
         CompletableFuture<Void> finishFuture = createRecordInserters();
@@ -891,7 +894,7 @@ public class OracleConnectorITCase {
         waitForSinkSize("sink", RECORDS_COUNT);
 
         List<Integer> actual =
-                TestValuesTableFactory.getResults("sink").stream()
+                TestValuesTableFactory.getResultsAsStrings("sink").stream()
                         .map(s -> s.replaceFirst("\\+I\\[(\\d+).+", "$1"))
                         .map(Integer::parseInt)
                         .sorted()
@@ -986,7 +989,7 @@ public class OracleConnectorITCase {
     private static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
+                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;

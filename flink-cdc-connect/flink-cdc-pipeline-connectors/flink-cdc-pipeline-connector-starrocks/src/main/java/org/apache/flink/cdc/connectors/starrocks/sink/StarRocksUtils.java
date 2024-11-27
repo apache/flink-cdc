@@ -84,7 +84,8 @@ public class StarRocksUtils {
                     new StarRocksColumn.Builder()
                             .setColumnName(column.getName())
                             .setOrdinalPosition(i)
-                            .setColumnComment(column.getComment());
+                            .setColumnComment(column.getComment())
+                            .setDefaultValue(column.getDefaultValueExpression());
             toStarRocksDataType(column, i < primaryKeyCount, builder);
             starRocksColumns.add(builder.build());
         }

@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
@@ -41,6 +42,7 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
 
     @Override
     public DataSource createDataSource(Context context) {
+        FactoryHelper.createFactoryHelper(this, context).validate();
         ValuesDataSourceHelper.EventSetId eventType =
                 context.getFactoryConfiguration().get(ValuesDataSourceOptions.EVENT_SET_ID);
         int failAtPos =
@@ -51,10 +53,13 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
 
     @Override
     public DataSink createDataSink(Context context) {
+        FactoryHelper.createFactoryHelper(this, context).validate();
         return new ValuesDataSink(
                 context.getFactoryConfiguration().get(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY),
                 context.getFactoryConfiguration().get(ValuesDataSinkOptions.PRINT_ENABLED),
-                context.getFactoryConfiguration().get(ValuesDataSinkOptions.SINK_API));
+                context.getFactoryConfiguration().get(ValuesDataSinkOptions.SINK_API),
+                context.getFactoryConfiguration()
+                        .get(ValuesDataSinkOptions.ERROR_ON_SCHEMA_CHANGE));
     }
 
     @Override
@@ -73,6 +78,9 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
         options.add(ValuesDataSourceOptions.EVENT_SET_ID);
         options.add(ValuesDataSourceOptions.FAILURE_INJECTION_INDEX);
         options.add(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY);
+        options.add(ValuesDataSinkOptions.PRINT_ENABLED);
+        options.add(ValuesDataSinkOptions.SINK_API);
+        options.add(ValuesDataSinkOptions.ERROR_ON_SCHEMA_CHANGE);
         return options;
     }
 }

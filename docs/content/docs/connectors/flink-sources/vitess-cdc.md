@@ -40,16 +40,16 @@ In order to setup the Vitess CDC connector, the following table provides depende
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-vitess-cdc-3.0.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-vitess-cdc/3.0.1/flink-sql-connector-vitess-cdc-3.0.1.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-vitess-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-vitess-cdc/3.1.0/flink-sql-connector-vitess-cdc-3.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to
-[flink-sql-connector-vitess-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-vitess-cdc),
+[flink-sql-connector-vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc),
 more released versions will be available in the Maven central warehouse.
 
 Setup Vitess server
 ----------------
 
-You can follow the Local Install via [Docker guide](https://vitess.io/docs/get-started/local-docker/), or the Vitess Operator for [Kubernetes guide](https://vitess.io/docs/get-started/operator/) to install Vitess. No special setup is needed to support Vitess connector.
+You can follow the Local Install via [Docker guide](https://vitess.io/docs/get-started/vttestserver-docker-image/), or the Vitess Operator for [Kubernetes guide](https://vitess.io/docs/get-started/operator/) to install Vitess. No special setup is needed to support Vitess connector.
 
 ### Checklist
 * Make sure that the VTGate host and its gRPC port (default is 15991) is accessible from the machine where the Vitess connector is installed

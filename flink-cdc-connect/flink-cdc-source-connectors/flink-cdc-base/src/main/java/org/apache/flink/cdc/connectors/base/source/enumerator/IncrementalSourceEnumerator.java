@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -187,7 +188,7 @@ public class IncrementalSourceEnumerator
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         LOG.info("Closing enumerator...");
         splitAssigner.close();
     }

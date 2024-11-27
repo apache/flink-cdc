@@ -27,6 +27,9 @@ import java.sql.Types;
 /** Utilities for converting from SqlServer types to Flink types. */
 public class SqlServerTypeUtils {
 
+    /** Microsoft SQL type GUID's type name. */
+    static final String UNIQUEIDENTIFIRER = "uniqueidentifier";
+
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
     public static DataType fromDbzColumn(Column column) {
         DataType dataType = convertFromColumn(column);
@@ -68,8 +71,8 @@ public class SqlServerTypeUtils {
                 return DataTypes.DATE();
             case Types.TIMESTAMP:
             case Types.TIMESTAMP_WITH_TIMEZONE:
-                return column.length() >= 0
-                        ? DataTypes.TIMESTAMP(column.length())
+                return column.scale().isPresent()
+                        ? DataTypes.TIMESTAMP(column.scale().get())
                         : DataTypes.TIMESTAMP();
             case Types.BOOLEAN:
                 return DataTypes.BOOLEAN();

@@ -48,10 +48,11 @@ Multiple rules can be declared in one single pipeline YAML file.
 There are some hidden columns used to access metadata information. They will only take effect when explicitly referenced in the transform rules.
 
 | Field               | Data Type | Description                                  |
-|--------------------|-----------|----------------------------------------------|
-| __namespace_name__ | String    | Name of the namespace that contains the row. |
-| __schema_name__    | String    | Name of the schema that contains the row.    |
-| __table_name__     | String    | Name of the table that contains the row.     |
+|---------------------|-----------|----------------------------------------------|
+| __namespace_name__  | String    | Name of the namespace that contains the row. |
+| __schema_name__     | String    | Name of the schema that contains the row.    |
+| __table_name__      | String    | Name of the table that contains the row.     |
+| __data_event_type__ | String    | Operation type of data change event.         |
 
 ## Metadata relationship
 
@@ -117,16 +118,17 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 
 ## String Functions
 
-| Function             | Janino Code              | Description                                       |
-| -------------------- | ------------------------ | ------------------------------------------------- |
-| string1 &#124;&#124; string2 | concat(string1, string2) | Returns the concatenation of STRING1 and STRING2. |
-| CHAR_LENGTH(string)  | charLength(string)       | Returns the number of characters in STRING.       |
-| UPPER(string)        | upper(string)            | Returns string in uppercase.                      |
-| LOWER(string) | lower(string) | Returns string in lowercase. |
-| TRIM(string1) | trim('BOTH',string1) | Returns a string that removes whitespaces at both sides. |
+| Function             | Janino Code              | Description                                                                                                                                                                                       |
+| -------------------- | ------------------------ |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| string1 &#124;&#124; string2 | concat(string1, string2) | Returns the concatenation of STRING1 and STRING2.                                                                                                                                                 |
+| CHAR_LENGTH(string)  | charLength(string)       | Returns the number of characters in STRING.                                                                                                                                                       |
+| UPPER(string)        | upper(string)            | Returns string in uppercase.                                                                                                                                                                      |
+| LOWER(string) | lower(string) | Returns string in lowercase.                                                                                                                                                                      |
+| TRIM(string1) | trim('BOTH',string1) | Returns a string that removes whitespaces at both sides.                                                                                                                                          |
 | REGEXP_REPLACE(string1, string2, string3) | regexpReplace(string1, string2, string3) | Returns a string from STRING1 with all the substrings that match a regular expression STRING2 consecutively being replaced with STRING3. E.g., 'foobar'.regexpReplace('oo\|ar', '') returns "fb". |
-| SUBSTRING(string FROM integer1 [ FOR integer2 ]) | substring(string,integer1,integer2) | Returns a substring of STRING starting from position INT1 with length INT2 (to the end by default). |
-| CONCAT(string1, string2,…) | concat(string1, string2,…) | Returns a string that concatenates string1, string2, …. E.g., CONCAT('AA', 'BB', 'CC') returns 'AABBCC'. |
+| SUBSTR(string, integer1[, integer2]) | substr(string,integer1,integer2) | Returns a substring of STRING starting from position integer1 with length integer2 (to the end by default).                                                                                       |
+| SUBSTRING(string FROM integer1 [ FOR integer2 ]) | substring(string,integer1,integer2) | Returns a substring of STRING starting from position integer1 with length integer2 (to the end by default).                                                                                       |
+| CONCAT(string1, string2,…) | concat(string1, string2,…) | Returns a string that concatenates string1, string2, …. E.g., CONCAT('AA', 'BB', 'CC') returns 'AABBCC'.                                                                                          |
 
 ## Temporal Functions
 
@@ -151,6 +153,23 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 | CASE WHEN condition1 THEN result1 (WHEN condition2 THEN result2)* (ELSE result_z) END | Nested ternary expression | Returns resultX when the first conditionX is met. When no condition is met, returns result_z if it is provided and returns NULL otherwise. |
 | COALESCE(value1 [, value2]*) | coalesce(Object... objects) | Returns the first argument that is not NULL.If all arguments are NULL, it returns NULL as well. The return type is the least restrictive, common type of all of its arguments. The return type is nullable if all arguments are nullable as well. |
 | IF(condition, true_value, false_value)   | condition ? true_value : false_value | Returns the true_value if condition is met, otherwise false_value. E.g., IF(5 > 3, 5, 3) returns 5. |
+
+## Casting Functions
+
+You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXPR>` to a specific type `<T>`. Possible conversion paths are:
+
+| Source Type                         | Target Type | Notes                                                                                      |
+|-------------------------------------|-------------|--------------------------------------------------------------------------------------------|
+| ANY                                 | STRING      | All types can be cast to STRING.                                                           |
+| NUMERIC, STRING                     | BOOLEAN     | Any non-zero numerics will be evaluated to `TRUE`.                                         |
+| NUMERIC                             | BYTE        | Value must be in the range of Byte (-128 ~ 127).                                           |
+| NUMERIC                             | SHORT       | Value must be in the range of Short (-32768 ~ 32767).                                      |
+| NUMERIC                             | INTEGER     | Value must be in the range of Integer (-2147483648 ~ 2147483647).                          |
+| NUMERIC                             | LONG        | Value must be in the range of Long (-9223372036854775808 ~ 9223372036854775807).           |
+| NUMERIC                             | FLOAT       | Value must be in the range of Float (1.40239846e-45f ~ 3.40282347e+38f).                   |
+| NUMERIC                             | DOUBLE      | Value must be in the range of Double (4.94065645841246544e-324 ~ 1.79769313486231570e+308) |
+| NUMERIC                             | DECIMAL     | Value must be in the range of BigDecimal(10, 0).                                           |
+| STRING, TIMESTAMP_TZ, TIMESTAMP_LTZ | TIMESTAMP   | String type value must be a valid `ISO_LOCAL_DATE_TIME` string.                            |
 
 # Example
 ## Add computed columns
@@ -252,7 +271,9 @@ transform:
 Tips: The format of table-options is `key1=value1,key2=value2`.
 
 ## Classification mapping
-Multiple transform rules can be defined to classify input data rows and apply different processings. For example, we may define a transform rule as follows:
+Multiple transform rules can be defined to classify input data rows and apply different processing.
+Only the first matched transform rule will apply.
+For example, we may define a transform rule as follows:
 
 ```yaml
 transform:
@@ -265,6 +286,147 @@ transform:
     filter: UPPER(province) = 'BEIJING'
     description: classification mapping example
 ```
+
+## User-defined Functions
+
+User-defined functions (UDFs) can be used in transform rules.
+
+Classes could be used as a UDF if:
+
+* implements `org.apache.flink.cdc.common.udf.UserDefinedFunction` interface
+* has a public constructor with no parameters
+* has at least one public method named `eval`
+
+It may also:
+
+* overrides `getReturnType` method to indicate its return CDC type
+* overrides `open` and `close` method to do some initialization and cleanup work
+
+For example, this is a valid UDF class:
+
+```java
+public class AddOneFunctionClass implements UserDefinedFunction {
+    
+    public Object eval(Integer num) {
+        return num + 1;
+    }
+    
+    @Override
+    public DataType getReturnType() {
+        return DataTypes.INT();
+    }
+    
+    @Override
+    public void open() throws Exception {
+        // ...
+    }
+
+    @Override
+    public void close() throws Exception {
+        // ...
+    }
+}
+```
+
+To ease the migration from Flink SQL to Flink CDC, a Flink `ScalarFunction` could also be used as a transform UDF, with some limitations:
+
+* `ScalarFunction` which has a constructor with parameters is not supported.
+* Flink-style type hint in `ScalarFunction` will be ignored.
+* `open` / `close` lifecycle hooks will not be invoked.
+
+UDF classes could be registered by adding a `user-defined-function` block:
+
+```yaml
+pipeline:
+  user-defined-function:
+    - name: addone
+      classpath: org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass
+    - name: format
+      classpath: org.apache.flink.cdc.udf.examples.java.FormatFunctionClass
+```
+
+Notice that given classpath must be fully-qualified, and corresponding `jar` files must be included in Flink `/lib` folder, or be passed with `flink-cdc.sh --jar` option.
+
+After being correctly registered, UDFs could be used in both `projection` and `filter` expressions, just like built-in functions:
+
+```yaml
+transform:
+  - source-table: db.\.*
+    projection: "*, inc(inc(inc(id))) as inc_id, format(id, 'id -> %d') as formatted_id"
+    filter: inc(id) < 100
+```
+
+## Embedding AI Model
+
+Embedding AI Model can be used in transform rules.
+To use Embedding AI Model, you need to download the jar of build-in model, and then add `--jar {$BUILT_IN_MODEL_PATH}` to your flink-cdc.sh command.
+
+How to define a Embedding AI Model:
+
+```yaml
+pipeline:
+  model:
+    - model-name: CHAT
+      class-name: OpenAIChatModel
+      openai.model: text-embedding-3-small
+      openai.host: https://xxxx
+      openai.apikey: abcd1234
+      openai.chat.prompt: please summary this
+    - model-name: GET_EMBEDDING
+      class-name: OpenAIEmbeddingModel
+      openai.model: text-embedding-3-small
+      openai.host: https://xxxx
+      openai.apikey: abcd1234
+```
+Note:
+* `model-name` is a common required parameter for all support models, which represent the function name called in `projection` or `filter`.
+* `class-name` is a common required parameter for all support models, available values can be found in [All Support models](#all-support-models).
+* `openai.model`, `openai.host`, `openai.apiKey` and `openai.chat.prompt` is option parameters that defined in specific model.
+
+How to use a Embedding AI Model:
+
+```yaml
+transform:
+  - source-table: db.\.*
+    projection: "*, inc(inc(inc(id))) as inc_id, GET_EMBEDDING(page) as emb, CHAT(page) as summary"
+    filter: inc(id) < 100
+pipeline:
+  model:
+    - model-name: CHAT
+      class-name: OpenAIChatModel
+      openai.model: gpt-4o-mini
+      openai.host: http://langchain4j.dev/demo/openai/v1
+      openai.apikey: demo
+      openai.chat.prompt: please summary this
+    - model-name: GET_EMBEDDING
+      class-name: OpenAIEmbeddingModel
+      openai.model: text-embedding-3-small
+      openai.host: http://langchain4j.dev/demo/openai/v1
+      openai.apikey: demo
+```
+Here, GET_EMBEDDING is defined though `model-name` in `pipeline`.
+
+### All Support models
+
+The following built-in models are provided:
+
+#### OpenAIChatModel
+
+| parameter          | type   | optional/required | meaning                                                                                                                              |
+|--------------------|--------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| openai.model       | STRING | required          | Name of model to be called, for example: "gpt-4o-mini", Available options are "gpt-4o-mini", "gpt-4o", "gpt-4-32k", "gpt-3.5-turbo". |
+| openai.host        | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                      |
+| openai.apikey      | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                   |
+| openai.chat.prompt | STRING | optional          | Prompt for chatting with OpenAI, for example: "Please summary this ".                                                                |
+
+#### OpenAIEmbeddingModel
+
+| parameter     | type   | optional/required | meaning                                                                                                                                                                |
+|---------------|--------|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| openai.model  | STRING | required          | Name of model to be called, for example: "text-embedding-3-small", Available options are "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002". |
+| openai.host   | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                                                        |
+| openai.apikey | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                                                     |
+
 
 # Known limitations
 * Currently, transform doesn't work with route rules. It will be supported in future versions.

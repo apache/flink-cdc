@@ -28,6 +28,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitSeriali
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderContext;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderWithCommit;
+import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.events.OffsetCommitAckEvent;
 import org.apache.flink.cdc.connectors.postgres.source.events.OffsetCommitEvent;
 import org.apache.flink.configuration.Configuration;
@@ -38,6 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.PriorityQueue;
 import java.util.function.Supplier;
 
 /**
@@ -53,6 +55,9 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
 
     /** whether to commit offset. */
     private volatile boolean isCommitOffset = false;
+
+    private final PriorityQueue<Long> minHeap;
+    private final int lsnCommitCheckpointsDelay;
 
     public PostgresSourceReader(
             FutureCompletingBlockingQueue elementQueue,
@@ -72,6 +77,9 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
                 sourceConfig,
                 sourceSplitSerializer,
                 dialect);
+        this.lsnCommitCheckpointsDelay =
+                ((PostgresSourceConfig) sourceConfig).getLsnCommitCheckpointsDelay();
+        this.minHeap = new PriorityQueue<>();
     }
 
     @Override
@@ -104,12 +112,23 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
 
     @Override
     public void notifyCheckpointComplete(long checkpointId) throws Exception {
+        this.minHeap.add(checkpointId);
+        if (this.minHeap.size() <= this.lsnCommitCheckpointsDelay) {
+            LOG.info("Pending checkpoints '{}'.", this.minHeap);
+            return;
+        }
+        final long checkpointIdToCommit = this.minHeap.poll();
+        LOG.info(
+                "Pending checkpoints '{}', to be committed checkpoint id '{}'.",
+                this.minHeap,
+                checkpointIdToCommit);
+
         // After all snapshot splits are finished, update stream split's metadata and reset start
         // offset, which maybe smaller than before.
         // In case that new start-offset of stream split has been recycled, don't commit offset
         // during new table added phase.
         if (isCommitOffset()) {
-            super.notifyCheckpointComplete(checkpointId);
+            super.notifyCheckpointComplete(checkpointIdToCommit);
         }
     }
 

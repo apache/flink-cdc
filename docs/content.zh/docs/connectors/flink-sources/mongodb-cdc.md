@@ -39,7 +39,7 @@ MongoDB CDC 连接器允许从 MongoDB 读取快照数据和增量数据。 本�
    <groupId>org.apache.flink</groupId>
    <artifactId>flink-connector-mongodb-cdc</artifactId>
    <!--  请使用已发布的版本依赖，snapshot 版本的依赖需要本地自行编译。 -->
-   <version>3.2-SNAPSHOT</version>
+   <version>3.3-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -47,9 +47,9 @@ MongoDB CDC 连接器允许从 MongoDB 读取快照数据和增量数据。 本�
 
 ```下载链接仅适用于稳定版本。```
 
-下载 [flink-sql-connector-mongodb-cdc-3.0.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-mongodb-cdc/3.0.1/flink-sql-connector-mongodb-cdc-3.0.1.jar)， 把它放在 `<FLINK_HOME>/lib/`.
+下载 [flink-sql-connector-mongodb-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mongodb-cdc/3.1.0/flink-sql-connector-mongodb-cdc-3.1.0.jar)， 把它放在 `<FLINK_HOME>/lib/`.
 
-**注意:** 参考 [flink-sql-connector-mongodb-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-mongodb-cdc)， 当前已发布的版本将在 Maven 中央仓库中提供。
+**注意:** 参考 [flink-sql-connector-mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc)， 当前已发布的版本将在 Maven 中央仓库中提供。
 
 设置 MongoDB
 ----------------

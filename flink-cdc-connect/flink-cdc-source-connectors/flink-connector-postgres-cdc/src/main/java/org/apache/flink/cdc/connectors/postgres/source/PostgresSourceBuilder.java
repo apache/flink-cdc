@@ -199,12 +199,6 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
-    /** Whether the {@link PostgresIncrementalSource} should output the schema changes or not. */
-    public PostgresSourceBuilder<T> includeSchemaChanges(boolean includeSchemaChanges) {
-        this.configFactory.includeSchemaChanges(includeSchemaChanges);
-        return this;
-    }
-
     /** Specifies the startup options. */
     public PostgresSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
         this.configFactory.startupOptions(startupOptions);
@@ -277,6 +271,12 @@ public class PostgresSourceBuilder<T> {
     /** Whether the {@link PostgresSourceEnumerator} should scan the newly added tables or not. */
     public PostgresSourceBuilder<T> scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
         this.configFactory.scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
+        return this;
+    }
+
+    /** Set the {@code LSN} checkpoints delay number for Postgres to commit the offsets. */
+    public PostgresSourceBuilder<T> lsnCommitCheckpointsDelay(int lsnCommitDelay) {
+        this.configFactory.setLsnCommitCheckpointsDelay(lsnCommitDelay);
         return this;
     }
 

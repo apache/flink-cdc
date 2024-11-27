@@ -27,14 +27,14 @@ import org.apache.flink.cdc.composer.utils.factory.DataSourceFactory1;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /** A test for the {@link DataSourceTranslator}. */
-public class DataSourceTranslatorTest {
+class DataSourceTranslatorTest {
 
     @Test
-    public void testCreateDataSourceFromSourceDef() {
+    void testCreateDataSourceFromSourceDef() {
         SourceDef sourceDef =
                 new SourceDef(
                         "data-source-factory-1",
@@ -55,7 +55,8 @@ public class DataSourceTranslatorTest {
                                 new Configuration(),
                                 Thread.currentThread().getContextClassLoader()));
 
-        Assert.assertTrue(dataSource instanceof DataSourceFactory1.TestDataSource);
-        Assert.assertEquals("0.0.0.0", ((DataSourceFactory1.TestDataSource) dataSource).getHost());
+        Assertions.assertTrue(dataSource instanceof DataSourceFactory1.TestDataSource);
+        Assertions.assertEquals(
+                "0.0.0.0", ((DataSourceFactory1.TestDataSource) dataSource).getHost());
     }
 }

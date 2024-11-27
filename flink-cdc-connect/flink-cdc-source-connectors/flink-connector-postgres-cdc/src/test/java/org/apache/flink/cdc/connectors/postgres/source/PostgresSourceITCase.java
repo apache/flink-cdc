@@ -707,6 +707,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         .tableList(tableId)
                         .startupOptions(startupOptions)
                         .skipSnapshotBackfill(skipSnapshotBackfill)
+                        .lsnCommitCheckpointsDelay(1)
                         .deserializer(customerTable.getDeserializer())
                         .build();
 
@@ -816,7 +817,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
                                 + " 'slot.name' = '%s',"
-                                + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
+                                + " 'scan.incremental.snapshot.backfill.skip' = '%s',"
+                                + " 'scan.lsn-commit.checkpoints-num-delay' = '1'"
                                 + ""
                                 + ")",
                         customDatabase.getHost(),

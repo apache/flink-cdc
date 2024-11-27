@@ -83,7 +83,8 @@ class CliFrontendTest {
                         "--global-config",
                         globalPipelineConfig());
         assertThat(executor.getGlobalPipelineConfig().toMap().get("parallelism")).isEqualTo("1");
-        assertThat(executor.getGlobalPipelineConfig().toMap().get("foo")).isEqualTo("bar");
+        assertThat(executor.getGlobalPipelineConfig().toMap().get("schema.change.behavior"))
+                .isEqualTo("ignore");
     }
 
     @Test
@@ -103,6 +104,19 @@ class CliFrontendTest {
         assertThat(executor.getSavepointSettings().getRestoreMode())
                 .isEqualTo(RestoreMode.NO_CLAIM);
         assertThat(executor.getSavepointSettings().allowNonRestoredState()).isTrue();
+    }
+
+    @Test
+    void testDeploymentTargetConfiguration() throws Exception {
+        CliExecutor executor =
+                createExecutor(
+                        pipelineDef(),
+                        "--flink-home",
+                        flinkHome(),
+                        "-t",
+                        "kubernetes-application",
+                        "-n");
+        assertThat(executor.getDeploymentTarget()).isEqualTo("kubernetes-application");
     }
 
     @Test
@@ -176,6 +190,10 @@ class CliFrontendTest {
                     + "                                   was triggered.\n"
                     + "    -s,--from-savepoint <arg>      Path to a savepoint to restore the job from\n"
                     + "                                   (for example hdfs:///flink/savepoint-1537\n"
+                    + "    -t,--target <arg>              The deployment target for the execution. This\n"
+                    + "                                   can take one of the following values\n"
+                    + "                                   local/remote/yarn-session/yarn-application/ku\n"
+                    + "                                   bernetes-session/kubernetes-application\n"
                     + "       --use-mini-cluster          Use Flink MiniCluster to run the pipeline\n";
 
     private static class NoOpComposer implements PipelineComposer {

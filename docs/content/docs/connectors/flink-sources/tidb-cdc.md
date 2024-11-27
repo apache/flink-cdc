@@ -41,9 +41,9 @@ In order to setup the TiDB CDC connector, the following table provides dependenc
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-tidb-cdc-3.0.1.jar](https://repo1.maven.org/maven2/com/ververica/flink-sql-connector-tidb-cdc/3.0.1/flink-sql-connector-tidb-cdc-3.0.1.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-tidb-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-tidb-cdc/3.1.0/flink-sql-connector-tidb-cdc-3.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
 
-**Note:** Refer to [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/com.ververica/flink-sql-connector-tidb-cdc), more released versions will be available in the Maven central warehouse.
+**Note:** Refer to [flink-sql-connector-tidb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-tidb-cdc), more released versions will be available in the Maven central warehouse.
 
 How to create a TiDB CDC table
 ----------------
@@ -124,6 +124,13 @@ Connector Options
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>TiKV cluster's PD address.</td>
+    </tr>
+    <tr>
+      <td>host-mapping</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>TiKV cluster's host-mapping used to configure public IP and intranet IP mapping. When the TiKV cluster is running on the intranet, you can map a set of intranet IPs to public IPs for an outside Flink cluster to access. The format is {Intranet IP1}:{Public IP1};{Intranet IP2}:{Public IP2}, e.g. 192.168.0.2:8.8.8.8;192.168.0.3:9.9.9.9.</td>
     </tr>
     <tr>
       <td>tikv.grpc.timeout_in_ms</td>

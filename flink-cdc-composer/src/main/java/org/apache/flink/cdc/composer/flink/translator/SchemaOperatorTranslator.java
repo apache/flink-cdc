@@ -17,12 +17,10 @@
 
 package org.apache.flink.cdc.composer.flink.translator;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.SchemaChangeEvent;
-import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
@@ -40,16 +38,18 @@ import java.util.List;
 public class SchemaOperatorTranslator {
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final String schemaOperatorUid;
-
     private final Duration rpcTimeOut;
+    private final String timezone;
 
     public SchemaOperatorTranslator(
             SchemaChangeBehavior schemaChangeBehavior,
             String schemaOperatorUid,
-            Duration rpcTimeOut) {
+            Duration rpcTimeOut,
+            String timezone) {
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.schemaOperatorUid = schemaOperatorUid;
         this.rpcTimeOut = rpcTimeOut;
+        this.timezone = timezone;
     }
 
     public DataStream<Event> translate(
@@ -57,18 +57,8 @@ public class SchemaOperatorTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes) {
-        switch (schemaChangeBehavior) {
-            case EVOLVE:
-                return addSchemaOperator(input, parallelism, metadataApplier, routes);
-            case IGNORE:
-                return dropSchemaChangeEvent(input, parallelism);
-            case EXCEPTION:
-                return exceptionOnSchemaChange(input, parallelism);
-            default:
-                throw new IllegalArgumentException(
-                        String.format(
-                                "Unrecognized schema change behavior: %s", schemaChangeBehavior));
-        }
+        return addSchemaOperator(
+                input, parallelism, metadataApplier, routes, schemaChangeBehavior, timezone);
     }
 
     public String getSchemaOperatorUid() {
@@ -79,37 +69,28 @@ public class SchemaOperatorTranslator {
             DataStream<Event> input,
             int parallelism,
             MetadataApplier metadataApplier,
-            List<RouteDef> routes) {
-        List<Tuple2<String, TableId>> routingRules = new ArrayList<>();
+            List<RouteDef> routes,
+            SchemaChangeBehavior schemaChangeBehavior,
+            String timezone) {
+        List<RouteRule> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
             routingRules.add(
-                    Tuple2.of(route.getSourceTable(), TableId.parse(route.getSinkTable())));
+                    new RouteRule(
+                            route.getSourceTable(),
+                            route.getSinkTable(),
+                            route.getReplaceSymbol().orElse(null)));
         }
         SingleOutputStreamOperator<Event> stream =
                 input.transform(
                         "SchemaOperator",
                         new EventTypeInfo(),
-                        new SchemaOperatorFactory(metadataApplier, routingRules, rpcTimeOut));
+                        new SchemaOperatorFactory(
+                                metadataApplier,
+                                routingRules,
+                                rpcTimeOut,
+                                schemaChangeBehavior,
+                                timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
-    }
-
-    private DataStream<Event> dropSchemaChangeEvent(DataStream<Event> input, int parallelism) {
-        return input.filter(event -> !(event instanceof SchemaChangeEvent))
-                .setParallelism(parallelism);
-    }
-
-    private DataStream<Event> exceptionOnSchemaChange(DataStream<Event> input, int parallelism) {
-        return input.map(
-                        event -> {
-                            if (event instanceof SchemaChangeEvent) {
-                                throw new RuntimeException(
-                                        String.format(
-                                                "Aborting execution as the pipeline encountered a schema change event: %s",
-                                                event));
-                            }
-                            return event;
-                        })
-                .setParallelism(parallelism);
     }
 }
