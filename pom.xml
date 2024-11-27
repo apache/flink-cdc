@@ -41,6 +41,7 @@ limitations under the License.
         <module>flink-cdc-runtime</module>
         <module>flink-cdc-e2e-tests</module>
         <module>flink-cdc-pipeline-udf-examples</module>
+        <module>flink-cdc-pipeline-model</module>
     </modules>
 
     <licenses>
@@ -69,8 +70,8 @@ limitations under the License.
         <flink.reuseForks>true</flink.reuseForks>
 
         <!-- dependencies versions -->
-        <flink.version>1.18.1</flink.version>
-        <flink.major.version>1.18</flink.major.version>
+        <flink.version>1.19.1</flink.version>
+        <flink.major.version>1.19</flink.major.version>
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
@@ -356,6 +357,13 @@ limitations under the License.
             <version>${assertj.version}</version>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.15</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -568,6 +576,7 @@ limitations under the License.
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
+                <version>3.4.1</version>
                 <executions>
                     <execution>
                         <id>shade-flink</id>

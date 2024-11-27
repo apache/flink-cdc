@@ -28,7 +28,7 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-connector-starrocks</artifactId>
 
     <properties>
-        <starrocks.connector.version>1.2.9_flink-${flink.major.version}</starrocks.connector.version>
+        <starrocks.connector.version>1.2.10_flink-${flink.major.version}</starrocks.connector.version>
     </properties>
 
     <dependencies>
@@ -36,15 +36,6 @@ limitations under the License.
             <groupId>com.starrocks</groupId>
             <artifactId>flink-connector-starrocks</artifactId>
             <version>${starrocks.connector.version}</version>
-        </dependency>
-
-        <dependency>
-            <!-- TODO connector 1.2.9 depends on this, but not package it, so add this dependency here.
-            This dependency can be removed after upgrading connector to 1.2.10 which will not use
-            commons-compress anymore. -->
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-compress</artifactId>
-            <version>1.21</version>
         </dependency>
 
         <dependency>

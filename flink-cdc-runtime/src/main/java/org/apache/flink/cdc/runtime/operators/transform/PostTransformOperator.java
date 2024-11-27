@@ -18,6 +18,8 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -29,6 +31,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.streaming.api.graph.StreamConfig;
@@ -44,6 +47,7 @@ import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,7 +73,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     /** keep the relationship of TableId and table information. */
     private final Map<TableId, PostTransformChangeInfo> postTransformChangeInfoMap;
 
-    private final List<Tuple2<String, String>> udfFunctions;
+    private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
     private List<UserDefinedFunctionDescriptor> udfDescriptors;
     private transient Map<String, Object> udfFunctionInstances;
 
@@ -88,7 +92,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     public static class Builder {
         private final List<TransformRule> transformRules = new ArrayList<>();
         private String timezone;
-        private final List<Tuple2<String, String>> udfFunctions = new ArrayList<>();
+        private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
+                new ArrayList<>();
 
         public PostTransformOperator.Builder addTransform(
                 String tableInclusions,
@@ -124,7 +129,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         }
 
         public PostTransformOperator.Builder addUdfFunctions(
-                List<Tuple2<String, String>> udfFunctions) {
+                List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
             this.udfFunctions.addAll(udfFunctions);
             return this;
         }
@@ -137,7 +142,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     private PostTransformOperator(
             List<TransformRule> transformRules,
             String timezone,
-            List<Tuple2<String, String>> udfFunctions) {
+            List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
         this.transformRules = transformRules;
         this.timezone = timezone;
         this.postTransformChangeInfoMap = new ConcurrentHashMap<>();
@@ -157,10 +162,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         super.setup(containingTask, config, output);
         udfDescriptors =
                 udfFunctions.stream()
-                        .map(
-                                udf -> {
-                                    return new UserDefinedFunctionDescriptor(udf.f0, udf.f1);
-                                })
+                        .map(udf -> new UserDefinedFunctionDescriptor(udf.f0, udf.f1, udf.f2))
                         .collect(Collectors.toList());
     }
 
@@ -242,6 +244,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
 
     private Optional<SchemaChangeEvent> cacheSchema(SchemaChangeEvent event) throws Exception {
         TableId tableId = event.tableId();
+        List<String> columnNamesBeforeChange = Collections.emptyList();
+
         if (event instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) event;
             Set<String> projectedColumnsSet =
@@ -286,6 +290,9 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                     createTableEvent.getSchema().getColumnNames().stream()
                             .filter(projectedColumnsSet::contains)
                             .collect(Collectors.toList()));
+        } else {
+            columnNamesBeforeChange =
+                    getPostTransformChangeInfo(tableId).getPreTransformedSchema().getColumnNames();
         }
 
         Schema schema;
@@ -304,9 +311,12 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
 
         if (event instanceof CreateTableEvent) {
             return Optional.of(new CreateTableEvent(tableId, projectedSchema));
+        } else if (hasAsteriskMap.getOrDefault(tableId, true)) {
+            // See comments in PreTransformOperator#cacheChangeSchema method.
+            return SchemaUtils.transformSchemaChangeEvent(true, columnNamesBeforeChange, event);
         } else {
             return SchemaUtils.transformSchemaChangeEvent(
-                    hasAsteriskMap.get(tableId), projectedColumnsMap.get(tableId), event);
+                    false, projectedColumnsMap.get(tableId), event);
         }
     }
 
@@ -530,7 +540,12 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                             // into UserDefinedFunction interface, thus the provided UDF classes
                             // might not be compatible with the interface definition in CDC common.
                             Object udfInstance = udfFunctionInstances.get(udf.getName());
-                            udfInstance.getClass().getMethod("open").invoke(udfInstance);
+                            UserDefinedFunctionContext userDefinedFunctionContext =
+                                    () -> Configuration.fromMap(udf.getParameters());
+                            udfInstance
+                                    .getClass()
+                                    .getMethod("open", UserDefinedFunctionContext.class)
+                                    .invoke(udfInstance, userDefinedFunctionContext);
                         } else {
                             // Do nothing, Flink-style UDF lifecycle hooks are not supported
                         }

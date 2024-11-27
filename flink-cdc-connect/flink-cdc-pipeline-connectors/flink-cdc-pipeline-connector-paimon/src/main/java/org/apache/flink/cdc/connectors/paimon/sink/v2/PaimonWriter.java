@@ -20,10 +20,10 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
-import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.io.disk.iomanager.IOManager;
 import org.apache.flink.runtime.io.disk.iomanager.IOManagerAsync;
+import org.apache.flink.streaming.api.operators.StreamOperator;
 
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
@@ -66,32 +66,48 @@ public class PaimonWriter<InputT>
     private final Map<Identifier, StoreSinkWrite> writes;
     private final ExecutorService compactExecutor;
     private final MetricGroup metricGroup;
-    private final List<MultiTableCommittable> committables;
+
+    /** A workaround variable trace the checkpointId in {@link StreamOperator#snapshotState}. */
+    private long lastCheckpointId;
 
     public PaimonWriter(
             Options catalogOptions,
             MetricGroup metricGroup,
             String commitUser,
-            PaimonRecordSerializer<InputT> serializer) {
+            PaimonRecordSerializer<InputT> serializer,
+            long lastCheckpointId) {
         catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
         this.metricGroup = metricGroup;
         this.commitUser = commitUser;
         this.tables = new HashMap<>();
         this.writes = new HashMap<>();
-        this.committables = new ArrayList<>();
         this.ioManager = new IOManagerAsync();
         this.compactExecutor =
                 Executors.newSingleThreadScheduledExecutor(
                         new ExecutorThreadFactory(
                                 Thread.currentThread().getName() + "-CdcMultiWrite-Compaction"));
         this.serializer = serializer;
+        this.lastCheckpointId = lastCheckpointId;
     }
 
     @Override
-    public Collection<MultiTableCommittable> prepareCommit() {
-        Collection<MultiTableCommittable> allCommittables = new ArrayList<>(committables);
-        committables.clear();
-        return allCommittables;
+    public Collection<MultiTableCommittable> prepareCommit() throws IOException {
+        List<MultiTableCommittable> committables = new ArrayList<>();
+        for (Map.Entry<Identifier, StoreSinkWrite> entry : writes.entrySet()) {
+            Identifier key = entry.getKey();
+            StoreSinkWrite write = entry.getValue();
+            boolean waitCompaction = false;
+            committables.addAll(
+                    // here we set it to lastCheckpointId+1 to
+                    // avoid prepareCommit the same checkpointId with the first round.
+                    write.prepareCommit(waitCompaction, lastCheckpointId + 1).stream()
+                            .map(
+                                    committable ->
+                                            MultiTableCommittable.fromCommittable(key, committable))
+                            .collect(Collectors.toList()));
+        }
+        lastCheckpointId++;
+        return committables;
     }
 
     @Override
@@ -101,8 +117,14 @@ public class PaimonWriter<InputT>
         if (paimonEvent.isShouldRefreshSchema()) {
             // remove the table temporarily, then add the table with latest schema when received
             // DataChangeEvent.
-            writes.remove(tableId);
             tables.remove(tableId);
+            try {
+                if (writes.containsKey(tableId)) {
+                    writes.get(tableId).replace(getTable(tableId));
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
         if (paimonEvent.getGenericRow() != null) {
             FileStoreTable table;
@@ -152,29 +174,9 @@ public class PaimonWriter<InputT>
                 });
     }
 
-    /**
-     * Called on checkpoint or end of input so that the writer to flush all pending data for
-     * at-least-once.
-     *
-     * <p>this method will also be called when receiving {@link FlushEvent}, but we don't need to
-     * commit the MultiTableCommittables immediately in this case, because {@link PaimonCommitter}
-     * support committing data of different schemas.
-     */
     @Override
-    public void flush(boolean endOfInput) throws IOException {
-        for (Map.Entry<Identifier, StoreSinkWrite> entry : writes.entrySet()) {
-            Identifier key = entry.getKey();
-            StoreSinkWrite write = entry.getValue();
-            boolean waitCompaction = false;
-            // checkpointId will be updated correctly by PreCommitOperator.
-            long checkpointId = 1L;
-            committables.addAll(
-                    write.prepareCommit(waitCompaction, checkpointId).stream()
-                            .map(
-                                    committable ->
-                                            MultiTableCommittable.fromCommittable(key, committable))
-                            .collect(Collectors.toList()));
-        }
+    public void flush(boolean endOfInput) {
+        // do nothing as StoreSinkWrite#replace will write buffer to file.
     }
 
     @Override

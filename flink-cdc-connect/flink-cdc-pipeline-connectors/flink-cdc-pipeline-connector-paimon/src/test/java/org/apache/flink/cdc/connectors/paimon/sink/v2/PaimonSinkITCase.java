@@ -18,6 +18,8 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobInfo;
+import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.serialization.SerializationSchema;
@@ -40,6 +42,8 @@ import org.apache.flink.cdc.connectors.paimon.sink.PaimonMetadataApplier;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
+import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
+import org.apache.flink.runtime.metrics.groups.InternalSinkCommitterMetricGroup;
 import org.apache.flink.streaming.runtime.operators.sink.committables.CommitRequestImpl;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
@@ -63,9 +67,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -83,6 +89,8 @@ public class PaimonSinkITCase {
     private TableId table1;
 
     private BinaryRecordDataGenerator generator;
+
+    private static int checkpointId = 1;
 
     public static final String TEST_DATABASE = "test";
     private static final String HADOOP_CONF_DIR =
@@ -106,6 +114,7 @@ public class PaimonSinkITCase {
         catalogOptions = new Options();
         catalogOptions.setString("metastore", metastore);
         catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
         table1 = TableId.tableId("test", "table1");
         if ("hive".equals(metastore)) {
             catalogOptions.setString("hadoop-conf-dir", HADOOP_CONF_DIR);
@@ -117,13 +126,14 @@ public class PaimonSinkITCase {
                                     + "'warehouse'='%s', "
                                     + "'metastore'='hive', "
                                     + "'hadoop-conf-dir'='%s', "
-                                    + "'hive-conf-dir'='%s' "
+                                    + "'hive-conf-dir'='%s', "
+                                    + "'cache-enabled'='false' "
                                     + ")",
                             warehouse, HADOOP_CONF_DIR, HIVE_CONF_DIR));
         } else {
             tEnv.executeSql(
                     String.format(
-                            "CREATE CATALOG paimon_catalog WITH ('type'='paimon', 'warehouse'='%s')",
+                            "CREATE CATALOG paimon_catalog WITH ('type'='paimon', 'warehouse'='%s', 'cache-enabled'='false')",
                             warehouse));
         }
         FlinkCatalogFactory.createPaimonCatalog(catalogOptions)
@@ -188,6 +198,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -214,6 +225,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -243,6 +255,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -253,6 +266,19 @@ public class PaimonSinkITCase {
                 .forEachRemaining(result::add);
         Assertions.assertEquals(
                 Collections.singletonList(Row.ofKind(RowKind.INSERT, "2", "x")), result);
+
+        result = new ArrayList<>();
+        tEnv.sqlQuery("select max_sequence_number from paimon_catalog.test.`table1$files`")
+                .execute()
+                .collect()
+                .forEachRemaining(result::add);
+        // Each commit will generate one sequence number(equal to checkpointId).
+        Assertions.assertEquals(
+                Arrays.asList(
+                        Row.ofKind(RowKind.INSERT, 1L),
+                        Row.ofKind(RowKind.INSERT, 2L),
+                        Row.ofKind(RowKind.INSERT, 3L)),
+                result);
     }
 
     @ParameterizedTest
@@ -274,6 +300,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -306,8 +333,8 @@ public class PaimonSinkITCase {
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(table1, Collections.singletonList(columnWithPosition));
         PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
-        writer.write(addColumnEvent, null);
         metadataApplier.applySchemaChange(addColumnEvent);
+        writer.write(addColumnEvent, null);
         generator =
                 new BinaryRecordDataGenerator(
                         RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
@@ -324,6 +351,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -371,6 +399,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -388,6 +417,13 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "5", "5"),
                         Row.ofKind(RowKind.INSERT, "6", "6")),
                 result);
+        result = new ArrayList<>();
+        tEnv.sqlQuery("select min_sequence_number from paimon_catalog.test.`table1$files`")
+                .execute()
+                .collect()
+                .forEachRemaining(result::add);
+        Set<Row> deduplicated = new HashSet<>(result);
+        Assertions.assertEquals(result.size(), deduplicated.size());
     }
 
     @ParameterizedTest
@@ -433,6 +469,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -454,10 +491,106 @@ public class PaimonSinkITCase {
                 Collections.singletonList(Row.ofKind(RowKind.INSERT, "1", "1")), result);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem", "hive"})
+    public void testDuplicateCommitAfterRestore(String metastore)
+            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+        initialize(metastore);
+        PaimonSink<Event> paimonSink =
+                new PaimonSink<>(
+                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+        PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
+        Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
+
+        // insert
+        for (Event event : createTestEvents()) {
+            writer.write(event, null);
+        }
+        writer.flush(false);
+        Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
+                writer.prepareCommit().stream()
+                        .map(this::correctCheckpointId)
+                        .map(MockCommitRequestImpl::new)
+                        .collect(Collectors.toList());
+        committer.commit(commitRequests);
+
+        // We add a loop for restore 7 times
+        for (int i = 2; i < 9; i++) {
+            // We've two steps in checkpoint: 1. snapshotState(ckp); 2.
+            // notifyCheckpointComplete(ckp).
+            // It's possible that flink job will restore from a checkpoint with only step#1 finished
+            // and
+            // step#2 not.
+            // CommitterOperator will try to re-commit recovered transactions.
+            committer.commit(commitRequests);
+            List<DataChangeEvent> events =
+                    Arrays.asList(
+                            DataChangeEvent.insertEvent(
+                                    table1,
+                                    generator.generate(
+                                            new Object[] {
+                                                BinaryStringData.fromString(Integer.toString(i)),
+                                                BinaryStringData.fromString(Integer.toString(i))
+                                            })));
+            Assertions.assertDoesNotThrow(
+                    () -> {
+                        for (Event event : events) {
+                            writer.write(event, null);
+                        }
+                    });
+            writer.flush(false);
+            // Checkpoint id start from 1
+            committer.commit(
+                    writer.prepareCommit().stream()
+                            .map(this::correctCheckpointId)
+                            .map(MockCommitRequestImpl::new)
+                            .collect(Collectors.toList()));
+        }
+
+        List<Row> result = new ArrayList<>();
+        tEnv.sqlQuery("select * from paimon_catalog.test.`table1$snapshots`")
+                .execute()
+                .collect()
+                .forEachRemaining(result::add);
+        // 8 APPEND and 1 COMPACT
+        Assertions.assertEquals(result.size(), 9);
+        result.clear();
+
+        tEnv.sqlQuery("select * from paimon_catalog.test.`table1`")
+                .execute()
+                .collect()
+                .forEachRemaining(result::add);
+        Assertions.assertEquals(
+                Arrays.asList(
+                        Row.ofKind(RowKind.INSERT, "1", "1"),
+                        Row.ofKind(RowKind.INSERT, "2", "2"),
+                        Row.ofKind(RowKind.INSERT, "3", "3"),
+                        Row.ofKind(RowKind.INSERT, "4", "4"),
+                        Row.ofKind(RowKind.INSERT, "5", "5"),
+                        Row.ofKind(RowKind.INSERT, "6", "6"),
+                        Row.ofKind(RowKind.INSERT, "7", "7"),
+                        Row.ofKind(RowKind.INSERT, "8", "8")),
+                result);
+    }
+
+    private MultiTableCommittable correctCheckpointId(MultiTableCommittable committable) {
+        // update the right checkpointId for MultiTableCommittable
+        return new MultiTableCommittable(
+                committable.getDatabase(),
+                committable.getTable(),
+                checkpointId++,
+                committable.kind(),
+                committable.wrappedCommittable());
+    }
+
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {
 
         protected MockCommitRequestImpl(CommT committable) {
-            super(committable);
+            super(
+                    committable,
+                    InternalSinkCommitterMetricGroup.wrap(
+                            UnregisteredMetricsGroup.createOperatorMetricGroup()));
         }
     }
 
@@ -516,6 +649,16 @@ public class PaimonSinkITCase {
         }
 
         public JobID getJobId() {
+            return null;
+        }
+
+        @Override
+        public JobInfo getJobInfo() {
+            return null;
+        }
+
+        @Override
+        public TaskInfo getTaskInfo() {
             return null;
         }
     }

@@ -107,7 +107,10 @@ public class FlinkPipelineComposer implements PipelineComposer {
         TransformTranslator transformTranslator = new TransformTranslator();
         stream =
                 transformTranslator.translatePreTransform(
-                        stream, pipelineDef.getTransforms(), pipelineDef.getUdfs());
+                        stream,
+                        pipelineDef.getTransforms(),
+                        pipelineDef.getUdfs(),
+                        pipelineDef.getModels());
 
         // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
@@ -124,8 +127,9 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 transformTranslator.translatePostTransform(
                         stream,
                         pipelineDef.getTransforms(),
-                        pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
-                        pipelineDef.getUdfs());
+                        pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
+                        pipelineDef.getUdfs(),
+                        pipelineDef.getModels());
 
         // Build DataSink in advance as schema operator requires MetadataApplier
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();

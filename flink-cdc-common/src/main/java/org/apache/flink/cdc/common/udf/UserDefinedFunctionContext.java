@@ -15,17 +15,12 @@
  * limitations under the License.
  */
 
-package com.starrocks.shade.org.apache.commons.compress.utils;
+package org.apache.flink.cdc.common.udf;
 
-import java.util.ArrayList;
+import org.apache.flink.cdc.common.configuration.Configuration;
 
-/**
- * Dummy class of shaded apache-commons since connector 1.2.9 depends on this, but not package it.
- * This package should be removed after upgrading to 1.2.10 which will not use commons-compress
- * anymore.
- */
-public class Lists {
-    public static <E> ArrayList<E> newArrayList() {
-        return new ArrayList<>();
-    }
+/** Context for initialization of {@link UserDefinedFunction}. */
+public interface UserDefinedFunctionContext {
+
+    Configuration configuration();
 }

@@ -27,6 +27,7 @@ import org.apache.paimon.options.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -49,7 +50,8 @@ public class PaimonCommitter implements Committer<MultiTableCommittable> {
     }
 
     @Override
-    public void commit(Collection<CommitRequest<MultiTableCommittable>> commitRequests) {
+    public void commit(Collection<CommitRequest<MultiTableCommittable>> commitRequests)
+            throws IOException {
         if (commitRequests.isEmpty()) {
             return;
         }
@@ -60,27 +62,23 @@ public class PaimonCommitter implements Committer<MultiTableCommittable> {
                         .collect(Collectors.toList());
         // All CommitRequest shared the same checkpointId.
         long checkpointId = committables.get(0).checkpointId();
-        int retriedNumber = commitRequests.stream().findFirst().get().getNumberOfRetries();
         WrappedManifestCommittable wrappedManifestCommittable =
                 storeMultiCommitter.combine(checkpointId, 1L, committables);
         try {
-            if (retriedNumber > 0) {
-                storeMultiCommitter.filterAndCommit(
-                        Collections.singletonList(wrappedManifestCommittable));
-            } else {
-                storeMultiCommitter.commit(Collections.singletonList(wrappedManifestCommittable));
-            }
+            storeMultiCommitter.filterAndCommit(
+                    Collections.singletonList(wrappedManifestCommittable));
             commitRequests.forEach(CommitRequest::signalAlreadyCommitted);
             LOGGER.info(
-                    String.format(
-                            "Commit succeeded for %s with %s committable",
-                            checkpointId, committables.size()));
+                    "Commit succeeded for {} with {} committable",
+                    checkpointId,
+                    committables.size());
         } catch (Exception e) {
             commitRequests.forEach(CommitRequest::retryLater);
             LOGGER.warn(
-                    String.format(
-                            "Commit failed for %s with %s committable",
-                            checkpointId, committables.size()));
+                    "Commit failed for {} with {} committable",
+                    checkpointId,
+                    committables.size(),
+                    e);
         }
     }
 

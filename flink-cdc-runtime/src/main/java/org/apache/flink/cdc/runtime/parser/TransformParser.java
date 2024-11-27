@@ -36,6 +36,7 @@ import org.apache.calcite.prepare.CalciteCatalogReader;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
@@ -123,10 +124,11 @@ public class TransformParser {
                 if (udf.getReturnTypeHint() != null) {
                     // This UDF has return type hint annotation
                     returnTypeInference =
-                            o ->
-                                    o.getTypeFactory()
-                                            .createSqlType(
-                                                    convertCalciteType(udf.getReturnTypeHint()));
+                            o -> {
+                                RelDataTypeFactory typeFactory = o.getTypeFactory();
+                                DataType returnTypeHint = udf.getReturnTypeHint();
+                                return convertCalciteType(typeFactory, returnTypeHint);
+                            };
                 } else {
                     // Infer it from eval method return type
                     returnTypeInference = o -> function.getReturnType(o.getTypeFactory());
@@ -588,7 +590,8 @@ public class TransformParser {
 
     public static boolean hasAsterisk(@Nullable String projection) {
         if (isNullOrWhitespaceOnly(projection)) {
-            return false;
+            // Providing an empty projection expression is equivalent to writing `*` explicitly.
+            return true;
         }
         return parseProjectionExpression(projection).getOperandList().stream()
                 .anyMatch(TransformParser::hasAsterisk);

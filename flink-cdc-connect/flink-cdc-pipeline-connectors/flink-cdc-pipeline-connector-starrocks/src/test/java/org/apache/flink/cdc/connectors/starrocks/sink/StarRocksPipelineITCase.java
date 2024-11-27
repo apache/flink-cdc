@@ -21,6 +21,7 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -42,6 +43,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 
@@ -71,7 +73,12 @@ public class StarRocksPipelineITCase extends StarRocksSinkTestBase {
 
         LOG.info("Database {} created.", StarRocksContainer.STARROCKS_DATABASE_NAME);
 
-        List<String> schema = Arrays.asList("id INT NOT NULL", "number DOUBLE", "name VARCHAR(51)");
+        List<String> schema =
+                Arrays.asList(
+                        "id INT NOT NULL",
+                        "number DOUBLE",
+                        "name VARCHAR(51)",
+                        "birthday DATETIME");
 
         executeSql(
                 String.format(
@@ -107,43 +114,76 @@ public class StarRocksPipelineITCase extends StarRocksSinkTestBase {
                         .column(new PhysicalColumn("id", DataTypes.INT(), null))
                         .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
                         .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .column(new PhysicalColumn("birthday", DataTypes.TIMESTAMP_LTZ(6), null))
                         .primaryKey("id")
                         .build();
         BinaryRecordDataGenerator generator =
                 new BinaryRecordDataGenerator(
-                        RowType.of(DataTypes.INT(), DataTypes.DOUBLE(), DataTypes.VARCHAR(17)));
+                        RowType.of(
+                                DataTypes.INT(),
+                                DataTypes.DOUBLE(),
+                                DataTypes.VARCHAR(17),
+                                DataTypes.TIMESTAMP_LTZ(6)));
 
         return Arrays.asList(
                 new CreateTableEvent(tableId, schema),
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
-                                new Object[] {17, 3.14, BinaryStringData.fromString("StarRocks")})),
-                DataChangeEvent.insertEvent(
-                        tableId,
-                        generator.generate(
                                 new Object[] {
-                                    19, 2.718, BinaryStringData.fromString("Que Sera Sera")
+                                    17,
+                                    3.14,
+                                    BinaryStringData.fromString("StarRocks"),
+                                    LocalZonedTimestampData.fromInstant(
+                                            Instant.parse("2023-01-01T00:00:00.000Z"))
                                 })),
                 DataChangeEvent.insertEvent(
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    21, 1.732, BinaryStringData.fromString("Disenchanted")
+                                    19,
+                                    2.718,
+                                    BinaryStringData.fromString("Que Sera Sera"),
+                                    LocalZonedTimestampData.fromInstant(
+                                            Instant.parse("2023-01-01T00:00:00.000Z"))
+                                })),
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(
+                                new Object[] {
+                                    21,
+                                    1.732,
+                                    BinaryStringData.fromString("Disenchanted"),
+                                    LocalZonedTimestampData.fromInstant(
+                                            Instant.parse("2023-01-01T00:00:00.000Z"))
                                 })),
                 DataChangeEvent.deleteEvent(
                         tableId,
                         generator.generate(
                                 new Object[] {
-                                    19, 2.718, BinaryStringData.fromString("Que Sera Sera")
+                                    19,
+                                    2.718,
+                                    BinaryStringData.fromString("Que Sera Sera"),
+                                    LocalZonedTimestampData.fromInstant(
+                                            Instant.parse("2023-01-01T00:00:00.000Z"))
                                 })),
                 DataChangeEvent.updateEvent(
                         tableId,
                         generator.generate(
-                                new Object[] {17, 3.14, BinaryStringData.fromString("StarRocks")}),
+                                new Object[] {
+                                    17,
+                                    3.14,
+                                    BinaryStringData.fromString("StarRocks"),
+                                    LocalZonedTimestampData.fromInstant(
+                                            Instant.parse("2023-01-01T00:00:00.000Z"))
+                                }),
                         generator.generate(
                                 new Object[] {
-                                    17, 6.28, BinaryStringData.fromString("StarRocks")
+                                    17,
+                                    6.28,
+                                    BinaryStringData.fromString("StarRocks"),
+                                    LocalZonedTimestampData.fromInstant(
+                                            Instant.parse("2023-01-01T00:00:00.000Z"))
                                 })));
     }
 
@@ -170,8 +210,11 @@ public class StarRocksPipelineITCase extends StarRocksSinkTestBase {
 
         env.execute("Values to StarRocks Sink");
 
-        List<String> actual = fetchTableContent(tableId, 3);
-        List<String> expected = Arrays.asList("17 | 6.28 | StarRocks", "21 | 1.732 | Disenchanted");
+        List<String> actual = fetchTableContent(tableId, 4);
+        List<String> expected =
+                Arrays.asList(
+                        "17 | 6.28 | StarRocks | 2023-01-01 00:00:00.0",
+                        "21 | 1.732 | Disenchanted | 2023-01-01 00:00:00.0");
 
         assertEqualsInAnyOrder(expected, actual);
     }
