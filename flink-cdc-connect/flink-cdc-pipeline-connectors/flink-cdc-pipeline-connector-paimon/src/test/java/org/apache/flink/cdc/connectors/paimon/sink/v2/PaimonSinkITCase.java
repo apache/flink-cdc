@@ -128,8 +128,6 @@ public class PaimonSinkITCase {
                                     + "'hadoop-conf-dir'='%s', "
                                     + "'hive-conf-dir'='%s', "
                                     + "'cache-enabled'='false'"
-                                    + "'hive-conf-dir'='%s', "
-                                    + "'cache-enabled'='false' "
                                     + ")",
                             warehouse, HADOOP_CONF_DIR, HIVE_CONF_DIR));
         } else {

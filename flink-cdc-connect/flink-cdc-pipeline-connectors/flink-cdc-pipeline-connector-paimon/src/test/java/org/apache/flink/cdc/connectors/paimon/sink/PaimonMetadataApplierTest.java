@@ -271,10 +271,10 @@ public class PaimonMetadataApplierTest {
                         Arrays.asList(
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
                                 new DataField(1, "col2", DataTypes.STRING()),
-                                new DataField(2, "col3", DataTypes.STRING()),
-                                new DataField(3, "col4", DataTypes.STRING())));
+                                new DataField(2, "col3", DataTypes.STRING().notNull()),
+                                new DataField(3, "col4", DataTypes.STRING().notNull())));
         Assertions.assertEquals(tableSchema, table.rowType());
-        Assertions.assertEquals(Collections.singletonList("col1"), table.primaryKeys());
+        Assertions.assertEquals(Arrays.asList("col1", "col3", "col4"), table.primaryKeys());
         Assertions.assertEquals(Arrays.asList("col3", "col4"), table.partitionKeys());
         Assertions.assertEquals("-1", table.options().get("bucket"));
     }
