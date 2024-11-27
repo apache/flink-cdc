@@ -41,7 +41,7 @@ In order to setup the SQLServer CDC connector, the following table provides depe
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-sqlserver-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-sqlserver-cdc/3.1.0/flink-sql-connector-sqlserver-cdc-3.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-sqlserver-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-sqlserver-cdc/{{< param Version >}}/flink-sql-connector-sqlserver-cdc-{{< param Version >}}.jar) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc), more released versions will be available in the Maven central warehouse.
 
