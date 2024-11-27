@@ -54,7 +54,7 @@ public class SingleSplitStrategy implements SplitStrategy {
         SnapshotSplit snapshotSplit =
                 new SnapshotSplit(
                         collectionId,
-                        splitId(collectionId, 0),
+                        0,
                         shardKeysToRowType(singleton(ID_FIELD)),
                         ChunkUtils.minLowerBoundOfId(),
                         ChunkUtils.maxUpperBoundOfId(),

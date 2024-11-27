@@ -152,7 +152,7 @@ public class PendingSplitsStateSerializerTest {
     private SchemalessSnapshotSplit constuctSchemalessSnapshotSplit() {
         return new SchemalessSnapshotSplit(
                 tableId,
-                "test",
+                tableId.toString() + ":0",
                 new RowType(
                         Collections.singletonList(new RowType.RowField("id", new BigIntType()))),
                 null,
