@@ -190,7 +190,7 @@ public class PendingSplitsStateSerializerTest {
             TableId tableId, int splitNo) {
         return new MySqlSchemalessSnapshotSplit(
                 tableId,
-                tableId.toString() + "-" + splitNo,
+                tableId.toString() + ":" + splitNo,
                 new RowType(
                         Collections.singletonList(new RowType.RowField("id", new BigIntType()))),
                 new Object[] {100L + splitNo * 1000L},
