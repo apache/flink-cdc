@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceOutput;
+import org.apache.flink.api.connector.source.util.ratelimit.RateLimiter;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
@@ -54,6 +55,8 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
     private final boolean includeSchemaChanges;
     private final OutputCollector<T> outputCollector;
 
+    private RateLimiter rateLimiter;
+
     public MySqlRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
@@ -71,6 +74,9 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         final Iterator<SourceRecord> elementIterator = sourceRecords.iterator();
         while (elementIterator.hasNext()) {
             processElement(elementIterator.next(), output, splitState);
+            if (rateLimiter != null) {
+                rateLimiter.acquire().toCompletableFuture().join();
+            }
         }
     }
 
@@ -157,5 +163,9 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         public void close() {
             // do nothing
         }
+    }
+
+    public void setRateLimiter(RateLimiter rateLimiter) {
+        this.rateLimiter = rateLimiter;
     }
 }
