@@ -109,14 +109,14 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     @Test
     public void testMysql57JsonDataTypes() throws Throwable {
         // Set `useLegacyJsonFormat` as false, so the json string will have no whitespace
-        // before value and after comma in json format.be formatted with legacy format.
+        // before value and after comma in json format be formatted with legacy format.
         testJsonDataType(fullTypesMySql57Database, false);
     }
 
     @Test
     public void testMysql57JsonDataTypesWithUseLegacyJsonFormat() throws Throwable {
         // Set `useLegacyJsonFormat` as true, so the json string will have whitespace before
-        // value and after comma in json format.be formatted with legacy format.
+        // value and after comma in json format be formatted with legacy format.
         testJsonDataType(fullTypesMySql57Database, true);
     }
 
@@ -128,14 +128,14 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     @Test
     public void testMySql8JsonDataTypes() throws Throwable {
         // Set `useLegacyJsonFormat` as false, so the json string will have no whitespace
-        // before value and after comma in json format.be formatted with legacy format.
+        // before value and after comma in json format be formatted with legacy format.
         testJsonDataType(fullTypesMySql8Database, false);
     }
 
     @Test
     public void testMySql8JsonDataTypesWithUseLegacyJsonFormat() throws Throwable {
         // Set `useLegacyJsonFormat` as true, so the json string will have whitespace before
-        // value and after comma in json format.be formatted with legacy format.
+        // value and after comma in json format be formatted with legacy format.
         testJsonDataType(fullTypesMySql8Database, true);
     }
 
@@ -539,6 +539,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         expectedSnapshot[4] = null;
 
         if (useLegacyJsonFormat) {
+            // removed whitespace before value and after comma in json format string value
             Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, JSON_TYPES))
                     .containsExactly(
                             DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
