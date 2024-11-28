@@ -131,8 +131,12 @@ public class StatementUtils {
     }
 
     public static String buildSplitScanQuery(
-            TableId tableId, RowType pkRowType, boolean isFirstSplit, boolean isLastSplit) {
-        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, true);
+            TableId tableId,
+            RowType pkRowType,
+            boolean isFirstSplit,
+            boolean isLastSplit,
+            String projection) {
+        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, true, projection);
     }
 
     private static String buildSplitQuery(
@@ -141,7 +145,8 @@ public class StatementUtils {
             boolean isFirstSplit,
             boolean isLastSplit,
             int limitSize,
-            boolean isScanningData) {
+            boolean isScanningData,
+            String projection) {
         final String condition;
 
         if (isFirstSplit && isLastSplit) {
@@ -174,7 +179,11 @@ public class StatementUtils {
 
         if (isScanningData) {
             return buildSelectWithRowLimits(
-                    tableId, limitSize, "*", Optional.ofNullable(condition), Optional.empty());
+                    tableId,
+                    limitSize,
+                    projection,
+                    Optional.ofNullable(condition),
+                    Optional.empty());
         } else {
             final String orderBy =
                     pkRowType.getFieldNames().stream().collect(Collectors.joining(", "));
