@@ -532,22 +532,26 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         }
 
         Object[] expectedStreamRecord = expectedSnapshot;
-
-        if (useLegacyJsonFormat) {
-            expectedSnapshot[1] = BinaryStringData.fromString("{\"key1\":\"value1\"}");
-            expectedSnapshot[2] =
-                    BinaryStringData.fromString("{\"key1\":\"value1\",\"key2\":\"value2\"}");
-            expectedSnapshot[3] =
-                    BinaryStringData.fromString(
-                            "[{\"key1\":\"value1\",\"key2\":{\"key2_1\":\"value2_1\",\"key2_2\":\"value2_2\"},\"key3\":[\"value3\"],\"key4\":[\"value4_1\",\"value4_2\"]},{\"key5\":\"value5\"}]");
-        }
-        expectedSnapshot[4] = null;
-
         List<Event> streamResults =
                 MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
-        Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, JSON_TYPES))
-                .isEqualTo(expectedStreamRecord);
+
+        expectedSnapshot[4] = null;
+
+        if (useLegacyJsonFormat) {
+            Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, JSON_TYPES))
+                    .containsExactly(
+                            DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
+                            BinaryStringData.fromString("{\"key1\":\"value1\"}"),
+                            BinaryStringData.fromString(
+                                    "{\"key1\":\"value1\",\"key2\":\"value2\"}"),
+                            BinaryStringData.fromString(
+                                    "[{\"key1\":\"value1\",\"key2\":{\"key2_1\":\"value2_1\",\"key2_2\":\"value2_2\"},\"key3\":[\"value3\"],\"key4\":[\"value4_1\",\"value4_2\"]},{\"key5\":\"value5\"}]"),
+                            null);
+        } else {
+            Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, JSON_TYPES))
+                    .containsExactly(expectedStreamRecord);
+        }
     }
 
     private Instant toInstant(String ts) {
