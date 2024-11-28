@@ -28,7 +28,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceCon
 /**
  * Copied from mysql-binlog-connector-java 0.27.2 to add whitespace before value and after comma.
  *
- * <p>Line 105: Added whitespace before value, Line 207: Added whitespace after comma
+ * <p>Line 105: Added whitespace before value, Line 213: Added whitespace after comma
  */
 public class JsonStringFormatter implements JsonFormatter {
 
