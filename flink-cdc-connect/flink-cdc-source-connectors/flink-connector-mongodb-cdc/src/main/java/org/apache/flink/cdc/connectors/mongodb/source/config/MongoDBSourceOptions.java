@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mongodb.source.config;
 
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.mongodb.source.MongoDBSource;
+import org.apache.flink.cdc.connectors.mongodb.source.assigners.splitters.AssignStrategy;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
@@ -157,4 +158,12 @@ public class MongoDBSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "MongoDB server normally times out idle cursors after an inactivity period (10 minutes) to prevent excess memory use. Set this option to true to prevent that.");
+
+    public static final ConfigOption<AssignStrategy> SCAN_CHUNK_ASSIGN_STRATEGY =
+            ConfigOptions.key("scan.chunk.assign.strategy")
+                    .enumType(AssignStrategy.class)
+                    .defaultValue(AssignStrategy.DESCENDING_ORDER)
+                    .withDescription(
+                            "Optional assign strategy for MySqlSnapshotSplitAssigner, valid enumerations are "
+                                    + "\"ascending_order\", \"descending_order\"");
 }

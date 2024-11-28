@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.source.config;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.connectors.mysql.debezium.EmbeddedFlinkDatabaseHistory;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
+import org.apache.flink.cdc.connectors.mysql.source.assigners.AssignStrategy;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.catalog.ObjectPath;
 
@@ -70,6 +71,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Properties dbzProperties;
     private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
     private boolean skipSnapshotBackfill = false;
+
+    private AssignStrategy scanChunkAssignStrategy = AssignStrategy.DESCENDING_ORDER;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -291,6 +294,11 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** How to assign splits to split reader. */
+    public void scanChunkAssignStrategy(AssignStrategy scanChunkAssignStrategy) {
+        this.scanChunkAssignStrategy = scanChunkAssignStrategy;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -384,6 +392,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 props,
                 jdbcProperties,
                 chunkKeyColumns,
-                skipSnapshotBackfill);
+                skipSnapshotBackfill,
+                scanChunkAssignStrategy);
     }
 }
