@@ -1138,4 +1138,14 @@ The example for different spatial data types mapping is as follows:
 </table>
 </div>
 
+## Metrics 
+The mysql-cdc connector offers six additional metrics for each type of data change record.
+- `numRecordsOutByDataChangeRecordInsert`: The number of `INSERT` data change records.
+- `numRecordsOutByDataChangeRecordUpdate`: The number of `UPDATE` data change records.
+- `numRecordsOutByDataChangeRecordDelete`: The number of `DELETE` data change records.
+- `numRecordsOutByRateDataChangeRecordInsert`: The number of `INSERT` data change records per second.
+- `numRecordsOutByRateDataChangeRecordUpdate`: The number of `UPDATE` data change records per second.
+- `numRecordsOutByRateDataChangeRecordDelete`: The number of `DELETE` data change records per second.
+
+
 {{< top >}}

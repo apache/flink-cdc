@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceOutput;
+import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
@@ -28,9 +29,12 @@ import org.apache.flink.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.util.Collector;
 
+import io.debezium.data.Envelope;
 import io.debezium.document.Array;
+import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
 import io.debezium.relational.history.TableChanges;
+import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -120,13 +124,32 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
 
-    private void reportMetrics(SourceRecord element) {
-
-        Long messageTimestamp = RecordUtils.getMessageTimestamp(element);
+    private void reportMetrics(SourceRecord record) {
+        Struct value = (Struct) record.value();
+        if (value != null) {
+            TableId tableId = RecordUtils.getTableId(record);
+            Envelope.Operation op =
+                    Envelope.Operation.forCode(value.getString(Envelope.FieldName.OPERATION));
+            switch (op) {
+                case CREATE:
+                    sourceReaderMetrics.numRecordsOutByDataChangeRecord(
+                            tableId, OperationType.INSERT);
+                    break;
+                case UPDATE:
+                    sourceReaderMetrics.numRecordsOutByDataChangeRecord(
+                            tableId, OperationType.UPDATE);
+                    break;
+                case DELETE:
+                    sourceReaderMetrics.numRecordsOutByDataChangeRecord(
+                            tableId, OperationType.DELETE);
+                    break;
+            }
+        }
+        Long messageTimestamp = RecordUtils.getMessageTimestamp(record);
 
         if (messageTimestamp != null && messageTimestamp > 0L) {
             // report fetch delay
-            Long fetchTimestamp = RecordUtils.getFetchTimestamp(element);
+            Long fetchTimestamp = RecordUtils.getFetchTimestamp(record);
             if (fetchTimestamp != null && fetchTimestamp >= messageTimestamp) {
                 // report fetch delay
                 sourceReaderMetrics.recordFetchDelay(fetchTimestamp - messageTimestamp);
