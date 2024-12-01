@@ -75,7 +75,11 @@ public class DataChangeEventSerializerTest extends SerializerTestBase<DataChange
             DataChangeEvent.updateEvent(
                     TableId.tableId("namespace", "schema", "table"), before, after),
             DataChangeEvent.updateEvent(
-                    TableId.tableId("namespace", "schema", "table"), before, after, meta)
+                    TableId.tableId("namespace", "schema", "table"), null, after),
+            DataChangeEvent.updateEvent(
+                    TableId.tableId("namespace", "schema", "table"), before, after, meta),
+            DataChangeEvent.updateEvent(
+                    TableId.tableId("namespace", "schema", "table"), null, after, meta)
         };
     }
 }
