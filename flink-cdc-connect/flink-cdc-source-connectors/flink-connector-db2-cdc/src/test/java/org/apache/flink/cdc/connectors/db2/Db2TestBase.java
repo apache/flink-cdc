@@ -229,7 +229,7 @@ public class Db2TestBase {
     }
 
     /**
-     * Executes a JDBC statement using the default jdbc config without autocommitting the
+     * Executes a JDBC statement using the default jdbc config without auto committing the
      * connection.
      */
     protected void initializeDb2Table(String sqlFile, String tableName) {

@@ -126,7 +126,7 @@ docker-compose down
  INSERT INTO products(name,description,weight)
  VALUES ('rocks','box of assorted rocks',5.3);
  INSERT INTO products(name,description,weight)
- VALUES ('jacket','water resistent black wind breaker',0.1);
+ VALUES ('jacket','water resistant black wind breaker',0.1);
  INSERT INTO products(name,description,weight)
  VALUES ('spare tire','24 inch spare tire',22.2);
  EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'products', @role_name = NULL, @supports_net_changes = 0;
