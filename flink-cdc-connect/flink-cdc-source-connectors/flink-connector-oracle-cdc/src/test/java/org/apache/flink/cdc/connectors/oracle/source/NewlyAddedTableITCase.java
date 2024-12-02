@@ -60,7 +60,7 @@ import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.w
 import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.waitForUpsertSinkSize;
 
 /** IT tests to cover various newly added tables during capture process. */
-@Timeout(600)
+@Timeout(value = 600, unit = TimeUnit.SECONDS)
 class NewlyAddedTableITCase extends OracleSourceTestBase {
 
     private final ScheduledExecutorService mockRedoLogExecutor =

@@ -64,7 +64,7 @@ import static java.lang.String.format;
  * IT tests to cover various newly added tables during capture process. Ignore this test because
  * this test will pass until close
  */
-@Timeout(300)
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 class NewlyAddedTableITCase extends PostgresTestBase {
 
     private static final String DB_NAME_PREFIX = "postgres";

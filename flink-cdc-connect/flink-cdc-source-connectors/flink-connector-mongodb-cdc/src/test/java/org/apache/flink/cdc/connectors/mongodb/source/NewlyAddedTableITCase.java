@@ -62,7 +62,7 @@ import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLI
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests to cover various newly added collections during capture process. */
-@Timeout(500)
+@Timeout(value = 500, unit = TimeUnit.SECONDS)
 class NewlyAddedTableITCase extends MongoDBSourceTestBase {
 
     private String customerDatabase;

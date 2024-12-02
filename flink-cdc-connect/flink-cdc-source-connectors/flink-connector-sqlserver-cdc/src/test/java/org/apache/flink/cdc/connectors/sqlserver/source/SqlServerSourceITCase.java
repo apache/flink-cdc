@@ -48,6 +48,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -59,7 +60,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** IT tests for {@link SqlServerSourceBuilder.SqlServerIncrementalSource}. */
-@Timeout(300)
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 class SqlServerSourceITCase extends SqlServerSourceTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(SqlServerSourceITCase.class);

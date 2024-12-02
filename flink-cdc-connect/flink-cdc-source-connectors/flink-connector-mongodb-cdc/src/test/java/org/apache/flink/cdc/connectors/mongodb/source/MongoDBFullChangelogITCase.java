@@ -54,6 +54,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertEqualsInAnyOrder;
@@ -69,7 +70,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 import static org.assertj.core.api.Assumptions.assumeThat;
 
 /** Integration tests for MongoDB full document before change info. */
-@Timeout(300)
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
 
     private static final int USE_POST_LOWWATERMARK_HOOK = 1;

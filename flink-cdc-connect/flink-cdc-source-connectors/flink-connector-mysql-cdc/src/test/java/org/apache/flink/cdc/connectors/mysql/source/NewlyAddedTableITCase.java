@@ -82,7 +82,7 @@ import static org.apache.flink.api.common.restartstrategy.RestartStrategies.noRe
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests to cover various newly added tables during capture process. */
-@Timeout(300)
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 class NewlyAddedTableITCase extends MySqlSourceTestBase {
 
     private final UniqueDatabase customDatabase =

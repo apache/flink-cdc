@@ -64,6 +64,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -78,7 +79,7 @@ import static org.apache.flink.table.catalog.Column.physical;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests for {@link PostgresSourceBuilder.PostgresIncrementalSource}. */
-@Timeout(300)
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 class PostgresSourceITCase extends PostgresTestBase {
 
     private static final String DEFAULT_SCAN_STARTUP_MODE = "initial";

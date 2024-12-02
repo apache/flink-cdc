@@ -41,12 +41,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static java.lang.String.format;
 import static org.testcontainers.containers.Db2Container.DB2_PORT;
 
 /** IT tests for {@link Db2IncrementalSource}. */
-@Timeout(value = 300)
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 class Db2SourceITCase extends Db2TestBase {
 
     @RegisterExtension

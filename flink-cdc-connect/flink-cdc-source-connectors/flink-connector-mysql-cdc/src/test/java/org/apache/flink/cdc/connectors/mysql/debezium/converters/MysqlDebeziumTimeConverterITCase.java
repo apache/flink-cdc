@@ -62,13 +62,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import static java.lang.String.format;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInAnyOrder;
 
 /** Test for {@link MysqlDebeziumTimeConverter}. */
-@Timeout(300)
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 class MysqlDebeziumTimeConverterITCase {
 
     private Path tempFolder;

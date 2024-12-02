@@ -49,6 +49,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.Collections.singletonList;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.FULL_DOCUMENT_FIELD;
@@ -63,7 +64,7 @@ import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLI
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 
 /** MongoDB stream split reader test case. */
-@Timeout(300)
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 class MongoDBStreamSplitReaderTest extends MongoDBSourceTestBase {
 
     private static final String STREAM_SPLIT_ID = "stream-split";

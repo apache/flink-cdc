@@ -105,7 +105,7 @@ import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests for {@link MySqlSource}. */
-@Timeout(300)
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 class MySqlSourceITCase extends MySqlSourceTestBase {
 
     public static final Duration TIMEOUT = Duration.ofSeconds(300);
