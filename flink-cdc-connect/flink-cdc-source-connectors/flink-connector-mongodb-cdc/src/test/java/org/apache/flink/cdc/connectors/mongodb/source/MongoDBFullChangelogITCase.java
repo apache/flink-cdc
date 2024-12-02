@@ -67,7 +67,6 @@ import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.assertj.core.api.Assumptions.assumeThat;
 
 /** Integration tests for MongoDB full document before change info. */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
@@ -139,79 +138,64 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
     }
 
     // Failover tests
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testTaskManagerFailoverInSnapshotPhase(boolean parallelismSnapshot) throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
+    @Test
+    void testTaskManagerFailoverInSnapshotPhase() throws Exception {
         testMongoDBParallelSource(
                 MongoDBTestUtils.FailoverType.TM,
                 MongoDBTestUtils.FailoverPhase.SNAPSHOT,
                 new String[] {"customers", "customers_1"},
-                parallelismSnapshot);
+                true);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testTaskManagerFailoverInStreamPhase(boolean parallelismSnapshot) throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
+    @Test
+    void testTaskManagerFailoverInStreamPhase() throws Exception {
         testMongoDBParallelSource(
                 MongoDBTestUtils.FailoverType.TM,
                 MongoDBTestUtils.FailoverPhase.STREAM,
                 new String[] {"customers", "customers_1"},
-                parallelismSnapshot);
+                true);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testJobManagerFailoverInSnapshotPhase(boolean parallelismSnapshot) throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
+    @Test
+    void testJobManagerFailoverInSnapshotPhase() throws Exception {
         testMongoDBParallelSource(
                 MongoDBTestUtils.FailoverType.JM,
                 MongoDBTestUtils.FailoverPhase.SNAPSHOT,
                 new String[] {"customers", "customers_1"},
-                parallelismSnapshot);
+                true);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testJobManagerFailoverInStreamPhase(boolean parallelismSnapshot) throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
+    @Test
+    void testJobManagerFailoverInStreamPhase() throws Exception {
         testMongoDBParallelSource(
                 MongoDBTestUtils.FailoverType.JM,
                 MongoDBTestUtils.FailoverPhase.STREAM,
                 new String[] {"customers", "customers_1"},
-                parallelismSnapshot);
+                true);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testTaskManagerFailoverSingleParallelism(boolean parallelismSnapshot) throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
+    @Test
+    void testTaskManagerFailoverSingleParallelism() throws Exception {
         testMongoDBParallelSource(
                 1,
                 MongoDBTestUtils.FailoverType.TM,
                 MongoDBTestUtils.FailoverPhase.SNAPSHOT,
                 new String[] {"customers"},
-                parallelismSnapshot);
+                true);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testJobManagerFailoverSingleParallelism(boolean parallelismSnapshot) throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
+    @Test
+    void testJobManagerFailoverSingleParallelism() throws Exception {
         testMongoDBParallelSource(
                 1,
                 MongoDBTestUtils.FailoverType.JM,
                 MongoDBTestUtils.FailoverPhase.SNAPSHOT,
                 new String[] {"customers"},
-                parallelismSnapshot);
+                true);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testReadSingleTableWithSingleParallelismAndSkipBackfill(boolean parallelismSnapshot)
-            throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
+    @Test
+    void testReadSingleTableWithSingleParallelismAndSkipBackfill() throws Exception {
         testMongoDBParallelSource(
                 DEFAULT_PARALLELISM,
                 MongoDBTestUtils.FailoverType.TM,
@@ -220,11 +204,8 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                 true);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testSnapshotOnlyModeWithDMLPostHighWaterMark(boolean parallelismSnapshot)
-            throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
+    @Test
+    void testSnapshotOnlyModeWithDMLPostHighWaterMark() throws Exception {
         // The data num is 21, set fetchSize = 22 to test whether the job is bounded.
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -255,10 +236,8 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testSnapshotOnlyModeWithDMLPreHighWaterMark(boolean parallelismSnapshot) throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
+    @Test
+    void testSnapshotOnlyModeWithDMLPreHighWaterMark() throws Exception {
         // The data num is 21, set fetchSize = 22 to test whether the job is bounded
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -291,11 +270,8 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testEnableBackfillWithDMLPreHighWaterMark(boolean parallelismSnapshot) throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
-
+    @Test
+    void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
         List<String> records =
                 testBackfillWhenWritingEvents(
                         false, 21, USE_PRE_HIGHWATERMARK_HOOK, StartupOptions.initial());
@@ -328,11 +304,8 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testEnableBackfillWithDMLPostLowWaterMark(boolean parallelismSnapshot) throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
-
+    @Test
+    void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
         List<String> records =
                 testBackfillWhenWritingEvents(
                         false, 21, USE_POST_LOWWATERMARK_HOOK, StartupOptions.initial());
@@ -365,10 +338,8 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testEnableBackfillWithDMLPostHighWaterMark(boolean parallelismSnapshot) throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
+    @Test
+    void testEnableBackfillWithDMLPostHighWaterMark() throws Exception {
         List<String> records =
                 testBackfillWhenWritingEvents(
                         false, 25, USE_POST_HIGHWATERMARK_HOOK, StartupOptions.initial());
@@ -402,11 +373,8 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testSkipBackfillWithDMLPreHighWaterMark(boolean parallelismSnapshot) throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
-
+    @Test
+    void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
         List<String> records =
                 testBackfillWhenWritingEvents(
                         true, 25, USE_PRE_HIGHWATERMARK_HOOK, StartupOptions.initial());
@@ -443,11 +411,8 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest(name = "parallelismSnapshot: {0}")
-    @ValueSource(booleans = {true, false})
-    void testSkipBackfillWithDMLPostLowWaterMark(boolean parallelismSnapshot) throws Exception {
-        assumeThat(parallelismSnapshot).isTrue();
-
+    @Test
+    void testSkipBackfillWithDMLPostLowWaterMark() throws Exception {
         List<String> records =
                 testBackfillWhenWritingEvents(
                         true, 25, USE_POST_LOWWATERMARK_HOOK, StartupOptions.initial());
