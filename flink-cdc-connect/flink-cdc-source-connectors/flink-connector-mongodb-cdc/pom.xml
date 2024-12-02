@@ -180,13 +180,6 @@ limitations under the License.
             <artifactId>commons-lang3</artifactId>
             <version>${commons-lang3.version}</version>
         </dependency>
-        <dependency>
-            <groupId>ant</groupId>
-            <artifactId>ant</artifactId>
-            <version>1.6.5</version>
-            <scope>test</scope>
-        </dependency>
-
     </dependencies>
 
     <build>
