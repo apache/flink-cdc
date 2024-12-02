@@ -112,10 +112,16 @@ public class MigrationTestBase {
         Object toVersionMockObject = toVersionMockClass.newInstance();
 
         Assertions.assertThat(
-                        toVersionMockClass
-                                .getDeclaredMethod(
-                                        "deserializeAndCheckObject", int.class, byte[].class)
-                                .invoke(toVersionMockObject, serializerVersion, serializedObject))
-                .isEqualTo(true);
+                        (boolean)
+                                toVersionMockClass
+                                        .getDeclaredMethod(
+                                                "deserializeAndCheckObject",
+                                                int.class,
+                                                byte[].class)
+                                        .invoke(
+                                                toVersionMockObject,
+                                                serializerVersion,
+                                                serializedObject))
+                .isTrue();
     }
 }

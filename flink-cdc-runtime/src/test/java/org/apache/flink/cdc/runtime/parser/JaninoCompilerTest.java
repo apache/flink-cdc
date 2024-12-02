@@ -45,7 +45,8 @@ class JaninoCompilerTest {
         ExpressionEvaluator expressionEvaluator = new ExpressionEvaluator();
         expressionEvaluator.cook(parser);
         Object evaluate = expressionEvaluator.evaluate();
-        Assertions.assertThat(evaluate).isEqualTo(false);
+        Assertions.assertThat(evaluate).isExactlyInstanceOf(Boolean.class);
+        Assertions.assertThat((Boolean) evaluate).isFalse();
     }
 
     @Test
@@ -76,7 +77,8 @@ class JaninoCompilerTest {
                 JaninoCompiler.compileExpression(
                         expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assertions.assertThat(evaluate).isEqualTo(true);
+        Assertions.assertThat(evaluate).isExactlyInstanceOf(Boolean.class);
+        Assertions.assertThat((Boolean) evaluate).isTrue();
     }
 
     @Test
@@ -89,7 +91,8 @@ class JaninoCompilerTest {
                 JaninoCompiler.compileExpression(
                         expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assertions.assertThat(evaluate).isEqualTo(true);
+        Assertions.assertThat(evaluate).isExactlyInstanceOf(Boolean.class);
+        Assertions.assertThat((Boolean) evaluate).isTrue();
     }
 
     @Test
@@ -102,7 +105,8 @@ class JaninoCompilerTest {
                 JaninoCompiler.compileExpression(
                         expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assertions.assertThat(evaluate).isEqualTo(true);
+        Assertions.assertThat(evaluate).isExactlyInstanceOf(Boolean.class);
+        Assertions.assertThat((Boolean) evaluate).isTrue();
     }
 
     @Test
