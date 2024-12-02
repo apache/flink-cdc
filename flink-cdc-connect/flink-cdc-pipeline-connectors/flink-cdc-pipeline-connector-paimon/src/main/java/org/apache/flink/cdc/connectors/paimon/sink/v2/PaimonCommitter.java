@@ -45,8 +45,8 @@ public class PaimonCommitter implements Committer<MultiTableCommittable> {
         storeMultiCommitter =
                 new StoreMultiCommitter(
                         () -> FlinkCatalogFactory.createPaimonCatalog(catalogOptions),
-                        commitUser,
-                        null);
+                        org.apache.paimon.flink.sink.Committer.createContext(
+                                commitUser, null, true, false, null));
     }
 
     @Override
