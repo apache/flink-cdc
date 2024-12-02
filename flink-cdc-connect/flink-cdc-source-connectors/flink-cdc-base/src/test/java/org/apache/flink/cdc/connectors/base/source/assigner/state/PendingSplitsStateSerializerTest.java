@@ -42,6 +42,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit.generateSplitId;
+
 /** Tests for {@link PendingSplitsStateSerializer}. */
 public class PendingSplitsStateSerializerTest {
 
@@ -152,7 +154,7 @@ public class PendingSplitsStateSerializerTest {
     private SchemalessSnapshotSplit constuctSchemalessSnapshotSplit() {
         return new SchemalessSnapshotSplit(
                 tableId,
-                "test",
+                generateSplitId(tableId, 0),
                 new RowType(
                         Collections.singletonList(new RowType.RowField("id", new BigIntType()))),
                 null,

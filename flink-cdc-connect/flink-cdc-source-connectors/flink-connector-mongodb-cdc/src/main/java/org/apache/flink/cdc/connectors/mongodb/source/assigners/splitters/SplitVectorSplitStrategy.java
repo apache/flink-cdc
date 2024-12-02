@@ -113,7 +113,7 @@ public class SplitVectorSplitStrategy implements SplitStrategy {
             snapshotSplits.add(
                     new SnapshotSplit(
                             collectionId,
-                            splitId(collectionId, i),
+                            i,
                             rowType,
                             ChunkUtils.boundOfId(lowerValue),
                             ChunkUtils.boundOfId(splitKeyValue),
@@ -125,7 +125,7 @@ public class SplitVectorSplitStrategy implements SplitStrategy {
         SnapshotSplit lastSplit =
                 new SnapshotSplit(
                         collectionId,
-                        splitId(collectionId, splitKeys.size()),
+                        splitKeys.size(),
                         rowType,
                         ChunkUtils.boundOfId(lowerValue),
                         ChunkUtils.maxUpperBoundOfId(),
