@@ -262,6 +262,10 @@ public class JaninoCompiler {
                 return generateBinaryOperation(sqlBasicCall, atoms, sqlBasicCall.getKind().sql);
             case CAST:
                 return generateCastOperation(sqlBasicCall, atoms);
+            case TIMESTAMP_DIFF:
+                return generateTimestampDiffOperation(sqlBasicCall, atoms);
+            case TIMESTAMP_ADD:
+                return generateTimestampAddOperation(sqlBasicCall, atoms);
             case OTHER:
                 return generateOtherOperation(sqlBasicCall, atoms);
             default:
@@ -298,6 +302,65 @@ public class JaninoCompiler {
         List<SqlNode> operandList = sqlBasicCall.getOperandList();
         SqlDataTypeSpec sqlDataTypeSpec = (SqlDataTypeSpec) operandList.get(1);
         return generateTypeConvertMethod(sqlDataTypeSpec, atoms);
+    }
+
+    private static Java.Rvalue generateTimestampDiffOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (atoms.length != 3) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        String symbol = atoms[0].toString();
+        switch (symbol) {
+            case "\"SECOND\"":
+            case "\"MINUTE\"":
+            case "\"HOUR\"":
+            case "\"DAY\"":
+            case "\"MONTH\"":
+            case "\"YEAR\"":
+                break;
+            default:
+                throw new ParseException(
+                        "Unsupported symbol in timestamp diff function: " + symbol);
+        }
+        List<Java.Rvalue> timestampDiffFunctionParam = new ArrayList<>();
+        timestampDiffFunctionParam.add(
+                new Java.AmbiguousName(Location.NOWHERE, new String[] {symbol}));
+        timestampDiffFunctionParam.add(atoms[1]);
+        timestampDiffFunctionParam.add(atoms[2]);
+        return new Java.MethodInvocation(
+                Location.NOWHERE,
+                null,
+                StringUtils.convertToCamelCase("TIMESTAMPDIFF"),
+                timestampDiffFunctionParam.toArray(new Java.Rvalue[0]));
+    }
+
+    private static Java.Rvalue generateTimestampAddOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (atoms.length != 3) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        String symbol = atoms[0].toString();
+        switch (symbol) {
+            case "\"SECOND\"":
+            case "\"MINUTE\"":
+            case "\"HOUR\"":
+            case "\"DAY\"":
+            case "\"MONTH\"":
+            case "\"YEAR\"":
+                break;
+            default:
+                throw new ParseException("Unsupported symbol in timestamp add function: " + symbol);
+        }
+        List<Java.Rvalue> timestampDiffFunctionParam = new ArrayList<>();
+        timestampDiffFunctionParam.add(
+                new Java.AmbiguousName(Location.NOWHERE, new String[] {symbol}));
+        timestampDiffFunctionParam.add(atoms[1]);
+        timestampDiffFunctionParam.add(atoms[2]);
+        return new Java.MethodInvocation(
+                Location.NOWHERE,
+                null,
+                StringUtils.convertToCamelCase("TIMESTAMPADD"),
+                timestampDiffFunctionParam.toArray(new Java.Rvalue[0]));
     }
 
     private static Java.Rvalue generateOtherOperation(
