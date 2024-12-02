@@ -126,12 +126,12 @@ public class PostTransformOperatorTest {
     private static final Schema TIMESTAMPADD_SCHEMA =
             Schema.newBuilder()
                     .physicalColumn("col1", DataTypes.STRING())
-                    .physicalColumn("second_add", DataTypes.TIMESTAMP(0))
-                    .physicalColumn("minute_add", DataTypes.TIMESTAMP(0))
-                    .physicalColumn("hour_add", DataTypes.TIMESTAMP(0))
-                    .physicalColumn("day_add", DataTypes.TIMESTAMP(0))
-                    .physicalColumn("month_add", DataTypes.TIMESTAMP(0))
-                    .physicalColumn("year_add", DataTypes.TIMESTAMP(0))
+                    .physicalColumn("second_add", DataTypes.STRING())
+                    .physicalColumn("minute_add", DataTypes.STRING())
+                    .physicalColumn("hour_add", DataTypes.STRING())
+                    .physicalColumn("day_add", DataTypes.STRING())
+                    .physicalColumn("month_add", DataTypes.STRING())
+                    .physicalColumn("year_add", DataTypes.STRING())
                     .primaryKey("col1")
                     .build();
 
@@ -852,23 +852,23 @@ public class PostTransformOperatorTest {
                 PostTransformOperator.newBuilder()
                         .addTransform(
                                 TIMESTAMPADD_TABLEID.identifier(),
-                                "col1, TIMESTAMPADD(SECOND, 1, TO_TIMESTAMP('2024-10-01 00:00:00')) as second_add,"
-                                        + " TIMESTAMPADD(MINUTE, 1, TO_TIMESTAMP('2024-10-01 00:00:00')) as minute_add,"
-                                        + " TIMESTAMPADD(HOUR, 1, TO_TIMESTAMP('2024-10-01 00:00:00')) as hour_add,"
-                                        + " TIMESTAMPADD(DAY, 1, TO_TIMESTAMP('2024-10-01 00:00:00')) as day_add,"
-                                        + " TIMESTAMPADD(MONTH, 1, TO_TIMESTAMP('2024-10-01 00:00:00')) as month_add,"
-                                        + " TIMESTAMPADD(YEAR, 1, TO_TIMESTAMP('2024-10-01 00:00:00')) as year_add",
+                                "col1, DATE_FORMAT(TIMESTAMPADD(SECOND, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as second_add,"
+                                        + " DATE_FORMAT(TIMESTAMPADD(MINUTE, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as minute_add,"
+                                        + " DATE_FORMAT(TIMESTAMPADD(HOUR, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as hour_add,"
+                                        + " DATE_FORMAT(TIMESTAMPADD(DAY, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as day_add,"
+                                        + " DATE_FORMAT(TIMESTAMPADD(MONTH, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as month_add,"
+                                        + " DATE_FORMAT(TIMESTAMPADD(YEAR, 1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as year_add",
                                 "col1='1'")
                         .addTransform(
                                 TIMESTAMPADD_TABLEID.identifier(),
-                                "col1, TIMESTAMPADD(SECOND, -1, TO_TIMESTAMP('2024-10-01 00:00:00')) as second_add,"
-                                        + " TIMESTAMPADD(MINUTE, -1, TO_TIMESTAMP('2024-10-01 00:00:00')) as minute_add,"
-                                        + " TIMESTAMPADD(HOUR, -1, TO_TIMESTAMP('2024-10-01 00:00:00')) as hour_add,"
-                                        + " TIMESTAMPADD(DAY, -1, TO_TIMESTAMP('2024-10-01 00:00:00')) as day_add,"
-                                        + " TIMESTAMPADD(MONTH, -1, TO_TIMESTAMP('2024-10-01 00:00:00')) as month_add,"
-                                        + " TIMESTAMPADD(YEAR, -1, TO_TIMESTAMP('2024-10-01 00:00:00')) as year_add",
+                                "col1, DATE_FORMAT(TIMESTAMPADD(SECOND, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as second_add,"
+                                        + " DATE_FORMAT(TIMESTAMPADD(MINUTE, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as minute_add,"
+                                        + " DATE_FORMAT(TIMESTAMPADD(HOUR, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as hour_add,"
+                                        + " DATE_FORMAT(TIMESTAMPADD(DAY, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as day_add,"
+                                        + " DATE_FORMAT(TIMESTAMPADD(MONTH, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as month_add,"
+                                        + " DATE_FORMAT(TIMESTAMPADD(YEAR, -1, TO_TIMESTAMP('2024-10-01 00:00:00')), 'yyyy-MM-dd HH:mm:ss') as year_add",
                                 "col1='2'")
-                        .addTimezone("Asia/Shanghai")
+                        .addTimezone("UTC")
                         .build();
         EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -894,12 +894,12 @@ public class PostTransformOperatorTest {
                         recordDataGenerator.generate(
                                 new Object[] {
                                     new BinaryStringData("1"),
-                                    TimestampData.fromMillis(1727712001000L),
-                                    TimestampData.fromMillis(1727712060000L),
-                                    TimestampData.fromMillis(1727715600000L),
-                                    TimestampData.fromMillis(1727798400000L),
-                                    TimestampData.fromMillis(1730390400000L),
-                                    TimestampData.fromMillis(1759248000000L)
+                                    new BinaryStringData("2024-10-01 00:00:01"),
+                                    new BinaryStringData("2024-10-01 00:01:00"),
+                                    new BinaryStringData("2024-10-01 01:00:00"),
+                                    new BinaryStringData("2024-10-02 00:00:00"),
+                                    new BinaryStringData("2024-11-01 00:00:00"),
+                                    new BinaryStringData("2025-10-01 00:00:00")
                                 }));
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(
@@ -925,12 +925,12 @@ public class PostTransformOperatorTest {
                         recordDataGenerator.generate(
                                 new Object[] {
                                     new BinaryStringData("2"),
-                                    TimestampData.fromMillis(1727711999000L),
-                                    TimestampData.fromMillis(1727711940000L),
-                                    TimestampData.fromMillis(1727708400000L),
-                                    TimestampData.fromMillis(1727625600000L),
-                                    TimestampData.fromMillis(1725120000000L),
-                                    TimestampData.fromMillis(1696089600000L)
+                                    new BinaryStringData("2024-09-30 23:59:59"),
+                                    new BinaryStringData("2024-09-30 23:59:00"),
+                                    new BinaryStringData("2024-09-30 23:00:00"),
+                                    new BinaryStringData("2024-09-30 00:00:00"),
+                                    new BinaryStringData("2024-09-01 00:00:00"),
+                                    new BinaryStringData("2023-10-01 00:00:00")
                                 }));
 
         transform.processElement(new StreamRecord<>(insertEvent2));
