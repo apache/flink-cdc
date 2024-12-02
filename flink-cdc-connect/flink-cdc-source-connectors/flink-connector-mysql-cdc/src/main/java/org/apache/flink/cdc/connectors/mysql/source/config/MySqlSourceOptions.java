@@ -262,4 +262,12 @@ public class MySqlSourceOptions {
                     .defaultValue(false)
                     .withDescription(
                             "Whether to skip backfill in snapshot reading phase. If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in binlog reading phase instead of being merged into the snapshot. WARNING: Skipping backfill might lead to data inconsistency because some binlog events happened within the snapshot phase might be replayed (only at-least-once semantic is promised). For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed binlog events should be handled specially.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> USE_LEGACY_JSON_FORMAT =
+            ConfigOptions.key("use.legacy.json.format")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Whether to use legacy json format. The default value is true, which means there is no whitespace before value and after comma in json format.");
 }

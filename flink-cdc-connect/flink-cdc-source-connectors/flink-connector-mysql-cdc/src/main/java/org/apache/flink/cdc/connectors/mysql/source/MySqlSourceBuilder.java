@@ -254,6 +254,15 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
+     * Whether to use legacy json format. The default value is true, which means there is no
+     * whitespace before value and after comma in json format.
+     */
+    public MySqlSourceBuilder<T> useLegacyJsonFormat(boolean useLegacyJsonFormat) {
+        this.configFactory.useLegacyJsonFormat(useLegacyJsonFormat);
+        return this;
+    }
+
+    /**
      * Whether to close idle readers at the end of the snapshot phase. This feature depends on
      * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
      * greater than or equal to 1.14, and the configuration <code>
