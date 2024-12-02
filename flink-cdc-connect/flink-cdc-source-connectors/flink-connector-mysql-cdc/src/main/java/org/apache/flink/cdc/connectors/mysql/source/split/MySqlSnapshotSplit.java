@@ -71,7 +71,7 @@ public class MySqlSnapshotSplit extends MySqlSplit {
      * This constructor should not be used directly. Please use the other constructor. If this
      * constructor must be invoked, please use the same format for the splitId as {@link
      * #generateSplitId(TableId, int)}. Or else the parsing method will fail. See more in {@link
-     * #parseTableId(String)} and {@link #parseChunkId(String)}.
+     * #extractTableId(String)} and {@link #extractChunkId(String)}.
      */
     @Internal
     public MySqlSnapshotSplit(
@@ -125,15 +125,15 @@ public class MySqlSnapshotSplit extends MySqlSplit {
                 tableId, splitId, splitKeyType, splitStart, splitEnd, highWatermark);
     }
 
-    private static String generateSplitId(TableId tableId, int chunkId) {
+    public static String generateSplitId(TableId tableId, int chunkId) {
         return tableId.toString() + ":" + chunkId;
     }
 
-    public static TableId parseTableId(String splitId) {
+    public static TableId extractTableId(String splitId) {
         return TableId.parse(splitId.substring(0, splitId.lastIndexOf(":")));
     }
 
-    public static int parseChunkId(String splitId) {
+    public static int extractChunkId(String splitId) {
         return Integer.parseInt(splitId.substring(splitId.lastIndexOf(":") + 1));
     }
 
