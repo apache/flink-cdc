@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mysql.table;
 
 import org.apache.flink.cdc.connectors.mysql.MySqlValidatorTest;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
+import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
@@ -27,6 +28,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -80,6 +82,9 @@ public class MySqlTimezoneITCase {
 
     @Before
     public void setup() throws Exception {
+        // Non-incremental snapshot version does not support MySQL > 8.0.x
+        Assume.assumeTrue(
+                incrementalSnapshot || MySqlVersion.AD_HOC.lessThanOrEqualTo(MySqlVersion.V8_0));
         resourceFolder =
                 Paths.get(
                                 Objects.requireNonNull(

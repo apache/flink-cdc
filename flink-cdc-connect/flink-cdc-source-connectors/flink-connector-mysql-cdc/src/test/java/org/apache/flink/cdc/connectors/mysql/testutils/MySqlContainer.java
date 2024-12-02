@@ -44,7 +44,7 @@ public class MySqlContainer extends JdbcDatabaseContainer {
     private String password = "test";
 
     public MySqlContainer() {
-        this(MySqlVersion.V5_7);
+        this(MySqlVersion.AD_HOC);
     }
 
     public MySqlContainer(MySqlVersion version) {

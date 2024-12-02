@@ -32,19 +32,14 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.RecordDataTestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.CloseableIterator;
 
 import org.assertj.core.api.Assertions;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
-import org.testcontainers.lifecycle.Startables;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -54,45 +49,21 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Stream;
 
 import static javax.xml.bind.DatatypeConverter.parseHexBinary;
 
 /** IT case for MySQL event source. */
 public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
-    private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
-
-    private final UniqueDatabase fullTypesMySql57Database =
+    private final UniqueDatabase fullTypesMySqlDatabase =
             new UniqueDatabase(
                     MYSQL_CONTAINER,
                     "column_type_test",
                     MySqSourceTestUtils.TEST_USER,
                     MySqSourceTestUtils.TEST_PASSWORD);
-    private final UniqueDatabase fullTypesMySql8Database =
-            new UniqueDatabase(
-                    MYSQL8_CONTAINER,
-                    "column_type_test_mysql8",
-                    MySqSourceTestUtils.TEST_USER,
-                    MySqSourceTestUtils.TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
-
-    @BeforeClass
-    public static void beforeClass() {
-        LOG.info("Starting MySql8 containers...");
-        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
-        LOG.info("Container MySql8 is started.");
-    }
-
-    @AfterClass
-    public static void afterClass() {
-        LOG.info("Stopping MySql8 containers...");
-        MYSQL8_CONTAINER.stop();
-        LOG.info("Container MySql8 is stopped.");
-    }
 
     @Before
     public void before() {
@@ -102,17 +73,12 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57CommonDataTypes() throws Throwable {
-        testCommonDataTypes(fullTypesMySql57Database);
+    public void testMysqlCommonDataTypes() throws Throwable {
+        testCommonDataTypes(fullTypesMySqlDatabase);
     }
 
     @Test
-    public void testMySql8CommonDataTypes() throws Throwable {
-        testCommonDataTypes(fullTypesMySql8Database);
-    }
-
-    @Test
-    public void testMysql57TimeDataTypes() throws Throwable {
+    public void testMysqlTimeDataTypes() throws Throwable {
         RowType recordType =
                 RowType.of(
                         DataTypes.DECIMAL(20, 0).notNull(),
@@ -161,76 +127,12 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                 };
 
         testTimeDataTypes(
-                fullTypesMySql57Database, recordType, expectedSnapshot, expectedStreamRecord);
+                fullTypesMySqlDatabase, recordType, expectedSnapshot, expectedStreamRecord);
     }
 
     @Test
-    public void testMysql8TimeDataTypes() throws Throwable {
-        RowType recordType =
-                RowType.of(
-                        DataTypes.DECIMAL(20, 0).notNull(),
-                        DataTypes.INT(),
-                        DataTypes.DATE(),
-                        DataTypes.TIME(0),
-                        DataTypes.TIME(3),
-                        DataTypes.TIME(6),
-                        DataTypes.TIMESTAMP(0),
-                        DataTypes.TIMESTAMP(3),
-                        DataTypes.TIMESTAMP(6),
-                        DataTypes.TIMESTAMP_LTZ(0),
-                        DataTypes.TIMESTAMP_LTZ(3),
-                        DataTypes.TIMESTAMP_LTZ(6),
-                        DataTypes.TIMESTAMP_LTZ(0));
-
-        Object[] expectedSnapshot =
-                new Object[] {
-                    DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
-                    2021,
-                    18460,
-                    64822000,
-                    64822123,
-                    // TIME(6) will lose precision for microseconds.
-                    // Because Flink's BinaryWriter force write int value for TIME(6).
-                    // See BinaryWriter#write for detail.
-                    64822123,
-                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
-                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123")),
-                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123456")),
-                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
-                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22.123")),
-                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22.123456")),
-                    null
-                };
-
-        Object[] expectedStreamRecord =
-                new Object[] {
-                    DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
-                    2021,
-                    18460,
-                    64822000,
-                    64822123,
-                    null,
-                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
-                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123")),
-                    TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123456")),
-                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
-                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22.123")),
-                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22.123456")),
-                    LocalZonedTimestampData.fromInstant(toInstant("2000-01-01 00:00:00"))
-                };
-
-        testTimeDataTypes(
-                fullTypesMySql8Database, recordType, expectedSnapshot, expectedStreamRecord);
-    }
-
-    @Test
-    public void testMysql57PrecisionTypes() throws Throwable {
-        testMysqlPrecisionTypes(fullTypesMySql57Database);
-    }
-
-    @Test
-    public void testMysql8PrecisionTypes() throws Throwable {
-        testMysqlPrecisionTypes(fullTypesMySql8Database);
+    public void testMysqlPrecisionTypes() throws Throwable {
+        testMysqlPrecisionTypes(fullTypesMySqlDatabase);
     }
 
     public void testMysqlPrecisionTypes(UniqueDatabase database) throws Throwable {

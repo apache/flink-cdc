@@ -41,15 +41,13 @@ import org.apache.flink.util.ExceptionUtils;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
-import org.junit.AfterClass;
+import org.junit.Assume;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
 import java.sql.Statement;
@@ -82,17 +80,11 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
 
-    private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
-
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
 
     private final UniqueDatabase fullTypesMySql57Database =
             new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", TEST_USER, TEST_PASSWORD);
-    private final UniqueDatabase fullTypesMySql8Database =
-            new UniqueDatabase(
-                    MYSQL8_CONTAINER, "column_type_test_mysql8", TEST_USER, TEST_PASSWORD);
 
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
@@ -104,11 +96,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     private final UniqueDatabase userDatabase2 =
             new UniqueDatabase(MYSQL_CONTAINER, "user_2", TEST_USER, TEST_PASSWORD);
 
-    private final UniqueDatabase inventoryDatabase8 =
-            new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
-
     private final UniqueDatabase binlogDatabase =
-            new UniqueDatabase(MYSQL8_CONTAINER, "binlog_metadata_test", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL_CONTAINER, "binlog_metadata_test", TEST_USER, TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -128,22 +117,12 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         return new Object[][] {new Object[] {false}, new Object[] {true}};
     }
 
-    @BeforeClass
-    public static void beforeClass() {
-        LOG.info("Starting MySql8 containers...");
-        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
-        LOG.info("Container MySql8 is started.");
-    }
-
-    @AfterClass
-    public static void afterClass() {
-        LOG.info("Stopping MySql8 containers...");
-        MYSQL8_CONTAINER.stop();
-        LOG.info("Container MySql8 is stopped.");
-    }
-
     @Before
     public void before() {
+        // Non-incremental snapshot version does not support MySQL > 8.0.x
+        Assume.assumeTrue(
+                incrementalSnapshot || MySqlVersion.AD_HOC.lessThanOrEqualTo(MySqlVersion.V8_0));
+
         TestValuesTableFactory.clearAllData();
         if (incrementalSnapshot) {
             env.setParallelism(DEFAULT_PARALLELISM);
@@ -504,13 +483,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57AllDataTypes() throws Throwable {
+    public void testMysqlAllDataTypes() throws Throwable {
         testAllDataTypes(MYSQL_CONTAINER, fullTypesMySql57Database);
-    }
-
-    @Test
-    public void testMySql8AllDataTypes() throws Throwable {
-        testAllDataTypes(MYSQL8_CONTAINER, fullTypesMySql8Database);
     }
 
     public void testAllDataTypes(MySqlContainer mySqlContainer, UniqueDatabase database)
@@ -1682,9 +1656,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     public void testStartupFromSpecificGtidSet() throws Exception {
         // Unfortunately the legacy MySQL source without incremental snapshot does not support
         // starting from GTID set
-        if (!incrementalSnapshot) {
-            return;
-        }
+        Assume.assumeTrue(incrementalSnapshot);
 
         inventoryDatabase.createAndInitialize();
 
@@ -2150,8 +2122,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
-                        MYSQL8_CONTAINER.getHost(),
-                        MYSQL8_CONTAINER.getDatabasePort(),
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
                         TEST_USER,
                         TEST_PASSWORD,
                         binlogDatabase.getDatabaseName(),

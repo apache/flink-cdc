@@ -53,7 +53,8 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     protected static final Logger LOG = LoggerFactory.getLogger(MySqlSourceTestBase.class);
 
     protected static final int DEFAULT_PARALLELISM = 4;
-    protected static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
+    protected static final MySqlContainer MYSQL_CONTAINER =
+            createMySqlContainer(MySqlVersion.AD_HOC);
     protected InMemoryReporter metricReporter = InMemoryReporter.createWithRetainedMetrics();
 
     @Rule

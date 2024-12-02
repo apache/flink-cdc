@@ -27,22 +27,16 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
-import org.testcontainers.lifecycle.Startables;
 
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -50,39 +44,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** IT cases for {@link MySqlMetadataAccessor}. */
 public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
 
-    private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
-
-    private final UniqueDatabase fullTypesMySql57Database =
+    private final UniqueDatabase fullTypesMySqlDatabase =
             new UniqueDatabase(
                     MYSQL_CONTAINER,
                     "column_type_test",
                     MySqSourceTestUtils.TEST_USER,
                     MySqSourceTestUtils.TEST_PASSWORD);
 
-    private final UniqueDatabase fullTypesMySql8Database =
-            new UniqueDatabase(
-                    MYSQL8_CONTAINER,
-                    "column_type_test_mysql8",
-                    MySqSourceTestUtils.TEST_USER,
-                    MySqSourceTestUtils.TEST_PASSWORD);
-
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
-
-    @BeforeClass
-    public static void beforeClass() {
-        LOG.info("Starting MySql8 containers...");
-        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
-        LOG.info("Container MySql8 is started.");
-    }
-
-    @AfterClass
-    public static void afterClass() {
-        LOG.info("Stopping MySql8 containers...");
-        MYSQL8_CONTAINER.stop();
-        LOG.info("Container MySql8 is stopped.");
-    }
 
     @Before
     public void before() {
@@ -92,36 +62,26 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57AccessDatabaseAndTable() {
-        testAccessDatabaseAndTable(fullTypesMySql57Database);
+    public void testMysqlAccessDatabaseAndTable() {
+        testAccessDatabaseAndTable(fullTypesMySqlDatabase);
     }
 
     @Test
-    public void testMysql8AccessDatabaseAndTable() {
-        testAccessDatabaseAndTable(fullTypesMySql8Database);
+    public void testMysqlAccessCommonTypesSchema() {
+        testAccessCommonTypesSchema(fullTypesMySqlDatabase);
     }
 
     @Test
-    public void testMysql57AccessCommonTypesSchema() {
-        testAccessCommonTypesSchema(fullTypesMySql57Database);
-    }
-
-    @Test
-    public void testMysql8AccessCommonTypesSchema() {
-        testAccessCommonTypesSchema(fullTypesMySql8Database);
-    }
-
-    @Test
-    public void testMysql57AccessTimeTypesSchema() {
-        fullTypesMySql57Database.createAndInitialize();
+    public void testMysqlAccessTimeTypesSchema() {
+        fullTypesMySqlDatabase.createAndInitialize();
 
         String[] tables = new String[] {"time_types"};
         MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql57Database);
+                getMetadataAccessor(tables, fullTypesMySqlDatabase);
 
         Schema actualSchema =
                 metadataAccessor.getTableSchema(
-                        TableId.tableId(fullTypesMySql57Database.getDatabaseName(), "time_types"));
+                        TableId.tableId(fullTypesMySqlDatabase.getDatabaseName(), "time_types"));
         Schema expectedSchema =
                 Schema.newBuilder()
                         .primaryKey("id")
@@ -158,142 +118,17 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql8AccessTimeTypesSchema() {
-        fullTypesMySql8Database.createAndInitialize();
-
-        String[] tables = new String[] {"time_types"};
-        MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql8Database);
-
-        Schema actualSchema =
-                metadataAccessor.getTableSchema(
-                        TableId.tableId(fullTypesMySql8Database.getDatabaseName(), "time_types"));
-        Schema expectedSchema =
-                Schema.newBuilder()
-                        .primaryKey("id")
-                        .fromRowDataType(
-                                RowType.of(
-                                        new DataType[] {
-                                            DataTypes.DECIMAL(20, 0).notNull(),
-                                            DataTypes.INT(),
-                                            DataTypes.DATE(),
-                                            DataTypes.TIME(0),
-                                            DataTypes.TIME(3),
-                                            DataTypes.TIME(6),
-                                            DataTypes.TIMESTAMP(0),
-                                            DataTypes.TIMESTAMP(3),
-                                            DataTypes.TIMESTAMP(6),
-                                            DataTypes.TIMESTAMP_LTZ(0),
-                                            DataTypes.TIMESTAMP_LTZ(3),
-                                            DataTypes.TIMESTAMP_LTZ(6),
-                                            DataTypes.TIMESTAMP_LTZ(0)
-                                        },
-                                        new String[] {
-                                            "id",
-                                            "year_c",
-                                            "date_c",
-                                            "time_c",
-                                            "time_3_c",
-                                            "time_6_c",
-                                            "datetime_c",
-                                            "datetime3_c",
-                                            "datetime6_c",
-                                            "timestamp_c",
-                                            "timestamp3_c",
-                                            "timestamp6_c",
-                                            "timestamp_def_c"
-                                        }))
-                        .build();
-        assertThat(actualSchema).isEqualTo(expectedSchema);
-    }
-
-    @Test
-    public void testMysql57PrecisionTypesSchema() {
-        fullTypesMySql57Database.createAndInitialize();
+    public void testMysqlPrecisionTypesSchema() {
+        fullTypesMySqlDatabase.createAndInitialize();
 
         String[] tables = new String[] {"precision_types"};
         MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql57Database);
+                getMetadataAccessor(tables, fullTypesMySqlDatabase);
 
         Schema actualSchema =
                 metadataAccessor.getTableSchema(
                         TableId.tableId(
-                                fullTypesMySql57Database.getDatabaseName(), "precision_types"));
-        Schema expectedSchema =
-                Schema.newBuilder()
-                        .primaryKey("id")
-                        .fromRowDataType(
-                                RowType.of(
-                                        new DataType[] {
-                                            DataTypes.DECIMAL(20, 0).notNull(),
-                                            DataTypes.DECIMAL(6, 2),
-                                            DataTypes.DECIMAL(9, 4),
-                                            DataTypes.DECIMAL(20, 4),
-                                            DataTypes.TIME(0),
-                                            DataTypes.TIME(3),
-                                            DataTypes.TIME(6),
-                                            DataTypes.TIMESTAMP(0),
-                                            DataTypes.TIMESTAMP(3),
-                                            DataTypes.TIMESTAMP(6),
-                                            DataTypes.TIMESTAMP_LTZ(0),
-                                            DataTypes.TIMESTAMP_LTZ(3),
-                                            DataTypes.TIMESTAMP_LTZ(6),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE()
-                                        },
-                                        new String[] {
-                                            "id",
-                                            "decimal_c0",
-                                            "decimal_c1",
-                                            "decimal_c2",
-                                            "time_c",
-                                            "time_3_c",
-                                            "time_6_c",
-                                            "datetime_c",
-                                            "datetime3_c",
-                                            "datetime6_c",
-                                            "timestamp_c",
-                                            "timestamp3_c",
-                                            "timestamp6_c",
-                                            "float_c0",
-                                            "float_c1",
-                                            "float_c2",
-                                            "real_c0",
-                                            "real_c1",
-                                            "real_c2",
-                                            "double_c0",
-                                            "double_c1",
-                                            "double_c2",
-                                            "double_precision_c0",
-                                            "double_precision_c1",
-                                            "double_precision_c2"
-                                        }))
-                        .build();
-        assertThat(actualSchema).isEqualTo(expectedSchema);
-    }
-
-    @Test
-    public void testMysql8PrecisionTypesSchema() {
-        fullTypesMySql8Database.createAndInitialize();
-
-        String[] tables = new String[] {"precision_types"};
-        MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql8Database);
-
-        Schema actualSchema =
-                metadataAccessor.getTableSchema(
-                        TableId.tableId(
-                                fullTypesMySql8Database.getDatabaseName(), "precision_types"));
+                                fullTypesMySqlDatabase.getDatabaseName(), "precision_types"));
         Schema expectedSchema =
                 Schema.newBuilder()
                         .primaryKey("id")
