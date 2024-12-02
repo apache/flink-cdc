@@ -227,15 +227,15 @@ public class StarRocksSinkTestBase extends TestLogger {
         return results;
     }
 
-    public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
+    public static <T> void assertEqualsInAnyOrder(List<T> expected, List<T> actual) {
         Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
     }
 
-    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
+    public static <T> void assertEqualsInOrder(List<T> expected, List<T> actual) {
         Assertions.assertThat(actual).containsExactlyElementsOf(expected);
     }
 
-    public static void assertMapEquals(Map<String, ?> expected, Map<String, ?> actual) {
-        Assertions.assertThat(actual).isEqualTo(expected);
+    public static <K, V> void assertMapEquals(Map<K, V> expected, Map<K, V> actual) {
+        Assertions.assertThat(actual).containsExactlyEntriesOf(expected);
     }
 }
