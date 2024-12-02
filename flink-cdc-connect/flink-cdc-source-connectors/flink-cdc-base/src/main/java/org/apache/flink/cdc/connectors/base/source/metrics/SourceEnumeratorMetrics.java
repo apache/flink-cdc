@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.base.source.metrics;
 
+import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.SplitEnumeratorMetricGroup;
@@ -125,11 +126,12 @@ public class SourceEnumeratorMetrics {
         private volatile long snapshotStartTime = UNDEFINED;
         private volatile long snapshotEndTime = UNDEFINED;
 
-        private Set<String> remainingSplitIds =
+        private Set<Integer> remainingSplitChunkIds =
                 Collections.newSetFromMap(new ConcurrentHashMap<>());
-        private Set<String> processedSplitIds =
+        private Set<Integer> processedSplitChunkIds =
                 Collections.newSetFromMap(new ConcurrentHashMap<>());
-        private Set<String> finishedSplitIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        private Set<Integer> finishedSplitChunkIds =
+                Collections.newSetFromMap(new ConcurrentHashMap<>());
 
         public TableMetrics(
                 String databaseName, String schemaName, String tableName, MetricGroup parentGroup) {
@@ -161,8 +163,9 @@ public class SourceEnumeratorMetrics {
         }
 
         public void addNewSplit(String newSplitId) {
-            if (!remainingSplitIds.contains(newSplitId)) {
-                remainingSplitIds.add(newSplitId);
+            int chunkId = SnapshotSplit.extractChunkId(newSplitId);
+            if (!remainingSplitChunkIds.contains(chunkId)) {
+                remainingSplitChunkIds.add(chunkId);
                 numSnapshotSplitsRemaining.getAndAdd(1);
                 LOGGER.info("add remaining split: {}", newSplitId);
             }
@@ -177,24 +180,27 @@ public class SourceEnumeratorMetrics {
         }
 
         public void removeRemainingSplit(String removeSplitId) {
-            if (remainingSplitIds.contains(removeSplitId)) {
-                remainingSplitIds.remove(removeSplitId);
+            int chunkId = SnapshotSplit.extractChunkId(removeSplitId);
+            if (remainingSplitChunkIds.contains(chunkId)) {
+                remainingSplitChunkIds.remove(chunkId);
                 numSnapshotSplitsRemaining.getAndUpdate(num -> num - 1);
                 LOGGER.info("remove remaining split: {}", removeSplitId);
             }
         }
 
         public void addProcessedSplit(String processedSplitId) {
-            if (!processedSplitIds.contains(processedSplitId)) {
-                processedSplitIds.add(processedSplitId);
+            int chunkId = SnapshotSplit.extractChunkId(processedSplitId);
+            if (!processedSplitChunkIds.contains(chunkId)) {
+                processedSplitChunkIds.add(chunkId);
                 numSnapshotSplitsProcessed.getAndAdd(1);
                 LOGGER.info("add processed split: {}", processedSplitId);
             }
         }
 
         public void removeProcessedSplit(String removeSplitId) {
-            if (processedSplitIds.contains(removeSplitId)) {
-                processedSplitIds.remove(removeSplitId);
+            int chunkId = SnapshotSplit.extractChunkId(removeSplitId);
+            if (processedSplitChunkIds.contains(chunkId)) {
+                processedSplitChunkIds.remove(chunkId);
                 numSnapshotSplitsProcessed.getAndUpdate(num -> num - 1);
                 LOGGER.info("remove processed split: {}", removeSplitId);
             }
@@ -228,8 +234,9 @@ public class SourceEnumeratorMetrics {
         }
 
         public void addFinishedSplit(String finishedSplitId) {
-            if (!finishedSplitIds.contains(finishedSplitId)) {
-                finishedSplitIds.add(finishedSplitId);
+            int chunkId = SnapshotSplit.extractChunkId(finishedSplitId);
+            if (!finishedSplitChunkIds.contains(chunkId)) {
+                finishedSplitChunkIds.add(chunkId);
                 numSnapshotSplitsFinished.getAndAdd(1);
                 tryToMarkSnapshotEndTime();
                 LOGGER.info("add finished split: {}", finishedSplitId);
@@ -237,15 +244,12 @@ public class SourceEnumeratorMetrics {
         }
 
         public void removeFinishedSplit(String removeSplitId) {
-            if (finishedSplitIds.contains(removeSplitId)) {
-                finishedSplitIds.remove(removeSplitId);
+            int chunkId = SnapshotSplit.extractChunkId(removeSplitId);
+            if (finishedSplitChunkIds.contains(chunkId)) {
+                finishedSplitChunkIds.remove(chunkId);
                 numSnapshotSplitsFinished.getAndUpdate(num -> num - 1);
                 LOGGER.info("remove finished split: {}", removeSplitId);
             }
-        }
-
-        public Set<String> getFinishedSplitIds() {
-            return finishedSplitIds;
         }
     }
 }
