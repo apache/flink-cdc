@@ -543,7 +543,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     @Override
     public void startAssignNewlyAddedTables() {
         Preconditions.checkState(
-                isAssigningFinished(assignerStatus), "Invalid assigner status {}", assignerStatus);
+                isAssigningFinished(assignerStatus), "Invalid assigner status %s", assignerStatus);
         assignerStatus = assignerStatus.startAssignNewlyTables();
     }
 
@@ -551,7 +551,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     public void onStreamSplitUpdated() {
         Preconditions.checkState(
                 isNewlyAddedAssigningSnapshotFinished(assignerStatus),
-                "Invalid assigner status {}",
+                "Invalid assigner status %s",
                 assignerStatus);
         assignerStatus = assignerStatus.onStreamSplitUpdated();
     }

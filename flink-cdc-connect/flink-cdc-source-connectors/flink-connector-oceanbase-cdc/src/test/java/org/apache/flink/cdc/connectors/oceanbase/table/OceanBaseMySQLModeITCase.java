@@ -17,17 +17,20 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.table;
 
+import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestBase;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.LogProxyContainer;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseCdcMetadata;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseContainer;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseMySQLCdcMetadata;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.UniqueDatabase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -38,6 +41,8 @@ import java.sql.Statement;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.createLogProxyContainer;
 import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.createOceanBaseContainerForCDC;
@@ -64,6 +69,9 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
     private static final OceanBaseCdcMetadata METADATA =
             new OceanBaseMySQLCdcMetadata(OB_SERVER, LOG_PROXY);
 
+    private UniqueDatabase inventoryDatabase;
+    private UniqueDatabase columnTypesDatabase;
+
     @Override
     protected OceanBaseCdcMetadata metadata() {
         return METADATA;
@@ -76,6 +84,19 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
         env.getCheckpointConfig().setMinPauseBetweenCheckpoints(500);
     }
 
+    @After
+    public void after() {
+        if (inventoryDatabase != null) {
+            inventoryDatabase.dropDatabase();
+            inventoryDatabase = null;
+        }
+
+        if (columnTypesDatabase != null) {
+            columnTypesDatabase.dropDatabase();
+            columnTypesDatabase = null;
+        }
+    }
+
     @Override
     protected String logProxyOptionsString() {
         return super.logProxyOptionsString()
@@ -85,8 +106,8 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
     @Test
     public void testTableList() throws Exception {
-        initializeTable("inventory");
-
+        inventoryDatabase = new UniqueDatabase(OB_SERVER, "inventory");
+        inventoryDatabase.createAndInitialize("mysql");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE ob_source ("
@@ -100,7 +121,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                                 + ", "
                                 + " 'table-list' = '%s'"
                                 + ")",
-                        "inventory.products");
+                        inventoryDatabase.getDatabaseName() + ".products");
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -125,17 +146,18 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
+            statement.execute(String.format("USE %s;", inventoryDatabase.getDatabaseName()));
             statement.execute(
-                    "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
-            statement.execute("UPDATE inventory.products SET weight='5.1' WHERE id=107;");
+                    "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
+            statement.execute("UPDATE products SET weight='5.1' WHERE id=107;");
             statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
+                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);"); // 110
             statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
+                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18);");
             statement.execute(
-                    "UPDATE inventory.products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
-            statement.execute("UPDATE inventory.products SET weight='5.17' WHERE id=111;");
-            statement.execute("DELETE FROM inventory.products WHERE id=111;");
+                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            statement.execute("UPDATE products SET weight='5.17' WHERE id=111;");
+            statement.execute("DELETE FROM products WHERE id=111;");
         }
 
         waitForSinkSize("sink", snapshotSize + 7);
@@ -188,8 +210,8 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
     @Test
     public void testMetadataColumns() throws Exception {
-        initializeTable("inventory");
-
+        inventoryDatabase = new UniqueDatabase(OB_SERVER, "inventory");
+        inventoryDatabase.createAndInitialize("mysql");
         String sourceDDL =
                 String.format(
                         "CREATE TABLE ob_source ("
@@ -207,7 +229,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
-                        "^inventory$",
+                        String.format("^%s$", inventoryDatabase.getDatabaseName()),
                         "^products$");
 
         String sinkDDL =
@@ -236,8 +258,9 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
+            statement.execute(String.format("USE %s;", inventoryDatabase.getDatabaseName()));
             statement.execute(
-                    "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
+                    "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
         }
 
         waitForSinkSize("sink", snapshotSize + 1);
@@ -245,37 +268,22 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
         String tenant = metadata().getTenantName();
 
         List<String> expected =
-                Arrays.asList(
-                        "+I("
-                                + tenant
-                                + ",inventory,products,101,scooter,Small 2-wheel scooter,3.1400000000)",
-                        "+I("
-                                + tenant
-                                + ",inventory,products,102,car battery,12V car battery,8.1000000000)",
-                        "+I("
-                                + tenant
-                                + ",inventory,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
-                        "+I("
-                                + tenant
-                                + ",inventory,products,104,hammer,12oz carpenter's hammer,0.7500000000)",
-                        "+I("
-                                + tenant
-                                + ",inventory,products,105,hammer,14oz carpenter's hammer,0.8750000000)",
-                        "+I("
-                                + tenant
-                                + ",inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
-                        "+I("
-                                + tenant
-                                + ",inventory,products,107,rocks,box of assorted rocks,5.3000000000)",
-                        "+I("
-                                + tenant
-                                + ",inventory,products,108,jacket,water resistent black wind breaker,0.1000000000)",
-                        "+I("
-                                + tenant
-                                + ",inventory,products,109,spare tire,24 inch spare tire,22.2000000000)",
-                        "+U("
-                                + tenant
-                                + ",inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)");
+                Stream.of(
+                                "+I(%s,%s,products,101,scooter,Small 2-wheel scooter,3.1400000000)",
+                                "+I(%s,%s,products,102,car battery,12V car battery,8.1000000000)",
+                                "+I(%s,%s,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8000000000)",
+                                "+I(%s,%s,products,104,hammer,12oz carpenter's hammer,0.7500000000)",
+                                "+I(%s,%s,products,105,hammer,14oz carpenter's hammer,0.8750000000)",
+                                "+I(%s,%s,products,106,hammer,16oz carpenter's hammer,1.0000000000)",
+                                "+I(%s,%s,products,107,rocks,box of assorted rocks,5.3000000000)",
+                                "+I(%s,%s,products,108,jacket,water resistent black wind breaker,0.1000000000)",
+                                "+I(%s,%s,products,109,spare tire,24 inch spare tire,22.2000000000)",
+                                "+U(%s,%s,products,106,hammer,18oz carpenter hammer,1.0000000000)")
+                        .map(
+                                line ->
+                                        String.format(
+                                                line, tenant, inventoryDatabase.getDatabaseName()))
+                        .collect(Collectors.toList());
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertContainsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
@@ -287,7 +295,9 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
         setGlobalTimeZone(serverTimeZone);
         tEnv.getConfig().setLocalTimeZone(ZoneId.of(serverTimeZone));
 
-        initializeTable("column_type_test");
+        columnTypesDatabase = new UniqueDatabase(OB_SERVER, "column_type_test");
+        columnTypesDatabase.createAndInitialize("mysql");
+
         String sourceDDL =
                 String.format(
                         "CREATE TABLE ob_source (\n"
@@ -340,7 +350,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'server-time-zone' = '%s'"
                                 + ")",
-                        "^column_type_test$",
+                        String.format("^%s$", columnTypesDatabase.getDatabaseName()),
                         "^full_types$",
                         serverTimeZone);
         String sinkDDL =
@@ -445,8 +455,9 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
+            statement.execute(String.format("USE %s;", columnTypesDatabase.getDatabaseName()));
             statement.execute(
-                    "UPDATE column_type_test.full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
 
         waitForSinkSize("sink", snapshotSize + 1);
@@ -475,7 +486,9 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
         setGlobalTimeZone(serverTimeZone);
         tEnv.getConfig().setLocalTimeZone(ZoneId.of(serverTimeZone));
 
-        initializeTable("column_type_test");
+        columnTypesDatabase = new UniqueDatabase(OB_SERVER, "column_type_test");
+        columnTypesDatabase.createAndInitialize("mysql");
+
         String sourceDDL =
                 String.format(
                         "CREATE TABLE ob_source (\n"
@@ -493,7 +506,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'server-time-zone' = '%s'"
                                 + ")",
-                        "column_type_test",
+                        columnTypesDatabase.getDatabaseName(),
                         "full_types",
                         serverTimeZone);
 
@@ -525,8 +538,9 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
+            statement.execute(String.format("USE %s;", columnTypesDatabase.getDatabaseName()));
             statement.execute(
-                    "UPDATE column_type_test.full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
 
         waitForSinkSize("sink", snapshotSize + 1);
@@ -543,7 +557,8 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
     @Test
     public void testSnapshotOnly() throws Exception {
-        initializeTable("inventory");
+        inventoryDatabase = new UniqueDatabase(OB_SERVER, "inventory");
+        inventoryDatabase.createAndInitialize("mysql");
 
         String sourceDDL =
                 String.format(
@@ -558,7 +573,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                                 + ", "
                                 + " 'table-list' = '%s'"
                                 + ")",
-                        "inventory.products");
+                        inventoryDatabase.getDatabaseName() + ".products");
 
         String sinkDDL =
                 "CREATE TABLE sink ("
@@ -593,5 +608,10 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                         "+I(109,spare tire,24 inch spare tire,22.2000000000)");
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertContainsInAnyOrder(expected, actual);
+
+        while (result.getJobClient().get().getJobStatus().get().equals(JobStatus.RUNNING)) {
+            Thread.sleep(100);
+            // Waiting for job to quit, in case if
+        }
     }
 }

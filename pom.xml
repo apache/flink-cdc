@@ -41,6 +41,7 @@ limitations under the License.
         <module>flink-cdc-runtime</module>
         <module>flink-cdc-e2e-tests</module>
         <module>flink-cdc-pipeline-udf-examples</module>
+        <module>flink-cdc-pipeline-model</module>
     </modules>
 
     <licenses>

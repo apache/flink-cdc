@@ -41,7 +41,7 @@ public class MySqlSplitStateTest {
         final MySqlSnapshotSplit split =
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
-                        "test_db.test_table-1",
+                        1,
                         new RowType(
                                 Collections.singletonList(
                                         new RowType.RowField("id", new BigIntType()))),
@@ -58,7 +58,7 @@ public class MySqlSplitStateTest {
         final MySqlSnapshotSplit split =
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
-                        "test_db.test_table-1",
+                        1,
                         new RowType(
                                 Collections.singletonList(
                                         new RowType.RowField("id", new BigIntType()))),
@@ -73,7 +73,7 @@ public class MySqlSplitStateTest {
         final MySqlSnapshotSplit expected =
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
-                        "test_db.test_table-1",
+                        1,
                         new RowType(
                                 Collections.singletonList(
                                         new RowType.RowField("id", new BigIntType()))),

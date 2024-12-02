@@ -417,17 +417,7 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
         Map<TableId, TableChanges.TableChange> schema = new HashMap<>();
         schema.put(tableId, dialect.queryTableSchema(jdbc, tableId));
         return new SnapshotSplit(
-                tableId,
-                splitId(tableId, chunkId),
-                splitKeyType,
-                splitStart,
-                splitEnd,
-                null,
-                schema);
-    }
-
-    private String splitId(TableId tableId, int chunkId) {
-        return tableId.toString() + ":" + chunkId;
+                tableId, chunkId, splitKeyType, splitStart, splitEnd, null, schema);
     }
 
     private void maySleep(int count, TableId tableId) {
