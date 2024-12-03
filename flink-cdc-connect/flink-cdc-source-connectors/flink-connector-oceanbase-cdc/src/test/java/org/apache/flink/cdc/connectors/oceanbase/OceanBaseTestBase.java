@@ -52,8 +52,6 @@ public abstract class OceanBaseTestBase extends AbstractTestBaseProxy {
 
     public static final Duration FETCH_TIMEOUT = Duration.ofSeconds(60);
 
-    public static final Duration FETCH_TIMEOUT = Duration.ofSeconds(60);
-
     protected abstract OceanBaseCdcMetadata metadata();
 
     protected String commonOptionsString() {
