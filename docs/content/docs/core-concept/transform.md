@@ -72,22 +72,22 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 
 ## Comparison Functions
 
-| Function             | Janino Code                 | Description                                                     |
-|----------------------|-----------------------------|-----------------------------------------------------------------|
-| value1 = value2      | valueEquals(value1, value2) | Returns TRUE if value1 is equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 <> value2     | !valueEquals(value1, value2) | Returns TRUE if value1 is not equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 > value2      | value1 > value2             | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL. |
-| value1 >= value2     | value1 >= value2            | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 < value2      | value1 < value2             | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL. |
-| value1 <= value2     | value1 <= value2            | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value IS NULL        | null == value               | Returns TRUE if value is NULL.                                  |
-| value IS NOT NULL    | null != value               | Returns TRUE if value is not NULL.                              |
-| value1 BETWEEN value2 AND value3 | betweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3. |
+| Function             | Janino Code                                  | Description                                                     |
+|----------------------|----------------------------------------------|-----------------------------------------------------------------|
+| value1 = value2      | valueEquals(value1, value2)                  | Returns TRUE if value1 is equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 <> value2     | !valueEquals(value1, value2)                 | Returns TRUE if value1 is not equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 > value2      | greaterThan(value1, value2)                  | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL. |
+| value1 >= value2     | greaterThanOrEqual(value1, value2)               | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 < value2      | lessThan(value1, value2)                         | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL. |
+| value1 <= value2     | lessThanOrEqual(value1, value2)                  | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value IS NULL        | null == value                                | Returns TRUE if value is NULL.                                  |
+| value IS NOT NULL    | null != value                                | Returns TRUE if value is not NULL.                              |
+| value1 BETWEEN value2 AND value3 | betweenAsymmetric(value1, value2, value3)    | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3. |
 | value1 NOT BETWEEN value2 AND value3 | notBetweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is less than value2 or greater than value3. |
-| string1 LIKE string2 | like(string1, string2)      | Returns TRUE if string1 matches pattern string2.                |
-| string1 NOT LIKE string2 | notLike(string1, string2) | Returns TRUE if string1 does not match pattern string2.       |
-| value1 IN (value2 [, value3]* ) | in(value1, value2 [, value3]*) | Returns TRUE if value1 exists in the given list (value2, value3, …). |
-| value1 NOT IN (value2 [, value3]* ) | notIn(value1, value2 [, value3]*) | Returns TRUE if value1 does not exist in the given list (value2, value3, …).  |
+| string1 LIKE string2 | like(string1, string2)                       | Returns TRUE if string1 matches pattern string2.                |
+| string1 NOT LIKE string2 | notLike(string1, string2)                    | Returns TRUE if string1 does not match pattern string2.       |
+| value1 IN (value2 [, value3]* ) | in(value1, value2 [, value3]*)               | Returns TRUE if value1 exists in the given list (value2, value3, …). |
+| value1 NOT IN (value2 [, value3]* ) | notIn(value1, value2 [, value3]*)            | Returns TRUE if value1 does not exist in the given list (value2, value3, …).  |
 
 ## Logical Functions
 
@@ -132,18 +132,18 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 
 ## Temporal Functions
 
-| Function             | Janino Code              | Description                                       |
-| -------------------- | ------------------------ | ------------------------------------------------- |
-| LOCALTIME | localtime() | Returns the current SQL time in the local time zone, the return type is TIME(0). |
-| LOCALTIMESTAMP | localtimestamp() | Returns the current SQL timestamp in local time zone, the return type is TIMESTAMP(3). |
-| CURRENT_TIME | currentTime() | Returns the current SQL time in the local time zone, this is a synonym of LOCAL_TIME. |
-| CURRENT_DATE                                         | currentDate() | Returns the current SQL date in the local time zone. |
-| CURRENT_TIMESTAMP | currentTimestamp() | Returns the current SQL timestamp in the local time zone, the return type is TIMESTAMP_LTZ(3). |
-| NOW() | now() | Returns the current SQL timestamp in the local time zone, this is a synonym of CURRENT_TIMESTAMP. |
-| DATE_FORMAT(timestamp, string) | dateFormat(timestamp, string) | Converts timestamp to a value of string in the format specified by the date format string. The format string is compatible with Java's SimpleDateFormat. |
-| TIMESTAMPDIFF(timepointunit, timepoint1, timepoint2) | timestampDiff(timepointunit, timepoint1, timepoint2) | Returns the (signed) number of timepointunit between timepoint1 and timepoint2. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR. |
-| TO_DATE(string1[, string2]) | toDate(string1[, string2]) | Converts a date string string1 with format string2 (by default 'yyyy-MM-dd') to a date. |
-| TO_TIMESTAMP(string1[, string2]) | toTimestamp(string1[, string2]) | Converts date time string string1 with format string2 (by default: 'yyyy-MM-dd HH:mm:ss') to a timestamp, without time zone. |
+| Function                                              | Janino Code              | Description                                       |
+|-------------------------------------------------------| ------------------------ | ------------------------------------------------- |
+| LOCALTIME                                             | localtime() | Returns the current SQL time in the local time zone, the return type is TIME(0). |
+| LOCALTIMESTAMP                                        | localtimestamp() | Returns the current SQL timestamp in local time zone, the return type is TIMESTAMP(3). |
+| CURRENT_TIME                                          | currentTime() | Returns the current SQL time in the local time zone, this is a synonym of LOCAL_TIME. |
+| CURRENT_DATE                                          | currentDate() | Returns the current SQL date in the local time zone. |
+| CURRENT_TIMESTAMP                                     | currentTimestamp() | Returns the current SQL timestamp in the local time zone, the return type is TIMESTAMP_LTZ(3). |
+| NOW()                                                 | now() | Returns the current SQL timestamp in the local time zone, this is a synonym of CURRENT_TIMESTAMP. |
+| DATE_FORMAT(timestamp, string)                        | dateFormat(timestamp, string) | Converts timestamp to a value of string in the format specified by the date format string. The format string is compatible with Java's SimpleDateFormat. |
+| TIMESTAMP_DIFF(timepointunit, timepoint1, timepoint2) | timestampDiff(timepointunit, timepoint1, timepoint2) | Returns the (signed) number of timepointunit between timepoint1 and timepoint2. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR. |
+| TO_DATE(string1[, string2])                           | toDate(string1[, string2]) | Converts a date string string1 with format string2 (by default 'yyyy-MM-dd') to a date. |
+| TO_TIMESTAMP(string1[, string2])                      | toTimestamp(string1[, string2]) | Converts date time string string1 with format string2 (by default: 'yyyy-MM-dd HH:mm:ss') to a timestamp, without time zone. |
 
 ## Conditional Functions
 
