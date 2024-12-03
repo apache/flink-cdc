@@ -24,6 +24,7 @@ import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.table.catalog.ObjectPath;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -265,6 +266,15 @@ public class MySqlSourceBuilder<T> {
      */
     public MySqlSourceBuilder<T> closeIdleReaders(boolean closeIdleReaders) {
         this.configFactory.closeIdleReaders(closeIdleReaders);
+        return this;
+    }
+
+    /**
+     * The filter of table snapshot, captured tables' rows will be filtered by the filter expression
+     * (AKA a SQL where clause) when reading the snapshot of table.
+     */
+    public MySqlSourceBuilder<T> snapshotFilters(Map<String, String> snapshotFilters) {
+        this.configFactory.snapshotFilters(snapshotFilters);
         return this;
     }
 

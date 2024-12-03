@@ -70,6 +70,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FILTERS;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET;
@@ -235,6 +236,27 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
             configFactory.chunkKeyColumn(chunkKeyColumnMap);
         }
 
+        String snapshotFilters = config.get(SCAN_SNAPSHOT_FILTERS);
+        if (snapshotFilters != null) {
+            Map<String, String> snapshotFilterMap = new HashMap<>();
+            for (String snapshotFilter : snapshotFilters.split(";")) {
+                String[] splits = snapshotFilter.trim().split(":");
+                if (splits.length == 2) {
+                    snapshotFilterMap.put(splits[0], splits[1]);
+                } else {
+                    throw new IllegalArgumentException(
+                            SCAN_SNAPSHOT_FILTERS.key()
+                                    + " = "
+                                    + snapshotFilters
+                                    + " failed to be parsed in this part '"
+                                    + snapshotFilter
+                                    + "'.");
+                }
+            }
+            LOG.info("Add snapshotFilters {}.", snapshotFilterMap);
+            configFactory.snapshotFilters(snapshotFilterMap);
+        }
+
         return new MySqlDataSource(configFactory);
     }
 
@@ -276,6 +298,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
+        options.add(SCAN_SNAPSHOT_FILTERS);
         return options;
     }
 

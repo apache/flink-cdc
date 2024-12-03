@@ -41,6 +41,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FILTERS;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
@@ -294,6 +295,39 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                             {
                                 put(multiMaxTable, "order_id");
                                 put(productsTable, "id");
+                            }
+                        });
+    }
+
+    @Test
+    public void testAddSnapshotFilters() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".\\.*");
+        options.put(
+                SCAN_SNAPSHOT_FILTERS.key(),
+                inventoryDatabase.getDatabaseName()
+                        + ".multi_max_\\.*:id > 200;"
+                        + inventoryDatabase.getDatabaseName()
+                        + ".products:1 = 0;");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+
+        assertThat(dataSource.getSourceConfig().getSnapshotFilters())
+                .isNotEmpty()
+                .isEqualTo(
+                        new HashMap<String, String>() {
+                            {
+                                put(
+                                        inventoryDatabase.getDatabaseName() + ".multi_max_\\.*",
+                                        "id > 200");
+                                put(inventoryDatabase.getDatabaseName() + ".products", "1 = 0");
                             }
                         });
     }
