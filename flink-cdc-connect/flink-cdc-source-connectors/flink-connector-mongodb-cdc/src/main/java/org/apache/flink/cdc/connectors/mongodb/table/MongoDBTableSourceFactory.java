@@ -47,6 +47,8 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.FULL_DOCUMENT_PRE_POST_IMAGE;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HOSTS;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.INITIAL_SNAPSHOTTING_MAX_THREADS;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.INITIAL_SNAPSHOTTING_PIPELINE;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.INITIAL_SNAPSHOTTING_QUEUE_SIZE;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
@@ -95,6 +97,10 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         StartupOptions startupOptions = getStartupOptions(config);
         Integer initialSnapshottingQueueSize =
                 config.getOptional(INITIAL_SNAPSHOTTING_QUEUE_SIZE).orElse(null);
+        Integer initialSnapshottingMaxThreads =
+                config.getOptional(INITIAL_SNAPSHOTTING_MAX_THREADS).orElse(null);
+        String initialSnapshottingPipeline =
+                config.getOptional(INITIAL_SNAPSHOTTING_PIPELINE).orElse(null);
 
         String zoneId = context.getConfiguration().get(TableConfigOptions.LOCAL_TIME_ZONE);
         ZoneId localTimeZone =
@@ -103,6 +109,18 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                         : ZoneId.of(zoneId);
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
+
+        // The initial.snapshotting.pipeline config is only used in Debezium mode and
+        // cannot be used in incremental snapshot mode because the semantic is inconsistent.
+        // The reason is that in snapshot phase of incremental snapshot mode, the oplog
+        // will be backfilled after each snapshot to compensate for changes, but the pipeline
+        // operations in initial.snapshotting.pipeline are not applied to the backfill oplog,
+        // which means the semantic of this config is inconsistent.
+        checkArgument(
+                !(enableParallelRead && initialSnapshottingPipeline != null),
+                "The initial.snapshotting.pipeline/copy.existing.pipeline config only applies to Debezium mode, "
+                        + "not incremental snapshot mode");
+
         boolean enableCloseIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
@@ -133,6 +151,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
                 connectionOptions,
                 startupOptions,
                 initialSnapshottingQueueSize,
+                initialSnapshottingMaxThreads,
+                initialSnapshottingPipeline,
                 batchSize,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
@@ -215,6 +235,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         options.add(SCAN_STARTUP_MODE);
         options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
         options.add(INITIAL_SNAPSHOTTING_QUEUE_SIZE);
+        options.add(INITIAL_SNAPSHOTTING_MAX_THREADS);
+        options.add(INITIAL_SNAPSHOTTING_PIPELINE);
         options.add(BATCH_SIZE);
         options.add(POLL_MAX_BATCH_SIZE);
         options.add(POLL_AWAIT_TIME_MILLIS);
