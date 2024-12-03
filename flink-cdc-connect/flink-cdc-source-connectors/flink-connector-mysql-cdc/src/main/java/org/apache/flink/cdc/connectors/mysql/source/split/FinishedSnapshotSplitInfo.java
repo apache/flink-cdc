@@ -34,8 +34,10 @@ import static org.apache.flink.cdc.connectors.mysql.source.utils.SerializerUtils
 import static org.apache.flink.cdc.connectors.mysql.source.utils.SerializerUtils.serializedStringToRow;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.SerializerUtils.writeBinlogPosition;
 
-/** The information used to describe a finished snapshot split. */
-public class FinishedSnapshotSplitInfo implements Comparable<FinishedSnapshotSplitInfo>{
+/**
+ * The information used to describe a finished snapshot split.
+ */
+public class FinishedSnapshotSplitInfo implements Comparable<FinishedSnapshotSplitInfo> {
 
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
@@ -46,7 +48,9 @@ public class FinishedSnapshotSplitInfo implements Comparable<FinishedSnapshotSpl
     private final Object[] splitEnd;
     private final BinlogOffset highWatermark;
 
-    /** Cache the return value of {@link #hashCode()} to reduce calculation. */
+    /**
+     * Cache the return value of {@link #hashCode()} to reduce calculation.
+     */
     private transient int hashcode;
 
     public FinishedSnapshotSplitInfo(
