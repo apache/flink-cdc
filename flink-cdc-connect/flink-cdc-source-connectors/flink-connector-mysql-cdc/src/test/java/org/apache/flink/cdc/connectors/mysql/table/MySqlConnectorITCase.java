@@ -2351,4 +2351,105 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();
     }
+
+    @Test
+    public void testReadChangelogAppendOnly() throws Exception {
+        userDatabase1.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE mysql_users ("
+                                + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
+                                + " table_name STRING METADATA VIRTUAL,"
+                                + " row_kind STRING METADATA FROM 'row_kind' VIRTUAL,"
+                                + " `id` DECIMAL(20, 0) NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " email STRING,"
+                                + " age INT,"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s',"
+                                + " 'scan.read-changelog-as-append-only.enabled' = 'true'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        userDatabase1.getUsername(),
+                        userDatabase1.getPassword(),
+                        userDatabase1.getDatabaseName(),
+                        "user_table_.*",
+                        incrementalSnapshot,
+                        getServerId(),
+                        getSplitSize());
+
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " database_name STRING,"
+                        + " table_name STRING,"
+                        + " row_kind STRING,"
+                        + " `id` DECIMAL(20, 0) NOT NULL,"
+                        + " name STRING,"
+                        + " address STRING,"
+                        + " phone_number STRING,"
+                        + " email STRING,"
+                        + " age INT,"
+                        + " primary key (database_name, table_name, id) not enforced"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM mysql_users");
+
+        // wait for snapshot finished and begin binlog
+        waitForSinkSize("sink", 2);
+
+        try (Connection connection = userDatabase1.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "INSERT INTO user_table_1_2 VALUES (200,'user_200','Wuhan',123567891234);");
+            statement.execute(
+                    "INSERT INTO user_table_1_1 VALUES (300,'user_300','Hangzhou',123567891234, 'user_300@foo.com');");
+            statement.execute("UPDATE user_table_1_1 SET address='Beijing' WHERE id=300;");
+            statement.execute("UPDATE user_table_1_2 SET phone_number=88888888 WHERE id=121;");
+            statement.execute("DELETE FROM user_table_1_1 WHERE id=111;");
+        }
+
+        // waiting for binlog finished (5 more events)
+        waitForSinkSize("sink", 7);
+
+        List<String> expected =
+                Stream.of(
+                                "+I[%s, user_table_1_1, +I, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
+                                "+I[%s, user_table_1_2, +I, 121, user_121, Shanghai, 123567891234, null, null]",
+                                "+I[%s, user_table_1_2, +I, 200, user_200, Wuhan, 123567891234, null, null]",
+                                "+I[%s, user_table_1_1, +I, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
+                                "+I[%s, user_table_1_1, +U, 300, user_300, Beijing, 123567891234, user_300@foo.com, null]",
+                                "+I[%s, user_table_1_2, +U, 121, user_121, Shanghai, 88888888, null, null]",
+                                "+I[%s, user_table_1_1, -D, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
+                                "+I[%s, user_table_1_1, -U, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
+                                "+I[%s, user_table_1_2, -U, 121, user_121, Shanghai, 123567891234, null, null]")
+                        .map(s -> String.format(s, userDatabase1.getDatabaseName()))
+                        .sorted()
+                        .collect(Collectors.toList());
+
+        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        Collections.sort(actual);
+        assertEquals(expected, actual);
+        result.getJobClient().get().cancel().get();
+    }
 }
