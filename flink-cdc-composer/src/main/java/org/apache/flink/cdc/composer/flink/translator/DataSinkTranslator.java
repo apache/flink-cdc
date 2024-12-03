@@ -20,6 +20,8 @@ package org.apache.flink.cdc.composer.flink.translator;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
+import org.apache.flink.api.connector.source.Boundedness;
+import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
@@ -48,6 +50,8 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.transformations.LegacySinkTransformation;
 import org.apache.flink.streaming.api.transformations.PhysicalTransformation;
+import org.apache.flink.streaming.api.transformations.WithBoundedness;
+import org.apache.flink.util.Preconditions;
 
 import java.lang.reflect.InvocationTargetException;
 
@@ -112,7 +116,7 @@ public class DataSinkTranslator {
         }
 
         if (sink instanceof TwoPhaseCommittingSink) {
-            addCommittingTopology(sink, stream, sinkName, schemaOperatorID);
+            addCommittingTopology((TwoPhaseCommittingSink<Event, ?>) sink, stream, sinkName, schemaOperatorID);
         } else {
             stream.transform(
                     SINK_WRITER_PREFIX + sinkName,
@@ -140,12 +144,12 @@ public class DataSinkTranslator {
     }
 
     private <CommT> void addCommittingTopology(
-            Sink<Event> sink,
+            TwoPhaseCommittingSink<Event, CommT> sink,
             DataStream<Event> inputStream,
             String sinkName,
             OperatorID schemaOperatorID) {
         TypeInformation<CommittableMessage<CommT>> typeInformation =
-                CommittableMessageTypeInfo.of(() -> getCommittableSerializer(sink));
+                CommittableMessageTypeInfo.of(sink::getCommittableSerializer);
         DataStream<CommittableMessage<CommT>> written =
                 inputStream.transform(
                         SINK_WRITER_PREFIX + sinkName,
@@ -158,8 +162,9 @@ public class DataSinkTranslator {
                     ((WithPreCommitTopology<Event, CommT>) sink).addPreCommitTopology(written);
         }
 
-        // TODO: Hard coding stream mode and checkpoint
-        boolean isBatchMode = false;
+        boolean isBatchMode = !existsUnboundedSource(inputStream.getTransformation());
+
+        // TODO: Hard coding checkpoint
         boolean isCheckpointingEnabled = true;
         DataStream<CommittableMessage<CommT>> committed =
                 preCommitted.transform(
@@ -208,5 +213,17 @@ public class DataSinkTranslator {
                 | InvocationTargetException e) {
             throw new RuntimeException("Failed to create CommitterOperatorFactory", e);
         }
+    }
+
+    private boolean existsUnboundedSource(final Transformation<?> transformation) {
+        return isUnboundedSource(transformation)
+                || transformation.getTransitivePredecessors().stream()
+                        .anyMatch(this::isUnboundedSource);
+    }
+
+    private boolean isUnboundedSource(final Transformation<?> transformation) {
+        Preconditions.checkNotNull(transformation);
+        return transformation instanceof WithBoundedness
+                && ((WithBoundedness) transformation).getBoundedness() != Boundedness.BOUNDED;
     }
 }

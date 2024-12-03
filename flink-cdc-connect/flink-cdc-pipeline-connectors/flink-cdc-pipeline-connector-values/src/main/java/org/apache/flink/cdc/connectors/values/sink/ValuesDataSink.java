@@ -17,8 +17,10 @@
 
 package org.apache.flink.cdc.connectors.values.sink;
 
+import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
@@ -35,8 +37,14 @@ import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.values.ValuesDatabase;
+import org.apache.flink.core.io.SimpleVersionedSerializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.io.Serializable;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,7 +93,7 @@ public class ValuesDataSink implements DataSink, Serializable {
     }
 
     /** an e2e {@link Sink} implementation that print all {@link DataChangeEvent} out. */
-    private static class ValuesSink implements Sink<Event> {
+    private static class ValuesSink implements Sink<Event>, TwoPhaseCommittingSink<Event, Integer> {
 
         private final boolean materializedInMemory;
 
@@ -97,19 +105,56 @@ public class ValuesDataSink implements DataSink, Serializable {
         }
 
         @Override
-        public SinkWriter<Event> createWriter(InitContext context) {
+        public PrecommittingSinkWriter<Event, Integer> createWriter(InitContext context) {
             return new ValuesSinkWriter(
                     materializedInMemory,
                     print,
                     context.getSubtaskId(),
                     context.getNumberOfParallelSubtasks());
         }
+
+        @Override
+        public Committer<Integer> createCommitter() throws IOException {
+            return new Committer<Integer>() {
+                private final Logger LOG = LoggerFactory.getLogger(ValuesSink.class);
+
+                @Override
+                public void commit(Collection<CommitRequest<Integer>> committables) {
+                    LOG.info("Find me in the logs. Committing {} committables.", committables.size());
+                }
+
+                @Override
+                public void close() {
+                }
+            };
+        }
+
+        @Override
+        public SimpleVersionedSerializer<Integer> getCommittableSerializer() {
+            return new SimpleVersionedSerializer<Integer>() {
+                @Override
+                public int getVersion() {
+                    return 0;
+                }
+
+                @Override
+                public byte[] serialize(Integer obj) {
+                    return new byte[0];
+                }
+
+                @Override
+                public Integer deserialize(int version, byte[] serialized) {
+                    return null;
+                }
+            };
+        }
     }
 
     /**
      * Print {@link DataChangeEvent} to console, and update table records in {@link ValuesDatabase}.
      */
-    private static class ValuesSinkWriter implements SinkWriter<Event> {
+    private static class ValuesSinkWriter implements SinkWriter<Event>, TwoPhaseCommittingSink.PrecommittingSinkWriter<Event, Integer> {
+        private static final Logger LOG = LoggerFactory.getLogger(ValuesSinkWriter.class);
 
         private final boolean materializedInMemory;
 
@@ -176,6 +221,11 @@ public class ValuesDataSink implements DataSink, Serializable {
 
         @Override
         public void close() {}
+
+        @Override
+        public Collection<Integer> prepareCommit() {
+            return Collections.singletonList(1);
+        }
     }
 
     /** SinkApi which sink based on. */
