@@ -141,7 +141,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                     "+I[1017, user_18, Shanghai, 123567891234]",
                     "+I[1018, user_19, Shanghai, 123567891234]",
                     "+I[1019, user_20, Shanghai, 123567891234]",
-                    "+I[2000, user_21, Shanghai, 123567891234]");
+                    "+I[2000, user_21, China:Shanghai, 123567891234]");
 
     /** First part binlog events in string, which is made by {@link #makeFirstPartBinlogEvents}. */
     private final List<String> firstPartBinlogEvents =
@@ -287,7 +287,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
 
         // The sleeping source will sleep awhile after send per record
-        MySqlSource<RowData> sleepingSource = buildSleepingSource();
+        MySqlSource<RowData> sleepingSource = buildSleepingSource(null);
         DataStreamSource<RowData> source =
                 env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
 
@@ -313,7 +313,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                     "+I[1017, user_18, Shanghai, 123567891234]",
                     "+I[1018, user_19, Shanghai, 123567891234]",
                     "+I[1019, user_20, Shanghai, 123567891234]",
-                    "+I[2000, user_21, Shanghai, 123567891234]"
+                    "+I[2000, user_21, China:Shanghai, 123567891234]"
                 };
         TypeSerializer<RowData> serializer =
                 source.getTransformation().getOutputType().createSerializer(env.getConfig());
@@ -345,6 +345,150 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         }
 
         // Check all snapshot records are sent with exactly-once semantics
+        assertEqualsInAnyOrder(
+                Arrays.asList(expectedSnapshotData),
+                fetchRowData(iterator, expectedSnapshotData.length));
+        assertTrue(!hasNextData(iterator));
+        jobClient.cancel().get();
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public void testSnapshotFilters() throws Exception {
+        customDatabase.createAndInitialize();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(DEFAULT_PARALLELISM);
+        env.enableCheckpointing(5000L);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+
+        // Filter user with `id > 200`
+        // The sleeping source will sleep awhile after send per record
+        MySqlSource<RowData> sleepingSource = buildSleepingSource("id > 1000");
+        DataStreamSource<RowData> source =
+                env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
+
+        String[] expectedSnapshotData =
+                new String[] {
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]",
+                    "+I[2000, user_21, China:Shanghai, 123567891234]"
+                };
+        TypeSerializer<RowData> serializer =
+                source.getTransformation().getOutputType().createSerializer(env.getConfig());
+        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
+        CollectSinkOperatorFactory<RowData> factory =
+                new CollectSinkOperatorFactory(serializer, accumulatorName);
+        CollectSinkOperator<RowData> operator = (CollectSinkOperator) factory.getOperator();
+        CollectResultIterator<RowData> iterator =
+                new CollectResultIterator(
+                        operator.getOperatorIdFuture(),
+                        serializer,
+                        accumulatorName,
+                        env.getCheckpointConfig(),
+                        10000L);
+        CollectStreamSink<RowData> sink = new CollectStreamSink(source, factory);
+        sink.name("Data stream collect sink");
+        env.addOperator(sink.getTransformation());
+        JobClient jobClient = env.executeAsync("snapshotSplitTest");
+        iterator.setJobClient(jobClient);
+        JobID jobId = jobClient.getJobID();
+
+        // Trigger failover once some snapshot records has been sent by sleeping source
+        if (iterator.hasNext()) {
+            triggerFailover(
+                    FailoverType.JM,
+                    jobId,
+                    miniClusterResource.getMiniCluster(),
+                    () -> sleepMs(100));
+        }
+
+        // Check all snapshot records are sent with exactly-once semantics
+        //        List<String> xx = fetchRowData(iterator, expectedSnapshotData.length);
+        assertEqualsInAnyOrder(
+                Arrays.asList(expectedSnapshotData),
+                fetchRowData(iterator, expectedSnapshotData.length));
+        assertTrue(!hasNextData(iterator));
+        jobClient.cancel().get();
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public void testSnapshotFiltersEscape() throws Exception {
+        customDatabase.createAndInitialize();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(DEFAULT_PARALLELISM);
+        env.enableCheckpointing(5000L);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+
+        // Filter user with `id > 200`
+        // The sleeping source will sleep awhile after send per record
+        MySqlSource<RowData> sleepingSource = buildSleepingSource("address != 'China:Shanghai'");
+        DataStreamSource<RowData> source =
+                env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
+
+        String[] expectedSnapshotData =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]"
+                };
+        TypeSerializer<RowData> serializer =
+                source.getTransformation().getOutputType().createSerializer(env.getConfig());
+        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
+        CollectSinkOperatorFactory<RowData> factory =
+                new CollectSinkOperatorFactory(serializer, accumulatorName);
+        CollectSinkOperator<RowData> operator = (CollectSinkOperator) factory.getOperator();
+        CollectResultIterator<RowData> iterator =
+                new CollectResultIterator(
+                        operator.getOperatorIdFuture(),
+                        serializer,
+                        accumulatorName,
+                        env.getCheckpointConfig(),
+                        10000L);
+        CollectStreamSink<RowData> sink = new CollectStreamSink(source, factory);
+        sink.name("Data stream collect sink");
+        env.addOperator(sink.getTransformation());
+        JobClient jobClient = env.executeAsync("snapshotSplitTest");
+        iterator.setJobClient(jobClient);
+        JobID jobId = jobClient.getJobID();
+
+        // Trigger failover once some snapshot records has been sent by sleeping source
+        if (iterator.hasNext()) {
+            triggerFailover(
+                    FailoverType.JM,
+                    jobId,
+                    miniClusterResource.getMiniCluster(),
+                    () -> sleepMs(100));
+        }
+
+        // Check all snapshot records are sent with exactly-once semantics
+        //        List<String> xx = fetchRowData(iterator, expectedSnapshotData.length);
         assertEqualsInAnyOrder(
                 Arrays.asList(expectedSnapshotData),
                 fetchRowData(iterator, expectedSnapshotData.length));
@@ -392,7 +536,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         "+I[1017, user_18, Shanghai, 123567891234]",
                         "+I[1018, user_19, Shanghai, 123567891234]",
                         "+I[1019, user_20, Shanghai, 123567891234]",
-                        "+I[2000, user_21, Shanghai, 123567891234]");
+                        "+I[2000, user_21, China:Shanghai, 123567891234]");
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
@@ -528,9 +672,9 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         "+I[1017, user_18, Shanghai, 123567891234]",
                         "+I[1018, user_19, Shanghai, 123567891234]",
                         "+I[1019, user_20, Shanghai, 123567891234]",
-                        "+I[2000, user_21, Shanghai, 123567891234]",
+                        "+I[2000, user_21, China:Shanghai, 123567891234]",
                         "+I[15213, user_15213, Shanghai, 123567891234]",
-                        "-U[2000, user_21, Shanghai, 123567891234]",
+                        "-U[2000, user_21, China:Shanghai, 123567891234]",
                         "+U[2000, user_21, Pittsburgh, 123567891234]",
                         "-D[1019, user_20, Shanghai, 123567891234]");
         // when skip backfill, the wal log between (snapshot, high_watermark) will be seen as
@@ -569,7 +713,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         "+I[2000, user_21, Pittsburgh, 123567891234]",
                         "+I[15213, user_15213, Shanghai, 123567891234]",
                         "+I[15213, user_15213, Shanghai, 123567891234]",
-                        "-U[2000, user_21, Shanghai, 123567891234]",
+                        "-U[2000, user_21, China:Shanghai, 123567891234]",
                         "+U[2000, user_21, Pittsburgh, 123567891234]",
                         "-D[1019, user_20, Shanghai, 123567891234]");
         // when skip backfill, the wal log between (snapshot, high_watermark) will still be
@@ -816,7 +960,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         return iterator;
     }
 
-    private MySqlSource<RowData> buildSleepingSource() {
+    private MySqlSource<RowData> buildSleepingSource(String snapshotFilter) {
         ResolvedSchema physicalSchema =
                 new ResolvedSchema(
                         Arrays.asList(
@@ -868,6 +1012,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 .chunkKeyColumn(
                         new ObjectPath(customDatabase.getDatabaseName(), tableName),
                         chunkColumnName)
+                .snapshotFilters(customDatabase.getDatabaseName() + "." + tableName, snapshotFilter)
                 .build();
     }
 
@@ -1009,7 +1154,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                     "+I[1017, user_18, Shanghai, 123567891234]",
                     "+I[1018, user_19, Shanghai, 123567891234]",
                     "+I[1019, user_20, Shanghai, 123567891234]",
-                    "+I[2000, user_21, Shanghai, 123567891234]"
+                    "+I[2000, user_21, China:Shanghai, 123567891234]"
                 };
 
         List<String> expectedSnapshotData = new ArrayList<>();

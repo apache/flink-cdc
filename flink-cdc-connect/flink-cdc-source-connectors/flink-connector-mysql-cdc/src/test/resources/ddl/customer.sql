@@ -46,7 +46,7 @@ VALUES (101,"user_1","Shanghai","123567891234"),
        (1017,"user_18","Shanghai","123567891234"),
        (1018,"user_19","Shanghai","123567891234"),
        (1019,"user_20","Shanghai","123567891234"),
-       (2000,"user_21","Shanghai","123567891234");
+       (2000,"user_21","China:Shanghai","123567891234");
 
 -- Create a table will not be read
 CREATE TABLE prefix_customers (
@@ -91,7 +91,7 @@ VALUES (101,"user_1","Shanghai","123567891234"),
        (1017,"user_18","Shanghai","123567891234"),
        (1018,"user_19","Shanghai","123567891234"),
        (1019,"user_20","Shanghai","123567891234"),
-       (2000,"user_21","Shanghai","123567891234");
+       (2000,"user_21","China:Shanghai","123567891234");
 
 -- create table whose split key is evenly distributed
 CREATE TABLE customers_even_dist (
@@ -179,7 +179,7 @@ VALUES (101,"user_1","Shanghai","123567891234"),
        (1017,"user_18","Shanghai","123567891234"),
        (1018,"user_19","Shanghai","123567891234"),
        (1019,"user_20","Shanghai","123567891234"),
-       (2000,"user_21","Shanghai","123567891234");
+       (2000,"user_21","China:Shanghai","123567891234");
 
 -- table has combined primary key
 CREATE TABLE customer_card (
