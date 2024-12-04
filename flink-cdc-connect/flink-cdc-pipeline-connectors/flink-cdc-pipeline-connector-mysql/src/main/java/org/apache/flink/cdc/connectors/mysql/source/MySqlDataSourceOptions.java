@@ -279,8 +279,8 @@ public class MySqlDataSourceOptions {
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "The filter of table snapshot, captured tables' rows will be filtered by the filter expression (AKA a SQL where clause) when reading the snapshot of table."
-                                    + "By default, no filter is applied, which means the entire table will be synchronized."
-                                    + "Use a colon (:) to separate table name and filter expression, use a semicolon (;) to separate multiple filters."
-                                    + "eg. db1.user_table_[0-9]+:id > 100;db[1-2].[app|web]_order_\\.*:id < 0;");
+                            "When reading a table snapshot, the rows of captured tables will be filtered using the specified filter expression (AKA a SQL WHERE clause). "
+                                    + "By default, no filter is applied, meaning the entire table will be synchronized. "
+                                    + "A colon (:) separates table name and filter expression, while a semicolon (;) separate multiple filters, "
+                                    + "e.g. `db1.user_table_[0-9]+:id > 100;db[1-2].[app|web]_order_\\.*:id < 0;`.");
 }
