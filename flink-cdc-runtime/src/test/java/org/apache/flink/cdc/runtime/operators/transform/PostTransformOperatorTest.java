@@ -92,7 +92,7 @@ public class PostTransformOperatorTest {
                     .physicalColumn("sid", DataTypes.INT())
                     .physicalColumn("name", DataTypes.STRING())
                     .physicalColumn("name_upper", DataTypes.STRING())
-                    .physicalColumn("tbname", DataTypes.STRING())
+                    .physicalColumn("tbname", DataTypes.STRING().notNull())
                     .primaryKey("sid")
                     .build();
 
