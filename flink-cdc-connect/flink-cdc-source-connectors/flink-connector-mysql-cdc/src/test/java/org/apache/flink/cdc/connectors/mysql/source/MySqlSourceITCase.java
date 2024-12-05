@@ -287,7 +287,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
 
         // The sleeping source will sleep awhile after send per record
-        MySqlSource<RowData> sleepingSource = buildSleepingSource(new HashMap<>());
+        MySqlSource<RowData> sleepingSource = buildSleepingSource(null);
         DataStreamSource<RowData> source =
                 env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
 
@@ -362,10 +362,8 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
 
         // Filter user with `id > 200`
-        HashMap<String, String> snapshotFilters = new HashMap<>();
-        snapshotFilters.put(customDatabase.getDatabaseName() + "." + tableName, "id > 200");
         // The sleeping source will sleep awhile after send per record
-        MySqlSource<RowData> sleepingSource = buildSleepingSource(snapshotFilters);
+        MySqlSource<RowData> sleepingSource = buildSleepingSource("id > 200");
         DataStreamSource<RowData> source =
                 env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
 
@@ -885,7 +883,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         return iterator;
     }
 
-    private MySqlSource<RowData> buildSleepingSource(HashMap<String, String> snapshotFilters) {
+    private MySqlSource<RowData> buildSleepingSource(String snapshotFilter) {
         ResolvedSchema physicalSchema =
                 new ResolvedSchema(
                         Arrays.asList(
@@ -937,7 +935,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 .chunkKeyColumn(
                         new ObjectPath(customDatabase.getDatabaseName(), tableName),
                         chunkColumnName)
-                .snapshotFilters(snapshotFilters)
+                .snapshotFilters(customDatabase.getDatabaseName() + "." + tableName, snapshotFilter)
                 .build();
     }
 

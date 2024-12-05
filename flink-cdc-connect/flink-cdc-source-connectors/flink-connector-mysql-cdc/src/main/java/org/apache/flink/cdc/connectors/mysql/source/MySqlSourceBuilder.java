@@ -270,11 +270,11 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
-     * The filter of table snapshot, captured tables' rows will be filtered by the filter expression
-     * (AKA a SQL where clause) when reading the snapshot of table.
+     * When reading a table snapshot, the rows of captured tables will be filtered using the
+     * specified filter expression (AKA a SQL WHERE clause).
      */
-    public MySqlSourceBuilder<T> snapshotFilters(Map<String, String> snapshotFilters) {
-        this.configFactory.snapshotFilters(snapshotFilters);
+    public MySqlSourceBuilder<T> snapshotFilters(String table, String filter) {
+        this.configFactory.snapshotFilters(table, filter);
         return this;
     }
 

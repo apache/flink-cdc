@@ -292,8 +292,21 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * When reading a table snapshot, the rows of captured tables will be filtered using the
+     * specified filter expression (AKA a SQL WHERE clause).
+     */
+    public MySqlSourceConfigFactory snapshotFilters(String table, String filter) {
+        this.snapshotFilters.put(table, filter);
+        return this;
+    }
+
+    /**
+     * When reading a table snapshot, the rows of captured tables will be filtered using the
+     * specified filter expression (AKA a SQL WHERE clause).
+     */
     public MySqlSourceConfigFactory snapshotFilters(Map<String, String> snapshotFilters) {
-        this.snapshotFilters = snapshotFilters;
+        this.snapshotFilters.putAll(snapshotFilters);
         return this;
     }
 
