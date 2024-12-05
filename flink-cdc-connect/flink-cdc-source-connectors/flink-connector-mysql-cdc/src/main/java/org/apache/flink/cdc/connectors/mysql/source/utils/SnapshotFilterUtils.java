@@ -60,7 +60,8 @@ public class SnapshotFilterUtils {
         String filter = null;
         for (Selectors selector : snapshotFilters.keySet()) {
             if (selector.isMatch(
-                    org.apache.flink.cdc.common.event.TableId.parse(tableId.identifier()))) {
+                    org.apache.flink.cdc.common.event.TableId.tableId(
+                            tableId.catalog(), tableId.table()))) {
                 filter = snapshotFilters.get(selector);
                 break;
             }

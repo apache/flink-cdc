@@ -24,7 +24,6 @@ import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.table.catalog.ObjectPath;
 
 import java.time.Duration;
-import java.util.Map;
 import java.util.Properties;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;

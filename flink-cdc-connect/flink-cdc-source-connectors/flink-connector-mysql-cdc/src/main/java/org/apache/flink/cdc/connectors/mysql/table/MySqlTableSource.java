@@ -223,7 +223,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .heartbeatInterval(heartbeatInterval)
                             .chunkKeyColumn(new ObjectPath(database, tableName), chunkKeyColumn)
                             .skipSnapshotBackfill(skipSnapshotBackFill)
-                            .snapshotFilters(database + "." + tableName, snapshotFilter)
+                            .snapshotFilters(
+                                    escapeDot(database) + "." + escapeDot(tableName),
+                                    snapshotFilter)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -411,5 +413,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             }
         }
         return newDbzProperties;
+    }
+
+    private String escapeDot(String str) {
+        return str.replace(".", "\\.");
     }
 }
