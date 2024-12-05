@@ -116,34 +116,6 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
     @Override
     protected Object convertToString(Object dbzObj, Schema schema) {
-        // the Geometry datatype in MySQL will be converted to
-        // a String with Json format
-        // if (Point.LOGICAL_NAME.equals(schema.name())
-        //        || Geometry.LOGICAL_NAME.equals(schema.name())) {
-        //    try {
-        //        Struct geometryStruct = (Struct) dbzObj;
-        //        byte[] wkb = geometryStruct.getBytes("wkb");
-        //        String geoJson = OGCGeometry.fromBinary(ByteBuffer.wrap(wkb)).asGeoJson();
-        //        JsonNode originGeoNode = OBJECT_MAPPER.readTree(geoJson);
-        //        Optional<Integer> srid = Optional.ofNullable(geometryStruct.getInt32("srid"));
-        //        Map<String, Object> geometryInfo = new HashMap<>();
-        //        String geometryType = originGeoNode.get("type").asText();
-        //        geometryInfo.put("type", geometryType);
-        //        if (geometryType.equals("GeometryCollection")) {
-        //            geometryInfo.put("geometries", originGeoNode.get("geometries"));
-        //        } else {
-        //            geometryInfo.put("coordinates", originGeoNode.get("coordinates"));
-        //        }
-        //        geometryInfo.put("srid", srid.orElse(0));
-        //        return BinaryStringData.fromString(
-        //                OBJECT_MAPPER.writer().writeValueAsString(geometryInfo));
-        //    } catch (Exception e) {
-        //        throw new IllegalArgumentException(
-        //                String.format("Failed to convert %s to geometry JSON.", dbzObj), e);
-        //    }
-        // } else {
-        //    return BinaryStringData.fromString(dbzObj.toString());
-        // }
         return BinaryStringData.fromString(dbzObj.toString());
     }
 }

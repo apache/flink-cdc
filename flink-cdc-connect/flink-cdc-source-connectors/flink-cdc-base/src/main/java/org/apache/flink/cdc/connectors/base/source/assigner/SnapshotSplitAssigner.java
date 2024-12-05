@@ -298,14 +298,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                     .addProcessedSplit(snapshotSplit.splitId());
         }
         for (String splitId : splitFinishedOffsets.keySet()) {
-            String[] splits = splitId.split(":");
-            if (splits.length == 2) {
-                TableId tableId = TableId.parse(splits[0]);
-                this.enumeratorMetrics.getTableMetrics(tableId).addFinishedSplit(splitId);
-            } else {
-                throw new IllegalArgumentException(
-                        "SplitId " + splitId + " is malformed, please refer to the documents");
-            }
+            TableId tableId = SnapshotSplit.extractTableId(splitId);
+            this.enumeratorMetrics.getTableMetrics(tableId).addFinishedSplit(splitId);
         }
     }
 
@@ -406,7 +400,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             splitFinishedCheckpointIds.put(splitId, UNDEFINED_CHECKPOINT_ID);
         }
         LOG.info(
-                "onFinishedSplits, splitFinishedCheckpointIds size: {}",
+                "splitFinishedCheckpointIds size in onFinishedSplits: {}",
                 splitFinishedCheckpointIds == null ? 0 : splitFinishedCheckpointIds.size());
         if (allSnapshotSplitsFinished() && isAssigningSnapshotSplits(assignerStatus)) {
             // Skip the waiting checkpoint when current parallelism is 1 which means we do not need
@@ -502,7 +496,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 if (splitCheckpointId != UNDEFINED_CHECKPOINT_ID
                         && checkpointId >= splitCheckpointId) {
                     // record table-level splits metrics
-                    TableId tableId = SnapshotSplit.parseTableId(splitId);
+                    TableId tableId = SnapshotSplit.extractTableId(splitId);
                     enumeratorMetrics.getTableMetrics(tableId).addFinishedSplit(splitId);
                     iterator.remove();
                 }
