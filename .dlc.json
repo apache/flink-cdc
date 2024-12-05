@@ -31,5 +31,11 @@
     200,
     401,
     403
+  ],
+  "replacementPatterns": [
+    {
+      "pattern": "{{< param Version >}}",
+      "replacement": "3.2.1"
+    }
   ]
 }
