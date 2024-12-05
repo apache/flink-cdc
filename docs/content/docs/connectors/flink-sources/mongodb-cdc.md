@@ -357,21 +357,29 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
     </tr>
+    <tr>
+      <td>row_kind</td>
+      <td>STRING NOT NULL</td>
+      <td>It indicates the row kind of the changelog,Note: The downstream SQL operator may fail to compare due to this new added column when processing the row retraction if 
+the source operator chooses to output the 'row_kind' column for each record. It is recommended to use this metadata column only in simple synchronization jobs.
+<br>'+I' means INSERT message, '-D' means DELETE message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message.</td>
+    </tr>
   </tbody>
 </table>
 
 The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
 ```sql
 CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    db_name         STRING METADATA FROM 'database_name' VIRTUAL,
     collection_name STRING METADATA  FROM 'collection_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    _id STRING, // must be declared
-    name STRING,
-    weight DECIMAL(10,3),
-    tags ARRAY<STRING>, -- array
-    price ROW<amount DECIMAL(10,2), currency STRING>, -- embedded document
-    suppliers ARRAY<ROW<name STRING, address STRING>>, -- embedded documents
+    operation_ts    TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation       STRING METADATA FROM 'row_kind' VIRTUAL,
+    _id             STRING, // must be declared
+    name            STRING,
+    weight          DECIMAL(10,3),
+    tags            ARRAY<STRING>, -- array
+    price           ROW<amount DECIMAL(10,2), currency STRING>, -- embedded document
+    suppliers       ARRAY<ROW<name STRING, address STRING>>, -- embedded documents
     PRIMARY KEY(_id) NOT ENFORCED
 ) WITH (
     'connector' = 'mongodb-cdc',
