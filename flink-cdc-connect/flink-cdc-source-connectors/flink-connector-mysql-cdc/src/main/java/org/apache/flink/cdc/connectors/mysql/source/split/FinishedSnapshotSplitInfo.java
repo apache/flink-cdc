@@ -48,11 +48,6 @@ public class FinishedSnapshotSplitInfo implements Comparable<FinishedSnapshotSpl
     private final Object[] splitEnd;
     private final BinlogOffset highWatermark;
 
-    /**
-     * Cache the return value of {@link #hashCode()} to reduce calculation.
-     */
-    private transient int hashcode;
-
     public FinishedSnapshotSplitInfo(
             TableId tableId,
             String splitId,
@@ -104,14 +99,9 @@ public class FinishedSnapshotSplitInfo implements Comparable<FinishedSnapshotSpl
 
     @Override
     public int hashCode() {
-        if (hashcode != 0) {
-            return hashcode;
-        }
-        // In rare situation the result is 0, recalculate is acceptable.
         int result = Objects.hash(tableId, splitId, highWatermark);
         result = 31 * result + Arrays.hashCode(splitStart);
         result = 31 * result + Arrays.hashCode(splitEnd);
-        hashcode = result;
         return result;
     }
 

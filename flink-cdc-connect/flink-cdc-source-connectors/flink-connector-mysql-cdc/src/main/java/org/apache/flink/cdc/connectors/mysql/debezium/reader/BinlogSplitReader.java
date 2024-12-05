@@ -90,7 +90,6 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
 
     private MySqlBinlogSplitReadTask binlogSplitReadTask;
     private MySqlBinlogSplit currentBinlogSplit;
-    //    private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
     private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
     private final Set<TableId> pureBinlogPhaseTables;
