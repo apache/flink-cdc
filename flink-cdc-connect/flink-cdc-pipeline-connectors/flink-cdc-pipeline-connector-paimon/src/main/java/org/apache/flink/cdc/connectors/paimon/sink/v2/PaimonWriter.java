@@ -56,9 +56,6 @@ public class PaimonWriter<InputT>
 
     // Each job can only have one user name and this name must be consistent across restarts.
     private final String commitUser;
-    // all table write should share one write buffer so that writers can preempt memory
-    // from those of other tables
-    private MemoryPoolFactory memoryPoolFactory;
 
     // deserializer that converts Input into PaimonEvent.
     private final PaimonRecordSerializer<InputT> serializer;
@@ -127,38 +124,37 @@ public class PaimonWriter<InputT>
             }
         }
         if (paimonEvent.getGenericRow() != null) {
-            FileStoreTable table;
-            table = getTable(tableId);
-            if (memoryPoolFactory == null) {
-                memoryPoolFactory =
-                        new MemoryPoolFactory(
-                                // currently, the options of all tables are the same in CDC
-                                new HeapMemorySegmentPool(
-                                        table.coreOptions().writeBufferSize(),
-                                        table.coreOptions().pageSize()));
-            }
-            StoreSinkWrite write =
-                    writes.computeIfAbsent(
-                            tableId,
-                            id -> {
-                                StoreSinkWriteImpl storeSinkWrite =
-                                        new StoreSinkWriteImpl(
-                                                table,
-                                                commitUser,
-                                                ioManager,
-                                                false,
-                                                false,
-                                                true,
-                                                memoryPoolFactory,
-                                                metricGroup);
-                                storeSinkWrite.withCompactExecutor(compactExecutor);
-                                return storeSinkWrite;
-                            });
+            StoreSinkWrite write = getWrite(tableId);
             try {
                 write.write(paimonEvent.getGenericRow(), paimonEvent.getBucket());
             } catch (Exception e) {
                 throw new IOException(e);
             }
+        }
+    }
+
+    private StoreSinkWrite getWrite(Identifier tableId) {
+        FileStoreTable table = getTable(tableId);
+        if (writes.containsKey(tableId)) {
+            return writes.get(tableId);
+        } else {
+            MemoryPoolFactory memoryPoolFactory =
+                    new MemoryPoolFactory(
+                            new HeapMemorySegmentPool(
+                                    table.coreOptions().writeBufferSize(),
+                                    table.coreOptions().pageSize()));
+            StoreSinkWriteImpl storeSinkWrite =
+                    new StoreSinkWriteImpl(
+                            table,
+                            commitUser,
+                            ioManager,
+                            false,
+                            true,
+                            true,
+                            memoryPoolFactory,
+                            metricGroup);
+            storeSinkWrite.withCompactExecutor(compactExecutor);
+            return storeSinkWrite;
         }
     }
 
