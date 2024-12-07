@@ -293,6 +293,17 @@ pipeline:
           scan.binlog.newly-added-table.enabled: only do binlog-reading for newly added table during binlog reading phase.
       </td>
     </tr>
+    <tr>
+      <td>scan.snapshot.filters</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>When reading a table snapshot, the rows of captured tables will be filtered using the specified filter expression (AKA a SQL WHERE clause). <br>
+          By default, no filter is applied, meaning the entire table will be synchronized. <br>
+          A colon (:) separates table name and filter expression, while a semicolon (;) separate multiple filters, 
+          e.g. `db1.user_table_[0-9]+:id > 100;db[1-2].[app|web]_order_\\.*:id < 0;`.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

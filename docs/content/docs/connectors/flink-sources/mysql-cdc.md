@@ -391,6 +391,13 @@ During a snapshot operation, the connector will query each included table to pro
           hex: The binary data type is converted to a hexadecimal string and transmitted.
       The default value is none. Depending on your requirements and data types, you can choose the appropriate processing mode. If your database contains a large number of binary data types, it is recommended to use base64 or hex mode to make it easier to handle during transmission.</td> 
     </tr>
+    <tr>
+      <td>scan.snapshot.filter</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>When reading a table snapshot, the rows of captured tables will be filtered using the specified filter expression (AKA a SQL WHERE clause). By default, no filter is applied, meaning the entire table will be synchronized. e.g. `id > 100`.</td> 
+    </tr>
     </tbody>
 </table>
 </div>
