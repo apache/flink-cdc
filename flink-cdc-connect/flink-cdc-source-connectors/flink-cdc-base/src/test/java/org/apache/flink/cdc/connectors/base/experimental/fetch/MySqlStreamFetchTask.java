@@ -17,8 +17,8 @@
 
 package org.apache.flink.cdc.connectors.base.experimental.fetch;
 
+import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.experimental.offset.BinlogOffset;
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
@@ -34,7 +34,9 @@ import io.debezium.connector.mysql.MySqlStreamingChangeEventSource;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.connector.mysql.MySqlTaskContext;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
+import io.debezium.relational.TableId;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +62,8 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
                 new MySqlBinlogSplitReadTask(
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getConnection(),
-                        sourceFetchContext.getDispatcher(),
+                        sourceFetchContext.getEventDispatcher(),
+                        sourceFetchContext.getWaterMarkDispatcher(),
                         sourceFetchContext.getErrorHandler(),
                         sourceFetchContext.getTaskContext(),
                         sourceFetchContext.getStreamingChangeEventSourceMetrics(),
@@ -96,14 +99,15 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
 
         private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplitReadTask.class);
         private final StreamSplit binlogSplit;
-        private final JdbcSourceEventDispatcher<MySqlPartition> dispatcher;
+        private final WatermarkDispatcher watermarkDispatcher;
         private final ErrorHandler errorHandler;
         private ChangeEventSourceContext context;
 
         public MySqlBinlogSplitReadTask(
                 MySqlConnectorConfig connectorConfig,
                 MySqlConnection connection,
-                JdbcSourceEventDispatcher<MySqlPartition> dispatcher,
+                EventDispatcher<MySqlPartition, TableId> eventDispatcher,
+                WatermarkDispatcher watermarkDispatcher,
                 ErrorHandler errorHandler,
                 MySqlTaskContext taskContext,
                 MySqlStreamingChangeEventSourceMetrics metrics,
@@ -111,13 +115,13 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
             super(
                     connectorConfig,
                     connection,
-                    dispatcher,
+                    eventDispatcher,
                     errorHandler,
                     Clock.SYSTEM,
                     taskContext,
                     metrics);
             this.binlogSplit = binlogSplit;
-            this.dispatcher = dispatcher;
+            this.watermarkDispatcher = watermarkDispatcher;
             this.errorHandler = errorHandler;
         }
 
@@ -143,7 +147,7 @@ public class MySqlStreamFetchTask implements FetchTask<SourceSplitBase> {
                 if (currentBinlogOffset.isAtOrAfter(binlogSplit.getEndingOffset())) {
                     // send binlog end event
                     try {
-                        dispatcher.dispatchWatermarkEvent(
+                        watermarkDispatcher.dispatchWatermarkEvent(
                                 partition.getSourcePartition(),
                                 binlogSplit,
                                 currentBinlogOffset,

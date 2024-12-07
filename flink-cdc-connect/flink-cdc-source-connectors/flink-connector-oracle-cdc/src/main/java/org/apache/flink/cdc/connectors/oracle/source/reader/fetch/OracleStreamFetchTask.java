@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.oracle.source.reader.fetch;
 
 import org.apache.flink.cdc.common.annotation.Internal;
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
+import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
@@ -33,6 +33,8 @@ import io.debezium.connector.oracle.OracleStreamingChangeEventSourceMetrics;
 import io.debezium.connector.oracle.logminer.LogMinerStreamingChangeEventSource;
 import io.debezium.connector.oracle.logminer.processor.LogMinerEventProcessor;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.EventDispatcher;
+import io.debezium.relational.TableId;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +58,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                 new RedoLogSplitReadTask(
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getConnection(),
-                        sourceFetchContext.getDispatcher(),
+                        sourceFetchContext.getEventDispatcher(),
+                        sourceFetchContext.getWaterMarkDispatcher(),
                         sourceFetchContext.getErrorHandler(),
                         sourceFetchContext.getDatabaseSchema(),
                         sourceFetchContext.getSourceConfig().getOriginDbzConnectorConfig(),
@@ -93,9 +96,9 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
 
         private static final Logger LOG = LoggerFactory.getLogger(RedoLogSplitReadTask.class);
         private final StreamSplit redoLogSplit;
-        private final JdbcSourceEventDispatcher<OraclePartition> dispatcher;
+        EventDispatcher<OraclePartition, TableId> eventDispatcher;
+        private final WatermarkDispatcher watermarkDispatcher;
         private final ErrorHandler errorHandler;
-        private ChangeEventSourceContext context;
         private final OracleConnectorConfig connectorConfig;
         private final OracleConnection connection;
 
@@ -106,7 +109,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
         public RedoLogSplitReadTask(
                 OracleConnectorConfig connectorConfig,
                 OracleConnection connection,
-                JdbcSourceEventDispatcher<OraclePartition> dispatcher,
+                EventDispatcher<OraclePartition, TableId> eventDispatcher,
+                WatermarkDispatcher watermarkDispatcher,
                 ErrorHandler errorHandler,
                 OracleDatabaseSchema schema,
                 Configuration jdbcConfig,
@@ -115,14 +119,15 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
             super(
                     connectorConfig,
                     connection,
-                    dispatcher,
+                    eventDispatcher,
                     errorHandler,
                     Clock.SYSTEM,
                     schema,
                     jdbcConfig,
                     metrics);
             this.redoLogSplit = redoLogSplit;
-            this.dispatcher = dispatcher;
+            this.eventDispatcher = eventDispatcher;
+            this.watermarkDispatcher = watermarkDispatcher;
             this.errorHandler = errorHandler;
             this.connectorConfig = connectorConfig;
             this.connection = connection;
@@ -135,7 +140,6 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                 ChangeEventSourceContext context,
                 OraclePartition partition,
                 OracleOffsetContext offsetContext) {
-            this.context = context;
             super.execute(context, partition, offsetContext);
         }
 
@@ -152,7 +156,8 @@ public class OracleStreamFetchTask implements FetchTask<SourceSplitBase> {
                     context,
                     connectorConfig,
                     connection,
-                    dispatcher,
+                    eventDispatcher,
+                    watermarkDispatcher,
                     partition,
                     offsetContext,
                     schema,
