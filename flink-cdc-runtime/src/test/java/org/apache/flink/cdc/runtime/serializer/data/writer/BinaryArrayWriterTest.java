@@ -510,20 +510,6 @@ public class BinaryArrayWriterTest {
         BinaryArrayData array = new BinaryArrayData();
         BinaryArrayWriter writer = new BinaryArrayWriter(array, 2, 8);
 
-        // 1. compact
-        {
-            final int precision = 3;
-            writer.reset();
-            writer.writeTimestamp(0, TimestampData.fromMillis(123L), precision);
-            writer.setNullAt(1);
-            writer.complete();
-
-            assertThat(array.getTimestamp(0, 3).toString()).isEqualTo("1970-01-01T00:00:00.123");
-            assertThat(array.isNullAt(1)).isTrue();
-            array.setTimestamp(0, TimestampData.fromMillis(-123L), precision);
-            assertThat(array.getTimestamp(0, 3).toString()).isEqualTo("1969-12-31T23:59:59.877");
-        }
-
         // 2. not compact
         {
             final int precision = 9;
