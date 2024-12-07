@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.parser;
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
@@ -182,7 +183,8 @@ public class TransformParserTest {
     @Test
     public void testParseComputedColumnNames() {
         List<String> computedColumnNames =
-                TransformParser.parseComputedColumnNames("CONCAT(id, order_id) as uniq_id, *");
+                TransformParser.parseComputedColumnNames(
+                        "CONCAT(id, order_id) as uniq_id, *", new SupportedMetadataColumn[0]);
 
         Assertions.assertThat(computedColumnNames.toArray()).isEqualTo(new String[] {"uniq_id"});
     }
@@ -323,7 +325,8 @@ public class TransformParserTest {
                 TransformParser.generateProjectionColumns(
                         "id, upper(name) as name, age + 1 as newage, weight / (height * height) as bmi",
                         testColumns,
-                        Collections.emptyList());
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
 
         List<String> expected =
                 Arrays.asList(
@@ -337,7 +340,8 @@ public class TransformParserTest {
                 TransformParser.generateProjectionColumns(
                         "*, __namespace_name__, __schema_name__, __table_name__",
                         testColumns,
-                        Collections.emptyList());
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
 
         List<String> metadataExpected =
                 Arrays.asList(
@@ -357,7 +361,10 @@ public class TransformParserTest {
         Assertions.assertThatThrownBy(
                         () ->
                                 TransformParser.generateProjectionColumns(
-                                        "id, 1 + 1", testColumns, Collections.emptyList()))
+                                        "id, 1 + 1",
+                                        testColumns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
                 .isExactlyInstanceOf(ParseException.class);
     }
 
