@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.mysql.debezium.reader;
 
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple5;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
@@ -26,6 +28,7 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.ChunkUtils;
+import org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
 import org.apache.flink.cdc.connectors.mysql.table.StartupMode;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
@@ -47,13 +50,9 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -66,6 +65,21 @@ import java.util.function.Predicate;
  */
 public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSplit> {
 
+    /**
+     * tuple5->; split_type, min_end, max_end, chunk_size, binlog_offset
+     * min_end: the min end key of all chunks
+     * max_end: the max end key of all chunks
+     */
+    private Map<TableId, Tuple5<String, Object, Object, Integer, BinlogOffset[]>> tableInfo = new HashMap<>();
+
+    private static final int MAX_SPLIT_INFO_CACHE_SIZE = 3;
+    /**
+     * First element of tuple contains all FinishedSnapshotSplitInfos of given table.
+     *
+     * <p>Second element of tuple contains only recently used FinishedSnapshotSplitInfos of given
+     * table.
+     */
+    private Map<TableId, Tuple2<TreeSet<FinishedSnapshotSplitInfo>, Set<FinishedSnapshotSplitInfo>>> finishedSplitsInfo;
     private static final Logger LOG = LoggerFactory.getLogger(BinlogSplitReader.class);
     private final StatefulTaskContext statefulTaskContext;
     private final ExecutorService executorService;
@@ -76,7 +90,6 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
 
     private MySqlBinlogSplitReadTask binlogSplitReadTask;
     private MySqlBinlogSplit currentBinlogSplit;
-    private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
     private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
     private final Set<TableId> pureBinlogPhaseTables;
@@ -232,12 +245,59 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                 Object[] chunkKey =
                         RecordUtils.getSplitKey(
                                 splitKeyType, statefulTaskContext.getSchemaNameAdjuster(), target);
-                for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
+
+                if (!tableInfo.containsKey(tableId)) {
+                    //get the split type
+                    getChunkType(tableId);
+                    if (tableInfo.get(tableId).f0.equals("even")) {
+                        getEvenlyChunkWatermark(tableId);
+                    }
+
+                }
+                // Search the FinishedSnapshotSplitInfo that contains given chunkKey by index
+                if (tableInfo.get(tableId).f0.equals("even")) {
+                    Object min_end = tableInfo.get(tableId).f1;
+                    Object max_end = tableInfo.get(tableId).f2;
+                    int chunk_size = tableInfo.get(tableId).f3;
+                    BinlogOffset[] arr = tableInfo.get(tableId).f4;
+                    if (ObjectUtils.compare(chunkKey[0], min_end) < 0) {
+                        return position.isAfter(arr[0]);
+                    } else if (ObjectUtils.compare(chunkKey[0], max_end) > 0) {
+                        return position.isAfter(arr[arr.length - 1]);
+                    } else {
+                        long count = ObjectUtils.minus(chunkKey[0], min_end).longValue();
+                        int index = (int) (Math.ceil(count / (double) chunk_size));
+                        return position.isAfter(arr[index]);
+                    }
+                }
+
+
+                // 1. Search the FinishedSnapshotSplitInfo that contains given chunkKey using cached
+                // SplitInfos.
+                Tuple2<TreeSet<FinishedSnapshotSplitInfo>, Set<FinishedSnapshotSplitInfo>>
+                        allOrCachedSplitInfoTuple = finishedSplitsInfo.get(tableId);
+                Set<FinishedSnapshotSplitInfo> cachedSplitInfos = allOrCachedSplitInfoTuple.f1;
+                for (FinishedSnapshotSplitInfo splitInfo : cachedSplitInfos) {
                     if (RecordUtils.splitKeyRangeContains(
-                                    chunkKey, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
+                            chunkKey, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
                             && position.isAfter(splitInfo.getHighWatermark())) {
                         return true;
                     }
+                }
+
+                // 2. Search the FinishedSnapshotSplitInfo using all SplitInfos.
+//                Comparator<FinishedSnapshotSplitInfo> reverseOrder = (s1, s2) -> (RecordUtils.splitKeyRangeContains(
+//                        chunkKey, s1.getSplitStart(), s2.getSplitEnd()));
+                FinishedSnapshotSplitInfo wrapChunkKey =
+                        new FinishedSnapshotSplitInfo(tableId, "", chunkKey, chunkKey, position);
+                FinishedSnapshotSplitInfo floorSplitInfo =
+                        allOrCachedSplitInfoTuple.f0.floor(wrapChunkKey);
+                if (floorSplitInfo != null) {
+                    if (cachedSplitInfos.size() == MAX_SPLIT_INFO_CACHE_SIZE) {
+                        cachedSplitInfos.clear();
+                    }
+                    cachedSplitInfos.add(floorSplitInfo);
+                    return position.isAfter(floorSplitInfo.getHighWatermark());
                 }
             }
             // not in the monitored splits scope, do not emit
@@ -276,7 +336,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     private void configureFilter() {
         List<FinishedSnapshotSplitInfo> finishedSplitInfos =
                 currentBinlogSplit.getFinishedSnapshotSplitInfos();
-        Map<TableId, List<FinishedSnapshotSplitInfo>> splitsInfoMap = new HashMap<>();
+        Map<TableId, Tuple2<TreeSet<FinishedSnapshotSplitInfo>, Set<FinishedSnapshotSplitInfo>>> splitsInfoMap = new HashMap<>();
+
         Map<TableId, BinlogOffset> tableIdBinlogPositionMap = new HashMap<>();
         // startup mode which is stream only
         if (finishedSplitInfos.isEmpty()) {
@@ -288,10 +349,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         else {
             for (FinishedSnapshotSplitInfo finishedSplitInfo : finishedSplitInfos) {
                 TableId tableId = finishedSplitInfo.getTableId();
-                List<FinishedSnapshotSplitInfo> list =
-                        splitsInfoMap.getOrDefault(tableId, new ArrayList<>());
-                list.add(finishedSplitInfo);
-                splitsInfoMap.put(tableId, list);
+                Tuple2<TreeSet<FinishedSnapshotSplitInfo>, Set<FinishedSnapshotSplitInfo>> allOrCachedSplitInfoTuple =
+                        splitsInfoMap.getOrDefault(tableId, new Tuple2<>(new TreeSet<>(), new HashSet<>()));
+                allOrCachedSplitInfoTuple.f0.add(finishedSplitInfo);
+                splitsInfoMap.put(tableId, allOrCachedSplitInfoTuple);
 
                 BinlogOffset highWatermark = finishedSplitInfo.getHighWatermark();
                 BinlogOffset maxHighWatermark = tableIdBinlogPositionMap.get(tableId);
@@ -304,6 +365,85 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;
         this.pureBinlogPhaseTables.clear();
     }
+
+    /**
+     * to judge whether the table is split through the even way
+     * If true,then get the chunk_size,the minimum end key and the max end key of the chunks
+     *
+     * @param tableId
+     */
+    private void getChunkType(TableId tableId) {
+        int chunk_num = this.finishedSplitsInfo.get(tableId).f0.size();
+        if (chunk_num <= 3) {
+            Tuple5<String, Object, Object, Integer, BinlogOffset[]> tuple5 = new Tuple5<>();
+            tuple5.f0 = "uneven";
+            tuple5.f3 = -1;
+            tableInfo.put(tableId, tuple5);
+        }
+        Tuple5<String, Object, Object, Integer, BinlogOffset[]> tuple5 = new Tuple5<>();
+        String type = "even";
+        int chunk_size = -1;
+        Object min_end = null;
+        Object max_end = null;
+
+        for (FinishedSnapshotSplitInfo splitInfo : this.finishedSplitsInfo.get(tableId).f0) {
+            if (splitInfo.getSplitEnd() != null && splitInfo.getSplitStart() != null) {
+                boolean isNumber = RecordUtils.isNumericObject(splitInfo.getSplitEnd()[0]) && RecordUtils.isNumericObject(splitInfo.getSplitStart()[0]);
+                int temp_chunk = 0;
+                if (isNumber) {
+                    temp_chunk = ObjectUtils.minus(splitInfo.getSplitEnd()[0], splitInfo.getSplitStart()[0]).intValue();
+                }
+                if (chunk_size == -1) {
+                    chunk_size = temp_chunk;
+                } else if (splitInfo.getSplitEnd().length != 1 || (chunk_size != temp_chunk) || temp_chunk == 0) {
+                    chunk_size = -1;
+                    type = "uneven";
+                    tuple5.f0 = type;
+                    tuple5.f3 = chunk_size;
+                    tableInfo.put(tableId, tuple5);
+                    return;
+                }
+
+            } else if (splitInfo.getSplitStart() == null) {
+                min_end = splitInfo.getSplitEnd()[0];
+            } else if (splitInfo.getSplitEnd() == null) {
+                max_end = splitInfo.getSplitStart()[0];
+            }
+        }
+        tuple5.f0 = type;
+        tuple5.f1 = min_end;
+        tuple5.f2 = max_end;
+        tuple5.f3 = chunk_size;
+        tableInfo.put(tableId, tuple5);
+    }
+
+    /**
+     * to get each chunk's high watermark and put it in array
+     *
+     * @param tableId
+     */
+    private void getEvenlyChunkWatermark(TableId tableId) {
+        BinlogOffset[] arr = new BinlogOffset[this.finishedSplitsInfo.get(tableId).f0.size()];
+        Object min_end = tableInfo.get(tableId).f1;
+        int chunk_size = tableInfo.get(tableId).f3;
+
+        for (FinishedSnapshotSplitInfo splitInfo : this.finishedSplitsInfo.get(tableId).f0) {
+            if (splitInfo.getSplitEnd() != null && splitInfo.getSplitStart() != null) {
+                BigDecimal subRowCnt = ObjectUtils.minus(splitInfo.getSplitEnd()[0], min_end);
+                int index =
+                        subRowCnt.divide(new BigDecimal(chunk_size), 4, RoundingMode.CEILING).intValue();
+                arr[index] = splitInfo.getHighWatermark();
+            } else if (splitInfo.getSplitStart() == null) {
+                arr[0] = splitInfo.getHighWatermark();
+            } else if (splitInfo.getSplitEnd() == null) {
+                arr[arr.length - 1] = splitInfo.getHighWatermark();
+            }
+        }
+        tableInfo.get(tableId).f4 = arr;
+        //remove the splitsInfo to release memory
+        finishedSplitsInfo.remove(tableId);
+    }
+
 
     private Predicate<Event> createEventFilter() {
         // If the startup mode is set as TIMESTAMP, we need to apply a filter on event to drop
