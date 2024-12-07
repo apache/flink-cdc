@@ -470,22 +470,6 @@ public class BinaryArrayWriterTest {
         }
     }
 
-    //    @Test
-    //    public void testGeneric() {
-    //        BinaryArrayData array = new BinaryArrayData();
-    //        BinaryArrayWriter writer = new BinaryArrayWriter(array, 2, 8);
-    //        RawValueData<String> generic = RawValueData.fromObject("hahah");
-    //        RawValueDataSerializer<String> serializer =
-    //                new RawValueDataSerializer<>(StringSerializer.INSTANCE);
-    //        writer.writeRawValue(0, generic, serializer);
-    //        writer.setNullAt(1);
-    //        writer.complete();
-    //
-    //        RawValueData<String> newGeneric = array.getRawValue(0);
-    //        assertThat(newGeneric).satisfies(matching(equivalent(generic, serializer)));
-    //        assertThat(array.isNullAt(1)).isTrue();
-    //    }
-
     @Test
     public void testNested() {
         BinaryArrayData array = new BinaryArrayData();

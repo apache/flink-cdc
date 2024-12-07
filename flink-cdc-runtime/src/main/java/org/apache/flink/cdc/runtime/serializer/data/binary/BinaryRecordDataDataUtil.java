@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.data.util;
+package org.apache.flink.cdc.runtime.serializer.data.binary;
 
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.core.memory.MemorySegmentFactory;

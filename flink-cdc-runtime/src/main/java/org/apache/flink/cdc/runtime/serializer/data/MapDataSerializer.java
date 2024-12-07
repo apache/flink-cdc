@@ -249,7 +249,7 @@ public class MapDataSerializer extends TypeSerializer<MapData> {
 
     /** {@link TypeSerializerSnapshot} for {@link MapDataSerializer}. */
     public static final class MapDataSerializerSnapshot implements TypeSerializerSnapshot<MapData> {
-        private static final int CURRENT_VERSION = 3;
+        private static final int CURRENT_VERSION = 0;
 
         private DataType keyType;
         private DataType valueType;

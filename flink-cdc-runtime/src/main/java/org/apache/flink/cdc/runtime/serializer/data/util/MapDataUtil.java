@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.data.util;
+package org.apache.flink.cdc.runtime.serializer.data.util;
 
 import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.data.MapData;

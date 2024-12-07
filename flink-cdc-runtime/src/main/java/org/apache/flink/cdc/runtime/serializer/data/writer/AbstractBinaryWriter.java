@@ -180,20 +180,24 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
 
     @Override
     public void writeTimestamp(int pos, TimestampData value, int precision) {
-        // store the nanoOfMillisecond in fixed-length part as offset and nanoOfMillisecond
-        ensureCapacity(8);
-
-        if (value == null) {
-            setNullBit(pos);
-            // zero-out the bytes
-            segment.putLong(cursor, 0L);
-            setOffsetAndSize(pos, cursor, 0);
+        if (TimestampData.isCompact(precision)) {
+            writeLong(pos, value.getMillisecond());
         } else {
-            segment.putLong(cursor, value.getMillisecond());
-            setOffsetAndSize(pos, cursor, value.getNanoOfMillisecond());
-        }
+            // store the nanoOfMillisecond in fixed-length part as offset and nanoOfMillisecond
+            ensureCapacity(8);
 
-        cursor += 8;
+            if (value == null) {
+                setNullBit(pos);
+                // zero-out the bytes
+                segment.putLong(cursor, 0L);
+                setOffsetAndSize(pos, cursor, 0);
+            } else {
+                segment.putLong(cursor, value.getMillisecond());
+                setOffsetAndSize(pos, cursor, value.getNanoOfMillisecond());
+            }
+
+            cursor += 8;
+        }
     }
 
     @Override

@@ -35,7 +35,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import static org.apache.flink.cdc.common.data.util.MapDataUtil.convertToJavaMap;
+import static org.apache.flink.cdc.runtime.serializer.data.util.MapDataUtil.convertToJavaMap;
 
 /** A test for the {@link MapDataSerializer}. */
 public class MapDataSerializerTest extends SerializerTestBase<MapData> {

@@ -320,7 +320,7 @@ public final class BinarySegmentUtils {
         }
     }
 
-    static boolean equalsMultiSegments(
+    public static boolean equalsMultiSegments(
             MemorySegment[] segments1,
             int offset1,
             MemorySegment[] segments2,
