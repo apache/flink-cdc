@@ -33,7 +33,8 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.FactoryUtil;
 
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -44,10 +45,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static org.junit.Assert.assertEquals;
-
 /** Test for {@link SqlServerTableSource} created by {@link SqlServerTableFactory}. */
-public class SqlServerTableFactoryTest {
+class SqlServerTableFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -82,7 +81,7 @@ public class SqlServerTableFactoryTest {
     private static final Properties PROPERTIES = new Properties();
 
     @Test
-    public void testCommonProperties() {
+    void testCommonProperties() {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
@@ -113,11 +112,11 @@ public class SqlServerTableFactoryTest {
                         null,
                         false,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testEnableParallelReadSource() {
+    void testEnableParallelReadSource() {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.incremental.snapshot.enabled", "true");
         properties.put("scan.incremental.snapshot.chunk.size", "8000");
@@ -156,11 +155,11 @@ public class SqlServerTableFactoryTest {
                         "testCol",
                         true,
                         true);
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testOptionalProperties() {
+    void testOptionalProperties() {
         Map<String, String> properties = getAllOptions();
         properties.put("port", "1433");
         properties.put("debezium.snapshot.mode", "initial");
@@ -197,11 +196,11 @@ public class SqlServerTableFactoryTest {
                         "testCol",
                         true,
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testMetadataColumns() {
+    void testMetadataColumns() {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
@@ -241,7 +240,7 @@ public class SqlServerTableFactoryTest {
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "schema_name", "table_name");
 
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     private Map<String, String> getAllOptions() {

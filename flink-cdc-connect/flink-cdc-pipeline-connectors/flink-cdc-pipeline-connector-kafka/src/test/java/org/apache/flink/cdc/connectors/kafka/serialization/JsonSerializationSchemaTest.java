@@ -37,19 +37,19 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonGenerator
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
 
 /** Tests for {@link JsonSerializationSchema}. */
-public class JsonSerializationSchemaTest {
+class JsonSerializationSchemaTest {
 
     public static final TableId TABLE_1 =
             TableId.tableId("default_namespace", "default_schema", "table1");
 
     @Test
-    public void testSerialize() throws Exception {
+    void testSerialize() throws Exception {
         ObjectMapper mapper =
                 JacksonMapperFactory.createObjectMapper()
                         .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
@@ -66,7 +66,7 @@ public class JsonSerializationSchemaTest {
                         .primaryKey("col1")
                         .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
-        Assertions.assertNull(serializationSchema.serialize(createTableEvent));
+        Assertions.assertThat(serializationSchema.serialize(createTableEvent)).isNull();
 
         // insert
         BinaryRecordDataGenerator generator =
@@ -83,7 +83,7 @@ public class JsonSerializationSchemaTest {
                 mapper.readTree(
                         "{\"TableId\":\"default_namespace.default_schema.table1\",\"col1\":\"1\"}");
         JsonNode actual = mapper.readTree(serializationSchema.serialize(insertEvent1));
-        Assertions.assertEquals(expected, actual);
+        Assertions.assertThat(actual).isEqualTo(expected);
 
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
@@ -97,7 +97,7 @@ public class JsonSerializationSchemaTest {
                 mapper.readTree(
                         "{\"TableId\":\"default_namespace.default_schema.table1\",\"col1\":\"2\"}");
         actual = mapper.readTree(serializationSchema.serialize(insertEvent2));
-        Assertions.assertEquals(expected, actual);
+        Assertions.assertThat(actual).isEqualTo(expected);
 
         DataChangeEvent deleteEvent =
                 DataChangeEvent.deleteEvent(
@@ -111,7 +111,7 @@ public class JsonSerializationSchemaTest {
                 mapper.readTree(
                         "{\"TableId\":\"default_namespace.default_schema.table1\",\"col1\":\"2\"}");
         actual = mapper.readTree(serializationSchema.serialize(deleteEvent));
-        Assertions.assertEquals(expected, actual);
+        Assertions.assertThat(actual).isEqualTo(expected);
 
         DataChangeEvent updateEvent =
                 DataChangeEvent.updateEvent(
@@ -130,6 +130,6 @@ public class JsonSerializationSchemaTest {
                 mapper.readTree(
                         "{\"TableId\":\"default_namespace.default_schema.table1\",\"col1\":\"1\"}");
         actual = mapper.readTree(serializationSchema.serialize(updateEvent));
-        Assertions.assertEquals(expected, actual);
+        Assertions.assertThat(actual).isEqualTo(expected);
     }
 }

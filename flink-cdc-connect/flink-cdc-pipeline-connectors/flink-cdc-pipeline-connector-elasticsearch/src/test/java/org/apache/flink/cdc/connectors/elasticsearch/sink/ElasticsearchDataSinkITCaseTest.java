@@ -62,7 +62,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** ITCase tests for {@link ElasticsearchDataSink}. */
 @Testcontainers
-public class ElasticsearchDataSinkITCaseTest {
+class ElasticsearchDataSinkITCaseTest {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(ElasticsearchDataSinkITCaseTest.class);
@@ -92,9 +92,9 @@ public class ElasticsearchDataSinkITCaseTest {
     }
 
     @Test
-    public void testElasticsearchSink() throws Exception {
+    void testElasticsearchSink() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
-        List<Event> events = ElasticsearchTestUtils.createTestEvents(tableId); // 使用工具类
+        List<Event> events = ElasticsearchTestUtils.createTestEvents(tableId);
 
         runJobWithEvents(events);
 
@@ -127,9 +127,9 @@ public class ElasticsearchDataSinkITCaseTest {
     }
 
     @Test
-    public void testElasticsearchInsertAndDelete() throws Exception {
+    void testElasticsearchInsertAndDelete() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
-        List<Event> events = ElasticsearchTestUtils.createTestEventsWithDelete(tableId); // 使用工具类
+        List<Event> events = ElasticsearchTestUtils.createTestEventsWithDelete(tableId);
 
         runJobWithEvents(events);
 
@@ -137,9 +137,9 @@ public class ElasticsearchDataSinkITCaseTest {
     }
 
     @Test
-    public void testElasticsearchAddColumn() throws Exception {
+    void testElasticsearchAddColumn() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
-        List<Event> events = ElasticsearchTestUtils.createTestEventsWithAddColumn(tableId); // 使用工具类
+        List<Event> events = ElasticsearchTestUtils.createTestEventsWithAddColumn(tableId);
 
         runJobWithEvents(events);
 
@@ -230,8 +230,9 @@ public class ElasticsearchDataSinkITCaseTest {
         assertThat(((Number) response.source().get("id")).intValue()).isEqualTo(expectedId);
         assertThat(((Number) response.source().get("number")).doubleValue())
                 .isEqualTo(expectedNumber);
-        assertThat(response.source().get("name")).isEqualTo(expectedName);
-        assertThat(response.source().get("bool")).isEqualTo(expectedBool);
+        assertThat(response.source())
+                .containsEntry("name", expectedName)
+                .containsEntry("bool", expectedBool);
         assertThat(((Number) response.source().get("tinyint")).byteValue())
                 .isEqualTo(expectedTinyint);
         assertThat(((Number) response.source().get("smallint")).shortValue())
@@ -267,10 +268,11 @@ public class ElasticsearchDataSinkITCaseTest {
         GetRequest getRequest = new GetRequest.Builder().index(tableId.toString()).id(id).build();
         GetResponse<Map> response = client.get(getRequest, Map.class);
 
-        assertThat(response.source()).isNotNull();
-        assertThat(response.source().get("id")).isEqualTo(expectedId);
-        assertThat(response.source().get("number")).isEqualTo(expectedNumber);
-        assertThat(response.source().get("name")).isEqualTo(expectedName);
-        assertThat(response.source().get("extra_bool")).isEqualTo(expectedExtraBool);
+        assertThat(response.source())
+                .isNotNull()
+                .containsEntry("id", expectedId)
+                .containsEntry("number", expectedNumber)
+                .containsEntry("name", expectedName)
+                .containsEntry("extra_bool", expectedExtraBool);
     }
 }

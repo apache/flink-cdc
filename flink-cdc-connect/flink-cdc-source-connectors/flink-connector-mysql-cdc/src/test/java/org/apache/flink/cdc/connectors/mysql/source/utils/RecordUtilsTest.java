@@ -17,20 +17,19 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.utils;
 
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.splitKeyRangeContains;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils}. */
-public class RecordUtilsTest {
+class RecordUtilsTest {
 
     @Test
-    public void testSplitKeyRangeContains() {
+    void testSplitKeyRangeContains() {
         // table with only one split
         assertKeyRangeContains(new Object[] {100L}, null, null);
         // the last split
@@ -41,21 +40,24 @@ public class RecordUtilsTest {
 
         // general splits
         assertKeyRangeContains(new Object[] {100L}, new Object[] {1L}, new Object[] {1024L});
-        assertFalse(
-                splitKeyRangeContains(new Object[] {0L}, new Object[] {1L}, new Object[] {1024L}));
+        Assertions.assertThat(
+                        splitKeyRangeContains(
+                                new Object[] {0L}, new Object[] {1L}, new Object[] {1024L}))
+                .isFalse();
 
         // split key from binlog may have different type
         assertKeyRangeContains(
                 new Object[] {BigInteger.valueOf(100L)}, new Object[] {1L}, new Object[] {1024L});
-        assertFalse(
-                splitKeyRangeContains(
-                        new Object[] {BigInteger.valueOf(0L)},
-                        new Object[] {1L},
-                        new Object[] {1024L}));
+        Assertions.assertThat(
+                        splitKeyRangeContains(
+                                new Object[] {BigInteger.valueOf(0L)},
+                                new Object[] {1L},
+                                new Object[] {1024L}))
+                .isFalse();
     }
 
     @Test
-    public void testDifferentKeyTypes() {
+    void testDifferentKeyTypes() {
         // first split
         assertKeyRangeContains(new Object[] {5}, null, new Object[] {Byte.valueOf("6")});
         assertKeyRangeContains(new Object[] {5}, null, new Object[] {Short.valueOf("6")});
@@ -101,6 +103,6 @@ public class RecordUtilsTest {
 
     private void assertKeyRangeContains(
             Object[] key, Object[] splitKeyStart, Object[] splitKeyEnd) {
-        assertTrue(splitKeyRangeContains(key, splitKeyStart, splitKeyEnd));
+        Assertions.assertThat(splitKeyRangeContains(key, splitKeyStart, splitKeyEnd)).isTrue();
     }
 }

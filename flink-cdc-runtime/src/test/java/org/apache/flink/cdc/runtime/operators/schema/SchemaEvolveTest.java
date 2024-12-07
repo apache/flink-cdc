@@ -56,7 +56,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /** Unit tests for the {@link SchemaOperator} to handle evolved schema. */
-public class SchemaEvolveTest {
+class SchemaEvolveTest {
 
     private static final DataType TINYINT = DataTypes.TINYINT();
     private static final DataType SMALLINT = DataTypes.SMALLINT();
@@ -71,7 +71,7 @@ public class SchemaEvolveTest {
 
     /** Tests common evolve schema changes without exceptions. */
     @Test
-    public void testEvolveSchema() throws Exception {
+    void testEvolveSchema() throws Exception {
         TableId tableId = CUSTOMERS_TABLE_ID;
         Schema schemaV1 =
                 Schema.newBuilder()
@@ -328,7 +328,7 @@ public class SchemaEvolveTest {
 
     /** Tests try-evolve behavior without exceptions. */
     @Test
-    public void testTryEvolveSchema() throws Exception {
+    void testTryEvolveSchema() throws Exception {
         TableId tableId = CUSTOMERS_TABLE_ID;
         Schema schemaV1 =
                 Schema.newBuilder()
@@ -585,7 +585,7 @@ public class SchemaEvolveTest {
 
     /** Tests evolve schema changes when schema change behavior is set to EXCEPTION. */
     @Test
-    public void testExceptionEvolveSchema() throws Exception {
+    void testExceptionEvolveSchema() throws Exception {
         TableId tableId = CUSTOMERS_TABLE_ID;
         Schema schemaV1 =
                 Schema.newBuilder()
@@ -694,7 +694,7 @@ public class SchemaEvolveTest {
 
     /** Tests evolve schema changes when schema change behavior is set to IGNORE. */
     @Test
-    public void testIgnoreEvolveSchema() throws Exception {
+    void testIgnoreEvolveSchema() throws Exception {
         TableId tableId = CUSTOMERS_TABLE_ID;
         Schema schemaV1 =
                 Schema.newBuilder()
@@ -973,7 +973,7 @@ public class SchemaEvolveTest {
 
     /** Tests common evolve schema changes with exceptions expected. */
     @Test
-    public void testEvolveSchemaWithFailure() throws Exception {
+    void testEvolveSchemaWithFailure() throws Exception {
         TableId tableId = CUSTOMERS_TABLE_ID;
         Schema schemaV1 =
                 Schema.newBuilder()
@@ -1041,7 +1041,7 @@ public class SchemaEvolveTest {
                                                 Column.physicalColumn(
                                                         "height", DOUBLE, "Height data")))));
         processEvent(schemaOperator, addColumnEvents);
-        Assertions.assertThat(harness.isJobFailed()).isEqualTo(true);
+        Assertions.assertThat(harness.isJobFailed()).isTrue();
         Assertions.assertThat(harness.getJobFailureCause())
                 .cause()
                 .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
@@ -1055,7 +1055,7 @@ public class SchemaEvolveTest {
 
     /** Tests evolve schema changes when schema change behavior is set to TRY_EVOLVE. */
     @Test
-    public void testTryEvolveSchemaWithFailure() throws Exception {
+    void testTryEvolveSchemaWithFailure() throws Exception {
         TableId tableId = CUSTOMERS_TABLE_ID;
         Schema schemaV1 =
                 Schema.newBuilder()
@@ -1367,7 +1367,7 @@ public class SchemaEvolveTest {
 
     /** Tests fine-grained schema change configurations. */
     @Test
-    public void testFineGrainedSchemaEvolves() throws Exception {
+    void testFineGrainedSchemaEvolves() throws Exception {
         TableId tableId = CUSTOMERS_TABLE_ID;
         Schema schemaV1 =
                 Schema.newBuilder()
@@ -1679,7 +1679,7 @@ public class SchemaEvolveTest {
 
     /** Tests lenient schema change behavior. */
     @Test
-    public void testLenientSchemaEvolves() throws Exception {
+    void testLenientSchemaEvolves() throws Exception {
         TableId tableId = CUSTOMERS_TABLE_ID;
         Schema schemaV1 =
                 Schema.newBuilder()
@@ -2048,7 +2048,7 @@ public class SchemaEvolveTest {
     }
 
     @Test
-    public void testLenientEvolveTweaks() throws Exception {
+    void testLenientEvolveTweaks() throws Exception {
         TableId tableId = CUSTOMERS_TABLE_ID;
         Schema schemaV1 =
                 Schema.newBuilder()

@@ -42,10 +42,10 @@ import org.apache.flink.util.CloseableIterator;
 
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -61,12 +61,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 /** Example Tests for {@link IncrementalSource}. */
-public class MySqlChangeEventSourceExampleTest {
+class MySqlChangeEventSourceExampleTest {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(MySqlChangeEventSourceExampleTest.class);
@@ -74,7 +70,6 @@ public class MySqlChangeEventSourceExampleTest {
     private static final int DEFAULT_PARALLELISM = 4;
     private static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
 
-    @Rule
     public final MiniClusterWithClientResource miniClusterResource =
             new MiniClusterWithClientResource(
                     new MiniClusterResourceConfiguration.Builder()
@@ -84,7 +79,7 @@ public class MySqlChangeEventSourceExampleTest {
                             .withHaLeadershipControl()
                             .build());
 
-    @BeforeClass
+    @BeforeAll
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
@@ -95,8 +90,8 @@ public class MySqlChangeEventSourceExampleTest {
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
 
     @Test
-    @Ignore("Test ignored because it won't stop and is used for manual test")
-    public void testConsumingScanEvents() throws Exception {
+    @Disabled("Test ignored because it won't stop and is used for manual test")
+    void testConsumingScanEvents() throws Exception {
         inventoryDatabase.createAndInitialize();
         MySqlSourceBuilder.MySqlIncrementalSource<String> mySqlChangeEventSource =
                 new MySqlSourceBuilder<String>()
@@ -127,8 +122,8 @@ public class MySqlChangeEventSourceExampleTest {
     }
 
     @Test
-    @Ignore("Test ignored because it won't stop and is used for manual test")
-    public void testConsumingAllEvents() throws Exception {
+    @Disabled("Test ignored because it won't stop and is used for manual test")
+    void testConsumingAllEvents() throws Exception {
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -262,16 +257,7 @@ public class MySqlChangeEventSourceExampleTest {
     }
 
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
-    }
-
-    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     private static MySqlContainer createMySqlContainer(MySqlVersion version) {

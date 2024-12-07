@@ -33,7 +33,7 @@ import java.util.Map;
 import java.util.Set;
 
 /** Tests for {@link FactoryHelper}. */
-public class FactoryHelperTests {
+class FactoryHelperTests {
 
     private Factory getDummyFactory() {
 
