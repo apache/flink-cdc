@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mongodb.source.config;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig.Factory;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.cdc.connectors.mongodb.source.assigners.splitters.AssignStrategy;
 
 import java.util.Arrays;
 import java.util.List;
@@ -28,6 +29,7 @@ import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_M
 import static org.apache.flink.cdc.connectors.base.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SCHEME;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_CHUNK_ASSIGN_STRATEGY;
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
@@ -63,6 +65,8 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     protected boolean skipSnapshotBackfill = false;
 
     protected boolean scanNewlyAddedTableEnabled = false;
+
+    protected AssignStrategy scanChunkAssignStrategy = SCAN_CHUNK_ASSIGN_STRATEGY.defaultValue();
 
     /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
     public MongoDBSourceConfigFactory scheme(String scheme) {
@@ -271,6 +275,13 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
+    /** Decide the strategy of how to assign split to reader. */
+    public MongoDBSourceConfigFactory scanChunkAssignStrategy(
+            AssignStrategy scanChunkAssignStrategy) {
+        this.scanChunkAssignStrategy = scanChunkAssignStrategy;
+        return this;
+    }
+
     /** Creates a new {@link MongoDBSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public MongoDBSourceConfig create(int subtaskId) {
@@ -296,6 +307,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 enableFullDocPrePostImage,
                 disableCursorTimeout,
                 skipSnapshotBackfill,
-                scanNewlyAddedTableEnabled);
+                scanNewlyAddedTableEnabled,
+                scanChunkAssignStrategy);
     }
 }

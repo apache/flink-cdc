@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mongodb.table;
 
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.cdc.connectors.mongodb.source.assigners.splitters.AssignStrategy;
 import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
 import org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.apache.flink.configuration.Configuration;
@@ -56,6 +57,7 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.HEARTBEAT_INTERVAL_MILLIS;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_AWAIT_TIME_MILLIS;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.POLL_MAX_BATCH_SIZE;
+import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_CHUNK_ASSIGN_STRATEGY;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
@@ -98,6 +100,8 @@ public class MongoDBTableFactoryTest {
     private static final String PASSWORD = "flinkpw";
     private static final String MY_DATABASE = "myDB";
     private static final String MY_TABLE = "myTable";
+    private static final ObjectIdentifier SOURCE_TABLE_IDENTIFIER =
+            ObjectIdentifier.of("default", "default", "t1");
     private static final ZoneId LOCAL_TIME_ZONE = ZoneId.systemDefault();
     private static final int BATCH_SIZE_DEFAULT = BATCH_SIZE.defaultValue();
     private static final int POLL_MAX_BATCH_SIZE_DEFAULT = POLL_MAX_BATCH_SIZE.defaultValue();
@@ -124,6 +128,9 @@ public class MongoDBTableFactoryTest {
 
     private static final boolean SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT =
             SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue();
+
+    private static final AssignStrategy SCAN_CHUNK_ASSIGN_STRATEGY_DEFAULT =
+            SCAN_CHUNK_ASSIGN_STRATEGY.defaultValue();
 
     @Test
     public void testCommonProperties() {
@@ -156,7 +163,8 @@ public class MongoDBTableFactoryTest {
                         FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
-                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT);
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
+                        SCAN_CHUNK_ASSIGN_STRATEGY.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -208,7 +216,8 @@ public class MongoDBTableFactoryTest {
                         true,
                         false,
                         true,
-                        true);
+                        true,
+                        SCAN_CHUNK_ASSIGN_STRATEGY.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -249,7 +258,8 @@ public class MongoDBTableFactoryTest {
                         FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
-                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT);
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
+                        SCAN_CHUNK_ASSIGN_STRATEGY_DEFAULT);
 
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");

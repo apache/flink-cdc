@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mysql.source.config;
 
 import org.apache.flink.cdc.connectors.mysql.schema.Selectors;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
+import org.apache.flink.cdc.connectors.mysql.source.assigners.AssignStrategy;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.catalog.ObjectPath;
 
@@ -67,6 +68,8 @@ public class MySqlSourceConfig implements Serializable {
     private final Map<ObjectPath, String> chunkKeyColumns;
     private final boolean skipSnapshotBackfill;
 
+    private final AssignStrategy scanChunkAssignStrategy;
+
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
     // --------------------------------------------------------------------------------------------
@@ -99,7 +102,8 @@ public class MySqlSourceConfig implements Serializable {
             Properties dbzProperties,
             Properties jdbcProperties,
             Map<ObjectPath, String> chunkKeyColumns,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            AssignStrategy scanChunkAssignStrategy) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -127,6 +131,7 @@ public class MySqlSourceConfig implements Serializable {
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
+        this.scanChunkAssignStrategy = scanChunkAssignStrategy;
     }
 
     public String getHostname() {
@@ -253,5 +258,9 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isSkipSnapshotBackfill() {
         return skipSnapshotBackfill;
+    }
+
+    public AssignStrategy getScanChunkAssignStrategy() {
+        return scanChunkAssignStrategy;
     }
 }

@@ -70,9 +70,9 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     public void testAssignSingleTableSplits() {
         List<String> expected =
                 Arrays.asList(
-                        "customers_even_dist null [105]",
+                        "customers_even_dist [109] null",
                         "customers_even_dist [105] [109]",
-                        "customers_even_dist [109] null");
+                        "customers_even_dist null [105]");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         4,
@@ -98,12 +98,12 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     public void testAssignMultipleTableSplits() {
         List<String> expected =
                 Arrays.asList(
-                        "customers_even_dist null [105]",
-                        "customers_even_dist [105] [109]",
                         "customers_even_dist [109] null",
-                        "customers_sparse_dist null [10]",
+                        "customers_even_dist [105] [109]",
+                        "customers_even_dist null [105]",
+                        "customers_sparse_dist [18] null",
                         "customers_sparse_dist [10] [18]",
-                        "customers_sparse_dist [18] null");
+                        "customers_sparse_dist null [10]");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         4,
@@ -137,9 +137,9 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     public void testAssignCompositePkTableSplitsEvenlyWithChunkKeyColumn() {
         List<String> expected =
                 Arrays.asList(
-                        "evenly_shopping_cart null [105]",
+                        "evenly_shopping_cart [109] null",
                         "evenly_shopping_cart [105] [109]",
-                        "evenly_shopping_cart [109] null");
+                        "evenly_shopping_cart null [105]");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         customerDatabase,
@@ -174,7 +174,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     @Test
     public void testEnableAutoIncrementedKeyOptimization() {
         List<String> expected =
-                Arrays.asList("shopping_cart_big null [3]", "shopping_cart_big [3] null");
+                Arrays.asList("shopping_cart_big [3] null", "shopping_cart_big null [3]");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         2,
@@ -204,8 +204,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     public void testAssignSnapshotSplitsWithDecimalKey() {
         List<String> expected =
                 Arrays.asList(
-                        "shopping_cart_dec null [123458.1230]",
-                        "shopping_cart_dec [123458.1230] null");
+                        "shopping_cart_dec [123458.1230] null",
+                        "shopping_cart_dec null [123458.1230]");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         2,
@@ -240,9 +240,9 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         // test sparse table with bigger distribution factor upper
         List<String> expected =
                 Arrays.asList(
-                        "customers_sparse_dist null [10]",
+                        "customers_sparse_dist [18] null",
                         "customers_sparse_dist [10] [18]",
-                        "customers_sparse_dist [18] null");
+                        "customers_sparse_dist null [10]");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         4,
@@ -267,7 +267,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
 
         // test sparse table that the approximate row count is bigger than chunk size
         List<String> expected2 =
-                Arrays.asList("customers_sparse_dist null [18]", "customers_sparse_dist [18] null");
+                Arrays.asList("customers_sparse_dist [18] null", "customers_sparse_dist null [18]");
         List<String> splits2 =
                 getTestAssignSnapshotSplits(
                         8,
@@ -282,9 +282,9 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
         // test dense table with smaller dense distribution factor lower
         List<String> expected =
                 Arrays.asList(
-                        "customers_dense_dist null [2]",
+                        "customers_dense_dist [3] null",
                         "customers_dense_dist [2] [3]",
-                        "customers_dense_dist [3] null");
+                        "customers_dense_dist null [2]");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         2,
@@ -355,11 +355,11 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     public void testAssignMinSplitSize() {
         List<String> expected =
                 Arrays.asList(
-                        "customers_even_dist null [103]",
-                        "customers_even_dist [103] [105]",
-                        "customers_even_dist [105] [107]",
+                        "customers_even_dist [109] null",
                         "customers_even_dist [107] [109]",
-                        "customers_even_dist [109] null");
+                        "customers_even_dist [105] [107]",
+                        "customers_even_dist [103] [105]",
+                        "customers_even_dist null [103]");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         2,
