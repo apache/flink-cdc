@@ -66,6 +66,7 @@ public class MySqlSourceConfig implements Serializable {
     private final Properties jdbcProperties;
     private final Map<ObjectPath, String> chunkKeyColumns;
     private final boolean skipSnapshotBackfill;
+    public static boolean useLegacyJsonFormat = true;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -99,7 +100,8 @@ public class MySqlSourceConfig implements Serializable {
             Properties dbzProperties,
             Properties jdbcProperties,
             Map<ObjectPath, String> chunkKeyColumns,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            boolean useLegacyJsonFormat) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -127,6 +129,7 @@ public class MySqlSourceConfig implements Serializable {
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
+        this.useLegacyJsonFormat = useLegacyJsonFormat;
     }
 
     public String getHostname() {

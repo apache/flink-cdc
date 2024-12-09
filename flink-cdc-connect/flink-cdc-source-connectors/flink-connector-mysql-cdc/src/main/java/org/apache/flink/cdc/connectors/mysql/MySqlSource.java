@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql;
 
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
@@ -154,6 +155,11 @@ public class MySqlSource {
         /** Specifies the startup options. */
         public Builder<T> startupOptions(StartupOptions startupOptions) {
             this.startupOptions = startupOptions;
+            return this;
+        }
+
+        public Builder<T> useLegacyJsonFormat(boolean useLegacyJsonFormat) {
+            MySqlSourceConfig.useLegacyJsonFormat = useLegacyJsonFormat;
             return this;
         }
 
