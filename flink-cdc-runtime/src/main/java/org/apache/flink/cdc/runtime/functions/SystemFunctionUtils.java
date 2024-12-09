@@ -606,53 +606,140 @@ public class SystemFunctionUtils {
         return object.toString();
     }
 
+    public static Boolean castToBoolean(Object object) {
+        if (object == null) {
+            return null;
+        } else if (object instanceof Boolean) {
+            return (Boolean) object;
+        } else if (object instanceof Byte) {
+            return !object.equals((byte) 0);
+        } else if (object instanceof Short) {
+            return !object.equals((short) 0);
+        } else if (object instanceof Integer) {
+            return !object.equals(0);
+        } else if (object instanceof Long) {
+            return !object.equals(0L);
+        } else if (object instanceof Float) {
+            return !object.equals(0f);
+        } else if (object instanceof Double) {
+            return !object.equals(0d);
+        } else if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).compareTo(BigDecimal.ZERO) != 0;
+        }
+        return Boolean.valueOf(castToString(object));
+    }
+
     public static Byte castToByte(Object object) {
         if (object == null) {
             return null;
         }
-        return Byte.valueOf(castObjectIntoString(object));
-    }
-
-    public static Boolean castToBoolean(Object object) {
-        if (object == null) {
-            return null;
+        if (object instanceof Boolean) {
+            return (byte) ((Boolean) object ? 1 : 0);
         }
-        if (object instanceof Byte
-                || object instanceof Short
-                || object instanceof Integer
-                || object instanceof Long
-                || object instanceof Float
-                || object instanceof Double
-                || object instanceof BigDecimal) {
-            return !object.equals(0);
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).byteValue();
         }
-        return Boolean.valueOf(castToString(object));
+        if (object instanceof Double) {
+            return ((Double) object).byteValue();
+        }
+        if (object instanceof Float) {
+            return ((Float) object).byteValue();
+        }
+        String stringRep = castToString(object);
+        try {
+            return Byte.valueOf(stringRep);
+        } catch (NumberFormatException e) {
+            return Double.valueOf(stringRep).byteValue();
+        }
     }
 
     public static Short castToShort(Object object) {
         if (object == null) {
             return null;
         }
-        return Short.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (short) ((Boolean) object ? 1 : 0);
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).shortValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).shortValue();
+        }
+        if (object instanceof Float) {
+            return ((Float) object).shortValue();
+        }
+        String stringRep = castToString(object);
+        try {
+            return Short.valueOf(stringRep);
+        } catch (NumberFormatException e) {
+            return Double.valueOf(stringRep).shortValue();
+        }
     }
 
     public static Integer castToInteger(Object object) {
         if (object == null) {
             return null;
         }
-        return Integer.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (Boolean) object ? 1 : 0;
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).intValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).intValue();
+        }
+        if (object instanceof Float) {
+            return ((Float) object).intValue();
+        }
+        String stringRep = castToString(object);
+        try {
+            return Integer.valueOf(stringRep);
+        } catch (NumberFormatException e) {
+            return Double.valueOf(stringRep).intValue();
+        }
     }
 
     public static Long castToLong(Object object) {
         if (object == null) {
             return null;
         }
-        return Long.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (Boolean) object ? 1L : 0L;
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).longValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).longValue();
+        }
+        if (object instanceof Float) {
+            return ((Float) object).longValue();
+        }
+        String stringRep = castToString(object);
+        try {
+            return Long.valueOf(stringRep);
+        } catch (NumberFormatException e) {
+            return Double.valueOf(stringRep).longValue();
+        }
     }
 
     public static Float castToFloat(Object object) {
         if (object == null) {
             return null;
+        }
+        if (object instanceof Boolean) {
+            return (Boolean) object ? 1f : 0f;
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).floatValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).floatValue();
+        }
+        if (object instanceof Float) {
+            return (Float) object;
         }
         return Float.valueOf(castObjectIntoString(object));
     }
@@ -661,6 +748,18 @@ public class SystemFunctionUtils {
         if (object == null) {
             return null;
         }
+        if (object instanceof Boolean) {
+            return (Boolean) object ? 1d : 0d;
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).doubleValue();
+        }
+        if (object instanceof Double) {
+            return (Double) object;
+        }
+        if (object instanceof Float) {
+            return ((Float) object).doubleValue();
+        }
         return Double.valueOf(castObjectIntoString(object));
     }
 
@@ -668,9 +767,15 @@ public class SystemFunctionUtils {
         if (object == null) {
             return null;
         }
+        if (object instanceof Boolean) {
+            object = (Boolean) object ? 1 : 0;
+        }
         BigDecimal bigDecimal =
                 new BigDecimal(castObjectIntoString(object), new MathContext(precision));
-        bigDecimal = bigDecimal.setScale(scale, BigDecimal.ROUND_HALF_UP);
+        bigDecimal = bigDecimal.setScale(scale, RoundingMode.HALF_UP);
+        if (bigDecimal.precision() > precision) {
+            return null;
+        }
         return bigDecimal;
     }
 
