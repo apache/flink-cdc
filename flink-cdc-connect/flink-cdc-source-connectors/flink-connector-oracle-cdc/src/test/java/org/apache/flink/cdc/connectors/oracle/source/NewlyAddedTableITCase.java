@@ -495,6 +495,8 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
             waitForSinkSize("sink", fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+            // wait task to stream phase
+            sleepMs(10000);
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             jobClient.cancel().get();
         }
