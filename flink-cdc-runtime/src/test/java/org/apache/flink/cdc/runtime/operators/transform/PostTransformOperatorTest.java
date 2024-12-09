@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.math.BigDecimal;
+import java.time.format.DateTimeParseException;
 
 /** Unit tests for the {@link PostTransformOperator}. */
 public class PostTransformOperatorTest {
@@ -1479,8 +1480,8 @@ public class PostTransformOperatorTest {
                             transform.processElement(new StreamRecord<>(insertEvent1));
                         })
                 .isExactlyInstanceOf(RuntimeException.class)
-                .hasRootCauseInstanceOf(NumberFormatException.class)
-                .hasRootCauseMessage("For input string: \"1.0\"");
+                .hasRootCauseInstanceOf(DateTimeParseException.class)
+                .hasRootCauseMessage("Text '1.0' could not be parsed at index 0");
     }
 
     @Test
