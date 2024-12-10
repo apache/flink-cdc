@@ -29,14 +29,17 @@ public class PostTransformer {
 
     private final Optional<TransformProjection> projection;
     private final Optional<TransformFilter> filter;
+    private final boolean convertDeleteAsInsert;
 
     public PostTransformer(
             Selectors selectors,
             @Nullable TransformProjection projection,
-            @Nullable TransformFilter filter) {
+            @Nullable TransformFilter filter,
+            boolean convertDeleteAsInsert) {
         this.selectors = selectors;
         this.projection = projection != null ? Optional.of(projection) : Optional.empty();
         this.filter = filter != null ? Optional.of(filter) : Optional.empty();
+        this.convertDeleteAsInsert = convertDeleteAsInsert;
     }
 
     public Selectors getSelectors() {
@@ -49,5 +52,9 @@ public class PostTransformer {
 
     public Optional<TransformFilter> getFilter() {
         return filter;
+    }
+
+    public boolean isconvertDeleteAsInsert() {
+        return convertDeleteAsInsert;
     }
 }

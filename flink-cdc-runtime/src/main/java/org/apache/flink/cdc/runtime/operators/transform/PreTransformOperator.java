@@ -88,7 +88,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
         public PreTransformOperator.Builder addTransform(
                 String tableInclusions, @Nullable String projection, @Nullable String filter) {
-            transformRules.add(new TransformRule(tableInclusions, projection, filter, "", "", ""));
+            transformRules.add(
+                    new TransformRule(tableInclusions, projection, filter, "", "", "", false));
             return this;
         }
 
@@ -98,7 +99,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                 @Nullable String filter,
                 String primaryKey,
                 String partitionKey,
-                String tableOption) {
+                String tableOption,
+                boolean convertDeleteAsInsert) {
             transformRules.add(
                     new TransformRule(
                             tableInclusions,
@@ -106,7 +108,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                             filter,
                             primaryKey,
                             partitionKey,
-                            tableOption));
+                            tableOption,
+                            convertDeleteAsInsert));
             return this;
         }
 

@@ -134,7 +134,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT,`uid` STRING,`double_age` INT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, 1Alice, 36], op=INSERT, meta=()}",
@@ -161,7 +162,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT,`cubic_age` INT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, 5832], op=INSERT, meta=()}",
@@ -187,7 +189,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=()}",
@@ -208,7 +211,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
@@ -235,7 +239,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null),
+                                null,
+                                false),
                         new TransformDef(
                                 "default_namespace.default_schema.\\.*",
                                 "*, 'OLD' AS category",
@@ -243,7 +248,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT,`category` STRING}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, YOUNG], op=INSERT, meta=()}",
@@ -268,7 +274,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null),
+                                null,
+                                false),
                         new TransformDef(
                                 "default_namespace.default_schema.\\.*",
                                 "id,age,name AS roleName",
@@ -276,7 +283,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`age` INT,`roleName` STRING}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, 18, Alice], op=INSERT, meta=()}",
@@ -301,7 +309,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null),
+                                null,
+                                false),
                         new TransformDef(
                                 "default_namespace.default_schema.mytable2",
                                 "id,name,age,description,name AS roleName",
@@ -309,7 +318,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
@@ -334,7 +344,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null),
+                                null,
+                                false),
                         new TransformDef(
                                 "default_namespace.default_schema.mytable2",
                                 "id,UPPER(name) AS name,age,description",
@@ -342,7 +353,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
@@ -368,7 +380,8 @@ class FlinkPipelineTransformITCase {
                                 "id,name",
                                 "id",
                                 "replication_num=1,bucket=17",
-                                "Just a Transform Block")),
+                                "Just a Transform Block",
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id;name, partitionKeys=id, options=({bucket=17, replication_num=1})}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
@@ -397,7 +410,8 @@ class FlinkPipelineTransformITCase {
                                 "id,name",
                                 "id",
                                 "replication_num=1,bucket=17",
-                                "A Transform Block without projection or filter")),
+                                "A Transform Block without projection or filter",
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id;name, partitionKeys=id, options=({bucket=17, replication_num=1})}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18], op=INSERT, meta=()}",
@@ -423,7 +437,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT,`__namespace_name__` STRING NOT NULL,`__schema_name__` STRING NOT NULL,`__table_name__` STRING NOT NULL}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, default_namespace, default_schema, mytable1], op=INSERT, meta=()}",
@@ -449,7 +464,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT,`__namespace_name__` STRING NOT NULL,`__schema_name__` STRING NOT NULL,`__table_name__` STRING NOT NULL}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, default_namespace, default_schema, mytable1], op=INSERT, meta=()}",
@@ -479,7 +495,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT,`string_literal` STRING}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, __namespace_name____schema_name____table_name__], op=INSERT, meta=()}",
@@ -489,6 +506,33 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student, __namespace_name____schema_name____table_name__], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student, __namespace_name____schema_name____table_name__], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, __namespace_name____schema_name____table_name__], after=[], op=DELETE, meta=()}"));
+    }
+
+    /** This tests if projection rule could reference metadata info correctly. */
+    @ParameterizedTest
+    @EnumSource
+    void testConvertDeleteAsInsert(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        runGenericTransformTest(
+                sinkApi,
+                Collections.singletonList(
+                        new TransformDef(
+                                "default_namespace.default_schema.\\.*",
+                                "id, name, age, __namespace_name__, __schema_name__, __table_name__, __data_event_type__",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                true)),
+                Arrays.asList(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT,`__namespace_name__` STRING NOT NULL,`__schema_name__` STRING NOT NULL,`__table_name__` STRING NOT NULL,`__data_event_type__` STRING NOT NULL}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, default_namespace, default_schema, mytable1, +I], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20, default_namespace, default_schema, mytable1, +I], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20, default_namespace, default_schema, mytable1, -U], after=[2, Bob, 30, default_namespace, default_schema, mytable1, +U], op=UPDATE, meta=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`__namespace_name__` STRING NOT NULL,`__schema_name__` STRING NOT NULL,`__table_name__` STRING NOT NULL,`__data_event_type__` STRING NOT NULL}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, default_namespace, default_schema, mytable2, +I], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, default_namespace, default_schema, mytable2, +I], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, default_namespace, default_schema, mytable2, -D], op=INSERT, meta=()}"));
     }
 
     /** This tests if built-in comparison functions work as expected. */
@@ -511,7 +555,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT,`col1` BOOLEAN,`col2` BOOLEAN,`col3` BOOLEAN,`col4` BOOLEAN,`col5` BOOLEAN,`col6` BOOLEAN,`col7` BOOLEAN,`col8` BOOLEAN,`col9` BOOLEAN,`col10` BOOLEAN,`col11` BOOLEAN,`col12` BOOLEAN,`col13` BOOLEAN,`col14` BOOLEAN}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, false, true, false, false, true, true, false, true, true, true, true, false, true, false], op=INSERT, meta=()}",
@@ -543,7 +588,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT,`col1` BOOLEAN,`col2` BOOLEAN,`col4` BOOLEAN,`col5` BOOLEAN,`col6` BOOLEAN,`col7` BOOLEAN,`col8` BOOLEAN,`col9` BOOLEAN,`col10` BOOLEAN}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, true, true, true, false, false, true, false, true, false], op=INSERT, meta=()}",
@@ -576,7 +622,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT,`col1` INT,`col2` INT,`col3` INT,`col4` DOUBLE,`col5` INT,`col6` INT,`col7` DOUBLE,`col8` DOUBLE,`col9` DOUBLE,`col10` INT}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, 18, -16, 17, 0.5882352941176471, 1, 16, 1.0, 0.0, 1.0, 36], op=INSERT, meta=()}",
@@ -612,7 +659,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT,`col1` STRING,`col2` INT,`col3` STRING,`col4` STRING,`col5` STRING,`col6` STRING,`col7` STRING,`col8` STRING,`col9` STRING,`col10` STRING}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, Dear Alice, 5, ALICE, alice, Alice, **ice, A, l, ice, Alice - 1], op=INSERT, meta=()}",
@@ -644,7 +692,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList("To", "be", "added"));
     }
 
@@ -679,7 +728,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null,
-                                null)),
+                                null,
+                                false)),
                 Arrays.asList("Foo", "Bar", "Baz"));
     }
 
@@ -741,7 +791,8 @@ class FlinkPipelineTransformITCase {
                                         null,
                                         null,
                                         null,
-                                        null)),
+                                        null,
+                                        false)),
                         Collections.emptyList(),
                         pipelineConfig);
 
@@ -1002,7 +1053,14 @@ class FlinkPipelineTransformITCase {
                         Collections.emptyList(),
                         Collections.singletonList(
                                 new TransformDef(
-                                        tableId.toString(), "*", null, null, null, null, null)),
+                                        tableId.toString(),
+                                        "*",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        false)),
                         Collections.emptyList(),
                         pipelineConfig);
 
@@ -1096,7 +1154,8 @@ class FlinkPipelineTransformITCase {
                                         null,
                                         null,
                                         null,
-                                        null)),
+                                        null,
+                                        false)),
                         Collections.emptyList(),
                         pipelineConfig);
 
@@ -1178,7 +1237,8 @@ class FlinkPipelineTransformITCase {
                                         null,
                                         null,
                                         null,
-                                        null)),
+                                        null,
+                                        false)),
                         Collections.emptyList(),
                         pipelineConfig);
 
@@ -1272,7 +1332,8 @@ class FlinkPipelineTransformITCase {
                                         null,
                                         null,
                                         null,
-                                        null)),
+                                        null,
+                                        false)),
                         Collections.emptyList(),
                         pipelineConfig);
 
@@ -1367,7 +1428,8 @@ class FlinkPipelineTransformITCase {
                                         null,
                                         null,
                                         null,
-                                        null)),
+                                        null,
+                                        false)),
                         Collections.emptyList(),
                         pipelineConfig);
 
@@ -1461,7 +1523,8 @@ class FlinkPipelineTransformITCase {
                                         null,
                                         null,
                                         null,
-                                        null)),
+                                        null,
+                                        false)),
                         Collections.emptyList(),
                         pipelineConfig);
 

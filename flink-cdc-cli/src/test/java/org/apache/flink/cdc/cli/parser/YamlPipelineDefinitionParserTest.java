@@ -336,7 +336,8 @@ class YamlPipelineDefinitionParserTest {
                                     "id",
                                     "product_name",
                                     "comment=app order",
-                                    "project fields from source table"),
+                                    "project fields from source table",
+                                    true),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
@@ -344,7 +345,8 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    "add new uniq_id for each row")),
+                                    "add new uniq_id for each row",
+                                    false)),
                     Collections.emptyList(),
                     Collections.singletonList(
                             new ModelDef(
@@ -402,6 +404,7 @@ class YamlPipelineDefinitionParserTest {
                         + "    partition-keys: product_name\n"
                         + "    table-options: comment=app order\n"
                         + "    description: project fields from source table\n"
+                        + "    convert-delete-as-insert: true\n"
                         + "  - source-table: mydb.web_order_.*\n"
                         + "    projection: CONCAT(id, order_id) as uniq_id, *\n"
                         + "    filter: uniq_id > 10\n"
@@ -469,7 +472,8 @@ class YamlPipelineDefinitionParserTest {
                                     "id",
                                     "product_name",
                                     "comment=app order",
-                                    "project fields from source table"),
+                                    "project fields from source table",
+                                    true),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
@@ -477,7 +481,8 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    "add new uniq_id for each row")),
+                                    "add new uniq_id for each row",
+                                    false)),
                     Collections.emptyList(),
                     Collections.singletonList(
                             new ModelDef(
@@ -606,7 +611,8 @@ class YamlPipelineDefinitionParserTest {
                                     "id",
                                     "product_name",
                                     "comment=app order",
-                                    "project fields from source table"),
+                                    "project fields from source table",
+                                    true),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
@@ -614,7 +620,8 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    "add new uniq_id for each row")),
+                                    "add new uniq_id for each row",
+                                    false)),
                     Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
@@ -646,7 +653,8 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    null)),
+                                    null,
+                                    false)),
                     Arrays.asList(
                             new UdfDef(
                                     "inc",
