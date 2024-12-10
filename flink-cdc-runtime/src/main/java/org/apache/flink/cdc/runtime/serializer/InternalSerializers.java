@@ -20,9 +20,11 @@ package org.apache.flink.cdc.runtime.serializer;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.types.ArrayType;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.MapType;
 import org.apache.flink.cdc.runtime.serializer.data.ArrayDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.DecimalDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.LocalZonedTimestampDataSerializer;
+import org.apache.flink.cdc.runtime.serializer.data.MapDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.RecordDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.StringDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.TimestampDataSerializer;
@@ -79,6 +81,8 @@ public class InternalSerializers {
             case ROW:
                 return new RecordDataSerializer();
             case MAP:
+                MapType mapType = (MapType) type;
+                return new MapDataSerializer(mapType.getKeyType(), mapType.getValueType());
             default:
                 throw new UnsupportedOperationException(
                         "Unsupported type '" + type + "' to get internal serializer");
