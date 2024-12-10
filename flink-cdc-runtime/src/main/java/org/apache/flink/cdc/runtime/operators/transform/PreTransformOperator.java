@@ -33,6 +33,7 @@ import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.runtime.state.StateInitializationContext;
@@ -88,7 +89,15 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
         public PreTransformOperator.Builder addTransform(
                 String tableInclusions, @Nullable String projection, @Nullable String filter) {
-            transformRules.add(new TransformRule(tableInclusions, projection, filter, "", "", ""));
+            transformRules.add(
+                    new TransformRule(
+                            tableInclusions,
+                            projection,
+                            filter,
+                            "",
+                            "",
+                            "",
+                            new SupportedMetadataColumn[0]));
             return this;
         }
 
@@ -98,7 +107,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                 @Nullable String filter,
                 String primaryKey,
                 String partitionKey,
-                String tableOption) {
+                String tableOption,
+                SupportedMetadataColumn[] supportedMetadataColumns) {
             transformRules.add(
                     new TransformRule(
                             tableInclusions,
@@ -106,7 +116,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                             filter,
                             primaryKey,
                             partitionKey,
-                            tableOption));
+                            tableOption,
+                            supportedMetadataColumns));
             return this;
         }
 
