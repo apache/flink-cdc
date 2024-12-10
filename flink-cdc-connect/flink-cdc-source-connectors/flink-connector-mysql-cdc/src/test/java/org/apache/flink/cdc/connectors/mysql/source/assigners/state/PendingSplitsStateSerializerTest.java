@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit.generateSplitId;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
@@ -190,7 +191,7 @@ public class PendingSplitsStateSerializerTest {
             TableId tableId, int splitNo) {
         return new MySqlSchemalessSnapshotSplit(
                 tableId,
-                tableId.toString() + "-" + splitNo,
+                generateSplitId(tableId, splitNo),
                 new RowType(
                         Collections.singletonList(new RowType.RowField("id", new BigIntType()))),
                 new Object[] {100L + splitNo * 1000L},

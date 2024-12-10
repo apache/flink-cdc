@@ -48,7 +48,7 @@ using a build automation tool (such as Maven or SBT) and SQL Client with SQL JAR
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-db2-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-db2-cdc/3.1.0/flink-sql-connector-db2-cdc-3.1.0.jar) and 
+Download [flink-sql-connector-db2-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-db2-cdc/{{< param Version >}}/flink-sql-connector-db2-cdc-{{< param Version >}}.jar) and 
 put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to
@@ -354,7 +354,7 @@ public class Db2SourceExample {
 }
 ```
 
-The DB2 CDC incremental connector (after 3.1.0) can be used as the following shows:
+The DB2 CDC incremental connector (since 3.1.0) can be used as the following shows:
 ```java
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;

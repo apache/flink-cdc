@@ -109,7 +109,7 @@ OceanBase CDC 源端读取方案：
 
 ```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
-下载[flink-sql-connector-oceanbase-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oceanbase-cdc/3.1.0/flink-sql-connector-oceanbase-cdc-3.1.0.jar)  到 `<FLINK_HOME>/lib/` 目录下。
+下载[flink-sql-connector-oceanbase-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oceanbase-cdc/{{< param Version >}}/flink-sql-connector-oceanbase-cdc-{{< param Version >}}.jar)  到 `<FLINK_HOME>/lib/` 目录下。
 
 **注意:** 参考 [flink-sql-connector-oceanbase-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-oceanbase-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 

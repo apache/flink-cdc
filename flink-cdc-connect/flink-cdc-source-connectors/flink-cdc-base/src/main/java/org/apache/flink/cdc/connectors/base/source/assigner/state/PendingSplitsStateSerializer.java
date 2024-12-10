@@ -53,7 +53,7 @@ import static org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplit
  */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
-    private static final int VERSION = 6;
+    private static final int VERSION = 7;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -114,6 +114,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             case 4:
             case 5:
             case 6:
+            case 7:
                 return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -168,6 +169,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         writeTableIds(state.getRemainingTables(), out);
         out.writeBoolean(state.isTableIdCaseSensitive());
         writeTableSchemas(state.getTableSchemas(), out);
+
+        writeSplitFinishedCheckpointIds(state.getSplitFinishedCheckpointIds(), out);
     }
 
     private void serializeHybridPendingSplitsState(
@@ -226,7 +229,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 assignerStatus,
                 new ArrayList<>(),
                 false,
-                false);
+                false,
+                new HashMap<>());
     }
 
     private HybridPendingSplitsState deserializeLegacyHybridPendingSplitsState(
@@ -277,6 +281,10 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         if (version >= 4) {
             tableSchemas.putAll(readTableSchemas(splitVersion, in));
         }
+        Map<String, Long> splitFinishedCheckpointIds = new HashMap<>();
+        if (version >= 7) {
+            splitFinishedCheckpointIds = readSplitFinishedCheckpointIds(in);
+        }
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
                 remainingSchemalessSplits,
@@ -286,7 +294,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 assignerStatus,
                 remainingTableIds,
                 isTableIdCaseSensitive,
-                true);
+                true,
+                splitFinishedCheckpointIds);
     }
 
     private HybridPendingSplitsState deserializeHybridPendingSplitsState(
@@ -305,6 +314,30 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
     // ------------------------------------------------------------------------------------------
     // Utilities
     // ------------------------------------------------------------------------------------------
+
+    private void writeSplitFinishedCheckpointIds(
+            Map<String, Long> splitFinishedCheckpointIds, DataOutputSerializer out)
+            throws IOException {
+        final int size = splitFinishedCheckpointIds.size();
+        out.writeInt(size);
+        for (Map.Entry<String, Long> splitFinishedCheckpointId :
+                splitFinishedCheckpointIds.entrySet()) {
+            out.writeUTF(splitFinishedCheckpointId.getKey());
+            out.writeLong(splitFinishedCheckpointId.getValue());
+        }
+    }
+
+    private Map<String, Long> readSplitFinishedCheckpointIds(DataInputDeserializer in)
+            throws IOException {
+        Map<String, Long> splitFinishedCheckpointIds = new HashMap<>();
+        final int size = in.readInt();
+        for (int i = 0; i < size; i++) {
+            String splitId = in.readUTF();
+            Long checkpointId = in.readLong();
+            splitFinishedCheckpointIds.put(splitId, checkpointId);
+        }
+        return splitFinishedCheckpointIds;
+    }
 
     private void writeFinishedOffsets(Map<String, Offset> splitsInfo, DataOutputSerializer out)
             throws IOException {
