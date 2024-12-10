@@ -32,10 +32,10 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns.METADATA_COLUMNS;
 
@@ -48,7 +48,7 @@ public class TransformFilterProcessor {
     private TransformExpressionKey transformExpressionKey;
     private final transient List<Object> udfFunctionInstances;
     private transient ExpressionEvaluator expressionEvaluator;
-    private final SupportedMetadataColumn[] supportedMetadataColumns;
+    private final Map<String, SupportedMetadataColumn> supportedMetadataColumns;
 
     public TransformFilterProcessor(
             PostTransformChangeInfo tableInfo,
@@ -56,7 +56,7 @@ public class TransformFilterProcessor {
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             List<Object> udfFunctionInstances,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            Map<String, SupportedMetadataColumn> supportedMetadataColumns) {
         this.tableInfo = tableInfo;
         this.transformFilter = transformFilter;
         this.timezone = timezone;
@@ -75,13 +75,18 @@ public class TransformFilterProcessor {
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             List<Object> udfFunctionInstances,
             SupportedMetadataColumn[] supportedMetadataColumns) {
+        Map<String, SupportedMetadataColumn> supportedMetadataColumnsMap = new HashMap<>();
+        for (SupportedMetadataColumn supportedMetadataColumn : supportedMetadataColumns) {
+            supportedMetadataColumnsMap.put(
+                    supportedMetadataColumn.getName(), supportedMetadataColumn);
+        }
         return new TransformFilterProcessor(
                 tableInfo,
                 transformFilter,
                 timezone,
                 udfDescriptors,
                 udfFunctionInstances,
-                supportedMetadataColumns);
+                supportedMetadataColumnsMap);
     }
 
     public boolean process(
@@ -124,13 +129,13 @@ public class TransformFilterProcessor {
                             }
                         });
 
-        Stream.of(supportedMetadataColumns)
+        supportedMetadataColumns
+                .keySet()
                 .forEach(
-                        col -> {
-                            if (scriptExpression.contains(col.getName())
-                                    && !argNames.contains(col.getName())) {
-                                argNames.add(col.getName());
-                                argTypes.add(col.getJavaClass());
+                        colName -> {
+                            if (scriptExpression.contains(colName) && !argNames.contains(colName)) {
+                                argNames.add(colName);
+                                argTypes.add(supportedMetadataColumns.get(colName).getJavaClass());
                             }
                         });
         return Tuple2.of(argNames, argTypes);
@@ -160,15 +165,8 @@ public class TransformFilterProcessor {
                     continue;
             }
 
-            boolean foundInMeta = false;
-            for (SupportedMetadataColumn supportedMetadataColumn : supportedMetadataColumns) {
-                if (supportedMetadataColumn.getName().equals(columnName)) {
-                    params.add(supportedMetadataColumn.read(meta));
-                    foundInMeta = true;
-                    break;
-                }
-            }
-            if (foundInMeta) {
+            if (supportedMetadataColumns.containsKey(columnName)) {
+                params.add(supportedMetadataColumns.get(columnName).read(meta));
                 continue;
             }
 

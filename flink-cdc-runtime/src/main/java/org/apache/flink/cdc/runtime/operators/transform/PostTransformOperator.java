@@ -183,10 +183,10 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         transforms =
                 transformRules.stream()
                         .map(
-                                tuple3 -> {
-                                    String tableInclusions = tuple3.getTableInclusions();
-                                    String projection = tuple3.getProjection();
-                                    String filterExpression = tuple3.getFilter();
+                                transformRule -> {
+                                    String tableInclusions = transformRule.getTableInclusions();
+                                    String projection = transformRule.getProjection();
+                                    String filterExpression = transformRule.getFilter();
 
                                     Selectors selectors =
                                             new Selectors.SelectorsBuilder()
@@ -194,7 +194,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                                     .build();
                                     return new PostTransformer(
                                             selectors,
-                                            tuple3.getSupportedMetadataColumns(),
+                                            transformRule.getSupportedMetadataColumns(),
                                             TransformProjection.of(projection).orElse(null),
                                             TransformFilter.of(filterExpression, udfDescriptors)
                                                     .orElse(null));
