@@ -865,7 +865,8 @@ public class FlinkPipelineUdfITCase {
                         "col1",
                         null,
                         "key1=value1",
-                        "");
+                        "",
+                        false);
 
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
