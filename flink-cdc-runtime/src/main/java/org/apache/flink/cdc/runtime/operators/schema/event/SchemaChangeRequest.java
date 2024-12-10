@@ -38,12 +38,18 @@ public class SchemaChangeRequest implements CoordinationRequest {
     private final SchemaChangeEvent schemaChangeEvent;
     /** The ID of subTask that initiated the request. */
     private final int subTaskId;
+    /**
+     * Nonce code to distinguish flush events corresponding to each schema change event from
+     * different subTasks.
+     */
+    private final long nonce;
 
     public SchemaChangeRequest(
-            TableId tableId, SchemaChangeEvent schemaChangeEvent, int subTaskId) {
+            TableId tableId, SchemaChangeEvent schemaChangeEvent, int subTaskId, long nonce) {
         this.tableId = tableId;
         this.schemaChangeEvent = schemaChangeEvent;
         this.subTaskId = subTaskId;
+        this.nonce = nonce;
     }
 
     public TableId getTableId() {
@@ -58,6 +64,10 @@ public class SchemaChangeRequest implements CoordinationRequest {
         return subTaskId;
     }
 
+    public long getNonce() {
+        return nonce;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -69,11 +79,12 @@ public class SchemaChangeRequest implements CoordinationRequest {
         SchemaChangeRequest that = (SchemaChangeRequest) o;
         return Objects.equals(tableId, that.tableId)
                 && Objects.equals(schemaChangeEvent, that.schemaChangeEvent)
-                && subTaskId == that.subTaskId;
+                && subTaskId == that.subTaskId
+                && nonce == that.nonce;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId, schemaChangeEvent, subTaskId);
+        return Objects.hash(tableId, schemaChangeEvent, subTaskId, nonce);
     }
 }
