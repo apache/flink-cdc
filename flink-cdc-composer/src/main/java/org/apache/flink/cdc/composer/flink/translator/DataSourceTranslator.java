@@ -78,7 +78,7 @@ public class DataSourceTranslator {
         }
     }
 
-    private DataSource createDataSource(
+    public DataSource createDataSource(
             SourceDef sourceDef, StreamExecutionEnvironment env, Configuration pipelineConfig) {
         // Search the data source factory
         DataSourceFactory sourceFactory =
