@@ -79,4 +79,11 @@ public class KafkaDataSinkOptions {
                     .defaultValue("")
                     .withDescription(
                             "custom headers for each kafka record. Each header are separated by ',', separate key and value by ':'. For example, we can set headers like 'key1:value1,key2:value2'.");
+
+    public static final ConfigOption<Boolean> SINK_SCHEMA_INFO_ENABLED =
+            key("sink.schema-info-enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether receive schema info, by default is false. If set to true and the 'schema-info.enabled' parameter in source is also true, the column type info will be sent and increase message size.");
 }

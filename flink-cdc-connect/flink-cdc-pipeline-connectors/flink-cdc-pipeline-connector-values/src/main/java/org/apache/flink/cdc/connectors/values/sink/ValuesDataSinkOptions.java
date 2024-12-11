@@ -20,6 +20,8 @@ package org.apache.flink.cdc.connectors.values.sink;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
 
+import static org.apache.flink.cdc.common.configuration.ConfigOptions.key;
+
 /** Configurations for {@link ValuesDataSink}. */
 public class ValuesDataSinkOptions {
 
@@ -49,4 +51,11 @@ public class ValuesDataSinkOptions {
                     .defaultValue(false)
                     .withDescription(
                             "True if a runtime error should be thrown when handling schema change events.");
+
+    public static final ConfigOption<Boolean> SINK_SCHEMA_INFO_ENABLED =
+            key("sink.schema-info-enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether receive schema info, by default is false. If set to true and the 'schema-info.enabled' parameter in source is also true, the column type info will be sent and increase message size.");
 }

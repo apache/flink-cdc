@@ -57,7 +57,8 @@ public class DebeziumJsonSerializationSchemaTest {
                 ChangeLogJsonFormatFactory.createSerializationSchema(
                         new Configuration(),
                         JsonSerializationType.DEBEZIUM_JSON,
-                        ZoneId.systemDefault());
+                        ZoneId.systemDefault(),
+                        false);
         serializationSchema.open(new MockInitializationContext());
         // create table
         Schema schema =

@@ -280,7 +280,7 @@ public class MySqlSourceMetricsTest {
 
     private MySqlEventDeserializer buildRowDataDebeziumDeserializeSchema() {
         MySqlEventDeserializer deserializer =
-                new MySqlEventDeserializer(DebeziumChangelogMode.ALL, true);
+                new MySqlEventDeserializer(DebeziumChangelogMode.ALL, true, false);
         return deserializer;
     }
 

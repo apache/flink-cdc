@@ -33,6 +33,8 @@ import org.junit.Test;
 
 import java.util.List;
 
+import static org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions.SINK_SCHEMA_INFO_ENABLED;
+
 /** A test for the {@link org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkHelper}. */
 public class ValuesDataSinkHelperTest {
 
@@ -52,7 +54,9 @@ public class ValuesDataSinkHelperTest {
         Assert.assertEquals(
                 "CreateTableEvent{tableId=default.default.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
                 ValuesDataSinkHelper.convertEventToStr(
-                        new CreateTableEvent(tableId, schema), fieldGetters));
+                        new CreateTableEvent(tableId, schema),
+                        fieldGetters,
+                        SINK_SCHEMA_INFO_ENABLED.defaultValue()));
 
         DataChangeEvent insertEvent =
                 DataChangeEvent.insertEvent(
@@ -64,7 +68,8 @@ public class ValuesDataSinkHelperTest {
                                 }));
         Assert.assertEquals(
                 "DataChangeEvent{tableId=default.default.table1, before=[], after=[1, 1], op=INSERT, meta=()}",
-                ValuesDataSinkHelper.convertEventToStr(insertEvent, fieldGetters));
+                ValuesDataSinkHelper.convertEventToStr(
+                        insertEvent, fieldGetters, SINK_SCHEMA_INFO_ENABLED.defaultValue()));
         DataChangeEvent deleteEvent =
                 DataChangeEvent.deleteEvent(
                         tableId,
@@ -75,7 +80,8 @@ public class ValuesDataSinkHelperTest {
                                 }));
         Assert.assertEquals(
                 "DataChangeEvent{tableId=default.default.table1, before=[1, 1], after=[], op=DELETE, meta=()}",
-                ValuesDataSinkHelper.convertEventToStr(deleteEvent, fieldGetters));
+                ValuesDataSinkHelper.convertEventToStr(
+                        deleteEvent, fieldGetters, SINK_SCHEMA_INFO_ENABLED.defaultValue()));
         DataChangeEvent updateEvent =
                 DataChangeEvent.updateEvent(
                         tableId,
@@ -91,6 +97,7 @@ public class ValuesDataSinkHelperTest {
                                 }));
         Assert.assertEquals(
                 "DataChangeEvent{tableId=default.default.table1, before=[1, 1], after=[1, x], op=UPDATE, meta=()}",
-                ValuesDataSinkHelper.convertEventToStr(updateEvent, fieldGetters));
+                ValuesDataSinkHelper.convertEventToStr(
+                        updateEvent, fieldGetters, SINK_SCHEMA_INFO_ENABLED.defaultValue()));
     }
 }

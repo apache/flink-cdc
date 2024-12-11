@@ -29,25 +29,41 @@ import java.util.List;
 public class ValuesDataSinkHelper {
 
     /** convert Event to String for {@link ValuesDataSink} to display detail message. */
-    public static String convertEventToStr(Event event, List<RecordData.FieldGetter> fieldGetters) {
+    public static String convertEventToStr(
+            Event event, List<RecordData.FieldGetter> fieldGetters, boolean includeSchemaInfo) {
         if (event instanceof SchemaChangeEvent) {
             return event.toString();
         } else if (event instanceof DataChangeEvent) {
             DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
-            String eventStr =
-                    "DataChangeEvent{"
-                            + "tableId="
-                            + dataChangeEvent.tableId()
-                            + ", before="
-                            + getFields(fieldGetters, dataChangeEvent.before())
-                            + ", after="
-                            + getFields(fieldGetters, dataChangeEvent.after())
-                            + ", op="
-                            + dataChangeEvent.op()
-                            + ", meta="
-                            + dataChangeEvent.describeMeta()
-                            + '}';
-            return eventStr;
+            if (includeSchemaInfo) {
+                return "DataChangeEvent{"
+                        + "tableId="
+                        + dataChangeEvent.tableId()
+                        + ", before="
+                        + getFields(fieldGetters, dataChangeEvent.before())
+                        + ", after="
+                        + getFields(fieldGetters, dataChangeEvent.after())
+                        + ", op="
+                        + dataChangeEvent.op()
+                        + ", meta="
+                        + dataChangeEvent.describeMeta()
+                        + ", schema="
+                        + dataChangeEvent.getSchema()
+                        + '}';
+            } else {
+                return "DataChangeEvent{"
+                        + "tableId="
+                        + dataChangeEvent.tableId()
+                        + ", before="
+                        + getFields(fieldGetters, dataChangeEvent.before())
+                        + ", after="
+                        + getFields(fieldGetters, dataChangeEvent.after())
+                        + ", op="
+                        + dataChangeEvent.op()
+                        + ", meta="
+                        + dataChangeEvent.describeMeta()
+                        + '}';
+            }
         }
         return "Event{}";
     }

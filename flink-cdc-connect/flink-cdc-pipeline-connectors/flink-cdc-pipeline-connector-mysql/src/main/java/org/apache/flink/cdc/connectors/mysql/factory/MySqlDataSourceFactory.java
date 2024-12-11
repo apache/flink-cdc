@@ -78,6 +78,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCHEMA_CHANGE_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCHEMA_INFO_ENABLE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_ID;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
@@ -117,6 +118,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         StartupOptions startupOptions = getStartupOptions(config);
 
         boolean includeSchemaChanges = config.get(SCHEMA_CHANGE_ENABLED);
+        boolean includeSchemaInfo = config.get(SCHEMA_INFO_ENABLE);
 
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
         int splitSize = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
@@ -168,6 +170,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .connectionPoolSize(connectionPoolSize)
                         .closeIdleReaders(closeIdleReaders)
                         .includeSchemaChanges(includeSchemaChanges)
+                        .includeSchemaInfo(includeSchemaInfo)
                         .debeziumProperties(getDebeziumProperties(configMap))
                         .jdbcProperties(getJdbcProperties(configMap))
                         .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
@@ -254,6 +257,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(PORT);
         options.add(TABLES_EXCLUDE);
         options.add(SCHEMA_CHANGE_ENABLED);
+        options.add(SCHEMA_INFO_ENABLE);
         options.add(SERVER_ID);
         options.add(SERVER_TIME_ZONE);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);

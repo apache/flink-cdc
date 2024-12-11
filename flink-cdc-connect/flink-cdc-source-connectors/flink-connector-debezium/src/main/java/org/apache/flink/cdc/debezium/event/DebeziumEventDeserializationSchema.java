@@ -39,6 +39,10 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.util.Collector;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.debezium.data.Envelope;
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
@@ -51,7 +55,10 @@ import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.apache.kafka.connect.storage.ConverterConfig;
+import org.apache.kafka.connect.storage.ConverterType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +66,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -82,10 +90,17 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     /** Changelog Mode to use for encoding changes in Flink internal data structure. */
     protected final DebeziumChangelogMode changelogMode;
 
+    private transient JsonConverter jsonConverter;
+
+    private final boolean includeSchemaInfo;
+
     public DebeziumEventDeserializationSchema(
-            SchemaDataTypeInference schemaDataTypeInference, DebeziumChangelogMode changelogMode) {
+            SchemaDataTypeInference schemaDataTypeInference,
+            DebeziumChangelogMode changelogMode,
+            boolean includeSchemaInfo) {
         this.schemaDataTypeInference = schemaDataTypeInference;
         this.changelogMode = changelogMode;
+        this.includeSchemaInfo = includeSchemaInfo;
     }
 
     @Override
@@ -102,21 +117,70 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         Schema valueSchema = record.valueSchema();
         Map<String, String> meta = getMetadata(record);
 
+        if (includeSchemaInfo) {
+            if (jsonConverter == null) {
+                initializeJsonConverter();
+            }
+        }
         if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
             RecordData after = extractAfterDataRecord(value, valueSchema);
-            return Collections.singletonList(DataChangeEvent.insertEvent(tableId, after, meta));
+            List<DataChangeEvent> dataChangeEvent =
+                    includeSchemaInfo
+                            ? Collections.singletonList(
+                                    DataChangeEvent.insertEvent(
+                                            tableId,
+                                            after,
+                                            meta,
+                                            extractBeforeAndAfterSchema(
+                                                    jsonConverter.asJsonSchema(valueSchema))))
+                            : Collections.singletonList(
+                                    DataChangeEvent.insertEvent(tableId, after, meta));
+            return dataChangeEvent;
         } else if (op == Envelope.Operation.DELETE) {
             RecordData before = extractBeforeDataRecord(value, valueSchema);
-            return Collections.singletonList(DataChangeEvent.deleteEvent(tableId, before, meta));
+            List<DataChangeEvent> dataChangeEvent =
+                    includeSchemaInfo
+                            ? Collections.singletonList(
+                                    DataChangeEvent.deleteEvent(
+                                            tableId,
+                                            before,
+                                            meta,
+                                            extractBeforeAndAfterSchema(
+                                                    jsonConverter.asJsonSchema(valueSchema))))
+                            : Collections.singletonList(
+                                    DataChangeEvent.deleteEvent(tableId, before, meta));
+            return dataChangeEvent;
         } else if (op == Envelope.Operation.UPDATE) {
             RecordData after = extractAfterDataRecord(value, valueSchema);
             if (changelogMode == DebeziumChangelogMode.ALL) {
                 RecordData before = extractBeforeDataRecord(value, valueSchema);
-                return Collections.singletonList(
-                        DataChangeEvent.updateEvent(tableId, before, after, meta));
+                List<DataChangeEvent> dataChangeEvent =
+                        includeSchemaInfo
+                                ? Collections.singletonList(
+                                        DataChangeEvent.updateEvent(
+                                                tableId,
+                                                before,
+                                                after,
+                                                meta,
+                                                extractBeforeAndAfterSchema(
+                                                        jsonConverter.asJsonSchema(valueSchema))))
+                                : Collections.singletonList(
+                                        DataChangeEvent.updateEvent(tableId, before, after, meta));
+                return dataChangeEvent;
             }
-            return Collections.singletonList(
-                    DataChangeEvent.updateEvent(tableId, null, after, meta));
+            List<DataChangeEvent> dataChangeEvent =
+                    includeSchemaInfo
+                            ? Collections.singletonList(
+                                    DataChangeEvent.updateEvent(
+                                            tableId,
+                                            null,
+                                            after,
+                                            meta,
+                                            extractBeforeAndAfterSchema(
+                                                    jsonConverter.asJsonSchema(valueSchema))))
+                            : Collections.singletonList(
+                                    DataChangeEvent.updateEvent(tableId, null, after, meta));
+            return dataChangeEvent;
         } else {
             LOG.trace("Received {} operation, skip", op);
             return Collections.emptyList();
@@ -140,6 +204,24 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         return extractDataRecord(afterValue, afterSchema);
     }
 
+    /** extract schema of before or after fields. */
+    private String extractBeforeAndAfterSchema(ObjectNode valueSchema) {
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode copyNode = valueSchema.deepCopy();
+
+        ArrayNode fieldsArray = (ArrayNode) copyNode.get("fields");
+        ArrayNode newFields = mapper.createArrayNode();
+        for (JsonNode field : fieldsArray) {
+            String fieldName = field.get("field").asText();
+            if (fieldName.equals(Envelope.FieldName.BEFORE)
+                    || fieldName.equals(Envelope.FieldName.AFTER)) {
+                newFields.add(field);
+            }
+        }
+        copyNode.set("fields", newFields);
+        return copyNode.toString();
+    }
+
     private RecordData extractDataRecord(Struct value, Schema valueSchema) throws Exception {
         DataType dataType = schemaDataTypeInference.infer(value, valueSchema);
         return (RecordData) getOrCreateConverter(dataType).convert(value, valueSchema);
@@ -147,6 +229,13 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
 
     private DeserializationRuntimeConverter getOrCreateConverter(DataType type) {
         return CONVERTERS.computeIfAbsent(type, this::createConverter);
+    }
+
+    private void initializeJsonConverter() {
+        jsonConverter = new JsonConverter();
+        final HashMap<String, Object> configs = new HashMap<>(2);
+        configs.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
+        jsonConverter.configure(configs);
     }
 
     // -------------------------------------------------------------------------------------

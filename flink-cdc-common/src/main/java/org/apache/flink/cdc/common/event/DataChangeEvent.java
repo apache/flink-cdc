@@ -40,11 +40,22 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
             RecordData after,
             OperationType op,
             Map<String, String> meta) {
+        this(tableId, before, after, op, meta, null);
+    }
+
+    private DataChangeEvent(
+            TableId tableId,
+            RecordData before,
+            RecordData after,
+            OperationType op,
+            Map<String, String> meta,
+            String schema) {
         this.tableId = tableId;
         this.before = before;
         this.after = after;
         this.op = op;
         this.meta = meta;
+        this.schema = schema;
     }
 
     private final TableId tableId;
@@ -60,6 +71,8 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
 
     /** Optional, describes the metadata of the change event. e.g. MySQL binlog file name, pos. */
     private final Map<String, String> meta;
+
+    private final String schema;
 
     @Override
     public TableId tableId() {
@@ -82,6 +95,10 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
         return meta;
     }
 
+    public String getSchema() {
+        return schema;
+    }
+
     /** Creates a {@link DataChangeEvent} instance that describes the insert event. */
     public static DataChangeEvent insertEvent(TableId tableId, RecordData after) {
         return new DataChangeEvent(
@@ -96,6 +113,15 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
         return new DataChangeEvent(tableId, null, after, OperationType.INSERT, meta);
     }
 
+    /**
+     * Creates a {@link DataChangeEvent} instance that describes the insert event with meta info and
+     * schema info.
+     */
+    public static DataChangeEvent insertEvent(
+            TableId tableId, RecordData after, Map<String, String> meta, String schema) {
+        return new DataChangeEvent(tableId, null, after, OperationType.INSERT, meta, schema);
+    }
+
     /** Creates a {@link DataChangeEvent} instance that describes the delete event. */
     public static DataChangeEvent deleteEvent(TableId tableId, RecordData before) {
         return new DataChangeEvent(
@@ -108,6 +134,15 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
     public static DataChangeEvent deleteEvent(
             TableId tableId, RecordData before, Map<String, String> meta) {
         return new DataChangeEvent(tableId, before, null, OperationType.DELETE, meta);
+    }
+
+    /**
+     * Creates a {@link DataChangeEvent} instance that describes the delete event with meta info and
+     * schema info.
+     */
+    public static DataChangeEvent deleteEvent(
+            TableId tableId, RecordData before, Map<String, String> meta, String schema) {
+        return new DataChangeEvent(tableId, before, null, OperationType.DELETE, meta, schema);
     }
 
     /** Creates a {@link DataChangeEvent} instance that describes the update event. */
@@ -125,6 +160,19 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
         return new DataChangeEvent(tableId, before, after, OperationType.UPDATE, meta);
     }
 
+    /**
+     * Creates a {@link DataChangeEvent} instance that describes the update event with meta info and
+     * schema info.
+     */
+    public static DataChangeEvent updateEvent(
+            TableId tableId,
+            RecordData before,
+            RecordData after,
+            Map<String, String> meta,
+            String schema) {
+        return new DataChangeEvent(tableId, before, after, OperationType.UPDATE, meta, schema);
+    }
+
     /** Creates a {@link DataChangeEvent} instance that describes the replace event. */
     public static DataChangeEvent replaceEvent(TableId tableId, RecordData after) {
         return new DataChangeEvent(
@@ -137,6 +185,14 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
     public static DataChangeEvent replaceEvent(
             TableId tableId, RecordData after, Map<String, String> meta) {
         return new DataChangeEvent(tableId, null, after, OperationType.REPLACE, meta);
+    }
+
+    /**
+     * Creates a {@link DataChangeEvent} instance that describes the replace event with meta info.
+     */
+    public static DataChangeEvent replaceEvent(
+            TableId tableId, RecordData after, Map<String, String> meta, String columnType) {
+        return new DataChangeEvent(tableId, null, after, OperationType.REPLACE, meta, columnType);
     }
 
     /**
@@ -211,6 +267,8 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
                 + op
                 + ", meta="
                 + describeMeta()
+                + ", schema="
+                + schema
                 + '}';
     }
 }

@@ -45,7 +45,9 @@ public class MySqlDataSource implements DataSource {
     public EventSourceProvider getEventSourceProvider() {
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
-                        DebeziumChangelogMode.ALL, sourceConfig.isIncludeSchemaChanges());
+                        DebeziumChangelogMode.ALL,
+                        sourceConfig.isIncludeSchemaChanges(),
+                        sourceConfig.isIncludeSchemaInfo());
 
         MySqlSource<Event> source =
                 new MySqlSource<>(

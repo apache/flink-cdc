@@ -48,7 +48,10 @@ public class ChangeLogJsonFormatFactory {
      * @return The configured instance of {@link SerializationSchema}.
      */
     public static SerializationSchema<Event> createSerializationSchema(
-            ReadableConfig formatOptions, JsonSerializationType type, ZoneId zoneId) {
+            ReadableConfig formatOptions,
+            JsonSerializationType type,
+            ZoneId zoneId,
+            boolean includeSchemaInfo) {
         TimestampFormat timestampFormat = JsonFormatOptionsUtil.getTimestampFormat(formatOptions);
         JsonFormatOptions.MapNullKeyMode mapNullKeyMode =
                 JsonFormatOptionsUtil.getMapNullKeyMode(formatOptions);
@@ -65,7 +68,8 @@ public class ChangeLogJsonFormatFactory {
                             mapNullKeyMode,
                             mapNullKeyLiteral,
                             zoneId,
-                            encodeDecimalAsPlainNumber);
+                            encodeDecimalAsPlainNumber,
+                            includeSchemaInfo);
                 }
             case CANAL_JSON:
                 {

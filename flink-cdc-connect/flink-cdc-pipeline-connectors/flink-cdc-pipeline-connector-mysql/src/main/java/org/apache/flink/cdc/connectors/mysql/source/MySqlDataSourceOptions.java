@@ -251,6 +251,14 @@ public class MySqlDataSourceOptions {
                             "Whether send schema change events, by default is true. If set to false, the schema changes will not be sent.");
 
     @Experimental
+    public static final ConfigOption<Boolean> SCHEMA_INFO_ENABLE =
+            ConfigOptions.key("schema-info.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether send schema info(such as column type info), by default is false. If set to true, the column type info will be sent and increase network transmission overhead.");
+
+    @Experimental
     public static final ConfigOption<String> TABLES_EXCLUDE =
             ConfigOptions.key("tables.exclude")
                     .stringType()
