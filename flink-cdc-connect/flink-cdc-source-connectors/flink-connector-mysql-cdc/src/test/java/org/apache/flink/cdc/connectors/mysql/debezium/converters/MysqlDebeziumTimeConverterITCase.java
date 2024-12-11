@@ -255,7 +255,7 @@ public class MysqlDebeziumTimeConverterITCase {
 
     protected MySqlContainer createMySqlContainer(String timezone) {
         return (MySqlContainer)
-                new MySqlContainer(MySqlVersion.V5_7)
+                new MySqlContainer(MySqlVersion.AD_HOC)
                         .withConfigurationOverride(buildMySqlConfigWithTimezone(timezone))
                         .withSetupSQL("docker/setup.sql")
                         .withDatabaseName("flink-test")

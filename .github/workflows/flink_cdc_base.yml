@@ -147,7 +147,16 @@ jobs:
               ("pipeline_connectors")
                modules=${{ env.MODULES_PIPELINE_CONNECTORS }}
               ;;
-              ("mysql")
+              ("mysql57")
+               modules=${{ env.MODULES_MYSQL }}
+              ;;
+              ("mysql80")
+               modules=${{ env.MODULES_MYSQL }}
+              ;;
+              ("mysql84")
+               modules=${{ env.MODULES_MYSQL }}
+              ;;
+              ("mysql90")
                modules=${{ env.MODULES_MYSQL }}
               ;;
               ("postgres")
@@ -197,6 +206,16 @@ jobs:
             build_maven_parameter="-DspecifiedMongoVersion=6.0.16"
           elif [ ${{ inputs.module }} == "mongodb7" ]; then
             build_maven_parameter="-DspecifiedMongoVersion=7.0.12"
+          fi
+          
+          if [ ${{ inputs.module }} == "mysql57" ]; then
+            build_maven_parameter="-DspecifiedMySqlVersion=5.7"
+          elif [ ${{ inputs.module }} == "mysql80" ]; then
+            build_maven_parameter="-DspecifiedMySqlVersion=8.0"
+          elif [ ${{ inputs.module }} == "mysql84" ]; then
+            build_maven_parameter="-DspecifiedMySqlVersion=8.4"
+          elif [ ${{ inputs.module }} == "mysql90" ]; then
+            build_maven_parameter="-DspecifiedMySqlVersion=9.0"
           fi
           
           if [ ! -z "${{ inputs.flink-version }}" ]; then

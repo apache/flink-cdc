@@ -61,7 +61,7 @@ jobs:
     strategy:
       matrix:
         java-version: [ '8' ]
-        module: [ 'core', 'pipeline_connectors', 'mysql', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase', 'db2', 'vitess' ]
+        module: [ 'core', 'pipeline_connectors', 'mysql57', 'mysql80', 'mysql84', 'mysql90', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase', 'db2', 'vitess' ]
     name: Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:

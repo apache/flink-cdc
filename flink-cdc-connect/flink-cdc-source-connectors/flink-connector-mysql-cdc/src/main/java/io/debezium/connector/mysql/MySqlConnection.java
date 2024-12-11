@@ -74,6 +74,10 @@ public class MySqlConnection extends JdbcConnection {
 
     private final String urlPattern;
 
+    private static String MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT = "SHOW MASTER STATUS";
+    private static String MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT = "SHOW BINARY LOG STATUS";
+    private String showBinaryLogStatement;
+
     /**
      * Creates a new connection using the supplied configuration.
      *
@@ -90,6 +94,40 @@ public class MySqlConnection extends JdbcConnection {
         this.connectionConfig = connectionConfig;
         this.mysqlFieldReader = fieldReader;
         this.urlPattern = connectionConfig.getUrlPattern();
+
+        probeShowBinaryLogStatement();
+    }
+
+    public String probeShowBinaryLogStatement() {
+        if (showBinaryLogStatement != null) {
+            return showBinaryLogStatement;
+        }
+        try {
+            LOGGER.info("Probing binary log statement.");
+            try {
+                // Attempt to query
+                query(MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT, rs -> {});
+                showBinaryLogStatement = MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT;
+            } catch (SQLException e) {
+                LOGGER.info(
+                        "Probing with {} failed, try {}. Caused by: {}",
+                        MYSQL_NEW_SHOW_BINARY_LOG_STATEMENT,
+                        MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT,
+                        e);
+                query(MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT, rs -> {});
+                showBinaryLogStatement = MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT;
+            }
+            LOGGER.info(
+                    "Successfully found show binary log statement with `{}`.",
+                    showBinaryLogStatement);
+            return showBinaryLogStatement;
+        } catch (Exception e) {
+            LOGGER.warn(
+                    "Failed to probe binary log statement version. Fallback to `{}`.",
+                    MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT,
+                    e);
+            return MYSQL_CLASSIC_SHOW_BINARY_LOG_STATEMENT;
+        }
     }
 
     /**
@@ -275,7 +313,7 @@ public class MySqlConnection extends JdbcConnection {
     public String knownGtidSet() {
         try {
             return queryAndMap(
-                    "SHOW MASTER STATUS",
+                    showBinaryLogStatement,
                     rs -> {
                         if (rs.next() && rs.getMetaData().getColumnCount() > 4) {
                             return rs.getString(

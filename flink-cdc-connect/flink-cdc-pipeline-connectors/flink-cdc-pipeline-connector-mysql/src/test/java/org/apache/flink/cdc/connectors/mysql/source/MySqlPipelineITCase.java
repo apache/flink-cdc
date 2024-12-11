@@ -42,8 +42,6 @@ import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
@@ -79,11 +77,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** IT tests for {@link MySqlDataSource}. */
 public class MySqlPipelineITCase extends MySqlSourceTestBase {
 
-    protected static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0);
-
     private final UniqueDatabase inventoryDatabase =
-            new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -91,14 +86,14 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
     @BeforeClass
     public static void startContainers() {
         LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
+        Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
     @AfterClass
     public static void stopContainers() {
         LOG.info("Stopping containers...");
-        MYSQL8_CONTAINER.stop();
+        MYSQL_CONTAINER.stop();
         LOG.info("Containers are stopped.");
     }
 
@@ -115,8 +110,8 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         inventoryDatabase.createAndInitialize();
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
-                        .hostname(MYSQL8_CONTAINER.getHost())
-                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
                         .username(TEST_USER)
                         .password(TEST_PASSWORD)
                         .databaseList(inventoryDatabase.getDatabaseName())
@@ -264,8 +259,8 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         inventoryDatabase.createAndInitialize();
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
-                        .hostname(MYSQL8_CONTAINER.getHost())
-                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
                         .username(TEST_USER)
                         .password(TEST_PASSWORD)
                         .databaseList(inventoryDatabase.getDatabaseName())
@@ -399,8 +394,8 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         inventoryDatabase.createAndInitialize();
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
-                        .hostname(MYSQL8_CONTAINER.getHost())
-                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
                         .username(TEST_USER)
                         .password(TEST_PASSWORD)
                         .databaseList(inventoryDatabase.getDatabaseName())
@@ -727,8 +722,8 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
 
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
-                        .hostname(MYSQL8_CONTAINER.getHost())
-                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
                         .username(TEST_USER)
                         .password(TEST_PASSWORD)
                         .databaseList(inventoryDatabase.getDatabaseName())

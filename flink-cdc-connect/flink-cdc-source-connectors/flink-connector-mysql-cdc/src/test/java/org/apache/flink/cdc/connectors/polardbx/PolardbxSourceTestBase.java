@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.polardbx;
 
+import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
@@ -26,6 +27,7 @@ import com.github.dockerjava.api.model.PortBinding;
 import com.github.dockerjava.api.model.Ports;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
+import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,6 +88,9 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBase {
 
     @BeforeClass
     public static void startContainers() throws InterruptedException {
+        // PolarDbX is irrelevant to MySQL versions. Running them on one single branch is enough.
+        Assume.assumeTrue(MySqlVersion.AD_HOC.getVersion().equals(MySqlVersion.V8_0.getVersion()));
+
         // no need to start container when the port 8527 is listening
         if (!checkConnection()) {
             LOG.info("Polardbx connection is not valid, so try to start containers...");

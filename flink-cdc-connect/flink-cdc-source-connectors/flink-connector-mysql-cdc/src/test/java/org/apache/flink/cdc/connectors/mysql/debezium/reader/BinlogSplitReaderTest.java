@@ -36,7 +36,6 @@ import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.RecordsFormatter;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.core.testutils.CommonTestUtils;
@@ -61,10 +60,7 @@ import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
-import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -80,7 +76,6 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.mysql.MySqlTestUtils.assertContainsErrorMsg;
 import static org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.initializeEffectiveOffset;
@@ -101,27 +96,11 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
     private final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
 
-    private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
-    private final UniqueDatabase inventoryDatabase8 =
-            new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
+    private final UniqueDatabase inventoryDatabase =
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
 
     private BinaryLogClient binaryLogClient;
     private MySqlConnection mySqlConnection;
-
-    @BeforeClass
-    public static void beforeClass() {
-        LOG.info("Starting MySql8 containers...");
-        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
-        LOG.info("Container MySql8 is started.");
-    }
-
-    @AfterClass
-    public static void afterClass() {
-        LOG.info("Stopping MySql8 containers...");
-        MYSQL8_CONTAINER.stop();
-        LOG.info("Container MySql8 is stopped.");
-    }
 
     @After
     public void after() throws Exception {
@@ -790,9 +769,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
     @Test
     public void testReadBinlogFromUnavailableBinlog() throws Exception {
         // Preparations
-        inventoryDatabase8.createAndInitialize();
+        inventoryDatabase.createAndInitialize();
         MySqlSourceConfig connectionConfig =
-                getConfig(MYSQL8_CONTAINER, inventoryDatabase8, new String[] {"products"});
+                getConfig(MYSQL_CONTAINER, inventoryDatabase, new String[] {"products"});
         binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
 
@@ -802,13 +781,13 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Create a new config to start reading from the offset captured above
         MySqlSourceConfig sourceConfig =
                 getConfig(
-                        MYSQL8_CONTAINER,
-                        inventoryDatabase8,
+                        MYSQL_CONTAINER,
+                        inventoryDatabase,
                         StartupOptions.specificOffset(startingOffset.getGtidSet()),
                         new String[] {"products"});
 
         // Create some binlog events and expire the binlog
-        try (Connection connection = inventoryDatabase8.getJdbcConnection();
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2);");
@@ -849,9 +828,9 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
     @Test
     public void testRestoreFromCheckpointWithTimestampStartingOffset() throws Exception {
         // Preparations
-        inventoryDatabase8.createAndInitialize();
+        inventoryDatabase.createAndInitialize();
         MySqlSourceConfig connectionConfig =
-                getConfig(MYSQL8_CONTAINER, inventoryDatabase8, new String[] {"products"});
+                getConfig(MYSQL_CONTAINER, inventoryDatabase, new String[] {"products"});
         binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
 
@@ -862,8 +841,8 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         long startTimestampMs = 15213L;
         MySqlSourceConfig sourceConfig =
                 getConfig(
-                        MYSQL8_CONTAINER,
-                        inventoryDatabase8,
+                        MYSQL_CONTAINER,
+                        inventoryDatabase,
                         StartupOptions.timestamp(startTimestampMs),
                         new String[] {"products"});
 
@@ -871,8 +850,8 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
         MySqlBinlogSplit checkpointSplit =
                 createBinlogSplit(
                         getConfig(
-                                MYSQL8_CONTAINER,
-                                inventoryDatabase8,
+                                MYSQL_CONTAINER,
+                                inventoryDatabase,
                                 StartupOptions.specificOffset(checkpointOffset),
                                 new String[] {"products"}));
 
