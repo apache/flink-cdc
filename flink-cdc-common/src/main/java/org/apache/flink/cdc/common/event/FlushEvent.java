@@ -28,12 +28,23 @@ public class FlushEvent implements Event {
     /** The schema changes from which table. */
     private final TableId tableId;
 
-    public FlushEvent(TableId tableId) {
+    /**
+     * Nonce code to distinguish flush events corresponding to each schema change event from
+     * different subTasks.
+     */
+    private final long nonce;
+
+    public FlushEvent(TableId tableId, long nonce) {
         this.tableId = tableId;
+        this.nonce = nonce;
     }
 
     public TableId getTableId() {
         return tableId;
+    }
+
+    public long getNonce() {
+        return nonce;
     }
 
     @Override
@@ -45,11 +56,16 @@ public class FlushEvent implements Event {
             return false;
         }
         FlushEvent that = (FlushEvent) o;
-        return Objects.equals(tableId, that.tableId);
+        return Objects.equals(tableId, that.tableId) && Objects.equals(nonce, that.nonce);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId);
+        return Objects.hash(tableId, nonce);
+    }
+
+    @Override
+    public String toString() {
+        return "FlushEvent{" + "tableId=" + tableId + ", nonce=" + nonce + '}';
     }
 }

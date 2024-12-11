@@ -36,9 +36,16 @@ public class FlushSuccessEvent implements OperatorEvent {
     /** The schema changes from which table is executing it. */
     private final TableId tableId;
 
-    public FlushSuccessEvent(int subtask, TableId tableId) {
+    /**
+     * Nonce code to distinguish flush events corresponding to each schema change event from
+     * different subTasks.
+     */
+    private final long nonce;
+
+    public FlushSuccessEvent(int subtask, TableId tableId, long nonce) {
         this.subtask = subtask;
         this.tableId = tableId;
+        this.nonce = nonce;
     }
 
     public int getSubtask() {
@@ -47,6 +54,10 @@ public class FlushSuccessEvent implements OperatorEvent {
 
     public TableId getTableId() {
         return tableId;
+    }
+
+    public long getNonce() {
+        return nonce;
     }
 
     @Override
@@ -58,11 +69,13 @@ public class FlushSuccessEvent implements OperatorEvent {
             return false;
         }
         FlushSuccessEvent that = (FlushSuccessEvent) o;
-        return subtask == that.subtask && Objects.equals(tableId, that.tableId);
+        return subtask == that.subtask
+                && Objects.equals(tableId, that.tableId)
+                && nonce == that.nonce;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(subtask, tableId);
+        return Objects.hash(subtask, tableId, nonce);
     }
 }
