@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.base.experimental.config;
+package org.apache.flink.cdc.connectors.base.mocked;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
@@ -31,13 +31,13 @@ import java.util.Properties;
  * Describes the connection information of the Mysql database and the configuration information for
  * performing snapshotting and streaming reading, such as splitSize.
  */
-public class MySqlSourceConfig extends JdbcSourceConfig {
+public class MockedSourceConfig extends JdbcSourceConfig {
 
     private static final long serialVersionUID = 1L;
 
     private transient MySqlConnectorConfig dbzMySqlConfig;
 
-    public MySqlSourceConfig(
+    public MockedSourceConfig(
             StartupOptions startupOptions,
             List<String> databaseList,
             List<String> tableList,
