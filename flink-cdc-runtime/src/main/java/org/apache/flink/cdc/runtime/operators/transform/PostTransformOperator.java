@@ -101,7 +101,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                 @Nullable String filter,
                 String primaryKey,
                 String partitionKey,
-                String tableOptions) {
+                String tableOptions,
+                boolean convertDeleteAsInsert) {
             transformRules.add(
                     new TransformRule(
                             tableInclusions,
@@ -109,13 +110,15 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                             filter,
                             primaryKey,
                             partitionKey,
-                            tableOptions));
+                            tableOptions,
+                            convertDeleteAsInsert));
             return this;
         }
 
         public PostTransformOperator.Builder addTransform(
                 String tableInclusions, @Nullable String projection, @Nullable String filter) {
-            transformRules.add(new TransformRule(tableInclusions, projection, filter, "", "", ""));
+            transformRules.add(
+                    new TransformRule(tableInclusions, projection, filter, "", "", "", false));
             return this;
         }
 
@@ -172,10 +175,10 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         transforms =
                 transformRules.stream()
                         .map(
-                                tuple3 -> {
-                                    String tableInclusions = tuple3.getTableInclusions();
-                                    String projection = tuple3.getProjection();
-                                    String filterExpression = tuple3.getFilter();
+                                transformRule -> {
+                                    String tableInclusions = transformRule.getTableInclusions();
+                                    String projection = transformRule.getProjection();
+                                    String filterExpression = transformRule.getFilter();
 
                                     Selectors selectors =
                                             new Selectors.SelectorsBuilder()
@@ -185,7 +188,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                             selectors,
                                             TransformProjection.of(projection).orElse(null),
                                             TransformFilter.of(filterExpression, udfDescriptors)
-                                                    .orElse(null));
+                                                    .orElse(null),
+                                            transformRule.isconvertDeleteAsInsert());
                                 })
                         .collect(Collectors.toList());
         this.transformProjectionProcessorMap = new ConcurrentHashMap<>();
@@ -431,6 +435,9 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                     dataChangeEventOptional.get(),
                                     epochTime);
                 }
+                if (dataChangeEventOptional.isPresent() && transform.isconvertDeleteAsInsert()) {
+                    dataChangeEventOptional = concertDeleteAsInsert(dataChangeEventOptional.get());
+                }
                 transformedDataChangeEventOptionalList.add(dataChangeEventOptional);
             }
         }
@@ -446,6 +453,17 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             }
             return Optional.empty();
         }
+    }
+
+    private Optional<DataChangeEvent> concertDeleteAsInsert(DataChangeEvent dataChangeEvent) {
+        if (dataChangeEvent.op() != OperationType.DELETE) {
+            return Optional.of(dataChangeEvent);
+        }
+        return Optional.of(
+                DataChangeEvent.insertEvent(
+                        dataChangeEvent.tableId(),
+                        dataChangeEvent.before(),
+                        dataChangeEvent.meta()));
     }
 
     private Optional<DataChangeEvent> processFilter(

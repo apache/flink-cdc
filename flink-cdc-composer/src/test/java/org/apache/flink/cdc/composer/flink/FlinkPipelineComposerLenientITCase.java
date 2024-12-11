@@ -370,7 +370,8 @@ class FlinkPipelineComposerLenientITCase {
                         "col1",
                         "col12",
                         "key1=value1",
-                        "");
+                        "",
+                        false);
 
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
@@ -430,7 +431,8 @@ class FlinkPipelineComposerLenientITCase {
                         "col1",
                         "col12",
                         "key1=value1",
-                        "");
+                        "",
+                        false);
 
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
@@ -490,7 +492,8 @@ class FlinkPipelineComposerLenientITCase {
                         "col1",
                         "col12",
                         "key1=value1",
-                        "");
+                        "",
+                        false);
         TransformDef transformDef2 =
                 new TransformDef(
                         "default_namespace.default_schema.table1",
@@ -499,7 +502,8 @@ class FlinkPipelineComposerLenientITCase {
                         null,
                         null,
                         null,
-                        "");
+                        "",
+                        false);
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
@@ -1020,7 +1024,8 @@ class FlinkPipelineComposerLenientITCase {
                                 null,
                                 null,
                                 null,
-                                ""));
+                                "",
+                                false));
 
         // Setup route
         TableId mergedTable = TableId.tableId("default_namespace", "default_schema", "merged");

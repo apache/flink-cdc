@@ -78,6 +78,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String TRANSFORM_PROJECTION_KEY = "projection";
     private static final String TRANSFORM_FILTER_KEY = "filter";
     private static final String TRANSFORM_DESCRIPTION_KEY = "description";
+    private static final String TRANSFORM_CONVERT_DELETE_AS_INSERT_KEY = "convert-delete-as-insert";
 
     // UDF related keys
     private static final String UDF_KEY = "user-defined-function";
@@ -316,6 +317,10 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 Optional.ofNullable(transformNode.get(TRANSFORM_DESCRIPTION_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
+        String convertDeleteAsInsert =
+                Optional.ofNullable(transformNode.get(TRANSFORM_CONVERT_DELETE_AS_INSERT_KEY))
+                        .map(JsonNode::asText)
+                        .orElse("false");
 
         return new TransformDef(
                 sourceTable,
@@ -324,7 +329,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 primaryKeys,
                 partitionKeys,
                 tableOptions,
-                description);
+                description,
+                Boolean.parseBoolean(convertDeleteAsInsert));
     }
 
     private Configuration toPipelineConfig(JsonNode pipelineConfigNode) {

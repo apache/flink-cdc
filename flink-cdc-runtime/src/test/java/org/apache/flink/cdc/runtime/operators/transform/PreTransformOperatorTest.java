@@ -191,7 +191,8 @@ public class PreTransformOperatorTest {
                                 null,
                                 "col2",
                                 "col12",
-                                "key1=value1,key2=value2")
+                                "key1=value1,key2=value2",
+                                false)
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -301,7 +302,8 @@ public class PreTransformOperatorTest {
                                 null,
                                 "id",
                                 "id",
-                                "key1=value1,key2=value2")
+                                "key1=value1,key2=value2",
+                                false)
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -331,7 +333,8 @@ public class PreTransformOperatorTest {
                                 "newage > 17 and ref2 > 17",
                                 "id",
                                 "id",
-                                "key1=value1,key2=value2")
+                                "key1=value1,key2=value2",
+                                false)
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -438,7 +441,8 @@ public class PreTransformOperatorTest {
                                 "newage > 17",
                                 "id",
                                 "id",
-                                "key1=value1,key2=value2")
+                                "key1=value1,key2=value2",
+                                false)
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -554,14 +558,16 @@ public class PreTransformOperatorTest {
                                 "age < 18",
                                 "id",
                                 null,
-                                null)
+                                null,
+                                false)
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
                                 "id, name as roleName",
                                 "age >= 18",
                                 "id",
                                 null,
-                                null)
+                                null,
+                                false)
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -591,14 +597,16 @@ public class PreTransformOperatorTest {
                                 "age < 18",
                                 "id",
                                 null,
-                                null)
+                                null,
+                                false)
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
                                 "id, age, name, sex, 'Juvenile' as roleName",
                                 "age >= 18",
                                 "id",
                                 null,
-                                null)
+                                null,
+                                false)
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -622,14 +630,21 @@ public class PreTransformOperatorTest {
         PreTransformOperator transform =
                 PreTransformOperator.newBuilder()
                         .addTransform(
-                                CUSTOMERS_TABLEID.identifier(), null, "age < 18", "id", null, null)
+                                CUSTOMERS_TABLEID.identifier(),
+                                null,
+                                "age < 18",
+                                "id",
+                                null,
+                                null,
+                                false)
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
                                 "id, age, UPPER(name) as name, sex",
                                 "age >= 18",
                                 "id",
                                 null,
-                                null)
+                                null,
+                                false)
                         .build();
         EventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
