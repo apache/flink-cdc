@@ -38,7 +38,7 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import java.math.BigDecimal;
 
 /** Unit tests for the {@link PostTransformOperator}. */
-public class PostTransformOperatorTest {
+class PostTransformOperatorTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
     private static final Schema CUSTOMERS_SCHEMA =
@@ -1603,7 +1603,7 @@ public class PostTransformOperatorTest {
     }
 
     @Test
-    public void testReduceSchemaTransform() throws Exception {
+    void testReduceSchemaTransform() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
                         .addTransform(
@@ -1705,7 +1705,7 @@ public class PostTransformOperatorTest {
     }
 
     @Test
-    public void testWildcardSchemaTransform() throws Exception {
+    void testWildcardSchemaTransform() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
                         .addTransform(

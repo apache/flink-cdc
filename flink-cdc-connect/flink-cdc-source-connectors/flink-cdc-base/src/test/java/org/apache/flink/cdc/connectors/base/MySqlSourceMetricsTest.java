@@ -26,6 +26,7 @@ import org.apache.flink.cdc.connectors.base.source.MySqlEventDeserializer;
 import org.apache.flink.cdc.connectors.base.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.base.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.base.testutils.UniqueDatabase;
+import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Counter;
@@ -47,10 +48,10 @@ import org.apache.flink.util.CloseableIterator;
 
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -67,10 +68,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 /** MySQL Source Metrics Tests. */
 public class MySqlSourceMetricsTest {
 
@@ -80,20 +77,21 @@ public class MySqlSourceMetricsTest {
     private static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
     protected InMemoryReporter metricReporter = InMemoryReporter.createWithRetainedMetrics();
 
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .setConfiguration(
-                                    metricReporter.addToConfiguration(new Configuration()))
-                            .build());
+    @RegisterExtension
+    public final ExternalResourceProxy<MiniClusterWithClientResource> miniClusterResource =
+            new ExternalResourceProxy<>(
+                    new MiniClusterWithClientResource(
+                            new MiniClusterResourceConfiguration.Builder()
+                                    .setNumberTaskManagers(1)
+                                    .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                                    .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                                    .withHaLeadershipControl()
+                                    .setConfiguration(
+                                            metricReporter.addToConfiguration(new Configuration()))
+                                    .build()));
 
-    @BeforeClass
-    public static void startContainers() {
+    @BeforeAll
+    static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Containers are started.");
@@ -103,7 +101,7 @@ public class MySqlSourceMetricsTest {
             new UniqueDatabase(MYSQL_CONTAINER, "metrics", "mysqluser", "mysqlpw");
 
     @Test
-    public void testSourceMetrics() throws Exception {
+    void testSourceMetrics() throws Exception {
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -158,7 +156,8 @@ public class MySqlSourceMetricsTest {
         }
 
         List<String> snapshotActualRecords = formatResult(snapshotRowDataList, dataType);
-        assertEqualsInAnyOrder(Arrays.asList(snapshotExpectedRecords), snapshotActualRecords);
+        Assertions.assertThat(snapshotActualRecords)
+                .containsExactlyInAnyOrderElementsOf(Arrays.asList(snapshotExpectedRecords));
 
         // step-2: make 6 change events in one MySQL transaction
         makeBinlogEvents(getConnection(), tableId);
@@ -181,7 +180,8 @@ public class MySqlSourceMetricsTest {
             binlogRowDataList.add(iterator.next());
         }
         List<String> binlogActualRecords = formatResult(binlogRowDataList, dataType);
-        assertEqualsInAnyOrder(Arrays.asList(binlogExpectedRecords), binlogActualRecords);
+        Assertions.assertThat(binlogActualRecords)
+                .containsExactlyInAnyOrderElementsOf(Arrays.asList(binlogExpectedRecords));
 
         Set<MetricGroup> metricGroups = metricReporter.findGroups("users");
         for (MetricGroup enumeratorGroup : metricGroups) {
@@ -197,17 +197,23 @@ public class MySqlSourceMetricsTest {
             }
             Map<String, Metric> enumeratorMetrics =
                     metricReporter.getMetricsByGroup(enumeratorGroup);
-            Assert.assertEquals(
-                    1, ((Counter) enumeratorMetrics.get("numDeleteDMLRecords")).getCount());
-            Assert.assertEquals(
-                    1, ((Counter) enumeratorMetrics.get("numInsertDMLRecords")).getCount());
-            Assert.assertEquals(
-                    9, ((Counter) enumeratorMetrics.get("numSnapshotRecords")).getCount());
+            Assertions.assertThat(
+                            ((Counter) enumeratorMetrics.get("numDeleteDMLRecords")).getCount())
+                    .isOne();
+            Assertions.assertThat(
+                            ((Counter) enumeratorMetrics.get("numInsertDMLRecords")).getCount())
+                    .isOne();
+            Assertions.assertThat(
+                            ((Counter) enumeratorMetrics.get("numSnapshotRecords")).getCount())
+                    .isEqualTo(9);
             // ddl eventd
-            Assert.assertEquals(1, ((Counter) enumeratorMetrics.get("numDDLRecords")).getCount());
-            Assert.assertEquals(13, ((Counter) enumeratorMetrics.get("numRecordsIn")).getCount());
-            Assert.assertEquals(
-                    2, ((Counter) enumeratorMetrics.get("numUpdateDMLRecords")).getCount());
+            Assertions.assertThat(((Counter) enumeratorMetrics.get("numDDLRecords")).getCount())
+                    .isOne();
+            Assertions.assertThat(((Counter) enumeratorMetrics.get("numRecordsIn")).getCount())
+                    .isEqualTo(13);
+            Assertions.assertThat(
+                            ((Counter) enumeratorMetrics.get("numUpdateDMLRecords")).getCount())
+                    .isEqualTo(2);
         }
         Set<MetricGroup> enumeratorGroups = metricReporter.findGroups("enumerator");
         for (MetricGroup enumeratorGroup : enumeratorGroups) {
@@ -221,57 +227,62 @@ public class MySqlSourceMetricsTest {
             Map<String, Metric> enumeratorMetrics =
                     metricReporter.getMetricsByGroup(enumeratorGroup);
             if (isTableMetric) {
-                Assert.assertEquals(
-                        0,
-                        ((Gauge<Integer>) enumeratorMetrics.get("numSnapshotSplitsRemaining"))
-                                .getValue()
-                                .intValue());
-                Assert.assertEquals(
-                        5,
-                        ((Gauge<Integer>) enumeratorMetrics.get("numSnapshotSplitsProcessed"))
-                                .getValue()
-                                .intValue());
-                Assert.assertEquals(
-                        5,
-                        ((Gauge<Integer>) enumeratorMetrics.get("numSnapshotSplitsFinished"))
-                                .getValue()
-                                .intValue());
-                Assert.assertTrue(
-                        ((Gauge<Long>) enumeratorMetrics.get("snapshotEndTime"))
+                Assertions.assertThat(
+                                ((Gauge<Integer>)
+                                                enumeratorMetrics.get("numSnapshotSplitsRemaining"))
                                         .getValue()
-                                        .longValue()
-                                > 0);
-                Assert.assertTrue(
-                        ((Gauge<Long>) enumeratorMetrics.get("snapshotStartTime"))
+                                        .intValue())
+                        .isZero();
+                Assertions.assertThat(
+                                ((Gauge<Integer>)
+                                                enumeratorMetrics.get("numSnapshotSplitsProcessed"))
                                         .getValue()
-                                        .longValue()
-                                > 0);
+                                        .intValue())
+                        .isEqualTo(5);
+                Assertions.assertThat(
+                                ((Gauge<Integer>)
+                                                enumeratorMetrics.get("numSnapshotSplitsFinished"))
+                                        .getValue()
+                                        .intValue())
+                        .isEqualTo(5);
+                Assertions.assertThat(
+                                ((Gauge<Long>) enumeratorMetrics.get("snapshotEndTime"))
+                                        .getValue()
+                                        .longValue())
+                        .isPositive();
+                Assertions.assertThat(
+                                ((Gauge<Long>) enumeratorMetrics.get("snapshotStartTime"))
+                                        .getValue()
+                                        .longValue())
+                        .isPositive();
             } else {
-                Assert.assertEquals(
-                        0,
-                        ((Gauge<Integer>) enumeratorMetrics.get("isSnapshotting"))
-                                .getValue()
-                                .intValue());
-                Assert.assertEquals(
-                        1,
-                        ((Gauge<Integer>) enumeratorMetrics.get("isStreamReading"))
-                                .getValue()
-                                .intValue());
-                Assert.assertEquals(
-                        1,
-                        ((Gauge<Integer>) enumeratorMetrics.get("numTablesSnapshotted"))
-                                .getValue()
-                                .intValue());
-                Assert.assertEquals(
-                        0,
-                        ((Gauge<Integer>) enumeratorMetrics.get("numSnapshotSplitsRemaining"))
-                                .getValue()
-                                .intValue());
-                Assert.assertEquals(
-                        5,
-                        ((Gauge<Integer>) enumeratorMetrics.get("numSnapshotSplitsProcessed"))
-                                .getValue()
-                                .intValue());
+                Assertions.assertThat(
+                                ((Gauge<Integer>) enumeratorMetrics.get("isSnapshotting"))
+                                        .getValue()
+                                        .intValue())
+                        .isZero();
+                Assertions.assertThat(
+                                ((Gauge<Integer>) enumeratorMetrics.get("isStreamReading"))
+                                        .getValue()
+                                        .intValue())
+                        .isOne();
+                Assertions.assertThat(
+                                ((Gauge<Integer>) enumeratorMetrics.get("numTablesSnapshotted"))
+                                        .getValue()
+                                        .intValue())
+                        .isOne();
+                Assertions.assertThat(
+                                ((Gauge<Integer>)
+                                                enumeratorMetrics.get("numSnapshotSplitsRemaining"))
+                                        .getValue()
+                                        .intValue())
+                        .isZero();
+                Assertions.assertThat(
+                                ((Gauge<Integer>)
+                                                enumeratorMetrics.get("numSnapshotSplitsProcessed"))
+                                        .getValue()
+                                        .intValue())
+                        .isEqualTo(5);
             }
         }
         // stop the worker
@@ -369,19 +380,6 @@ public class MySqlSourceMetricsTest {
         } finally {
             connection.close();
         }
-    }
-
-    public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
-    }
-
-    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
     }
 
     private static MySqlContainer createMySqlContainer(MySqlVersion version) {

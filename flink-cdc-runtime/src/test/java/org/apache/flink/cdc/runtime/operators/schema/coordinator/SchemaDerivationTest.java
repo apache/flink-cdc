@@ -254,8 +254,8 @@ class SchemaDerivationTest {
         List<SchemaChangeEvent> derivedChangesAfterCreateTable2 =
                 schemaDerivation.applySchemaChange(
                         new CreateTableEvent(TABLE_2, COMPATIBLE_SCHEMA));
-        assertThat(derivedChangesAfterCreateTable2).hasSize(2);
         assertThat(derivedChangesAfterCreateTable2)
+                .hasSize(2)
                 .containsExactlyInAnyOrder(
                         new AddColumnEvent(
                                 MERGED_TABLE,

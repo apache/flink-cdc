@@ -23,16 +23,14 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.junit.jupiter.Container;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -43,8 +41,7 @@ import java.time.Duration;
 import java.util.concurrent.TimeoutException;
 
 /** E2e tests for routing features. */
-@RunWith(Parameterized.class)
-public class RouteE2eITCase extends PipelineTestEnvironment {
+class RouteE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(RouteE2eITCase.class);
 
     // ------------------------------------------------------------------------------------------
@@ -56,7 +53,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
     protected static final long EVENT_DEFAULT_TIMEOUT = 60000L;
 
-    @ClassRule
+    @Container
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
@@ -73,13 +70,13 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     protected final UniqueDatabase routeTestDatabase =
             new UniqueDatabase(MYSQL, "route_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         super.before();
         routeTestDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         routeTestDatabase.dropDatabase();
@@ -137,7 +134,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testDefaultRoute() throws Exception {
+    void testDefaultRoute() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -229,7 +226,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testMergeTableRoute() throws Exception {
+    void testMergeTableRoute() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -313,7 +310,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testPartialRoute() throws Exception {
+    void testPartialRoute() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -409,7 +406,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testMultipleRoute() throws Exception {
+    void testMultipleRoute() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -515,7 +512,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testOneToManyRoute() throws Exception {
+    void testOneToManyRoute() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -629,7 +626,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testMergeTableRouteWithTransform() throws Exception {
+    void testMergeTableRouteWithTransform() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -718,7 +715,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testReplacementSymbol() throws Exception {
+    void testReplacementSymbol() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -841,6 +838,6 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     }
 
     private void assertNotExists(String event) {
-        Assert.assertFalse(taskManagerConsumer.toUtf8String().contains(event));
+        Assertions.assertThat(taskManagerConsumer.toUtf8String()).doesNotContain(event);
     }
 }

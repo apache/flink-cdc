@@ -45,7 +45,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link PaimonHashFunction}. */
-public class PaimonHashFunctionTest {
+class PaimonHashFunctionTest {
 
     @TempDir public static Path temporaryFolder;
 
@@ -72,7 +72,7 @@ public class PaimonHashFunctionTest {
     }
 
     @Test
-    public void testHashCodeForFixedBucketTable() {
+    void testHashCodeForFixedBucketTable() {
         TableId tableId = TableId.tableId(TEST_DATABASE, "test_table");
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "10");

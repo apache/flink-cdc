@@ -40,7 +40,8 @@ import org.apache.flink.table.types.logical.RowType;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -51,17 +52,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.sqlserver.source.utils.SqlServerConnectionUtils.createSqlServerConnection;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** Tests for {@link SqlServerScanFetchTask}. */
-public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
+class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
     @Test
-    public void testChangingDataInSnapshotScan() throws Exception {
+    void testChangingDataInSnapshotScan() throws Exception {
         String databaseName = "customer";
         String tableName = "dbo.customers";
 
@@ -128,7 +125,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testInsertDataInSnapshotScan() throws Exception {
+    void testInsertDataInSnapshotScan() throws Exception {
         String databaseName = "customer";
         String tableName = "dbo.customers";
 
@@ -193,7 +190,7 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testDateTimePrimaryKey() throws Exception {
+    void testDateTimePrimaryKey() throws Exception {
         String databaseName = "pk";
         String tableName = "dbo.dt_pk";
 
@@ -205,18 +202,19 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
         SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfig);
 
         List<SnapshotSplit> snapshotSplits = getSnapshotSplits(sourceConfig, sqlServerDialect);
-        assertFalse(snapshotSplits.isEmpty());
+        Assertions.assertThat(snapshotSplits).isNotEmpty();
 
         RowType expectedType =
                 (RowType)
                         DataTypes.ROW(DataTypes.FIELD("dt", DataTypes.TIMESTAMP(3).notNull()))
                                 .getLogicalType();
 
-        snapshotSplits.forEach(s -> assertEquals(expectedType, s.getSplitKeyType()));
+        snapshotSplits.forEach(
+                s -> Assertions.assertThat(s.getSplitKeyType()).isEqualTo(expectedType));
     }
 
     @Test
-    public void testDeleteDataInSnapshotScan() throws Exception {
+    void testDeleteDataInSnapshotScan() throws Exception {
         String databaseName = "customer";
         String tableName = "dbo.customers";
 
@@ -306,8 +304,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
         sourceScanFetcher.close();
 
-        assertNotNull(sourceScanFetcher.getExecutorService());
-        assertTrue(sourceScanFetcher.getExecutorService().isTerminated());
+        Assertions.assertThat(sourceScanFetcher.getExecutorService()).isNotNull();
+        Assertions.assertThat(sourceScanFetcher.getExecutorService().isTerminated()).isTrue();
 
         return formatResult(result, dataType);
     }
