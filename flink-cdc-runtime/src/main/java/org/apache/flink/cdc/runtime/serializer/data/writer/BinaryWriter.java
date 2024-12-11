@@ -32,7 +32,9 @@ import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.cdc.runtime.serializer.NullableSerializerWrapper;
 import org.apache.flink.cdc.runtime.serializer.data.ArrayDataSerializer;
+import org.apache.flink.cdc.runtime.serializer.data.MapDataSerializer;
 
 /**
  * Writer to write a composite data format, like row, array. 1. Invoke {@link #reset()}. 2. Write
@@ -76,7 +78,7 @@ public interface BinaryWriter {
 
     void writeArray(int pos, ArrayData value, ArrayDataSerializer serializer);
 
-    void writeMap(int pos, MapData value, TypeSerializer<MapData> serializer);
+    void writeMap(int pos, MapData value, MapDataSerializer serializer);
 
     void writeRecord(int pos, RecordData value, TypeSerializer<RecordData> serializer);
 
@@ -131,10 +133,16 @@ public interface BinaryWriter {
                 writer.writeDecimal(pos, (DecimalData) o, decimalType.getPrecision());
                 break;
             case ARRAY:
+                if (serializer instanceof NullableSerializerWrapper) {
+                    serializer = ((NullableSerializerWrapper) serializer).getWrappedSerializer();
+                }
                 writer.writeArray(pos, (ArrayData) o, (ArrayDataSerializer) serializer);
                 break;
             case MAP:
-                writer.writeMap(pos, (MapData) o, (TypeSerializer<MapData>) serializer);
+                if (serializer instanceof NullableSerializerWrapper) {
+                    serializer = ((NullableSerializerWrapper) serializer).getWrappedSerializer();
+                }
+                writer.writeMap(pos, (MapData) o, (MapDataSerializer) serializer);
                 break;
             case ROW:
                 writer.writeRecord(pos, (RecordData) o, (TypeSerializer<RecordData>) serializer);
