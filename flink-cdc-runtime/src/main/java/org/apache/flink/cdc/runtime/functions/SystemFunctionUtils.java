@@ -774,6 +774,8 @@ public class SystemFunctionUtils {
                 new BigDecimal(castObjectIntoString(object), new MathContext(precision));
         bigDecimal = bigDecimal.setScale(scale, RoundingMode.HALF_UP);
         if (bigDecimal.precision() > precision) {
+            // TODO: Handle malformed data properly after dirty data handling is implemented in
+            // Pipeline Framework.
             return null;
         }
         return bigDecimal;
