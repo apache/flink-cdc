@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.base.experimental;
+package org.apache.flink.cdc.connectors.base.mocked;
 
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
@@ -23,7 +23,7 @@ import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnection
 
 /** A MySQL datasource factory. */
 @Experimental
-public class MysqlPooledDataSourceFactory extends JdbcConnectionPoolFactory {
+public class MockedPooledDataSourceFactory extends JdbcConnectionPoolFactory {
 
     public static final String JDBC_URL_PATTERN =
             "jdbc:mysql://%s:%s/?useInformationSchema=true&nullCatalogMeansCurrent=false&useUnicode=true&characterEncoding=UTF-8&characterSetResults=UTF-8&zeroDateTimeBehavior=CONVERT_TO_NULL";

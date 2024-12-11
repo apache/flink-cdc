@@ -18,8 +18,8 @@
 package org.apache.flink.cdc.connectors.base;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
-import org.apache.flink.cdc.connectors.base.experimental.MysqlPooledDataSourceFactory;
-import org.apache.flink.cdc.connectors.base.experimental.config.MySqlSourceConfig;
+import org.apache.flink.cdc.connectors.base.mocked.MockedPooledDataSourceFactory;
+import org.apache.flink.cdc.connectors.base.mocked.MockedSourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.relational.connection.ConnectionPoolId;
 import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
@@ -34,7 +34,7 @@ import java.util.Arrays;
 import java.util.Properties;
 
 /** Tests for {@link JdbcConnectionPools}. */
-public class JdbcConnectionPoolTest {
+public class GenericConnectionPoolTest {
     public static final String HOSTNAME = "localhost";
     public static final int PORT = 3306;
 
@@ -48,13 +48,13 @@ public class JdbcConnectionPoolTest {
     @Test
     public void testMultiConnectionPoolFactory() {
         MockConnectionPoolFactory mockConnectionPoolFactory = new MockConnectionPoolFactory();
-        MysqlPooledDataSourceFactory mysqlPooledDataSourceFactory =
-                new MysqlPooledDataSourceFactory();
+        MockedPooledDataSourceFactory genericPooledDataSourceFactory =
+                new MockedPooledDataSourceFactory();
         JdbcConnectionPools mockInstance =
                 JdbcConnectionPools.getInstance(mockConnectionPoolFactory);
         JdbcConnectionPools mysqlInstance =
-                JdbcConnectionPools.getInstance(mysqlPooledDataSourceFactory);
-        MySqlSourceConfig mySqlSourceConfig =
+                JdbcConnectionPools.getInstance(genericPooledDataSourceFactory);
+        MockedSourceConfig mySqlSourceConfig =
                 getMockMySqlSourceConfig(HOSTNAME, PORT, USER_NAME, PASSWORD, DATABASE, TABLE);
 
         Assert.assertEquals(
@@ -63,21 +63,21 @@ public class JdbcConnectionPoolTest {
                 mockConnectionPoolFactory.getJdbcUrl(mySqlSourceConfig));
         Assert.assertEquals(
                 mysqlInstance.getJdbcUrl(
-                        mySqlSourceConfig, mysqlPooledDataSourceFactory.getClass().getName()),
-                mysqlPooledDataSourceFactory.getJdbcUrl(mySqlSourceConfig));
+                        mySqlSourceConfig, genericPooledDataSourceFactory.getClass().getName()),
+                genericPooledDataSourceFactory.getJdbcUrl(mySqlSourceConfig));
         Assert.assertNotEquals(
                 mysqlInstance.getJdbcUrl(
-                        mySqlSourceConfig, mysqlPooledDataSourceFactory.getClass().getName()),
+                        mySqlSourceConfig, genericPooledDataSourceFactory.getClass().getName()),
                 mockConnectionPoolFactory.getJdbcUrl(mySqlSourceConfig));
     }
 
     @Test
     public void testNoDataSourcePoolFactoryIdentifier() {
-        MysqlPooledDataSourceFactory mysqlPooledDataSourceFactory =
-                new MysqlPooledDataSourceFactory();
+        MockedPooledDataSourceFactory mysqlPooledDataSourceFactory =
+                new MockedPooledDataSourceFactory();
         JdbcConnectionPools mysqlInstance =
                 JdbcConnectionPools.getInstance(mysqlPooledDataSourceFactory);
-        MySqlSourceConfig mySqlSourceConfig =
+        MockedSourceConfig mySqlSourceConfig =
                 getMockMySqlSourceConfig(HOSTNAME, PORT, USER_NAME, PASSWORD, DATABASE, TABLE);
         ConnectionPoolId poolId =
                 new ConnectionPoolId(
@@ -94,14 +94,14 @@ public class JdbcConnectionPoolTest {
                 () -> mysqlInstance.getOrCreateConnectionPool(poolId, mySqlSourceConfig));
     }
 
-    private static MySqlSourceConfig getMockMySqlSourceConfig(
+    private static MockedSourceConfig getMockMySqlSourceConfig(
             String hostname,
             int port,
             String username,
             String password,
             String database,
             String table) {
-        return new MySqlSourceConfig(
+        return new MockedSourceConfig(
                 StartupOptions.latest(),
                 Arrays.asList(database),
                 Arrays.asList(table),
