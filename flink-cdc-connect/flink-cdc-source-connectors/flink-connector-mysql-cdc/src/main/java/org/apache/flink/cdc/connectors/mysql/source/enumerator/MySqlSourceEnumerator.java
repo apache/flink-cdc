@@ -277,8 +277,8 @@ public class MySqlSourceEnumerator implements SplitEnumerator<MySqlSplit, Pendin
     private void requestBinlogSplitUpdateIfNeed() {
         if (!isBinlogSplitUpdateRequestAlreadySent
                 && isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())) {
-            isBinlogSplitUpdateRequestAlreadySent = true;
             for (int subtaskId : getRegisteredReader()) {
+                isBinlogSplitUpdateRequestAlreadySent = true;
                 LOG.info(
                         "The enumerator requests subtask {} to update the binlog split after newly added table.",
                         subtaskId);
