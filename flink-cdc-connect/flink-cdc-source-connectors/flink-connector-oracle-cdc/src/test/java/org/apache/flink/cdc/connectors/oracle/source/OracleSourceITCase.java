@@ -492,7 +492,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                         "INSERT INTO sink SELECT ID,NAME, ADDRESS,PHONE_NUMBER FROM customers");
         waitForSinkSize("sink", 1);
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
 
         String[] expected = new String[] {"+I[9999, user_offset, Shanghai, 123567891234]"};
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
