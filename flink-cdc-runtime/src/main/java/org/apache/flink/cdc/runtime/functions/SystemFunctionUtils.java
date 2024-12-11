@@ -44,7 +44,10 @@ import java.util.regex.Pattern;
 import static org.apache.flink.cdc.common.utils.DateTimeUtils.timestampMillisToDate;
 import static org.apache.flink.cdc.common.utils.DateTimeUtils.timestampMillisToTime;
 
-/** System function utils to support the call of flink cdc pipeline transform. */
+/**
+ * System function utils to support the call of flink cdc pipeline transform. <br>
+ * {@code castToXxx}-series function returns `null` when conversion is not viable.
+ */
 public class SystemFunctionUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(SystemFunctionUtils.class);
@@ -649,7 +652,13 @@ public class SystemFunctionUtils {
         try {
             return Byte.valueOf(stringRep);
         } catch (NumberFormatException e) {
+            // Ignore this exception because it could still represent a valid floating point number,
+            // but could not be accepted by Byte#valueOf.
+        }
+        try {
             return Double.valueOf(stringRep).byteValue();
+        } catch (NumberFormatException ignored) {
+            return null;
         }
     }
 
@@ -673,7 +682,13 @@ public class SystemFunctionUtils {
         try {
             return Short.valueOf(stringRep);
         } catch (NumberFormatException e) {
+            // Ignore this exception because it could still represent a valid floating point number,
+            // but could not be accepted by Short#valueOf.
+        }
+        try {
             return Double.valueOf(stringRep).shortValue();
+        } catch (NumberFormatException ignored) {
+            return null;
         }
     }
 
@@ -697,7 +712,13 @@ public class SystemFunctionUtils {
         try {
             return Integer.valueOf(stringRep);
         } catch (NumberFormatException e) {
+            // Ignore this exception because it could still represent a valid floating point number,
+            // but could not be accepted by Integer#valueOf.
+        }
+        try {
             return Double.valueOf(stringRep).intValue();
+        } catch (NumberFormatException ignored) {
+            return null;
         }
     }
 
@@ -721,7 +742,13 @@ public class SystemFunctionUtils {
         try {
             return Long.valueOf(stringRep);
         } catch (NumberFormatException e) {
+            // Ignore this exception because it could still represent a valid floating point number,
+            // but could not be accepted by Long#valueOf.
+        }
+        try {
             return Double.valueOf(stringRep).longValue();
+        } catch (NumberFormatException ignored) {
+            return null;
         }
     }
 
@@ -741,7 +768,11 @@ public class SystemFunctionUtils {
         if (object instanceof Float) {
             return (Float) object;
         }
-        return Float.valueOf(castObjectIntoString(object));
+        try {
+            return Float.valueOf(castObjectIntoString(object));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public static Double castToDouble(Object object) {
@@ -760,7 +791,11 @@ public class SystemFunctionUtils {
         if (object instanceof Float) {
             return ((Float) object).doubleValue();
         }
-        return Double.valueOf(castObjectIntoString(object));
+        try {
+            return Double.valueOf(castObjectIntoString(object));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public static BigDecimal castToBigDecimal(Object object, int precision, int scale) {
@@ -770,12 +805,18 @@ public class SystemFunctionUtils {
         if (object instanceof Boolean) {
             object = (Boolean) object ? 1 : 0;
         }
-        BigDecimal bigDecimal =
-                new BigDecimal(castObjectIntoString(object), new MathContext(precision));
-        bigDecimal = bigDecimal.setScale(scale, RoundingMode.HALF_UP);
+
+        BigDecimal bigDecimal;
+        try {
+            bigDecimal = new BigDecimal(castObjectIntoString(object), new MathContext(precision));
+            bigDecimal = bigDecimal.setScale(scale, RoundingMode.HALF_UP);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+
+        // If the precision overflows, null will be returned. Otherwise, we may accidentally emit a
+        // non-serializable object into the pipeline that breaks downstream.
         if (bigDecimal.precision() > precision) {
-            // TODO: Handle malformed data properly after dirty data handling is implemented in
-            // Pipeline Framework.
             return null;
         }
         return bigDecimal;
