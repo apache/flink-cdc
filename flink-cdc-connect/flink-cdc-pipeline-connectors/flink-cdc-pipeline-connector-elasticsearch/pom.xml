@@ -36,7 +36,7 @@ limitations under the License.
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <elasticsearch.version>8.12.1</elasticsearch.version>
-        <flink.version>1.18.0</flink.version>
+        <flink.version>1.19.1</flink.version>
         <scala.binary.version>4.0</scala.binary.version>
         <jackson.version>2.13.2</jackson.version>
         <surefire.module.config>--add-opens=java.base/java.util=ALL-UNNAMED</surefire.module.config>
@@ -197,7 +197,7 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-composer</artifactId>
-            <version>${revision}</version>
+            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

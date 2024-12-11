@@ -96,7 +96,7 @@ public class PostgresTestUtils {
     public static int upsertSinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getResults(sinkName).size();
+                return TestValuesTableFactory.getResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;

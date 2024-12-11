@@ -207,6 +207,156 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
         assertThat(actualSchema).isEqualTo(expectedSchema);
     }
 
+    @Test
+    public void testMysql57PrecisionTypesSchema() {
+        fullTypesMySql57Database.createAndInitialize();
+
+        String[] tables = new String[] {"precision_types"};
+        MySqlMetadataAccessor metadataAccessor =
+                getMetadataAccessor(tables, fullTypesMySql57Database);
+
+        Schema actualSchema =
+                metadataAccessor.getTableSchema(
+                        TableId.tableId(
+                                fullTypesMySql57Database.getDatabaseName(), "precision_types"));
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .primaryKey("id")
+                        .fromRowDataType(
+                                RowType.of(
+                                        new DataType[] {
+                                            DataTypes.DECIMAL(20, 0).notNull(),
+                                            DataTypes.DECIMAL(6, 2),
+                                            DataTypes.DECIMAL(9, 4),
+                                            DataTypes.DECIMAL(20, 4),
+                                            DataTypes.TIME(0),
+                                            DataTypes.TIME(3),
+                                            DataTypes.TIME(6),
+                                            DataTypes.TIMESTAMP(0),
+                                            DataTypes.TIMESTAMP(3),
+                                            DataTypes.TIMESTAMP(6),
+                                            DataTypes.TIMESTAMP_LTZ(0),
+                                            DataTypes.TIMESTAMP_LTZ(3),
+                                            DataTypes.TIMESTAMP_LTZ(6),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE()
+                                        },
+                                        new String[] {
+                                            "id",
+                                            "decimal_c0",
+                                            "decimal_c1",
+                                            "decimal_c2",
+                                            "time_c",
+                                            "time_3_c",
+                                            "time_6_c",
+                                            "datetime_c",
+                                            "datetime3_c",
+                                            "datetime6_c",
+                                            "timestamp_c",
+                                            "timestamp3_c",
+                                            "timestamp6_c",
+                                            "float_c0",
+                                            "float_c1",
+                                            "float_c2",
+                                            "real_c0",
+                                            "real_c1",
+                                            "real_c2",
+                                            "double_c0",
+                                            "double_c1",
+                                            "double_c2",
+                                            "double_precision_c0",
+                                            "double_precision_c1",
+                                            "double_precision_c2"
+                                        }))
+                        .build();
+        assertThat(actualSchema).isEqualTo(expectedSchema);
+    }
+
+    @Test
+    public void testMysql8PrecisionTypesSchema() {
+        fullTypesMySql8Database.createAndInitialize();
+
+        String[] tables = new String[] {"precision_types"};
+        MySqlMetadataAccessor metadataAccessor =
+                getMetadataAccessor(tables, fullTypesMySql8Database);
+
+        Schema actualSchema =
+                metadataAccessor.getTableSchema(
+                        TableId.tableId(
+                                fullTypesMySql8Database.getDatabaseName(), "precision_types"));
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .primaryKey("id")
+                        .fromRowDataType(
+                                RowType.of(
+                                        new DataType[] {
+                                            DataTypes.DECIMAL(20, 0).notNull(),
+                                            DataTypes.DECIMAL(6, 2),
+                                            DataTypes.DECIMAL(9, 4),
+                                            DataTypes.DECIMAL(20, 4),
+                                            DataTypes.TIME(0),
+                                            DataTypes.TIME(3),
+                                            DataTypes.TIME(6),
+                                            DataTypes.TIMESTAMP(0),
+                                            DataTypes.TIMESTAMP(3),
+                                            DataTypes.TIMESTAMP(6),
+                                            DataTypes.TIMESTAMP_LTZ(0),
+                                            DataTypes.TIMESTAMP_LTZ(3),
+                                            DataTypes.TIMESTAMP_LTZ(6),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE(),
+                                            DataTypes.DOUBLE()
+                                        },
+                                        new String[] {
+                                            "id",
+                                            "decimal_c0",
+                                            "decimal_c1",
+                                            "decimal_c2",
+                                            "time_c",
+                                            "time_3_c",
+                                            "time_6_c",
+                                            "datetime_c",
+                                            "datetime3_c",
+                                            "datetime6_c",
+                                            "timestamp_c",
+                                            "timestamp3_c",
+                                            "timestamp6_c",
+                                            "float_c0",
+                                            "float_c1",
+                                            "float_c2",
+                                            "real_c0",
+                                            "real_c1",
+                                            "real_c2",
+                                            "double_c0",
+                                            "double_c1",
+                                            "double_c2",
+                                            "double_precision_c0",
+                                            "double_precision_c1",
+                                            "double_precision_c2"
+                                        }))
+                        .build();
+        assertThat(actualSchema).isEqualTo(expectedSchema);
+    }
+
     private void testAccessDatabaseAndTable(UniqueDatabase database) {
         database.createAndInitialize();
 

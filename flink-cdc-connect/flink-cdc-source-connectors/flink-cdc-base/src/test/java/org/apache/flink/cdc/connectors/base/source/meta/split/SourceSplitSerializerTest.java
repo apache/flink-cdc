@@ -88,7 +88,7 @@ public class SourceSplitSerializerTest {
     private SnapshotSplit constuctSnapshotSplit() {
         return new SnapshotSplit(
                 new TableId("cata`log\"", "s\"che`ma", "ta\"ble.1`"),
-                "test",
+                0,
                 new RowType(
                         Collections.singletonList(new RowType.RowField("id", new BigIntType()))),
                 null,

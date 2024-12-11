@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.composer.flink;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
@@ -88,32 +89,36 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
     @Override
     public PipelineExecution compose(PipelineDef pipelineDef) {
-        int parallelism = pipelineDef.getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
+        Configuration pipelineDefConfig = pipelineDef.getConfig();
+
+        int parallelism = pipelineDefConfig.get(PipelineOptions.PIPELINE_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
 
         SchemaChangeBehavior schemaChangeBehavior =
-                pipelineDef.getConfig().get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
+                pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
 
         // Build Source Operator
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
         DataStream<Event> stream =
                 sourceTranslator.translate(
-                        pipelineDef.getSource(), env, pipelineDef.getConfig(), parallelism);
+                        pipelineDef.getSource(), env, pipelineDefConfig, parallelism);
 
         // Build PreTransformOperator for processing Schema Event
         TransformTranslator transformTranslator = new TransformTranslator();
         stream =
                 transformTranslator.translatePreTransform(
-                        stream, pipelineDef.getTransforms(), pipelineDef.getUdfs());
+                        stream,
+                        pipelineDef.getTransforms(),
+                        pipelineDef.getUdfs(),
+                        pipelineDef.getModels());
 
         // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
                         schemaChangeBehavior,
-                        pipelineDef.getConfig().get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID),
-                        pipelineDef
-                                .getConfig()
-                                .get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT));
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID),
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT),
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
         OperatorIDGenerator schemaOperatorIDGenerator =
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
 
@@ -123,12 +128,13 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         stream,
                         pipelineDef.getTransforms(),
                         pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
-                        pipelineDef.getUdfs());
+                        pipelineDef.getUdfs(),
+                        pipelineDef.getModels());
 
         // Build DataSink in advance as schema operator requires MetadataApplier
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
         DataSink dataSink =
-                sinkTranslator.createDataSink(pipelineDef.getSink(), pipelineDef.getConfig(), env);
+                sinkTranslator.createDataSink(pipelineDef.getSink(), pipelineDefConfig, env);
 
         stream =
                 schemaOperatorTranslator.translate(
@@ -157,7 +163,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
         addFrameworkJars();
 
         return new FlinkPipelineExecution(
-                env, pipelineDef.getConfig().get(PipelineOptions.PIPELINE_NAME), isBlocking);
+                env, pipelineDefConfig.get(PipelineOptions.PIPELINE_NAME), isBlocking);
     }
 
     private void addFrameworkJars() {

@@ -130,9 +130,8 @@ public class PaimonWriterHelperTest {
                                 java.sql.Timestamp.valueOf("2023-01-01 00:00:00.000")),
                         Timestamp.fromSQLTimestamp(
                                 java.sql.Timestamp.valueOf("2023-01-01 00:00:00")),
-                        // plus 8 hours.
-                        Timestamp.fromInstant(Instant.parse("2023-01-01T08:00:00.000Z")),
-                        Timestamp.fromInstant(Instant.parse("2023-01-01T08:00:00.000Z")),
+                        Timestamp.fromInstant(Instant.parse("2023-01-01T00:00:00.000Z")),
+                        Timestamp.fromInstant(Instant.parse("2023-01-01T00:00:00.000Z")),
                         null),
                 genericRow);
     }

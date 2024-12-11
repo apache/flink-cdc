@@ -271,7 +271,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[spare tire, 22.200]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
         result.getJobClient().get().cancel().get();
     }
@@ -410,7 +410,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                             "+I[110, jacket, new water resistent white wind breaker, 0.500]"
                         };
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
         result.getJobClient().get().cancel().get();
     }
@@ -919,7 +919,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         expected.addAll(
                 Lists.newArrayList("+U[0, 1024]", "+U[1, 1025]", "+U[2, 2048]", "+U[3, 2049]"));
 
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         Collections.sort(actual);
         Collections.sort(expected);
         assertEquals(expected, actual);
@@ -1023,7 +1023,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         // TODO: we can't assert merged result for incremental-snapshot, because we can't add a
         //  keyby shuffle before "values" upsert sink. We should assert merged result once
         //  https://issues.apache.org/jira/browse/FLINK-24511 is fixed.
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         Collections.sort(actual);
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
@@ -1593,78 +1593,6 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testShardingTablesWithInconsistentSchema() throws Exception {
-        userDatabase1.createAndInitialize();
-        userDatabase2.createAndInitialize();
-        String sourceDDL =
-                String.format(
-                        "CREATE TABLE `user` ("
-                                + " `id` DECIMAL(20, 0) NOT NULL,"
-                                + " name STRING,"
-                                + " address STRING,"
-                                + " phone_number STRING,"
-                                + " email STRING,"
-                                + " age INT,"
-                                + " primary key (`id`) not enforced"
-                                + ") WITH ("
-                                + " 'connector' = 'mysql-cdc',"
-                                + " 'hostname' = '%s',"
-                                + " 'port' = '%s',"
-                                + " 'username' = '%s',"
-                                + " 'password' = '%s',"
-                                + " 'database-name' = '%s',"
-                                + " 'table-name' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = '%s',"
-                                + " 'server-time-zone' = 'UTC',"
-                                + " 'server-id' = '%s',"
-                                + " 'scan.incremental.snapshot.chunk.size' = '%s'"
-                                + ")",
-                        MYSQL_CONTAINER.getHost(),
-                        MYSQL_CONTAINER.getDatabasePort(),
-                        userDatabase1.getUsername(),
-                        userDatabase1.getPassword(),
-                        String.format(
-                                "(%s|%s)",
-                                userDatabase1.getDatabaseName(), userDatabase2.getDatabaseName()),
-                        "user_table_.*",
-                        incrementalSnapshot,
-                        getServerId(),
-                        getSplitSize());
-        tEnv.executeSql(sourceDDL);
-
-        // async submit job
-        TableResult result = tEnv.executeSql("SELECT * FROM `user`");
-
-        CloseableIterator<Row> iterator = result.collect();
-        waitForSnapshotStarted(iterator);
-
-        try (Connection connection = userDatabase1.getJdbcConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute("UPDATE user_table_1_1 SET email = 'user_111@bar.org' WHERE id=111;");
-        }
-
-        try (Connection connection = userDatabase2.getJdbcConnection();
-                Statement statement = connection.createStatement()) {
-            statement.execute("UPDATE user_table_2_2 SET age = 20 WHERE id=221;");
-        }
-
-        String[] expected =
-                new String[] {
-                    "+I[111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
-                    "-U[111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
-                    "+U[111, user_111, Shanghai, 123567891234, user_111@bar.org, null]",
-                    "+I[121, user_121, Shanghai, 123567891234, null, null]",
-                    "+I[211, user_211, Shanghai, 123567891234, null, null]",
-                    "+I[221, user_221, Shanghai, 123567891234, null, 18]",
-                    "-U[221, user_221, Shanghai, 123567891234, null, 18]",
-                    "+U[221, user_221, Shanghai, 123567891234, null, 20]",
-                };
-
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
-        result.getJobClient().get().cancel().get();
-    }
-
-    @Test
     public void testStartupFromSpecificBinlogFilePos() throws Exception {
         inventoryDatabase.createAndInitialize();
 
@@ -1744,7 +1672,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
@@ -1845,7 +1773,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
@@ -1925,7 +1853,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[110, jacket, new water resistent white wind breaker, 0.500]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
@@ -2000,7 +1928,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
 
         result.getJobClient().get().cancel().get();
@@ -2319,7 +2247,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
     private static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
+                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;

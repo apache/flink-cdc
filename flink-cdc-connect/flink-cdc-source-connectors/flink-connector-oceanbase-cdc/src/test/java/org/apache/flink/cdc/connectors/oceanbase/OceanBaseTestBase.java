@@ -31,8 +31,10 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -46,6 +48,8 @@ public abstract class OceanBaseTestBase extends AbstractTestBase {
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+
+    public static final Duration FETCH_TIMEOUT = Duration.ofSeconds(60);
 
     protected abstract OceanBaseCdcMetadata metadata();
 
@@ -130,16 +134,25 @@ public abstract class OceanBaseTestBase extends AbstractTestBase {
     }
 
     public static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
+            throws InterruptedException, TimeoutException {
+        long deadlineTimestamp = System.currentTimeMillis() + FETCH_TIMEOUT.toMillis();
+        while (System.currentTimeMillis() < deadlineTimestamp) {
+            if (sinkSize(sinkName) < expectedSize) {
+                Thread.sleep(100);
+            } else {
+                return;
+            }
         }
+        throw new TimeoutException(
+                String.format(
+                        "Failed to fetch enough records in sink.\nExpected size: %d\nActual values: %s",
+                        expectedSize, TestValuesTableFactory.getRawResults(sinkName)));
     }
 
     public static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
+                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;

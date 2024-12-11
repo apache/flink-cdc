@@ -20,8 +20,12 @@ package org.apache.flink.cdc.runtime.operators.schema;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
@@ -37,6 +41,7 @@ import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeFamily;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
+import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.utils.ChangeEventUtils;
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
@@ -71,7 +76,10 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -96,6 +104,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private static final Duration CACHE_EXPIRE_DURATION = Duration.ofDays(1);
 
     private final List<RouteRule> routingRules;
+
+    private final String timezone;
 
     /**
      * Storing route source table selector, sink table name (before symbol replacement), and replace
@@ -127,6 +137,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT.toMillis();
         this.schemaChangeBehavior = SchemaChangeBehavior.EVOLVE;
+        this.timezone = "UTC";
     }
 
     @VisibleForTesting
@@ -135,8 +146,10 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = rpcTimeOut.toMillis();
         this.schemaChangeBehavior = SchemaChangeBehavior.EVOLVE;
+        this.timezone = "UTC";
     }
 
+    @VisibleForTesting
     public SchemaOperator(
             List<RouteRule> routingRules,
             Duration rpcTimeOut,
@@ -145,6 +158,19 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeOutInMillis = rpcTimeOut.toMillis();
         this.schemaChangeBehavior = schemaChangeBehavior;
+        this.timezone = "UTC";
+    }
+
+    public SchemaOperator(
+            List<RouteRule> routingRules,
+            Duration rpcTimeOut,
+            SchemaChangeBehavior schemaChangeBehavior,
+            String timezone) {
+        this.routingRules = routingRules;
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
+        this.rpcTimeOutInMillis = rpcTimeOut.toMillis();
+        this.schemaChangeBehavior = schemaChangeBehavior;
+        this.timezone = timezone;
     }
 
     @Override
@@ -372,7 +398,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 } else {
                     fieldGetters.add(
                             new TypeCoercionFieldGetter(
-                                    column.getType(), fieldGetter, tolerantMode));
+                                    originalSchema.getColumn(columnName).get().getType(),
+                                    column.getType(),
+                                    fieldGetter,
+                                    tolerantMode,
+                                    timezone));
                 }
             }
         }
@@ -541,17 +571,23 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     }
 
     private static class TypeCoercionFieldGetter implements RecordData.FieldGetter {
+        private final DataType originalType;
         private final DataType destinationType;
         private final RecordData.FieldGetter originalFieldGetter;
         private final boolean tolerantMode;
+        private final String timezone;
 
         public TypeCoercionFieldGetter(
+                DataType originalType,
                 DataType destinationType,
                 RecordData.FieldGetter originalFieldGetter,
-                boolean tolerantMode) {
+                boolean tolerantMode,
+                String timezone) {
+            this.originalType = originalType;
             this.destinationType = destinationType;
             this.originalFieldGetter = originalFieldGetter;
             this.tolerantMode = tolerantMode;
+            this.timezone = timezone;
         }
 
         private Object fail(IllegalArgumentException e) throws IllegalArgumentException {
@@ -578,14 +614,42 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 } else if (originalField instanceof Integer) {
                     // INT
                     return ((Integer) originalField).longValue();
+                } else if (originalField instanceof Long) {
+                    // BIGINT
+                    return originalField;
                 } else {
                     return fail(
                             new IllegalArgumentException(
                                     String.format(
                                             "Cannot fit type \"%s\" into a BIGINT column. "
-                                                    + "Currently only TINYINT / SMALLINT / INT can be accepted by a BIGINT column",
+                                                    + "Currently only TINYINT / SMALLINT / INT / LONG can be accepted by a BIGINT column",
                                             originalField.getClass())));
                 }
+            } else if (destinationType instanceof DecimalType) {
+                DecimalType decimalType = (DecimalType) destinationType;
+                BigDecimal decimalValue;
+                if (originalField instanceof Byte) {
+                    decimalValue = BigDecimal.valueOf(((Byte) originalField).longValue(), 0);
+                } else if (originalField instanceof Short) {
+                    decimalValue = BigDecimal.valueOf(((Short) originalField).longValue(), 0);
+                } else if (originalField instanceof Integer) {
+                    decimalValue = BigDecimal.valueOf(((Integer) originalField).longValue(), 0);
+                } else if (originalField instanceof Long) {
+                    decimalValue = BigDecimal.valueOf((Long) originalField, 0);
+                } else if (originalField instanceof DecimalData) {
+                    decimalValue = ((DecimalData) originalField).toBigDecimal();
+                } else {
+                    return fail(
+                            new IllegalArgumentException(
+                                    String.format(
+                                            "Cannot fit type \"%s\" into a DECIMAL column. "
+                                                    + "Currently only BYTE / SHORT / INT / LONG / DECIMAL can be accepted by a DECIMAL column",
+                                            originalField.getClass())));
+                }
+                return decimalValue != null
+                        ? DecimalData.fromBigDecimal(
+                                decimalValue, decimalType.getPrecision(), decimalType.getScale())
+                        : null;
             } else if (destinationType.is(DataTypeFamily.APPROXIMATE_NUMERIC)) {
                 if (originalField instanceof Float) {
                     // FLOAT
@@ -609,6 +673,21 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                                     + "Currently only CHAR / VARCHAR can be accepted by a STRING column",
                                             originalField.getClass())));
                 }
+            } else if (destinationType.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)
+                    && originalType.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)) {
+                // For now, TimestampData / ZonedTimestampData / LocalZonedTimestampData has no
+                // difference in its internal representation, so there's no need to do any precision
+                // conversion.
+                return originalField;
+            } else if (destinationType.is(DataTypeRoot.TIMESTAMP_WITH_TIME_ZONE)
+                    && originalType.is(DataTypeRoot.TIMESTAMP_WITH_TIME_ZONE)) {
+                return originalField;
+            } else if (destinationType.is(DataTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE)
+                    && originalType.is(DataTypeRoot.TIMESTAMP_WITH_LOCAL_TIME_ZONE)) {
+                return originalField;
+            } else if (destinationType.is(DataTypeFamily.TIMESTAMP)
+                    && originalType.is(DataTypeFamily.TIMESTAMP)) {
+                return castToTimestamp(originalField, timezone);
             } else {
                 return fail(
                         new IllegalArgumentException(
@@ -623,5 +702,24 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     public void snapshotState(StateSnapshotContext context) throws Exception {
         // Needless to do anything, since AbstractStreamOperator#snapshotState and #processElement
         // is guaranteed not to be mixed together.
+    }
+
+    private static TimestampData castToTimestamp(Object object, String timezone) {
+        if (object == null) {
+            return null;
+        }
+        if (object instanceof LocalZonedTimestampData) {
+            return TimestampData.fromLocalDateTime(
+                    LocalDateTime.ofInstant(
+                            ((LocalZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
+        } else if (object instanceof ZonedTimestampData) {
+            return TimestampData.fromLocalDateTime(
+                    LocalDateTime.ofInstant(
+                            ((ZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
+        } else {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Unable to implicitly coerce object `%s` as a TIMESTAMP.", object));
+        }
     }
 }
