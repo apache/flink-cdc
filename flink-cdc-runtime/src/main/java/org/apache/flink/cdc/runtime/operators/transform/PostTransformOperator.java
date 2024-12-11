@@ -329,7 +329,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         return tableInfo;
     }
 
-    private Schema transformSchema(TableId tableId, Schema schema) throws Exception {
+    private Schema transformSchema(TableId tableId, Schema schema) {
         List<Schema> newSchemas = new ArrayList<>();
         for (PostTransformer transform : transforms) {
             Selectors selectors = transform.getSelectors();

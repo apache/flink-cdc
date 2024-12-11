@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.utils.StringUtils;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -96,11 +97,36 @@ public class ProjectionColumn implements Serializable {
         return !StringUtils.isNullOrWhitespaceOnly(scriptExpression);
     }
 
-    public static ProjectionColumn of(String columnName, DataType dataType) {
-        return new ProjectionColumn(Column.physicalColumn(columnName, dataType), null, null, null);
+    /**
+     * This projection is created with a plain column name. <br>
+     * Just like column {@code id} in {@code id, name AS new_name, age + 1 AS new_age}. <br>
+     * Comments and default expressions will be intact.
+     */
+    public static ProjectionColumn ofForwarded(Column column) {
+        String name = column.getName();
+        return new ProjectionColumn(column, name, name, Collections.singletonList(name));
     }
 
-    public static ProjectionColumn of(
+    /**
+     * This projection is created with a simple $id$ AS $new_id$ expression. <br>
+     * Just like column {@code new_name} in {@code id, name AS new_name, age + 1 AS new_age}. <br>
+     * Comments and default expressions will be intact.
+     */
+    public static ProjectionColumn ofAliased(Column column, String newName) {
+        String originalName = column.getName();
+        return new ProjectionColumn(
+                column.copy(newName),
+                originalName,
+                originalName,
+                Collections.singletonList(originalName));
+    }
+
+    /**
+     * This projection is created with a complex calculation expression. <br>
+     * Just like column {@code new_age} in {@code id, name AS new_name, age + 1 AS new_age}. <br>
+     * No comments nor default expressions will be kept.
+     */
+    public static ProjectionColumn ofCalculated(
             String columnName,
             DataType dataType,
             String expression,
