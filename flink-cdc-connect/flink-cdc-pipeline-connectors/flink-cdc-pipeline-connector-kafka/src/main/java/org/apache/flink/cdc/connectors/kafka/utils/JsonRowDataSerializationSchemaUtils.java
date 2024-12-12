@@ -28,7 +28,10 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 
-/** Utils for creating JsonRowDataSerializationSchema. */
+/**
+ * Utils for creating JsonRowDataSerializationSchema.TODO: Remove this class after bump to Flink
+ * 1.20 or higher.
+ */
 public class JsonRowDataSerializationSchemaUtils {
 
     /**
@@ -75,10 +78,12 @@ public class JsonRowDataSerializationSchemaUtils {
                 }
             }
         } catch (Exception e) {
-            throw new RuntimeException("Failed to create JsonRowDataSerializationSchema", e);
+            throw new RuntimeException(
+                    "Failed to create JsonRowDataSerializationSchema,please check your Flink version is 1.19 or 1.20.",
+                    e);
         }
         throw new RuntimeException(
-                "Failed to find appropriate constructor for JsonRowDataSerializationSchema");
+                "Failed to find appropriate constructor for JsonRowDataSerializationSchema,please check your Flink version is 1.19 or 1.20.");
     }
 
     /** flink>=1.20 only has the ENCODE_IGNORE_NULL_FIELDS parameter. */
