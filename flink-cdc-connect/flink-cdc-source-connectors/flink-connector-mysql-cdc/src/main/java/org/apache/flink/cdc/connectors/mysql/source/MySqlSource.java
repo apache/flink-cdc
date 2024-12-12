@@ -208,7 +208,8 @@ public class MySqlSource<T>
                                 sourceConfig,
                                 enumContext.currentParallelism(),
                                 new ArrayList<>(),
-                                isTableIdCaseSensitive);
+                                isTableIdCaseSensitive,
+                                enumContext);
             } catch (Exception e) {
                 throw new FlinkRuntimeException(
                         "Failed to discover captured tables for enumerator", e);
@@ -233,7 +234,8 @@ public class MySqlSource<T>
                     new MySqlHybridSplitAssigner(
                             sourceConfig,
                             enumContext.currentParallelism(),
-                            (HybridPendingSplitsState) checkpoint);
+                            (HybridPendingSplitsState) checkpoint,
+                            enumContext);
         } else if (checkpoint instanceof BinlogPendingSplitsState) {
             splitAssigner =
                     new MySqlBinlogSplitAssigner(
