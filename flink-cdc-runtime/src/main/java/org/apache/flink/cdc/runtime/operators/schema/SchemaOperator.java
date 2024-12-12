@@ -31,7 +31,6 @@ import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
-import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
@@ -432,15 +431,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     private void handleSchemaChangeEvent(TableId tableId, SchemaChangeEvent schemaChangeEvent)
             throws InterruptedException, TimeoutException {
-
-        if (schemaChangeBehavior == SchemaChangeBehavior.EXCEPTION
-                && schemaChangeEvent.getType() != SchemaChangeEventType.CREATE_TABLE) {
-            // CreateTableEvent should be applied even in EXCEPTION mode
-            throw new RuntimeException(
-                    String.format(
-                            "Refused to apply schema change event %s in EXCEPTION mode.",
-                            schemaChangeEvent));
-        }
 
         // The request will block if another schema change event is being handled
         SchemaChangeResponse response = requestSchemaChange(tableId, schemaChangeEvent);
