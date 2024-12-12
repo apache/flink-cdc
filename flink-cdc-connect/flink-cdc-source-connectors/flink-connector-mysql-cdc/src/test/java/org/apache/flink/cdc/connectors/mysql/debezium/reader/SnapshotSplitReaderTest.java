@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.connectors.mysql.testutils.MetricsUtils.getMySqlSplitEnumeratorContext;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -629,7 +630,11 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
             MySqlSourceConfig sourceConfig, List<TableId> remainingTables) {
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(
-                        sourceConfig, DEFAULT_PARALLELISM, remainingTables, false);
+                        sourceConfig,
+                        DEFAULT_PARALLELISM,
+                        remainingTables,
+                        false,
+                        getMySqlSplitEnumeratorContext());
         assigner.open();
         List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {
