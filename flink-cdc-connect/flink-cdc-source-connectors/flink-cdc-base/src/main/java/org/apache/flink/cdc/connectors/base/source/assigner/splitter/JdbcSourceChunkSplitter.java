@@ -256,8 +256,8 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
             throws SQLException {
         return JdbcChunkUtils.queryMin(
                 jdbc,
-                jdbc.quotedColumnIdString(splitColumn.name()),
                 jdbc.quotedTableIdString(tableId),
+                jdbc.quotedColumnIdString(splitColumn.name()),
                 excludedLowerBound);
     }
 
