@@ -307,15 +307,18 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
 
         // The modification of 8th version: add ChunkSplitterState to SnapshotPendingSplitsState,
         // which contains the asynchronously splitting chunk info.
-        TableId splittingTableId = null;
-        Object nextChunkStart = null;
-        Integer nextChunkId = null;
+        ChunkSplitterState chunkSplitterState = ChunkSplitterState.NO_SPLITTING_TABLE_STATE;
         if (version >= 8) {
             boolean hasTableIsSplitting = in.readBoolean();
             if (hasTableIsSplitting) {
-                splittingTableId = TableId.parse(in.readUTF());
-                nextChunkStart = SerializerUtils.serializedStringToRow(in.readUTF())[0];
-                nextChunkId = in.readInt();
+                TableId splittingTableId = TableId.parse(in.readUTF());
+                Object nextChunkStart = SerializerUtils.serializedStringToRow(in.readUTF())[0];
+                Integer nextChunkId = in.readInt();
+                chunkSplitterState =
+                        new ChunkSplitterState(
+                                splittingTableId,
+                                ChunkSplitterState.ChunkBound.middleOf(nextChunkStart),
+                                nextChunkId);
             }
         }
         return new SnapshotPendingSplitsState(
@@ -329,12 +332,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 isTableIdCaseSensitive,
                 true,
                 splitFinishedCheckpointIds,
-                splittingTableId == null
-                        ? ChunkSplitterState.NO_SPLITTING_TABLE_STATE
-                        : new ChunkSplitterState(
-                                splittingTableId,
-                                ChunkSplitterState.ChunkBound.middleOf(nextChunkStart),
-                                nextChunkId));
+                chunkSplitterState);
     }
 
     private HybridPendingSplitsState deserializeHybridPendingSplitsState(

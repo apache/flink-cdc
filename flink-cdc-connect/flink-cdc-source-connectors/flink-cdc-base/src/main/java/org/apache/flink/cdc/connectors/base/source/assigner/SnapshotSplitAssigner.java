@@ -95,7 +95,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     private static final long UNDEFINED_CHECKPOINT_ID = -1;
 
     private final Object lock = new Object();
-    private ExecutorService executor;
+    private ExecutorService splittingExecutorService;
     private volatile Throwable uncaughtSplitterException;
 
     public SnapshotSplitAssigner(
@@ -337,12 +337,12 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
 
     private void startAsynchronouslySplit() {
         if (chunkSplitter.hasNextChunk() || !remainingTables.isEmpty()) {
-            if (executor == null) {
+            if (splittingExecutorService == null) {
                 ThreadFactory threadFactory =
                         new ThreadFactoryBuilder().setNameFormat("snapshot-splitting").build();
-                this.executor = Executors.newSingleThreadExecutor(threadFactory);
+                this.splittingExecutorService = Executors.newSingleThreadExecutor(threadFactory);
             }
-            executor.submit(this::splitChunksForRemainingTables);
+            splittingExecutorService.submit(this::splitChunksForRemainingTables);
         }
     }
 
@@ -364,9 +364,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
 
                 if (!hasRecordSchema && !splits.isEmpty()) {
                     hasRecordSchema = true;
-                    final Map<TableId, TableChanges.TableChange> tableSchema = new HashMap<>();
-                    tableSchema.putAll(splits.iterator().next().getTableSchemas());
-                    tableSchemas.putAll(tableSchema);
+                    tableSchemas.putAll(splits.iterator().next().getTableSchemas());
                 }
                 final List<SchemalessSnapshotSplit> schemalessSnapshotSplits =
                         splits.stream()
@@ -513,7 +511,6 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                     splitFinishedCheckpointIds.size());
         }
 
-        Map<String, Long> splitFinishedCheckpointIds1 = splitFinishedCheckpointIds;
         SnapshotPendingSplitsState state =
                 new SnapshotPendingSplitsState(
                         alreadyProcessedTables,
@@ -582,12 +579,12 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 LOG.warn("Fail to close the chunk splitter.");
             }
         }
-        // dialect.close();
+        dialect.close();
     }
 
     private void closeExecutorService() {
-        if (executor != null) {
-            executor.shutdown();
+        if (splittingExecutorService != null) {
+            splittingExecutorService.shutdown();
         }
     }
 

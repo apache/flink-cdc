@@ -335,14 +335,12 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
                         UnregisteredMetricsGroup.createSplitEnumeratorMetricGroup()));
         snapshotSplitAssigner.open();
         List<SnapshotSplit> snapshotSplitList = new ArrayList<>();
-        while (true) {
-            Optional<SourceSplitBase> split = snapshotSplitAssigner.getNext();
-            if (split.isPresent()) {
-                snapshotSplitList.add(split.get().asSnapshotSplit());
-            } else {
-                break;
-            }
+        Optional<SourceSplitBase> split = snapshotSplitAssigner.getNext();
+        while (split.isPresent()) {
+            snapshotSplitList.add(split.get().asSnapshotSplit());
+            split = snapshotSplitAssigner.getNext();
         }
+
         snapshotSplitAssigner.close();
         return snapshotSplitList;
     }

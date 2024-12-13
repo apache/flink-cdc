@@ -154,7 +154,9 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
 
     @Override
     public void close() throws Exception {
-        jdbcConnection.close();
+        if (jdbcConnection != null) {
+            jdbcConnection.close();
+        }
     }
 
     /**
