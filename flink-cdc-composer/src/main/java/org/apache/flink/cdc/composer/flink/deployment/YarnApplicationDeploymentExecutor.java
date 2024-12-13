@@ -25,7 +25,6 @@ import org.apache.flink.client.program.ClusterClient;
 import org.apache.flink.client.program.ClusterClientProvider;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.DeploymentOptions;
-import org.apache.flink.configuration.DeploymentOptionsInternal;
 import org.apache.flink.configuration.PipelineOptions;
 import org.apache.flink.core.fs.FileStatus;
 import org.apache.flink.core.fs.Path;
@@ -33,12 +32,16 @@ import org.apache.flink.yarn.YarnClusterClientFactory;
 import org.apache.flink.yarn.YarnClusterDescriptor;
 import org.apache.flink.yarn.configuration.YarnConfigOptions;
 import org.apache.flink.yarn.configuration.YarnDeploymentTarget;
+import org.apache.flink.yarn.configuration.YarnLogConfigUtil;
+
+import org.apache.flink.shaded.guava31.com.google.common.base.Joiner;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Arrays;
@@ -71,7 +74,8 @@ public class YarnApplicationDeploymentExecutor implements PipelineDeploymentExec
                 additionalJars.stream().map(Path::toString).collect(Collectors.toList()));
 
         flinkConfig.set(ApplicationConfiguration.APPLICATION_ARGS, commandLine.getArgList());
-        flinkConfig.set(DeploymentOptionsInternal.CONF_DIR, flinkHome + "/conf");
+        YarnLogConfigUtil.setLogConfigFileInConfig(
+                flinkConfig, Joiner.on(File.separator).join(flinkHome, "conf"));
 
         flinkConfig.set(
                 ApplicationConfiguration.APPLICATION_MAIN_CLASS,

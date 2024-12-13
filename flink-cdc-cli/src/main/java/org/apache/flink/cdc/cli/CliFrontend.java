@@ -23,9 +23,10 @@ import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.runtime.jobgraph.RestoreMode;
 import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
+
+import org.apache.flink.shaded.guava31.com.google.common.base.Joiner;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -35,6 +36,8 @@ import org.apache.commons.cli.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -119,18 +122,43 @@ public class CliFrontend {
             String savepointPath = commandLine.getOptionValue(SAVEPOINT_PATH_OPTION.getOpt());
             boolean allowNonRestoredState =
                     commandLine.hasOption(SAVEPOINT_ALLOW_NON_RESTORED_OPTION.getOpt());
-            final RestoreMode restoreMode;
+            final Object restoreMode;
             if (commandLine.hasOption(SAVEPOINT_CLAIM_MODE)) {
                 restoreMode =
                         org.apache.flink.configuration.ConfigurationUtils.convertValue(
                                 commandLine.getOptionValue(SAVEPOINT_CLAIM_MODE),
-                                RestoreMode.class);
+                                ConfigurationUtils.getClaimModeClass());
             } else {
                 restoreMode = SavepointConfigOptions.RESTORE_MODE.defaultValue();
             }
             // allowNonRestoredState is always false because all operators are predefined.
-            return SavepointRestoreSettings.forPath(
-                    savepointPath, allowNonRestoredState, restoreMode);
+
+            return (SavepointRestoreSettings)
+                    Arrays.stream(SavepointRestoreSettings.class.getMethods())
+                            .filter(
+                                    method ->
+                                            method.getName().equals("forPath")
+                                                    && method.getParameterCount() == 3)
+                            .findFirst()
+                            .map(
+                                    method -> {
+                                        try {
+                                            return method.invoke(
+                                                    null,
+                                                    savepointPath,
+                                                    allowNonRestoredState,
+                                                    restoreMode);
+                                        } catch (IllegalAccessException
+                                                | InvocationTargetException e) {
+                                            throw new RuntimeException(
+                                                    "Failed to invoke SavepointRestoreSettings#forPath nethod.",
+                                                    e);
+                                        }
+                                    })
+                            .orElseThrow(
+                                    () ->
+                                            new RuntimeException(
+                                                    "Failed to resolve SavepointRestoreSettings#forPath method."));
         } else {
             return SavepointRestoreSettings.none();
         }
@@ -169,7 +197,9 @@ public class CliFrontend {
         // Fallback to Flink CDC home
         String flinkCdcHome = System.getenv(FLINK_CDC_HOME_ENV_VAR);
         if (flinkCdcHome != null) {
-            Path globalConfigPath = new Path(flinkCdcHome, "/conf" + "/flink-cdc.yaml");
+            Path globalConfigPath =
+                    new Path(
+                            flinkCdcHome, Joiner.on(File.separator).join("conf", "flink-cdc.yaml"));
             LOG.info("Using global config in FLINK_CDC_HOME: {}", globalConfigPath);
             return ConfigurationUtils.loadConfigFile(globalConfigPath);
         }
