@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.common.event;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -24,16 +26,35 @@ import java.util.Objects;
  * start flushing.
  */
 public class FlushEvent implements Event {
+    /** The schema changes from which table. */
+    private final List<TableId> tableIds;
 
     /** Which subTask ID this FlushEvent was initiated from. */
     private final int sourceSubTaskId;
 
+    /** Flag indicating whether the FlushEvent is sent before a create table event. */
+    private final Boolean isForCreateTableEvent;
+
     public FlushEvent(int sourceSubTaskId) {
+        this(sourceSubTaskId, Collections.emptyList(), false);
+    }
+
+    public FlushEvent(int sourceSubTaskId, List<TableId> tableIds, boolean isForCreateTableEvent) {
+        this.tableIds = tableIds;
         this.sourceSubTaskId = sourceSubTaskId;
+        this.isForCreateTableEvent = isForCreateTableEvent;
+    }
+
+    public List<TableId> getTableIds() {
+        return tableIds;
     }
 
     public int getSourceSubTaskId() {
         return sourceSubTaskId;
+    }
+
+    public Boolean getIsForCreateTableEvent() {
+        return isForCreateTableEvent;
     }
 
     @Override
@@ -45,7 +66,9 @@ public class FlushEvent implements Event {
             return false;
         }
         FlushEvent that = (FlushEvent) o;
-        return sourceSubTaskId == that.sourceSubTaskId;
+        return sourceSubTaskId == that.sourceSubTaskId
+                && Objects.equals(tableIds, that.tableIds)
+                && Objects.equals(isForCreateTableEvent, that.isForCreateTableEvent);
     }
 
     @Override
