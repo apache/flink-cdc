@@ -20,11 +20,11 @@ package org.apache.flink.cdc.connectors.postgres.source.fetch;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.assigner.SnapshotSplitAssigner;
-import org.apache.flink.cdc.connectors.base.source.assigner.SplitAssigner;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import org.apache.flink.cdc.connectors.base.source.reader.external.IncrementalSourceScanFetcher;
@@ -37,6 +37,7 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.testutils.RecordsFormatter;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
+import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 
@@ -321,7 +322,7 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
             throws Exception {
         List<TableId> discoverTables = sourceDialect.discoverDataCollections(sourceConfig);
         OffsetFactory offsetFactory = new PostgresOffsetFactory();
-        final SplitAssigner snapshotSplitAssigner =
+        final SnapshotSplitAssigner snapshotSplitAssigner =
                 new SnapshotSplitAssigner<JdbcSourceConfig>(
                         sourceConfig,
                         DEFAULT_PARALLELISM,
@@ -329,6 +330,9 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
                         sourceDialect.isDataCollectionIdCaseSensitive(sourceConfig),
                         sourceDialect,
                         offsetFactory);
+        snapshotSplitAssigner.initEnumeratorMetrics(
+                new SourceEnumeratorMetrics(
+                        UnregisteredMetricsGroup.createSplitEnumeratorMetricGroup()));
         snapshotSplitAssigner.open();
         List<SnapshotSplit> snapshotSplitList = new ArrayList<>();
         while (true) {

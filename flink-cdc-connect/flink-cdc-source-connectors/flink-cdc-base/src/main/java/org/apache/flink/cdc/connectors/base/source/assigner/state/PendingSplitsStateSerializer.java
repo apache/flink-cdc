@@ -118,6 +118,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             case 5:
             case 6:
             case 7:
+            case 8:
                 return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
