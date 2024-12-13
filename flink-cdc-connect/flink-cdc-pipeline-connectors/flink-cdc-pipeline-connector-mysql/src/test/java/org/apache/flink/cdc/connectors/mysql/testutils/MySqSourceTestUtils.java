@@ -66,8 +66,6 @@ public class MySqSourceTestUtils {
         return serverId + "-" + (serverId + parallelism);
     }
 
-    private MySqSourceTestUtils() {}
-
     public static void loopCheck(
             Supplier<Boolean> runnable, String description, Duration timeout, Duration interval)
             throws Exception {
@@ -81,4 +79,6 @@ public class MySqSourceTestUtils {
         throw new TimeoutException(
                 "Ran out of time when waiting for " + description + " to success.");
     }
+
+    private MySqSourceTestUtils() {}
 }

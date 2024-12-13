@@ -500,7 +500,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                     Thread.sleep(1000);
                 } else if (response.isWaitingForFlush()) {
                     LOG.info(
-                            "{}> Schema change event (with once {}) has not collected enough flush success events from writers, waiting...",
+                            "{}> Schema change event (with nonce {}) has not collected enough flush success events from writers, waiting...",
                             subTaskId,
                             nonce);
                     Thread.sleep(1000);

@@ -148,7 +148,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     LOG.info("Event {} has been addressed before, ignoring it.", event);
                     clearCurrentSchemaChangeRequest(nonce);
                     LOG.info(
-                            "SchemaChangeStatus switched from WAITING_FOR_FLUSH to IDLE for request {} due to duplicated request.",
+                            "SchemaChangeStatus is still IDLE for request {} due to duplicated request.",
                             request);
                     response.complete(wrap(SchemaChangeResponse.duplicate()));
                     return;
@@ -183,7 +183,7 @@ public class SchemaRegistryRequestHandler implements Closeable {
                     LOG.info("Event {} is omitted from sending to downstream, ignoring it.", event);
                     clearCurrentSchemaChangeRequest(nonce);
                     LOG.info(
-                            "SchemaChangeStatus switched from WAITING_FOR_FLUSH to IDLE for request {} due to ignored request.",
+                            "SchemaChangeStatus is still IDLE for request {} due to ignored request.",
                             request);
 
                     response.complete(wrap(SchemaChangeResponse.ignored()));
