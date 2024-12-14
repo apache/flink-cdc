@@ -80,28 +80,32 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         }
         final DataOutputSerializer out = SERIALIZER_CACHE.get();
 
-        out.writeInt(splitSerializer.getVersion());
-        if (state instanceof SnapshotPendingSplitsState) {
-            out.writeInt(SNAPSHOT_PENDING_SPLITS_STATE_FLAG);
-            serializeSnapshotPendingSplitsState((SnapshotPendingSplitsState) state, out);
-        } else if (state instanceof StreamPendingSplitsState) {
-            out.writeInt(STREAM_PENDING_SPLITS_STATE_FLAG);
-            serializeStreamPendingSplitsState((StreamPendingSplitsState) state, out);
-        } else if (state instanceof HybridPendingSplitsState) {
-            out.writeInt(HYBRID_PENDING_SPLITS_STATE_FLAG);
-            serializeHybridPendingSplitsState((HybridPendingSplitsState) state, out);
-        } else {
-            throw new IOException(
-                    "Unsupported to serialize PendingSplitsState class: "
-                            + state.getClass().getName());
-        }
+        try {
+            out.writeInt(splitSerializer.getVersion());
+            if (state instanceof SnapshotPendingSplitsState) {
+                out.writeInt(SNAPSHOT_PENDING_SPLITS_STATE_FLAG);
+                serializeSnapshotPendingSplitsState((SnapshotPendingSplitsState) state, out);
+            } else if (state instanceof StreamPendingSplitsState) {
+                out.writeInt(STREAM_PENDING_SPLITS_STATE_FLAG);
+                serializeStreamPendingSplitsState((StreamPendingSplitsState) state, out);
+            } else if (state instanceof HybridPendingSplitsState) {
+                out.writeInt(HYBRID_PENDING_SPLITS_STATE_FLAG);
+                serializeHybridPendingSplitsState((HybridPendingSplitsState) state, out);
+            } else {
+                throw new IOException(
+                        "Unsupported to serialize PendingSplitsState class: "
+                                + state.getClass().getName());
+            }
 
-        final byte[] result = out.getCopyOfBuffer();
-        // optimization: cache the serialized from, so we avoid the byte work during repeated
-        // serialization
-        state.serializedFormCache = result;
-        out.clear();
-        return result;
+            final byte[] result = out.getCopyOfBuffer();
+            // optimization: cache the serialized from, so we avoid the byte work during repeated
+            // serialization
+            state.serializedFormCache = result;
+
+            return result;
+        } finally {
+            out.clear();
+        }
     }
 
     @Override
