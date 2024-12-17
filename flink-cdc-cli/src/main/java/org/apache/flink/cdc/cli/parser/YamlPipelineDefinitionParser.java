@@ -78,6 +78,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String TRANSFORM_PROJECTION_KEY = "projection";
     private static final String TRANSFORM_FILTER_KEY = "filter";
     private static final String TRANSFORM_DESCRIPTION_KEY = "description";
+    private static final String TRANSFORM_CONVERTOR_AFTER_TRANSFORM_KEY =
+            "convertor-after-transform";
 
     // UDF related keys
     private static final String UDF_KEY = "user-defined-function";
@@ -316,6 +318,10 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 Optional.ofNullable(transformNode.get(TRANSFORM_DESCRIPTION_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
+        String convertorAfterTransform =
+                Optional.ofNullable(transformNode.get(TRANSFORM_CONVERTOR_AFTER_TRANSFORM_KEY))
+                        .map(JsonNode::asText)
+                        .orElse(null);
 
         return new TransformDef(
                 sourceTable,
@@ -324,7 +330,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 primaryKeys,
                 partitionKeys,
                 tableOptions,
-                description);
+                description,
+                convertorAfterTransform);
     }
 
     private Configuration toPipelineConfig(JsonNode pipelineConfigNode) {

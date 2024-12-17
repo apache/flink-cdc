@@ -50,6 +50,7 @@ public class TransformDef {
     private final String primaryKeys;
     private final String partitionKeys;
     private final String tableOptions;
+    private final String convertorAfterTransform;
 
     public TransformDef(
             String sourceTable,
@@ -58,7 +59,8 @@ public class TransformDef {
             String primaryKeys,
             String partitionKeys,
             String tableOptions,
-            String description) {
+            String description,
+            String convertorAfterTransform) {
         this.sourceTable = sourceTable;
         this.projection = projection;
         this.filter = filter;
@@ -66,6 +68,7 @@ public class TransformDef {
         this.partitionKeys = partitionKeys;
         this.tableOptions = tableOptions;
         this.description = description;
+        this.convertorAfterTransform = convertorAfterTransform;
     }
 
     public String getSourceTable() {
@@ -104,6 +107,10 @@ public class TransformDef {
         return tableOptions;
     }
 
+    public String getConvertorAfterTransform() {
+        return convertorAfterTransform;
+    }
+
     @Override
     public String toString() {
         return "TransformDef{"
@@ -118,6 +125,9 @@ public class TransformDef {
                 + '\''
                 + ", description='"
                 + description
+                + '\''
+                + ", convertorAfterTransform='"
+                + convertorAfterTransform
                 + '\''
                 + '}';
     }
@@ -137,7 +147,8 @@ public class TransformDef {
                 && Objects.equals(description, that.description)
                 && Objects.equals(primaryKeys, that.primaryKeys)
                 && Objects.equals(partitionKeys, that.partitionKeys)
-                && Objects.equals(tableOptions, that.tableOptions);
+                && Objects.equals(tableOptions, that.tableOptions)
+                && Objects.equals(convertorAfterTransform, that.convertorAfterTransform);
     }
 
     @Override
@@ -149,6 +160,7 @@ public class TransformDef {
                 description,
                 primaryKeys,
                 partitionKeys,
-                tableOptions);
+                tableOptions,
+                convertorAfterTransform);
     }
 }

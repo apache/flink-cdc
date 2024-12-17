@@ -33,6 +33,7 @@ public class TransformRule implements Serializable {
     private final String primaryKey;
     private final String partitionKey;
     private final String tableOption;
+    private final @Nullable String convertorAfterTransform;
 
     public TransformRule(
             String tableInclusions,
@@ -40,13 +41,15 @@ public class TransformRule implements Serializable {
             @Nullable String filter,
             String primaryKey,
             String partitionKey,
-            String tableOption) {
+            String tableOption,
+            @Nullable String convertorAfterTransform) {
         this.tableInclusions = tableInclusions;
         this.projection = projection;
         this.filter = normalizeFilter(projection, filter);
         this.primaryKey = primaryKey;
         this.partitionKey = partitionKey;
         this.tableOption = tableOption;
+        this.convertorAfterTransform = convertorAfterTransform;
     }
 
     public String getTableInclusions() {
@@ -73,5 +76,10 @@ public class TransformRule implements Serializable {
 
     public String getTableOption() {
         return tableOption;
+    }
+
+    @Nullable
+    public String getConvertorAfterTransform() {
+        return convertorAfterTransform;
     }
 }

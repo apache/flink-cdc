@@ -33,6 +33,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.transform.convertor.TransformConvertor;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -101,7 +102,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                 @Nullable String filter,
                 String primaryKey,
                 String partitionKey,
-                String tableOptions) {
+                String tableOptions,
+                String convertorAfterTransform) {
             transformRules.add(
                     new TransformRule(
                             tableInclusions,
@@ -109,13 +111,15 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                             filter,
                             primaryKey,
                             partitionKey,
-                            tableOptions));
+                            tableOptions,
+                            convertorAfterTransform));
             return this;
         }
 
         public PostTransformOperator.Builder addTransform(
                 String tableInclusions, @Nullable String projection, @Nullable String filter) {
-            transformRules.add(new TransformRule(tableInclusions, projection, filter, "", "", ""));
+            transformRules.add(
+                    new TransformRule(tableInclusions, projection, filter, "", "", "", null));
             return this;
         }
 
@@ -172,10 +176,10 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         transforms =
                 transformRules.stream()
                         .map(
-                                tuple3 -> {
-                                    String tableInclusions = tuple3.getTableInclusions();
-                                    String projection = tuple3.getProjection();
-                                    String filterExpression = tuple3.getFilter();
+                                transformRule -> {
+                                    String tableInclusions = transformRule.getTableInclusions();
+                                    String projection = transformRule.getProjection();
+                                    String filterExpression = transformRule.getFilter();
 
                                     Selectors selectors =
                                             new Selectors.SelectorsBuilder()
@@ -185,7 +189,9 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                             selectors,
                                             TransformProjection.of(projection).orElse(null),
                                             TransformFilter.of(filterExpression, udfDescriptors)
-                                                    .orElse(null));
+                                                    .orElse(null),
+                                            TransformConvertor.of(
+                                                    transformRule.getConvertorAfterTransform()));
                                 })
                         .collect(Collectors.toList());
         this.transformProjectionProcessorMap = new ConcurrentHashMap<>();
@@ -431,6 +437,13 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                     dataChangeEventOptional.get(),
                                     epochTime);
                 }
+                if (dataChangeEventOptional.isPresent()
+                        && transform.getConvertorAfterTransform().isPresent()) {
+                    dataChangeEventOptional =
+                            convertDataChangeEvent(
+                                    dataChangeEventOptional.get(),
+                                    transform.getConvertorAfterTransform().get());
+                }
                 transformedDataChangeEventOptionalList.add(dataChangeEventOptional);
             }
         }
@@ -446,6 +459,11 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             }
             return Optional.empty();
         }
+    }
+
+    private Optional<DataChangeEvent> convertDataChangeEvent(
+            DataChangeEvent dataChangeEvent, TransformConvertor convertor) {
+        return convertor.convert(dataChangeEvent);
     }
 
     private Optional<DataChangeEvent> processFilter(
