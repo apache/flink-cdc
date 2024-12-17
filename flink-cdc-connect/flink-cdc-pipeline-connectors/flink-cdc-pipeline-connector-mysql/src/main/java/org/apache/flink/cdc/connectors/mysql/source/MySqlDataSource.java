@@ -28,7 +28,11 @@ import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEmitter;
+import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /** A {@link DataSource} for mysql cdc connector. */
 @Internal
@@ -37,16 +41,27 @@ public class MySqlDataSource implements DataSource {
     private final MySqlSourceConfigFactory configFactory;
     private final MySqlSourceConfig sourceConfig;
 
+    private List<MySqlReadableMetadata> readableMetadataList;
+
     public MySqlDataSource(MySqlSourceConfigFactory configFactory) {
+        this(configFactory, new ArrayList<>());
+    }
+
+    public MySqlDataSource(
+            MySqlSourceConfigFactory configFactory,
+            List<MySqlReadableMetadata> readableMetadataList) {
         this.configFactory = configFactory;
         this.sourceConfig = configFactory.createConfig(0);
+        this.readableMetadataList = readableMetadataList;
     }
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
-                        DebeziumChangelogMode.ALL, sourceConfig.isIncludeSchemaChanges());
+                        DebeziumChangelogMode.ALL,
+                        sourceConfig.isIncludeSchemaChanges(),
+                        readableMetadataList);
 
         MySqlSource<Event> source =
                 new MySqlSource<>(
