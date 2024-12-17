@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.debezium.reader;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
@@ -54,6 +55,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -76,7 +78,16 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
 
     private MySqlBinlogSplitReadTask binlogSplitReadTask;
     private MySqlBinlogSplit currentBinlogSplit;
-    private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
+
+    /**
+     * First element of tuple contains all FinishedSnapshotSplitInfos of given table.
+     *
+     * <p>Second element of tuple contains only recently used FinishedSnapshotSplitInfos of given
+     * table.
+     */
+    private Map<TableId, Tuple2<TreeSet<FinishedSnapshotSplitInfo>, Set<FinishedSnapshotSplitInfo>>>
+            finishedSplitsInfo;
+
     // tableId -> the max splitHighWatermark
     private Map<TableId, BinlogOffset> maxSplitHighWatermarkMap;
     private final Set<TableId> pureBinlogPhaseTables;
@@ -85,6 +96,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             new StoppableChangeEventSourceContext();
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
+
+    private static final int MAX_SPLIT_INFO_CACHE_SIZE = 3;
 
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
         this.statefulTaskContext = statefulTaskContext;
@@ -232,25 +245,37 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                 Object[] chunkKey =
                         RecordUtils.getSplitKey(
                                 splitKeyType, statefulTaskContext.getSchemaNameAdjuster(), target);
-                for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
+                Tuple2<TreeSet<FinishedSnapshotSplitInfo>, Set<FinishedSnapshotSplitInfo>>
+                        allOrCachedSplitInfoTuple = finishedSplitsInfo.get(tableId);
+                // 1. Search the FinishedSnapshotSplitInfo that contains given chunkKey using cached
+                // SplitInfos.
+                Set<FinishedSnapshotSplitInfo> cachedSplitInfos = allOrCachedSplitInfoTuple.f1;
+                for (FinishedSnapshotSplitInfo splitInfo : cachedSplitInfos) {
                     if (RecordUtils.splitKeyRangeContains(
                                     chunkKey, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
                             && position.isAfter(splitInfo.getHighWatermark())) {
                         return true;
                     }
                 }
+
+                // 2. Search the FinishedSnapshotSplitInfo using all SplitInfos.
+                FinishedSnapshotSplitInfo wrapChunkKey =
+                        new FinishedSnapshotSplitInfo(tableId, "", chunkKey, chunkKey, position);
+                FinishedSnapshotSplitInfo ceilingSplitInfo =
+                        allOrCachedSplitInfoTuple.f0.ceiling(wrapChunkKey);
+                if (ceilingSplitInfo != null) {
+                    if (cachedSplitInfos.size() == MAX_SPLIT_INFO_CACHE_SIZE) {
+                        cachedSplitInfos.clear();
+                    }
+                    cachedSplitInfos.add(ceilingSplitInfo);
+                    return position.isAfter(ceilingSplitInfo.getHighWatermark());
+                }
             }
             // not in the monitored splits scope, do not emit
             return false;
-        } else if (RecordUtils.isSchemaChangeEvent(sourceRecord)) {
-            if (RecordUtils.isTableChangeRecord(sourceRecord)) {
-                TableId tableId = RecordUtils.getTableId(sourceRecord);
-                return capturedTableFilter.test(tableId);
-            } else {
-                // Not related to changes in table structure, like `CREATE/DROP DATABASE`, skip it
-                return false;
-            }
         }
+        // always send the schema change event and signal event
+        // we need record them to state of Flink
         return true;
     }
 
@@ -276,9 +301,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     private void configureFilter() {
         List<FinishedSnapshotSplitInfo> finishedSplitInfos =
                 currentBinlogSplit.getFinishedSnapshotSplitInfos();
-        Map<TableId, List<FinishedSnapshotSplitInfo>> splitsInfoMap = new HashMap<>();
+        Map<TableId, Tuple2<TreeSet<FinishedSnapshotSplitInfo>, Set<FinishedSnapshotSplitInfo>>>
+                splitsInfoMap = new HashMap<>();
         Map<TableId, BinlogOffset> tableIdBinlogPositionMap = new HashMap<>();
-        // startup mode which is stream only
+        // specific offset mode
         if (finishedSplitInfos.isEmpty()) {
             for (TableId tableId : currentBinlogSplit.getTableSchemas().keySet()) {
                 tableIdBinlogPositionMap.put(tableId, currentBinlogSplit.getStartingOffset());
@@ -288,10 +314,13 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         else {
             for (FinishedSnapshotSplitInfo finishedSplitInfo : finishedSplitInfos) {
                 TableId tableId = finishedSplitInfo.getTableId();
-                List<FinishedSnapshotSplitInfo> list =
-                        splitsInfoMap.getOrDefault(tableId, new ArrayList<>());
-                list.add(finishedSplitInfo);
-                splitsInfoMap.put(tableId, list);
+
+                Tuple2<TreeSet<FinishedSnapshotSplitInfo>, Set<FinishedSnapshotSplitInfo>>
+                        allOrCachedSplitInfoTuple =
+                                splitsInfoMap.getOrDefault(
+                                        tableId, new Tuple2<>(new TreeSet<>(), new HashSet<>()));
+                allOrCachedSplitInfoTuple.f0.add(finishedSplitInfo);
+                splitsInfoMap.put(tableId, allOrCachedSplitInfoTuple);
 
                 BinlogOffset highWatermark = finishedSplitInfo.getHighWatermark();
                 BinlogOffset maxHighWatermark = tableIdBinlogPositionMap.get(tableId);
