@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer.event;
 import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.TableId;
@@ -61,13 +62,8 @@ public class DataChangeEventSerializer extends TypeSerializerSingleton<DataChang
     public void serialize(DataChangeEvent event, DataOutputView target) throws IOException {
         opSerializer.serialize(event.op(), target);
         tableIdSerializer.serialize(event.tableId(), target);
-
-        if (event.before() != null) {
-            recordDataSerializer.serialize(event.before(), target);
-        }
-        if (event.after() != null) {
-            recordDataSerializer.serialize(event.after(), target);
-        }
+        recordDataSerializer.serialize(event.before(), target);
+        recordDataSerializer.serialize(event.after(), target);
         metaSerializer.serialize(event.meta(), target);
     }
 
@@ -76,28 +72,18 @@ public class DataChangeEventSerializer extends TypeSerializerSingleton<DataChang
         OperationType op = opSerializer.deserialize(source);
         TableId tableId = tableIdSerializer.deserialize(source);
 
+        RecordData before = recordDataSerializer.deserialize(source);
+        RecordData after = recordDataSerializer.deserialize(source);
+        Map<String, String> meta = metaSerializer.deserialize(source);
         switch (op) {
             case DELETE:
-                return DataChangeEvent.deleteEvent(
-                        tableId,
-                        recordDataSerializer.deserialize(source),
-                        metaSerializer.deserialize(source));
+                return DataChangeEvent.deleteEvent(tableId, before, meta);
             case INSERT:
-                return DataChangeEvent.insertEvent(
-                        tableId,
-                        recordDataSerializer.deserialize(source),
-                        metaSerializer.deserialize(source));
+                return DataChangeEvent.insertEvent(tableId, after, meta);
             case UPDATE:
-                return DataChangeEvent.updateEvent(
-                        tableId,
-                        recordDataSerializer.deserialize(source),
-                        recordDataSerializer.deserialize(source),
-                        metaSerializer.deserialize(source));
+                return DataChangeEvent.updateEvent(tableId, before, after, meta);
             case REPLACE:
-                return DataChangeEvent.replaceEvent(
-                        tableId,
-                        recordDataSerializer.deserialize(source),
-                        metaSerializer.deserialize(source));
+                return DataChangeEvent.replaceEvent(tableId, after, meta);
             default:
                 throw new IllegalArgumentException("Unsupported data change event: " + op);
         }
