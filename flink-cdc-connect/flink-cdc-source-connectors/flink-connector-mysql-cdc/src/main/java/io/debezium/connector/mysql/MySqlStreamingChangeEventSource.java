@@ -382,20 +382,7 @@ public class MySqlStreamingChangeEventSource
                         : null;
         offsetContext.setBinlogServerId(eventHeader.getServerId());
 
-        final EventType eventType = eventHeader.getEventType();
-        if (eventType == EventType.ROTATE) {
-            EventData eventData = event.getData();
-            RotateEventData rotateEventData;
-            if (eventData instanceof EventDeserializer.EventDataWrapper) {
-                rotateEventData =
-                        (RotateEventData)
-                                ((EventDeserializer.EventDataWrapper) eventData).getInternal();
-            } else {
-                rotateEventData = (RotateEventData) eventData;
-            }
-            offsetContext.setBinlogStartPoint(
-                    rotateEventData.getBinlogFilename(), rotateEventData.getBinlogPosition());
-        } else if (eventHeader instanceof EventHeaderV4) {
+        if (eventHeader instanceof EventHeaderV4) {
             EventHeaderV4 trackableEventHeader = (EventHeaderV4) eventHeader;
             offsetContext.setEventPosition(
                     trackableEventHeader.getPosition(), trackableEventHeader.getEventLength());
@@ -405,7 +392,7 @@ public class MySqlStreamingChangeEventSource
         try {
             // Forward the event to the handler ...
             eventHandlers
-                    .getOrDefault(eventType, (e) -> ignoreEvent(offsetContext, e))
+                    .getOrDefault(eventHeader.getEventType(), (e) -> ignoreEvent(offsetContext, e))
                     .accept(event);
 
             // Generate heartbeat message if the time is right
@@ -1093,7 +1080,11 @@ public class MySqlStreamingChangeEventSource
 
         BinaryLogClient.EventListener listener;
         if (connectorConfig.bufferSizeForStreamingChangeEventSource() == 0) {
-            listener = (event) -> handleEvent(partition, effectiveOffsetContext, event);
+            listener = (event) -> {
+                // when start with timestamp option we need record the binlog_name first
+                updateBinlogStartPoint(effectiveOffsetContext, event);
+                handleEvent(partition, effectiveOffsetContext, event);
+            };
         } else {
             EventBuffer buffer =
                     new EventBuffer(
@@ -1560,6 +1551,33 @@ public class MySqlStreamingChangeEventSource
                 LOGGER.debug("A deserialization failure event arrived", ex);
                 logStreamingSourceState(Level.DEBUG);
             }
+        }
+    }
+
+    /**
+     * update the binlogStartPoint
+     * @param offsetContext the MySqlOffsetContext object
+     * @param event the binlog event
+     * @return void
+     */
+    protected void updateBinlogStartPoint(MySqlOffsetContext offsetContext, Event event) {
+        if (null == event) {
+            return;
+        }
+        final EventHeader eventHeader = event.getHeader();
+        final EventType eventType = eventHeader.getEventType();
+        if (eventType == EventType.ROTATE) {
+            EventData eventData = event.getData();
+            RotateEventData rotateEventData;
+            if (eventData instanceof EventDeserializer.EventDataWrapper) {
+                rotateEventData =
+                        (RotateEventData)
+                                ((EventDeserializer.EventDataWrapper) eventData).getInternal();
+            } else {
+                rotateEventData = (RotateEventData) eventData;
+            }
+            offsetContext.setBinlogStartPoint(
+                    rotateEventData.getBinlogFilename(), rotateEventData.getBinlogPosition());
         }
     }
 
