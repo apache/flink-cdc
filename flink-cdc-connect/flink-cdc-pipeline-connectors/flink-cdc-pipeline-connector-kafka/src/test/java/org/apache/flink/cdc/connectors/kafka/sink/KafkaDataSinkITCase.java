@@ -560,6 +560,68 @@ class KafkaDataSinkITCase extends TestLogger {
         checkProducerLeak();
     }
 
+    @Test
+    void testSINKTABLEMAPPING() throws Exception {
+        final StreamExecutionEnvironment env = new LocalStreamEnvironment();
+        env.enableCheckpointing(1000L);
+        env.setRestartStrategy(RestartStrategies.noRestart());
+        final DataStream<Event> source =
+                env.fromCollection(createSourceEvents(), new EventTypeInfo());
+        Map<String, String> config = new HashMap<>();
+        config.put(
+                KafkaDataSinkOptions.SINK_TABLE_MAPPING.key(),
+                "default_namespace.default_schema_copy.\\.*:test_topic_mapping_copy;default_namespace.default_schema.\\.*:test_topic_mapping");
+        Properties properties = getKafkaClientConfiguration();
+        properties.forEach(
+                (key, value) ->
+                        config.put(
+                                KafkaDataSinkOptions.PROPERTIES_PREFIX + key.toString(),
+                                value.toString()));
+        source.sinkTo(
+                ((FlinkSinkProvider)
+                                (new KafkaDataSinkFactory()
+                                        .createDataSink(
+                                                new FactoryHelper.DefaultContext(
+                                                        Configuration.fromMap(config),
+                                                        Configuration.fromMap(new HashMap<>()),
+                                                        this.getClass().getClassLoader()))
+                                        .getEventSinkProvider()))
+                        .getSink());
+        env.execute();
+
+        final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
+                drainAllRecordsFromTopic("test_topic_mapping", false, 0);
+        final long recordsCount = 5;
+        assertThat(recordsCount).isEqualTo(collectedRecords.size());
+        ObjectMapper mapper =
+                JacksonMapperFactory.createObjectMapper()
+                        .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
+        List<JsonNode> expected =
+                Arrays.asList(
+                        mapper.readTree(
+                                String.format(
+                                        "{\"before\":null,\"after\":{\"col1\":\"1\",\"col2\":\"1\"},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())),
+                        mapper.readTree(
+                                String.format(
+                                        "{\"before\":null,\"after\":{\"col1\":\"2\",\"col2\":\"2\"},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())),
+                        mapper.readTree(
+                                String.format(
+                                        "{\"before\":null,\"after\":{\"col1\":\"3\",\"col2\":\"3\"},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())),
+                        mapper.readTree(
+                                String.format(
+                                        "{\"before\":{\"col1\":\"1\",\"newCol3\":\"1\"},\"after\":null,\"op\":\"d\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())),
+                        mapper.readTree(
+                                String.format(
+                                        "{\"before\":{\"col1\":\"2\",\"newCol3\":\"\"},\"after\":{\"col1\":\"2\",\"newCol3\":\"x\"},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                        table1.getTableName())));
+        assertThat(deserializeValues(collectedRecords)).containsAll(expected);
+        checkProducerLeak();
+    }
+
     private List<ConsumerRecord<byte[], byte[]>> drainAllRecordsFromTopic(
             String topic, boolean committed, int... partitionArr) {
         Properties properties = getKafkaClientConfiguration();

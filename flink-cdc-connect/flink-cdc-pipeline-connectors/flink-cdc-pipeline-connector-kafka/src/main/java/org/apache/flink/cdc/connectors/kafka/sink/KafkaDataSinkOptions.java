@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.kafka.sink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.configuration.description.Description;
 import org.apache.flink.cdc.connectors.kafka.json.JsonSerializationType;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 
@@ -28,6 +29,10 @@ public class KafkaDataSinkOptions {
 
     // Prefix for Kafka specific properties.
     public static final String PROPERTIES_PREFIX = "properties.";
+
+    public static final String DILIMITER_TABLE_MAPPINGS = ";";
+
+    public static final String DILIMITER_SELECTOR_TABLEID = ":";
 
     public static final ConfigOption<DeliveryGuarantee> DELIVERY_GUARANTEE =
             key("sink.delivery-guarantee")
@@ -79,4 +84,20 @@ public class KafkaDataSinkOptions {
                     .defaultValue("")
                     .withDescription(
                             "custom headers for each kafka record. Each header are separated by ',', separate key and value by ':'. For example, we can set headers like 'key1:value1,key2:value2'.");
+
+    public static final ConfigOption<String> SINK_TABLE_MAPPING =
+            key("sink.table.mapping")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            Description.builder()
+                                    .text(
+                                            "Custom table mappings for each table from upstream tableId to downstream Kafka topic. Each mapping is separated by ")
+                                    .text(DILIMITER_TABLE_MAPPINGS)
+                                    .text(
+                                            ", separate upstream tableId and downstream Kafka topic by ")
+                                    .text(DILIMITER_SELECTOR_TABLEID)
+                                    .text(
+                                            ". For example, we can set sink.table.mapping like 'mydb.mytable1:topic1;mydb.mytable2:topic2'.")
+                                    .build());
 }
