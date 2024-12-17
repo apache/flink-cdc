@@ -286,7 +286,6 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         new MySqlDataSourceFactory()
                                 .createDataSource(context)
                                 .getEventSourceProvider();
-        ;
         CloseableIterator<Event> events =
                 env.fromSource(
                                 sourceProvider.getSource(),
