@@ -30,10 +30,8 @@ limitations under the License.
     <packaging>pom</packaging>
 
     <modules>
-        <module>flink-cdc-release-3.0.0</module>
-        <module>flink-cdc-release-3.0.1</module>
-        <module>flink-cdc-release-3.1.0</module>
-        <module>flink-cdc-release-3.1.1</module>
+        <module>flink-cdc-release-3.2.0</module>
+        <module>flink-cdc-release-3.2.1</module>
         <module>flink-cdc-release-snapshot</module>
         <module>flink-cdc-migration-testcases</module>
     </modules>
