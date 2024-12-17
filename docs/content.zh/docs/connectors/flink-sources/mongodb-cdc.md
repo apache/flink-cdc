@@ -248,6 +248,35 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
         <td>起始毫秒数, 仅适用于 <code>'timestamp'</code> 启动模式.</td>
     </tr>
     <tr>
+      <td>initial.snapshotting.queue.size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">10240</td>
+      <td>Integer</td>
+      <td>进行初始快照时的队列大小。仅在 scan.startup.mode 选项设置为 initial 时生效。
+          注意：已弃用的选项名是 copy.existing.queue.size，为了兼容旧版本的作业，该选项名仍可用，但是推荐升级到新选项名
+      </td>
+    </tr>
+    <tr>
+      <td>initial.snapshotting.max.threads</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">Processors Count</td>
+      <td>Integer</td>
+      <td>执行数据复制时使用的线程数。仅在 scan.startup.mode 选项设置为 initial 时生效。
+          注意：已弃用的选项名是 copy.existing.max.threads，为了兼容旧版本的作业，该选项名仍可用，但是推荐升级到新选项名
+      </td>
+    </tr>
+    <tr>
+      <td>initial.snapshotting.pipeline</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>MongoDB 管道操作的 JSON 对象数组，在快照读取阶段，会把该操作下推到 MongoDB，只筛选所需的数据，从而提高读取效率，
+          比如管道操作 [{"$match": {"closed": "false"}}] 表示只复制 closed 字段为 "false" 的文档。
+          该选项仅在 scan.startup.mode 选项设置为 initial 时生效，且仅限于在 Debezium 模式下使用，不能用于增量快照模式，因为会出现语义不一致的问题。
+          注意：已弃用的选项名是 copy.existing.pipeline，为了兼容旧版本的作业，该选项名仍可用，但是推荐升级到新选项名
+      </td>
+    </tr>
+    <tr>
       <td>batch.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1024</td>
@@ -397,6 +426,17 @@ CREATE TABLE mongodb_source (...) WITH (
 
 **Notes:**
 - 'timestamp' 指定时间戳启动模式，需要开启增量快照读。
+
+### 快照数据筛选器
+
+配置选项 `initial.snapshotting.pipeline` 描述复制现有数据时的筛选器。<br>
+在快照读取阶段，会把该筛选器下推到 MongoDB，只筛选所需的数据，从而提高读取效率。
+
+在下面的示例中，`$match` 聚合运算符确保只复制 closed 字段设置为 "false" 的文档。
+
+```
+'initial.snapshotting.pipeline' = '[ { "$match": { "closed": "false" } } ]'
+```
 
 ### 更改流
 
