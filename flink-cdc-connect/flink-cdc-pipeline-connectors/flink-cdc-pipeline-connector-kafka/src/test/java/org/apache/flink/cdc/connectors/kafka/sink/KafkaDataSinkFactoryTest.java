@@ -39,6 +39,9 @@ public class KafkaDataSinkFactoryTest {
         Assertions.assertThat(sinkFactory).isInstanceOf(KafkaDataSinkFactory.class);
 
         Configuration conf = Configuration.fromMap(ImmutableMap.<String, String>builder().build());
+        conf.set(
+                KafkaDataSinkOptions.SINK_TABLE_MAPPING,
+                "mydb.mytable1:topic1;mydb.mytable2:topic2");
         DataSink dataSink =
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
