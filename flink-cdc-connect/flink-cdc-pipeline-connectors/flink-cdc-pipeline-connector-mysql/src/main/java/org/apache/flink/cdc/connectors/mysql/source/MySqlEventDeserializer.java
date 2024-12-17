@@ -25,6 +25,7 @@ import org.apache.flink.cdc.connectors.mysql.source.parser.CustomMySqlAntlrDdlPa
 import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
+import org.apache.flink.table.data.TimestampData;
 
 import com.esri.core.geometry.ogc.OGCGeometry;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -34,7 +35,6 @@ import io.debezium.data.geometry.Geometry;
 import io.debezium.data.geometry.Point;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.HistoryRecord;
-import org.apache.flink.table.data.TimestampData;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
