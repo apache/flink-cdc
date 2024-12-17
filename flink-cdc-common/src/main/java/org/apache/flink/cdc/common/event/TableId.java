@@ -50,6 +50,7 @@ public class TableId implements Serializable {
     @Nullable private final String namespace;
     @Nullable private final String schemaName;
     private final String tableName;
+    private transient int cachedHashCode;
 
     private TableId(@Nullable String namespace, @Nullable String schemaName, String tableName) {
         this.namespace = namespace;
@@ -125,7 +126,10 @@ public class TableId implements Serializable {
 
     @Override
     public int hashCode() {
-        return Objects.hash(namespace, schemaName, tableName);
+        if (cachedHashCode == 0) {
+            cachedHashCode = Objects.hash(namespace, schemaName, tableName);
+        }
+        return cachedHashCode;
     }
 
     @Override

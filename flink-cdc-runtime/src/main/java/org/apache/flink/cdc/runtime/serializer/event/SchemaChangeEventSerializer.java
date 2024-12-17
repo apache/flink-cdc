@@ -67,6 +67,11 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
             public TableId tableId() {
                 return TableId.tableId("unknown", "unknown", "unknown");
             }
+
+            @Override
+            public SchemaChangeEvent copy(TableId newTableId) {
+                return null;
+            }
         };
     }
 

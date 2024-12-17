@@ -13,11 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Flink CDC CI Nightly
+name: Flink CDC CI
 on:
-  schedule:
-    - cron: '0 0 * * *' # Deploy every day
-  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - release-*
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+  pull_request:
+    branches:
+      - master
+      - release-*
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.number || github.run_id }}
@@ -39,7 +50,7 @@ jobs:
       - name: Set JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '11'
+          java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
       - name: Compiling jar packages
@@ -56,12 +67,16 @@ jobs:
       java-version: "[11]"
       module: ${{ matrix.module }}
   pipeline_e2e:
+    strategy:
+      matrix:
+        parallelism: [ 1, 4 ]
     name: Pipeline E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-version: "[11]"
       flink-version: "['1.19.1', '1.20.0']"
       module: pipeline_e2e
+      parallelism: ${{ matrix.parallelism }}
   source_e2e:
     name: Source E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml

@@ -67,4 +67,11 @@ public class MySqlDataSource implements DataSource {
     public MySqlSourceConfig getSourceConfig() {
         return sourceConfig;
     }
+
+    @Override
+    public boolean canContainDistributedTables() {
+        // During incremental stage, MySQL never emits schema change events on different partitions
+        // (since it has one Binlog stream only.)
+        return false;
+    }
 }

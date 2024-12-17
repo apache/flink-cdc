@@ -851,7 +851,7 @@ class FlinkPipelineComposerLenientITCase {
                         Schema.newBuilder()
                                 .physicalColumn("id", DataTypes.BIGINT())
                                 .physicalColumn("name", DataTypes.STRING())
-                                .physicalColumn("age", DataTypes.BIGINT())
+                                .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("description", DataTypes.STRING())
                                 .physicalColumn("last_name", DataTypes.STRING())
                                 .physicalColumn("gender", DataTypes.STRING())
@@ -865,7 +865,7 @@ class FlinkPipelineComposerLenientITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[2, Bob, 20], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[2, Bob, 20], after=[2, Bob, 30], op=UPDATE, meta=()}",
                         "AddColumnEvent{tableId=default_namespace.default_schema.merged, addedColumns=[ColumnWithPosition{column=`description` STRING, position=LAST, existedColumnName=null}]}",
-                        "AlterColumnTypeEvent{tableId=default_namespace.default_schema.merged, typeMapping={age=BIGINT, id=BIGINT}, oldTypeMapping={age=INT, id=INT}}",
+                        "AlterColumnTypeEvent{tableId=default_namespace.default_schema.merged, typeMapping={id=BIGINT}, oldTypeMapping={id=INT}}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[3, Charlie, 15, student], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[4, Donald, 25, student], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[4, Donald, 25, student], after=[], op=DELETE, meta=()}",
@@ -1059,7 +1059,7 @@ class FlinkPipelineComposerLenientITCase {
                         Schema.newBuilder()
                                 .physicalColumn("id", DataTypes.BIGINT())
                                 .physicalColumn("name", DataTypes.STRING())
-                                .physicalColumn("age", DataTypes.BIGINT())
+                                .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("last_name", DataTypes.STRING())
                                 .physicalColumn("description", DataTypes.STRING())
                                 .physicalColumn("gender", DataTypes.STRING())
@@ -1073,7 +1073,7 @@ class FlinkPipelineComposerLenientITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[2, Bob, 20, last_name], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[2, Bob, 20, last_name], after=[2, Bob, 30, last_name], op=UPDATE, meta=()}",
                         "AddColumnEvent{tableId=default_namespace.default_schema.merged, addedColumns=[ColumnWithPosition{column=`description` STRING, position=LAST, existedColumnName=null}]}",
-                        "AlterColumnTypeEvent{tableId=default_namespace.default_schema.merged, typeMapping={age=BIGINT, id=BIGINT}, oldTypeMapping={age=INT, id=INT}}",
+                        "AlterColumnTypeEvent{tableId=default_namespace.default_schema.merged, typeMapping={id=BIGINT}, oldTypeMapping={id=INT}}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[3, Charlie, 15, last_name, student], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[4, Donald, 25, last_name, student], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[4, Donald, 25, last_name, student], after=[], op=DELETE, meta=()}",

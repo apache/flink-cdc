@@ -20,7 +20,6 @@ package org.apache.flink.cdc.runtime.serializer.event;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
-import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 
@@ -49,12 +48,7 @@ class PartitioningEventSerializerTest extends SerializerTestBase<PartitioningEve
 
     @Override
     protected PartitioningEvent[] getTestData() {
-        Event[] flushEvents =
-                new Event[] {
-                    new FlushEvent(TableId.tableId("table")),
-                    new FlushEvent(TableId.tableId("schema", "table")),
-                    new FlushEvent(TableId.tableId("namespace", "schema", "table"))
-                };
+        Event[] flushEvents = new Event[] {new FlushEvent(1), new FlushEvent(2), new FlushEvent(3)};
         Event[] dataChangeEvents = new DataChangeEventSerializerTest().getTestData();
         Event[] schemaChangeEvents = new SchemaChangeEventSerializerTest().getTestData();
 
@@ -62,15 +56,27 @@ class PartitioningEventSerializerTest extends SerializerTestBase<PartitioningEve
 
         partitioningEvents.addAll(
                 Arrays.stream(flushEvents)
-                        .map(event -> new PartitioningEvent(event, 1))
+                        .map(event -> PartitioningEvent.ofRegular(event, 1))
                         .collect(Collectors.toList()));
         partitioningEvents.addAll(
                 Arrays.stream(dataChangeEvents)
-                        .map(event -> new PartitioningEvent(event, 2))
+                        .map(event -> PartitioningEvent.ofRegular(event, 2))
                         .collect(Collectors.toList()));
         partitioningEvents.addAll(
                 Arrays.stream(schemaChangeEvents)
-                        .map(event -> new PartitioningEvent(event, 3))
+                        .map(event -> PartitioningEvent.ofRegular(event, 3))
+                        .collect(Collectors.toList()));
+        partitioningEvents.addAll(
+                Arrays.stream(flushEvents)
+                        .map(event -> PartitioningEvent.ofDistributed(event, 4, 14))
+                        .collect(Collectors.toList()));
+        partitioningEvents.addAll(
+                Arrays.stream(dataChangeEvents)
+                        .map(event -> PartitioningEvent.ofDistributed(event, 5, 15))
+                        .collect(Collectors.toList()));
+        partitioningEvents.addAll(
+                Arrays.stream(schemaChangeEvents)
+                        .map(event -> PartitioningEvent.ofDistributed(event, 6, 16))
                         .collect(Collectors.toList()));
 
         return partitioningEvents.toArray(new PartitioningEvent[0]);

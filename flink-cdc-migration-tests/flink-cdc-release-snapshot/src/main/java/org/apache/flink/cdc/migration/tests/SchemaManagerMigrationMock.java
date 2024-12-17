@@ -21,33 +21,55 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaManager;
+import org.apache.flink.cdc.runtime.operators.schema.common.SchemaManager;
 
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
 /** Dummy classes for migration test. Called via reflection. */
 public class SchemaManagerMigrationMock implements MigrationMockBase {
-    private static final TableId DUMMY_TABLE_ID =
-            TableId.tableId("dummyNamespace", "dummySchema", "dummyTable");
-    private static final Schema DUMMY_SCHEMA =
-            Schema.newBuilder()
-                    .physicalColumn("id", DataTypes.INT())
-                    .physicalColumn("name", DataTypes.STRING())
-                    .physicalColumn("age", DataTypes.DOUBLE())
-                    .primaryKey("id", "name")
-                    .build();
+    private static final TableId TABLE_1 = TableId.tableId("ns", "scm", "tbl1");
+    private static final TableId TABLE_2 = TableId.tableId("ns", "scm", "tbl2");
+
+    private static final String SCHEMA_MANAGER =
+            "runtime.operators.schema.coordinator.SchemaManager";
+
+    private static Schema genSchema(String identifier) {
+        return Schema.newBuilder()
+                .physicalColumn("id", DataTypes.INT())
+                .physicalColumn("col_" + identifier, DataTypes.STRING())
+                .primaryKey("id")
+                .build();
+    }
+
+    private static final Map<TableId, SortedMap<Integer, Schema>> ORIGINAL_SCHEMA_MAP;
+    private static final Map<TableId, SortedMap<Integer, Schema>> EVOLVED_SCHEMA_MAP;
+
+    static {
+        SortedMap<Integer, Schema> originalSchemas = new TreeMap<>();
+        originalSchemas.put(1, genSchema("upstream_1"));
+        originalSchemas.put(2, genSchema("upstream_2"));
+        originalSchemas.put(3, genSchema("upstream_3"));
+
+        SortedMap<Integer, Schema> evolvedSchemas = new TreeMap<>();
+        evolvedSchemas.put(1, genSchema("evolved_1"));
+        evolvedSchemas.put(2, genSchema("evolved_2"));
+        evolvedSchemas.put(3, genSchema("evolved_3"));
+
+        ORIGINAL_SCHEMA_MAP = new HashMap<>();
+        ORIGINAL_SCHEMA_MAP.put(TABLE_1, originalSchemas);
+        ORIGINAL_SCHEMA_MAP.put(TABLE_2, originalSchemas);
+
+        EVOLVED_SCHEMA_MAP = new HashMap<>();
+        EVOLVED_SCHEMA_MAP.put(TABLE_1, evolvedSchemas);
+        EVOLVED_SCHEMA_MAP.put(TABLE_2, evolvedSchemas);
+    }
 
     public SchemaManager generateDummyObject() {
-        SortedMap<Integer, Schema> schemaVersions = new TreeMap<>();
-        schemaVersions.put(1, DUMMY_SCHEMA);
-        schemaVersions.put(2, DUMMY_SCHEMA);
-        schemaVersions.put(3, DUMMY_SCHEMA);
         return new SchemaManager(
-                Collections.singletonMap(DUMMY_TABLE_ID, schemaVersions),
-                Collections.singletonMap(DUMMY_TABLE_ID, schemaVersions),
-                SchemaChangeBehavior.EVOLVE);
+                ORIGINAL_SCHEMA_MAP, EVOLVED_SCHEMA_MAP, SchemaChangeBehavior.TRY_EVOLVE);
     }
 
     @Override

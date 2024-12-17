@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.common.source;
 
+import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 
 /**
@@ -31,4 +32,18 @@ public interface DataSource {
 
     /** Get the {@link MetadataAccessor} for accessing metadata from external systems. */
     MetadataAccessor getMetadataAccessor();
+
+    /**
+     * Indicating if this source guarantees for each TableId, it will not be evolved differently
+     * among subTasks. If returns {@code false}, you'll get a regular operator topology that is
+     * compatible with single-incremented sources like MySQL. Returns {@code true} for sources that
+     * does not maintain a globally sequential schema change events stream, like MongoDB or Kafka.
+     * <br>
+     * Note that new topology still an experimental feature. Return {@code false} by default to
+     * avoid unexpected behaviors.
+     */
+    @Experimental
+    default boolean canContainDistributedTables() {
+        return false;
+    }
 }
