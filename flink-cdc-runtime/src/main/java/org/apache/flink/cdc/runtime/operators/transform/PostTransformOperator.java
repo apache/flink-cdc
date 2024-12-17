@@ -31,9 +31,9 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.transform.converter.PostTransformConverter;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
-import org.apache.flink.cdc.runtime.operators.transform.convertor.TransformConvertor;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -103,7 +103,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                 String primaryKey,
                 String partitionKey,
                 String tableOptions,
-                String convertorAfterTransform) {
+                String postTransformConverter) {
             transformRules.add(
                     new TransformRule(
                             tableInclusions,
@@ -112,7 +112,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                             primaryKey,
                             partitionKey,
                             tableOptions,
-                            convertorAfterTransform));
+                            postTransformConverter));
             return this;
         }
 
@@ -190,8 +190,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                             TransformProjection.of(projection).orElse(null),
                                             TransformFilter.of(filterExpression, udfDescriptors)
                                                     .orElse(null),
-                                            TransformConvertor.of(
-                                                    transformRule.getConvertorAfterTransform()));
+                                            PostTransformConverter.of(
+                                                    transformRule.getPostTransformConverter()));
                                 })
                         .collect(Collectors.toList());
         this.transformProjectionProcessorMap = new ConcurrentHashMap<>();
@@ -438,11 +438,11 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                     epochTime);
                 }
                 if (dataChangeEventOptional.isPresent()
-                        && transform.getConvertorAfterTransform().isPresent()) {
+                        && transform.getPostTransformConverter().isPresent()) {
                     dataChangeEventOptional =
                             convertDataChangeEvent(
                                     dataChangeEventOptional.get(),
-                                    transform.getConvertorAfterTransform().get());
+                                    transform.getPostTransformConverter().get());
                 }
                 transformedDataChangeEventOptionalList.add(dataChangeEventOptional);
             }
@@ -462,8 +462,8 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     }
 
     private Optional<DataChangeEvent> convertDataChangeEvent(
-            DataChangeEvent dataChangeEvent, TransformConvertor convertor) {
-        return convertor.convert(dataChangeEvent);
+            DataChangeEvent dataChangeEvent, PostTransformConverter postTransformConverter) {
+        return postTransformConverter.convert(dataChangeEvent);
     }
 
     private Optional<DataChangeEvent> processFilter(

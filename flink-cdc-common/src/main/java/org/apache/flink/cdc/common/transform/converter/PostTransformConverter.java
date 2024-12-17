@@ -15,47 +15,48 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.transform.convertor;
+package org.apache.flink.cdc.common.transform.converter;
 
+import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.utils.StringUtils;
-import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
-import org.apache.flink.cdc.runtime.operators.transform.TransformRule;
 
 import java.io.Serializable;
 import java.util.Optional;
 
 /**
- * The TransformConvertor applies to convert the {@link DataChangeEvent} after other part of {@link
- * TransformRule} in {@link PostTransformOperator}.
+ * The PostTransformConverter applies to convert the {@link DataChangeEvent} after other part of
+ * TransformRule in PostTransformOperator.
  */
-public interface TransformConvertor extends Serializable {
-    String SOFT_DELETE_CONVERTOR = "SOFT_DELETE";
+@Experimental
+public interface PostTransformConverter extends Serializable {
 
     Optional<DataChangeEvent> convert(DataChangeEvent dataChangeEvent);
 
-    static Optional<TransformConvertor> of(String classPath) {
+    static Optional<PostTransformConverter> of(String classPath) {
         if (StringUtils.isNullOrWhitespaceOnly(classPath)) {
             return Optional.empty();
         }
 
-        if (SOFT_DELETE_CONVERTOR.equals(classPath)) {
-            return Optional.of(new SoftDeleteConvertor());
+        Optional<PostTransformConverter> postTransformConverter =
+                PostTransformConverters.getInternalPostTransformConverter(classPath);
+        if (postTransformConverter.isPresent()) {
+            return postTransformConverter;
         }
 
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         try {
-            Class<?> convertorClass = classLoader.loadClass(classPath);
-            Object convertor = convertorClass.newInstance();
-            if (convertor instanceof TransformConvertor) {
-                return Optional.of((TransformConvertor) convertor);
+            Class<?> converterClass = classLoader.loadClass(classPath);
+            Object converter = converterClass.newInstance();
+            if (converter instanceof PostTransformConverter) {
+                return Optional.of((PostTransformConverter) converter);
             }
             throw new IllegalArgumentException(
                     String.format(
                             "%s is not an instance of %s",
-                            classPath, TransformConvertor.class.getName()));
+                            classPath, PostTransformConverter.class.getName()));
         } catch (Exception e) {
-            throw new RuntimeException("Create transform convertor failed.", e);
+            throw new RuntimeException("Create post transform converter failed.", e);
         }
     }
 }

@@ -100,7 +100,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                 String primaryKey,
                 String partitionKey,
                 String tableOption,
-                @Nullable String convertorAfterTransform) {
+                @Nullable String postTransformConverter) {
             transformRules.add(
                     new TransformRule(
                             tableInclusions,
@@ -109,7 +109,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                             primaryKey,
                             partitionKey,
                             tableOption,
-                            convertorAfterTransform));
+                            postTransformConverter));
             return this;
         }
 

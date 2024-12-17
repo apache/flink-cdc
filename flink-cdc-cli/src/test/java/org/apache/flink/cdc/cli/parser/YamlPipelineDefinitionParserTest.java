@@ -404,7 +404,7 @@ class YamlPipelineDefinitionParserTest {
                         + "    partition-keys: product_name\n"
                         + "    table-options: comment=app order\n"
                         + "    description: project fields from source table\n"
-                        + "    convertor-after-transform: SOFT_DELETE\n"
+                        + "    post-transform-converter: SOFT_DELETE\n"
                         + "  - source-table: mydb.web_order_.*\n"
                         + "    projection: CONCAT(id, order_id) as uniq_id, *\n"
                         + "    filter: uniq_id > 10\n"

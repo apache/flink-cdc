@@ -61,7 +61,7 @@ public class TransformTranslator {
                     transform.getPrimaryKeys(),
                     transform.getPartitionKeys(),
                     transform.getTableOptions(),
-                    transform.getConvertorAfterTransform());
+                    transform.getPostTransformConverter());
         }
 
         preTransformFunctionBuilder.addUdfFunctions(
@@ -93,7 +93,7 @@ public class TransformTranslator {
                         transform.getPrimaryKeys(),
                         transform.getPartitionKeys(),
                         transform.getTableOptions(),
-                        transform.getConvertorAfterTransform());
+                        transform.getPostTransformConverter());
             }
         }
         postTransformFunctionBuilder.addTimezone(timezone);

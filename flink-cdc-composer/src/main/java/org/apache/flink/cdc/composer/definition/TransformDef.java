@@ -50,7 +50,7 @@ public class TransformDef {
     private final String primaryKeys;
     private final String partitionKeys;
     private final String tableOptions;
-    private final String convertorAfterTransform;
+    private final String postTransformConverter;
 
     public TransformDef(
             String sourceTable,
@@ -60,7 +60,7 @@ public class TransformDef {
             String partitionKeys,
             String tableOptions,
             String description,
-            String convertorAfterTransform) {
+            String postTransformConverter) {
         this.sourceTable = sourceTable;
         this.projection = projection;
         this.filter = filter;
@@ -68,7 +68,7 @@ public class TransformDef {
         this.partitionKeys = partitionKeys;
         this.tableOptions = tableOptions;
         this.description = description;
-        this.convertorAfterTransform = convertorAfterTransform;
+        this.postTransformConverter = postTransformConverter;
     }
 
     public String getSourceTable() {
@@ -107,8 +107,8 @@ public class TransformDef {
         return tableOptions;
     }
 
-    public String getConvertorAfterTransform() {
-        return convertorAfterTransform;
+    public String getPostTransformConverter() {
+        return postTransformConverter;
     }
 
     @Override
@@ -126,8 +126,8 @@ public class TransformDef {
                 + ", description='"
                 + description
                 + '\''
-                + ", convertorAfterTransform='"
-                + convertorAfterTransform
+                + ", postTransformConverter='"
+                + postTransformConverter
                 + '\''
                 + '}';
     }
@@ -148,7 +148,7 @@ public class TransformDef {
                 && Objects.equals(primaryKeys, that.primaryKeys)
                 && Objects.equals(partitionKeys, that.partitionKeys)
                 && Objects.equals(tableOptions, that.tableOptions)
-                && Objects.equals(convertorAfterTransform, that.convertorAfterTransform);
+                && Objects.equals(postTransformConverter, that.postTransformConverter);
     }
 
     @Override
@@ -161,6 +161,6 @@ public class TransformDef {
                 primaryKeys,
                 partitionKeys,
                 tableOptions,
-                convertorAfterTransform);
+                postTransformConverter);
     }
 }
