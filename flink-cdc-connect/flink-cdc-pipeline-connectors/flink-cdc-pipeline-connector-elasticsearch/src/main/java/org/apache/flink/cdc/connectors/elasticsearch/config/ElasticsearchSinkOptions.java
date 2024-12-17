@@ -17,12 +17,15 @@
 
 package org.apache.flink.cdc.connectors.elasticsearch.config;
 
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.connectors.elasticsearch.v2.NetworkConfig;
 
 import org.apache.http.HttpHost;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /** Elasticsearch DataSink Options reference {@link ElasticsearchSinkOptions}. */
 public class ElasticsearchSinkOptions implements Serializable {
@@ -37,6 +40,7 @@ public class ElasticsearchSinkOptions implements Serializable {
     private final int version;
     private final String username;
     private final String password;
+    private final Map<TableId, String> shardingKey;
 
     /** Constructor for ElasticsearchSinkOptions. */
     public ElasticsearchSinkOptions(
@@ -50,6 +54,32 @@ public class ElasticsearchSinkOptions implements Serializable {
             int version,
             String username,
             String password) {
+        this(
+                maxBatchSize,
+                maxInFlightRequests,
+                maxBufferedRequests,
+                maxBatchSizeInBytes,
+                maxTimeInBufferMS,
+                maxRecordSizeInBytes,
+                networkConfig,
+                version,
+                username,
+                password,
+                Collections.emptyMap());
+    }
+
+    public ElasticsearchSinkOptions(
+            int maxBatchSize,
+            int maxInFlightRequests,
+            int maxBufferedRequests,
+            long maxBatchSizeInBytes,
+            long maxTimeInBufferMS,
+            long maxRecordSizeInBytes,
+            NetworkConfig networkConfig,
+            int version,
+            String username,
+            String password,
+            Map<TableId, String> shardingKey) {
         this.maxBatchSize = maxBatchSize;
         this.maxInFlightRequests = maxInFlightRequests;
         this.maxBufferedRequests = maxBufferedRequests;
@@ -60,6 +90,7 @@ public class ElasticsearchSinkOptions implements Serializable {
         this.version = version;
         this.username = username;
         this.password = password;
+        this.shardingKey = shardingKey;
     }
 
     /** @return the maximum batch size */
@@ -112,5 +143,9 @@ public class ElasticsearchSinkOptions implements Serializable {
 
     public String getPassword() {
         return password;
+    }
+
+    public Map<TableId, String> getShardingKey() {
+        return shardingKey;
     }
 }
