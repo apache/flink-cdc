@@ -89,7 +89,8 @@ public class MongoDBTableFactoryTest {
                             Column.physical("eee", DataTypes.TIMESTAMP(3)),
                             Column.metadata("time", DataTypes.TIMESTAMP_LTZ(3), "op_ts", true),
                             Column.metadata(
-                                    "_database_name", DataTypes.STRING(), "database_name", true)),
+                                    "_database_name", DataTypes.STRING(), "database_name", true),
+                            Column.metadata("_row_kind", DataTypes.STRING(), "row_kind", true)),
                     Collections.emptyList(),
                     UniqueConstraint.primaryKey("pk", Collections.singletonList("_id")));
 
@@ -220,7 +221,7 @@ public class MongoDBTableFactoryTest {
         DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
         MongoDBTableSource mongoDBSource = (MongoDBTableSource) actualSource;
         mongoDBSource.applyReadableMetadata(
-                Arrays.asList("op_ts", "database_name"),
+                Arrays.asList("op_ts", "database_name", "row_kind"),
                 SCHEMA_WITH_METADATA.toSourceRowDataType());
         actualSource = mongoDBSource.copy();
 
@@ -252,7 +253,7 @@ public class MongoDBTableFactoryTest {
                         SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT);
 
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
-        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
+        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name", "row_kind");
 
         assertEquals(expectedSource, actualSource);
 
