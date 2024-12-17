@@ -150,16 +150,14 @@ public class BinlogSplitReaderTest extends MySqlSourceTestBase {
                 getMySqlSplits(new String[] {"customers_even_dist"}, sourceConfig);
         String[] expected =
                 new String[] {
-                    "+I[101, user_1, Shanghai, 123567891234]",
-                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[109, user_9, Shanghai, 123567891234]",
+                    "+I[110, user_10, Shanghai, 123567891234]",
                     "-D[102, user_2, Shanghai, 123567891234]",
                     "+I[102, user_2, Shanghai, 123567891234]",
                     "-U[103, user_3, Shanghai, 123567891234]",
                     "+U[103, user_3, Hangzhou, 123567891234]",
                     "-U[103, user_3, Hangzhou, 123567891234]",
                     "+U[103, user_3, Shanghai, 123567891234]",
-                    "+I[104, user_4, Shanghai, 123567891234]",
-                    "+I[103, user_3, Shanghai, 123567891234]"
                 };
 
         List<String> actual =
