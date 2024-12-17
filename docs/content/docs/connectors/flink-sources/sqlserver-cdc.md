@@ -100,7 +100,7 @@ CREATE TABLE orders (
     'username' = 'sa',
     'password' = 'Password!',
     'database-name' = 'inventory',
-    'table-name' = 'dob.orders'
+    'table-name' = 'dbo.orders'
 );
 
 -- read snapshot and binlogs from orders table
