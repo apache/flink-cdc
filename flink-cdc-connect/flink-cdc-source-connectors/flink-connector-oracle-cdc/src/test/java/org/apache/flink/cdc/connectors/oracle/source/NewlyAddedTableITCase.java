@@ -891,8 +891,10 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
                         + ")",
                 ORACLE_CONTAINER.getHost(),
                 ORACLE_CONTAINER.getOraclePort(),
-                ORACLE_CONTAINER.getUsername(),
-                ORACLE_CONTAINER.getPassword(),
+                // To analyze table for approximate rowCnt computation, use admin user before chunk
+                // splitting.
+                TOP_USER,
+                TOP_SECRET,
                 ORACLE_DATABASE,
                 ORACLE_SCHEMA,
                 getTableNameRegex(captureTableNames),

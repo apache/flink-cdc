@@ -434,8 +434,10 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                 OracleSourceBuilder.OracleIncrementalSource.<RowData>builder()
                         .hostname(ORACLE_CONTAINER.getHost())
                         .port(ORACLE_CONTAINER.getOraclePort())
-                        .username(CONNECTOR_USER)
-                        .password(CONNECTOR_PWD)
+                        // To analyze table for approximate rowCnt computation, use admin user
+                        // before chunk splitting.
+                        .username(TOP_USER)
+                        .password(TOP_SECRET)
                         .databaseList(ORACLE_DATABASE)
                         .schemaList(ORACLE_SCHEMA)
                         .tableList("DEBEZIUM.CUSTOMERS")
@@ -559,8 +561,10 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                                 + ")",
                         ORACLE_CONTAINER.getHost(),
                         ORACLE_CONTAINER.getOraclePort(),
-                        ORACLE_CONTAINER.getUsername(),
-                        ORACLE_CONTAINER.getPassword(),
+                        // To analyze table for approximate rowCnt computation, use admin user
+                        // before chunk splitting.
+                        TOP_USER,
+                        TOP_SECRET,
                         ORACLE_DATABASE,
                         ORACLE_SCHEMA,
                         getTableNameRegex(captureCustomerTables), // (customer|customer_1)
