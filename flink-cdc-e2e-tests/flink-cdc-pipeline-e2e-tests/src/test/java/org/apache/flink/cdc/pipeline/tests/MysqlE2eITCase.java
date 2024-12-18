@@ -351,7 +351,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                                 + "transform:\n"
                                 + "  - source-table: \\.*.\\.*\n"
                                 + "    projection: \\*, __data_event_type__ AS op_type\n"
-                                + "    post-transform-converter: SOFT_DELETE\n"
+                                + "    converter-after-transform: SOFT_DELETE\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"

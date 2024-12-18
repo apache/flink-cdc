@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.cdc.common.schema.Selectors;
-import org.apache.flink.cdc.common.transform.converter.PostTransformConverter;
+import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverter;
 
 import javax.annotation.Nullable;
 

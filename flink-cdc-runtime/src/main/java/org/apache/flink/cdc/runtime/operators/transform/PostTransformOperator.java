@@ -31,9 +31,10 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
-import org.apache.flink.cdc.common.transform.converter.PostTransformConverter;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverter;
+import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverters;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -190,7 +191,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                             TransformProjection.of(projection).orElse(null),
                                             TransformFilter.of(filterExpression, udfDescriptors)
                                                     .orElse(null),
-                                            PostTransformConverter.of(
+                                            PostTransformConverters.of(
                                                     transformRule.getPostTransformConverter()));
                                 })
                         .collect(Collectors.toList());
