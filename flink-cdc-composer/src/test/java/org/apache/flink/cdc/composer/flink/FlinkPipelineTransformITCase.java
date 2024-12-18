@@ -1711,6 +1711,7 @@ class FlinkPipelineTransformITCase {
                                             null,
                                             null,
                                             null,
+                                            null,
                                             null)),
                             Collections.emptyList(),
                             pipelineConfig);
