@@ -37,6 +37,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
@@ -129,14 +130,14 @@ public class MySqlSchemaUtils {
                 new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive())) {
             TableChanges.TableChange tableSchema =
                     mySqlSchema.getTableSchema(partition, jdbc, toDbzTableId(tableId));
-            return toSchema(tableSchema.getTable());
+            return toSchema(tableSchema.getTable(), sourceConfig.getJdbcProperties());
         }
     }
 
-    public static Schema toSchema(Table table) {
+    public static Schema toSchema(Table table, Properties jdbcProperties) {
         List<Column> columns =
                 table.columns().stream()
-                        .map(MySqlSchemaUtils::toColumn)
+                        .map(column -> toColumn(column, jdbcProperties))
                         .collect(Collectors.toList());
 
         return Schema.newBuilder()
@@ -146,9 +147,11 @@ public class MySqlSchemaUtils {
                 .build();
     }
 
-    public static Column toColumn(io.debezium.relational.Column column) {
+    public static Column toColumn(io.debezium.relational.Column column, Properties jdbcProperties) {
         return Column.physicalColumn(
-                column.name(), MySqlTypeUtils.fromDbzColumn(column), column.comment());
+                column.name(),
+                MySqlTypeUtils.fromDbzColumn(column, jdbcProperties),
+                column.comment());
     }
 
     public static io.debezium.relational.TableId toDbzTableId(TableId tableId) {
