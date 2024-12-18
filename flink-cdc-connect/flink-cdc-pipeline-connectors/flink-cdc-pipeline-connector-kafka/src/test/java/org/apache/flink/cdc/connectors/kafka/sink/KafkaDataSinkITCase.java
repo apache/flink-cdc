@@ -356,7 +356,7 @@ class KafkaDataSinkITCase extends TestLogger {
                                         table1.getTableName())),
                         mapper.readTree(
                                 String.format(
-                                        "{\"old\":[{\"col1\":\"1\",\"newCol3\":\"1\"}],\"data\":null,\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]}",
+                                        "{\"old\":null,\"data\":[{\"col1\":\"1\",\"newCol3\":\"1\"}],\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]}",
                                         table1.getTableName())),
                         mapper.readTree(
                                 String.format(
@@ -449,7 +449,7 @@ class KafkaDataSinkITCase extends TestLogger {
                                                 table1.toString())),
                                 mapper.readTree(
                                         String.format(
-                                                "{\"old\":[{\"col1\":\"1\",\"newCol3\":\"1\"}],\"data\":null,\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]})",
+                                                "{\"old\":null,\"data\":[{\"col1\":\"1\",\"newCol3\":\"1\"}],\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"col1\"]})",
                                                 table1.getTableName()))),
                         Tuple2.of(
                                 mapper.readTree(
