@@ -357,10 +357,71 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
         assertThat(actualSchema).isEqualTo(expectedSchema);
     }
 
+    @Test
+    public void testMysql57AccessJsonTypesSchema() {
+        fullTypesMySql57Database.createAndInitialize();
+
+        String[] tables = new String[] {"json_types"};
+        MySqlMetadataAccessor metadataAccessor =
+                getMetadataAccessor(tables, fullTypesMySql57Database);
+
+        Schema actualSchema =
+                metadataAccessor.getTableSchema(
+                        TableId.tableId(fullTypesMySql57Database.getDatabaseName(), "json_types"));
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .primaryKey("id")
+                        .fromRowDataType(
+                                RowType.of(
+                                        new DataType[] {
+                                            DataTypes.DECIMAL(20, 0).notNull(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.INT()
+                                        },
+                                        new String[] {
+                                            "id", "json_c0", "json_c1", "json_c2", "int_c",
+                                        }))
+                        .build();
+        assertThat(actualSchema).isEqualTo(expectedSchema);
+    }
+
+    @Test
+    public void testMysql8AccessJsonTypesSchema() {
+        fullTypesMySql57Database.createAndInitialize();
+
+        String[] tables = new String[] {"json_types"};
+        MySqlMetadataAccessor metadataAccessor =
+                getMetadataAccessor(tables, fullTypesMySql57Database);
+
+        Schema actualSchema =
+                metadataAccessor.getTableSchema(
+                        TableId.tableId(fullTypesMySql57Database.getDatabaseName(), "json_types"));
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .primaryKey("id")
+                        .fromRowDataType(
+                                RowType.of(
+                                        new DataType[] {
+                                            DataTypes.DECIMAL(20, 0).notNull(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.INT()
+                                        },
+                                        new String[] {
+                                            "id", "json_c0", "json_c1", "json_c2", "int_c",
+                                        }))
+                        .build();
+        assertThat(actualSchema).isEqualTo(expectedSchema);
+    }
+
     private void testAccessDatabaseAndTable(UniqueDatabase database) {
         database.createAndInitialize();
 
-        String[] tables = new String[] {"common_types", "time_types", "precision_types"};
+        String[] tables =
+                new String[] {"common_types", "time_types", "precision_types", "json_types"};
         MySqlMetadataAccessor metadataAccessor = getMetadataAccessor(tables, database);
 
         assertThatThrownBy(metadataAccessor::listNamespaces)
