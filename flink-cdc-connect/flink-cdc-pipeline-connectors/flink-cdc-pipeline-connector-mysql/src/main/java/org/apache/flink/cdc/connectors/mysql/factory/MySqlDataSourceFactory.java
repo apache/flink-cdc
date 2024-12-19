@@ -248,15 +248,24 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         if (StringUtils.isNullOrWhitespaceOnly(metadataList)) {
             return new ArrayList<>();
         }
-        List<String> readableMetadataList =
+        Set<String> readableMetadataList =
                 Arrays.stream(metadataList.split(","))
                         .map(String::trim)
-                        .collect(Collectors.toList());
-        return Arrays.stream(MySqlReadableMetadata.values())
-                .filter(
-                        (mySqlReadableMetadata ->
-                                readableMetadataList.contains(mySqlReadableMetadata.getKey())))
-                .collect(Collectors.toList());
+                        .collect(Collectors.toSet());
+        List<MySqlReadableMetadata> foundMetadata = new ArrayList<>();
+        for (MySqlReadableMetadata metadata : MySqlReadableMetadata.values()) {
+            if (readableMetadataList.contains(metadata.getKey())) {
+                foundMetadata.add(metadata);
+                readableMetadataList.remove(metadata.getKey());
+            }
+        }
+        if (readableMetadataList.isEmpty()) {
+            return foundMetadata;
+        }
+        throw new IllegalArgumentException(
+                String.format(
+                        "[%s] cannot be found in mysql metadata.",
+                        String.join(", ", readableMetadataList)));
     }
 
     @Override
