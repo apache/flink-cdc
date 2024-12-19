@@ -445,8 +445,15 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         // The request will block if another schema change event is being handled
         SchemaChangeResponse response = requestSchemaChange(tableId, schemaChangeEvent);
         if (response.isAccepted()) {
-            LOG.info("{}> Sending the FlushEvent for table {}.", subTaskId, tableId);
-            output.collect(new StreamRecord<>(new FlushEvent(tableId)));
+            TableId sinkTable = response.getSchemaChangeEvents().get(0).tableId();
+            LOG.info("{}> Sending the FlushEvent for table {}.", subTaskId, sinkTable);
+            output.collect(
+                    new StreamRecord<>(
+                            new FlushEvent(
+                                    sinkTable,
+                                    schemaChangeEvent.getType()
+                                            == SchemaChangeEventType.CREATE_TABLE)));
+
             List<SchemaChangeEvent> expectedSchemaChangeEvents = response.getSchemaChangeEvents();
             schemaOperatorMetrics.increaseSchemaChangeEvents(expectedSchemaChangeEvents.size());
 

@@ -112,6 +112,11 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
     // ----------------------------- Helper functions -------------------------------
     private void handleFlushEvent(FlushEvent event) throws Exception {
         userFunction.finish();
+        if (!processedTableIds.contains(event.getTableId()) && !event.getIsForCreateTableEvent()) {
+            LOG.info("Table {} has not been processed", event.getTableId());
+            emitLatestSchema(event.getTableId());
+            processedTableIds.add(event.getTableId());
+        }
         schemaEvolutionClient.notifyFlushSuccess(
                 getRuntimeContext().getIndexOfThisSubtask(), event.getTableId());
     }
