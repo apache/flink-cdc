@@ -62,7 +62,10 @@ public class DorisRowConverterTest {
                         Column.physicalColumn("f19", DataTypes.TIMESTAMP()),
                         Column.physicalColumn("f20", DataTypes.TIMESTAMP_LTZ()),
                         Column.physicalColumn("f21", DataTypes.TIMESTAMP_LTZ()),
-                        Column.physicalColumn("f22", DataTypes.TIMESTAMP_LTZ()));
+                        Column.physicalColumn("f22", DataTypes.TIMESTAMP_LTZ()),
+                        Column.physicalColumn("f23", DataTypes.TIME(0)),
+                        Column.physicalColumn("f24", DataTypes.TIME(3)),
+                        Column.physicalColumn("f24", DataTypes.TIME(6)));
 
         List<DataType> dataTypes =
                 columns.stream().map(v -> v.getType()).collect(Collectors.toList());
@@ -104,6 +107,9 @@ public class DorisRowConverterTest {
                             LocalZonedTimestampData.fromInstant(f20),
                             LocalZonedTimestampData.fromInstant(f21),
                             LocalZonedTimestampData.fromInstant(f22),
+                            3661000,
+                            3661123,
+                            3661123
                         });
         List row = new ArrayList();
         for (int i = 0; i < recordData.getArity(); i++) {
@@ -115,7 +121,7 @@ public class DorisRowConverterTest {
         Assert.assertEquals(
                 "[true, 1.2, 1.2345, 1, 32, 64, 128, 2021-01-01 08:00:00.000000, 2021-01-01, a, doris, 2021-01-01 "
                         + "08:01:11.000000, 2021-01-01 08:01:11.123000, 2021-01-01 08:01:11.123456, 2021-01-01 "
-                        + "16:01:11.000000, 2021-01-01 16:01:11.123000, 2021-01-01 16:01:11.123456]",
+                        + "16:01:11.000000, 2021-01-01 16:01:11.123000, 2021-01-01 16:01:11.123456, 01:01:01, 01:01:01.123, 01:01:01.123]",
                 row.toString());
     }
 }
