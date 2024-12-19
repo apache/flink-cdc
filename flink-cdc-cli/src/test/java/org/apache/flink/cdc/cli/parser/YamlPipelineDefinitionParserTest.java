@@ -159,7 +159,7 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
-    void testInvalidTimeZone() throws Exception {
+    void testInvalidTimeZone() {
         URL resource = Resources.getResource("definitions/pipeline-definition-minimized.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         assertThatThrownBy(
@@ -336,7 +336,8 @@ class YamlPipelineDefinitionParserTest {
                                     "id",
                                     "product_name",
                                     "comment=app order",
-                                    "project fields from source table"),
+                                    "project fields from source table",
+                                    "SOFT_DELETE"),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
@@ -344,7 +345,8 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    "add new uniq_id for each row")),
+                                    "add new uniq_id for each row",
+                                    null)),
                     Collections.emptyList(),
                     Collections.singletonList(
                             new ModelDef(
@@ -402,6 +404,7 @@ class YamlPipelineDefinitionParserTest {
                         + "    partition-keys: product_name\n"
                         + "    table-options: comment=app order\n"
                         + "    description: project fields from source table\n"
+                        + "    converter-after-transform: SOFT_DELETE\n"
                         + "  - source-table: mydb.web_order_.*\n"
                         + "    projection: CONCAT(id, order_id) as uniq_id, *\n"
                         + "    filter: uniq_id > 10\n"
@@ -469,7 +472,8 @@ class YamlPipelineDefinitionParserTest {
                                     "id",
                                     "product_name",
                                     "comment=app order",
-                                    "project fields from source table"),
+                                    "project fields from source table",
+                                    "SOFT_DELETE"),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
@@ -477,7 +481,8 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    "add new uniq_id for each row")),
+                                    "add new uniq_id for each row",
+                                    null)),
                     Collections.emptyList(),
                     Collections.singletonList(
                             new ModelDef(
@@ -606,7 +611,8 @@ class YamlPipelineDefinitionParserTest {
                                     "id",
                                     "product_name",
                                     "comment=app order",
-                                    "project fields from source table"),
+                                    "project fields from source table",
+                                    "SOFT_DELETE"),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
@@ -614,7 +620,8 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    "add new uniq_id for each row")),
+                                    "add new uniq_id for each row",
+                                    null)),
                     Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
@@ -643,6 +650,7 @@ class YamlPipelineDefinitionParserTest {
                                     "mydb.web_order",
                                     "*, inc(inc(inc(id))) as inc_id, format(id, 'id -> %d') as formatted_id",
                                     "inc(id) < 100",
+                                    null,
                                     null,
                                     null,
                                     null,

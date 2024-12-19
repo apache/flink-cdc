@@ -60,7 +60,8 @@ public class TransformTranslator {
                     transform.getFilter().orElse(null),
                     transform.getPrimaryKeys(),
                     transform.getPartitionKeys(),
-                    transform.getTableOptions());
+                    transform.getTableOptions(),
+                    transform.getPostTransformConverter());
         }
 
         preTransformFunctionBuilder.addUdfFunctions(
@@ -91,7 +92,8 @@ public class TransformTranslator {
                         transform.isValidFilter() ? transform.getFilter().get() : null,
                         transform.getPrimaryKeys(),
                         transform.getPartitionKeys(),
-                        transform.getTableOptions());
+                        transform.getTableOptions(),
+                        transform.getPostTransformConverter());
             }
         }
         postTransformFunctionBuilder.addTimezone(timezone);

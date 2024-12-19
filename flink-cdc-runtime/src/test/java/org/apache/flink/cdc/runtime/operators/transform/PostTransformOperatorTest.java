@@ -434,7 +434,8 @@ public class PostTransformOperatorTest {
     void testDataChangeEventTransformProjectionDataTypeConvert() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
-                        .addTransform(DATATYPE_TABLEID.identifier(), "*", null, null, null, null)
+                        .addTransform(
+                                DATATYPE_TABLEID.identifier(), "*", null, null, null, null, null)
                         .build();
         EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -569,6 +570,91 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
+    }
+
+    @Test
+    void testSoftDeleteTransform() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                METADATA_TABLEID.identifier(),
+                                "*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ identifier_name, __namespace_name__, __schema_name__, __table_name__, __data_event_type__",
+                                " __table_name__ = 'metadata_table' ",
+                                "",
+                                "",
+                                "",
+                                "SOFT_DELETE")
+                        .build();
+        EventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        new EventOperatorTestHarness<>(transform, 1);
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("identifier_name", DataTypes.STRING())
+                        .physicalColumn("__namespace_name__", DataTypes.STRING().notNull())
+                        .physicalColumn("__schema_name__", DataTypes.STRING().notNull())
+                        .physicalColumn("__table_name__", DataTypes.STRING().notNull())
+                        .physicalColumn("__data_event_type__", DataTypes.STRING().notNull())
+                        .primaryKey("col1")
+                        .build();
+
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(METADATA_TABLEID, METADATA_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) METADATA_SCHEMA.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) expectedSchema.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        METADATA_TABLEID,
+                        recordDataGenerator.generate(new Object[] {new BinaryStringData("1")}));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        METADATA_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    new BinaryStringData("my_company.my_branch.metadata_table"),
+                                    new BinaryStringData("my_company"),
+                                    new BinaryStringData("my_branch"),
+                                    new BinaryStringData("metadata_table"),
+                                    new BinaryStringData("+I")
+                                }));
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(new CreateTableEvent(METADATA_TABLEID, expectedSchema)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+
+        // Delete
+        DataChangeEvent deleteEvent =
+                DataChangeEvent.deleteEvent(
+                        METADATA_TABLEID,
+                        recordDataGenerator.generate(new Object[] {new BinaryStringData("1")}));
+        DataChangeEvent deleteEventExpect =
+                DataChangeEvent.insertEvent(
+                        METADATA_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    new BinaryStringData("my_company.my_branch.metadata_table"),
+                                    new BinaryStringData("my_company"),
+                                    new BinaryStringData("my_branch"),
+                                    new BinaryStringData("metadata_table"),
+                                    new BinaryStringData("-D")
+                                }));
+        transform.processElement(new StreamRecord<>(deleteEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(deleteEventExpect));
     }
 
     @Test

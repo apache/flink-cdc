@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverter;
 
 import javax.annotation.Nullable;
 
@@ -29,14 +30,17 @@ public class PostTransformer {
 
     private final Optional<TransformProjection> projection;
     private final Optional<TransformFilter> filter;
+    private final Optional<PostTransformConverter> postTransformConverter;
 
     public PostTransformer(
             Selectors selectors,
             @Nullable TransformProjection projection,
-            @Nullable TransformFilter filter) {
+            @Nullable TransformFilter filter,
+            Optional<PostTransformConverter> postTransformConverter) {
         this.selectors = selectors;
         this.projection = projection != null ? Optional.of(projection) : Optional.empty();
         this.filter = filter != null ? Optional.of(filter) : Optional.empty();
+        this.postTransformConverter = postTransformConverter;
     }
 
     public Selectors getSelectors() {
@@ -49,5 +53,9 @@ public class PostTransformer {
 
     public Optional<TransformFilter> getFilter() {
         return filter;
+    }
+
+    public Optional<PostTransformConverter> getPostTransformConverter() {
+        return postTransformConverter;
     }
 }

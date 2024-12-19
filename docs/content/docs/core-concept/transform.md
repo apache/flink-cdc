@@ -31,17 +31,33 @@ What's more, it also helps users filter some unnecessary data during the synchro
 # Parameters
 To describe a transform rule, the following parameters can be used:
 
-| Parameter    | Meaning                                            | Optional/Required |
-|--------------|----------------------------------------------------|-------------------|
-| source-table | Source table id, supports regular expressions      | required          |
-| projection   | Projection rule, supports syntax similar to the select clause in SQL      | optional          |
-| filter       | Filter rule, supports syntax similar to the where clause in SQL      | optional          |
-| primary-keys | Sink table primary keys, separated by commas       | optional          |
-| partition-keys | Sink table partition keys, separated by commas       | optional          |
-| table-options | used to the configure table creation statement when automatically creating tables | optional          |
-| description  | Transform rule description | optional          |
+| Parameter                 | Meaning                                                                           | Optional/Required |
+|---------------------------|-----------------------------------------------------------------------------------|-------------------|
+| source-table              | Source table id, supports regular expressions                                     | required          |
+| projection                | Projection rule, supports syntax similar to the select clause in SQL              | optional          |
+| filter                    | Filter rule, supports syntax similar to the where clause in SQL                   | optional          |
+| primary-keys              | Sink table primary keys, separated by commas                                      | optional          |
+| partition-keys            | Sink table partition keys, separated by commas                                    | optional          |
+| table-options             | used to the configure table creation statement when automatically creating tables | optional          |
+| converter-after-transform | used to add a converter to change DataChangeEvent after transform                 | optional          |
+| description               | Transform rule description                                                        | optional          |
 
 Multiple rules can be declared in one single pipeline YAML file.
+
+## converter-after-transform
+
+`converter-after-transform` is used to change the DataChangeEvent after other transform. The available values of this options are as follows.
+
+- SOFT_DELETE: The delete event will be converted as an insert event. This converter should be used together with the metadata `__data_event_type__`. Then you can implement the soft delete.
+
+For example, the following transform will not delete data when the delete event happens. Instead it will update the column `op_type` to -D in sink and transform it to an insert record.
+
+```yaml
+transform:
+  - source-table: \.*.\.*
+    projection: \*, __data_event_type__ AS op_type
+    converter-after-transform: SOFT_DELETE
+```
 
 # Metadata Fields
 ## Fields definition

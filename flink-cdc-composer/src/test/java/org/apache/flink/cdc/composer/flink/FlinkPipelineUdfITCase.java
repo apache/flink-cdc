@@ -133,7 +133,8 @@ public class FlinkPipelineUdfITCase {
                         "col1",
                         null,
                         "key1=value1",
-                        "");
+                        "",
+                        null);
 
         UdfDef udfDef =
                 new UdfDef(
@@ -203,7 +204,8 @@ public class FlinkPipelineUdfITCase {
                         "col1",
                         null,
                         "key1=value1",
-                        "");
+                        "",
+                        null);
 
         UdfDef udfDef =
                 new UdfDef(
@@ -271,7 +273,8 @@ public class FlinkPipelineUdfITCase {
                         "col1",
                         null,
                         "key1=value1",
-                        "");
+                        "",
+                        null);
 
         UdfDef udfDef =
                 new UdfDef(
@@ -341,7 +344,8 @@ public class FlinkPipelineUdfITCase {
                         "col1",
                         null,
                         "key1=value1",
-                        "");
+                        "",
+                        null);
 
         UdfDef udfDef =
                 new UdfDef(
@@ -413,7 +417,8 @@ public class FlinkPipelineUdfITCase {
                         "col1",
                         null,
                         "key1=value1",
-                        "");
+                        "",
+                        null);
 
         UdfDef udfDef =
                 new UdfDef(
@@ -483,7 +488,8 @@ public class FlinkPipelineUdfITCase {
                         "col1",
                         null,
                         "key1=value1",
-                        "");
+                        "",
+                        null);
 
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
@@ -572,7 +578,8 @@ public class FlinkPipelineUdfITCase {
                         "col1",
                         null,
                         "key1=value1",
-                        "");
+                        "",
+                        null);
 
         UdfDef udfDef =
                 new UdfDef(
@@ -641,7 +648,8 @@ public class FlinkPipelineUdfITCase {
                         "col1",
                         null,
                         "key1=value1",
-                        "");
+                        "",
+                        null);
 
         UdfDef udfDef =
                 new UdfDef(
@@ -708,7 +716,8 @@ public class FlinkPipelineUdfITCase {
                         "col1",
                         null,
                         "key1=value1",
-                        "");
+                        "",
+                        null);
 
         UdfDef udfDef =
                 new UdfDef(
@@ -777,7 +786,8 @@ public class FlinkPipelineUdfITCase {
                         "col1",
                         null,
                         "key1=value1",
-                        "");
+                        "",
+                        null);
 
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
@@ -855,7 +865,8 @@ public class FlinkPipelineUdfITCase {
                         "col1",
                         null,
                         "key1=value1",
-                        "");
+                        "",
+                        null);
 
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
