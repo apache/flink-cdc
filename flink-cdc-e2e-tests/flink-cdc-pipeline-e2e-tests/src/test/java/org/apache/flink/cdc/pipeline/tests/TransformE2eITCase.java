@@ -69,7 +69,8 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
-                                    MySqlVersion.V8_0_18) // v8 support both ARM and AMD architectures
+                                    MySqlVersion
+                                            .V8_0_18) // v8 support both ARM and AMD architectures
                             .withConfigurationOverride("docker/mysql/my.cnf")
                             .withSetupSQL("docker/mysql/setup.sql")
                             .withDatabaseName("flink-test")
@@ -469,13 +470,13 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`identifier_name` STRING,`type` STRING,`opts` BIGINT}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`identifier_name` STRING,`type` STRING NOT NULL,`opts` BIGINT NOT NULL}, primaryKeys=ID, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`identifier_name` STRING,`type` STRING,`opts` BIGINT}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`identifier_name` STRING,`type` STRING NOT NULL,`opts` BIGINT NOT NULL}, primaryKeys=ID, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
