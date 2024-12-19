@@ -70,7 +70,7 @@ jobs:
     strategy:
       matrix:
         parallelism: [ 1, 4 ]
-    name: Pipeline E2E Tests
+    name: Pipeline E2E Tests (${{ matrix.parallelism }}-Parallelism)
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-version: "[8]"
