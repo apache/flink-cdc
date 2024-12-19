@@ -84,12 +84,6 @@ public class DistributedPrePartitionOperator extends AbstractStreamOperator<Part
                     (tId, oldSchema) ->
                             SchemaUtils.applySchemaChangeEvent(oldSchema, schemaChangeEvent));
 
-            // For malformed dangling dropTableEvents, we simply ignore this event to avoid breaking
-            // the pipeline.
-            if (schemaMap.get(tableId) == null) {
-                return;
-            }
-
             // Update hash function
             hashFunctionMap.put(tableId, recreateHashFunction(tableId));
 
