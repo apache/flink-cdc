@@ -41,7 +41,7 @@ import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.PA
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.PROPERTIES_PREFIX;
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_ADD_TABLEID_TO_HEADER_ENABLED;
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_CUSTOM_HEADER;
-import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_TABLE_MAPPING;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_TABLE_ID_TO_TOPIC_MAPPING;
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.TOPIC;
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.VALUE_FORMAT;
 
@@ -93,7 +93,7 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
                 context.getFactoryConfiguration().get(KafkaDataSinkOptions.SINK_CUSTOM_HEADER);
         PartitionStrategy partitionStrategy =
                 context.getFactoryConfiguration().get(KafkaDataSinkOptions.PARTITION_STRATEGY);
-        String tableMapping = context.getFactoryConfiguration().get(SINK_TABLE_MAPPING);
+        String tableMapping = context.getFactoryConfiguration().get(SINK_TABLE_ID_TO_TOPIC_MAPPING);
         return new KafkaDataSink(
                 deliveryGuarantee,
                 kafkaProperties,
@@ -127,7 +127,7 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
         options.add(SINK_ADD_TABLEID_TO_HEADER_ENABLED);
         options.add(SINK_CUSTOM_HEADER);
         options.add(KafkaDataSinkOptions.DELIVERY_GUARANTEE);
-        options.add(SINK_TABLE_MAPPING);
+        options.add(SINK_TABLE_ID_TO_TOPIC_MAPPING);
         return options;
     }
 }

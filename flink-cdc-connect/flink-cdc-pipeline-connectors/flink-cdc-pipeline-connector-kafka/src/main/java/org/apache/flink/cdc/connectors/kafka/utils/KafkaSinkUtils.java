@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.kafka.utils;
 
-import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions;
@@ -25,27 +24,28 @@ import org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.DILIMITER_SELECTOR_TABLEID;
-import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.DILIMITER_TABLE_MAPPINGS;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.DELIMITER_SELECTOR_TOPIC;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.DELIMITER_TABLE_MAPPINGS;
 
 /** Util class for {@link org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSink}. */
 public class KafkaSinkUtils {
 
-    /** Parse the mapping text to a map from Selectors to TableId. */
-    public static Map<Selectors, TableId> parseSelectorsToTableIdMapping(String tableMappings) {
+    /** Parse the mapping text to a map from Selectors to Kafka Topic name. */
+    public static Map<Selectors, String> parseSelectorsToTopicMap(String mappingRuleString) {
         // Keep the order.
-        Map<Selectors, TableId> result = new LinkedHashMap<>();
-        if (tableMappings == null || tableMappings.isEmpty()) {
+        Map<Selectors, String> result = new LinkedHashMap<>();
+        if (mappingRuleString == null || mappingRuleString.isEmpty()) {
             return result;
         }
-        for (String mapping : tableMappings.split(DILIMITER_TABLE_MAPPINGS)) {
-            String[] selectorsAndTableId = mapping.split(DILIMITER_SELECTOR_TABLEID);
+        for (String mapping : mappingRuleString.split(DELIMITER_TABLE_MAPPINGS)) {
+            String[] selectorsAndTopic = mapping.split(DELIMITER_SELECTOR_TOPIC);
             Preconditions.checkArgument(
-                    selectorsAndTableId.length == 2,
-                    "Please check you configuration of " + KafkaDataSinkOptions.SINK_TABLE_MAPPING);
+                    selectorsAndTopic.length == 2,
+                    "Please check you configuration of "
+                            + KafkaDataSinkOptions.SINK_TABLE_ID_TO_TOPIC_MAPPING);
             Selectors selectors =
-                    new Selectors.SelectorsBuilder().includeTables(selectorsAndTableId[0]).build();
-            result.put(selectors, TableId.parse(selectorsAndTableId[1]));
+                    new Selectors.SelectorsBuilder().includeTables(selectorsAndTopic[0]).build();
+            result.put(selectors, selectorsAndTopic[1]);
         }
         return result;
     }

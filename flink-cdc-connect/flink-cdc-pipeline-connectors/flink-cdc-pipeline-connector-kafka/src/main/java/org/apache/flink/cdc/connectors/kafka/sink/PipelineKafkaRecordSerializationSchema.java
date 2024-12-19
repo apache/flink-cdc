@@ -59,9 +59,9 @@ public class PipelineKafkaRecordSerializationSchema
     // key value pairs to be put into Kafka Record Header.
     public final Map<String, String> customHeaders;
 
-    private final String tableMapping;
+    private final String mappingRuleString;
 
-    private Map<Selectors, TableId> tableMappings;
+    private Map<Selectors, String> selectorsToTopicMap;
 
     // A cache to speed up TableId to Topic mapping.
     private Map<TableId, String> tableIdToTopicCache;
@@ -79,7 +79,7 @@ public class PipelineKafkaRecordSerializationSchema
             String unifiedTopic,
             boolean addTableToHeaderEnabled,
             String customHeaderString,
-            String tableMapping) {
+            String mappingRuleString) {
         this.keySerialization = keySerialization;
         this.valueSerialization = checkNotNull(valueSerialization);
         this.unifiedTopic = unifiedTopic;
@@ -100,7 +100,7 @@ public class PipelineKafkaRecordSerializationSchema
             }
         }
         partition = partitionStrategy.equals(PartitionStrategy.ALL_TO_ZERO) ? 0 : null;
-        this.tableMapping = tableMapping;
+        this.mappingRuleString = mappingRuleString;
     }
 
     @Override
@@ -146,10 +146,10 @@ public class PipelineKafkaRecordSerializationSchema
                     if (unifiedTopic != null && !unifiedTopic.isEmpty()) {
                         return unifiedTopic;
                     }
-                    if (tableMappings != null && !tableMappings.isEmpty()) {
-                        for (Map.Entry<Selectors, TableId> entry : tableMappings.entrySet()) {
+                    if (selectorsToTopicMap != null && !selectorsToTopicMap.isEmpty()) {
+                        for (Map.Entry<Selectors, String> entry : selectorsToTopicMap.entrySet()) {
                             if (entry.getKey().isMatch(tableId)) {
-                                return entry.getValue().toString();
+                                return entry.getValue();
                             }
                         }
                     }
@@ -161,7 +161,7 @@ public class PipelineKafkaRecordSerializationSchema
     public void open(
             SerializationSchema.InitializationContext context, KafkaSinkContext sinkContext)
             throws Exception {
-        this.tableMappings = KafkaSinkUtils.parseSelectorsToTableIdMapping(tableMapping);
+        this.selectorsToTopicMap = KafkaSinkUtils.parseSelectorsToTopicMap(mappingRuleString);
         this.tableIdToTopicCache = new HashMap<>();
         valueSerialization.open(context);
     }
