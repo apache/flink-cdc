@@ -36,6 +36,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
@@ -459,6 +460,34 @@ public class TransformParserTest {
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(id)) > 4 OR TYPEOF(id) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
                 "__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)) > 4 || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+    }
+
+    @Test
+    void testLargeNumericalLiterals() {
+        // For literals within [-2147483648, 2147483647] range, plain Integers are OK
+        testFilterExpression("id > 2147483647", "id > 2147483647");
+        testFilterExpression("id < -2147483648", "id < -2147483648");
+
+        // For out-of-range literals, an extra `L` suffix is required
+        testFilterExpression("id > 2147483648", "id > 2147483648L");
+        testFilterExpression("id > -2147483649", "id > -2147483649L");
+        testFilterExpression("id < 9223372036854775807", "id < 9223372036854775807L");
+        testFilterExpression("id > -9223372036854775808", "id > -9223372036854775808L");
+
+        // But there's still a limit
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.translateFilterExpressionToJaninoExpression(
+                                        "id > 9223372036854775808", Collections.emptyList()))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("Numeric literal '9223372036854775808' out of range");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.translateFilterExpressionToJaninoExpression(
+                                        "id < -9223372036854775809", Collections.emptyList()))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("Numeric literal '-9223372036854775809' out of range");
     }
 
     private void testFilterExpression(String expression, String expressionExpect) {
