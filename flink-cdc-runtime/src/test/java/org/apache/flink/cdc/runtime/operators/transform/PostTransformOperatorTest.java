@@ -591,7 +591,8 @@ public class PostTransformOperatorTest {
                                 "",
                                 "",
                                 "",
-                                "SOFT_DELETE")
+                                "SOFT_DELETE",
+                                new SupportedMetadataColumn[0])
                         .build();
         EventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
