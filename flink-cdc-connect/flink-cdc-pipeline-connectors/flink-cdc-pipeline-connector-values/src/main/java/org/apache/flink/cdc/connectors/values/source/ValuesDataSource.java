@@ -34,6 +34,7 @@ import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.source.MetadataAccessor;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.connectors.values.ValuesDatabase;
 import org.apache.flink.core.io.InputStatus;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
@@ -78,6 +79,11 @@ public class ValuesDataSource implements DataSource {
     @Override
     public MetadataAccessor getMetadataAccessor() {
         return new ValuesDatabase.ValuesMetadataAccessor();
+    }
+
+    @Override
+    public SupportedMetadataColumn[] supportedMetadataColumns() {
+        return new SupportedMetadataColumn[] {new OpTsMetadataColumn()};
     }
 
     /**

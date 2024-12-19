@@ -22,8 +22,10 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.connectors.mysql.source.parser.CustomMySqlAntlrDdlParser;
+import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
+import org.apache.flink.table.data.TimestampData;
 
 import com.esri.core.geometry.ogc.OGCGeometry;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,6 +41,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -63,10 +66,20 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private transient Tables tables;
     private transient CustomMySqlAntlrDdlParser customParser;
 
+    private List<MySqlReadableMetadata> readableMetadataList;
+
     public MySqlEventDeserializer(
             DebeziumChangelogMode changelogMode, boolean includeSchemaChanges) {
+        this(changelogMode, includeSchemaChanges, new ArrayList<>());
+    }
+
+    public MySqlEventDeserializer(
+            DebeziumChangelogMode changelogMode,
+            boolean includeSchemaChanges,
+            List<MySqlReadableMetadata> readableMetadataList) {
         super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
+        this.readableMetadataList = readableMetadataList;
     }
 
     @Override
@@ -118,7 +131,19 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
     @Override
     protected Map<String, String> getMetadata(SourceRecord record) {
-        return Collections.emptyMap();
+        Map<String, String> metadataMap = new HashMap<>();
+        readableMetadataList.forEach(
+                (mySqlReadableMetadata -> {
+                    Object metadata = mySqlReadableMetadata.getConverter().read(record);
+                    if (mySqlReadableMetadata.equals(MySqlReadableMetadata.OP_TS)) {
+                        metadataMap.put(
+                                mySqlReadableMetadata.getKey(),
+                                String.valueOf(((TimestampData) metadata).getMillisecond()));
+                    } else {
+                        metadataMap.put(mySqlReadableMetadata.getKey(), String.valueOf(metadata));
+                    }
+                }));
+        return metadataMap;
     }
 
     @Override
