@@ -69,7 +69,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
-                                    MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
+                                    MySqlVersion.V8_0_18) // v8 support both ARM and AMD architectures
                             .withConfigurationOverride("docker/mysql/my.cnf")
                             .withSetupSQL("docker/mysql/setup.sql")
                             .withDatabaseName("flink-test")
@@ -443,7 +443,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
-                                + "  metadata-column.include-list: op_ts\n"
+                                + "  metadata.list: op_ts\n"
                                 + "sink:\n"
                                 + "  type: values\n"
                                 + "transform:\n"
