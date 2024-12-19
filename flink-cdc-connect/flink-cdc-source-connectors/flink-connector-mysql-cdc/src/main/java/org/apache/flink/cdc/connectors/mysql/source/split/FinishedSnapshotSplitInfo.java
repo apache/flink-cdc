@@ -28,13 +28,16 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
 
+import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.compareObjects;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.SerializerUtils.readBinlogPosition;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.SerializerUtils.rowToSerializedString;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.SerializerUtils.serializedStringToRow;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.SerializerUtils.writeBinlogPosition;
 
-/** The information used to describe a finished snapshot split. */
-public class FinishedSnapshotSplitInfo {
+/**
+ * The information used to describe a finished snapshot split.
+ */
+public class FinishedSnapshotSplitInfo implements Comparable<FinishedSnapshotSplitInfo> {
 
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
@@ -153,5 +156,31 @@ public class FinishedSnapshotSplitInfo {
         } catch (IOException e) {
             throw new FlinkRuntimeException(e);
         }
+    }
+
+    /**
+     * Won't call compareTo if there is only one FinishedSnapshotSplitInfo,
+     *
+     * <p>and preconditions guarantee that each FinishedSnapshotSplitInfo will not overlap.
+     */
+    @Override
+    public int compareTo(FinishedSnapshotSplitInfo that) {
+        // that is first split.
+        if (that.splitStart == null) {
+            return 1;
+        }
+        // this is first split.
+        if (this.splitStart == null) {
+            return -1;
+        }
+        // other split.
+        for (int i = 0; i < splitStart.length; i++) {
+            int compareResult = compareObjects(splitStart[i], that.splitStart[i]);
+            if (compareResult != 0) {
+                return compareResult;
+            }
+        }
+        // Actually, preconditions guarantee that the same splitStart will never occur.
+        return 0;
     }
 }

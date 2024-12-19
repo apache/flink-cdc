@@ -450,7 +450,7 @@ public class RecordUtils {
     }
 
     @SuppressWarnings("unchecked")
-    private static int compareObjects(Object o1, Object o2) {
+    public static int compareObjects(Object o1, Object o2) {
         if (o1 instanceof Comparable && o1.getClass().equals(o2.getClass())) {
             return ((Comparable) o1).compareTo(o2);
         } else if (isNumericObject(o1) && isNumericObject(o2)) {
@@ -460,7 +460,7 @@ public class RecordUtils {
         }
     }
 
-    private static boolean isNumericObject(Object obj) {
+    public static boolean isNumericObject(Object obj) {
         return obj instanceof Byte
                 || obj instanceof Short
                 || obj instanceof Integer
