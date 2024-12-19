@@ -30,9 +30,9 @@ public class KafkaDataSinkOptions {
     // Prefix for Kafka specific properties.
     public static final String PROPERTIES_PREFIX = "properties.";
 
-    public static final String DILIMITER_TABLE_MAPPINGS = ";";
+    public static final String DELIMITER_TABLE_MAPPINGS = ";";
 
-    public static final String DILIMITER_SELECTOR_TABLEID = ":";
+    public static final String DELIMITER_SELECTOR_TOPIC = ":";
 
     public static final ConfigOption<DeliveryGuarantee> DELIVERY_GUARANTEE =
             key("sink.delivery-guarantee")
@@ -85,19 +85,19 @@ public class KafkaDataSinkOptions {
                     .withDescription(
                             "custom headers for each kafka record. Each header are separated by ',', separate key and value by ':'. For example, we can set headers like 'key1:value1,key2:value2'.");
 
-    public static final ConfigOption<String> SINK_TABLE_MAPPING =
-            key("sink.table.mapping")
+    public static final ConfigOption<String> SINK_TABLE_ID_TO_TOPIC_MAPPING =
+            key("sink.tableId-to-topic.mapping")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
                             Description.builder()
                                     .text(
                                             "Custom table mappings for each table from upstream tableId to downstream Kafka topic. Each mapping is separated by ")
-                                    .text(DILIMITER_TABLE_MAPPINGS)
+                                    .text(DELIMITER_TABLE_MAPPINGS)
                                     .text(
-                                            ", separate upstream tableId and downstream Kafka topic by ")
-                                    .text(DILIMITER_SELECTOR_TABLEID)
+                                            ", separate upstream tableId selectors and downstream Kafka topic by ")
+                                    .text(DELIMITER_SELECTOR_TOPIC)
                                     .text(
-                                            ". For example, we can set sink.table.mapping like 'mydb.mytable1:topic1;mydb.mytable2:topic2'.")
+                                            ". For example, we can set 'sink.tableId-to-topic.mappingg' like 'mydb.mytable1:topic1;mydb.mytable2:topic2'.")
                                     .build());
 }

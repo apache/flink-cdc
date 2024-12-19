@@ -263,8 +263,7 @@ class KafkaDataSinkITCase extends TestLogger {
 
         final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
                 drainAllRecordsFromTopic(topic, false, 0);
-        final long recordsCount = 5;
-        assertThat(recordsCount).isEqualTo(collectedRecords.size());
+        assertThat(collectedRecords).hasSize(5);
         ObjectMapper mapper =
                 JacksonMapperFactory.createObjectMapper()
                         .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
@@ -561,15 +560,14 @@ class KafkaDataSinkITCase extends TestLogger {
     }
 
     @Test
-    void testSINKTABLEMAPPING() throws Exception {
+    void testSinkTableMapping() throws Exception {
         final StreamExecutionEnvironment env = new LocalStreamEnvironment();
         env.enableCheckpointing(1000L);
         env.setRestartStrategy(RestartStrategies.noRestart());
-        final DataStream<Event> source =
-                env.fromCollection(createSourceEvents(), new EventTypeInfo());
+        final DataStream<Event> source = env.fromData(createSourceEvents(), new EventTypeInfo());
         Map<String, String> config = new HashMap<>();
         config.put(
-                KafkaDataSinkOptions.SINK_TABLE_MAPPING.key(),
+                KafkaDataSinkOptions.SINK_TABLE_ID_TO_TOPIC_MAPPING.key(),
                 "default_namespace.default_schema_copy.\\.*:test_topic_mapping_copy;default_namespace.default_schema.\\.*:test_topic_mapping");
         Properties properties = getKafkaClientConfiguration();
         properties.forEach(
