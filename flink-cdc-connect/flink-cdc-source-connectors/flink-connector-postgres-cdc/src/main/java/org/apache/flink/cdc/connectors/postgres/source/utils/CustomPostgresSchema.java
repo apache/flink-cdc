@@ -17,9 +17,6 @@
 
 package org.apache.flink.cdc.connectors.postgres.source.utils;
 
-import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
-import org.apache.flink.util.FlinkRuntimeException;
-
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.PostgresPartition;
@@ -31,6 +28,8 @@ import io.debezium.relational.history.TableChanges;
 import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.schema.SchemaChangeEvent;
 import io.debezium.util.Clock;
+import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import java.sql.SQLException;
 import java.time.Instant;
@@ -41,7 +40,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** A CustomPostgresSchema similar to PostgresSchema with customization. */
+/**
+ * A CustomPostgresSchema similar to PostgresSchema with customization.
+ */
 public class CustomPostgresSchema {
 
     // cache the schema for each table
@@ -112,7 +113,8 @@ public class CustomPostgresSchema {
                     tables,
                     dbzConfig.databaseName(),
                     null,
-                    dbzConfig.getTableFilters().dataCollectionFilter(),
+                    // only check context tableIds
+                    (tb) -> tableIds.stream().anyMatch(t -> t.schema().equals(tb.schema()) && t.table().equals(tb.table())),
                     null,
                     false);
         } catch (SQLException e) {
