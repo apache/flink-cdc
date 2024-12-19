@@ -100,12 +100,10 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // Build Source Operator
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
-        DataStream<Event> stream =
-                sourceTranslator.translate(
-                        pipelineDef.getSource(), env, pipelineDefConfig, parallelism);
-
         DataSource dataSource =
                 sourceTranslator.createDataSource(pipelineDef.getSource(), env, pipelineDefConfig);
+        DataStream<Event> stream =
+                sourceTranslator.translate(pipelineDef.getSource(), env, parallelism, dataSource);
 
         // Build PreTransformOperator for processing Schema Event
         TransformTranslator transformTranslator = new TransformTranslator();

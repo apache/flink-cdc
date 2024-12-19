@@ -39,14 +39,29 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 @Internal
 public class DataSourceTranslator {
 
+    public DataSource createDataSource(
+            SourceDef sourceDef, StreamExecutionEnvironment env, Configuration pipelineConfig) {
+        // Search the data source factory
+        DataSourceFactory sourceFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier(
+                        sourceDef.getType(), DataSourceFactory.class);
+        // Add source JAR to environment
+        FactoryDiscoveryUtils.getJarPathByIdentifier(sourceFactory)
+                .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
+        DataSource dataSource =
+                sourceFactory.createDataSource(
+                        new FactoryHelper.DefaultContext(
+                                sourceDef.getConfig(),
+                                pipelineConfig,
+                                Thread.currentThread().getContextClassLoader()));
+        return dataSource;
+    }
+
     public DataStreamSource<Event> translate(
             SourceDef sourceDef,
             StreamExecutionEnvironment env,
-            Configuration pipelineConfig,
-            int sourceParallelism) {
-        // Create data source
-        DataSource dataSource = createDataSource(sourceDef, env, pipelineConfig);
-
+            int sourceParallelism,
+            DataSource dataSource) {
         // Get source provider
         EventSourceProvider eventSourceProvider = dataSource.getEventSourceProvider();
         if (eventSourceProvider instanceof FlinkSourceProvider) {
@@ -76,24 +91,6 @@ public class DataSourceTranslator {
                             "Unsupported EventSourceProvider type \"%s\"",
                             eventSourceProvider.getClass().getCanonicalName()));
         }
-    }
-
-    public DataSource createDataSource(
-            SourceDef sourceDef, StreamExecutionEnvironment env, Configuration pipelineConfig) {
-        // Search the data source factory
-        DataSourceFactory sourceFactory =
-                FactoryDiscoveryUtils.getFactoryByIdentifier(
-                        sourceDef.getType(), DataSourceFactory.class);
-        // Add source JAR to environment
-        FactoryDiscoveryUtils.getJarPathByIdentifier(sourceFactory)
-                .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
-        DataSource dataSource =
-                sourceFactory.createDataSource(
-                        new FactoryHelper.DefaultContext(
-                                sourceDef.getConfig(),
-                                pipelineConfig,
-                                Thread.currentThread().getContextClassLoader()));
-        return dataSource;
     }
 
     private String generateDefaultSourceName(SourceDef sourceDef) {

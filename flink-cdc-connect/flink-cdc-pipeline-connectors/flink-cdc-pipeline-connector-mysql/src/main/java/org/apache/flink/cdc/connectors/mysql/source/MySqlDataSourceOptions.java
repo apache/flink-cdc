@@ -280,5 +280,5 @@ public class MySqlDataSourceOptions {
                     .noDefaultValue()
                     .withDescription(
                             "List of readable metadata from SourceRecord to be passed to downstream, split by `,`. "
-                                    + "Refer to MySqlReadableMetadata, available readable metadata are: table_name,database_name,op_ts,row_kind.");
+                                    + "Available readable metadata are: op_ts.");
 }
