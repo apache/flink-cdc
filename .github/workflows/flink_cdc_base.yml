@@ -32,6 +32,11 @@ on:
         description: "Flink CDC module to test against."
         required: true
         type: string
+      parallelism:
+        description: "Flink parallelism."
+        required: false
+        type: number
+        default: 4
       custom-maven-parameter:
         description: "Custom maven parameter."
         required: false
@@ -210,7 +215,7 @@ jobs:
           
           build_maven_parameter="${build_maven_parameter:+$build_maven_parameter }${{ inputs.custom-maven-parameter }}"
           
-          mvn --no-snapshot-updates -B -DskipTests -pl $compile_modules -am install && mvn --no-snapshot-updates -B $build_maven_parameter -pl $modules verify
+          mvn --no-snapshot-updates -B -DskipTests -pl $compile_modules -am install && mvn --no-snapshot-updates -B $build_maven_parameter -pl $modules -DspecifiedParallelism=${{ inputs.parallelism }} verify
 
       - name: Print JVM thread dumps when cancelled
         if: ${{ failure() }}

@@ -60,6 +60,12 @@ public class Schema implements Serializable {
     // Used to index column by name
     private transient volatile Map<String, Column> nameToColumns;
 
+    /**
+     * Schema might be used as a LoadingCache key frequently, and maintaining a cache of hashCode
+     * would be more efficient.
+     */
+    private transient int cachedHashCode;
+
     private Schema(
             List<Column> columns,
             List<String> primaryKeys,
@@ -186,7 +192,10 @@ public class Schema implements Serializable {
 
     @Override
     public int hashCode() {
-        return Objects.hash(columns, primaryKeys, partitionKeys, options, comment);
+        if (cachedHashCode == 0) {
+            cachedHashCode = Objects.hash(columns, primaryKeys, partitionKeys, options, comment);
+        }
+        return cachedHashCode;
     }
 
     // -----------------------------------------------------------------------------------

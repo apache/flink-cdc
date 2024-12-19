@@ -458,7 +458,7 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
 
         stream =
-                schemaOperatorTranslator.translate(
+                schemaOperatorTranslator.translateRegular(
                         stream,
                         DEFAULT_PARALLELISM,
                         dorisSink
