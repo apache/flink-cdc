@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
@@ -99,9 +100,10 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // Build Source Operator
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
+        DataSource dataSource =
+                sourceTranslator.createDataSource(pipelineDef.getSource(), env, pipelineDefConfig);
         DataStream<Event> stream =
-                sourceTranslator.translate(
-                        pipelineDef.getSource(), env, pipelineDefConfig, parallelism);
+                sourceTranslator.translate(pipelineDef.getSource(), env, parallelism, dataSource);
 
         // Build PreTransformOperator for processing Schema Event
         TransformTranslator transformTranslator = new TransformTranslator();
@@ -110,7 +112,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         stream,
                         pipelineDef.getTransforms(),
                         pipelineDef.getUdfs(),
-                        pipelineDef.getModels());
+                        pipelineDef.getModels(),
+                        dataSource.supportedMetadataColumns());
 
         // Schema operator
         SchemaOperatorTranslator schemaOperatorTranslator =
@@ -129,7 +132,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getTransforms(),
                         pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
                         pipelineDef.getUdfs(),
-                        pipelineDef.getModels());
+                        pipelineDef.getModels(),
+                        dataSource.supportedMetadataColumns());
 
         // Build DataSink in advance as schema operator requires MetadataApplier
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();

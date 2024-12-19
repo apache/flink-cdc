@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
 import org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
@@ -32,6 +33,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns.METADATA_COLUMNS;
 
@@ -47,6 +50,7 @@ public class ProjectionColumnProcessor {
     private String timezone;
     private TransformExpressionKey transformExpressionKey;
     private final List<UserDefinedFunctionDescriptor> udfDescriptors;
+    private final SupportedMetadataColumn[] supportedMetadataColumns;
     private final transient List<Object> udfFunctionInstances;
     private transient ExpressionEvaluator expressionEvaluator;
 
@@ -55,11 +59,13 @@ public class ProjectionColumnProcessor {
             ProjectionColumn projectionColumn,
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            final List<Object> udfFunctionInstances) {
+            final List<Object> udfFunctionInstances,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         this.tableInfo = tableInfo;
         this.projectionColumn = projectionColumn;
         this.timezone = timezone;
         this.udfDescriptors = udfDescriptors;
+        this.supportedMetadataColumns = supportedMetadataColumns;
         this.transformExpressionKey = generateTransformExpressionKey();
         this.expressionEvaluator =
                 TransformExpressionCompiler.compileExpression(
@@ -72,18 +78,25 @@ public class ProjectionColumnProcessor {
             ProjectionColumn projectionColumn,
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            List<Object> udfFunctionInstances) {
+            List<Object> udfFunctionInstances,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         return new ProjectionColumnProcessor(
-                tableInfo, projectionColumn, timezone, udfDescriptors, udfFunctionInstances);
+                tableInfo,
+                projectionColumn,
+                timezone,
+                udfDescriptors,
+                udfFunctionInstances,
+                supportedMetadataColumns);
     }
 
     public ProjectionColumn getProjectionColumn() {
         return projectionColumn;
     }
 
-    public Object evaluate(BinaryRecordData record, long epochTime, String opType) {
+    public Object evaluate(
+            BinaryRecordData record, long epochTime, String opType, Map<String, String> meta) {
         try {
-            return expressionEvaluator.evaluate(generateParams(record, epochTime, opType));
+            return expressionEvaluator.evaluate(generateParams(record, epochTime, opType, meta));
         } catch (InvocationTargetException e) {
             LOG.error(
                     "Table:{} column:{} projection:{} execute failed. {}",
@@ -95,7 +108,8 @@ public class ProjectionColumnProcessor {
         }
     }
 
-    private Object[] generateParams(BinaryRecordData record, long epochTime, String opType) {
+    private Object[] generateParams(
+            BinaryRecordData record, long epochTime, String opType, Map<String, String> meta) {
         List<Object> params = new ArrayList<>();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
 
@@ -117,6 +131,18 @@ public class ProjectionColumnProcessor {
                 case MetadataColumns.DEFAULT_DATA_EVENT_TYPE:
                     params.add(opType);
                     continue;
+            }
+
+            boolean foundInMeta = false;
+            for (SupportedMetadataColumn supportedMetadataColumn : supportedMetadataColumns) {
+                if (supportedMetadataColumn.getName().equals(originalColumnName)) {
+                    params.add(supportedMetadataColumn.read(meta));
+                    foundInMeta = true;
+                    break;
+                }
+            }
+            if (foundInMeta) {
+                continue;
             }
 
             boolean argumentFound = false;
@@ -170,6 +196,14 @@ public class ProjectionColumnProcessor {
                             col -> {
                                 argumentNames.add(col.f0);
                                 paramTypes.add(col.f2);
+                            });
+            Stream.of(supportedMetadataColumns)
+                    .filter(col -> col.getName().equals(originalColumnName))
+                    .findFirst()
+                    .ifPresent(
+                            col -> {
+                                argumentNames.add(col.getName());
+                                paramTypes.add(col.getJavaClass());
                             });
         }
 
