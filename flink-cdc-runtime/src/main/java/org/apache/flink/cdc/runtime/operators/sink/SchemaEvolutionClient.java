@@ -19,12 +19,12 @@ package org.apache.flink.cdc.runtime.operators.sink;
 
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.FlushSuccessEvent;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetEvolvedSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetEvolvedSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetOriginalSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetOriginalSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.SinkWriterRegisterEvent;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetOriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetOriginalSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.SinkWriterRegisterEvent;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
@@ -33,7 +33,7 @@ import org.apache.flink.util.SerializedValue;
 import java.io.IOException;
 import java.util.Optional;
 
-import static org.apache.flink.cdc.runtime.operators.schema.common.event.common.CoordinationResponseUtils.unwrap;
+import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.unwrap;
 
 /**
  * Client for {@link DataSinkWriterOperator} interact with Schema Registry (Could be distributed or

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.common.event.common;
+package org.apache.flink.cdc.runtime.operators.schema.common.event;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -26,12 +26,12 @@ import javax.annotation.Nullable;
 
 import java.util.Optional;
 
-/** Coordination response from {@link SchemaRegistry} for {@link GetEvolvedSchemaRequest}. */
+/** Coordination response from {@link SchemaRegistry} for {@link GetOriginalSchemaRequest}. */
 @Internal
-public class GetEvolvedSchemaResponse implements CoordinationResponse {
+public class GetOriginalSchemaResponse implements CoordinationResponse {
     @Nullable private final Schema schema;
 
-    public GetEvolvedSchemaResponse(@Nullable Schema schema) {
+    public GetOriginalSchemaResponse(@Nullable Schema schema) {
         this.schema = schema;
     }
 

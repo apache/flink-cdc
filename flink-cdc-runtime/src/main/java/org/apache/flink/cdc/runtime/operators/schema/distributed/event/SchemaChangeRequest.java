@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.common.event.distributed;
+package org.apache.flink.cdc.runtime.operators.schema.distributed.event;
 
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.runtime.operators.schema.distributed.SchemaCoordinator;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 
-/** Mapper's request to {@link SchemaCoordinator} for merging an incompatible schema. */
+/** Schema operator's request to {@link SchemaCoordinator} for merging an incompatible schema. */
 public class SchemaChangeRequest implements CoordinationRequest {
     // Indicating which source subTask does this schema change event comes from.
     private final int sourceSubTaskId;

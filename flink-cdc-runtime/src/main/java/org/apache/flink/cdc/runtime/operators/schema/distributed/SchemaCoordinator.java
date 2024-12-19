@@ -31,10 +31,10 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaManager;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaRegistry;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.FlushSuccessEvent;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetOriginalSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.distributed.SchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.distributed.SchemaChangeResponse;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetOriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeResponse;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
@@ -65,7 +65,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.cdc.runtime.operators.schema.common.event.common.CoordinationResponseUtils.wrap;
+import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.wrap;
 
 /** Coordinator node for {@link SchemaOperator}. Registry actor in distributed topology. */
 public class SchemaCoordinator extends SchemaRegistry {

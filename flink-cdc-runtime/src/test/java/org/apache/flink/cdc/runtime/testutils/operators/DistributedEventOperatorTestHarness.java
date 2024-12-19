@@ -22,10 +22,10 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.FlushSuccessEvent;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetEvolvedSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetEvolvedSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.SinkWriterRegisterEvent;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.SinkWriterRegisterEvent;
 import org.apache.flink.cdc.runtime.operators.schema.distributed.SchemaCoordinator;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.testutils.schema.CollectingMetadataApplier;
@@ -52,7 +52,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.concurrent.Executors;
 
-import static org.apache.flink.cdc.runtime.operators.schema.common.event.common.CoordinationResponseUtils.unwrap;
+import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.unwrap;
 
 /**
  * Harness for testing customized operators handling {@link Event}s in CDC pipeline.

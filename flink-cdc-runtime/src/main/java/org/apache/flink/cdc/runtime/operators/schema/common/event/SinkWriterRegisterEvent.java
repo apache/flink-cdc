@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.common.event.common;
+package org.apache.flink.cdc.runtime.operators.schema.common.event;
 
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaRegistry;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;

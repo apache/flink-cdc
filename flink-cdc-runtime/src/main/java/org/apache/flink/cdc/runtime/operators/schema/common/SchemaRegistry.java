@@ -24,12 +24,12 @@ import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.FlushSuccessEvent;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetEvolvedSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetEvolvedSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetOriginalSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetOriginalSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.SinkWriterRegisterEvent;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetOriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetOriginalSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.SinkWriterRegisterEvent;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandler;
@@ -55,7 +55,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BooleanSupplier;
 
-import static org.apache.flink.cdc.runtime.operators.schema.common.event.common.CoordinationResponseUtils.wrap;
+import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.wrap;
 
 /**
  * An abstract centralized schema registry that accepts requests from {@link SchemaEvolutionClient}.
@@ -92,7 +92,6 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     // -------------------------
     protected transient int currentParallelism;
     protected transient Set<Integer> activeSinkWriters;
-    protected transient Map<Integer, SubtaskGateway> subtaskGatewayMap;
     protected transient Map<Integer, Throwable> failedReasons;
     protected transient SchemaManager schemaManager;
     protected transient TableIdRouter router;
@@ -122,7 +121,6 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
         LOG.info("Starting SchemaRegistry - {}.", operatorName);
         this.currentParallelism = context.currentParallelism();
         this.activeSinkWriters = ConcurrentHashMap.newKeySet();
-        this.subtaskGatewayMap = new ConcurrentHashMap<>();
         this.failedReasons = new ConcurrentHashMap<>();
         this.schemaManager = new SchemaManager();
         this.router = new TableIdRouter(routingRules);
@@ -277,7 +275,6 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     public final void subtaskReset(int subTaskId, long checkpointId) {
         Throwable rootCause = failedReasons.get(subTaskId);
         LOG.error("Subtask {} reset at checkpoint {}.", subTaskId, checkpointId, rootCause);
-        subtaskGatewayMap.remove(subTaskId);
     }
 
     @Override
@@ -289,7 +286,8 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     @Override
     public final void executionAttemptReady(
             int subTaskId, int attemptNumber, SubtaskGateway gateway) {
-        subtaskGatewayMap.put(subTaskId, gateway);
+        // Needless to do anything. SchemaRegistry does not post message to the coordinator
+        // spontaneously.
     }
 
     // ---------------------------

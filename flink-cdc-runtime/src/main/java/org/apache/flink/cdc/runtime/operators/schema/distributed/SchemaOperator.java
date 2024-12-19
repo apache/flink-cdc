@@ -28,18 +28,16 @@ import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.TableIdRouter;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.CoordinationResponseUtils;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.distributed.SchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.distributed.SchemaChangeResponse;
 import org.apache.flink.cdc.runtime.operators.schema.common.metrics.SchemaOperatorMetrics;
+import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeResponse;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
-import org.apache.flink.runtime.operators.coordination.OperatorEvent;
-import org.apache.flink.runtime.operators.coordination.OperatorEventHandler;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -64,9 +62,7 @@ import java.util.concurrent.TimeUnit;
 
 /** This operator merges upstream inferred schema into a centralized Schema Registry. */
 public class SchemaOperator extends AbstractStreamOperator<Event>
-        implements OneInputStreamOperator<PartitioningEvent, Event>,
-                OperatorEventHandler,
-                Serializable {
+        implements OneInputStreamOperator<PartitioningEvent, Event>, Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(SchemaOperator.class);
 
@@ -190,11 +186,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             throw new IllegalStateException(
                     subTaskId + "> SchemaOperator received an unexpected event: " + event);
         }
-    }
-
-    @Override
-    public void handleOperatorEvent(OperatorEvent event) {
-        throw new IllegalArgumentException("Unexpected operator event: " + event);
     }
 
     private void requestSchemaChange(SchemaChangeRequest schemaChangeRequest) {

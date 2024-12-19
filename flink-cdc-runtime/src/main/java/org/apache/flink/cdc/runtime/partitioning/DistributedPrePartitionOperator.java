@@ -38,10 +38,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Operator for processing events from {@link SchemaOperator} before {@link EventPartitioner} with
- * distributed topology.
- */
+/** Operator for processing events from upstream before flowing to {@link SchemaOperator}. */
 @Internal
 public class DistributedPrePartitionOperator extends AbstractStreamOperator<PartitioningEvent>
         implements OneInputStreamOperator<Event, PartitioningEvent>, Serializable {

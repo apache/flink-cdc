@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.common.event.distributed;
+package org.apache.flink.cdc.runtime.operators.schema.distributed.event;
 
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.runtime.operators.schema.distributed.SchemaCoordinator;
@@ -24,7 +24,7 @@ import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import java.util.List;
 import java.util.Objects;
 
-/** Mapper's request to {@link SchemaCoordinator} for merging an incompatible schema. */
+/** Response from a {@link SchemaCoordinator} to broadcast a coordination consensus. */
 public class SchemaChangeResponse implements CoordinationResponse {
 
     private final List<SchemaChangeEvent> schemaEvolveResult;
