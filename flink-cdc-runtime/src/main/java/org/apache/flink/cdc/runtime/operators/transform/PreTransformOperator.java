@@ -33,6 +33,7 @@ import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.runtime.state.StateInitializationContext;
@@ -454,20 +455,25 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
     private DataChangeEvent processDataChangeEvent(DataChangeEvent dataChangeEvent) {
         if (!transforms.isEmpty()) {
-            PreTransformProcessor preTransformProcessor =
-                    preTransformProcessorMap.get(dataChangeEvent.tableId());
+            TableId tableId = dataChangeEvent.tableId();
+            PreTransformProcessor processor = preTransformProcessorMap.get(tableId);
+            Preconditions.checkArgument(
+                    processor != null,
+                    "Transform operator receives a data change event from table %s without a full schema view. "
+                            + "This might happen if source with distributed tables doesn't emit CreateTableEvent first after fail-over. "
+                            + "This is likely a bug, please consider filing an issue.",
+                    tableId);
+
             BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
             BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
             if (before != null) {
-                BinaryRecordData projectedBefore =
-                        preTransformProcessor.processFillDataField(before);
+                BinaryRecordData projectedBefore = processor.processFillDataField(before);
                 dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
             }
             if (after != null) {
-                BinaryRecordData projectedAfter = preTransformProcessor.processFillDataField(after);
+                BinaryRecordData projectedAfter = processor.processFillDataField(after);
                 dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
             }
-            return dataChangeEvent;
         }
         return dataChangeEvent;
     }
