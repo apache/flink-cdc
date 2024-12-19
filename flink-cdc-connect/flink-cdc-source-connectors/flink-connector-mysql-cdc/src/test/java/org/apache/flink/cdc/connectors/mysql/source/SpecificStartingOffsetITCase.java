@@ -44,17 +44,17 @@ import org.apache.flink.test.junit5.MiniClusterExtension;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.connector.mysql.MySqlConnection;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
-import org.junit.rules.TemporaryFolder;
-import org.locationtech.jts.util.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -74,12 +74,13 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 /** Integration test for validating specifying starting offset. */
-public class SpecificStartingOffsetITCase {
+class SpecificStartingOffsetITCase {
     private static final Logger LOG = LoggerFactory.getLogger(SpecificStartingOffsetITCase.class);
     @RegisterExtension static MiniClusterExtension miniCluster = new MiniClusterExtension();
+
+    private final Path tempDir =
+            Files.createTempDirectory(getResourceFolder().toPath(), "mysql-config");
 
     @SuppressWarnings("unchecked")
     private final MySqlContainer mysql =
@@ -100,6 +101,8 @@ public class SpecificStartingOffsetITCase {
             new TestTable(customDatabase, "customers", TestTableSchemas.CUSTOMERS);
 
     private MySqlConnection connection;
+
+    SpecificStartingOffsetITCase() throws IOException {}
 
     @BeforeEach
     void prepare() throws Exception {
@@ -151,7 +154,7 @@ public class SpecificStartingOffsetITCase {
         JobClient jobClient = env.executeAsync();
         iterator.setJobClient(jobClient);
         List<String> rows = fetchRowData(iterator, 3, customers::stringify);
-        assertThat(rows)
+        Assertions.assertThat(rows)
                 .containsExactly(
                         "+I[15213, Alice, Rome, 123456987]",
                         "+I[15513, Bob, Milan, 123456987]",
@@ -177,7 +180,7 @@ public class SpecificStartingOffsetITCase {
         JobClient restoredJobClient = restoredEnv.executeAsync();
         iterator.setJobClient(restoredJobClient);
         List<String> rowsAfterRestored = fetchRowData(iterator, 2, customers::stringify);
-        assertThat(rowsAfterRestored)
+        Assertions.assertThat(rowsAfterRestored)
                 .containsExactly(
                         "-U[15213, Alice, Rome, 123456987]", "+U[15213, Alicia, Rome, 123456987]");
 
@@ -226,7 +229,7 @@ public class SpecificStartingOffsetITCase {
         JobClient jobClient = env.executeAsync();
         iterator.setJobClient(jobClient);
         List<String> rows = fetchRowData(iterator, 3, customers::stringify);
-        assertThat(rows)
+        Assertions.assertThat(rows)
                 .containsExactly(
                         "+I[15213, Alice, Rome, 123456987]",
                         "+I[15513, Bob, Milan, 123456987]",
@@ -252,7 +255,7 @@ public class SpecificStartingOffsetITCase {
         JobClient restoredJobClient = restoredEnv.executeAsync("snapshotSplitTest");
         iterator.setJobClient(restoredJobClient);
         List<String> rowsAfterRestored = fetchRowData(iterator, 2, customers::stringify);
-        assertThat(rowsAfterRestored)
+        Assertions.assertThat(rowsAfterRestored)
                 .containsExactly(
                         "-U[15213, Alice, Rome, 123456987]", "+U[15213, Alicia, Rome, 123456987]");
 
@@ -266,10 +269,10 @@ public class SpecificStartingOffsetITCase {
 
         long t0 = System.currentTimeMillis();
         String servedId0 = "5400";
-        Assert.equals(
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000004", 0),
-                DebeziumUtils.findBinlogOffset(
-                        t0, connection, getMySqlSourceConfig(t0, servedId0)));
+        Assertions.assertThat(
+                        DebeziumUtils.findBinlogOffset(
+                                t0, connection, getMySqlSourceConfig(t0, servedId0)))
+                .isEqualTo(BinlogOffset.ofBinlogFilePosition("mysql-bin.000004", 0));
 
         executeStatements(
                 String.format(
@@ -316,32 +319,36 @@ public class SpecificStartingOffsetITCase {
         String servedId5 = "5405";
         flushLogs();
 
-        Assert.equals(
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000005", 0),
-                DebeziumUtils.findBinlogOffset(
-                        t1, connection, getMySqlSourceConfig(t1, servedId1)));
-        Assert.equals(
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000006", 0),
-                DebeziumUtils.findBinlogOffset(
-                        t2, connection, getMySqlSourceConfig(t1, servedId2)));
-        Assert.equals(
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000007", 0),
-                DebeziumUtils.findBinlogOffset(
-                        t3, connection, getMySqlSourceConfig(t1, servedId3)));
-        Assert.equals(
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000008", 0),
-                DebeziumUtils.findBinlogOffset(
-                        t4, connection, getMySqlSourceConfig(t1, servedId4)));
-        Assert.equals(
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000009", 0),
-                DebeziumUtils.findBinlogOffset(
-                        t5, connection, getMySqlSourceConfig(t1, servedId5)));
+        Assertions.assertThat(
+                        DebeziumUtils.findBinlogOffset(
+                                t1, connection, getMySqlSourceConfig(t1, servedId1)))
+                .isEqualTo(BinlogOffset.ofBinlogFilePosition("mysql-bin.000005", 0));
+
+        Assertions.assertThat(
+                        DebeziumUtils.findBinlogOffset(
+                                t2, connection, getMySqlSourceConfig(t1, servedId2)))
+                .isEqualTo(BinlogOffset.ofBinlogFilePosition("mysql-bin.000006", 0));
+
+        Assertions.assertThat(
+                        DebeziumUtils.findBinlogOffset(
+                                t3, connection, getMySqlSourceConfig(t1, servedId3)))
+                .isEqualTo(BinlogOffset.ofBinlogFilePosition("mysql-bin.000007", 0));
+
+        Assertions.assertThat(
+                        DebeziumUtils.findBinlogOffset(
+                                t4, connection, getMySqlSourceConfig(t1, servedId4)))
+                .isEqualTo(BinlogOffset.ofBinlogFilePosition("mysql-bin.000008", 0));
+
+        Assertions.assertThat(
+                        DebeziumUtils.findBinlogOffset(
+                                t5, connection, getMySqlSourceConfig(t1, servedId5)))
+                .isEqualTo(BinlogOffset.ofBinlogFilePosition("mysql-bin.000009", 0));
 
         purgeBinaryLogs();
-        Assert.equals(
-                BinlogOffset.ofBinlogFilePosition("mysql-bin.000009", 0),
-                DebeziumUtils.findBinlogOffset(
-                        t5, connection, getMySqlSourceConfig(t1, servedId5)));
+        Assertions.assertThat(
+                        DebeziumUtils.findBinlogOffset(
+                                t5, connection, getMySqlSourceConfig(t1, servedId5)))
+                .isEqualTo(BinlogOffset.ofBinlogFilePosition("mysql-bin.000009", 0));
     }
 
     @Test
@@ -399,7 +406,7 @@ public class SpecificStartingOffsetITCase {
         JobClient jobClient = env.executeAsync();
         iterator.setJobClient(jobClient);
         List<String> rows = fetchRowData(iterator, 3, customers::stringify);
-        assertThat(rows)
+        Assertions.assertThat(rows)
                 .containsExactly(
                         "+I[19613, Tom, NewYork, 123456987]",
                         "+I[20913, Cat, Washington, 123456987]",
@@ -425,7 +432,7 @@ public class SpecificStartingOffsetITCase {
         JobClient restoredJobClient = restoredEnv.executeAsync("snapshotSplitTest");
         iterator.setJobClient(restoredJobClient);
         List<String> rowsAfterRestored = fetchRowData(iterator, 2, customers::stringify);
-        assertThat(rowsAfterRestored)
+        Assertions.assertThat(rowsAfterRestored)
                 .containsExactly(
                         "-U[18213, Charlie, Paris, 123456987]",
                         "+U[18213, George, Paris, 123456987]");
@@ -511,12 +518,9 @@ public class SpecificStartingOffsetITCase {
         return rows.stream().map(stringifier).collect(Collectors.toList());
     }
 
-    private static String buildMySqlConfigWithTimezone(File resourceDirectory, String timezone) {
+    private String buildMySqlConfigWithTimezone(File resourceDirectory, String timezone) {
         try {
-            TemporaryFolder tempFolder = new TemporaryFolder(resourceDirectory);
-            tempFolder.create();
-            File folder = tempFolder.newFolder(String.valueOf(UUID.randomUUID()));
-            Path cnf = Files.createFile(Paths.get(folder.getPath(), "my.cnf"));
+            Path cnf = Files.createFile(Paths.get(tempDir.toString(), "my.cnf"));
             String mysqldConf =
                     "[mysqld]\n"
                             + "binlog_format = row\n"

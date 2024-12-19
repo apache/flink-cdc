@@ -38,7 +38,7 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 
 /** Unit tests for the {@link PreTransformOperator}. */
-public class PreTransformOperatorTest {
+class PreTransformOperatorTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
     private static final Schema CUSTOMERS_SCHEMA =
@@ -293,7 +293,7 @@ public class PreTransformOperatorTest {
     }
 
     @Test
-    public void testNullabilityColumn() throws Exception {
+    void testNullabilityColumn() throws Exception {
         PreTransformOperator transform =
                 PreTransformOperator.newBuilder()
                         .addTransform(
@@ -324,7 +324,7 @@ public class PreTransformOperatorTest {
     }
 
     @Test
-    public void testReduceTransformColumn() throws Exception {
+    void testReduceTransformColumn() throws Exception {
         PreTransformOperator transform =
                 PreTransformOperator.newBuilder()
                         .addTransform(
@@ -432,7 +432,7 @@ public class PreTransformOperatorTest {
     }
 
     @Test
-    public void testWildcardTransformColumn() throws Exception {
+    void testWildcardTransformColumn() throws Exception {
         PreTransformOperator transform =
                 PreTransformOperator.newBuilder()
                         .addTransform(

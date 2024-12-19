@@ -36,7 +36,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /** Tests for {@link ElasticsearchDataSinkFactory}. */
-public class ElasticsearchDataSinkFactoryTest {
+class ElasticsearchDataSinkFactoryTest {
 
     private static final String ELASTICSEARCH_IDENTIFIER = "elasticsearch";
 
@@ -57,18 +57,11 @@ public class ElasticsearchDataSinkFactoryTest {
         DataSinkFactory sinkFactory = getElasticsearchDataSinkFactory();
         List<String> requiredKeys = getRequiredKeys(sinkFactory);
         for (String requiredKey : requiredKeys) {
-            // 创建一个新的配置 Map，包含所有必需选项
             Map<String, String> options = new HashMap<>(createValidOptions());
-            // 移除当前正在测试的必需选项
             options.remove(requiredKey);
             Configuration conf = Configuration.fromMap(options);
-            // 打印日志以确保我们在测试缺少必需选项的情况
-            System.out.println("Testing missing required option: " + requiredKey);
 
-            // 添加创建 DataSink 对象的代码
             Assertions.assertThatThrownBy(() -> createDataSink(sinkFactory, conf))
-
-                    // Assertions to check for missing required option
                     .isInstanceOf(ValidationException.class)
                     .hasMessageContaining(
                             String.format(
@@ -91,11 +84,8 @@ public class ElasticsearchDataSinkFactoryTest {
                                 .put("version", "7")
                                 .put("unsupported_key", "unsupported_value")
                                 .build());
-
-        // 打印日志以确保我们在测试不受支持的选项
         System.out.println("Testing unsupported option");
 
-        // Assertions to check for unsupported options
         Assertions.assertThatThrownBy(() -> createDataSink(sinkFactory, conf))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining(
@@ -120,9 +110,6 @@ public class ElasticsearchDataSinkFactoryTest {
                                 .put("inflight.requests.max", "5")
                                 .put("version", "7") // Added version to the test configuration
                                 .build());
-
-        // 打印日志以确保我们在测试带前缀的必需选项
-        System.out.println("Testing prefixed required option");
 
         DataSink dataSink = createDataSink(sinkFactory, conf);
         Assertions.assertThat(dataSink).isInstanceOf(ElasticsearchDataSink.class);

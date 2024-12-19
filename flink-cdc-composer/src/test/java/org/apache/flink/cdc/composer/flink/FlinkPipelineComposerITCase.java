@@ -338,7 +338,7 @@ class FlinkPipelineComposerITCase {
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
-                        new ArrayList<>(Arrays.asList(transformDef)),
+                        new ArrayList<>(Collections.singletonList(transformDef)),
                         Collections.emptyList(),
                         pipelineConfig);
 

@@ -24,7 +24,7 @@ import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 import java.util.Arrays;
 
 /** A test for the {@link StringDataSerializer}. */
-public class StringDataSerializerTest extends SerializerTestBase<StringData> {
+class StringDataSerializerTest extends SerializerTestBase<StringData> {
 
     @Override
     protected StringDataSerializer createSerializer() {

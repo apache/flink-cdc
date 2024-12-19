@@ -27,7 +27,7 @@ import java.util.Arrays;
 import java.util.stream.Stream;
 
 /** A test for the {@link EventSerializer}. */
-public class EventSerializerTest extends SerializerTestBase<Event> {
+class EventSerializerTest extends SerializerTestBase<Event> {
     @Override
     protected TypeSerializer<Event> createSerializer() {
         return EventSerializer.INSTANCE;
