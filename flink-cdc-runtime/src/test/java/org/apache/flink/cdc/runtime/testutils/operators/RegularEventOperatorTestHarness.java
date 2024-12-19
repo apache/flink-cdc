@@ -24,12 +24,12 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.FlushSuccessEvent;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetEvolvedSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetEvolvedSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetOriginalSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.GetOriginalSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.SinkWriterRegisterEvent;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetOriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetOriginalSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.SinkWriterRegisterEvent;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaCoordinator;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.testutils.schema.CollectingMetadataApplier;
@@ -60,7 +60,7 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.cdc.runtime.operators.schema.common.event.common.CoordinationResponseUtils.unwrap;
+import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.unwrap;
 
 /**
  * Harness for testing customized operators handling {@link Event}s in CDC pipeline.

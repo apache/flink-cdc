@@ -25,12 +25,9 @@ import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
-import org.apache.flink.runtime.operators.coordination.OperatorEventDispatcher;
 import org.apache.flink.streaming.api.operators.CoordinatedOperatorFactory;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
-import org.apache.flink.streaming.api.operators.StreamOperator;
-import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 
 import java.time.Duration;
 import java.util.List;
@@ -58,17 +55,6 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
         this.routingRules = routingRules;
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.rpcTimeout = rpcTimeout;
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T extends StreamOperator<Event>> T createStreamOperator(
-            StreamOperatorParameters<Event> parameters) {
-        SchemaOperator mapper = super.createStreamOperator(parameters);
-        final OperatorID operatorId = parameters.getStreamConfig().getOperatorID();
-        final OperatorEventDispatcher eventDispatcher = parameters.getOperatorEventDispatcher();
-        eventDispatcher.registerEventHandler(operatorId, mapper);
-        return (T) mapper;
     }
 
     @Override

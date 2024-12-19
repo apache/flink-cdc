@@ -32,9 +32,9 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaManager;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaRegistry;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.common.FlushSuccessEvent;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.regular.SchemaChangeRequest;
-import org.apache.flink.cdc.runtime.operators.schema.common.event.regular.SchemaChangeResponse;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
+import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeResponse;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
@@ -64,7 +64,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.cdc.runtime.operators.schema.common.event.common.CoordinationResponseUtils.wrap;
+import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.wrap;
 
 /** Coordinator node for {@link SchemaOperator}. Registry actor in regular topology. */
 public class SchemaCoordinator extends SchemaRegistry {
