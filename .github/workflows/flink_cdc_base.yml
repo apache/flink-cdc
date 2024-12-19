@@ -19,14 +19,15 @@ on:
   workflow_call:
     inputs:
       java-version:
-        description: "Jdk version to test against."
+        description: "Jdk versions to test against."
         required: false
         type: string
-        default: "8"
+        default: "['8']"
       flink-version:
-        description: "Flink version to test against."
+        description: "Flink versions to test against."
         required: false
         type: string
+        default: "['generic']"
       module:
         description: "Flink CDC module to test against."
         required: true
@@ -99,9 +100,12 @@ jobs:
   compile_and_test:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    strategy:
+      matrix:
+        java-version: ${{ fromJSON(inputs.java-version) }}
+        flink-version: ${{ fromJSON(inputs.flink-version) }}
     steps:
-      - run: echo "Running CI pipeline for JDK version ${{ inputs.java-version }}"
-
+      - run: echo "Running CI pipeline for JDK version ${{ matrix.java-version }}"
       - name: Clean up disk space
         run: |
           set -euo pipefail
@@ -127,7 +131,7 @@ jobs:
       - name: Set JDK
         uses: actions/setup-java@v4
         with:
-          java-version: ${{ inputs.java-version }}
+          java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
           cache: 'maven'
 
@@ -200,8 +204,8 @@ jobs:
             build_maven_parameter="-DspecifiedMongoVersion=7.0.12"
           fi
           
-          if [ ! -z "${{ inputs.flink-version }}" ]; then
-            build_maven_parameter="${build_maven_parameter:+$build_maven_parameter }-DspecifiedFlinkVersion=${{ inputs.flink-version }}"
+          if [ ! -z "${{ matrix.flink-version }}" ]; then
+            build_maven_parameter="${build_maven_parameter:+$build_maven_parameter }-DspecifiedFlinkVersion=${{ matrix.flink-version }}"
           fi
           
           build_maven_parameter="${build_maven_parameter:+$build_maven_parameter }${{ inputs.custom-maven-parameter }}"

@@ -17,10 +17,24 @@ name: Migration Tests
 
 on:
   workflow_call:
+    inputs:
+      java-version:
+        description: "Jdk versions to test against, passed as a JSON array string."
+        required: false
+        type: string
+        default: "['8']"
+      flink-version:
+        description: "Flink versions to test against, passed as a JSON array string."
+        required: true
+        type: string
 
 jobs:
   migration_test_ut:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: ${{ fromJSON(inputs.java-version) }}
+        flink-version: ${{ fromJSON(inputs.flink-version) }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -28,7 +42,7 @@ jobs:
           submodules: true
       - uses: actions/setup-java@v4
         with:
-          java-version: 8
+          java-version: ${{ matrix.java-version }}
           distribution: temurin
       - name: Compile snapshot CDC version
         run: mvn --no-snapshot-updates -B install -DskipTests
@@ -39,8 +53,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        flink-version: [ '1.19.1', '1.20.0' ]
-
+        java-version: ${{ fromJSON(inputs.java-version) }}
+        flink-version: ${{ fromJSON(inputs.flink-version) }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Ruby
@@ -50,7 +64,7 @@ jobs:
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
       - uses: actions/setup-java@v4
         with:
-          java-version: 8
+          java-version: ${{ matrix.java-version }}
           distribution: temurin
           cache: maven
       - name: Install dependencies
@@ -78,6 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        java-version: ${{ fromJSON(inputs.java-version) }}
         flink-version: [ '1.19.1', '1.20.0' ]
 
     steps:
@@ -89,7 +104,7 @@ jobs:
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
       - uses: actions/setup-java@v4
         with:
-          java-version: 8
+          java-version: ${{ matrix.java-version }}
           distribution: temurin
           cache: maven
       - name: Install dependencies

@@ -13,22 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Flink CDC CI
+name: Flink CDC CI Nightly
 on:
-  push:
-    branches:
-      - master
-      - release-*
-    paths-ignore:
-      - 'docs/**'
-      - 'README.md'
-  pull_request:
-    branches:
-      - master
-      - release-*
-    paths-ignore:
-      - 'docs/**'
-      - 'README.md'
+  schedule:
+    - cron: '0 0 * * *' # Deploy every day
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.number || github.run_id }}
@@ -50,7 +39,7 @@ jobs:
       - name: Set JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '8'
+          java-version: '11'
           distribution: 'temurin'
           cache: 'maven'
       - name: Compiling jar packages
@@ -60,37 +49,29 @@ jobs:
   ut:
     strategy:
       matrix:
-        java-version: [ '8' ]
         module: [ 'core', 'pipeline_connectors', 'mysql', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase', 'db2', 'vitess' ]
     name: Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-version: ${{ matrix.java-version }}
+      java-version: "[11]"
       module: ${{ matrix.module }}
   pipeline_e2e:
-    strategy:
-      matrix:
-        java-version: [ '8' ]
-        flink-version: ['1.19.1', '1.20.0']
-        module: [ 'pipeline_e2e' ]
     name: Pipeline E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-version: ${{ matrix.java-version }}
-      flink-version: ${{ matrix.flink-version }}
-      module: ${{ matrix.module }}
+      java-version: "[11]"
+      flink-version: "['1.19.1', '1.20.0']"
+      module: pipeline_e2e
   source_e2e:
-    strategy:
-      matrix:
-        java-version: [ '8' ]
-        flink-version: ['1.19.1', '1.20.0']
-        module: [ 'source_e2e' ]
     name: Source E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-version: ${{ matrix.java-version }}
-      flink-version: ${{ matrix.flink-version }}
-      module: ${{ matrix.module }}
+      java-version: "[11]"
+      flink-version: "['1.19.1', '1.20.0']"
+      module: source_e2e
   migration_test:
     name: Migration Tests
-    uses: ./.github/workflows/flink_cdc_migration_test.yml
+    uses: ./.github/workflows/flink_cdc_migration_test_base.yml
+    with:
+      java-version: "[11]"
+      flink-version: "['1.19.1', '1.20.0']"
