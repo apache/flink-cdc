@@ -57,9 +57,9 @@ import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.Lists;
 
 import java.nio.file.Files;
@@ -101,13 +101,13 @@ import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtil
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests to cover various newly added tables during capture process in pipeline mode. */
-public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
+class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
     private final ScheduledExecutorService mockBinlogExecutor = Executors.newScheduledThreadPool(1);
 
-    @Before
+    @BeforeEach
     public void before() throws SQLException {
         TestValuesTableFactory.clearAllData();
         customDatabase.createAndInitialize();
@@ -138,7 +138,7 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
         }
     }
 
-    @After
+    @AfterEach
     public void after() {
         mockBinlogExecutor.shutdown();
     }
@@ -156,7 +156,7 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testScanBinlogNewlyAddedTableEnabled() throws Exception {
+    void testScanBinlogNewlyAddedTableEnabled() throws Exception {
         List<String> tables = Collections.singletonList("address_\\.*");
         Map<String, String> options = new HashMap<>();
         options.put(SCAN_STARTUP_MODE.key(), "timestamp");
@@ -197,7 +197,7 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testScanBinlogNewlyAddedTableEnabledAndExcludeTables() throws Exception {
+    void testScanBinlogNewlyAddedTableEnabledAndExcludeTables() throws Exception {
         List<String> tables = Collections.singletonList("address_\\.*");
         Map<String, String> options = new HashMap<>();
         options.put(TABLES_EXCLUDE.key(), customDatabase.getDatabaseName() + ".address_beijing");
@@ -238,7 +238,7 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testAddNewTableOneByOneSingleParallelism() throws Exception {
+    void testAddNewTableOneByOneSingleParallelism() throws Exception {
         TestParam testParam =
                 TestParam.newBuilder(
                                 Collections.singletonList("address_hangzhou"),
@@ -253,7 +253,7 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testAddNewTableOneByOne() throws Exception {
+    void testAddNewTableOneByOne() throws Exception {
         TestParam testParam =
                 TestParam.newBuilder(
                                 Collections.singletonList("address_hangzhou"),
@@ -268,7 +268,7 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testAddNewTableByPatternSingleParallelism() throws Exception {
+    void testAddNewTableByPatternSingleParallelism() throws Exception {
         TestParam testParam =
                 TestParam.newBuilder(
                                 Collections.singletonList("address_\\.*"),
@@ -285,7 +285,7 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testAddNewTableByPattern() throws Exception {
+    void testAddNewTableByPattern() throws Exception {
         TestParam testParam =
                 TestParam.newBuilder(
                                 Collections.singletonList("address_\\.*"),

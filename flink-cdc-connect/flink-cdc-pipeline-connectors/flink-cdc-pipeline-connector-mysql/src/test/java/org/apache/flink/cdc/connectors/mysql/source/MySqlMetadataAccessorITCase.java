@@ -32,10 +32,10 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.lifecycle.Startables;
 
 import java.time.ZoneId;
@@ -48,7 +48,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** IT cases for {@link MySqlMetadataAccessor}. */
-public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
+class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
 
     private static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
@@ -70,21 +70,21 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() {
         LOG.info("Starting MySql8 containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         LOG.info("Container MySql8 is started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterClass() {
         LOG.info("Stopping MySql8 containers...");
         MYSQL8_CONTAINER.stop();
         LOG.info("Container MySql8 is stopped.");
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(200);
@@ -92,27 +92,27 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57AccessDatabaseAndTable() {
+    void testMysql57AccessDatabaseAndTable() {
         testAccessDatabaseAndTable(fullTypesMySql57Database);
     }
 
     @Test
-    public void testMysql8AccessDatabaseAndTable() {
+    void testMysql8AccessDatabaseAndTable() {
         testAccessDatabaseAndTable(fullTypesMySql8Database);
     }
 
     @Test
-    public void testMysql57AccessCommonTypesSchema() {
+    void testMysql57AccessCommonTypesSchema() {
         testAccessCommonTypesSchema(fullTypesMySql57Database);
     }
 
     @Test
-    public void testMysql8AccessCommonTypesSchema() {
+    void testMysql8AccessCommonTypesSchema() {
         testAccessCommonTypesSchema(fullTypesMySql8Database);
     }
 
     @Test
-    public void testMysql57AccessTimeTypesSchema() {
+    void testMysql57AccessTimeTypesSchema() {
         fullTypesMySql57Database.createAndInitialize();
 
         String[] tables = new String[] {"time_types"};
@@ -158,7 +158,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql8AccessTimeTypesSchema() {
+    void testMysql8AccessTimeTypesSchema() {
         fullTypesMySql8Database.createAndInitialize();
 
         String[] tables = new String[] {"time_types"};
@@ -208,7 +208,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57PrecisionTypesSchema() {
+    void testMysql57PrecisionTypesSchema() {
         fullTypesMySql57Database.createAndInitialize();
 
         String[] tables = new String[] {"precision_types"};
@@ -283,7 +283,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql8PrecisionTypesSchema() {
+    void testMysql8PrecisionTypesSchema() {
         fullTypesMySql8Database.createAndInitialize();
 
         String[] tables = new String[] {"precision_types"};

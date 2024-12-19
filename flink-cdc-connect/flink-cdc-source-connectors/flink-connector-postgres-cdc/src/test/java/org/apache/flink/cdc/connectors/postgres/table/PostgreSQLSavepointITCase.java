@@ -29,11 +29,13 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.lang.reflect.Field;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.Arrays;
@@ -41,28 +43,27 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertThat;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Integration tests for PostgreSQL to start from a savepoint. */
-public class PostgreSQLSavepointITCase extends PostgresTestBase {
-    @Before
+class PostgreSQLSavepointITCase extends PostgresTestBase {
+
+    @TempDir private Path tempDir;
+
+    @BeforeEach
     public void before() {
         TestValuesTableFactory.clearAllData();
     }
 
     @Test
-    public void testSavepoint() throws Exception {
+    void testSavepoint() throws Exception {
         testRestartFromSavepoint();
     }
 
     private void testRestartFromSavepoint() throws Exception {
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
 
-        final TemporaryFolder temporaryFolder = new TemporaryFolder();
-        temporaryFolder.create();
-        final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
+        final String savepointDirectory = tempDir.toString();
         String finishedSavePointPath = null;
 
         StreamExecutionEnvironment env = getStreamExecutionEnvironment(finishedSavePointPath, 4);
@@ -180,10 +181,9 @@ public class PostgreSQLSavepointITCase extends PostgresTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         jobClient.cancel().get();
-        temporaryFolder.delete();
     }
 
     private StreamExecutionEnvironment getStreamExecutionEnvironment(

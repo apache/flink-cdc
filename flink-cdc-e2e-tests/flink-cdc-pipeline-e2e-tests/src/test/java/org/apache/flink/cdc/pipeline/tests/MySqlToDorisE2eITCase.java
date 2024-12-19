@@ -24,18 +24,16 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
+import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.lifecycle.Startables;
 
 import java.nio.file.Path;
@@ -50,16 +48,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 /** End-to-end tests for mysql cdc to Doris pipeline job. */
-@RunWith(Parameterized.class)
-public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
+class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToDorisE2eITCase.class);
 
     // ------------------------------------------------------------------------------------------
@@ -71,7 +63,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     public static final int DEFAULT_STARTUP_TIMEOUT_SECONDS = 240;
     public static final int TESTCASE_TIMEOUT_SECONDS = 60;
 
-    @ClassRule
+    @Container
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
@@ -85,7 +77,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                             .withNetworkAliases("mysql")
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @ClassRule
+    @Container
     public static final DorisContainer DORIS =
             new DorisContainer(NETWORK)
                     .withNetworkAliases("doris")
@@ -97,7 +89,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     protected final UniqueDatabase complexDataTypesDatabase =
             new UniqueDatabase(MYSQL, "data_types_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
-    @BeforeClass
+    @BeforeAll
     public static void initializeContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL)).join();
@@ -127,7 +119,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
         LOG.info("Containers are started.");
     }
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         super.before();
         mysqlInventoryDatabase.createAndInitialize();
@@ -139,7 +131,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
     private static boolean checkBackendAvailability() {
         try {
-            Container.ExecResult rs =
+            org.testcontainers.containers.Container.ExecResult rs =
                     DORIS.execInContainer(
                             "mysql",
                             "--protocol=TCP",
@@ -161,7 +153,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
         }
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         mysqlInventoryDatabase.dropDatabase();
@@ -172,7 +164,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testSyncWholeDatabase() throws Exception {
+    void testSyncWholeDatabase() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -299,7 +291,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testComplexDataTypes() throws Exception {
+    void testComplexDataTypes() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -398,7 +390,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
     public static void createDorisDatabase(String databaseName) {
         try {
-            Container.ExecResult rs =
+            org.testcontainers.containers.Container.ExecResult rs =
                     DORIS.execInContainer(
                             "mysql",
                             "--protocol=TCP",
@@ -417,7 +409,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
     public static void dropDorisDatabase(String databaseName) {
         try {
-            Container.ExecResult rs =
+            org.testcontainers.containers.Container.ExecResult rs =
                     DORIS.execInContainer(
                             "mysql",
                             "--protocol=TCP",
@@ -479,15 +471,10 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     }
 
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+        Assertions.assertThat(actual).containsExactlyElementsOf(expected);
     }
 }
