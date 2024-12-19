@@ -61,8 +61,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
-                                    MySqlVersion
-                                            .V8_0_18) // v8 support both ARM and AMD architectures
+                                    MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
                             .withConfigurationOverride("docker/mysql/my.cnf")
                             .withSetupSQL("docker/mysql/setup.sql")
                             .withDatabaseName("flink-test")

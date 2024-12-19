@@ -47,9 +47,10 @@ Multiple rules can be declared in one single pipeline YAML file.
 ## converter-after-transform
 
 `converter-after-transform` is used to change the DataChangeEvent after other transform. The available values of this options are as follows.
+
 - SOFT_DELETE: The delete event will be converted as an insert event. This converter should be used together with the metadata `__data_event_type__`. Then you can implement the soft delete.
 
-For example, the following transform will not delete data when the delete event happens. Instead it will update the column `op_type` to -D in sink when deleting data.
+For example, the following transform will not delete data when the delete event happens. Instead it will update the column `op_type` to -D in sink and transform it to an insert record.
 
 ```yaml
 transform:
