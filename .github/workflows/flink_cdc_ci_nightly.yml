@@ -13,22 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Flink CDC CI
+name: Flink CDC CI Nightly
 on:
-  push:
-    branches:
-      - master
-      - release-*
-    paths-ignore:
-      - 'docs/**'
-      - 'README.md'
-  pull_request:
-    branches:
-      - master
-      - release-*
-    paths-ignore:
-      - 'docs/**'
-      - 'README.md'
+  schedule:
+    - cron: '0 0 * * *' # Deploy every day
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.number || github.run_id }}
@@ -50,7 +39,7 @@ jobs:
       - name: Set JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '8'
+          java-version: '11'
           distribution: 'temurin'
           cache: 'maven'
       - name: Compiling jar packages
