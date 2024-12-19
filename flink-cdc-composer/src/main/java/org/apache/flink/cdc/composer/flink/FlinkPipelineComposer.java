@@ -30,7 +30,6 @@ import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
 import org.apache.flink.cdc.composer.flink.translator.DataSourceTranslator;
-import org.apache.flink.cdc.composer.flink.translator.DistributedSchemaOperatorTranslator;
 import org.apache.flink.cdc.composer.flink.translator.PartitioningTranslator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.composer.flink.translator.TransformTranslator;
@@ -122,12 +121,6 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID),
                         pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT),
                         pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
-        DistributedSchemaOperatorTranslator distributedSchemaOperatorTranslator =
-                new DistributedSchemaOperatorTranslator(
-                        schemaChangeBehavior,
-                        pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID),
-                        pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT),
-                        pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
 
         // And required constructors
@@ -176,7 +169,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
             // Partitioning -> Schema Operator
             stream =
-                    distributedSchemaOperatorTranslator.translate(
+                    schemaOperatorTranslator.translateDistributed(
                             partitionedStream,
                             parallelism,
                             dataSink.getMetadataApplier()
@@ -186,14 +179,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
                                                     .getIncludedSchemaEvolutionTypes()),
                             pipelineDef.getRoute());
 
-            // Schema Operator -> Sink
-            sinkTranslator.translate(
-                    pipelineDef.getSink(), stream, dataSink, schemaOperatorIDGenerator.generate());
         } else {
             // Translate a regular topology for sources without distributed tables
             // PostTransform ---> Schema Operator
             stream =
-                    schemaOperatorTranslator.translate(
+                    schemaOperatorTranslator.translateRegular(
                             stream,
                             parallelism,
                             dataSink.getMetadataApplier()
@@ -211,11 +201,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
                             parallelism,
                             schemaOperatorIDGenerator.generate(),
                             dataSink.getDataChangeEventHashFunctionProvider(parallelism));
-
-            // Partitioning ---> Sink ---> X
-            sinkTranslator.translate(
-                    pipelineDef.getSink(), stream, dataSink, schemaOperatorIDGenerator.generate());
         }
+
+        // Schema Operator -> Sink -> X
+        sinkTranslator.translate(
+                pipelineDef.getSink(), stream, dataSink, schemaOperatorIDGenerator.generate());
     }
 
     private void addFrameworkJars() {
