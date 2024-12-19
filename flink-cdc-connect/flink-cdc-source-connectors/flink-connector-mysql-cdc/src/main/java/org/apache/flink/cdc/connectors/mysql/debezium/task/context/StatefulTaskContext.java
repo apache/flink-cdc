@@ -71,7 +71,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetUt
  * <p>The offset change and schema change should record to MySqlSplitState when emit the record,
  * thus the Flink's state mechanism can help to store/restore when failover happens.
  */
-public class StatefulTaskContext {
+public class StatefulTaskContext implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(StatefulTaskContext.class);
     private static final int DEFAULT_BINLOG_QUEUE_SIZE_IN_SNAPSHOT_SCAN = 1024;
@@ -298,6 +298,27 @@ public class StatefulTaskContext {
             LOG.info("MySQL has the binlog file '{}' required by the connector", binlogFilename);
         }
         return found;
+    }
+
+    @Override
+    public void close() throws Exception {
+        // BinaryLogClient still tries to enqueue records, if this queue is full, it will
+        // lead to deadlock.
+        if (queue != null) {
+            queue.poll();
+        }
+        if (connection != null) {
+            connection.close();
+        }
+        if (binaryLogClient != null) {
+            binaryLogClient.disconnect();
+        }
+        if (databaseSchema != null) {
+            databaseSchema.close();
+        }
+        if (dispatcher != null) {
+            dispatcher.close();
+        }
     }
 
     /** Copied from debezium for accessing here. */
