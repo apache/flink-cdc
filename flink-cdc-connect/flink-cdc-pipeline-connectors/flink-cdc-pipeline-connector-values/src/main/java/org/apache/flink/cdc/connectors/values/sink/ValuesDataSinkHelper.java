@@ -22,8 +22,11 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 
+import org.apache.flink.shaded.guava31.com.google.common.io.BaseEncoding;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /** A helper class for {@link ValuesDataSink} to process {@link Event}. */
 public class ValuesDataSinkHelper {
@@ -61,6 +64,18 @@ public class ValuesDataSinkHelper {
         for (RecordData.FieldGetter fieldGetter : fieldGetters) {
             fields.add(fieldGetter.getFieldOrNull(recordData));
         }
-        return fields;
+        return fields.stream()
+                .map(
+                        o -> {
+                            if (o == null) {
+                                return "null";
+                            }
+                            if (o instanceof byte[]) {
+                                return BaseEncoding.base64().encode((byte[]) o);
+                            } else {
+                                return o.toString();
+                            }
+                        })
+                .collect(Collectors.toList());
     }
 }
