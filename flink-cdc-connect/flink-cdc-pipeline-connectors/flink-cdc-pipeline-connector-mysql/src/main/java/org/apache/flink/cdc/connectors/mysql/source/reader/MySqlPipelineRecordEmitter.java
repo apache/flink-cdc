@@ -51,10 +51,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_EXCLUDE_LIST;
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_INCLUDE_LIST;
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isLowWatermarkEvent;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
+import static org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils.matchesColumn;
 
 /** The {@link RecordEmitter} implementation for pipeline mysql connector. */
 public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
@@ -194,8 +198,19 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
     private Schema parseDDL(String ddlStatement, TableId tableId) {
         Table table = parseDdl(ddlStatement, tableId);
-
-        List<Column> columns = table.columns();
+        List<Column> columns =
+                table.columns().stream()
+                        .filter(
+                                column ->
+                                        matchesColumn(
+                                                table.id() + "." + column.name(),
+                                                sourceConfig
+                                                        .getDbzConfiguration()
+                                                        .getStrings(COLUMN_INCLUDE_LIST, ","),
+                                                sourceConfig
+                                                        .getDbzConfiguration()
+                                                        .getStrings(COLUMN_EXCLUDE_LIST, ",")))
+                        .collect(Collectors.toList());
         Schema.Builder tableBuilder = Schema.newBuilder();
         for (int i = 0; i < columns.size(); i++) {
             Column column = columns.get(i);

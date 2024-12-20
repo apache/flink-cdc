@@ -34,6 +34,9 @@ import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_EXCLUDE_LIST;
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_INCLUDE_LIST;
+
 /** A {@link DataSource} for mysql cdc connector. */
 @Internal
 public class MySqlDataSource implements DataSource {
@@ -61,7 +64,9 @@ public class MySqlDataSource implements DataSource {
                 new MySqlEventDeserializer(
                         DebeziumChangelogMode.ALL,
                         sourceConfig.isIncludeSchemaChanges(),
-                        readableMetadataList);
+                        readableMetadataList,
+                        sourceConfig.getDbzConfiguration().getStrings(COLUMN_INCLUDE_LIST, ","),
+                        sourceConfig.getDbzConfiguration().getStrings(COLUMN_EXCLUDE_LIST, ","));
 
         MySqlSource<Event> source =
                 new MySqlSource<>(
