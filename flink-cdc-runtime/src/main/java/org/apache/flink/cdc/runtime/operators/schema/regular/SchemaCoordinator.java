@@ -297,21 +297,26 @@ public class SchemaCoordinator extends SchemaRegistry {
     }
 
     private List<SchemaChangeEvent> deduceEvolvedSchemaChanges(SchemaChangeEvent event) {
+        LOG.info("Step 1 - Start deducing evolved schema change for {}", event);
+
         TableId originalTableId = event.tableId();
-
         List<SchemaChangeEvent> deducedSchemaChangeEvents = new ArrayList<>();
-
         Set<TableId> originalTables = schemaManager.getAllOriginalTables();
 
         // First, grab all affected evolved tables.
         Set<TableId> affectedEvolvedTables =
                 SchemaDerivator.getAffectedEvolvedTables(
                         router, Collections.singleton(originalTableId));
+        LOG.info("Step 2 - Affected downstream tables are: {}", affectedEvolvedTables);
 
         // For each affected table, we need to...
         for (TableId evolvedTableId : affectedEvolvedTables) {
             Schema currentEvolvedSchema =
                     schemaManager.getLatestEvolvedSchema(evolvedTableId).orElse(null);
+            LOG.info(
+                    "Step 3.1 - For to-be-evolved table {} with schema {}...",
+                    evolvedTableId,
+                    currentEvolvedSchema);
 
             // ... reversely look up this affected sink table's upstream dependency
             Set<TableId> upstreamDependencies =
@@ -320,15 +325,21 @@ public class SchemaCoordinator extends SchemaRegistry {
             Preconditions.checkArgument(
                     !upstreamDependencies.isEmpty(),
                     "An affected sink table's upstream dependency cannot be empty.");
+            LOG.info("Step 3.2 - upstream dependency tables are: {}", upstreamDependencies);
 
             List<SchemaChangeEvent> rawSchemaChangeEvents = new ArrayList<>();
             if (upstreamDependencies.size() == 1) {
                 // If it's a one-by-one routing rule, we can simply forward it to downstream sink.
-                rawSchemaChangeEvents.add(event.copy(evolvedTableId));
+                SchemaChangeEvent rawEvent = event.copy(evolvedTableId);
+                rawSchemaChangeEvents.add(rawEvent);
+                LOG.info(
+                        "Step 3.3 - It's an one-by-one routing and could be forwarded as {}.",
+                        rawEvent);
             } else {
                 Set<Schema> toBeMergedSchemas =
                         SchemaDerivator.reverseLookupDependingUpstreamSchemas(
                                 router, evolvedTableId, schemaManager);
+                LOG.info("Step 3.3 - Upstream dependency schemas are: {}.", toBeMergedSchemas);
 
                 // We're in a table routing mode now, so we need to infer a widest schema for all
                 // upstream tables.
@@ -337,22 +348,31 @@ public class SchemaCoordinator extends SchemaRegistry {
                     mergedSchema =
                             SchemaMergingUtils.getLeastCommonSchema(mergedSchema, toBeMergedSchema);
                 }
+                LOG.info("Step 3.4 - Deduced widest schema is: {}.", mergedSchema);
 
                 // Detect what schema changes we need to apply to get expected sink table.
-                rawSchemaChangeEvents.addAll(
+                List<SchemaChangeEvent> rawEvents =
                         SchemaMergingUtils.getSchemaDifference(
-                                evolvedTableId, currentEvolvedSchema, mergedSchema));
+                                evolvedTableId, currentEvolvedSchema, mergedSchema);
+                LOG.info(
+                        "Step 3.5 - It's an many-to-one routing and causes schema changes: {}.",
+                        rawEvents);
+
+                rawSchemaChangeEvents.addAll(rawEvents);
             }
 
             // Finally, we normalize schema change events, including rewriting events by current
             // schema change behavior configuration, dropping explicitly excluded schema change
             // event types.
-            deducedSchemaChangeEvents.addAll(
+            List<SchemaChangeEvent> normalizedEvents =
                     SchemaDerivator.normalizeSchemaChangeEvents(
-                            currentEvolvedSchema,
-                            rawSchemaChangeEvents,
-                            behavior,
-                            metadataApplier));
+                            currentEvolvedSchema, rawSchemaChangeEvents, behavior, metadataApplier);
+            LOG.info(
+                    "Step 4 - After being normalized with {} behavior, final schema change events are: {}",
+                    behavior,
+                    normalizedEvents);
+
+            deducedSchemaChangeEvents.addAll(normalizedEvents);
         }
 
         return deducedSchemaChangeEvents;

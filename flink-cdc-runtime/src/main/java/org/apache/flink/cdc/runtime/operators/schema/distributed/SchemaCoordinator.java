@@ -336,6 +336,9 @@ public class SchemaCoordinator extends SchemaRegistry {
                                 request ->
                                         !request.isNoOpRequest()) // Ignore alignment only requests
                         .collect(Collectors.toList());
+        LOG.info(
+                "Step 1 - Start deducing evolved schema change events for {}",
+                validSchemaChangeRequests);
 
         // Firstly, based on changed upstream tables, infer a set of sink tables that might be
         // affected by this event. Schema changes will be derived individually for each sink table.
@@ -345,28 +348,33 @@ public class SchemaCoordinator extends SchemaRegistry {
                         validSchemaChangeRequests.stream()
                                 .map(rsr -> rsr.getSchemaChangeEvent().tableId())
                                 .collect(Collectors.toSet()));
+        LOG.info("Step 2 - Affected sink tables are: {}", affectedSinkTableIds);
 
         List<SchemaChangeEvent> evolvedSchemaChanges = new ArrayList<>();
 
         // For each affected sink table, we may...
         for (TableId affectedSinkTableId : affectedSinkTableIds) {
-
             Schema currentSinkSchema =
                     schemaManager.getLatestEvolvedSchema(affectedSinkTableId).orElse(null);
+            LOG.info(
+                    "Step 3.1 - For affected sink table {} with schema {}...",
+                    affectedSinkTableId,
+                    currentSinkSchema);
 
             // ... reversely look up this affected sink table's upstream dependency.
             Set<TableId> upstreamDependencies =
                     SchemaDerivator.reverseLookupDependingUpstreamTables(
                             router, affectedSinkTableId, upstreamSchemaTable);
-
             Preconditions.checkState(
                     !upstreamDependencies.isEmpty(),
                     "An affected sink table's upstream dependency cannot be empty.");
+            LOG.info("Step 3.2 - upstream dependency tables are: {}", upstreamDependencies);
 
             // Then, grab all upstream schemas from all known partitions and merge them.
             Set<Schema> toBeMergedSchemas =
                     SchemaDerivator.reverseLookupDependingUpstreamSchemas(
                             router, affectedSinkTableId, upstreamSchemaTable);
+            LOG.info("Step 3.3 - Upstream dependency schemas are: {}.", toBeMergedSchemas);
 
             // In distributed topology, schema will never be narrowed because current schema is
             // in the merging base. Notice that current schema might be NULL if it's the first
@@ -376,21 +384,28 @@ public class SchemaCoordinator extends SchemaRegistry {
                 mergedSchema =
                         SchemaMergingUtils.getLeastCommonSchema(mergedSchema, toBeMergedSchema);
             }
+            LOG.info("Step 3.4 - Deduced widest schema is: {}.", mergedSchema);
 
             // Detect what schema changes we need to apply to get expected sink table.
             List<SchemaChangeEvent> localEvolvedSchemaChanges =
                     SchemaMergingUtils.getSchemaDifference(
                             affectedSinkTableId, currentSinkSchema, mergedSchema);
+            LOG.info("Step 3.5 - Corresponding schema changes are: {}.", localEvolvedSchemaChanges);
 
             // Finally, we normalize schema change events, including rewriting events by current
             // schema change behavior configuration, dropping explicitly excluded schema change
             // event types.
-            evolvedSchemaChanges.addAll(
+            List<SchemaChangeEvent> normalizedEvents =
                     SchemaDerivator.normalizeSchemaChangeEvents(
                             currentSinkSchema,
                             localEvolvedSchemaChanges,
                             behavior,
-                            metadataApplier));
+                            metadataApplier);
+            LOG.info(
+                    "Step 3.6 - After being normalized with {} behavior, final schema change events are: {}",
+                    behavior,
+                    normalizedEvents);
+            evolvedSchemaChanges.addAll(normalizedEvents);
         }
 
         return evolvedSchemaChanges;
