@@ -135,8 +135,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // O ---> Source
         DataStream<Event> stream =
-                sourceTranslator.translate(
-                        pipelineDef.getSource(), dataSource, env, pipelineDefConfig, parallelism);
+                sourceTranslator.translate(pipelineDef.getSource(), dataSource, env, parallelism);
 
         // Source ---> PreTransform
         stream =
@@ -145,6 +144,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getTransforms(),
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels(),
+                        dataSource.supportedMetadataColumns(),
                         canContainDistributedTables);
 
         // PreTransform ---> PostTransform
