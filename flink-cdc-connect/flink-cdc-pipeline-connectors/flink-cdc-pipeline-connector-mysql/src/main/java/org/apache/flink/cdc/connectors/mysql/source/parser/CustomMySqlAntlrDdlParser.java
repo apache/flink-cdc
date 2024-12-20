@@ -29,15 +29,18 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
 
 /** A ddl parser that will use custom listener. */
 public class CustomMySqlAntlrDdlParser extends MySqlAntlrDdlParser {
 
     private final LinkedList<SchemaChangeEvent> parsedEvents;
+    private final Properties jdbcProperties;
 
-    public CustomMySqlAntlrDdlParser() {
+    public CustomMySqlAntlrDdlParser(Properties jdbcProperties) {
         super();
         this.parsedEvents = new LinkedList<>();
+        this.jdbcProperties = jdbcProperties;
     }
 
     // Overriding this method because the BIT type requires default length dimension of 1.
@@ -277,7 +280,7 @@ public class CustomMySqlAntlrDdlParser extends MySqlAntlrDdlParser {
 
     @Override
     protected AntlrDdlParserListener createParseTreeWalkerListener() {
-        return new CustomMySqlAntlrDdlParserListener(this, parsedEvents);
+        return new CustomMySqlAntlrDdlParserListener(this, parsedEvents, jdbcProperties);
     }
 
     public List<SchemaChangeEvent> getAndClearParsedEvents() {
