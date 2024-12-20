@@ -31,4 +31,9 @@ public interface DataSource {
 
     /** Get the {@link MetadataAccessor} for accessing metadata from external systems. */
     MetadataAccessor getMetadataAccessor();
+
+    /** Get the {@link SupportedMetadataColumn}s of the source. */
+    default SupportedMetadataColumn[] supportedMetadataColumns() {
+        return new SupportedMetadataColumn[0];
+    }
 }
