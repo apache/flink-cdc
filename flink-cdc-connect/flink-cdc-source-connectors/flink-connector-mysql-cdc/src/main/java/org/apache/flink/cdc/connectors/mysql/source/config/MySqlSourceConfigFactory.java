@@ -70,6 +70,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Properties dbzProperties;
     private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
     private boolean skipSnapshotBackfill = false;
+    private boolean parseOnLineSchemaChanges = false;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -291,6 +292,12 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /** Whether to parse gh-ost/pt-osc utility generated schema change events. Defaults to false. */
+    public MySqlSourceConfigFactory parseOnLineSchemaChanges(boolean parseOnLineSchemaChanges) {
+        this.parseOnLineSchemaChanges = parseOnLineSchemaChanges;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -384,6 +391,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 props,
                 jdbcProperties,
                 chunkKeyColumns,
-                skipSnapshotBackfill);
+                skipSnapshotBackfill,
+                parseOnLineSchemaChanges);
     }
 }
