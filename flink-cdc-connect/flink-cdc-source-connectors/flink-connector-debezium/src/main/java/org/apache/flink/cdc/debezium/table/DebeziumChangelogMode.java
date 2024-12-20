@@ -25,7 +25,9 @@ public enum DebeziumChangelogMode {
      * Encodes changes as upsert stream that describes idempotent updates on a key. Primary keys
      * must be set in tables to use this changelog mode.
      */
-    UPSERT("upsert");
+    UPSERT("upsert"),
+    /** Encodes changes as an insert-only stream. */
+    INSERT_ONLY("insert-only");
 
     private final String value;
 
