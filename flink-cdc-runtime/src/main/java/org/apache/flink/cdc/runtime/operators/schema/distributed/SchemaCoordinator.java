@@ -243,7 +243,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                         "All sink subTasks ({}) have already reported request {}. Remove it out of tracking.",
                         reportedSinkSubTasks,
                         uniqueKey);
-                alreadyHandledSchemaChangeEvents.removeAll(request);
+                alreadyHandledSchemaChangeEvents.removeAll(uniqueKey);
             }
         }
 
