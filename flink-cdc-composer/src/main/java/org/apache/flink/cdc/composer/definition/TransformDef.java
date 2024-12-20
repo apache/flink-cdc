@@ -75,16 +75,16 @@ public class TransformDef {
         return sourceTable;
     }
 
-    public Optional<String> getProjection() {
-        return Optional.ofNullable(projection);
+    public String getProjection() {
+        return projection;
     }
 
     public boolean isValidProjection() {
         return !StringUtils.isNullOrWhitespaceOnly(projection);
     }
 
-    public Optional<String> getFilter() {
-        return Optional.ofNullable(filter);
+    public String getFilter() {
+        return filter;
     }
 
     public boolean isValidFilter() {

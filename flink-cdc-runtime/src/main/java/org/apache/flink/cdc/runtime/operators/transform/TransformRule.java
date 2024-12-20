@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.common.utils.StringUtils;
+
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
@@ -44,7 +46,7 @@ public class TransformRule implements Serializable {
             String tableOption,
             @Nullable String postTransformConverter) {
         this.tableInclusions = tableInclusions;
-        this.projection = projection;
+        this.projection = StringUtils.isNullOrWhitespaceOnly(projection) ? "*" : projection;
         this.filter = normalizeFilter(projection, filter);
         this.primaryKey = primaryKey;
         this.partitionKey = partitionKey;
