@@ -397,17 +397,27 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                         BinaryStringData.fromString("c-21")
                                     })));
         }
+
+        int snapshotRecordsCount = expectedSnapshot.size();
+        int binlogRecordsCount = expectedBinlog.size();
+
+        // Ditto, CreateTableEvent might be emitted in multiple partitions.
         List<Event> actual =
-                fetchResults(events, 1 + expectedSnapshot.size() + expectedBinlog.size());
-        assertThat(actual.get(0)).isEqualTo(createTableEvent);
-        assertThat(actual.subList(1, 10))
-                .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
-        for (int i = 0; i < expectedBinlog.size(); i++) {
+                fetchResultsExcept(
+                        events, snapshotRecordsCount + binlogRecordsCount, createTableEvent);
+
+        List<Event> actualSnapshotEvents = actual.subList(0, snapshotRecordsCount);
+        List<Event> actualBinlogEvents = actual.subList(snapshotRecordsCount, actual.size());
+
+        assertThat(actualSnapshotEvents).containsExactlyInAnyOrderElementsOf(expectedSnapshot);
+        assertThat(actualBinlogEvents).hasSize(binlogRecordsCount);
+
+        for (int i = 0; i < binlogRecordsCount; i++) {
             if (expectedBinlog.get(i) instanceof SchemaChangeEvent) {
-                assertThat(expectedBinlog.get(i)).isEqualTo(actual.get(10 + i));
+                assertThat(actualBinlogEvents.get(i)).isEqualTo(expectedBinlog.get(i));
             } else {
                 DataChangeEvent expectedEvent = (DataChangeEvent) expectedBinlog.get(i);
-                DataChangeEvent actualEvent = (DataChangeEvent) actual.get(10 + i);
+                DataChangeEvent actualEvent = (DataChangeEvent) actualBinlogEvents.get(i);
                 assertThat(actualEvent.op()).isEqualTo(expectedEvent.op());
                 assertThat(actualEvent.before()).isEqualTo(expectedEvent.before());
                 assertThat(actualEvent.after()).isEqualTo(expectedEvent.after());
