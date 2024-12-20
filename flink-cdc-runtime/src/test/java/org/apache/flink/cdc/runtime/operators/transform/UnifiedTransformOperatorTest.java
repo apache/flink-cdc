@@ -27,7 +27,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
-import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
+import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
@@ -72,8 +72,10 @@ public class UnifiedTransformOperatorTest {
         private final BinaryRecordDataGenerator preTransformedRecordGenerator;
         private final BinaryRecordDataGenerator postTransformedRecordGenerator;
 
-        private EventOperatorTestHarness<PreTransformOperator, Event> preTransformOperatorHarness;
-        private EventOperatorTestHarness<PostTransformOperator, Event> postTransformOperatorHarness;
+        private RegularEventOperatorTestHarness<PreTransformOperator, Event>
+                preTransformOperatorHarness;
+        private RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                postTransformOperatorHarness;
 
         public static UnifiedTransformTestCase of(
                 TableId tableId,
@@ -241,7 +243,8 @@ public class UnifiedTransformOperatorTest {
                             .addTransform(
                                     tableId.identifier(), projectionExpression, filterExpression)
                             .build();
-            preTransformOperatorHarness = new EventOperatorTestHarness<>(preTransformOperator, 1);
+            preTransformOperatorHarness =
+                    RegularEventOperatorTestHarness.with(preTransformOperator, 1);
             preTransformOperatorHarness.open();
 
             postTransformOperator =
@@ -249,7 +252,8 @@ public class UnifiedTransformOperatorTest {
                             .addTransform(
                                     tableId.identifier(), projectionExpression, filterExpression)
                             .build();
-            postTransformOperatorHarness = new EventOperatorTestHarness<>(postTransformOperator, 1);
+            postTransformOperatorHarness =
+                    RegularEventOperatorTestHarness.with(postTransformOperator, 1);
             postTransformOperatorHarness.open();
             return this;
         }

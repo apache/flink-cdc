@@ -48,7 +48,8 @@ public class TransformTranslator {
             List<TransformDef> transforms,
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            boolean canContainDistributedTables) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -67,10 +68,15 @@ public class TransformTranslator {
                     supportedMetadataColumns);
         }
 
-        preTransformFunctionBuilder.addUdfFunctions(
-                udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
-        preTransformFunctionBuilder.addUdfFunctions(
-                models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
+        preTransformFunctionBuilder
+                .addUdfFunctions(
+                        udfFunctions.stream()
+                                .map(this::udfDefToUDFTuple)
+                                .collect(Collectors.toList()))
+                .addUdfFunctions(
+                        models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()))
+                .canContainDistributedTables(canContainDistributedTables);
+
         return input.transform(
                 "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
     }

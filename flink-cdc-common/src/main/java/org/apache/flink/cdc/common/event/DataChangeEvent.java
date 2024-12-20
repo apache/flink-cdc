@@ -167,6 +167,16 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
                 dataChangeEvent.meta);
     }
 
+    /** Updates the {@link TableId} info of current data change event. */
+    public static DataChangeEvent route(DataChangeEvent dataChangeEvent, TableId tableId) {
+        return new DataChangeEvent(
+                tableId,
+                dataChangeEvent.before,
+                dataChangeEvent.after,
+                dataChangeEvent.op,
+                dataChangeEvent.meta);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {

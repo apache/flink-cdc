@@ -34,6 +34,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.runtime.state.StateInitializationContext;
@@ -75,6 +76,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private List<UserDefinedFunctionDescriptor> udfDescriptors;
     private Map<TableId, PreTransformProcessor> preTransformProcessorMap;
     private Map<TableId, Boolean> hasAsteriskMap;
+    private final boolean canContainDistributedTables;
 
     public static PreTransformOperator.Builder newBuilder() {
         return new PreTransformOperator.Builder();
@@ -83,6 +85,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     /** Builder of {@link PreTransformOperator}. */
     public static class Builder {
         private final List<TransformRule> transformRules = new ArrayList<>();
+        private boolean canContainDistributedTables;
 
         private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
                 new ArrayList<>();
@@ -130,20 +133,30 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             return this;
         }
 
+        public PreTransformOperator.Builder canContainDistributedTables(
+                boolean canContainDistributedTables) {
+            this.canContainDistributedTables = canContainDistributedTables;
+            return this;
+        }
+
         public PreTransformOperator build() {
-            return new PreTransformOperator(transformRules, udfFunctions);
+            return new PreTransformOperator(
+                    transformRules, udfFunctions, canContainDistributedTables);
         }
     }
 
     private PreTransformOperator(
             List<TransformRule> transformRules,
-            List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
-        this.transformRules = transformRules;
+            List<Tuple3<String, String, Map<String, String>>> udfFunctions,
+            boolean canContainDistributedTables) {
         this.preTransformChangeInfoMap = new ConcurrentHashMap<>();
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
         this.schemaMetadataTransformers = new ArrayList<>();
         this.chainingStrategy = ChainingStrategy.ALWAYS;
+
+        this.transformRules = transformRules;
         this.udfFunctions = udfFunctions;
+        this.canContainDistributedTables = canContainDistributedTables;
     }
 
     @Override
@@ -186,6 +199,12 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
         super.initializeState(context);
+        if (canContainDistributedTables) {
+            // In distributed mode, we don't have a globally consistent schema for each partition.
+            // It's not meaningful to persist them to state. Instead, we rely on each source
+            // partition to send fresh CreateTableEvent to instantiate each event flow.
+            return;
+        }
         OperatorStateStore stateStore = context.getOperatorStateStore();
         ListStateDescriptor<byte[]> descriptor =
                 new ListStateDescriptor<>("originalSchemaState", byte[].class);
@@ -216,6 +235,10 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
+        if (canContainDistributedTables) {
+            // Same reason in this#initializeState.
+            return;
+        }
         state.update(
                 new ArrayList<>(
                         preTransformChangeInfoMap.values().stream()
@@ -443,20 +466,25 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
     private DataChangeEvent processDataChangeEvent(DataChangeEvent dataChangeEvent) {
         if (!transforms.isEmpty()) {
-            PreTransformProcessor preTransformProcessor =
-                    preTransformProcessorMap.get(dataChangeEvent.tableId());
+            TableId tableId = dataChangeEvent.tableId();
+            PreTransformProcessor processor = preTransformProcessorMap.get(tableId);
+            Preconditions.checkArgument(
+                    processor != null,
+                    "Transform operator receives a data change event from table %s without a full schema view. "
+                            + "This might happen if source with distributed tables doesn't emit CreateTableEvent first after fail-over. "
+                            + "This is likely a bug, please consider filing an issue.",
+                    tableId);
+
             BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
             BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
             if (before != null) {
-                BinaryRecordData projectedBefore =
-                        preTransformProcessor.processFillDataField(before);
+                BinaryRecordData projectedBefore = processor.processFillDataField(before);
                 dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
             }
             if (after != null) {
-                BinaryRecordData projectedAfter = preTransformProcessor.processFillDataField(after);
+                BinaryRecordData projectedAfter = processor.processFillDataField(after);
                 dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
             }
-            return dataChangeEvent;
         }
         return dataChangeEvent;
     }
