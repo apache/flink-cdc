@@ -324,8 +324,7 @@ class KafkaDataSinkITCase extends TestLogger {
 
         final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
                 drainAllRecordsFromTopic(topic, false, 0);
-        final long recordsCount = 5;
-        assertThat(recordsCount).isEqualTo(collectedRecords.size());
+        assertThat(collectedRecords).hasSize(5);
         for (ConsumerRecord<byte[], byte[]> consumerRecord : collectedRecords) {
             assertThat(
                             consumerRecord
