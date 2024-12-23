@@ -17,10 +17,12 @@
 
 package org.apache.flink.cdc.composer.flink;
 
+import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.RunTimeMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.source.DataSource;
@@ -92,6 +94,13 @@ public class FlinkPipelineComposer implements PipelineComposer {
     @Override
     public PipelineExecution compose(PipelineDef pipelineDef) {
         Configuration pipelineDefConfig = pipelineDef.getConfig();
+
+        boolean isBatchMode = false;
+        if (RunTimeMode.BATCH.equals(
+                pipelineDefConfig.get(PipelineOptions.PIPELINE_RUNTIME_MODE))) {
+            isBatchMode = true;
+            env.setRuntimeMode(RuntimeExecutionMode.BATCH);
+        }
 
         int parallelism = pipelineDefConfig.get(PipelineOptions.PIPELINE_PARALLELISM);
         env.getConfig().setParallelism(parallelism);

@@ -54,7 +54,8 @@ public class ValuesDataSourceHelper {
         SINGLE_SPLIT_MULTI_TABLES,
         MULTI_SPLITS_SINGLE_TABLE,
         CUSTOM_SOURCE_EVENTS,
-        TRANSFORM_TABLE
+        TRANSFORM_TABLE,
+        BATCH_TABLE
     }
 
     public static final TableId TABLE_1 =
@@ -118,6 +119,11 @@ public class ValuesDataSourceHelper {
             case TRANSFORM_TABLE:
                 {
                     sourceEvents = transformTable();
+                    break;
+                }
+            case BATCH_TABLE:
+                {
+                    sourceEvents = batchTable();
                     break;
                 }
             default:
@@ -641,6 +647,54 @@ public class ValuesDataSourceHelper {
                             }
                         }));
 
+        eventOfSplits.add(split1);
+        return eventOfSplits;
+    }
+
+    public static List<List<Event>> batchTable() {
+        List<List<Event>> eventOfSplits = new ArrayList<>();
+        List<Event> split1 = new ArrayList<>();
+
+        // create table
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .primaryKey("col1")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
+        split1.add(createTableEvent);
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
+        // insert
+        DataChangeEvent insertEvent1 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1")
+                                }));
+        split1.add(insertEvent1);
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
+                                }));
+        split1.add(insertEvent2);
+        DataChangeEvent insertEvent3 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("3")
+                                }));
+        split1.add(insertEvent3);
         eventOfSplits.add(split1);
         return eventOfSplits;
     }
