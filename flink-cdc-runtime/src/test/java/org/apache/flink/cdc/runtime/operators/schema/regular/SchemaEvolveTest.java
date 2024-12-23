@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema;
+package org.apache.flink.cdc.runtime.operators.schema.regular;
 
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
@@ -37,9 +38,10 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
-import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
+import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
@@ -53,6 +55,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 /** Unit tests for the {@link SchemaOperator} to handle evolved schema. */
@@ -85,8 +88,9 @@ public class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
-        EventOperatorTestHarness<SchemaOperator, Event> harness =
-                new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndBehavior(
+                        schemaOperator, 17, Duration.ofSeconds(3), behavior);
         harness.open();
 
         // Test CreateTableEvent
@@ -108,7 +112,7 @@ public class SchemaEvolveTest {
 
             Assertions.assertThat(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     createAndInsertDataEvents))
                     .isEqualTo(
                             harness.getOutputRecords().stream()
@@ -168,8 +172,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
-                                    addColumnEvents));
+                                    Collections.singletonList(new FlushEvent(0)), addColumnEvents));
 
             Schema schemaV2 =
                     Schema.newBuilder()
@@ -227,7 +230,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     renameColumnEvents));
 
             Schema schemaV3 =
@@ -272,7 +275,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     alterColumnTypeEvents));
 
             Schema schemaV4 =
@@ -308,7 +311,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     dropColumnEvents));
 
             Schema schemaV5 =
@@ -342,8 +345,9 @@ public class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
-        EventOperatorTestHarness<SchemaOperator, Event> harness =
-                new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndBehavior(
+                        schemaOperator, 17, Duration.ofSeconds(3), behavior);
         harness.open();
 
         // Test CreateTableEvent
@@ -369,7 +373,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     createAndInsertDataEvents));
 
             Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
@@ -425,8 +429,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
-                                    addColumnEvents));
+                                    Collections.singletonList(new FlushEvent(0)), addColumnEvents));
 
             Schema schemaV2 =
                     Schema.newBuilder()
@@ -484,7 +487,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     renameColumnEvents));
 
             Schema schemaV3 =
@@ -529,7 +532,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     alterColumnTypeEvents));
 
             Schema schemaV4 =
@@ -565,7 +568,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     dropColumnEvents));
 
             Schema schemaV5 =
@@ -599,8 +602,9 @@ public class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
-        EventOperatorTestHarness<SchemaOperator, Event> harness =
-                new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndBehavior(
+                        schemaOperator, 17, Duration.ofSeconds(3), behavior);
         harness.open();
 
         // Test CreateTableEvent
@@ -626,7 +630,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     createAndInsertDataEvents));
 
             Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
@@ -648,45 +652,25 @@ public class SchemaEvolveTest {
                                             new AddColumnEvent.ColumnWithPosition(
                                                     Column.physicalColumn(
                                                             "height", DOUBLE, "Height data")))));
-            Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents));
+            Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents))
+                    .isExactlyInstanceOf(IllegalStateException.class)
+                    .cause()
+                    .isExactlyInstanceOf(ExecutionException.class)
+                    .cause()
+                    .isExactlyInstanceOf(FlinkRuntimeException.class)
+                    .hasMessage("Failed to apply schema change event.")
+                    .cause()
+                    .isExactlyInstanceOf(SchemaEvolveException.class)
+                    .extracting("applyingEvent", "exceptionMessage")
+                    .containsExactly(
+                            addColumnEvents.get(0),
+                            "Unexpected schema change events occurred in EXCEPTION mode. Job will fail now.");
 
             // No schema change events should be sent to downstream
-            Assertions.assertThat(harness.getOutputRecords()).isEmpty();
-        }
-
-        // Test RenameColumnEvent (expected to fail)
-        {
-            List<Event> addColumnEvents =
-                    Collections.singletonList(
-                            new RenameColumnEvent(
-                                    tableId, ImmutableMap.of("name", "namae", "age", "toshi")));
-            Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents));
-
-            // No schema change events should be sent to downstream
-            Assertions.assertThat(harness.getOutputRecords()).isEmpty();
-        }
-
-        // Test AlterColumnTypeEvent (expected to fail)
-        {
-            List<Event> addColumnEvents =
-                    Collections.singletonList(
-                            new AlterColumnTypeEvent(
-                                    tableId, ImmutableMap.of("score", BIGINT, "toshi", FLOAT)));
-            Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents));
-
-            // No schema change events should be sent to downstream
-            Assertions.assertThat(harness.getOutputRecords()).isEmpty();
-        }
-
-        // Test DropColumnEvent (expected to fail)
-        {
-            List<Event> addColumnEvents =
-                    Collections.singletonList(
-                            new DropColumnEvent(tableId, Arrays.asList("score", "height")));
-            Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents));
-
-            // No schema change events should be sent to downstream
-            Assertions.assertThat(harness.getOutputRecords()).isEmpty();
+            Assertions.assertThat(harness.getOutputRecords())
+                    .map(StreamRecord::getValue)
+                    .map(e -> e.getClass().getName())
+                    .containsExactly("org.apache.flink.cdc.common.event.FlushEvent");
         }
 
         harness.close();
@@ -708,8 +692,9 @@ public class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
-        EventOperatorTestHarness<SchemaOperator, Event> harness =
-                new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndBehavior(
+                        schemaOperator, 17, Duration.ofSeconds(3), behavior);
         harness.open();
 
         // Test CreateTableEvent
@@ -735,7 +720,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     createAndInsertDataEvents));
 
             Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
@@ -787,7 +772,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId),
+                            new FlushEvent(0),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(INT, 4, STRING, "Derrida", SMALLINT, (short) 20)),
@@ -855,7 +840,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId),
+                            new FlushEvent(0),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(INT, 6, STRING, null, SMALLINT, (short) 22)),
@@ -904,7 +889,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId),
+                            new FlushEvent(0),
                             DataChangeEvent.insertEvent(
                                     tableId, buildRecord(INT, 8, STRING, null, SMALLINT, null)),
                             DataChangeEvent.insertEvent(
@@ -945,7 +930,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId),
+                            new FlushEvent(0),
                             DataChangeEvent.insertEvent(
                                     tableId, buildRecord(INT, 12, STRING, null, DOUBLE, null)),
                             DataChangeEvent.insertEvent(
@@ -987,8 +972,8 @@ public class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
-        EventOperatorTestHarness<SchemaOperator, Event> harness =
-                new EventOperatorTestHarness<>(
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndFineGrainedBehaviorWithError(
                         schemaOperator,
                         17,
                         Duration.ofSeconds(3),
@@ -1021,7 +1006,7 @@ public class SchemaEvolveTest {
                                 .collect(Collectors.toList()))
                 .isEqualTo(
                         ListUtils.union(
-                                Collections.singletonList(new FlushEvent(tableId)),
+                                Collections.singletonList(new FlushEvent(0)),
                                 createAndInsertDataEvents));
 
         Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
@@ -1040,7 +1025,19 @@ public class SchemaEvolveTest {
                                         new AddColumnEvent.ColumnWithPosition(
                                                 Column.physicalColumn(
                                                         "height", DOUBLE, "Height data")))));
-        processEvent(schemaOperator, addColumnEvents);
+        Assertions.assertThatThrownBy(() -> processEvent(schemaOperator, addColumnEvents))
+                .isExactlyInstanceOf(IllegalStateException.class)
+                .cause()
+                .isExactlyInstanceOf(ExecutionException.class)
+                .cause()
+                .isExactlyInstanceOf(FlinkRuntimeException.class)
+                .hasMessage("Failed to apply schema change event.")
+                .cause()
+                .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
+                .extracting("applyingEvent", "exceptionMessage")
+                .containsExactly(
+                        addColumnEvents.get(0), "Sink doesn't support such schema change event.");
+
         Assertions.assertThat(harness.isJobFailed()).isEqualTo(true);
         Assertions.assertThat(harness.getJobFailureCause())
                 .cause()
@@ -1072,8 +1069,8 @@ public class SchemaEvolveTest {
 
         // All types of schema change events will be sent to the sink
         // AddColumn and RenameColumn events will always fail
-        EventOperatorTestHarness<SchemaOperator, Event> harness =
-                new EventOperatorTestHarness<>(
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndFineGrainedBehaviorWithError(
                         schemaOperator,
                         17,
                         Duration.ofSeconds(3),
@@ -1108,7 +1105,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     createAndInsertDataEvents));
 
             Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
@@ -1159,7 +1156,7 @@ public class SchemaEvolveTest {
             processEvent(schemaOperator, addColumnEvents);
 
             List<Event> expectedEvents = new ArrayList<>();
-            expectedEvents.add(new FlushEvent(tableId));
+            expectedEvents.add(new FlushEvent(0));
             expectedEvents.addAll(addColumnEvents);
 
             Assertions.assertThat(
@@ -1221,7 +1218,7 @@ public class SchemaEvolveTest {
             processEvent(schemaOperator, renameColumnEvents);
 
             List<Event> expectedEvents = new ArrayList<>();
-            expectedEvents.add(new FlushEvent(tableId));
+            expectedEvents.add(new FlushEvent(0));
             expectedEvents.addAll(renameColumnEvents);
 
             Assertions.assertThat(
@@ -1266,7 +1263,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId),
+                            new FlushEvent(0),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1324,7 +1321,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId),
+                            new FlushEvent(0),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1384,8 +1381,8 @@ public class SchemaEvolveTest {
 
         // All types of schema change events will be sent to the sink
         // AddColumn and RenameColumn events will always fail
-        EventOperatorTestHarness<SchemaOperator, Event> harness =
-                new EventOperatorTestHarness<>(
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndFineGrainedBehavior(
                         schemaOperator,
                         17,
                         Duration.ofSeconds(3),
@@ -1420,7 +1417,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     createAndInsertDataEvents));
 
             Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
@@ -1471,7 +1468,8 @@ public class SchemaEvolveTest {
             processEvent(schemaOperator, addColumnEvents);
 
             List<Event> expectedEvents = new ArrayList<>();
-            expectedEvents.add(new FlushEvent(tableId));
+            expectedEvents.add(new FlushEvent(0));
+
             expectedEvents.addAll(addColumnEvents);
 
             Assertions.assertThat(
@@ -1533,7 +1531,7 @@ public class SchemaEvolveTest {
             processEvent(schemaOperator, renameColumnEvents);
 
             List<Event> expectedEvents = new ArrayList<>();
-            expectedEvents.add(new FlushEvent(tableId));
+            expectedEvents.add(new FlushEvent(0));
             expectedEvents.addAll(renameColumnEvents);
 
             Assertions.assertThat(
@@ -1578,7 +1576,7 @@ public class SchemaEvolveTest {
 
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId),
+                            new FlushEvent(0),
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1634,9 +1632,11 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, dropColumnEvents);
 
+            FlushEvent result;
+            result = new FlushEvent(0);
             List<Event> expectedEvents =
                     Arrays.asList(
-                            new FlushEvent(tableId),
+                            result,
                             DataChangeEvent.insertEvent(
                                     tableId,
                                     buildRecord(
@@ -1693,8 +1693,9 @@ public class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
-        EventOperatorTestHarness<SchemaOperator, Event> harness =
-                new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndBehavior(
+                        schemaOperator, 17, Duration.ofSeconds(3), behavior);
         harness.open();
 
         // Test CreateTableEvent
@@ -1714,14 +1715,17 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, createAndInsertDataEvents);
 
+            FlushEvent result;
+            TableId tableId1 = tableId;
+            Event schemaChangeEvent = createAndInsertDataEvents.get(0);
+            result = new FlushEvent(0);
             Assertions.assertThat(
                             harness.getOutputRecords().stream()
                                     .map(StreamRecord::getValue)
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
-                                    createAndInsertDataEvents));
+                                    Collections.singletonList(result), createAndInsertDataEvents));
 
             Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
@@ -1776,8 +1780,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
-                                    addColumnEvents));
+                                    Collections.singletonList(new FlushEvent(0)), addColumnEvents));
 
             Schema schemaV2 =
                     Schema.newBuilder()
@@ -1878,14 +1881,18 @@ public class SchemaEvolveTest {
                                             SMALLINT,
                                             (short) 23)));
 
+            FlushEvent result;
+            int subTaskId = 0;
+            TableId tableId1 = tableId;
+            Event schemaChangeEvent = renameColumnEvents.get(0);
+            result = new FlushEvent(subTaskId);
             Assertions.assertThat(
                             harness.getOutputRecords().stream()
                                     .map(StreamRecord::getValue)
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
-                                    lenientRenameColumnEvents));
+                                    Collections.singletonList(result), lenientRenameColumnEvents));
 
             Schema schemaV3 =
                     Schema.newBuilder()
@@ -1959,7 +1966,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     lenientAlterColumnTypeEvents));
 
             Schema schemaV4 =
@@ -2018,7 +2025,10 @@ public class SchemaEvolveTest {
                             harness.getOutputRecords().stream()
                                     .map(StreamRecord::getValue)
                                     .collect(Collectors.toList()))
-                    .isEqualTo(lenientDropColumnEvents);
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(new FlushEvent(0)),
+                                    lenientDropColumnEvents));
 
             Schema schemaV5 =
                     Schema.newBuilder()
@@ -2063,8 +2073,9 @@ public class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
-        EventOperatorTestHarness<SchemaOperator, Event> harness =
-                new EventOperatorTestHarness<>(schemaOperator, 17, Duration.ofSeconds(3), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndBehavior(
+                        schemaOperator, 17, Duration.ofSeconds(3), behavior);
         harness.open();
 
         // Test CreateTableEvent
@@ -2094,14 +2105,17 @@ public class SchemaEvolveTest {
 
             processEvent(schemaOperator, createAndInsertDataEvents);
 
+            FlushEvent result;
+            TableId tableId1 = tableId;
+            Event schemaChangeEvent = createAndInsertDataEvents.get(0);
+            result = new FlushEvent(0);
             Assertions.assertThat(
                             harness.getOutputRecords().stream()
                                     .map(StreamRecord::getValue)
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
-                                    createAndInsertDataEvents));
+                                    Collections.singletonList(result), createAndInsertDataEvents));
 
             Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
             Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
@@ -2142,7 +2156,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     lenientDropColumnEvents));
 
             Schema schemaV2 =
@@ -2257,7 +2271,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     lenientAddColumnEvents));
 
             Schema schemaV3 =
@@ -2375,7 +2389,7 @@ public class SchemaEvolveTest {
                                     .collect(Collectors.toList()))
                     .isEqualTo(
                             ListUtils.union(
-                                    Collections.singletonList(new FlushEvent(tableId)),
+                                    Collections.singletonList(new FlushEvent(0)),
                                     lenientRenameColumnEvents));
 
             Schema schemaV4 =
