@@ -56,12 +56,16 @@ jobs:
       java-version: "[11]"
       module: ${{ matrix.module }}
   pipeline_e2e:
-    name: Pipeline E2E Tests
+    strategy:
+      matrix:
+        parallelism: [ 1, 4 ]
+    name: Pipeline E2E Tests (${{ matrix.parallelism }} Parallelism)
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-version: "[11]"
       flink-version: "['1.19.1', '1.20.0']"
       module: pipeline_e2e
+      parallelism: ${{ matrix.parallelism }}
   source_e2e:
     name: Source E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml

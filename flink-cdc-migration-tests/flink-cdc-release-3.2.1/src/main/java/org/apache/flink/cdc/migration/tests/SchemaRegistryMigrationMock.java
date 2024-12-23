@@ -17,24 +17,20 @@
 
 package org.apache.flink.cdc.migration.tests;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.runtime.operators.schema.common.SchemaManager;
-import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaCoordinator;
-import org.apache.flink.metrics.groups.OperatorCoordinatorMetricGroup;
-import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
-import org.apache.flink.runtime.jobgraph.OperatorID;
-import org.apache.flink.runtime.operators.coordination.CoordinatorStore;
-import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
-
-import javax.annotation.Nullable;
+import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaDerivation;
+import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaManager;
+import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
 
 import java.lang.reflect.Field;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -81,34 +77,24 @@ public class SchemaRegistryMigrationMock implements MigrationMockBase {
         return new SchemaManager(new HashMap<>(), new HashMap<>(), SchemaChangeBehavior.EVOLVE);
     }
 
-    public SchemaCoordinator generateSchemaRegistry() {
-        SchemaCoordinator coordinator =
-                new SchemaCoordinator(
-                        "Dummy Name",
-                        MOCKED_CONTEXT,
-                        Executors.newSingleThreadExecutor(),
-                        e -> {},
-                        new ArrayList<>(),
-                        SchemaChangeBehavior.EVOLVE,
-                        Duration.ofMinutes(3));
-        try {
-            coordinator.start();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        return coordinator;
+    public SchemaRegistry generateSchemaRegistry() {
+        return new SchemaRegistry(
+                "Dummy Name",
+                null,
+                Executors.newSingleThreadExecutor(),
+                e -> {},
+                new ArrayList<>());
     }
 
-    private SchemaManager getSchemaManager(SchemaCoordinator schemaCoordinator) throws Exception {
-        Field managerField =
-                SchemaCoordinator.class.getSuperclass().getDeclaredField("schemaManager");
+    private SchemaManager getSchemaManager(SchemaRegistry schemaRegistry) throws Exception {
+        Field managerField = SchemaRegistry.class.getDeclaredField("schemaManager");
         managerField.setAccessible(true);
-        return (SchemaManager) managerField.get(schemaCoordinator);
+        return (SchemaManager) managerField.get(schemaRegistry);
     }
 
     @SuppressWarnings("unchecked")
     private Map<TableId, SortedMap<Integer, Schema>> getOriginalSchemaMap(
-            SchemaCoordinator schemaRegistry) throws Exception {
+            SchemaRegistry schemaRegistry) throws Exception {
         SchemaManager schemaManager = getSchemaManager(schemaRegistry);
         Field originalField = SchemaManager.class.getDeclaredField("originalSchemas");
         originalField.setAccessible(true);
@@ -116,7 +102,7 @@ public class SchemaRegistryMigrationMock implements MigrationMockBase {
     }
 
     private void setOriginalSchemaMap(
-            SchemaCoordinator schemaRegistry,
+            SchemaRegistry schemaRegistry,
             Map<TableId, SortedMap<Integer, Schema>> originalSchemaMap)
             throws Exception {
         SchemaManager schemaManager = getSchemaManager(schemaRegistry);
@@ -127,7 +113,7 @@ public class SchemaRegistryMigrationMock implements MigrationMockBase {
 
     @SuppressWarnings("unchecked")
     private Map<TableId, SortedMap<Integer, Schema>> getEvolvedSchemaMap(
-            SchemaCoordinator schemaRegistry) throws Exception {
+            SchemaRegistry schemaRegistry) throws Exception {
         SchemaManager schemaManager = getSchemaManager(schemaRegistry);
         Field originalField = SchemaManager.class.getDeclaredField("evolvedSchemas");
         originalField.setAccessible(true);
@@ -135,13 +121,28 @@ public class SchemaRegistryMigrationMock implements MigrationMockBase {
     }
 
     private void setEvolvedSchemaMap(
-            SchemaCoordinator schemaRegistry,
+            SchemaRegistry schemaRegistry,
             Map<TableId, SortedMap<Integer, Schema>> evolvedSchemaMap)
             throws Exception {
         SchemaManager schemaManager = getSchemaManager(schemaRegistry);
         Field field = SchemaManager.class.getDeclaredField("evolvedSchemas");
         field.setAccessible(true);
         field.set(schemaManager, evolvedSchemaMap);
+    }
+
+    private SchemaDerivation getSchemaDerivation(SchemaRegistry schemaRegistry) throws Exception {
+        Field field = SchemaRegistry.class.getDeclaredField("schemaDerivation");
+        field.setAccessible(true);
+        return (SchemaDerivation) field.get(schemaRegistry);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Tuple2<Selectors, TableId>> getSchemaRoutes(SchemaRegistry schemaRegistry)
+            throws Exception {
+        SchemaDerivation schemaDerivation = getSchemaDerivation(schemaRegistry);
+        Field field = SchemaDerivation.class.getDeclaredField("routes");
+        field.setAccessible(true);
+        return (List<Tuple2<Selectors, TableId>>) field.get(schemaDerivation);
     }
 
     @Override
@@ -152,7 +153,7 @@ public class SchemaRegistryMigrationMock implements MigrationMockBase {
     @Override
     public byte[] serializeObject() throws Exception {
         CompletableFuture<byte[]> future = new CompletableFuture<>();
-        SchemaCoordinator registry = generateSchemaRegistry();
+        SchemaRegistry registry = generateSchemaRegistry();
         setOriginalSchemaMap(registry, ORIGINAL_SCHEMA_MAP);
         setEvolvedSchemaMap(registry, EVOLVED_SCHEMA_MAP);
 
@@ -166,57 +167,15 @@ public class SchemaRegistryMigrationMock implements MigrationMockBase {
 
     @Override
     public boolean deserializeAndCheckObject(int v, byte[] b) throws Exception {
-        SchemaCoordinator expected = generateSchemaRegistry();
+        SchemaRegistry expected = generateSchemaRegistry();
         setOriginalSchemaMap(expected, ORIGINAL_SCHEMA_MAP);
         setEvolvedSchemaMap(expected, EVOLVED_SCHEMA_MAP);
 
-        SchemaCoordinator actual = generateSchemaRegistry();
+        SchemaRegistry actual = generateSchemaRegistry();
         actual.resetToCheckpoint(0, b);
 
         return getOriginalSchemaMap(expected).equals(getOriginalSchemaMap(actual))
-                && getEvolvedSchemaMap(expected).equals(getEvolvedSchemaMap(actual));
+                && getEvolvedSchemaMap(expected).equals(getEvolvedSchemaMap(actual))
+                && getSchemaRoutes(expected).equals(getSchemaRoutes(actual));
     }
-
-    private static final OperatorCoordinator.Context MOCKED_CONTEXT =
-            new OperatorCoordinator.Context() {
-
-                @Override
-                public OperatorID getOperatorId() {
-                    return null;
-                }
-
-                @Override
-                public OperatorCoordinatorMetricGroup metricGroup() {
-                    return null;
-                }
-
-                @Override
-                public void failJob(Throwable throwable) {}
-
-                @Override
-                public int currentParallelism() {
-                    return 0;
-                }
-
-                @Override
-                public ClassLoader getUserCodeClassloader() {
-                    return null;
-                }
-
-                @Override
-                public CoordinatorStore getCoordinatorStore() {
-                    return null;
-                }
-
-                @Override
-                public boolean isConcurrentExecutionAttemptsSupported() {
-                    return false;
-                }
-
-                @Nullable
-                @Override
-                public CheckpointCoordinator getCheckpointCoordinator() {
-                    return null;
-                }
-            };
 }
