@@ -40,7 +40,6 @@ import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -77,203 +76,13 @@ public class SchemaUtils {
     public static List<Object> restoreOriginalData(
             @Nullable RecordData recordData, List<RecordData.FieldGetter> fieldGetters) {
         if (recordData == null) {
-            return Collections.emptyList();
+            return null;
         }
         List<Object> actualFields = new ArrayList<>();
         for (RecordData.FieldGetter fieldGetter : fieldGetters) {
             actualFields.add(fieldGetter.getFieldOrNull(recordData));
         }
         return actualFields;
-    }
-
-    /** Merge compatible upstream schemas. */
-    public static Schema inferWiderSchema(List<Schema> schemas) {
-        if (schemas.isEmpty()) {
-            return null;
-        } else if (schemas.size() == 1) {
-            return schemas.get(0);
-        } else {
-            Schema outputSchema = null;
-            for (Schema schema : schemas) {
-                outputSchema = inferWiderSchema(outputSchema, schema);
-            }
-            return outputSchema;
-        }
-    }
-
-    /** Try to combine two schemas with potential incompatible type. */
-    @VisibleForTesting
-    public static Schema inferWiderSchema(@Nullable Schema lSchema, Schema rSchema) {
-        if (lSchema == null) {
-            return rSchema;
-        }
-        if (lSchema.getColumnCount() != rSchema.getColumnCount()) {
-            throw new IllegalStateException(
-                    String.format(
-                            "Unable to merge schema %s and %s with different column counts.",
-                            lSchema, rSchema));
-        }
-        if (!lSchema.primaryKeys().equals(rSchema.primaryKeys())) {
-            throw new IllegalStateException(
-                    String.format(
-                            "Unable to merge schema %s and %s with different primary keys.",
-                            lSchema, rSchema));
-        }
-        if (!lSchema.partitionKeys().equals(rSchema.partitionKeys())) {
-            throw new IllegalStateException(
-                    String.format(
-                            "Unable to merge schema %s and %s with different partition keys.",
-                            lSchema, rSchema));
-        }
-        if (!lSchema.options().equals(rSchema.options())) {
-            throw new IllegalStateException(
-                    String.format(
-                            "Unable to merge schema %s and %s with different options.",
-                            lSchema, rSchema));
-        }
-        if (!Objects.equals(lSchema.comment(), rSchema.comment())) {
-            throw new IllegalStateException(
-                    String.format(
-                            "Unable to merge schema %s and %s with different comments.",
-                            lSchema, rSchema));
-        }
-
-        List<Column> leftColumns = lSchema.getColumns();
-        List<Column> rightColumns = rSchema.getColumns();
-
-        List<Column> mergedColumns =
-                IntStream.range(0, lSchema.getColumnCount())
-                        .mapToObj(i -> inferWiderColumn(leftColumns.get(i), rightColumns.get(i)))
-                        .collect(Collectors.toList());
-
-        return lSchema.copy(mergedColumns);
-    }
-
-    /** Try to combine two columns with potential incompatible type. */
-    @VisibleForTesting
-    public static Column inferWiderColumn(Column lColumn, Column rColumn) {
-        if (!Objects.equals(lColumn.getName(), rColumn.getName())) {
-            throw new IllegalStateException(
-                    String.format(
-                            "Unable to merge column %s and %s with different name.",
-                            lColumn, rColumn));
-        }
-        if (!Objects.equals(lColumn.getComment(), rColumn.getComment())) {
-            throw new IllegalStateException(
-                    String.format(
-                            "Unable to merge column %s and %s with different comments.",
-                            lColumn, rColumn));
-        }
-        return lColumn.copy(inferWiderType(lColumn.getType(), rColumn.getType()));
-    }
-
-    /** Try to combine given data types to a compatible wider data type. */
-    @VisibleForTesting
-    public static DataType inferWiderType(DataType lType, DataType rType) {
-        // Ignore nullability during data type merge
-        boolean nullable = lType.isNullable() || rType.isNullable();
-        lType = lType.notNull();
-        rType = rType.notNull();
-
-        DataType mergedType;
-        if (lType.equals(rType)) {
-            // identical type
-            mergedType = rType;
-        } else if (lType instanceof TimestampType && rType instanceof TimestampType) {
-            return DataTypes.TIMESTAMP(
-                    Math.max(
-                            ((TimestampType) lType).getPrecision(),
-                            ((TimestampType) rType).getPrecision()));
-        } else if (lType instanceof ZonedTimestampType && rType instanceof ZonedTimestampType) {
-            return DataTypes.TIMESTAMP_TZ(
-                    Math.max(
-                            ((ZonedTimestampType) lType).getPrecision(),
-                            ((ZonedTimestampType) rType).getPrecision()));
-        } else if (lType instanceof LocalZonedTimestampType
-                && rType instanceof LocalZonedTimestampType) {
-            return DataTypes.TIMESTAMP_LTZ(
-                    Math.max(
-                            ((LocalZonedTimestampType) lType).getPrecision(),
-                            ((LocalZonedTimestampType) rType).getPrecision()));
-        } else if (lType.is(DataTypeFamily.TIMESTAMP) && rType.is(DataTypeFamily.TIMESTAMP)) {
-            return DataTypes.TIMESTAMP(TimestampType.MAX_PRECISION);
-        } else if (lType.is(DataTypeFamily.INTEGER_NUMERIC)
-                && rType.is(DataTypeFamily.INTEGER_NUMERIC)) {
-            mergedType = DataTypes.BIGINT();
-        } else if (lType.is(DataTypeFamily.CHARACTER_STRING)
-                && rType.is(DataTypeFamily.CHARACTER_STRING)) {
-            mergedType = DataTypes.STRING();
-        } else if (lType.is(DataTypeFamily.APPROXIMATE_NUMERIC)
-                && rType.is(DataTypeFamily.APPROXIMATE_NUMERIC)) {
-            mergedType = DataTypes.DOUBLE();
-        } else if (lType instanceof DecimalType && rType instanceof DecimalType) {
-            // Merge two decimal types
-            DecimalType lhsDecimal = (DecimalType) lType;
-            DecimalType rhsDecimal = (DecimalType) rType;
-            int resultIntDigits =
-                    Math.max(
-                            lhsDecimal.getPrecision() - lhsDecimal.getScale(),
-                            rhsDecimal.getPrecision() - rhsDecimal.getScale());
-            int resultScale = Math.max(lhsDecimal.getScale(), rhsDecimal.getScale());
-            Preconditions.checkArgument(
-                    resultIntDigits + resultScale <= DecimalType.MAX_PRECISION,
-                    String.format(
-                            "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
-                            lType,
-                            rType,
-                            resultIntDigits + resultScale,
-                            DecimalType.MAX_PRECISION));
-            mergedType = DataTypes.DECIMAL(resultIntDigits + resultScale, resultScale);
-        } else if (lType instanceof DecimalType && rType.is(DataTypeFamily.EXACT_NUMERIC)) {
-            // Merge decimal and int
-            mergedType = mergeExactNumericsIntoDecimal((DecimalType) lType, rType);
-        } else if (rType instanceof DecimalType && lType.is(DataTypeFamily.EXACT_NUMERIC)) {
-            // Merge decimal and int
-            mergedType = mergeExactNumericsIntoDecimal((DecimalType) rType, lType);
-        } else {
-            throw new IllegalStateException(
-                    String.format("Incompatible types: \"%s\" and \"%s\"", lType, rType));
-        }
-
-        if (nullable) {
-            return mergedType.nullable();
-        } else {
-            return mergedType.notNull();
-        }
-    }
-
-    private static DataType mergeExactNumericsIntoDecimal(
-            DecimalType decimalType, DataType otherType) {
-        int resultPrecision =
-                Math.max(
-                        decimalType.getPrecision(),
-                        decimalType.getScale() + getNumericPrecision(otherType));
-        Preconditions.checkArgument(
-                resultPrecision <= DecimalType.MAX_PRECISION,
-                String.format(
-                        "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
-                        decimalType, otherType, resultPrecision, DecimalType.MAX_PRECISION));
-        return DataTypes.DECIMAL(resultPrecision, decimalType.getScale());
-    }
-
-    @VisibleForTesting
-    public static int getNumericPrecision(DataType dataType) {
-        if (dataType.is(DataTypeFamily.EXACT_NUMERIC)) {
-            if (dataType.is(DataTypeRoot.TINYINT)) {
-                return 3;
-            } else if (dataType.is(DataTypeRoot.SMALLINT)) {
-                return 5;
-            } else if (dataType.is(DataTypeRoot.INTEGER)) {
-                return 10;
-            } else if (dataType.is(DataTypeRoot.BIGINT)) {
-                return 19;
-            } else if (dataType.is(DataTypeRoot.DECIMAL)) {
-                return ((DecimalType) dataType).getPrecision();
-            }
-        }
-
-        throw new IllegalArgumentException(
-                "Failed to get precision of non-exact decimal type " + dataType);
     }
 
     /** apply SchemaChangeEvent to the old schema and return the schema after changing. */
@@ -468,5 +277,310 @@ public class SchemaUtils {
             evolvedSchemaChangeEvent = Optional.of(event);
         }
         return evolvedSchemaChangeEvent;
+    }
+
+    /**
+     * This function checks if the given schema change event has been applied already. If so, it
+     * will be ignored to avoid sending duplicate evolved schema change events to sink metadata
+     * applier.
+     */
+    public static boolean isSchemaChangeEventRedundant(
+            @Nullable Schema currentSchema, SchemaChangeEvent event) {
+        Optional<Schema> latestSchema = Optional.ofNullable(currentSchema);
+        return Boolean.TRUE.equals(
+                SchemaChangeEventVisitor.visit(
+                        event,
+                        addColumnEvent -> {
+                            // It has not been applied if schema does not even exist
+                            if (!latestSchema.isPresent()) {
+                                return false;
+                            }
+                            List<Column> existedColumns = latestSchema.get().getColumns();
+
+                            // It has been applied only if all columns are present in existedColumns
+                            for (AddColumnEvent.ColumnWithPosition column :
+                                    addColumnEvent.getAddedColumns()) {
+                                if (!existedColumns.contains(column.getAddColumn())) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        },
+                        alterColumnTypeEvent -> {
+                            // It has not been applied if schema does not even exist
+                            if (!latestSchema.isPresent()) {
+                                return false;
+                            }
+                            Schema schema = latestSchema.get();
+
+                            // It has been applied only if all column types are set as expected
+                            for (Map.Entry<String, DataType> entry :
+                                    alterColumnTypeEvent.getTypeMapping().entrySet()) {
+                                if (!schema.getColumn(entry.getKey()).isPresent()
+                                        || !schema.getColumn(entry.getKey())
+                                                .get()
+                                                .getType()
+                                                .equals(entry.getValue())) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        },
+                        createTableEvent -> {
+                            // It has been applied if such table already exists
+                            return latestSchema.isPresent();
+                        },
+                        dropColumnEvent -> {
+                            // It has not been applied if schema does not even exist
+                            if (!latestSchema.isPresent()) {
+                                return false;
+                            }
+                            List<String> existedColumnNames = latestSchema.get().getColumnNames();
+
+                            // It has been applied only if corresponding column types do not exist
+                            return dropColumnEvent.getDroppedColumnNames().stream()
+                                    .noneMatch(existedColumnNames::contains);
+                        },
+                        dropTableEvent -> {
+                            // It has been applied if such table does not exist
+                            return !latestSchema.isPresent();
+                        },
+                        renameColumnEvent -> {
+                            // It has been applied if such table already exists
+                            if (!latestSchema.isPresent()) {
+                                return false;
+                            }
+                            List<String> existedColumnNames = latestSchema.get().getColumnNames();
+
+                            // It has been applied only if all previous names do not exist, and all
+                            // new names already exist
+                            for (Map.Entry<String, String> entry :
+                                    renameColumnEvent.getNameMapping().entrySet()) {
+                                if (existedColumnNames.contains(entry.getKey())
+                                        || !existedColumnNames.contains(entry.getValue())) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        },
+                        truncateTableEvent -> {
+                            // We have no way to ensure if a TruncateTableEvent has been applied
+                            // before. Just assume it's not.
+                            return false;
+                        }));
+    }
+
+    // Schema merging related utility methods have been moved to SchemaMergingUtils class.
+    // The following methods have been deprecated and should not be used.
+
+    /**
+     * Merge compatible schemas.
+     *
+     * @deprecated Use {@code getCommonSchema} in {@link SchemaMergingUtils} instead.
+     */
+    @Deprecated
+    public static Schema inferWiderSchema(List<Schema> schemas) {
+        if (schemas.isEmpty()) {
+            return null;
+        } else if (schemas.size() == 1) {
+            return schemas.get(0);
+        } else {
+            Schema outputSchema = null;
+            for (Schema schema : schemas) {
+                outputSchema = inferWiderSchema(outputSchema, schema);
+            }
+            return outputSchema;
+        }
+    }
+
+    /**
+     * Try to combine two schemas with potential incompatible type.
+     *
+     * @deprecated Use {@code getLeastCommonSchema} in {@link SchemaMergingUtils} instead.
+     */
+    @Deprecated
+    @VisibleForTesting
+    public static Schema inferWiderSchema(@Nullable Schema lSchema, Schema rSchema) {
+        if (lSchema == null) {
+            return rSchema;
+        }
+        if (lSchema.getColumnCount() != rSchema.getColumnCount()) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Unable to merge schema %s and %s with different column counts.",
+                            lSchema, rSchema));
+        }
+        if (!lSchema.primaryKeys().equals(rSchema.primaryKeys())) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Unable to merge schema %s and %s with different primary keys.",
+                            lSchema, rSchema));
+        }
+        if (!lSchema.partitionKeys().equals(rSchema.partitionKeys())) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Unable to merge schema %s and %s with different partition keys.",
+                            lSchema, rSchema));
+        }
+        if (!lSchema.options().equals(rSchema.options())) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Unable to merge schema %s and %s with different options.",
+                            lSchema, rSchema));
+        }
+        if (!Objects.equals(lSchema.comment(), rSchema.comment())) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Unable to merge schema %s and %s with different comments.",
+                            lSchema, rSchema));
+        }
+
+        List<Column> leftColumns = lSchema.getColumns();
+        List<Column> rightColumns = rSchema.getColumns();
+
+        List<Column> mergedColumns =
+                IntStream.range(0, lSchema.getColumnCount())
+                        .mapToObj(i -> inferWiderColumn(leftColumns.get(i), rightColumns.get(i)))
+                        .collect(Collectors.toList());
+
+        return lSchema.copy(mergedColumns);
+    }
+
+    /**
+     * Try to combine two columns with potential incompatible type.
+     *
+     * @deprecated Use {@code getLeastCommonType} in {@link SchemaMergingUtils} instead.
+     */
+    @Deprecated
+    @VisibleForTesting
+    public static Column inferWiderColumn(Column lColumn, Column rColumn) {
+        if (!Objects.equals(lColumn.getName(), rColumn.getName())) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Unable to merge column %s and %s with different name.",
+                            lColumn, rColumn));
+        }
+        if (!Objects.equals(lColumn.getComment(), rColumn.getComment())) {
+            throw new IllegalStateException(
+                    String.format(
+                            "Unable to merge column %s and %s with different comments.",
+                            lColumn, rColumn));
+        }
+        return lColumn.copy(inferWiderType(lColumn.getType(), rColumn.getType()));
+    }
+
+    /**
+     * Try to combine given data types to a compatible wider data type.
+     *
+     * @deprecated Use {@code getLeastCommonType} in {@link SchemaMergingUtils} instead.
+     */
+    @Deprecated
+    @VisibleForTesting
+    public static DataType inferWiderType(DataType lType, DataType rType) {
+        // Ignore nullability during data type merge
+        boolean nullable = lType.isNullable() || rType.isNullable();
+        lType = lType.notNull();
+        rType = rType.notNull();
+
+        DataType mergedType;
+        if (lType.equals(rType)) {
+            // identical type
+            mergedType = rType;
+        } else if (lType instanceof TimestampType && rType instanceof TimestampType) {
+            return DataTypes.TIMESTAMP(
+                    Math.max(
+                            ((TimestampType) lType).getPrecision(),
+                            ((TimestampType) rType).getPrecision()));
+        } else if (lType instanceof ZonedTimestampType && rType instanceof ZonedTimestampType) {
+            return DataTypes.TIMESTAMP_TZ(
+                    Math.max(
+                            ((ZonedTimestampType) lType).getPrecision(),
+                            ((ZonedTimestampType) rType).getPrecision()));
+        } else if (lType instanceof LocalZonedTimestampType
+                && rType instanceof LocalZonedTimestampType) {
+            return DataTypes.TIMESTAMP_LTZ(
+                    Math.max(
+                            ((LocalZonedTimestampType) lType).getPrecision(),
+                            ((LocalZonedTimestampType) rType).getPrecision()));
+        } else if (lType.is(DataTypeFamily.TIMESTAMP) && rType.is(DataTypeFamily.TIMESTAMP)) {
+            return DataTypes.TIMESTAMP(TimestampType.MAX_PRECISION);
+        } else if (lType.is(DataTypeFamily.INTEGER_NUMERIC)
+                && rType.is(DataTypeFamily.INTEGER_NUMERIC)) {
+            mergedType = DataTypes.BIGINT();
+        } else if (lType.is(DataTypeFamily.CHARACTER_STRING)
+                && rType.is(DataTypeFamily.CHARACTER_STRING)) {
+            mergedType = DataTypes.STRING();
+        } else if (lType.is(DataTypeFamily.APPROXIMATE_NUMERIC)
+                && rType.is(DataTypeFamily.APPROXIMATE_NUMERIC)) {
+            mergedType = DataTypes.DOUBLE();
+        } else if (lType instanceof DecimalType && rType instanceof DecimalType) {
+            // Merge two decimal types
+            DecimalType lhsDecimal = (DecimalType) lType;
+            DecimalType rhsDecimal = (DecimalType) rType;
+            int resultIntDigits =
+                    Math.max(
+                            lhsDecimal.getPrecision() - lhsDecimal.getScale(),
+                            rhsDecimal.getPrecision() - rhsDecimal.getScale());
+            int resultScale = Math.max(lhsDecimal.getScale(), rhsDecimal.getScale());
+            Preconditions.checkArgument(
+                    resultIntDigits + resultScale <= DecimalType.MAX_PRECISION,
+                    String.format(
+                            "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
+                            lType,
+                            rType,
+                            resultIntDigits + resultScale,
+                            DecimalType.MAX_PRECISION));
+            mergedType = DataTypes.DECIMAL(resultIntDigits + resultScale, resultScale);
+        } else if (lType instanceof DecimalType && rType.is(DataTypeFamily.EXACT_NUMERIC)) {
+            // Merge decimal and int
+            mergedType = mergeExactNumericsIntoDecimal((DecimalType) lType, rType);
+        } else if (rType instanceof DecimalType && lType.is(DataTypeFamily.EXACT_NUMERIC)) {
+            // Merge decimal and int
+            mergedType = mergeExactNumericsIntoDecimal((DecimalType) rType, lType);
+        } else {
+            throw new IllegalStateException(
+                    String.format("Incompatible types: \"%s\" and \"%s\"", lType, rType));
+        }
+
+        if (nullable) {
+            return mergedType.nullable();
+        } else {
+            return mergedType.notNull();
+        }
+    }
+
+    private static DataType mergeExactNumericsIntoDecimal(
+            DecimalType decimalType, DataType otherType) {
+        int resultPrecision =
+                Math.max(
+                        decimalType.getPrecision(),
+                        decimalType.getScale() + getNumericPrecision(otherType));
+        Preconditions.checkArgument(
+                resultPrecision <= DecimalType.MAX_PRECISION,
+                String.format(
+                        "Failed to merge %s and %s type into DECIMAL. %d precision digits required, %d available",
+                        decimalType, otherType, resultPrecision, DecimalType.MAX_PRECISION));
+        return DataTypes.DECIMAL(resultPrecision, decimalType.getScale());
+    }
+
+    @Deprecated
+    @VisibleForTesting
+    public static int getNumericPrecision(DataType dataType) {
+        if (dataType.is(DataTypeFamily.EXACT_NUMERIC)) {
+            if (dataType.is(DataTypeRoot.TINYINT)) {
+                return 3;
+            } else if (dataType.is(DataTypeRoot.SMALLINT)) {
+                return 5;
+            } else if (dataType.is(DataTypeRoot.INTEGER)) {
+                return 10;
+            } else if (dataType.is(DataTypeRoot.BIGINT)) {
+                return 19;
+            } else if (dataType.is(DataTypeRoot.DECIMAL)) {
+                return ((DecimalType) dataType).getPrecision();
+            }
+        }
+
+        throw new IllegalArgumentException(
+                "Failed to get precision of non-exact decimal type " + dataType);
     }
 }
