@@ -1215,8 +1215,14 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     boolean extractDataLines(String line) {
         // In multiple parallelism mode, a prefix with subTaskId (like '1> ') will be appended.
         // Should trim it before extracting data fields.
-        if (!line.startsWith("DataChangeEvent{", 3)) {
-            return false;
+        if (parallelism > 1) {
+            if (!line.startsWith("DataChangeEvent{", 3)) {
+                return false;
+            }
+        } else {
+            if (!line.startsWith("DataChangeEvent{")) {
+                return false;
+            }
         }
         Stream.of("before", "after")
                 .forEach(

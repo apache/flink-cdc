@@ -373,7 +373,7 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
 
         stream =
-                schemaOperatorTranslator.translate(
+                schemaOperatorTranslator.translateRegular(
                         stream,
                         DEFAULT_PARALLELISM,
                         starRocksSink
