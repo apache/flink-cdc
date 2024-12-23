@@ -21,7 +21,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.runtime.operators.schema.common.SchemaManager;
+import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaManager;
 
 import java.util.HashMap;
 import java.util.Map;

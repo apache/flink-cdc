@@ -115,54 +115,31 @@ def test_migration(from_version, to_version)
 end
 
 version_list = case ARGV[0]
-               when '1.18.1' then %w[3.0.0 3.0.1 3.1.1 3.3-SNAPSHOT]
-               when '1.19.1' then %w[3.1.1 3.3-SNAPSHOT]
-               when '1.20.0' then %w[3.3-SNAPSHOT]
+               when '1.19.1' then %w[3.2.0 3.2.1 3.3-SNAPSHOT]
+               when '1.20.0' then %w[3.2.1 3.3-SNAPSHOT]
                else []
                end
 
-no_savepoint_versions = %w[3.0.0 3.0.1]
 version_result = Hash.new('❓')
 @failures = []
 
+new_version = version_list.last
+
 version_list.each_with_index do |old_version, old_index|
+  puts "-> Testing migrating from #{old_version} to latest snapshot."
   puts 'Restarting cluster...'
   `#{FLINK_HOME}/bin/stop-cluster.sh`
   puts 'Stopped cluster.'
   `#{FLINK_HOME}/bin/start-cluster.sh`
   puts 'Started cluster.'
-  version_list.each_with_index do |new_version, new_index|
-    next if old_index > new_index
-    next if no_savepoint_versions.include? new_version
 
-    result = test_migration old_version, new_version
-    version_result[old_version + new_version] = result ? '✅' : '❌'
-    @failures << [old_version, new_version] unless result
-  end
+  result = test_migration old_version, new_version
+  version_result[old_version + new_version] = result ? '✅' : '❌'
+  @failures << [old_version, new_version] unless result
 end
-
-printable_result = []
-printable_result << [''] + version_list
-version_list.each_with_index do |old_version, old_index|
-  table_line = [old_version]
-  version_list.each_with_index do |new_version, new_index|
-    table_line << if old_index > new_index
-                    ''
-                  else
-                    version_result[old_version + new_version]
-                  end
-  end
-  printable_result << table_line
-end
-
-begin
-  require 'terminal-table'
-  puts Terminal::Table.new rows: printable_result, title: 'Migration Test Result'
-rescue LoadError
-  puts 'Test summary: ', printable_result
-end
-puts "✅ - Compatible, ❌ - Not compatible, ❓ - Target version doesn't support `--from-savepoint`"
 
 if @failures.any?
+  puts 'Some migration to snapshot version tests failed. Details: '
+  puts @failures
   abort 'Some migration to snapshot version tests failed.'
 end
