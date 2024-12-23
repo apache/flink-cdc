@@ -15,56 +15,73 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.event;
+package org.apache.flink.cdc.runtime.operators.schema.regular.event;
 
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
-import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
+import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaCoordinator;
+import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
- * The response for {@link SchemaChangeRequest} from {@link SchemaRegistry} to {@link
+ * The response for {@link SchemaChangeRequest} from {@link SchemaCoordinator} to {@link
  * SchemaOperator}.
  */
 public class SchemaChangeResponse implements CoordinationResponse {
     private static final long serialVersionUID = 1L;
 
     /**
-     * Whether the SchemaOperator need to buffer data and the SchemaOperatorCoordinator need to wait
-     * for flushing.
+     * Actually finished schema change events. This will only be effective if status is {@code
+     * accepted}.
      */
-    private final List<SchemaChangeEvent> schemaChangeEvents;
+    private final List<SchemaChangeEvent> appliedSchemaChangeEvents;
+
+    private final Map<TableId, Schema> evolvedSchemas;
 
     private final ResponseCode responseCode;
 
-    public static SchemaChangeResponse accepted(List<SchemaChangeEvent> schemaChangeEvents) {
-        return new SchemaChangeResponse(schemaChangeEvents, ResponseCode.ACCEPTED);
+    public static SchemaChangeResponse success(
+            List<SchemaChangeEvent> schemaChangeEvents, Map<TableId, Schema> evolvedSchemas) {
+        return new SchemaChangeResponse(ResponseCode.SUCCESS, schemaChangeEvents, evolvedSchemas);
     }
 
     public static SchemaChangeResponse busy() {
-        return new SchemaChangeResponse(Collections.emptyList(), ResponseCode.BUSY);
+        return new SchemaChangeResponse(ResponseCode.BUSY);
     }
 
     public static SchemaChangeResponse duplicate() {
-        return new SchemaChangeResponse(Collections.emptyList(), ResponseCode.DUPLICATE);
+        return new SchemaChangeResponse(ResponseCode.DUPLICATE);
     }
 
     public static SchemaChangeResponse ignored() {
-        return new SchemaChangeResponse(Collections.emptyList(), ResponseCode.IGNORED);
+        return new SchemaChangeResponse(ResponseCode.IGNORED);
+    }
+
+    public static SchemaChangeResponse waitingForFlush() {
+        return new SchemaChangeResponse(ResponseCode.WAITING_FOR_FLUSH);
+    }
+
+    private SchemaChangeResponse(ResponseCode responseCode) {
+        this(responseCode, Collections.emptyList(), Collections.emptyMap());
     }
 
     private SchemaChangeResponse(
-            List<SchemaChangeEvent> schemaChangeEvents, ResponseCode responseCode) {
-        this.schemaChangeEvents = schemaChangeEvents;
+            ResponseCode responseCode,
+            List<SchemaChangeEvent> appliedSchemaChangeEvents,
+            Map<TableId, Schema> evolvedSchemas) {
         this.responseCode = responseCode;
+        this.appliedSchemaChangeEvents = appliedSchemaChangeEvents;
+        this.evolvedSchemas = evolvedSchemas;
     }
 
-    public boolean isAccepted() {
-        return ResponseCode.ACCEPTED.equals(responseCode);
+    public boolean isSuccess() {
+        return ResponseCode.SUCCESS.equals(responseCode);
     }
 
     public boolean isRegistryBusy() {
@@ -79,8 +96,16 @@ public class SchemaChangeResponse implements CoordinationResponse {
         return ResponseCode.IGNORED.equals(responseCode);
     }
 
-    public List<SchemaChangeEvent> getSchemaChangeEvents() {
-        return schemaChangeEvents;
+    public boolean isWaitingForFlush() {
+        return ResponseCode.WAITING_FOR_FLUSH.equals(responseCode);
+    }
+
+    public List<SchemaChangeEvent> getAppliedSchemaChangeEvents() {
+        return appliedSchemaChangeEvents;
+    }
+
+    public Map<TableId, Schema> getEvolvedSchemas() {
+        return evolvedSchemas;
     }
 
     @Override
@@ -92,20 +117,20 @@ public class SchemaChangeResponse implements CoordinationResponse {
             return false;
         }
         SchemaChangeResponse response = (SchemaChangeResponse) o;
-        return Objects.equals(schemaChangeEvents, response.schemaChangeEvents)
+        return Objects.equals(appliedSchemaChangeEvents, response.appliedSchemaChangeEvents)
                 && responseCode == response.responseCode;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(schemaChangeEvents, responseCode);
+        return Objects.hash(appliedSchemaChangeEvents, responseCode);
     }
 
     @Override
     public String toString() {
         return "SchemaChangeResponse{"
                 + "schemaChangeEvents="
-                + schemaChangeEvents
+                + appliedSchemaChangeEvents
                 + ", responseCode="
                 + responseCode
                 + '}';
@@ -126,9 +151,10 @@ public class SchemaChangeResponse implements CoordinationResponse {
      * required. Possibly caused by LENIENT mode or merging table strategies.
      */
     public enum ResponseCode {
-        ACCEPTED,
+        SUCCESS,
         BUSY,
         DUPLICATE,
-        IGNORED
+        IGNORED,
+        WAITING_FOR_FLUSH
     }
 }

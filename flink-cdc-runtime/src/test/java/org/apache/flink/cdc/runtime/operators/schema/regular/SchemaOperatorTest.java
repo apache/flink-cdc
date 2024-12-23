@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema;
+package org.apache.flink.cdc.runtime.operators.schema.regular;
 
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -26,13 +26,13 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
-import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
+import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -46,6 +46,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 
 /** Unit tests for the {@link SchemaOperator}. */
 public class SchemaOperatorTest {
@@ -67,14 +69,21 @@ public class SchemaOperatorTest {
         final OperatorID opID = new OperatorID();
         final TableId tableId = TableId.tableId("testProcessElement");
         final RowType rowType = DataTypes.ROW(DataTypes.BIGINT(), DataTypes.STRING());
+        final Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
 
         List<OneInputStreamOperatorTestHarness<Event, Event>> testHarnesses = new ArrayList<>();
         for (int subtaskIndex = 0; subtaskIndex < parallelism; subtaskIndex++) {
+            SchemaOperator operator = new SchemaOperator(new ArrayList<>());
             OneInputStreamOperatorTestHarness<Event, Event> testHarness =
-                    createTestHarness(maxParallelism, parallelism, subtaskIndex, opID);
+                    createTestHarness(maxParallelism, parallelism, subtaskIndex, opID, operator);
             testHarnesses.add(testHarness);
             testHarness.setup(EventSerializer.INSTANCE);
             testHarness.open();
+            operator.registerInitialSchema(tableId, schema);
 
             Map<String, String> meta = new HashMap<>();
             meta.put("subtask", String.valueOf(subtaskIndex));
@@ -114,15 +123,18 @@ public class SchemaOperatorTest {
     void testProcessSchemaChangeEventWithTimeOut() throws Exception {
         SchemaOperator schemaOperator =
                 new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(1));
-        EventOperatorTestHarness<SchemaOperator, Event> harness =
-                new EventOperatorTestHarness<>(schemaOperator, 1, Duration.ofSeconds(3));
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDuration(
+                        schemaOperator, 1, Duration.ofSeconds(3));
         harness.open();
-        Assertions.assertThrowsExactly(
-                TimeoutException.class,
-                () ->
-                        schemaOperator.processElement(
-                                new StreamRecord<>(
-                                        new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))));
+        assertThatThrownBy(
+                        () ->
+                                schemaOperator.processElement(
+                                        new StreamRecord<>(
+                                                new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))))
+                .isExactlyInstanceOf(IllegalStateException.class)
+                .cause()
+                .isExactlyInstanceOf(TimeoutException.class);
         harness.close();
     }
 
@@ -130,22 +142,28 @@ public class SchemaOperatorTest {
     void testProcessSchemaChangeEventWithOutTimeOut() throws Exception {
         SchemaOperator schemaOperator =
                 new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30));
-        EventOperatorTestHarness<SchemaOperator, Event> harness =
-                new EventOperatorTestHarness<>(schemaOperator, 1, Duration.ofSeconds(3));
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDuration(
+                        schemaOperator, 1, Duration.ofSeconds(3));
         harness.open();
-        Assertions.assertDoesNotThrow(
-                () ->
-                        schemaOperator.processElement(
-                                new StreamRecord<>(
-                                        new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))));
+        assertThatCode(
+                        () ->
+                                schemaOperator.processElement(
+                                        new StreamRecord<>(
+                                                new CreateTableEvent(CUSTOMERS, CUSTOMERS_SCHEMA))))
+                .doesNotThrowAnyException();
         harness.close();
     }
 
     private OneInputStreamOperatorTestHarness<Event, Event> createTestHarness(
-            int maxParallelism, int parallelism, int subtaskIndex, OperatorID opID)
+            int maxParallelism,
+            int parallelism,
+            int subtaskIndex,
+            OperatorID opID,
+            OneInputStreamOperator<Event, Event> operator)
             throws Exception {
         return new OneInputStreamOperatorTestHarness<>(
-                new SchemaOperator(new ArrayList<>()),
+                operator,
                 maxParallelism,
                 parallelism,
                 subtaskIndex,
