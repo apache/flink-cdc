@@ -178,4 +178,9 @@ public final class AddColumnEvent implements SchemaChangeEvent {
     public SchemaChangeEventType getType() {
         return SchemaChangeEventType.ADD_COLUMN;
     }
+
+    @Override
+    public SchemaChangeEvent copy(TableId newTableId) {
+        return new AddColumnEvent(newTableId, addedColumns);
+    }
 }

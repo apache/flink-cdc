@@ -88,4 +88,11 @@ public class MySqlDataSource implements DataSource {
     public SupportedMetadataColumn[] supportedMetadataColumns() {
         return new SupportedMetadataColumn[] {new OpTsMetadataColumn()};
     }
+
+    @Override
+    public boolean isParallelMetadataSource() {
+        // During incremental stage, MySQL never emits schema change events on different partitions
+        // (since it has one Binlog stream only.)
+        return false;
+    }
 }
