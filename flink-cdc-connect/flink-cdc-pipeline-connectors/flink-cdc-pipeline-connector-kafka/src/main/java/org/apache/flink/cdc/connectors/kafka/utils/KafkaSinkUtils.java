@@ -41,7 +41,7 @@ public class KafkaSinkUtils {
             String[] selectorsAndTopic = mapping.split(DELIMITER_SELECTOR_TOPIC);
             Preconditions.checkArgument(
                     selectorsAndTopic.length == 2,
-                    "Please check you configuration of "
+                    "Please check your configuration of "
                             + KafkaDataSinkOptions.SINK_TABLE_ID_TO_TOPIC_MAPPING);
             Selectors selectors =
                     new Selectors.SelectorsBuilder().includeTables(selectorsAndTopic[0]).build();
