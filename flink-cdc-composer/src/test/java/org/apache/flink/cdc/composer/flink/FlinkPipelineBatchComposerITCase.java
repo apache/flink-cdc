@@ -170,7 +170,7 @@ public class FlinkPipelineBatchComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RunTimeMode.BATCH);
         pipelineConfig.set(
-                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.IGNORE);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
