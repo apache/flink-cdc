@@ -350,7 +350,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
                                 .primaryKey("id")
@@ -396,7 +396,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING().notNull())
                                 .physicalColumn("age", DataTypes.INT().notNull())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -515,7 +515,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -562,7 +562,7 @@ public class UnifiedTransformOperatorTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("computed", DataTypes.INT())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .primaryKey("id")
@@ -611,7 +611,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("__namespace_name__", DataTypes.STRING().notNull())
@@ -665,7 +665,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("identifier_name", DataTypes.STRING())
@@ -714,7 +714,7 @@ public class UnifiedTransformOperatorTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("identifier_name", DataTypes.STRING())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .primaryKey("id")
@@ -765,7 +765,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("identifier_name", DataTypes.STRING())
@@ -855,7 +855,7 @@ public class UnifiedTransformOperatorTest {
                                 .physicalColumn("__namespace_name__", DataTypes.STRING().notNull())
                                 .physicalColumn("__schema_name__", DataTypes.STRING().notNull())
                                 .physicalColumn("__table_name__", DataTypes.STRING().notNull())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .primaryKey("id")
@@ -942,7 +942,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING().notNull())
                                 .physicalColumn("age", DataTypes.INT().notNull())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -1065,7 +1065,10 @@ public class UnifiedTransformOperatorTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn(
-                                        "id", DataTypes.INT(), "id column", "AUTO_INCREMENT()")
+                                        "id",
+                                        DataTypes.INT().notNull(),
+                                        "id column",
+                                        "AUTO_INCREMENT()")
                                 .physicalColumn(
                                         "name", DataTypes.STRING(), "name column", "John Smith")
                                 .physicalColumn("age", DataTypes.INT(), "age column", "17")
@@ -1098,7 +1101,10 @@ public class UnifiedTransformOperatorTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn(
-                                        "id", DataTypes.INT(), "id column", "AUTO_INCREMENT()")
+                                        "id",
+                                        DataTypes.INT().notNull(),
+                                        "id column",
+                                        "AUTO_INCREMENT()")
                                 .physicalColumn("age", DataTypes.INT(), "age column", "17")
                                 .physicalColumn("computed", DataTypes.INT())
                                 .primaryKey("id")
@@ -1145,7 +1151,10 @@ public class UnifiedTransformOperatorTest {
                                 .physicalColumn(
                                         "name", DataTypes.STRING(), "name column", "John Smith")
                                 .physicalColumn(
-                                        "id", DataTypes.INT(), "id column", "AUTO_INCREMENT()")
+                                        "id",
+                                        DataTypes.INT().notNull(),
+                                        "id column",
+                                        "AUTO_INCREMENT()")
                                 .primaryKey("id")
                                 .build())
                 .initializeHarness()

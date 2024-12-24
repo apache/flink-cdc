@@ -245,7 +245,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
                                 .primaryKey("id")
@@ -302,7 +302,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
                                 .primaryKey("id")
@@ -362,7 +362,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -412,7 +412,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -547,7 +547,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("computed1", DataTypes.INT())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed2", DataTypes.INT())
@@ -682,7 +682,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("computed", DataTypes.INT())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .primaryKey("id")

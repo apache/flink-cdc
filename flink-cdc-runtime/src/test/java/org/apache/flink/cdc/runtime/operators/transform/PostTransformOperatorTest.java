@@ -45,7 +45,7 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "customers");
     private static final Schema CUSTOMERS_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("col2", DataTypes.STRING())
                     .physicalColumn("col12", DataTypes.STRING())
                     .primaryKey("col1")
@@ -55,7 +55,7 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "data_types");
     private static final Schema DATATYPE_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("colString", DataTypes.STRING())
+                    .physicalColumn("colString", DataTypes.STRING().notNull())
                     .physicalColumn("colBoolean", DataTypes.BOOLEAN())
                     .physicalColumn("colTinyint", DataTypes.TINYINT())
                     .physicalColumn("colSmallint", DataTypes.SMALLINT())
@@ -74,12 +74,12 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "metadata_table");
     private static final Schema METADATA_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .primaryKey("col1")
                     .build();
     private static final Schema EXPECTED_METADATA_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("identifier_name", DataTypes.STRING())
                     .physicalColumn("__namespace_name__", DataTypes.STRING().notNull())
                     .physicalColumn("__schema_name__", DataTypes.STRING().notNull())
@@ -91,7 +91,7 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "metadata_as_table");
     private static final Schema METADATA_AS_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("sid", DataTypes.INT())
+                    .physicalColumn("sid", DataTypes.INT().notNull())
                     .physicalColumn("name", DataTypes.STRING())
                     .physicalColumn("name_upper", DataTypes.STRING())
                     .physicalColumn("tbname", DataTypes.STRING().notNull())
@@ -102,7 +102,7 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "timestamp_table");
     private static final Schema TIMESTAMP_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("time_equal", DataTypes.INT())
                     .physicalColumn("timestamp_equal", DataTypes.INT())
                     .physicalColumn("date_equal", DataTypes.INT())
@@ -113,7 +113,7 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "timestampdiff_table");
     private static final Schema TIMESTAMPDIFF_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("second_diff", DataTypes.INT())
                     .physicalColumn("minute_diff", DataTypes.INT())
                     .physicalColumn("hour_diff", DataTypes.INT())
@@ -125,7 +125,7 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "data_null");
     private static final Schema NULL_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("colString", DataTypes.STRING())
                     .physicalColumn("nullInt", DataTypes.INT())
                     .physicalColumn("nullBoolean", DataTypes.BOOLEAN())
@@ -145,7 +145,7 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "data_cast");
     private static final Schema CAST_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("castInt", DataTypes.INT())
                     .physicalColumn("castBoolean", DataTypes.BOOLEAN())
                     .physicalColumn("castTinyint", DataTypes.TINYINT())
@@ -164,7 +164,7 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "timezone_table");
     private static final Schema TIMEZONE_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("datetime", DataTypes.STRING())
                     .primaryKey("col1")
                     .build();
@@ -173,7 +173,7 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "condition_table");
     private static final Schema CONDITION_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("condition_result", DataTypes.BOOLEAN())
                     .primaryKey("col1")
                     .build();
@@ -232,7 +232,7 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "column_square");
     private static final Schema COLUMN_SQUARE_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.INT())
+                    .physicalColumn("col1", DataTypes.INT().notNull())
                     .physicalColumn("col2", DataTypes.INT())
                     .physicalColumn("square_col2", DataTypes.INT())
                     .primaryKey("col1")
@@ -604,7 +604,7 @@ public class PostTransformOperatorTest {
                         RegularEventOperatorTestHarness.with(transform, 1);
         Schema expectedSchema =
                 Schema.newBuilder()
-                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col1", DataTypes.STRING().notNull())
                         .physicalColumn("identifier_name", DataTypes.STRING())
                         .physicalColumn("__namespace_name__", DataTypes.STRING().notNull())
                         .physicalColumn("__schema_name__", DataTypes.STRING().notNull())
