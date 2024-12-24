@@ -95,13 +95,6 @@ public class FlinkPipelineComposer implements PipelineComposer {
     public PipelineExecution compose(PipelineDef pipelineDef) {
         Configuration pipelineDefConfig = pipelineDef.getConfig();
 
-        boolean isBatchMode = false;
-        if (RunTimeMode.BATCH.equals(
-                pipelineDefConfig.get(PipelineOptions.PIPELINE_RUNTIME_MODE))) {
-            isBatchMode = true;
-            env.setRuntimeMode(RuntimeExecutionMode.BATCH);
-        }
-
         int parallelism = pipelineDefConfig.get(PipelineOptions.PIPELINE_PARALLELISM);
         env.getConfig().setParallelism(parallelism);
 
@@ -119,6 +112,13 @@ public class FlinkPipelineComposer implements PipelineComposer {
         int parallelism = pipelineDefConfig.get(PipelineOptions.PIPELINE_PARALLELISM);
         SchemaChangeBehavior schemaChangeBehavior =
                 pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
+
+        boolean isBatchMode = false;
+        if (RunTimeMode.BATCH.equals(
+                pipelineDefConfig.get(PipelineOptions.PIPELINE_RUNTIME_MODE))) {
+            isBatchMode = true;
+            env.setRuntimeMode(RuntimeExecutionMode.BATCH);
+        }
 
         // Initialize translators
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
@@ -166,7 +166,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getModels(),
                         dataSource.supportedMetadataColumns());
 
-        if (isParallelMetadataSource) {
+        if (isParallelMetadataSource || isBatchMode) {
             // Translate a distributed topology for sources with distributed tables
             // PostTransform -> Partitioning
             DataStream<PartitioningEvent> partitionedStream =
