@@ -40,10 +40,12 @@ import io.debezium.pipeline.source.AbstractSnapshotChangeEventSource;
 import io.debezium.pipeline.spi.ChangeRecordEmitter;
 import io.debezium.pipeline.spi.SnapshotResult;
 import io.debezium.relational.Column;
+import io.debezium.relational.ColumnFilterMode;
 import io.debezium.relational.RelationalSnapshotChangeEventSource;
 import io.debezium.relational.SnapshotChangeRecordEmitter;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.Clock;
 import io.debezium.util.ColumnUtils;
@@ -61,6 +63,11 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.time.Duration;
 import java.util.Calendar;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_EXCLUDE_LIST;
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_INCLUDE_LIST;
 
 /** Task to read snapshot split of table. */
 public class MySqlSnapshotSplitReadTask
@@ -83,6 +90,7 @@ public class MySqlSnapshotSplitReadTask
 
     private final SnapshotPhaseHooks hooks;
     private final boolean isBackfillSkipped;
+    private final Tables.ColumnNameFilter columnFilter;
 
     public MySqlSnapshotSplitReadTask(
             MySqlSourceConfig sourceConfig,
@@ -109,6 +117,21 @@ public class MySqlSnapshotSplitReadTask
         this.snapshotChangeEventSourceMetrics = snapshotChangeEventSourceMetrics;
         this.hooks = hooks;
         this.isBackfillSkipped = isBackfillSkipped;
+
+        // setting column filter
+        String columnIncludeList =
+                sourceConfig.getDbzConfiguration().getString(COLUMN_INCLUDE_LIST);
+        String columnExcludeList =
+                sourceConfig.getDbzConfiguration().getString(COLUMN_EXCLUDE_LIST);
+        if (columnIncludeList != null) {
+            this.columnFilter =
+                    Tables.ColumnNameFilterFactory.createIncludeListFilter(
+                            columnIncludeList, ColumnFilterMode.CATALOG);
+        } else {
+            this.columnFilter =
+                    Tables.ColumnNameFilterFactory.createExcludeListFilter(
+                            columnExcludeList, ColumnFilterMode.CATALOG);
+        }
     }
 
     @Override
@@ -247,7 +270,8 @@ public class MySqlSnapshotSplitReadTask
                         snapshotSplit.getTableId(),
                         snapshotSplit.getSplitKeyType(),
                         snapshotSplit.getSplitStart() == null,
-                        snapshotSplit.getSplitEnd() == null);
+                        snapshotSplit.getSplitEnd() == null,
+                        getScanColumns(table));
         LOG.info(
                 "For split '{}' of table {} using select statement: '{}'",
                 snapshotSplit.splitId(),
@@ -303,6 +327,24 @@ public class MySqlSnapshotSplitReadTask
         } catch (SQLException e) {
             throw new ConnectException("Snapshotting of table " + table.id() + " failed", e);
         }
+    }
+
+    private String getScanColumns(Table table) {
+        List<String> columnNames =
+                table.retrieveColumnNames().stream()
+                        .filter(
+                                columnName ->
+                                        columnFilter.matches(
+                                                table.id().catalog(),
+                                                table.id().schema(),
+                                                table.id().table(),
+                                                columnName))
+                        .map(columnName -> jdbcConnection.quotedColumnIdString(columnName))
+                        .collect(Collectors.toList());
+        if (columnNames.isEmpty()) {
+            columnNames.add("*");
+        }
+        return String.join(", ", columnNames);
     }
 
     protected ChangeRecordEmitter<MySqlPartition> getChangeRecordEmitter(
