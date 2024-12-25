@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.composer.definition.RouteDef;
+import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaBatchOperator;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperatorFactory;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
@@ -59,8 +60,26 @@ public class SchemaOperatorTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes) {
-        return addRegularSchemaOperator(
-                input, parallelism, metadataApplier, routes, schemaChangeBehavior, timezone);
+        return translateRegular(input, parallelism, false, metadataApplier, routes);
+    }
+
+    public DataStream<Event> translateRegular(
+            DataStream<Event> input,
+            int parallelism,
+            boolean isBatchMode,
+            MetadataApplier metadataApplier,
+            List<RouteDef> routes) {
+
+        return isBatchMode
+                ? addRegularSchemaBatchOperator(
+                        input, parallelism, metadataApplier, routes, timezone)
+                : addRegularSchemaOperator(
+                        input,
+                        parallelism,
+                        metadataApplier,
+                        routes,
+                        schemaChangeBehavior,
+                        timezone);
     }
 
     public DataStream<Event> translateDistributed(
@@ -101,6 +120,29 @@ public class SchemaOperatorTranslator {
                                 rpcTimeOut,
                                 schemaChangeBehavior,
                                 timezone));
+        stream.uid(schemaOperatorUid).setParallelism(parallelism);
+        return stream;
+    }
+
+    private DataStream<Event> addRegularSchemaBatchOperator(
+            DataStream<Event> input,
+            int parallelism,
+            MetadataApplier metadataApplier,
+            List<RouteDef> routes,
+            String timezone) {
+        List<RouteRule> routingRules = new ArrayList<>();
+        for (RouteDef route : routes) {
+            routingRules.add(
+                    new RouteRule(
+                            route.getSourceTable(),
+                            route.getSinkTable(),
+                            route.getReplaceSymbol().orElse(null)));
+        }
+        SingleOutputStreamOperator<Event> stream =
+                input.transform(
+                        "SchemaBatchOperator",
+                        new EventTypeInfo(),
+                        new SchemaBatchOperator(routingRules, metadataApplier, timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
     }
