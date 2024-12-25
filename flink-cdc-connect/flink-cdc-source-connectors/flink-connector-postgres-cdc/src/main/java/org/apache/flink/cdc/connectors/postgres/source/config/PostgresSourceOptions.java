@@ -59,7 +59,8 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                     .withDescription(
                             "The changelog mode used for encoding streaming changes.\n"
                                     + "\"all\": Encodes changes as retract stream using all RowKinds. This is the default mode.\n"
-                                    + "\"upsert\": Encodes changes as upsert stream that describes idempotent updates on a key. It can be used for tables with primary keys when replica identity FULL is not an option.");
+                                    + "\"upsert\": Encodes changes as upsert stream that describes idempotent updates on a key. It can be used for tables with primary keys when replica identity FULL is not an option.\n"
+                                    + "\"insert-only\": Encodes changes as an insert-only stream.\n");
 
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_ENABLED =
             ConfigOptions.key("scan.incremental.snapshot.enabled")
