@@ -49,7 +49,7 @@ import static org.apache.flink.cdc.connectors.mongodb.source.utils.MongoRecordUt
  * <p>The {@link RecordEmitter} buffers the snapshot records of split and call the stream reader to
  * emit records rather than emit the records directly.
  */
-public final class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitter<T> {
+public class MongoDBRecordEmitter<T> extends IncrementalSourceRecordEmitter<T> {
 
     private static final Logger LOG = LoggerFactory.getLogger(MongoDBRecordEmitter.class);
 
