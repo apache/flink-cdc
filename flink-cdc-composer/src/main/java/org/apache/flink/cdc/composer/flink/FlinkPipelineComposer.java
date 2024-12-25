@@ -166,7 +166,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getModels(),
                         dataSource.supportedMetadataColumns());
 
-        if (isParallelMetadataSource || isBatchMode) {
+        if (isParallelMetadataSource) {
             // Translate a distributed topology for sources with distributed tables
             // PostTransform -> Partitioning
             DataStream<PartitioningEvent> partitionedStream =
@@ -195,6 +195,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                     schemaOperatorTranslator.translateRegular(
                             stream,
                             parallelism,
+                            isBatchMode,
                             dataSink.getMetadataApplier()
                                     .setAcceptedSchemaEvolutionTypes(
                                             pipelineDef
@@ -208,13 +209,18 @@ public class FlinkPipelineComposer implements PipelineComposer {
                             stream,
                             parallelism,
                             parallelism,
+                            isBatchMode,
                             schemaOperatorIDGenerator.generate(),
                             dataSink.getDataChangeEventHashFunctionProvider(parallelism));
         }
 
         // Schema Operator -> Sink -> X
         sinkTranslator.translate(
-                pipelineDef.getSink(), stream, dataSink, schemaOperatorIDGenerator.generate());
+                pipelineDef.getSink(),
+                stream,
+                dataSink,
+                isBatchMode,
+                schemaOperatorIDGenerator.generate());
     }
 
     private void addFrameworkJars() {
