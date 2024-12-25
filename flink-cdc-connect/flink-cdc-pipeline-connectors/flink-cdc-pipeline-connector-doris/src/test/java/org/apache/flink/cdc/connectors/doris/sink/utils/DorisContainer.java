@@ -17,10 +17,10 @@
 
 package org.apache.flink.cdc.connectors.doris.sink.utils;
 
-import org.junit.ClassRule;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
@@ -28,6 +28,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 
 /** Docker container for Doris. */
+@Testcontainers
 public class DorisContainer extends JdbcDatabaseContainer<DorisContainer> {
 
     private static final String DOCKER_IMAGE_NAME = "apache/doris:doris-all-in-one-2.1.0";
@@ -36,7 +37,7 @@ public class DorisContainer extends JdbcDatabaseContainer<DorisContainer> {
     public static final int BE_INNER_PORT = 8040;
     public static final int DB_INNER_PORT = 9030;
 
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
+    public static final Network NETWORK = Network.newNetwork();
 
     public String getFeNodes() {
         return String.format("%s:%d", getHost(), getMappedPort(FE_INNER_PORT));

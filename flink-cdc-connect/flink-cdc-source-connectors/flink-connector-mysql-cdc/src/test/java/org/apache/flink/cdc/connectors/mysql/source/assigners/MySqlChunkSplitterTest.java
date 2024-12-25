@@ -18,17 +18,16 @@
 package org.apache.flink.cdc.connectors.mysql.source.assigners;
 
 import io.debezium.relational.TableId;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlChunkSplitter}. */
-public class MySqlChunkSplitterTest {
+class MySqlChunkSplitterTest {
 
     @Test
-    public void testSplitEvenlySizedChunksOverflow() {
+    void testSplitEvenlySizedChunksOverflow() {
         MySqlChunkSplitter splitter = new MySqlChunkSplitter(null, null);
         List<ChunkRange> res =
                 splitter.splitEvenlySizedChunks(
@@ -38,13 +37,12 @@ public class MySqlChunkSplitterTest {
                         20,
                         10,
                         10);
-        assertEquals(2, res.size());
-        assertEquals(ChunkRange.of(null, 2147483638), res.get(0));
-        assertEquals(ChunkRange.of(2147483638, null), res.get(1));
+        Assertions.assertThat(res)
+                .containsExactly(ChunkRange.of(null, 2147483638), ChunkRange.of(2147483638, null));
     }
 
     @Test
-    public void testSplitEvenlySizedChunksNormal() {
+    void testSplitEvenlySizedChunksNormal() {
         MySqlChunkSplitter splitter = new MySqlChunkSplitter(null, null);
         List<ChunkRange> res =
                 splitter.splitEvenlySizedChunks(
@@ -54,9 +52,10 @@ public class MySqlChunkSplitterTest {
                         20,
                         10,
                         10);
-        assertEquals(3, res.size());
-        assertEquals(ChunkRange.of(null, 2147483637), res.get(0));
-        assertEquals(ChunkRange.of(2147483637, 2147483647), res.get(1));
-        assertEquals(ChunkRange.of(2147483647, null), res.get(2));
+        Assertions.assertThat(res)
+                .containsExactly(
+                        ChunkRange.of(null, 2147483637),
+                        ChunkRange.of(2147483637, 2147483647),
+                        ChunkRange.of(2147483647, null));
     }
 }

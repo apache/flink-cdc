@@ -20,7 +20,7 @@ package org.apache.flink.cdc.runtime.model;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** A test for {@link OpenAIChatModel}. */
@@ -35,6 +35,6 @@ public class TestOpenAIChatModel {
         UserDefinedFunctionContext userDefinedFunctionContext = () -> configuration;
         openAIChatModel.open(userDefinedFunctionContext);
         String response = openAIChatModel.eval("Who invented the electric light?");
-        Assertions.assertFalse(response.isEmpty());
+        Assertions.assertThat(response).isNotEmpty();
     }
 }

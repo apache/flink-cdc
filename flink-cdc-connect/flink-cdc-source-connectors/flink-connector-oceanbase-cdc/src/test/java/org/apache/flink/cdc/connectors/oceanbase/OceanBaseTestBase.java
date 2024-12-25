@@ -18,11 +18,13 @@
 package org.apache.flink.cdc.connectors.oceanbase;
 
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseCdcMetadata;
+import org.apache.flink.cdc.connectors.utils.AbstractTestBaseProxy;
+import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
-import org.apache.flink.test.util.AbstractTestBase;
 
-import org.junit.ClassRule;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.net.URL;
 import java.nio.file.Files;
@@ -39,15 +41,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
 /** Basic class for testing OceanBase source. */
-public abstract class OceanBaseTestBase extends AbstractTestBase {
+public abstract class OceanBaseTestBase extends AbstractTestBaseProxy {
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    @RegisterExtension
+    public static StaticExternalResourceProxy<LegacyRowResource> usesLegacyRows =
+            new StaticExternalResourceProxy<>(LegacyRowResource.INSTANCE);
 
     public static final Duration FETCH_TIMEOUT = Duration.ofSeconds(60);
 
@@ -108,7 +109,7 @@ public abstract class OceanBaseTestBase extends AbstractTestBase {
         final String ddlFile =
                 String.format("ddl/%s/%s.sql", metadata().getCompatibleMode(), sqlFile);
         final URL ddlTestFile = getClass().getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             final List<String> statements =
@@ -161,9 +162,6 @@ public abstract class OceanBaseTestBase extends AbstractTestBase {
     }
 
     public static void assertContainsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertTrue(
-                String.format("expected: %s, actual: %s", expected, actual),
-                actual.containsAll(expected));
+        Assertions.assertThat(actual).containsAll(expected);
     }
 }

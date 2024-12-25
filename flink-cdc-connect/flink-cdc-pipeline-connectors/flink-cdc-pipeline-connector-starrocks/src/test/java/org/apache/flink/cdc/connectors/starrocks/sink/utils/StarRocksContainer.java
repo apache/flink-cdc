@@ -17,10 +17,10 @@
 
 package org.apache.flink.cdc.connectors.starrocks.sink.utils;
 
-import org.junit.ClassRule;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 
 /** Docker container for StarRocks. */
+@Testcontainers
 public class StarRocksContainer extends JdbcDatabaseContainer<StarRocksContainer> {
 
     private static final String DOCKER_IMAGE_NAME = "starrocks/allin1-ubuntu:3.2.6";
@@ -43,7 +44,7 @@ public class StarRocksContainer extends JdbcDatabaseContainer<StarRocksContainer
     public static final String STARROCKS_USERNAME = "root";
     public static final String STARROCKS_PASSWORD = "";
 
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
+    public static final Network NETWORK = Network.newNetwork();
 
     public StarRocksContainer() {
         super(DockerImageName.parse(DOCKER_IMAGE_NAME));

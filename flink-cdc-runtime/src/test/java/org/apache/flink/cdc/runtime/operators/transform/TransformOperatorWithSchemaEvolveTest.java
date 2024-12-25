@@ -49,7 +49,7 @@ import java.util.Optional;
  * Unit tests for the {@link PreTransformOperator} and {@link PostTransformOperator} handling schema
  * evolution events.
  */
-public class TransformOperatorWithSchemaEvolveTest {
+class TransformOperatorWithSchemaEvolveTest {
 
     /** Defines a unified transform test cases. */
     static class TransformWithSchemaEvolveTestCase {
@@ -227,7 +227,7 @@ public class TransformOperatorWithSchemaEvolveTest {
 
     /** This case tests when schema evolution happens with unspecified columns. */
     @Test
-    public void testIrrelevantSchemaChangeInExplicitTransformRules() throws Exception {
+    void testIrrelevantSchemaChangeInExplicitTransformRules() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         TransformWithSchemaEvolveTestCase.of(
                         tableId,
@@ -283,7 +283,7 @@ public class TransformOperatorWithSchemaEvolveTest {
 
     /** This case tests when schema evolution happens with referenced-only columns. */
     @Test
-    public void testSemiRelevantSchemaChangeInExplicitTransformRules() throws Exception {
+    void testSemiRelevantSchemaChangeInExplicitTransformRules() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         TransformWithSchemaEvolveTestCase.of(
                         tableId,
@@ -343,7 +343,7 @@ public class TransformOperatorWithSchemaEvolveTest {
 
     /** This case tests when schema evolution happens with explicitly-written columns. */
     @Test
-    public void testRelevantColumnSchemaInExplicitTransformRules() throws Exception {
+    void testRelevantColumnSchemaInExplicitTransformRules() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         TransformWithSchemaEvolveTestCase.of(
                         tableId,
@@ -393,7 +393,7 @@ public class TransformOperatorWithSchemaEvolveTest {
 
     /** This case tests when schema evolution happens with a wildcard character at first. */
     @Test
-    public void testSchemaChangeWithPreWildcard() throws Exception {
+    void testSchemaChangeWithPreWildcard() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         TransformWithSchemaEvolveTestCase.of(
                         tableId,
@@ -527,7 +527,7 @@ public class TransformOperatorWithSchemaEvolveTest {
 
     /** This case tests when schema evolution happens with a wildcard character in the middle. */
     @Test
-    public void testSchemaChangeWithMidWildcard() throws Exception {
+    void testSchemaChangeWithMidWildcard() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         TransformWithSchemaEvolveTestCase.of(
                         tableId,
@@ -662,7 +662,7 @@ public class TransformOperatorWithSchemaEvolveTest {
 
     /** This case tests when schema evolution happens with a wildcard character at last. */
     @Test
-    public void testSchemaChangeWithPostWildcard() throws Exception {
+    void testSchemaChangeWithPostWildcard() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         TransformWithSchemaEvolveTestCase.of(
                         tableId,

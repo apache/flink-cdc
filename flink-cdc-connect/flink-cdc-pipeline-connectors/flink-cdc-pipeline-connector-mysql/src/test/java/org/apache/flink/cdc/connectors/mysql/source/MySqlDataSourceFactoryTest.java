@@ -25,7 +25,7 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ObjectPath;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -51,13 +51,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Unit tests for {@link MySqlDataSourceFactory}. */
-public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
+class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
 
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
 
     @Test
-    public void testCreateSource() {
+    void testCreateSource() {
         inventoryDatabase.createAndInitialize();
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
@@ -74,7 +74,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testCreateSourceScanBinlogNewlyAddedTableEnabled() {
+    void testCreateSourceScanBinlogNewlyAddedTableEnabled() {
         inventoryDatabase.createAndInitialize();
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
@@ -94,7 +94,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNoMatchedTable() {
+    void testNoMatchedTable() {
         inventoryDatabase.createAndInitialize();
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
@@ -112,7 +112,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testExcludeTable() {
+    void testExcludeTable() {
         inventoryDatabase.createAndInitialize();
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
@@ -136,7 +136,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testExcludeAllTable() {
+    void testExcludeAllTable() {
         inventoryDatabase.createAndInitialize();
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
@@ -157,7 +157,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testDatabaseAndTableWithTheSameName() throws SQLException {
+    void testDatabaseAndTableWithTheSameName() throws SQLException {
         inventoryDatabase.createAndInitialize();
         // create a table with the same name of database
         try (Connection connection = inventoryDatabase.getJdbcConnection();
@@ -195,7 +195,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testLackRequireOption() {
+    void testLackRequireOption() {
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
         options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
@@ -225,7 +225,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testUnsupportedOption() {
+    void testUnsupportedOption() {
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
         options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
@@ -246,7 +246,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testPrefixRequireOption() {
+    void testPrefixRequireOption() {
         inventoryDatabase.createAndInitialize();
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
@@ -265,7 +265,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testAddChunkKeyColumns() {
+    void testAddChunkKeyColumns() {
         inventoryDatabase.createAndInitialize();
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
