@@ -21,6 +21,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.mongodb.source.MongoDBSource;
 import org.apache.flink.cdc.connectors.mongodb.source.MongoDBSourceBuilder;
+import org.apache.flink.cdc.connectors.mongodb.source.assigners.splitters.AssignStrategy;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.MetadataConverter;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -87,6 +88,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final boolean skipSnapshotBackfill;
     private final boolean scanNewlyAddedTableEnabled;
 
+    private final AssignStrategy scanChunkAssignStrategy;
+
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
     // --------------------------------------------------------------------------------------------
@@ -121,7 +124,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             boolean enableFullDocPrePostImage,
             boolean noCursorTimeout,
             boolean skipSnapshotBackfill,
-            boolean scanNewlyAddedTableEnabled) {
+            boolean scanNewlyAddedTableEnabled,
+            AssignStrategy scanChunkAssignStrategy) {
         this.physicalSchema = physicalSchema;
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
@@ -148,6 +152,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.noCursorTimeout = noCursorTimeout;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.scanChunkAssignStrategy = scanChunkAssignStrategy;
     }
 
     @Override
@@ -206,6 +211,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                             .startupOptions(startupOptions)
                             .skipSnapshotBackfill(skipSnapshotBackfill)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                            .scanChunkAssignStrategy(scanChunkAssignStrategy)
                             .deserializer(deserializer)
                             .disableCursorTimeout(noCursorTimeout);
 
@@ -307,7 +313,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         enableFullDocPrePostImage,
                         noCursorTimeout,
                         skipSnapshotBackfill,
-                        scanNewlyAddedTableEnabled);
+                        scanNewlyAddedTableEnabled,
+                        scanChunkAssignStrategy);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -347,7 +354,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(enableFullDocPrePostImage, that.enableFullDocPrePostImage)
                 && Objects.equals(noCursorTimeout, that.noCursorTimeout)
                 && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
-                && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled);
+                && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled)
+                && Objects.equals(scanChunkAssignStrategy, that.scanChunkAssignStrategy);
     }
 
     @Override
@@ -378,7 +386,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 enableFullDocPrePostImage,
                 noCursorTimeout,
                 skipSnapshotBackfill,
-                scanNewlyAddedTableEnabled);
+                scanNewlyAddedTableEnabled,
+                scanChunkAssignStrategy);
     }
 
     @Override

@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.table;
 
+import org.apache.flink.cdc.connectors.mysql.source.assigners.AssignStrategy;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import org.apache.flink.cdc.connectors.mysql.source.config.ServerIdRange;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -102,6 +103,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 config.get(MySqlSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         boolean skipSnapshotBackFill =
                 config.get(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
+        AssignStrategy assignStrategy = config.get(MySqlSourceOptions.SCAN_CHUNK_ASSIGN_STRATEGY);
 
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
@@ -145,7 +147,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 JdbcUrlUtils.getJdbcProperties(context.getCatalogTable().getOptions()),
                 heartbeatInterval,
                 chunkKeyColumn,
-                skipSnapshotBackFill);
+                skipSnapshotBackFill,
+                assignStrategy);
     }
 
     @Override
@@ -191,6 +194,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.HEARTBEAT_INTERVAL);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
+        options.add(MySqlSourceOptions.SCAN_CHUNK_ASSIGN_STRATEGY);
         return options;
     }
 
