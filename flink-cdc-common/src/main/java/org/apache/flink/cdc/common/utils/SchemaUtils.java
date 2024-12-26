@@ -101,6 +101,9 @@ public class SchemaUtils {
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
         LinkedList<Column> columns = new LinkedList<>(oldSchema.getColumns());
         for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
+            if (oldSchema.getColumnNames().contains(columnWithPosition.getAddColumn().getName())) {
+                continue;
+            }
             switch (columnWithPosition.getPosition()) {
                 case FIRST:
                     {
