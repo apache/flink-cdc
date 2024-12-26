@@ -138,6 +138,19 @@ public class SchemaDerivator {
     public static Set<Schema> reverseLookupDependingUpstreamSchemas(
             final TableIdRouter tableIdRouter,
             final TableId evolvedTableId,
+            final Set<TableId> allOriginalTables,
+            final Schema originalSchema) {
+        return reverseLookupDependingUpstreamTables(
+                        tableIdRouter, evolvedTableId, allOriginalTables)
+                .stream()
+                .map(utid -> originalSchema)
+                .collect(Collectors.toSet());
+    }
+
+    /** For an evolved table ID, reverse lookup all upstream schemas that needs to be fit in. */
+    public static Set<Schema> reverseLookupDependingUpstreamSchemas(
+            final TableIdRouter tableIdRouter,
+            final TableId evolvedTableId,
             final Table<TableId, Integer, Schema> upstreamSchemaTable) {
         return reverseLookupDependingUpstreamTables(
                         tableIdRouter, evolvedTableId, upstreamSchemaTable)
@@ -340,5 +353,36 @@ public class SchemaDerivator {
         }
 
         return Optional.of(dataChangeEvent);
+    }
+
+    /** Get affected evolved table IDs based on changed upstream tables. */
+    public static List<CreateTableEvent> deduceCreateTableEventInBatchMode(
+            TableIdRouter router, List<CreateTableEvent> createTableEvents) {
+
+        List<CreateTableEvent> deducedCreateTableEvents = new ArrayList<>();
+        Set<org.apache.flink.cdc.common.event.TableId> originalTables =
+                createTableEvents.stream()
+                        .map(CreateTableEvent::tableId)
+                        .collect(Collectors.toSet());
+
+        // For each affected table, we need to...
+        for (CreateTableEvent createTableEvent : createTableEvents) {
+            Schema currentSchema = createTableEvent.getSchema();
+
+            Set<Schema> toBeMergedSchemas =
+                    SchemaDerivator.reverseLookupDependingUpstreamSchemas(
+                            router, createTableEvent.tableId(), originalTables, currentSchema);
+            // We're in a table routing mode now, so we need to infer a widest schema for all
+            // upstream tables.
+            Schema mergedSchema = currentSchema;
+            for (Schema toBeMergedSchema : toBeMergedSchemas) {
+                mergedSchema =
+                        SchemaMergingUtils.getLeastCommonSchema(mergedSchema, toBeMergedSchema);
+            }
+            deducedCreateTableEvents.add(
+                    new CreateTableEvent(createTableEvent.tableId(), mergedSchema));
+        }
+
+        return deducedCreateTableEvents;
     }
 }

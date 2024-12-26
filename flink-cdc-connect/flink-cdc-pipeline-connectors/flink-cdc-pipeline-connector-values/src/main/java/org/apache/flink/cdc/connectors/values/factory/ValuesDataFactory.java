@@ -19,10 +19,13 @@ package org.apache.flink.cdc.connectors.values.factory;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.RunTimeMode;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
@@ -48,7 +51,15 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
         int failAtPos =
                 context.getFactoryConfiguration()
                         .get(ValuesDataSourceOptions.FAILURE_INJECTION_INDEX);
-        return new ValuesDataSource(eventType, failAtPos);
+        boolean isBatchMode = false;
+        Configuration pipelineConfiguration = context.getPipelineConfiguration();
+        if (pipelineConfiguration != null
+                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_RUNTIME_MODE)) {
+            isBatchMode =
+                    RunTimeMode.BATCH.equals(
+                            pipelineConfiguration.get(PipelineOptions.PIPELINE_RUNTIME_MODE));
+        }
+        return new ValuesDataSource(eventType, failAtPos, isBatchMode, context.getRouteRules());
     }
 
     @Override
