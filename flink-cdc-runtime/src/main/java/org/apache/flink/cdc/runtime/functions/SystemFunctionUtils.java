@@ -80,6 +80,27 @@ public class SystemFunctionUtils {
         return timestampMillisToDate(localtimestamp(epochTime, timezone).getMillisecond());
     }
 
+    public static String fromUnixtime(long seconds, String timezone) {
+        return DateTimeUtils.formatUnixTimestamp(seconds, TimeZone.getTimeZone(timezone));
+    }
+
+    public static String fromUnixtime(long seconds, String format, String timezone) {
+        return DateTimeUtils.formatUnixTimestamp(seconds, format, TimeZone.getTimeZone(timezone));
+    }
+
+    public static long unixTimestamp(long epochTime, String timezone) {
+        return DateTimeUtils.unixTimestamp(epochTime);
+    }
+
+    public static long unixTimestamp(String dateTimeStr, long epochTime, String timezone) {
+        return DateTimeUtils.unixTimestamp(dateTimeStr, TimeZone.getTimeZone(timezone));
+    }
+
+    public static long unixTimestamp(
+            String dateTimeStr, String format, long epochTime, String timezone) {
+        return DateTimeUtils.unixTimestamp(dateTimeStr, format, TimeZone.getTimeZone(timezone));
+    }
+
     public static String dateFormat(TimestampData timestamp, String format) {
         return DateTimeUtils.formatTimestampMillis(
                 timestamp.getMillisecond(), format, TimeZone.getTimeZone("UTC"));

@@ -109,6 +109,21 @@ public class PostTransformOperatorTest {
                     .primaryKey("col1")
                     .build();
 
+    private static final TableId UNIX_TIMESTAMP_TABLEID =
+            TableId.tableId("my_company", "my_branch", "unix_timestamp_table");
+    private static final Schema UNIX_TIMESTAMP_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("from_unixtime", DataTypes.STRING())
+                    .physicalColumn("from_unixtime_format", DataTypes.STRING())
+                    .physicalColumn("current_unix_timestamp", DataTypes.INT())
+                    .physicalColumn("unix_timestamp", DataTypes.BIGINT())
+                    .physicalColumn("unix_timestamp_format_tz", DataTypes.BIGINT())
+                    .physicalColumn("unix_timestamp_format", DataTypes.BIGINT())
+                    .physicalColumn("unix_timestamp_format_error", DataTypes.BIGINT())
+                    .primaryKey("col1")
+                    .build();
+
     private static final TableId TIMESTAMPDIFF_TABLEID =
             TableId.tableId("my_company", "my_branch", "timestampdiff_table");
     private static final Schema TIMESTAMPDIFF_SCHEMA =
@@ -773,6 +788,76 @@ public class PostTransformOperatorTest {
                 .isEqualTo(
                         new StreamRecord<>(
                                 new CreateTableEvent(TIMESTAMP_TABLEID, TIMESTAMP_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testUnixTimestampTransform() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                UNIX_TIMESTAMP_TABLEID.identifier(),
+                                "col1, FROM_UNIXTIME(44) as from_unixtime,"
+                                        + " FROM_UNIXTIME(44, 'yyyy/MM/dd HH:mm:ss') as from_unixtime_format,"
+                                        + " IF(UNIX_TIMESTAMP() = UNIX_TIMESTAMP(DATE_FORMAT(LOCALTIMESTAMP, 'yyyy-MM-dd HH:mm:ss')), 1, 0) as current_unix_timestamp,"
+                                        + " UNIX_TIMESTAMP('1970-01-01 08:00:01') as unix_timestamp,"
+                                        + " UNIX_TIMESTAMP('1970-01-01 08:00:01.001 +0800', 'yyyy-MM-dd HH:mm:ss.SSS X') as unix_timestamp_format_tz,"
+                                        + " UNIX_TIMESTAMP('1970-01-01 08:00:01.001 +0800', 'yyyy-MM-dd HH:mm:ss.SSS') as unix_timestamp_format,"
+                                        + " UNIX_TIMESTAMP('1970-01-01 08:00:01.001', 'yyyy-MM-dd HH:mm:ss.SSS X') as unix_timestamp_format_error",
+                                null)
+                        //                        .addTimezone("UTC")
+                        .addTimezone("Europe/Berlin")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(UNIX_TIMESTAMP_TABLEID, UNIX_TIMESTAMP_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) UNIX_TIMESTAMP_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        UNIX_TIMESTAMP_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null
+                                }));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        UNIX_TIMESTAMP_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    new BinaryStringData("1970-01-01 01:00:44"),
+                                    new BinaryStringData("1970/01/01 01:00:44"),
+                                    1,
+                                    25201L,
+                                    1L,
+                                    25201L,
+                                    -9223372036854775808L
+                                }));
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(
+                                        UNIX_TIMESTAMP_TABLEID, UNIX_TIMESTAMP_SCHEMA)));
         transform.processElement(new StreamRecord<>(insertEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())

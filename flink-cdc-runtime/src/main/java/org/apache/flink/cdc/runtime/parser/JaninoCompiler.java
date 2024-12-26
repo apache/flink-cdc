@@ -57,13 +57,18 @@ public class JaninoCompiler {
             Arrays.asList("CURRENT_TIMESTAMP", "NOW");
 
     private static final List<String> TIMEZONE_REQUIRED_TEMPORAL_FUNCTIONS =
-            Arrays.asList("LOCALTIME", "LOCALTIMESTAMP", "CURRENT_TIME", "CURRENT_DATE");
+            Arrays.asList(
+                    "LOCALTIME",
+                    "LOCALTIMESTAMP",
+                    "CURRENT_TIME",
+                    "CURRENT_DATE",
+                    "UNIX_TIMESTAMP");
 
     private static final List<String> TIMEZONE_FREE_TEMPORAL_CONVERSION_FUNCTIONS =
             Arrays.asList("DATE_FORMAT");
 
     private static final List<String> TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS =
-            Arrays.asList("TO_DATE", "TO_TIMESTAMP");
+            Arrays.asList("TO_DATE", "TO_TIMESTAMP", "FROM_UNIXTIME");
 
     public static final String DEFAULT_EPOCH_TIME = "__epoch_time__";
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
