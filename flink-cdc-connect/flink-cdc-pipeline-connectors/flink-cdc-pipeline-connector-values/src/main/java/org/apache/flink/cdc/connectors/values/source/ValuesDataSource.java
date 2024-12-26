@@ -30,6 +30,7 @@ import org.apache.flink.api.connector.source.lib.util.IteratorSourceSplit;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
@@ -60,20 +61,41 @@ public class ValuesDataSource implements DataSource {
     /** index for {@link EventIteratorReader} to fail when reading. */
     private final int failAtPos;
 
+    /** Batch source only provide create table event and data change event (Insert). */
+    private final boolean isBatchSource;
+
+    private final List<RouteRule> routeRules;
+
     public ValuesDataSource(ValuesDataSourceHelper.EventSetId eventSetId) {
         this.eventSetId = eventSetId;
         this.failAtPos = Integer.MAX_VALUE;
+        this.isBatchSource = false;
+        this.routeRules = new ArrayList<>();
     }
 
     public ValuesDataSource(ValuesDataSourceHelper.EventSetId eventSetId, int failAtPos) {
         this.eventSetId = eventSetId;
         this.failAtPos = failAtPos;
+        this.isBatchSource = false;
+        this.routeRules = new ArrayList<>();
+    }
+
+    public ValuesDataSource(
+            ValuesDataSourceHelper.EventSetId eventSetId,
+            int failAtPos,
+            boolean isBatchSource,
+            List<RouteRule> routeRules) {
+        this.eventSetId = eventSetId;
+        this.failAtPos = failAtPos;
+        this.isBatchSource = isBatchSource;
+        this.routeRules = routeRules;
     }
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
         ValuesDataSourceHelper.setSourceEvents(eventSetId);
-        return FlinkSourceProvider.of(new ValuesSource(failAtPos, eventSetId, false));
+        return FlinkSourceProvider.of(
+                new ValuesSource(failAtPos, eventSetId, isBatchSource, routeRules));
     }
 
     @Override
@@ -102,13 +124,17 @@ public class ValuesDataSource implements DataSource {
         /** True this source is in snapshot stage, otherwise is in incremental stage. */
         private final boolean isInSnapshotPhase;
 
+        private final List<RouteRule> routeRules;
+
         public ValuesSource(
                 int failAtPos,
                 ValuesDataSourceHelper.EventSetId eventSetId,
-                boolean isInSnapshotPhase) {
+                boolean isInSnapshotPhase,
+                List<RouteRule> routeRules) {
             this.failAtPos = failAtPos;
             this.eventSetId = eventSetId;
             this.isInSnapshotPhase = isInSnapshotPhase;
+            this.routeRules = routeRules;
         }
 
         @Override
@@ -121,7 +147,8 @@ public class ValuesDataSource implements DataSource {
                 SplitEnumeratorContext<EventIteratorSplit> enumContext) {
             ValuesDataSourceHelper.setSourceEvents(eventSetId);
             Collection<EventIteratorSplit> eventIteratorSplits = new ArrayList<>();
-            List<List<Event>> eventWithSplits = ValuesDataSourceHelper.getSourceEvents();
+            List<List<Event>> eventWithSplits =
+                    ValuesDataSourceHelper.getSourceEvents(isInSnapshotPhase, routeRules);
             // make the last EventIteratorSplit of eventWithSplits to be an incremental
             // EventIteratorSplit.
             if (isInSnapshotPhase) {
