@@ -87,6 +87,7 @@ public class BucketWrapperEventSerializer extends TypeSerializerSingleton<Event>
             BucketWrapperFlushEvent bucketWrapperFlushEvent = (BucketWrapperFlushEvent) event;
             dataOutputView.writeInt(bucketWrapperFlushEvent.getBucket());
             dataOutputView.writeInt(bucketWrapperFlushEvent.getSourceSubTaskId());
+            dataOutputView.writeInt(bucketWrapperFlushEvent.getBucketAssignTaskId());
             tableIdListSerializer.serialize(bucketWrapperFlushEvent.getTableIds(), dataOutputView);
             schemaChangeEventTypeEnumSerializer.serialize(
                     bucketWrapperFlushEvent.getSchemaChangeEventType(), dataOutputView);
@@ -97,6 +98,8 @@ public class BucketWrapperEventSerializer extends TypeSerializerSingleton<Event>
     public Event deserialize(DataInputView source) throws IOException {
         EventClass eventClass = enumSerializer.deserialize(source);
         if (eventClass.equals(EventClass.BUCKET_WRAPPER_FLUSH_EVENT)) {
+            return new BucketWrapperFlushEvent(
+                    source.readInt(), source.readInt(), source.readInt());
             return new BucketWrapperFlushEvent(
                     source.readInt(),
                     source.readInt(),
