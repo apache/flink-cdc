@@ -23,10 +23,12 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceFunctionProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
+import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.flink.FlinkEnvironmentUtils;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
@@ -34,6 +36,9 @@ import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /** Translator used to build {@link DataSource} which will generate a {@link DataStream}. */
 @Internal
@@ -76,7 +81,10 @@ public class DataSourceTranslator {
     }
 
     public DataSource createDataSource(
-            SourceDef sourceDef, Configuration pipelineConfig, StreamExecutionEnvironment env) {
+            SourceDef sourceDef,
+            List<RouteDef> routes,
+            Configuration pipelineConfig,
+            StreamExecutionEnvironment env) {
         // Search the data source factory
         DataSourceFactory sourceFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier(
@@ -84,6 +92,26 @@ public class DataSourceTranslator {
         // Add source JAR to environment
         FactoryDiscoveryUtils.getJarPathByIdentifier(sourceFactory)
                 .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
+
+        if (routes != null && !routes.isEmpty()) {
+            List<RouteRule> routeRules =
+                    routes.stream()
+                            .map(
+                                    routeDef ->
+                                            new RouteRule(
+                                                    routeDef.getSourceTable(),
+                                                    routeDef.getSinkTable(),
+                                                    routeDef.getReplaceSymbol().isPresent()
+                                                            ? routeDef.getReplaceSymbol().get()
+                                                            : null))
+                            .collect(Collectors.toList());
+            return sourceFactory.createDataSource(
+                    new FactoryHelper.DefaultContext(
+                            sourceDef.getConfig(),
+                            pipelineConfig,
+                            routeRules,
+                            Thread.currentThread().getContextClassLoader()));
+        }
         return sourceFactory.createDataSource(
                 new FactoryHelper.DefaultContext(
                         sourceDef.getConfig(),
