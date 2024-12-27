@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.runtime.parser.metadata;
 
 import org.apache.flink.cdc.runtime.functions.BuiltInScalarFunction;
-import org.apache.flink.cdc.runtime.functions.BuiltInSqlFunction;
 import org.apache.flink.cdc.runtime.functions.BuiltInTimestampFunction;
 
 import org.apache.calcite.sql.SqlBinaryOperator;
@@ -42,7 +41,6 @@ import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeTransforms;
 import org.apache.calcite.sql.util.ReflectiveSqlOperatorTable;
-import org.apache.calcite.sql.validate.SqlMonotonicity;
 import org.apache.calcite.sql.validate.SqlNameMatcher;
 import org.apache.calcite.sql.validate.SqlNameMatchers;
 
@@ -215,25 +213,16 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                 }
             };
     public static final SqlFunction UNIX_TIMESTAMP =
-            BuiltInSqlFunction.newBuilder()
-                    .name("UNIX_TIMESTAMP")
-                    .returnType(ReturnTypes.BIGINT_NULLABLE)
-                    .operandTypeChecker(
-                            OperandTypes.or(
-                                    OperandTypes.NILADIC,
-                                    OperandTypes.family(SqlTypeFamily.CHARACTER),
-                                    OperandTypes.family(
-                                            SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)))
-                    .notDeterministic()
-                    .monotonicity(
-                            call -> {
-                                if (call.getOperandCount() == 0) {
-                                    return SqlMonotonicity.INCREASING;
-                                } else {
-                                    return SqlMonotonicity.NOT_MONOTONIC;
-                                }
-                            })
-                    .build();
+            new SqlFunction(
+                    "UNIX_TIMESTAMP",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.BIGINT_NULLABLE,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.NILADIC,
+                            OperandTypes.family(SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
+                    SqlFunctionCategory.TIMEDATE);
     public static final SqlFunction FROM_UNIXTIME =
             new SqlFunction(
                     "FROM_UNIXTIME",
