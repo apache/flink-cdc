@@ -994,7 +994,7 @@ class SchemaMergingUtilsTest {
                 BIGINT,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, BIGINT, BIGINT,
-                        DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
+                        DECIMAL, DOUBLE, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING));
 
         assertTypeMergingVector(
@@ -1007,14 +1007,14 @@ class SchemaMergingUtilsTest {
         assertTypeMergingVector(
                 FLOAT,
                 Arrays.asList(
-                        STRING, STRING, STRING, STRING, STRING, FLOAT, FLOAT, DOUBLE, STRING,
+                        STRING, STRING, STRING, STRING, STRING, FLOAT, FLOAT, DOUBLE, DOUBLE,
                         STRING, FLOAT, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING));
 
         assertTypeMergingVector(
                 DOUBLE,
                 Arrays.asList(
-                        STRING, STRING, STRING, STRING, STRING, DOUBLE, DOUBLE, DOUBLE, STRING,
+                        STRING, STRING, STRING, STRING, STRING, DOUBLE, DOUBLE, DOUBLE, DOUBLE,
                         STRING, DOUBLE, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING));
 
