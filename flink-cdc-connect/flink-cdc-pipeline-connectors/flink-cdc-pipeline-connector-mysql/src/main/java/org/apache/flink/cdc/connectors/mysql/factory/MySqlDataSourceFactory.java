@@ -277,8 +277,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                     RunTimeMode.BATCH.equals(
                             pipelineConfiguration.get(PipelineOptions.PIPELINE_RUNTIME_MODE));
         }
-        return new MySqlDataSource(
-                configFactory, isBatchMode, context.getRouteRules(), readableMetadataList);
+        return new MySqlDataSource(configFactory, isBatchMode, readableMetadataList);
     }
 
     private List<MySqlReadableMetadata> listReadableMetadata(String metadataList) {
