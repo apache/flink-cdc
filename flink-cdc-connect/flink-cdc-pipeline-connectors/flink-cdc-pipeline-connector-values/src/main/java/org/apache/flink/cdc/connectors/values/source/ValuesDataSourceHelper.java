@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.values.source;
 
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.CreateTableCompletedEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
@@ -26,13 +27,10 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
-import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
-import org.apache.flink.cdc.runtime.operators.schema.common.TableIdRouter;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import java.util.ArrayList;
@@ -77,11 +75,10 @@ public class ValuesDataSourceHelper {
     private static List<List<Event>> sourceEvents;
 
     public static List<List<Event>> getSourceEvents() {
-        return getSourceEvents(false, new ArrayList<>());
+        return getSourceEvents(false);
     }
 
-    public static List<List<Event>> getSourceEvents(
-            boolean isBatchSource, List<RouteRule> routeRules) {
+    public static List<List<Event>> getSourceEvents(boolean isBatchSource) {
         if (sourceEvents == null) {
             // use default enum of SINGLE_SPLIT_SINGLE_TABLE
             sourceEvents = singleSplitSingleTable();
@@ -95,26 +92,25 @@ public class ValuesDataSourceHelper {
             }
             return Collections.singletonList(mergeEvents);
         }
-        List<CreateTableEvent> createTableEvents = new ArrayList<>();
+        List<Event> mergeEvents = new ArrayList<>();
+        List<Event> dataChangeEvents = new ArrayList<>();
         for (List<Event> events : sourceEvents) {
             for (Event event : events) {
+                if (event instanceof CreateTableCompletedEvent) {
+                    return sourceEvents;
+                }
                 if (event instanceof CreateTableEvent) {
-                    createTableEvents.add((CreateTableEvent) event);
-                }
-            }
-        }
-        TableIdRouter router = new TableIdRouter(routeRules);
-        final List<CreateTableEvent> mergedCreateTableEvents =
-                SchemaDerivator.deduceCreateTableEventInBatchMode(router, createTableEvents);
-        List<Event> mergeEvents = new ArrayList<>(mergedCreateTableEvents);
-        for (List<Event> events : sourceEvents) {
-            for (Event event : events) {
-                if (!(event instanceof CreateTableEvent)) {
                     mergeEvents.add(event);
+                } else {
+                    dataChangeEvents.add(event);
                 }
             }
         }
-        return Collections.singletonList(mergeEvents);
+        mergeEvents.add(new CreateTableCompletedEvent());
+        mergeEvents.addAll(dataChangeEvents);
+
+        sourceEvents = Collections.singletonList(mergeEvents);
+        return sourceEvents;
     }
 
     /** set sourceEvents using custom events. */
