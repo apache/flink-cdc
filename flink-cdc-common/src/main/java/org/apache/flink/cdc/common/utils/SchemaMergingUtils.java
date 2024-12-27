@@ -810,7 +810,9 @@ public class SchemaMergingUtils {
         mergingTree.put(DoubleType.class, ImmutableList.of(doubleType, stringType));
         mergingTree.put(FloatType.class, ImmutableList.of(floatType, doubleType, stringType));
         mergingTree.put(DecimalType.class, ImmutableList.of(stringType));
-        mergingTree.put(BigIntType.class, ImmutableList.of(bigIntType, decimalType, stringType));
+        mergingTree.put(
+                BigIntType.class,
+                ImmutableList.of(bigIntType, decimalType, doubleType, stringType));
         mergingTree.put(
                 IntType.class,
                 ImmutableList.of(intType, bigIntType, decimalType, doubleType, stringType));
