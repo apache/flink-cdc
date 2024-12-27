@@ -20,9 +20,7 @@ package org.apache.flink.cdc.common.factories;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
-import org.apache.flink.cdc.common.route.RouteRule;
 
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -73,9 +71,6 @@ public interface Factory {
 
         /** Returns the configuration of current pipeline. */
         Configuration getPipelineConfiguration();
-
-        /** Returns the configuration of current routers. */
-        List<RouteRule> getRouteRules();
 
         /**
          * Returns the class loader of the current session.

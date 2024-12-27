@@ -187,11 +187,6 @@ public class FactoryHelper {
         }
 
         @Override
-        public List<RouteRule> getRouteRules() {
-            return routeRules;
-        }
-
-        @Override
         public ClassLoader getClassLoader() {
             return classLoader;
         }
