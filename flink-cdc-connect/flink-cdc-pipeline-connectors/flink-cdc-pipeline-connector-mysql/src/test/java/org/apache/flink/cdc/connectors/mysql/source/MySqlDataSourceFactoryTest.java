@@ -20,7 +20,6 @@ package org.apache.flink.cdc.connectors.mysql.source;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.Factory;
-import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.table.api.ValidationException;
@@ -32,7 +31,6 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -348,11 +346,6 @@ class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
         @Override
         public Configuration getPipelineConfiguration() {
             return null;
-        }
-
-        @Override
-        public List<RouteRule> getRouteRules() {
-            return Collections.emptyList();
         }
 
         @Override
