@@ -355,34 +355,49 @@ public class SchemaDerivator {
         return Optional.of(dataChangeEvent);
     }
 
-    /** Get affected evolved table IDs based on changed upstream tables. */
-    public static List<CreateTableEvent> deduceCreateTableEventInBatchMode(
+    /** Deduce merged CreateTableEvent in batch mode. */
+    public static List<CreateTableEvent> deduceMergedCreateTableEventInBatchMode(
             TableIdRouter router, List<CreateTableEvent> createTableEvents) {
-
-        List<CreateTableEvent> deducedCreateTableEvents = new ArrayList<>();
         Set<org.apache.flink.cdc.common.event.TableId> originalTables =
                 createTableEvents.stream()
                         .map(CreateTableEvent::tableId)
                         .collect(Collectors.toSet());
 
-        // For each affected table, we need to...
-        for (CreateTableEvent createTableEvent : createTableEvents) {
-            Schema currentSchema = createTableEvent.getSchema();
-
+        List<Set<TableId>> sourceTablesByRouteRule =
+                router.groupSourceTablesByRouteRule(originalTables);
+        Map<TableId, Schema> sourceTableIdToSchemaMap =
+                createTableEvents.stream()
+                        .collect(
+                                Collectors.toMap(
+                                        CreateTableEvent::tableId, CreateTableEvent::getSchema));
+        Map<TableId, Schema> sinkTableIdToSchemaMap = new HashMap<>();
+        for (Set<TableId> sourceTables : sourceTablesByRouteRule) {
             Set<Schema> toBeMergedSchemas =
-                    SchemaDerivator.reverseLookupDependingUpstreamSchemas(
-                            router, createTableEvent.tableId(), originalTables, currentSchema);
-            // We're in a table routing mode now, so we need to infer a widest schema for all
-            // upstream tables.
-            Schema mergedSchema = currentSchema;
+                    sourceTables.stream()
+                            .map(sourceTableIdToSchemaMap::get)
+                            .collect(Collectors.toSet());
+            if (toBeMergedSchemas.isEmpty()) {
+                continue;
+            }
+            Schema mergedSchema = null;
             for (Schema toBeMergedSchema : toBeMergedSchemas) {
+                if (mergedSchema == null) {
+                    mergedSchema = toBeMergedSchema;
+                    continue;
+                }
                 mergedSchema =
                         SchemaMergingUtils.getLeastCommonSchema(mergedSchema, toBeMergedSchema);
             }
-            deducedCreateTableEvents.add(
-                    new CreateTableEvent(createTableEvent.tableId(), mergedSchema));
-        }
 
-        return deducedCreateTableEvents;
+            for (TableId tableId : sourceTables) {
+                List<TableId> sinkTableIds = router.calculateRoute(tableId);
+                for (TableId sinkTableId : sinkTableIds) {
+                    sinkTableIdToSchemaMap.put(sinkTableId, mergedSchema);
+                }
+            }
+        }
+        return sinkTableIdToSchemaMap.entrySet().stream()
+                .map(entry -> new CreateTableEvent(entry.getKey(), entry.getValue()))
+                .collect(Collectors.toList());
     }
 }

@@ -59,7 +59,7 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
                     RunTimeMode.BATCH.equals(
                             pipelineConfiguration.get(PipelineOptions.PIPELINE_RUNTIME_MODE));
         }
-        return new ValuesDataSource(eventType, failAtPos, isBatchMode, context.getRouteRules());
+        return new ValuesDataSource(eventType, failAtPos, isBatchMode);
     }
 
     @Override

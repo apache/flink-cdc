@@ -18,22 +18,21 @@
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceOutput;
+import org.apache.flink.cdc.common.event.CreateTableCompletedEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.utils.Preconditions;
-import org.apache.flink.cdc.common.utils.SchemaMergingUtils;
 import org.apache.flink.cdc.connectors.mysql.schema.MySqlFieldDefinition;
 import org.apache.flink.cdc.connectors.mysql.schema.MySqlTableDefinition;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
+import org.apache.flink.cdc.connectors.mysql.table.StartupMode;
+import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
+import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlTypeUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
-import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
-import org.apache.flink.cdc.runtime.operators.schema.common.TableIdRouter;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
@@ -57,9 +56,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getTableId;
@@ -80,11 +77,16 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     private Set<TableId> alreadySendCreateTableTables;
 
     private Map<TableId, CreateTableEvent> createTableEventCache;
+    // Used when startup mode is not initial
+    private boolean isBatchMode = false;
+    private boolean alreadySendCreateTableForBinlogSplit = false;
+    private boolean alreadySendAllCreateTable = false;
 
     public MySqlPipelineRecordEmitter(
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
-            MySqlSourceConfig sourceConfig) {
+            MySqlSourceConfig sourceConfig,
+            boolean isBatchMode) {
         super(
                 debeziumDeserializationSchema,
                 sourceReaderMetrics,
@@ -105,13 +107,26 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 });
 
         createTableEventCache = new ArrayList<>(createTableEventSet);
+        this.isBatchMode = isBatchMode;
     }
 
     @Override
     protected void processElement(
             SourceRecord element, SourceOutput<Event> output, MySqlSplitState splitState)
             throws Exception {
-        if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
+        if (isBatchMode
+                && StartupOptions.snapshot().equals(sourceConfig.getStartupOptions())
+                && !alreadySendAllCreateTable) {
+            // In snapshot mode, we simply emit all schemas at once.
+            createTableEventCache.forEach(
+                (tableId, createTableEvent) -> {
+                        output.collect(createTableEvent);
+                        alreadySendCreateTableTables.add(tableId);
+                    });
+            output.collect(new CreateTableCompletedEvent());
+            alreadySendCreateTableForBinlogSplit = true;
+            alreadySendAllCreateTable = true;
+        } else if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
             // In Snapshot phase of INITIAL startup mode, we lazily send CreateTableEvent to
             // downstream to avoid checkpoint timeout.
             TableId tableId = splitState.asSnapshotSplitState().toMySqlSplit().getTableId();
@@ -134,6 +149,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 }
             }
         }
+
         super.processElement(element, output, splitState);
     }
 
@@ -282,80 +298,5 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
         } catch (SQLException e) {
             throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
         }
-    }
-
-    private List<CreateTableEvent> deduceEvolvedSchemaChanges(
-            TableIdRouter router, CreateTableEvent event) {
-        LOG.info("Step 1 - Start deducing evolved schema change for {}", event);
-
-        org.apache.flink.cdc.common.event.TableId originalTableId = event.tableId();
-        List<CreateTableEvent> deducedSchemaChangeEvents = new ArrayList<>();
-        Set<org.apache.flink.cdc.common.event.TableId> originalTables =
-                createTableEventCache.stream()
-                        .map(CreateTableEvent::tableId)
-                        .collect(Collectors.toSet());
-
-        // First, grab all affected evolved tables.
-        Set<org.apache.flink.cdc.common.event.TableId> affectedEvolvedTables =
-                SchemaDerivator.getAffectedEvolvedTables(
-                        router, Collections.singleton(originalTableId));
-        LOG.info("Step 2 - Affected downstream tables are: {}", affectedEvolvedTables);
-
-        // For each affected table, we need to...
-        for (org.apache.flink.cdc.common.event.TableId evolvedTableId : affectedEvolvedTables) {
-            Optional<CreateTableEvent> currentCreateTableEventOptional =
-                    createTableEventCache.stream()
-                            .filter(
-                                    createTableEvent ->
-                                            createTableEvent.tableId().equals(evolvedTableId))
-                            .findFirst();
-            if (!currentCreateTableEventOptional.isPresent()) {
-                continue;
-            }
-            Schema currentEvolvedSchema = currentCreateTableEventOptional.get().getSchema();
-            LOG.info(
-                    "Step 3.1 - For to-be-evolved table {} with schema {}...",
-                    evolvedTableId,
-                    currentEvolvedSchema);
-
-            // ... reversely look up this affected sink table's upstream dependency
-            Set<org.apache.flink.cdc.common.event.TableId> upstreamDependencies =
-                    SchemaDerivator.reverseLookupDependingUpstreamTables(
-                            router, evolvedTableId, originalTables);
-            Preconditions.checkArgument(
-                    !upstreamDependencies.isEmpty(),
-                    "An affected sink table's upstream dependency cannot be empty.");
-            LOG.info("Step 3.2 - upstream dependency tables are: {}", upstreamDependencies);
-
-            List<CreateTableEvent> rawSchemaChangeEvents = new ArrayList<>();
-            if (upstreamDependencies.size() == 1) {
-                // If it's a one-by-one routing rule, we can simply forward it to downstream sink.
-                CreateTableEvent rawEvent = event.copy(evolvedTableId);
-                rawSchemaChangeEvents.add(rawEvent);
-                LOG.info(
-                        "Step 3.3 - It's an one-by-one routing and could be forwarded as {}.",
-                        rawEvent);
-            } else {
-                Set<Schema> toBeMergedSchemas =
-                        SchemaDerivator.reverseLookupDependingUpstreamSchemas(
-                                router, evolvedTableId, originalTables, currentEvolvedSchema);
-                LOG.info("Step 3.3 - Upstream dependency schemas are: {}.", toBeMergedSchemas);
-
-                // We're in a table routing mode now, so we need to infer a widest schema for all
-                // upstream tables.
-                Schema mergedSchema = currentEvolvedSchema;
-                for (Schema toBeMergedSchema : toBeMergedSchemas) {
-                    mergedSchema =
-                            SchemaMergingUtils.getLeastCommonSchema(mergedSchema, toBeMergedSchema);
-                }
-                LOG.info("Step 3.4 - Deduced widest schema is: {}.", mergedSchema);
-
-                rawSchemaChangeEvents.add(new CreateTableEvent(evolvedTableId, mergedSchema));
-            }
-
-            deducedSchemaChangeEvents.addAll(rawSchemaChangeEvents);
-        }
-
-        return deducedSchemaChangeEvents;
     }
 }

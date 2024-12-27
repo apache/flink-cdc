@@ -20,7 +20,6 @@ package org.apache.flink.cdc.connectors.mysql.source;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
@@ -45,27 +44,24 @@ public class MySqlDataSource implements DataSource {
 
     private List<MySqlReadableMetadata> readableMetadataList;
     private final Boolean isBatchMode;
-    private final List<RouteRule> routeRules;
 
     public MySqlDataSource(MySqlSourceConfigFactory configFactory) {
-        this(configFactory, false, new ArrayList<>(), new ArrayList<>());
+        this(configFactory, false, new ArrayList<>());
     }
 
     public MySqlDataSource(
             MySqlSourceConfigFactory configFactory,
             List<MySqlReadableMetadata> readableMetadataList) {
-        this(configFactory, false, new ArrayList<>(), readableMetadataList);
+        this(configFactory, false, readableMetadataList);
     }
 
     public MySqlDataSource(
             MySqlSourceConfigFactory configFactory,
             Boolean isBatchMode,
-            List<RouteRule> routeRules,
             List<MySqlReadableMetadata> readableMetadataList) {
         this.configFactory = configFactory;
         this.sourceConfig = configFactory.createConfig(0);
         this.isBatchMode = isBatchMode;
-        this.routeRules = routeRules;
         this.readableMetadataList = readableMetadataList;
     }
 
@@ -87,7 +83,7 @@ public class MySqlDataSource implements DataSource {
                         sourceConfig.isTreatTinyInt1AsBoolean());
 
         MySqlSource.RecordEmitterSupplier recordEmitterSupplier =
-                new MySqlPipelineSourceRecordEmitterSupplier(deserializer, isBatchMode, routeRules);
+                new MySqlPipelineSourceRecordEmitterSupplier(deserializer, isBatchMode);
         MySqlSource<Event> source =
                 new MySqlSource<>(configFactory, deserializer, recordEmitterSupplier);
         return FlinkSourceProvider.of(source);
