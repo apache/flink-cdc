@@ -111,7 +111,7 @@ public class DataTypeConverter {
             case VARBINARY:
                 return byte[].class;
             case DECIMAL:
-                return BigDecimal.class;
+                return DecimalData.class;
             case ROW:
                 return Object.class;
             case ARRAY:
@@ -495,7 +495,7 @@ public class DataTypeConverter {
             case VARBINARY:
                 return convertToBinary(value);
             case DECIMAL:
-                return convertToDecimalOriginal(value);
+                return convertToDecimal(value);
             case ROW:
                 return value;
             case ARRAY:
@@ -817,6 +817,7 @@ public class DataTypeConverter {
         }
     }
 
+    // convert to DecimalData
     private static Object convertToDecimal(Object obj) {
         if (obj instanceof BigDecimal) {
             BigDecimal bigDecimalValue = (BigDecimal) obj;
@@ -824,18 +825,6 @@ public class DataTypeConverter {
                     bigDecimalValue, bigDecimalValue.precision(), bigDecimalValue.scale());
         } else if (obj instanceof DecimalData) {
             return obj;
-        } else {
-            throw new UnsupportedOperationException(
-                    "Unsupported Decimal value type: " + obj.getClass().getSimpleName());
-        }
-    }
-
-    private static Object convertToDecimalOriginal(Object obj) {
-        if (obj instanceof BigDecimal) {
-            return obj;
-        } else if (obj instanceof DecimalData) {
-            DecimalData decimalData = (DecimalData) obj;
-            return decimalData.toBigDecimal();
         } else {
             throw new UnsupportedOperationException(
                     "Unsupported Decimal value type: " + obj.getClass().getSimpleName());

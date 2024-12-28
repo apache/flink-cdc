@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.functions;
 
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
@@ -237,6 +238,14 @@ public class SystemFunctionUtils {
         return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
     }
 
+    public static boolean betweenAsymmetric(
+            DecimalData value, DecimalData minValue, DecimalData maxValue) {
+        if (value == null) {
+            return false;
+        }
+        return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
+    }
+
     public static boolean notBetweenAsymmetric(String value, String minValue, String maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
@@ -263,6 +272,11 @@ public class SystemFunctionUtils {
 
     public static boolean notBetweenAsymmetric(
             BigDecimal value, BigDecimal minValue, BigDecimal maxValue) {
+        return !betweenAsymmetric(value, minValue, maxValue);
+    }
+
+    public static boolean notBetweenAsymmetric(
+            DecimalData value, DecimalData minValue, DecimalData maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
 
@@ -294,6 +308,10 @@ public class SystemFunctionUtils {
         return Arrays.stream(values).anyMatch(item -> value.equals(item));
     }
 
+    public static boolean in(DecimalData value, DecimalData... values) {
+        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+    }
+
     public static boolean notIn(String value, String... values) {
         return !in(value, values);
     }
@@ -319,6 +337,10 @@ public class SystemFunctionUtils {
     }
 
     public static boolean notIn(BigDecimal value, BigDecimal... values) {
+        return !in(value, values);
+    }
+
+    public static boolean notIn(DecimalData value, DecimalData... values) {
         return !in(value, values);
     }
 
@@ -557,8 +579,24 @@ public class SystemFunctionUtils {
     }
 
     /** SQL <code>ROUND</code> operator applied to BigDecimal values. */
+    public static DecimalData round(DecimalData b0) {
+        return round(b0, 0);
+    }
+
+    /** SQL <code>ROUND</code> operator applied to BigDecimal values. */
     public static BigDecimal round(BigDecimal b0, int b1) {
         return b0.movePointRight(b1).setScale(0, RoundingMode.HALF_UP).movePointLeft(b1);
+    }
+
+    /** SQL <code>ROUND</code> operator applied to DecimalData values. */
+    public static DecimalData round(DecimalData b0, int b1) {
+        return DecimalData.fromBigDecimal(
+                b0.toBigDecimal()
+                        .movePointRight(b1)
+                        .setScale(0, RoundingMode.HALF_UP)
+                        .movePointLeft(b1),
+                b0.precision(),
+                b0.scale());
     }
 
     /** SQL <code>ROUND</code> operator applied to float values. */
@@ -628,6 +666,8 @@ public class SystemFunctionUtils {
             return !object.equals(0d);
         } else if (object instanceof BigDecimal) {
             return ((BigDecimal) object).compareTo(BigDecimal.ZERO) != 0;
+        } else if (object instanceof DecimalData) {
+            return ((DecimalData) object).compareTo(DecimalData.zero(1, 0)) != 0;
         }
         return Boolean.valueOf(castToString(object));
     }
@@ -641,6 +681,9 @@ public class SystemFunctionUtils {
         }
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).byteValue();
+        }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().byteValue();
         }
         if (object instanceof Double) {
             return ((Double) object).byteValue();
@@ -672,6 +715,9 @@ public class SystemFunctionUtils {
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).shortValue();
         }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().shortValue();
+        }
         if (object instanceof Double) {
             return ((Double) object).shortValue();
         }
@@ -701,6 +747,9 @@ public class SystemFunctionUtils {
         }
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).intValue();
+        }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().intValue();
         }
         if (object instanceof Double) {
             return ((Double) object).intValue();
@@ -732,6 +781,9 @@ public class SystemFunctionUtils {
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).longValue();
         }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().longValue();
+        }
         if (object instanceof Double) {
             return ((Double) object).longValue();
         }
@@ -762,6 +814,9 @@ public class SystemFunctionUtils {
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).floatValue();
         }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().floatValue();
+        }
         if (object instanceof Double) {
             return ((Double) object).floatValue();
         }
@@ -784,6 +839,9 @@ public class SystemFunctionUtils {
         }
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).doubleValue();
+        }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().doubleValue();
         }
         if (object instanceof Double) {
             return (Double) object;
@@ -820,6 +878,30 @@ public class SystemFunctionUtils {
             return null;
         }
         return bigDecimal;
+    }
+
+    public static DecimalData castToDecimalData(Object object, int precision, int scale) {
+        if (object == null) {
+            return null;
+        }
+        if (object instanceof Boolean) {
+            object = (Boolean) object ? 1 : 0;
+        }
+
+        BigDecimal bigDecimal;
+        try {
+            bigDecimal = new BigDecimal(castObjectIntoString(object), new MathContext(precision));
+            bigDecimal = bigDecimal.setScale(scale, RoundingMode.HALF_UP);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+
+        // If the precision overflows, null will be returned. Otherwise, we may accidentally emit a
+        // non-serializable object into the pipeline that breaks downstream.
+        if (bigDecimal.precision() > precision) {
+            return null;
+        }
+        return DecimalData.fromBigDecimal(bigDecimal, precision, scale);
     }
 
     public static TimestampData castToTimestamp(Object object, String timezone) {

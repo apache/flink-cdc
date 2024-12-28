@@ -437,7 +437,7 @@ public class JaninoCompiler {
                 return new Java.MethodInvocation(
                         Location.NOWHERE,
                         null,
-                        "castToBigDecimal",
+                        "castToDecimalData",
                         newAtoms.toArray(new Java.Rvalue[0]));
             case "CHAR":
             case "VARCHAR":
