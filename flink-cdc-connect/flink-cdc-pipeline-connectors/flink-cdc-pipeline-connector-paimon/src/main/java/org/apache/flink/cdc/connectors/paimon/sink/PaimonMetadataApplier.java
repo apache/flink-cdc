@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
@@ -48,6 +49,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
@@ -72,6 +74,10 @@ public class PaimonMetadataApplier implements MetadataApplier {
     private final Map<TableId, List<String>> partitionMaps;
 
     private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
+
+    private static final String OPTION_DEFAULT_VALUE_PREFIX = "FIELDS";
+
+    private static final String OPTION_DEFAULT_VALUE_SUFFIX = "default-value";
 
     public PaimonMetadataApplier(Options catalogOptions) {
         this.catalogOptions = catalogOptions;
@@ -210,6 +216,21 @@ public class PaimonMetadataApplier implements MetadataApplier {
         try {
             List<SchemaChange> tableChangeList = new ArrayList<>();
             for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
+                // if default value express exists, we need to set the default value to the table
+                // option
+                Column column = columnWithPosition.getAddColumn();
+                Optional.ofNullable(column.getDefaultValueExpression())
+                        .ifPresent(
+                                value -> {
+                                    String key =
+                                            String.format(
+                                                    "%s.%s.%s",
+                                                    OPTION_DEFAULT_VALUE_PREFIX,
+                                                    column.getName(),
+                                                    OPTION_DEFAULT_VALUE_SUFFIX);
+                                    tableChangeList.add(SchemaChangeProvider.setOption(key, value));
+                                });
+
                 SchemaChange tableChange;
                 switch (columnWithPosition.getPosition()) {
                     case FIRST:
