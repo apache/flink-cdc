@@ -183,9 +183,11 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
             schemaMaps.put(
                     createTableEvent.tableId(),
                     new TableSchemaInfo(createTableEvent.getSchema(), zoneId));
-            output.collect(
-                    new StreamRecord<>(
-                            new BucketWrapperChangeEvent(currentTaskNumber, (ChangeEvent) event)));
+            for (int index = 0; index < totalTasksNumber; index++) {
+                output.collect(
+                        new StreamRecord<>(
+                                new BucketWrapperChangeEvent(index, (ChangeEvent) event)));
+            }
         } else if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             Schema schema =
@@ -193,9 +195,12 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                             schemaMaps.get(schemaChangeEvent.tableId()).getSchema(),
                             schemaChangeEvent);
             schemaMaps.put(schemaChangeEvent.tableId(), new TableSchemaInfo(schema, zoneId));
-            output.collect(
-                    new StreamRecord<>(
-                            new BucketWrapperChangeEvent(currentTaskNumber, (ChangeEvent) event)));
+            // Broadcast SchemachangeEvent.
+            for (int index=0; index<totalTasksNumber; index++) {
+                output.collect(
+                        new StreamRecord<>(
+                                new BucketWrapperChangeEvent(index, (ChangeEvent) event)));
+            }
         }
     }
 
