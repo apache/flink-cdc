@@ -39,7 +39,14 @@ public class DataFieldSerializer extends TypeSerializerSingleton<DataField> {
     public static final DataFieldSerializer INSTANCE = new DataFieldSerializer();
 
     private final StringSerializer stringSerializer = StringSerializer.INSTANCE;
-    private final DataTypeSerializer dataTypeSerializer = new DataTypeSerializer();
+    private DataTypeSerializer dataTypeSerializer;
+
+    private DataTypeSerializer getDataTypeSerializer() {
+        if (dataTypeSerializer == null) {
+            dataTypeSerializer = new DataTypeSerializer();
+        }
+        return dataTypeSerializer;
+    }
 
     @Override
     public boolean isImmutableType() {
@@ -55,7 +62,7 @@ public class DataFieldSerializer extends TypeSerializerSingleton<DataField> {
     public DataField copy(DataField from) {
         return new DataField(
                 stringSerializer.copy(from.getName()),
-                dataTypeSerializer.copy(from.getType()),
+                getDataTypeSerializer().copy(from.getType()),
                 stringSerializer.copy(from.getDescription()));
     }
 
@@ -72,14 +79,14 @@ public class DataFieldSerializer extends TypeSerializerSingleton<DataField> {
     @Override
     public void serialize(DataField record, DataOutputView target) throws IOException {
         stringSerializer.serialize(record.getName(), target);
-        dataTypeSerializer.serialize(record.getType(), target);
+        getDataTypeSerializer().serialize(record.getType(), target);
         stringSerializer.serialize(record.getDescription(), target);
     }
 
     @Override
     public DataField deserialize(DataInputView source) throws IOException {
         String name = stringSerializer.deserialize(source);
-        DataType type = dataTypeSerializer.deserialize(source);
+        DataType type = getDataTypeSerializer().deserialize(source);
         String desc = stringSerializer.deserialize(source);
         return new DataField(name, type, desc);
     }
