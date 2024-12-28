@@ -100,4 +100,15 @@ public class SchemaChangeProvider {
     public static SchemaChange drop(String columnName) {
         return SchemaChange.dropColumn(columnName);
     }
+
+    /**
+     * Creates a SchemaChange object for setting an option.
+     *
+     * @param key The key of the option to be set.
+     * @param value The value of the option to be set.
+     * @return A SchemaChange object representing the setting of an option.
+     */
+    public static SchemaChange setOption(String key, String value) {
+        return SchemaChange.setOption(key, value);
+    }
 }
