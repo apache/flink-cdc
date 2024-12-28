@@ -332,21 +332,29 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>它指示在数据库中进行更改的时间。 <br>如果记录是从表的快照而不是改变流中读取的，该值将始终为0。</td>
     </tr>
+    <tr>
+      <td>row_kind</td>
+      <td>STRING NOT NULL</td>
+      <td>当前记录对应的 changelog 类型。注意：当 Source 算子选择为每条记录输出 row_kind 字段后，下游 SQL 算子在处理消息撤回时会因为这个字段不同而比对失败，
+建议只在简单的同步作业中引用该元数据列。<br>'+I' 表示 INSERT 数据，'-D' 表示 DELETE 数据，'-U' 表示 UPDATE_BEFORE 数据，'+U' 表示 UPDATE_AFTER 数据。
+</td>
+    </tr>
   </tbody>
 </table>
 
 扩展的 CREATE TABLE 示例演示了用于公开这些元数据字段的语法：
 ```sql
 CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    db_name         STRING METADATA FROM 'database_name' VIRTUAL,
     collection_name STRING METADATA  FROM 'collection_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    _id STRING, // 必须声明
-    name STRING,
-    weight DECIMAL(10,3),
-    tags ARRAY<STRING>, -- array
-    price ROW<amount DECIMAL(10,2), currency STRING>, -- 嵌入式文档
-    suppliers ARRAY<ROW<name STRING, address STRING>>, -- 嵌入式文档
+    operation_ts    TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation       STRING METADATA FROM 'row_kind' VIRTUAL,
+    _id             STRING, // 必须声明
+    name            STRING,
+    weight          DECIMAL(10,3),
+    tags            ARRAY<STRING>, -- array
+    price           ROW<amount DECIMAL(10,2), currency STRING>, -- 嵌入式文档
+    suppliers       ARRAY<ROW<name STRING, address STRING>>, -- 嵌入式文档
     PRIMARY KEY(_id) NOT ENFORCED
 ) WITH (
     'connector' = 'mongodb-cdc',
