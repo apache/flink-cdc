@@ -975,7 +975,7 @@ class SchemaMergingUtilsTest {
                         DECIMAL, FLOAT, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING));
 
-        // 16-bit TINYINT could fit into FLOAT (24 sig bits) or DOUBLE (53 sig bits)
+        // 16-bit SMALLINT could fit into FLOAT (24 sig bits) or DOUBLE (53 sig bits)
         assertTypeMergingVector(
                 SMALLINT,
                 Arrays.asList(
@@ -983,7 +983,7 @@ class SchemaMergingUtilsTest {
                         DECIMAL, FLOAT, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING));
 
-        // 32-bit TINYINT could fit into DOUBLE (53 sig bits)
+        // 32-bit INT could fit into DOUBLE (53 sig bits)
         assertTypeMergingVector(
                 INT,
                 Arrays.asList(
@@ -994,7 +994,7 @@ class SchemaMergingUtilsTest {
                 BIGINT,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, BIGINT, BIGINT,
-                        DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
+                        DECIMAL, DOUBLE, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING));
 
         assertTypeMergingVector(
@@ -1007,14 +1007,14 @@ class SchemaMergingUtilsTest {
         assertTypeMergingVector(
                 FLOAT,
                 Arrays.asList(
-                        STRING, STRING, STRING, STRING, STRING, FLOAT, FLOAT, DOUBLE, STRING,
+                        STRING, STRING, STRING, STRING, STRING, FLOAT, FLOAT, DOUBLE, DOUBLE,
                         STRING, FLOAT, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING));
 
         assertTypeMergingVector(
                 DOUBLE,
                 Arrays.asList(
-                        STRING, STRING, STRING, STRING, STRING, DOUBLE, DOUBLE, DOUBLE, STRING,
+                        STRING, STRING, STRING, STRING, STRING, DOUBLE, DOUBLE, DOUBLE, DOUBLE,
                         STRING, DOUBLE, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING));
 
