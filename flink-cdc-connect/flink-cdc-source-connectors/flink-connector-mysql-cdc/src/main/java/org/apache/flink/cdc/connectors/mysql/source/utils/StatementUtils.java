@@ -26,6 +26,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -131,8 +132,13 @@ public class StatementUtils {
     }
 
     public static String buildSplitScanQuery(
-            TableId tableId, RowType pkRowType, boolean isFirstSplit, boolean isLastSplit) {
-        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, true);
+            TableId tableId,
+            RowType pkRowType,
+            boolean isFirstSplit,
+            boolean isLastSplit,
+            List<String> columnNames) {
+        return buildSplitQuery(
+                tableId, pkRowType, isFirstSplit, isLastSplit, -1, true, columnNames);
     }
 
     private static String buildSplitQuery(
@@ -141,7 +147,8 @@ public class StatementUtils {
             boolean isFirstSplit,
             boolean isLastSplit,
             int limitSize,
-            boolean isScanningData) {
+            boolean isScanningData,
+            List<String> columnNames) {
         final String condition;
 
         if (isFirstSplit && isLastSplit) {
@@ -174,7 +181,13 @@ public class StatementUtils {
 
         if (isScanningData) {
             return buildSelectWithRowLimits(
-                    tableId, limitSize, "*", Optional.ofNullable(condition), Optional.empty());
+                    tableId,
+                    limitSize,
+                    columnNames.stream()
+                            .map(StatementUtils::quote)
+                            .collect(Collectors.joining(", ")),
+                    Optional.ofNullable(condition),
+                    Optional.empty());
         } else {
             final String orderBy =
                     pkRowType.getFieldNames().stream().collect(Collectors.joining(", "));
