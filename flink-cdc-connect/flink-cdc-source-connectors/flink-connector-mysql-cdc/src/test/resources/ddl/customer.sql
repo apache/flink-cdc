@@ -326,3 +326,19 @@ CREATE TABLE default_value_test (
 INSERT INTO default_value_test
 VALUES (1,'user1','Shanghai',123567),
        (2,'user2','Shanghai',123567);
+
+-- create table whose primary key are varchar collate utf8mb3_general_ci.
+CREATE TABLE varchar_value_test (
+  id VARCHAR(255) NOT NULL PRIMARY KEY COLLATE utf8mb3_general_ci ,
+  name VARCHAR(255) NOT NULL,
+  address VARCHAR(1024),
+  phone_number INTEGER
+);
+INSERT INTO varchar_value_test
+VALUES ('aGGGGGG','u1','Beijing',1),
+       ('GbGGGGG','u2','Beijing',2),
+       ('GGcGGGG','u3','Beijing',3),
+       ('GGGdGGG','u4','New York',4),
+       ('GGGGeGG','u5','New York',5),
+       ('GGGGGfG','u6','Berlin',6),
+       ('GGGGGGg','u7','Berlin',7);
