@@ -74,6 +74,37 @@ public class KafkaDataSinkFactoryTest {
     }
 
     @Test
+    void testUnsupportedFormatOption() {
+
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("kafka", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(KafkaDataSinkFactory.class);
+
+        Configuration conf =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put("value.format", "debezium-json")
+                                .put("key.format", "csv")
+                                .put("key.csv.field-delimiter", "|")
+                                .put("debezium-json.encode.decimal-as-plain-number", "true")
+                                .put("debezium-json.unsupported_key", "true")
+                                .build());
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                sinkFactory.createDataSink(
+                                        new FactoryHelper.DefaultContext(
+                                                conf,
+                                                conf,
+                                                Thread.currentThread().getContextClassLoader())))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining(
+                        "Unsupported options found for 'kafka'.\n\n"
+                                + "Unsupported options:\n\n"
+                                + "debezium-json.unsupported_key");
+    }
+
+    @Test
     void testPrefixRequireOption() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("kafka", DataSinkFactory.class);

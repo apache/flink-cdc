@@ -37,7 +37,7 @@ public class FactoryHelper {
     private final Factory factory;
     private final Factory.Context context;
 
-    private FactoryHelper(Factory factory, Factory.Context context) {
+    public FactoryHelper(Factory factory, Factory.Context context) {
         this.factory = factory;
         this.context = context;
     }

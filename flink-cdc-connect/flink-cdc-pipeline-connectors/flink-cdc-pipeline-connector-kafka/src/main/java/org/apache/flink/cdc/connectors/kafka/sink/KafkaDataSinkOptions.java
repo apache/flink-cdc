@@ -18,7 +18,8 @@
 package org.apache.flink.cdc.connectors.kafka.sink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
-import org.apache.flink.cdc.connectors.kafka.json.JsonSerializationType;
+import org.apache.flink.cdc.connectors.kafka.format.JsonFormatFactory;
+import org.apache.flink.cdc.connectors.kafka.format.debezium.DebeziumJsonFormatFactory;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 
 import static org.apache.flink.cdc.common.configuration.ConfigOptions.key;
@@ -43,18 +44,18 @@ public class KafkaDataSinkOptions {
                             "Defines the strategy for sending record to kafka topic, "
                                     + "available options are `all-to-zero` and `hash-by-key`, default option is `all-to-zero`.");
 
-    public static final ConfigOption<KeyFormat> KEY_FORMAT =
+    public static final ConfigOption<String> KEY_FORMAT =
             key("key.format")
-                    .enumType(KeyFormat.class)
-                    .defaultValue(KeyFormat.JSON)
+                    .stringType()
+                    .defaultValue(JsonFormatFactory.IDENTIFIER)
                     .withDescription(
                             "Defines the format identifier for encoding key data, "
                                     + "available options are `csv` and `json`, default option is `json`.");
 
-    public static final ConfigOption<JsonSerializationType> VALUE_FORMAT =
+    public static final ConfigOption<String> VALUE_FORMAT =
             key("value.format")
-                    .enumType(JsonSerializationType.class)
-                    .defaultValue(JsonSerializationType.DEBEZIUM_JSON)
+                    .stringType()
+                    .defaultValue(DebeziumJsonFormatFactory.IDENTIFIER)
                     .withDescription(
                             "Defines the format identifier for encoding value data, "
                                     + "available options are `debezium-json` and `canal-json`, default option is `debezium-json`.");

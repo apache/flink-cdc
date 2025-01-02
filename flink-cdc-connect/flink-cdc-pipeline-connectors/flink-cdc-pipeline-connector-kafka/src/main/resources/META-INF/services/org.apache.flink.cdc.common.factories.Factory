@@ -14,3 +14,9 @@
 # limitations under the License.
 
 org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkFactory
+
+#format factories
+org.apache.flink.cdc.connectors.kafka.format.debezium.DebeziumJsonFormatFactory
+org.apache.flink.cdc.connectors.kafka.format.canal.CanalJsonFormatFactory
+org.apache.flink.cdc.connectors.kafka.format.csv.CsvFormatFactory
+org.apache.flink.cdc.connectors.kafka.format.JsonFormatFactory

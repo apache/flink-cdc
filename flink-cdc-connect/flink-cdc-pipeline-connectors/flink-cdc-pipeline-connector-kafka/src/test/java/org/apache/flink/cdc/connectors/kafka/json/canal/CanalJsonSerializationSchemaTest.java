@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.kafka.json.canal;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -26,11 +27,12 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
-import org.apache.flink.cdc.connectors.kafka.json.ChangeLogJsonFormatFactory;
-import org.apache.flink.cdc.connectors.kafka.json.JsonSerializationType;
+import org.apache.flink.cdc.connectors.kafka.format.JsonFormatOptionsUtil;
+import org.apache.flink.cdc.connectors.kafka.format.canal.CanalJsonSerializationSchema;
 import org.apache.flink.cdc.connectors.kafka.json.MockInitializationContext;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
-import org.apache.flink.configuration.Configuration;
+import org.apache.flink.formats.common.TimestampFormat;
+import org.apache.flink.formats.json.JsonFormatOptions;
 import org.apache.flink.util.jackson.JacksonMapperFactory;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonGenerator;
@@ -41,6 +43,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
+
+import static org.apache.flink.cdc.connectors.kafka.format.JsonFormatOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER;
+import static org.apache.flink.cdc.connectors.kafka.format.canal.CanalJsonFormatOptions.JSON_MAP_NULL_KEY_LITERAL;
 
 /** Tests for {@link CanalJsonSerializationSchema}. */
 public class CanalJsonSerializationSchemaTest {
@@ -53,11 +58,20 @@ public class CanalJsonSerializationSchemaTest {
         ObjectMapper mapper =
                 JacksonMapperFactory.createObjectMapper()
                         .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
+        Configuration formatOptions = new Configuration();
+        TimestampFormat timestampFormat = JsonFormatOptionsUtil.getTimestampFormat(formatOptions);
+        JsonFormatOptions.MapNullKeyMode mapNullKeyMode =
+                JsonFormatOptionsUtil.getMapNullKeyMode(formatOptions);
+        String mapNullKeyLiteral = formatOptions.get(JSON_MAP_NULL_KEY_LITERAL);
+
+        Boolean encodeDecimalAsPlainNumber = formatOptions.get(ENCODE_DECIMAL_AS_PLAIN_NUMBER);
         SerializationSchema<Event> serializationSchema =
-                ChangeLogJsonFormatFactory.createSerializationSchema(
-                        new Configuration(),
-                        JsonSerializationType.CANAL_JSON,
-                        ZoneId.systemDefault());
+                new CanalJsonSerializationSchema(
+                        timestampFormat,
+                        mapNullKeyMode,
+                        mapNullKeyLiteral,
+                        ZoneId.systemDefault(),
+                        encodeDecimalAsPlainNumber);
         serializationSchema.open(new MockInitializationContext());
 
         // create table
