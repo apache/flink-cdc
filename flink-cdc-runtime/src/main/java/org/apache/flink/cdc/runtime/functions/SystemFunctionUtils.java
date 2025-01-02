@@ -207,13 +207,13 @@ public class SystemFunctionUtils {
         return timestampDiff(symbol, fromTimestamp, toTimestamp);
     }
 
-    public static int timestampDiff(String symbol, long fromDate, long toDate) {
+    public static int timestampDiff(String timeIntervalUnit, long fromDate, long toDate) {
         Calendar from = Calendar.getInstance();
         from.setTime(new Date(fromDate));
         Calendar to = Calendar.getInstance();
         to.setTime(new Date(toDate));
         Long second = (to.getTimeInMillis() - from.getTimeInMillis()) / 1000;
-        switch (symbol) {
+        switch (timeIntervalUnit) {
             case "SECOND":
                 return second.intValue();
             case "MINUTE":
@@ -229,32 +229,34 @@ public class SystemFunctionUtils {
             case "YEAR":
                 return to.get(Calendar.YEAR) - from.get(Calendar.YEAR);
             default:
-                LOG.error("Unsupported timestamp diff: {}", symbol);
-                throw new RuntimeException("Unsupported timestamp diff: " + symbol);
+                throw new RuntimeException(
+                        String.format(
+                                "Unsupported timestamp interval unit %s. Supported units are: SECOND, MINUTE, HOUR, DAY, MONTH, YEAR",
+                                timeIntervalUnit));
         }
     }
 
     public static TimestampData timestampadd(
-            String timeintervalunit, int interval, LocalZonedTimestampData timepoint) {
-        return timestampadd(timeintervalunit, interval, timepoint.getEpochMillisecond());
+            String timeIntervalUnit, int interval, LocalZonedTimestampData timePoint) {
+        return timestampadd(timeIntervalUnit, interval, timePoint.getEpochMillisecond());
     }
 
     public static TimestampData timestampadd(
-            String timeintervalunit, int interval, ZonedTimestampData timepoint) {
-        return timestampadd(timeintervalunit, interval, timepoint.getMillisecond());
+            String timeIntervalUnit, int interval, ZonedTimestampData timePoint) {
+        return timestampadd(timeIntervalUnit, interval, timePoint.getMillisecond());
     }
 
     public static TimestampData timestampadd(
-            String timeintervalunit, int interval, TimestampData timepoint) {
-        return timestampadd(timeintervalunit, interval, timepoint.getMillisecond());
+            String timeIntervalUnit, int interval, TimestampData timePoint) {
+        return timestampadd(timeIntervalUnit, interval, timePoint.getMillisecond());
     }
 
     public static TimestampData timestampadd(
-            String timeintervalunit, int interval, long timepoint) {
+            String timeIntervalUnit, int interval, long timePoint) {
         Calendar calendar = Calendar.getInstance();
-        calendar.setTime(new Date(timepoint));
+        calendar.setTime(new Date(timePoint));
         int field;
-        switch (timeintervalunit) {
+        switch (timeIntervalUnit) {
             case "SECOND":
                 field = Calendar.SECOND;
                 break;
@@ -274,8 +276,10 @@ public class SystemFunctionUtils {
                 field = Calendar.YEAR;
                 break;
             default:
-                LOG.error("Unsupported timestamp add: {}", timeintervalunit);
-                throw new RuntimeException("Unsupported timestamp add: " + timeintervalunit);
+                throw new RuntimeException(
+                        String.format(
+                                "Unsupported timestamp interval unit %s. Supported units are: SECOND, MINUTE, HOUR, DAY, MONTH, YEAR",
+                                timeIntervalUnit));
         }
         calendar.add(field, interval);
         return TimestampData.fromMillis(calendar.getTimeInMillis());
