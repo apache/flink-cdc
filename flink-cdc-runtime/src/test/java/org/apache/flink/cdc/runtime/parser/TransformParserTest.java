@@ -484,14 +484,14 @@ public class TransformParserTest {
     @Test
     void testLargeNumericalLiterals() {
         // For literals within [-2147483648, 2147483647] range, plain Integers are OK
-        testFilterExpression("id > 2147483647", "id > 2147483647");
-        testFilterExpression("id < -2147483648", "id < -2147483648");
+        testFilterExpression("id > 2147483647", "greaterThan(id, 2147483647)");
+        testFilterExpression("id < -2147483648", "lessThan(id, -2147483648)");
 
         // For out-of-range literals, an extra `L` suffix is required
-        testFilterExpression("id > 2147483648", "id > 2147483648L");
-        testFilterExpression("id > -2147483649", "id > -2147483649L");
-        testFilterExpression("id < 9223372036854775807", "id < 9223372036854775807L");
-        testFilterExpression("id > -9223372036854775808", "id > -9223372036854775808L");
+        testFilterExpression("id > 2147483648", "greaterThan(id, 2147483648L)");
+        testFilterExpression("id > -2147483649", "greaterThan(id, -2147483649L)");
+        testFilterExpression("id < 9223372036854775807", "lessThan(id, 9223372036854775807L)");
+        testFilterExpression("id > -9223372036854775808", "greaterThan(id, -9223372036854775808L)");
 
         // But there's still a limit
         Assertions.assertThatThrownBy(

@@ -2009,9 +2009,10 @@ public class PostTransformOperatorTest {
                                 "2 > 1")
                         .addTimezone("UTC")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
+
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -2058,9 +2059,9 @@ public class PostTransformOperatorTest {
                                 "2 > 1")
                         .addTimezone("UTC")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -2102,9 +2103,9 @@ public class PostTransformOperatorTest {
                                 null)
                         .addTimezone("UTC")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
