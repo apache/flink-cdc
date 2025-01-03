@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
@@ -150,6 +151,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
             // Then, notify this information to the coordinator
             requestSchemaChange(
+                    tableId,
                     new SchemaChangeRequest(sourcePartition, subTaskId, schemaChangeEvent));
             schemaOperatorMetrics.increaseFinishedSchemaChangeEvents(1);
         } else if (event instanceof DataChangeEvent) {
@@ -188,9 +190,16 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         }
     }
 
-    private void requestSchemaChange(SchemaChangeRequest schemaChangeRequest) {
+    private void requestSchemaChange(
+            TableId sourceTableId, SchemaChangeRequest schemaChangeRequest) {
         LOG.info("{}> Sent FlushEvent to downstream...", subTaskId);
-        output.collect(new StreamRecord<>(new FlushEvent(subTaskId)));
+        output.collect(
+                new StreamRecord<>(
+                        new FlushEvent(
+                                subTaskId,
+                                tableIdRouter.route(sourceTableId),
+                                schemaChangeRequest.getSchemaChangeEvent().getType()
+                                        == SchemaChangeEventType.CREATE_TABLE)));
 
         LOG.info("{}> Sending evolve request...", subTaskId);
         SchemaChangeResponse response = sendRequestToCoordinator(schemaChangeRequest);

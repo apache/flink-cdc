@@ -198,6 +198,20 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
 
     private void handleFlushEvent(FlushEvent event) throws Exception {
         copySinkWriter.flush(false);
+        if (!event.getIsForCreateTableEvent()) {
+            event.getTableIds().stream()
+                    .filter(tableId -> !processedTableIds.contains(tableId))
+                    .forEach(
+                            tableId -> {
+                                LOG.info("Table {} has not been processed", tableId);
+                                try {
+                                    emitLatestSchema(tableId);
+                                } catch (Exception e) {
+                                    throw new RuntimeException(e);
+                                }
+                                processedTableIds.add(tableId);
+                            });
+        }
         schemaEvolutionClient.notifyFlushSuccess(
                 getRuntimeContext().getIndexOfThisSubtask(), event.getSourceSubTaskId());
     }

@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.runtime.operators.sink;
 
-import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
@@ -26,39 +25,39 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
-import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
+import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
-import org.apache.flink.streaming.api.operators.StreamSink;
+import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
+import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * An operator that processes records to be written into a {@link
- * org.apache.flink.streaming.api.functions.sink.SinkFunction}.
- *
- * <p>The operator is a proxy of {@link org.apache.flink.streaming.api.operators.StreamSink} in
- * Flink.
- *
- * <p>The operator is always part of a sink pipeline and is the first operator.
+ * The DataSinkOperatorAdapter class acts as an adapter for testing the core schema evolution
+ * process in both {@link DataSinkWriterOperator} and {@link DataSinkFunctionOperator}.
  */
-@Internal
-public class DataSinkFunctionOperator extends StreamSink<Event> {
+public class DataSinkOperatorAdapter extends AbstractStreamOperator<Event>
+        implements OneInputStreamOperator<Event, Event>, BoundedOneInput {
 
     private SchemaEvolutionClient schemaEvolutionClient;
+
     private final OperatorID schemaOperatorID;
+
     /** A set of {@link TableId} that already processed {@link CreateTableEvent}. */
     private final Set<TableId> processedTableIds;
 
-    public DataSinkFunctionOperator(SinkFunction<Event> userFunction, OperatorID schemaOperatorID) {
-        super(userFunction);
-        this.schemaOperatorID = schemaOperatorID;
-        processedTableIds = new HashSet<>();
+    public DataSinkOperatorAdapter() {
+        this.schemaOperatorID = new OperatorID();
+        this.processedTableIds = new HashSet<>();
         this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
@@ -66,7 +65,7 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
     public void setup(
             StreamTask<?, ?> containingTask,
             StreamConfig config,
-            Output<StreamRecord<Object>> output) {
+            Output<StreamRecord<Event>> output) {
         super.setup(containingTask, config, output);
         schemaEvolutionClient =
                 new SchemaEvolutionClient(
@@ -75,10 +74,21 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
     }
 
     @Override
+    public void open() throws Exception {}
+
+    @Override
     public void initializeState(StateInitializationContext context) throws Exception {
         schemaEvolutionClient.registerSubtask(getRuntimeContext().getIndexOfThisSubtask());
-        super.initializeState(context);
     }
+
+    @Override
+    public void snapshotState(StateSnapshotContext context) {}
+
+    @Override
+    public void processWatermark(Watermark mark) {}
+
+    @Override
+    public void processWatermarkStatus(WatermarkStatus watermarkStatus) {}
 
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
@@ -93,7 +103,8 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
         // CreateTableEvent marks the table as processed directly
         if (event instanceof CreateTableEvent) {
             processedTableIds.add(((CreateTableEvent) event).tableId());
-            super.processElement(element);
+            // replace FlinkWriterOperator/StreamSink and emit the event for testing
+            output.collect(element);
             return;
         }
 
@@ -106,12 +117,22 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
             processedTableIds.add(changeEvent.tableId());
         }
         processedTableIds.add(changeEvent.tableId());
-        super.processElement(element);
+        output.collect(element);
     }
 
+    @Override
+    public void prepareSnapshotPreBarrier(long checkpointId) {}
+
+    @Override
+    public void close() throws Exception {}
+
+    @Override
+    public void endInput() {}
+
     // ----------------------------- Helper functions -------------------------------
+
     private void handleFlushEvent(FlushEvent event) throws Exception {
-        userFunction.finish();
+        // omit copySinkWriter/userFunction flush from testing
         if (!event.getIsForCreateTableEvent()) {
             event.getTableIds().stream()
                     .filter(tableId -> !processedTableIds.contains(tableId))
@@ -133,9 +154,9 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
     private void emitLatestSchema(TableId tableId) throws Exception {
         Optional<Schema> schema = schemaEvolutionClient.getLatestEvolvedSchema(tableId);
         if (schema.isPresent()) {
-            // request and process CreateTableEvent because SinkFunction need to retrieve
+            // request and process CreateTableEvent because SinkWriter need to retrieve
             // Schema to deserialize RecordData after resuming job.
-            super.processElement(new StreamRecord<>(new CreateTableEvent(tableId, schema.get())));
+            output.collect(new StreamRecord<>(new CreateTableEvent(tableId, schema.get())));
             processedTableIds.add(tableId);
         } else {
             throw new RuntimeException(
