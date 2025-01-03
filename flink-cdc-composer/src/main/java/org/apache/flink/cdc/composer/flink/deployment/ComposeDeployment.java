@@ -17,19 +17,11 @@
 
 package org.apache.flink.cdc.composer.flink.deployment;
 
-import org.apache.flink.cdc.composer.PipelineDeploymentExecutor;
-
-import org.apache.commons.cli.CommandLine;
-
 /** Create deployment methods corresponding to different goals. */
-public class ComposeDeploymentFactory {
-
-    public PipelineDeploymentExecutor getFlinkComposeExecutor(CommandLine commandLine) {
-        String target = commandLine.getOptionValue("target");
-        if (target.equalsIgnoreCase("kubernetes-application")) {
-            return new K8SApplicationDeploymentExecutor();
-        }
-        throw new IllegalArgumentException(
-                String.format("Deployment target %s is not supported", target));
-    }
+public class ComposeDeployment {
+    public static final String KUBERNETES_APPLICATION = "kubernetes-application";
+    public static final String YARN_APPLICATION = "yarn-application";
+    public static final String YARN_SESSION = "yarn-session";
+    public static final String LOCAL = "local";
+    public static final String REMOTE = "remote";
 }
