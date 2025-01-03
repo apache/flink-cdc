@@ -57,7 +57,8 @@ env:
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-kafka,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-paimon,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-elasticsearch"
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-elasticsearch,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oceanbase"
 
   MODULES_MYSQL: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\

@@ -45,8 +45,8 @@ public class OceanBaseTestUtils {
     }
 
     public static OceanBaseContainer createOceanBaseContainerForJdbc() {
-        return createOceanBaseContainer(LATEST_VERSION, "slim")
-                .withStartupTimeout(Duration.ofMinutes(2));
+        return createOceanBaseContainer(LATEST_VERSION, "mini")
+                .withStartupTimeout(Duration.ofMinutes(4));
     }
 
     public static OceanBaseContainer createOceanBaseContainer(String version, String mode) {
