@@ -17,14 +17,12 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
-import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.utils.StringUtils;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * The projection of transform applies to describe a projection of filtering tables. Projection
@@ -41,6 +39,11 @@ public class TransformProjection implements Serializable {
     private static final long serialVersionUID = 1L;
     private String projection;
     private List<ProjectionColumn> projectionColumns;
+
+    public TransformProjection(String projection) {
+        this.projection = projection;
+        this.projectionColumns = new ArrayList<>();
+    }
 
     public TransformProjection(String projection, List<ProjectionColumn> projectionColumns) {
         this.projection = projection;
@@ -68,11 +71,5 @@ public class TransformProjection implements Serializable {
             return Optional.empty();
         }
         return Optional.of(new TransformProjection(projection, new ArrayList<>()));
-    }
-
-    public List<Column> getAllColumnList() {
-        return projectionColumns.stream()
-                .map(ProjectionColumn::getColumn)
-                .collect(Collectors.toList());
     }
 }
