@@ -18,6 +18,8 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobInfo;
+import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.serialization.SerializationSchema;
@@ -40,6 +42,8 @@ import org.apache.flink.cdc.connectors.paimon.sink.PaimonMetadataApplier;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
+import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
+import org.apache.flink.runtime.metrics.groups.InternalSinkCommitterMetricGroup;
 import org.apache.flink.streaming.runtime.operators.sink.committables.CommitRequestImpl;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
@@ -63,9 +67,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -108,6 +114,7 @@ public class PaimonSinkITCase {
         catalogOptions = new Options();
         catalogOptions.setString("metastore", metastore);
         catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
         table1 = TableId.tableId("test", "table1");
         if ("hive".equals(metastore)) {
             catalogOptions.setString("hadoop-conf-dir", HADOOP_CONF_DIR);
@@ -119,13 +126,14 @@ public class PaimonSinkITCase {
                                     + "'warehouse'='%s', "
                                     + "'metastore'='hive', "
                                     + "'hadoop-conf-dir'='%s', "
-                                    + "'hive-conf-dir'='%s' "
+                                    + "'hive-conf-dir'='%s', "
+                                    + "'cache-enabled'='false' "
                                     + ")",
                             warehouse, HADOOP_CONF_DIR, HIVE_CONF_DIR));
         } else {
             tEnv.executeSql(
                     String.format(
-                            "CREATE CATALOG paimon_catalog WITH ('type'='paimon', 'warehouse'='%s')",
+                            "CREATE CATALOG paimon_catalog WITH ('type'='paimon', 'warehouse'='%s', 'cache-enabled'='false')",
                             warehouse));
         }
         FlinkCatalogFactory.createPaimonCatalog(catalogOptions)
@@ -325,8 +333,8 @@ public class PaimonSinkITCase {
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(table1, Collections.singletonList(columnWithPosition));
         PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
-        writer.write(addColumnEvent, null);
         metadataApplier.applySchemaChange(addColumnEvent);
+        writer.write(addColumnEvent, null);
         generator =
                 new BinaryRecordDataGenerator(
                         RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
@@ -409,6 +417,13 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "5", "5"),
                         Row.ofKind(RowKind.INSERT, "6", "6")),
                 result);
+        result = new ArrayList<>();
+        tEnv.sqlQuery("select min_sequence_number from paimon_catalog.test.`table1$files`")
+                .execute()
+                .collect()
+                .forEachRemaining(result::add);
+        Set<Row> deduplicated = new HashSet<>(result);
+        Assertions.assertEquals(result.size(), deduplicated.size());
     }
 
     @ParameterizedTest
@@ -572,7 +587,10 @@ public class PaimonSinkITCase {
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {
 
         protected MockCommitRequestImpl(CommT committable) {
-            super(committable);
+            super(
+                    committable,
+                    InternalSinkCommitterMetricGroup.wrap(
+                            UnregisteredMetricsGroup.createOperatorMetricGroup()));
         }
     }
 
@@ -631,6 +649,16 @@ public class PaimonSinkITCase {
         }
 
         public JobID getJobId() {
+            return null;
+        }
+
+        @Override
+        public JobInfo getJobInfo() {
+            return null;
+        }
+
+        @Override
+        public TaskInfo getTaskInfo() {
             return null;
         }
     }

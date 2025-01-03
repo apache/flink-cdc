@@ -53,6 +53,8 @@ public class MySqlDeserializationConverterFactory {
             public Optional<DeserializationRuntimeConverter> createUserDefinedConverter(
                     LogicalType logicalType, ZoneId serverTimeZone) {
                 switch (logicalType.getTypeRoot()) {
+                    case TINYINT:
+                        return createTinyIntConverter();
                     case CHAR:
                     case VARCHAR:
                         return createStringConverter();
@@ -146,6 +148,23 @@ public class MySqlDeserializationConverterFactory {
             // otherwise, fallback to default converter
             return Optional.empty();
         }
+    }
+
+    private static Optional<DeserializationRuntimeConverter> createTinyIntConverter() {
+
+        return Optional.of(
+                new DeserializationRuntimeConverter() {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object convert(Object dbzObj, Schema schema) throws Exception {
+                        if (dbzObj instanceof Boolean) {
+                            return dbzObj == Boolean.TRUE ? (byte) 1 : (byte) 0;
+                        } else {
+                            return Byte.parseByte(dbzObj.toString());
+                        }
+                    }
+                });
     }
 
     private static boolean hasFamily(LogicalType logicalType, LogicalTypeFamily family) {

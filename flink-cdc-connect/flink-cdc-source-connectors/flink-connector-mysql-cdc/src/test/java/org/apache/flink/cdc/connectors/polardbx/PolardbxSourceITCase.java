@@ -127,7 +127,8 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
         tableResult = tEnv.executeSql("insert into sink select * from orders_source");
 
         waitForSinkSize("sink", realSnapshotData.size());
-        assertEqualsInAnyOrder(expectedSnapshotData, TestValuesTableFactory.getRawResults("sink"));
+        assertEqualsInAnyOrder(
+                expectedSnapshotData, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
         // third step: check dml events
         try (Connection connection = getJdbcConnection();
@@ -346,7 +347,8 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
 
         waitForSinkSize("multi_key_sink", realSnapshotData.size());
         assertEqualsInAnyOrder(
-                expectedSnapshotData, TestValuesTableFactory.getRawResults("multi_key_sink"));
+                expectedSnapshotData,
+                TestValuesTableFactory.getRawResultsAsStrings("multi_key_sink"));
 
         // third step: check dml events
         try (Connection connection = getJdbcConnection();

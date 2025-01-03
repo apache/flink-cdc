@@ -17,9 +17,6 @@
 -- DATABASE:  column_type_test
 -- ----------------------------------------------------------------------------------------------------------------
 
-CREATE DATABASE IF NOT EXISTS column_type_test;
-USE column_type_test;
-
 DROP TABLE IF EXISTS full_types;
 CREATE TABLE full_types
 (

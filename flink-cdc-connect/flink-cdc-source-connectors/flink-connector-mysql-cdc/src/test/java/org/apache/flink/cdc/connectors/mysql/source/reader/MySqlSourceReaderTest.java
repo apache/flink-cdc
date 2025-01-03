@@ -149,23 +149,11 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
             snapshotSplits =
                     Collections.singletonList(
                             new MySqlSnapshotSplit(
-                                    tableId0,
-                                    tableId0 + ":0",
-                                    splitType,
-                                    null,
-                                    null,
-                                    null,
-                                    tableSchemas));
+                                    tableId0, 0, splitType, null, null, null, tableSchemas));
             toRemoveSplits =
                     Collections.singletonList(
                             new MySqlSnapshotSplit(
-                                    tableId1,
-                                    tableId1 + ":0",
-                                    splitType,
-                                    null,
-                                    null,
-                                    null,
-                                    tableSchemas));
+                                    tableId1, 0, splitType, null, null, null, tableSchemas));
         }
 
         // Step 1: start source reader and assign snapshot splits
@@ -254,7 +242,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     Arrays.asList(
                             new MySqlSnapshotSplit(
                                     tableId,
-                                    tableId + ":0",
+                                    0,
                                     splitType,
                                     null,
                                     new Integer[] {200},
@@ -262,7 +250,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                                     tableSchemas),
                             new MySqlSnapshotSplit(
                                     tableId,
-                                    tableId + ":1",
+                                    1,
                                     splitType,
                                     new Integer[] {200},
                                     new Integer[] {1500},
@@ -270,7 +258,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                                     tableSchemas),
                             new MySqlSnapshotSplit(
                                     tableId,
-                                    tableId + ":2",
+                                    2,
                                     splitType,
                                     new Integer[] {1500},
                                     null,

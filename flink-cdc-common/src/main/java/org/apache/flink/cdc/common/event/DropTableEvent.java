@@ -68,4 +68,9 @@ public class DropTableEvent implements SchemaChangeEvent {
     public SchemaChangeEventType getType() {
         return SchemaChangeEventType.DROP_TABLE;
     }
+
+    @Override
+    public SchemaChangeEvent copy(TableId newTableId) {
+        return new DropTableEvent(newTableId);
+    }
 }

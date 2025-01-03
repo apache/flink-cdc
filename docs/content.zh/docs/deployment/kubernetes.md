@@ -159,9 +159,9 @@ Job Description: Sync MySQL Database to Doris
    假设您的Docker构建目录为`/opt/docker/flink-cdc`，此时该目录下的文件结构如下：
     ```text
     /opt/docker/flink-cdc
-        ├── flink-cdc-3.1.0-bin.tar.gz
-        ├── flink-cdc-pipeline-connector-doris-3.1.0.jar
-        ├── flink-cdc-pipeline-connector-mysql-3.1.0.jar
+        ├── flink-cdc-{{< param Version >}}-bin.tar.gz
+        ├── flink-cdc-pipeline-connector-doris-{{< param Version >}}.jar
+        ├── flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar
         ├── mysql-connector-java-8.0.27.jar
         └── ...
     ```
@@ -170,23 +170,23 @@ Job Description: Sync MySQL Database to Doris
     FROM flink:1.18.0-java8
     ADD *.jar $FLINK_HOME/lib/
     ADD flink-cdc*.tar.gz $FLINK_HOME/
-    RUN mv $FLINK_HOME/flink-cdc-3.1.0/lib/flink-cdc-dist-3.1.0.jar $FLINK_HOME/lib/
+    RUN mv $FLINK_HOME/flink-cdc-{{< param Version >}}/lib/flink-cdc-dist-{{< param Version >}}.jar $FLINK_HOME/lib/
     ```
    Docker镜像构建目录最终如下：
     ```text
     /opt/docker/flink-cdc
         ├── Dockerfile
-        ├── flink-cdc-3.1.0-bin.tar.gz
-        ├── flink-cdc-pipeline-connector-doris-3.1.0.jar
-        ├── flink-cdc-pipeline-connector-mysql-3.1.0.jar
+        ├── flink-cdc-{{< param Version >}}-bin.tar.gz
+        ├── flink-cdc-pipeline-connector-doris-{{< param Version >}}.jar
+        ├── flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar
         ├── mysql-connector-java-8.0.27.jar
         └── ...
     ```
 3. 构建自定义镜像并推送至仓库
     ```bash
-   docker build -t flink-cdc-pipeline:3.1.0 .
+   docker build -t flink-cdc-pipeline:{{< param Version >}} .
    
-   docker push flink-cdc-pipeline:3.1.0
+   docker push flink-cdc-pipeline:{{< param Version >}}
    ```
 
 ### 创建ConfigMap用于挂载Flink CDC配置文件
@@ -237,14 +237,14 @@ spec:
     state.checkpoints.dir: 'file:///tmp/checkpoints'
     state.savepoints.dir: 'file:///tmp/savepoints'
   flinkVersion: v1_18
-  image: 'flink-cdc-pipeline:3.1.0'
+  image: 'flink-cdc-pipeline:{{< param Version >}}'
   imagePullPolicy: Always
   job:
     args:
       - '--use-mini-cluster'
-      - /opt/flink/flink-cdc-3.1.0/conf/mysql-to-doris.yaml
+      - /opt/flink/flink-cdc-{{< param Version >}}/conf/mysql-to-doris.yaml
     entryClass: org.apache.flink.cdc.cli.CliFrontend
-    jarURI: 'local:///opt/flink/flink-cdc-3.1.0/lib/flink-cdc-dist-3.1.0.jar'
+    jarURI: 'local:///opt/flink/flink-cdc-{{< param Version >}}/lib/flink-cdc-dist-{{< param Version >}}.jar'
     parallelism: 1
     state: running
     upgradeMode: savepoint
@@ -261,7 +261,7 @@ spec:
         # don't modify this name
         - name: flink-main-container
           volumeMounts:
-            - mountPath: /opt/flink/flink-cdc-3.1.0/conf
+            - mountPath: /opt/flink/flink-cdc-{{< param Version >}}/conf
               name: flink-cdc-pipeline-config
       volumes:
         - configMap:

@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mongodb.source.assigners.splitters;
 
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfig;
 
@@ -44,4 +45,26 @@ public class MongoDBChunkSplitter implements ChunkSplitter {
         }
         return SplitVectorSplitStrategy.INSTANCE.split(splitContext);
     }
+
+    @Override
+    public void open() {}
+
+    @Override
+    public boolean hasNextChunk() {
+        // mongo cdc doesn't support chunk split asynchronously now.
+        return false;
+    }
+
+    @Override
+    public ChunkSplitterState snapshotState(long checkpointId) {
+        return ChunkSplitterState.NO_SPLITTING_TABLE_STATE;
+    }
+
+    @Override
+    public TableId getCurrentSplittingTableId() {
+        return null;
+    }
+
+    @Override
+    public void close() throws Exception {}
 }

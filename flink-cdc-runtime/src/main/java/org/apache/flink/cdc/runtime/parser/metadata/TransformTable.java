@@ -51,8 +51,7 @@ public class TransformTable extends AbstractTable {
         for (Column column : columns) {
             names.add(column.getName());
             RelDataType sqlType =
-                    relDataTypeFactory.createSqlType(
-                            DataTypeConverter.convertCalciteType(column.getType()));
+                    DataTypeConverter.convertCalciteType(relDataTypeFactory, column.getType());
             types.add(sqlType);
         }
         return relDataTypeFactory.createStructType(Pair.zip(names, types));

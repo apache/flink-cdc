@@ -30,8 +30,19 @@ public interface UserDefinedFunction {
         return null;
     }
 
-    /** This will be invoked every time when a UDF got created. */
+    /**
+     * This will be invoked every time when a UDF got created.
+     *
+     * <p>this method is {@link Deprecated}, please use {@link #open(UserDefinedFunctionContext)}
+     * instead.
+     */
+    @Deprecated
     default void open() throws Exception {}
+
+    /** This will be invoked every time when a UDF got created. */
+    default void open(UserDefinedFunctionContext context) throws Exception {
+        open();
+    }
 
     /** This will be invoked before a UDF got destroyed. */
     default void close() throws Exception {}

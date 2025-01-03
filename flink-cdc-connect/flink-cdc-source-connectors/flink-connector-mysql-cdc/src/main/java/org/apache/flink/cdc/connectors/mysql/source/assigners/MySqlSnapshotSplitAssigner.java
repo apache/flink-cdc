@@ -471,7 +471,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     public void startAssignNewlyAddedTables() {
         Preconditions.checkState(
                 AssignerStatus.isAssigningFinished(assignerStatus),
-                "Invalid assigner status {}",
+                "Invalid assigner status %s",
                 assignerStatus);
         assignerStatus = assignerStatus.startAssignNewlyTables();
     }
@@ -480,7 +480,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     public void onBinlogSplitUpdated() {
         Preconditions.checkState(
                 AssignerStatus.isNewlyAddedAssigningSnapshotFinished(assignerStatus),
-                "Invalid assigner status {}",
+                "Invalid assigner status %s",
                 assignerStatus);
         assignerStatus = assignerStatus.onBinlogSplitUpdated();
     }

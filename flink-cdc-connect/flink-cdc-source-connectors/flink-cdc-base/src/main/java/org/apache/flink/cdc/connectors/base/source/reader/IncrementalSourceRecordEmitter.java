@@ -152,6 +152,9 @@ public class IncrementalSourceRecordEmitter<T>
     }
 
     protected void emitElement(SourceRecord element, SourceOutput<T> output) throws Exception {
+        sourceReaderMetrics.markRecord();
+        sourceReaderMetrics.updateRecordCounters(element);
+
         outputCollector.output = output;
         outputCollector.currentMessageTimestamp = getMessageTimestamp(element);
         debeziumDeserializationSchema.deserialize(element, outputCollector);
@@ -169,9 +172,10 @@ public class IncrementalSourceRecordEmitter<T>
         }
     }
 
-    private static class OutputCollector<T> implements Collector<T> {
-        private SourceOutput<T> output;
-        private Long currentMessageTimestamp;
+    /** An adapter between {@link SourceOutput} and {@link Collector}. */
+    protected static class OutputCollector<T> implements Collector<T> {
+        public SourceOutput<T> output;
+        public Long currentMessageTimestamp;
 
         @Override
         public void collect(T record) {

@@ -129,7 +129,7 @@ public class SampleBucketSplitStrategy implements SplitStrategy {
         SnapshotSplit firstSplit =
                 new SnapshotSplit(
                         collectionId,
-                        splitId(collectionId, 0),
+                        0,
                         rowType,
                         ChunkUtils.minLowerBoundOfId(),
                         ChunkUtils.boundOfId(lowerBoundOfBucket(chunks.get(0))),
@@ -142,7 +142,7 @@ public class SampleBucketSplitStrategy implements SplitStrategy {
             snapshotSplits.add(
                     new SnapshotSplit(
                             collectionId,
-                            splitId(collectionId, i + 1),
+                            i + 1,
                             rowType,
                             ChunkUtils.boundOfId(lowerBoundOfBucket(bucket)),
                             ChunkUtils.boundOfId(upperBoundOfBucket(bucket)),
@@ -153,7 +153,7 @@ public class SampleBucketSplitStrategy implements SplitStrategy {
         SnapshotSplit lastSplit =
                 new SnapshotSplit(
                         collectionId,
-                        splitId(collectionId, chunks.size() + 1),
+                        chunks.size() + 1,
                         rowType,
                         ChunkUtils.boundOfId(upperBoundOfBucket(chunks.get(chunks.size() - 1))),
                         ChunkUtils.maxUpperBoundOfId(),

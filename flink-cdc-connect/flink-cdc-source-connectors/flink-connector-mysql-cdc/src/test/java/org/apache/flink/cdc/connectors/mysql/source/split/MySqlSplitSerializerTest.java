@@ -46,7 +46,7 @@ public class MySqlSplitSerializerTest {
         final MySqlSplit split =
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
-                        "test_db.test_table-1",
+                        1,
                         new RowType(
                                 Collections.singletonList(
                                         new RowType.RowField("id", new BigIntType()))),
@@ -122,7 +122,7 @@ public class MySqlSplitSerializerTest {
         final MySqlSplit split =
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
-                        "test_db.test_table-0",
+                        0,
                         new RowType(
                                 Collections.singletonList(
                                         new RowType.RowField("id", new BigIntType()))),

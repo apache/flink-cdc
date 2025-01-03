@@ -10,7 +10,7 @@
       "pattern": "^{"
     },
     {
-      "pattern": "^https://repo1.maven.org/maven2/org/apache/flink.*SNAPSHOT.*"
+      "pattern": "^https://repo1.maven.org/maven2/org/apache/flink.*"
     },
     {
       "pattern": "^https://mvnrepository.com"

@@ -369,13 +369,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         Map<TableId, TableChange> schema = new HashMap<>();
         schema.put(tableId, mySqlSchema.getTableSchema(partition, jdbc, tableId));
         return new MySqlSnapshotSplit(
-                tableId,
-                splitId(tableId, chunkId),
-                splitKeyType,
-                splitStart,
-                splitEnd,
-                null,
-                schema);
+                tableId, chunkId, splitKeyType, splitStart, splitEnd, null, schema);
     }
 
     // ------------------------------------------------------------------------------------------
@@ -453,10 +447,6 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                 max,
                 approximateRowCnt);
         return distributionFactor;
-    }
-
-    private static String splitId(TableId tableId, int chunkId) {
-        return tableId.toString() + ":" + chunkId;
     }
 
     private static void maySleep(int count, TableId tableId) {

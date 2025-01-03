@@ -18,6 +18,8 @@
 package org.apache.flink.cdc.connectors.starrocks.sink;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobInfo;
+import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.serialization.SerializationSchema;
@@ -351,6 +353,16 @@ public class EventRecordSerializationSchemaTest {
 
         @Override
         public JobID getJobId() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public JobInfo getJobInfo() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public TaskInfo getTaskInfo() {
             throw new UnsupportedOperationException();
         }
     }

@@ -199,7 +199,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                     "spare tire,22.200"
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -275,7 +275,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                     "113,scooter,Big 3-wheel scooter,5.200"
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -385,7 +385,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                 Arrays.asList(
                         "+I(0,cc ,vcc,tc,cč ,vcč,tč,1.123,2,3.323,4.323,5,6,true,22,333,4444,55555,2018-07-13,10:23:45.680,10:23:45.678,2018-07-13T11:23:45.340,2018-07-13T01:23:45.456Z,2018-07-13T13:23:45.780,2018-07-13T14:24,<a>b</a>)",
                         "+U(0,cc ,vcc,tc,cč ,vcč,tč,1.123,2,3.323,4.323,5,6,true,22,333,8888,55555,2018-07-13,10:23:45.680,10:23:45.679,2018-07-13T11:23:45.340,2018-07-13T01:23:45.456Z,2018-07-13T13:23:45.780,2018-07-13T14:24,<a>b</a>)");
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertEquals(expected, actual);
 
         result.getJobClient().get().cancel().get();
@@ -483,7 +483,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         "+U(inventory,dbo,products,110,jacket,new water resistent white wind breaker,0.500)",
                         "+U(inventory,dbo,products,111,scooter,Big 2-wheel scooter ,5.170)",
                         "-D(inventory,dbo,products,111,scooter,Big 2-wheel scooter ,5.170)");
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         Collections.sort(actual);
         Collections.sort(expected);
         assertEquals(expected, actual);

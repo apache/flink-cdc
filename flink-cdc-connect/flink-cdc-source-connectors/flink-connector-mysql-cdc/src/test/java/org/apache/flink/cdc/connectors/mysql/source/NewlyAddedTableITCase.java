@@ -535,7 +535,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         operator.getOperatorIdFuture(),
                         serializer,
                         accumulatorName,
-                        stream.getExecutionEnvironment().getCheckpointConfig());
+                        stream.getExecutionEnvironment().getCheckpointConfig(),
+                        10000L);
         return iterator;
     }
 
@@ -638,7 +639,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         () -> sleepMs(100));
             }
             waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             jobClient.cancel().get();
         }
@@ -673,7 +675,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             JobClient jobClient = tableResult.getJobClient().get();
 
             waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
             // step 3: make binlog data for all tables
             List<String> expectedBinlogDataThisRound = new ArrayList<>();
@@ -701,7 +704,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             }
 
             if (failoverPhase == FailoverPhase.BINLOG
-                    && TestValuesTableFactory.getRawResults("sink").size()
+                    && TestValuesTableFactory.getRawResultsAsStrings("sink").size()
                             > fetchedDataList.size()) {
                 triggerFailover(
                         failoverType,
@@ -713,7 +716,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             fetchedDataList.addAll(expectedBinlogDataThisRound);
             // step 4: assert fetched binlog data in this round
             waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
             // step 5: trigger savepoint
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
@@ -827,7 +831,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             }
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
             waitForUpsertSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
             // step 3: make some binlog data for this round
             makeFirstPartBinlogForAddressTable(getConnection(), newlyAddedTable);
@@ -869,7 +874,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             // the result size of sink may arrive fetchedDataList.size() with old data, wait one
             // checkpoint to wait retract old record and send new record
             Thread.sleep(1000);
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
             // step 6: trigger savepoint
             if (round != captureAddressTables.length - 1) {
@@ -1108,7 +1114,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     private static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
+                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;
@@ -1176,7 +1182,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                                     newlyAddedTable, cityName, cityName));
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
             waitForUpsertSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
             // step 3: make some binlog data for this round
             makeFirstPartBinlogForAddressTable(getConnection(), newlyAddedTable);
             makeSecondPartBinlogForAddressTable(getConnection(), newlyAddedTable);
@@ -1206,7 +1213,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             // the result size of sink may arrive fetchedDataList.size() with old data, wait one
             // checkpoint to wait retract old record and send new record
             Thread.sleep(1000);
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
             // step 6: trigger savepoint
             if (round != captureAddressTables.length - 1) {
                 finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);

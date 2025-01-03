@@ -21,23 +21,26 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.function.HashFunctionProvider;
+import org.apache.flink.cdc.runtime.partitioning.DistributedPrePartitionOperator;
 import org.apache.flink.cdc.runtime.partitioning.EventPartitioner;
+import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEventKeySelector;
 import org.apache.flink.cdc.runtime.partitioning.PostPartitionProcessor;
-import org.apache.flink.cdc.runtime.partitioning.PrePartitionOperator;
+import org.apache.flink.cdc.runtime.partitioning.RegularPrePartitionOperator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.cdc.runtime.typeutils.PartitioningEventTypeInfo;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 /**
- * Translator used to build {@link PrePartitionOperator}, {@link EventPartitioner} and {@link
- * PostPartitionProcessor} which are responsible for events partition.
+ * Translator used to build {@link RegularPrePartitionOperator} or {@link
+ * DistributedPrePartitionOperator}, {@link EventPartitioner} and {@link PostPartitionProcessor}
+ * that are responsible for events partition.
  */
 @Internal
 public class PartitioningTranslator {
 
-    public DataStream<Event> translate(
+    public DataStream<Event> translateRegular(
             DataStream<Event> input,
             int upstreamParallelism,
             int downstreamParallelism,
@@ -46,11 +49,25 @@ public class PartitioningTranslator {
         return input.transform(
                         "PrePartition",
                         new PartitioningEventTypeInfo(),
-                        new PrePartitionOperator(
+                        new RegularPrePartitionOperator(
                                 schemaOperatorID, downstreamParallelism, hashFunctionProvider))
                 .setParallelism(upstreamParallelism)
                 .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
                 .map(new PostPartitionProcessor(), new EventTypeInfo())
                 .name("PostPartition");
+    }
+
+    public DataStream<PartitioningEvent> translateDistributed(
+            DataStream<Event> input,
+            int upstreamParallelism,
+            int downstreamParallelism,
+            HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
+        return input.transform(
+                        "Partitioning",
+                        new PartitioningEventTypeInfo(),
+                        new DistributedPrePartitionOperator(
+                                downstreamParallelism, hashFunctionProvider))
+                .setParallelism(upstreamParallelism)
+                .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector());
     }
 }
