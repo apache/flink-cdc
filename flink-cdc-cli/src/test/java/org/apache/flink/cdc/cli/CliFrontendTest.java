@@ -34,6 +34,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -143,6 +144,31 @@ class CliFrontendTest {
         PipelineExecution.ExecutionInfo executionInfo = executor.run();
         assertThat(executionInfo.getId()).isEqualTo("fake-id");
         assertThat(executionInfo.getDescription()).isEqualTo("fake-description");
+    }
+
+    @Test
+    void testPipelineExecutingWithFlinkConfig() throws Exception {
+        CliExecutor executor =
+                createExecutor(
+                        pipelineDef(),
+                        "--flink-home",
+                        flinkHome(),
+                        "--global-config",
+                        globalPipelineConfig(),
+                        "--flink-conf",
+                        "execution.target=yarn-session",
+                        "--flink-conf",
+                        "rest.bind-port=42689",
+                        "-fc",
+                        "yarn.application.id=application_1714009558476_3563",
+                        "-fc",
+                        "rest.bind-address=10.1.140.140");
+        Map<String, String> configMap = executor.getFlinkConfig().toMap();
+        assertThat(configMap.get("execution.target")).isEqualTo("yarn-session");
+        assertThat(configMap.get("rest.bind-port")).isEqualTo("42689");
+        assertThat(configMap.get("yarn.application.id"))
+                .isEqualTo("application_1714009558476_3563");
+        assertThat(configMap.get("rest.bind-address")).isEqualTo("10.1.140.140");
     }
 
     private CliExecutor createExecutor(String... args) throws Exception {
