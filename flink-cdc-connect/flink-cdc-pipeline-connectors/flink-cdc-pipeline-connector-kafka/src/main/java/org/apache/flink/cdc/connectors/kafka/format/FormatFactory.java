@@ -15,26 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.kafka.sink;
+package org.apache.flink.cdc.connectors.kafka.format;
 
 import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.factories.Factory;
 
-import org.apache.kafka.clients.producer.ProducerRecord;
+/** Factory for creating a {@link SerializationSchema} for {@link Event}. */
+public interface FormatFactory extends Factory {
 
-/** Enum class for building {@link SerializationSchema} for {@link ProducerRecord}. */
-public enum KeyFormat {
-    JSON("json"),
+    SerializationSchema<Event> createEncodingFormat(Context context, Configuration formatOptions);
 
-    CSV("csv");
-
-    private final String value;
-
-    KeyFormat(String value) {
-        this.value = value;
-    }
-
-    @Override
-    public String toString() {
-        return value;
-    }
+    // TODO: definition createDecodingFormat method
 }
