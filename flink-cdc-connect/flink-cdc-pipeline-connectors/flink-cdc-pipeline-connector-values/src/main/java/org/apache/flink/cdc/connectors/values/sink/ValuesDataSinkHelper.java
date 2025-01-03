@@ -67,10 +67,13 @@ public class ValuesDataSinkHelper {
         return fields.stream()
                 .map(
                         o -> {
+                            if (o == null) {
+                                return "null";
+                            }
                             if (o instanceof byte[]) {
                                 return BaseEncoding.base64().encode((byte[]) o);
                             } else {
-                                return o;
+                                return o.toString();
                             }
                         })
                 .collect(Collectors.toList());
