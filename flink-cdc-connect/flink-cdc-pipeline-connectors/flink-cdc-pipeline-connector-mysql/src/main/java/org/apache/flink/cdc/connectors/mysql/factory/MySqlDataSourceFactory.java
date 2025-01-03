@@ -88,6 +88,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USE_LEGACY_JSON_FORMAT;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils.doubleCompare;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
@@ -139,6 +140,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         boolean scanBinlogNewlyAddedTableEnabled =
                 config.get(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
+        boolean useLegacyJsonFormat = config.get(USE_LEGACY_JSON_FORMAT);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -175,7 +177,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .includeSchemaChanges(includeSchemaChanges)
                         .debeziumProperties(getDebeziumProperties(configMap))
                         .jdbcProperties(getJdbcProperties(configMap))
-                        .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
+                        .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                        .useLegacyJsonFormat(useLegacyJsonFormat);
 
         List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
 
@@ -306,6 +309,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
+        options.add(USE_LEGACY_JSON_FORMAT);
         options.add(METADATA_LIST);
         return options;
     }
