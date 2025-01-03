@@ -143,6 +143,8 @@ public class MongoDBTableFactoryTest {
                         null,
                         StartupOptions.initial(),
                         null,
+                        null,
+                        null,
                         BATCH_SIZE_DEFAULT,
                         POLL_MAX_BATCH_SIZE_DEFAULT,
                         POLL_AWAIT_TIME_MILLIS_DEFAULT,
@@ -168,6 +170,7 @@ public class MongoDBTableFactoryTest {
         options.put("scan.startup.mode", "timestamp");
         options.put("scan.startup.timestamp-millis", "1667232000000");
         options.put("initial.snapshotting.queue.size", "100");
+        options.put("initial.snapshotting.max.threads", "2");
         options.put("batch.size", "101");
         options.put("poll.max.batch.size", "102");
         options.put("poll.await.time.ms", "103");
@@ -195,6 +198,8 @@ public class MongoDBTableFactoryTest {
                         "replicaSet=test&connectTimeoutMS=300000",
                         StartupOptions.timestamp(1667232000000L),
                         100,
+                        2,
+                        null,
                         101,
                         102,
                         103,
@@ -235,6 +240,8 @@ public class MongoDBTableFactoryTest {
                         MY_TABLE,
                         null,
                         StartupOptions.initial(),
+                        null,
+                        null,
                         null,
                         BATCH_SIZE_DEFAULT,
                         POLL_MAX_BATCH_SIZE_DEFAULT,
@@ -278,6 +285,64 @@ public class MongoDBTableFactoryTest {
                     ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
                             .isPresent());
         }
+    }
+
+    @Test
+    public void testCopyExistingPipelineConflictWithIncrementalSnapshotMode() {
+        try {
+            Map<String, String> properties = getAllOptions();
+            properties.put("scan.incremental.snapshot.enabled", "true");
+            properties.put(
+                    "initial.snapshotting.pipeline", "[{\"$match\": {\"closed\": \"false\"}}]");
+
+            createTableSource(SCHEMA, properties);
+            fail("exception expected");
+        } catch (Throwable t) {
+            assertTrue(
+                    ExceptionUtils.findThrowableWithMessage(
+                                    t,
+                                    "The initial.snapshotting.pipeline/copy.existing.pipeline config only applies to "
+                                            + "Debezium mode, not incremental snapshot mode")
+                            .isPresent());
+        }
+    }
+
+    @Test
+    public void testCopyExistingPipelineInDebeziumMode() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.incremental.snapshot.enabled", "false");
+        properties.put("initial.snapshotting.pipeline", "[{\"$match\": {\"closed\": \"false\"}}]");
+        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+
+        MongoDBTableSource expectedSource =
+                new MongoDBTableSource(
+                        SCHEMA,
+                        SCHEME.defaultValue(),
+                        MY_HOSTS,
+                        USER,
+                        PASSWORD,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        null,
+                        StartupOptions.initial(),
+                        null,
+                        null,
+                        "[{\"$match\": {\"closed\": \"false\"}}]",
+                        BATCH_SIZE_DEFAULT,
+                        POLL_MAX_BATCH_SIZE_DEFAULT,
+                        POLL_AWAIT_TIME_MILLIS_DEFAULT,
+                        HEARTBEAT_INTERVAL_MILLIS_DEFAULT,
+                        LOCAL_TIME_ZONE,
+                        false,
+                        CHUNK_META_GROUP_SIZE_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES_DEFAULT,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
+                        FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
+                        SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT);
+        assertEquals(expectedSource, actualSource);
     }
 
     private Map<String, String> getAllOptions() {
