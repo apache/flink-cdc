@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer.event;
 import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.cdc.common.event.CreateTableCompletedEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
@@ -61,8 +62,9 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
     @Override
     public Event copy(Event from) {
         if (from instanceof FlushEvent) {
-            FlushEvent flushEvent = (FlushEvent) from;
             return new FlushEvent(((FlushEvent) from).getSourceSubTaskId());
+        } else if (from instanceof CreateTableCompletedEvent) {
+            return new CreateTableCompletedEvent();
         } else if (from instanceof SchemaChangeEvent) {
             return schemaChangeEventSerializer.copy((SchemaChangeEvent) from);
         } else if (from instanceof DataChangeEvent) {
@@ -86,6 +88,8 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
         if (record instanceof FlushEvent) {
             enumSerializer.serialize(EventClass.FLUSH_EVENT, target);
             target.writeInt(((FlushEvent) record).getSourceSubTaskId());
+        } else if (record instanceof CreateTableCompletedEvent) {
+            enumSerializer.serialize(EventClass.CREATE_TABLE_COMPLETED_EVENT, target);
         } else if (record instanceof SchemaChangeEvent) {
             enumSerializer.serialize(EventClass.SCHEME_CHANGE_EVENT, target);
             schemaChangeEventSerializer.serialize((SchemaChangeEvent) record, target);
@@ -103,6 +107,8 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
         switch (eventClass) {
             case FLUSH_EVENT:
                 return new FlushEvent(source.readInt());
+            case CREATE_TABLE_COMPLETED_EVENT:
+                return new CreateTableCompletedEvent();
             case DATA_CHANGE_EVENT:
                 return dataChangeEventSerializer.deserialize(source);
             case SCHEME_CHANGE_EVENT:
@@ -139,6 +145,7 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
     enum EventClass {
         DATA_CHANGE_EVENT,
         SCHEME_CHANGE_EVENT,
-        FLUSH_EVENT
+        FLUSH_EVENT,
+        CREATE_TABLE_COMPLETED_EVENT
     }
 }

@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceOutput;
+import org.apache.flink.cdc.common.event.CreateTableCompletedEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -28,6 +29,7 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.table.StartupMode;
+import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlTypeUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -68,13 +70,16 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     private Set<TableId> alreadySendCreateTableTables;
 
     // Used when startup mode is not initial
+    private boolean isBatchMode = false;
     private boolean alreadySendCreateTableForBinlogSplit = false;
     private List<CreateTableEvent> createTableEventCache;
+    private boolean alreadySendAllCreateTable = false;
 
     public MySqlPipelineRecordEmitter(
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
-            MySqlSourceConfig sourceConfig) {
+            MySqlSourceConfig sourceConfig,
+            boolean isBatchMode) {
         super(
                 debeziumDeserializationSchema,
                 sourceReaderMetrics,
@@ -82,13 +87,27 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
         this.sourceConfig = sourceConfig;
         this.alreadySendCreateTableTables = new HashSet<>();
         this.createTableEventCache = generateCreateTableEvent(sourceConfig);
+        this.isBatchMode = isBatchMode;
     }
 
     @Override
     protected void processElement(
             SourceRecord element, SourceOutput<Event> output, MySqlSplitState splitState)
             throws Exception {
-        if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
+        if (isBatchMode
+                && StartupOptions.snapshot().equals(sourceConfig.getStartupOptions())
+                && !alreadySendAllCreateTable) {
+            // In snapshot mode, we simply emit all schemas at once.
+            createTableEventCache.forEach(
+                    createTableEvent -> {
+                        output.collect(createTableEvent);
+                        TableId tableId = TableId.parse(createTableEvent.tableId().identifier());
+                        alreadySendCreateTableTables.add(tableId);
+                    });
+            output.collect(new CreateTableCompletedEvent());
+            alreadySendCreateTableForBinlogSplit = true;
+            alreadySendAllCreateTable = true;
+        } else if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
             // In Snapshot phase of INITIAL startup mode, we lazily send CreateTableEvent to
             // downstream to avoid checkpoint timeout.
             TableId tableId = splitState.asSnapshotSplitState().toMySqlSplit().getTableId();
@@ -117,6 +136,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 createTableEventCache.forEach(output::collect);
             }
         }
+
         super.processElement(element, output, splitState);
     }
 
