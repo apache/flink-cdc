@@ -29,6 +29,9 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.TestLogger;
 
 import com.fasterxml.jackson.core.Version;
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.ExecCreateCmdResponse;
+import com.github.dockerjava.api.model.Volume;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -38,19 +41,26 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.DockerClientFactory;
+import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.output.FrameConsumerResultCallback;
+import org.testcontainers.containers.output.OutputFrame;
 import org.testcontainers.containers.output.ToStringConsumer;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.MountableFile;
 
 import javax.annotation.Nullable;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -87,6 +97,23 @@ public abstract class PipelineTestEnvironment extends TestLogger {
     public static final int JOB_MANAGER_REST_PORT = 8081;
     public static final String INTER_CONTAINER_JM_ALIAS = "jobmanager";
     public static final String INTER_CONTAINER_TM_ALIAS = "taskmanager";
+    public static final List<String> EXTERNAL_PROPS =
+            Arrays.asList(
+                    String.format("jobmanager.rpc.address: %s", INTER_CONTAINER_JM_ALIAS),
+                    "jobmanager.bind-host: 0.0.0.0",
+                    "taskmanager.bind-host: 0.0.0.0",
+                    "rest.bind-address: 0.0.0.0",
+                    "rest.address: 0.0.0.0",
+                    "jobmanager.memory.process.size: 1GB",
+                    "query.server.port: 6125",
+                    "blob.server.port: 6124",
+                    "taskmanager.numberOfTaskSlots: 10",
+                    "parallelism.default: 4",
+                    "execution.checkpointing.interval: 300",
+                    "state.backend.type: hashmap",
+                    "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false",
+                    "restart-strategy.type: off");
+    public static final String FLINK_PROPERTIES = String.join("\n", EXTERNAL_PROPS);
 
     @ClassRule public static final Network NETWORK = Network.newNetwork();
 
@@ -95,6 +122,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
     @Nullable protected RestClusterClient<StandaloneClusterId> restClusterClient;
     protected GenericContainer<?> jobManager;
     protected GenericContainer<?> taskManager;
+    protected Volume sharedVolume = new Volume("/tmp/shared");
 
     protected ToStringConsumer jobManagerConsumer;
 
@@ -114,30 +142,36 @@ public abstract class PipelineTestEnvironment extends TestLogger {
     public void before() throws Exception {
         LOG.info("Starting containers...");
         jobManagerConsumer = new ToStringConsumer();
-
-        String flinkProperties = getFlinkProperties();
-
+        List<String> cmds = new ArrayList<>();
+        for (String prop : EXTERNAL_PROPS) {
+            cmds.add(String.format("echo '%s' >> /opt/flink/conf/flink-conf.yaml.tmp", prop));
+        }
+        cmds.add("mv /opt/flink/conf/flink-conf.yaml.tmp /opt/flink/conf/flink-conf.yaml");
+        String preCmd = String.join(" && ", cmds);
         jobManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
-                        .withCommand("jobmanager")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
-                        .withEnv("FLINK_PROPERTIES", flinkProperties)
+                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                        .withCreateContainerCmdModifier(cmd -> cmd.withVolumes(sharedVolume))
                         .withLogConsumer(jobManagerConsumer);
+        Startables.deepStart(Stream.of(jobManager)).join();
+        runInContainerAsRoot(jobManager, "chmod", "0777", "-R", sharedVolume.toString());
+        LOG.info("JobManager is started.");
+
         taskManagerConsumer = new ToStringConsumer();
         taskManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
-                        .withCommand("taskmanager")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
-                        .withEnv("FLINK_PROPERTIES", flinkProperties)
+                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
                         .dependsOn(jobManager)
+                        .withVolumesFrom(jobManager, BindMode.READ_WRITE)
                         .withLogConsumer(taskManagerConsumer);
-
-        Startables.deepStart(Stream.of(jobManager)).join();
         Startables.deepStart(Stream.of(taskManager)).join();
-        LOG.info("Containers are started.");
+        runInContainerAsRoot(taskManager, "chmod", "0777", "-R", sharedVolume.toString());
+        LOG.info("TaskManager is started.");
     }
 
     @After
@@ -278,5 +312,29 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                         "parallelism.default: 4",
                         "execution.checkpointing.interval: 300",
                         "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false"));
+    }
+
+    private void runInContainerAsRoot(GenericContainer<?> container, String... command)
+            throws InterruptedException {
+        ToStringConsumer stdoutConsumer = new ToStringConsumer();
+        ToStringConsumer stderrConsumer = new ToStringConsumer();
+        DockerClient dockerClient = DockerClientFactory.instance().client();
+        ExecCreateCmdResponse execCreateCmdResponse =
+                dockerClient
+                        .execCreateCmd(container.getContainerId())
+                        .withUser("root")
+                        .withCmd(command)
+                        .exec();
+        FrameConsumerResultCallback callback = new FrameConsumerResultCallback();
+        callback.addConsumer(OutputFrame.OutputType.STDOUT, stdoutConsumer);
+        callback.addConsumer(OutputFrame.OutputType.STDERR, stderrConsumer);
+        dockerClient.execStartCmd(execCreateCmdResponse.getId()).exec(callback).awaitCompletion();
+    }
+
+    protected List<String> readLines(String resource) throws IOException {
+        final URL url = PipelineTestEnvironment.class.getClassLoader().getResource(resource);
+        assert url != null;
+        Path path = new File(url.getFile()).toPath();
+        return Files.readAllLines(path);
     }
 }
