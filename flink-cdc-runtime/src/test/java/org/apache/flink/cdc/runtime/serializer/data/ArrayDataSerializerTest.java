@@ -19,11 +19,23 @@ package org.apache.flink.cdc.runtime.serializer.data;
 
 import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.GenericMapData;
+import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.binary.BinaryArrayData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
+import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryArrayWriter;
 import org.apache.flink.testutils.DeeplyEqualsChecker;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
 
 /** A test for the {@link ArrayDataSerializer}. */
 class ArrayDataSerializerTest extends SerializerTestBase<ArrayData> {
@@ -78,5 +90,76 @@ class ArrayDataSerializerTest extends SerializerTestBase<ArrayData> {
                         BinaryStringData.fromString("11"), null, BinaryStringData.fromString("ke")
                     })
         };
+    }
+
+    static BinaryArrayData createArray(String... vs) {
+        BinaryArrayData array = new BinaryArrayData();
+        BinaryArrayWriter writer = new BinaryArrayWriter(array, vs.length, 8);
+        for (int i = 0; i < vs.length; i++) {
+            writer.writeString(i, BinaryStringData.fromString(vs[i]));
+        }
+        writer.complete();
+        return array;
+    }
+
+    @Test
+    public void testToBinaryArrayWithNestedTypes() {
+        // Create a nested ArrayData
+        Map<BinaryStringData, BinaryStringData> map = new HashMap<>();
+        map.put(BinaryStringData.fromString("key1"), BinaryStringData.fromString("value1"));
+        map.put(BinaryStringData.fromString("key2"), BinaryStringData.fromString("value2"));
+        GenericMapData genMapData = new GenericMapData(map);
+
+        ArrayData innerArrayData = new GenericArrayData(new Object[] {genMapData});
+
+        // Serialize to BinaryArrayData
+        ArrayDataSerializer serializer =
+                new ArrayDataSerializer(DataTypes.MAP(DataTypes.STRING(), DataTypes.STRING()));
+        BinaryArrayData binaryArrayData = serializer.toBinaryArray(innerArrayData);
+
+        // Verify the conversion
+        MapData mapData = binaryArrayData.getMap(0);
+        Assertions.assertEquals(2, mapData.size());
+    }
+
+    @Test
+    public void testToBinaryArrayWithDeeplyNestedTypes() {
+        // Create a nested structure: MapData containing ArrayData elements
+        Map<BinaryStringData, ArrayData> nestedMap = new HashMap<>();
+        nestedMap.put(
+                BinaryStringData.fromString("key1"), new GenericArrayData(new Object[] {42, 43}));
+        nestedMap.put(
+                BinaryStringData.fromString("key2"), new GenericArrayData(new Object[] {44, 45}));
+
+        GenericMapData genMapData = new GenericMapData(nestedMap);
+
+        // Create an outer ArrayData containing the nested MapData
+        ArrayData outerArrayData = new GenericArrayData(new Object[] {genMapData});
+
+        // Serialize to BinaryArrayData
+        ArrayDataSerializer serializer =
+                new ArrayDataSerializer(
+                        DataTypes.MAP(DataTypes.STRING(), DataTypes.ARRAY(DataTypes.INT())));
+        BinaryArrayData binaryArrayData = serializer.toBinaryArray(outerArrayData);
+
+        // Verify the conversion
+        MapData mapData = binaryArrayData.getMap(0);
+        assertEquals(2, mapData.size());
+
+        // Check nested arrays in map
+        ArrayData keys = mapData.keyArray();
+        ArrayData values = mapData.valueArray();
+
+        // Check the first key-value pair
+        int keyIndex = keys.getString(0).toString().equals("key1") ? 0 : 1;
+        ArrayData arrayData1 = values.getArray(keyIndex);
+        assertEquals(42, arrayData1.getInt(0));
+        assertEquals(43, arrayData1.getInt(1));
+
+        // Check the second key-value pair
+        keyIndex = keys.getString(0).toString().equals("key2") ? 0 : 1;
+        ArrayData arrayData2 = values.getArray(keyIndex);
+        assertEquals(44, arrayData2.getInt(0));
+        assertEquals(45, arrayData2.getInt(1));
     }
 }
