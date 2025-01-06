@@ -16,27 +16,27 @@
 CREATE TABLE ancient_times
 (
     id             SERIAL,
-    date_col       DATE         DEFAULT '0017-08-12',
-    datetime_0_col DATETIME(0)  DEFAULT '0016-07-13 17:17:17',
-    datetime_1_col DATETIME(1)  DEFAULT '0015-06-14 17:17:17.1',
-    datetime_2_col DATETIME(2)  DEFAULT '0014-05-15 17:17:17.12',
-    datetime_3_col DATETIME(3)  DEFAULT '0013-04-16 17:17:17.123',
-    datetime_4_col DATETIME(4)  DEFAULT '0012-03-17 17:17:17.1234',
-    datetime_5_col DATETIME(5)  DEFAULT '0011-02-18 17:17:17.12345',
-    datetime_6_col DATETIME(6)  DEFAULT '0010-01-19 17:17:17.123456',
+    date_col       DATE,
+    datetime_0_col DATETIME(0),
+    datetime_1_col DATETIME(1),
+    datetime_2_col DATETIME(2),
+    datetime_3_col DATETIME(3),
+    datetime_4_col DATETIME(4),
+    datetime_5_col DATETIME(5),
+    datetime_6_col DATETIME(6),
     PRIMARY KEY (id)
 );
 
 INSERT INTO ancient_times VALUES (
     DEFAULT,
-    DEFAULT,
-    DEFAULT,
-    DEFAULT,
-    DEFAULT,
-    DEFAULT,
-    DEFAULT,
-    DEFAULT,
-    DEFAULT
+    '0017-08-12',
+    '0016-07-13 17:17:17',
+    '0015-06-14 17:17:17.1',
+    '0014-05-15 17:17:17.12',
+    '0013-04-16 17:17:17.123',
+    '0012-03-17 17:17:17.1234',
+    '0011-02-18 17:17:17.12345',
+    '0010-01-19 17:17:17.123456'
 );
 
 INSERT INTO ancient_times VALUES (
