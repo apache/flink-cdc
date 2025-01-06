@@ -246,14 +246,14 @@ public class MySqlAncientDateAndTimeITCase extends MySqlSourceTestBase {
             statement.execute(
                     "INSERT INTO ancient_times VALUES (\n"
                             + "    DEFAULT,\n"
-                            + "    DEFAULT,\n"
-                            + "    DEFAULT,\n"
-                            + "    DEFAULT,\n"
-                            + "    DEFAULT,\n"
-                            + "    DEFAULT,\n"
-                            + "    DEFAULT,\n"
-                            + "    DEFAULT,\n"
-                            + "    DEFAULT\n"
+                            + "    '0017-08-12',\n"
+                            + "    '0016-07-13 17:17:17',\n"
+                            + "    '0015-06-14 17:17:17.1',\n"
+                            + "    '0014-05-15 17:17:17.12',\n"
+                            + "    '0013-04-16 17:17:17.123',\n"
+                            + "    '0012-03-17 17:17:17.1234',\n"
+                            + "    '0011-02-18 17:17:17.12345',\n"
+                            + "    '0010-01-19 17:17:17.123456'\n"
                             + ");");
             statement.execute(
                     "INSERT INTO ancient_times VALUES (\n"
