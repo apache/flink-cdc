@@ -104,6 +104,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                     "taskmanager.bind-host: 0.0.0.0",
                     "rest.bind-address: 0.0.0.0",
                     "rest.address: 0.0.0.0",
+                    "jobmanager.memory.process.size: 1GB",
                     "query.server.port: 6125",
                     "blob.server.port: 6124",
                     "taskmanager.numberOfTaskSlots: 10",
@@ -141,9 +142,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
     public void before() throws Exception {
         LOG.info("Starting containers...");
         jobManagerConsumer = new ToStringConsumer();
-        // These cmds will put the FLINK_PROPERTIES to flink-conf.yaml
         List<String> cmds = new ArrayList<>();
-        cmds.add("cp /opt/flink/conf/flink-conf.yaml /opt/flink/conf/flink-conf.yaml.tmp");
         for (String prop : EXTERNAL_PROPS) {
             cmds.add(String.format("echo '%s' >> /opt/flink/conf/flink-conf.yaml.tmp", prop));
         }
@@ -152,7 +151,6 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         jobManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
                         .withCommand("bash", "-c", preCmd + " && jobmanager.sh start-foreground")
-                        .withExtraHost("host.docker.internal", "host-gateway")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
@@ -167,7 +165,6 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         taskManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
                         .withCommand("bash", "-c", preCmd + " && taskmanager.sh start-foreground")
-                        .withExtraHost("host.docker.internal", "host-gateway")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
                         .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)

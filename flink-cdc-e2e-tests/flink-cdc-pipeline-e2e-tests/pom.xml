@@ -30,9 +30,11 @@ limitations under the License.
     <properties>
         <flink-1.19>1.19.1</flink-1.19>
         <flink-1.20>1.20.0</flink-1.20>
+        <flink-major-1.19>1.19</flink-major-1.19>
+        <flink-major-1.20>1.20</flink-major-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <starrocks.connector.version>1.2.10_flink-${flink.major.version}</starrocks.connector.version>
-        <paimon.version>0.8.2</paimon.version>
+        <paimon.version>0.9.0</paimon.version>
     </properties>
 
     <dependencies>
@@ -295,9 +297,18 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.paimon</groupId>
-                            <artifactId>paimon-flink-${flink.major.version}</artifactId>
+                            <artifactId>paimon-flink-${flink-major-1.19}</artifactId>
                             <version>${paimon.version}</version>
-                            <destFileName>paimon-sql-connector.jar</destFileName>
+                            <destFileName>paimon-sql-connector-${flink-1.19}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.paimon</groupId>
+                            <artifactId>paimon-flink-${flink-major-1.20}</artifactId>
+                            <version>${paimon.version}</version>
+                            <destFileName>paimon-sql-connector-${flink-1.20}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

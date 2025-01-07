@@ -17,6 +17,7 @@
 -- Warehouse Path, Database Name, and Table Name.
 
 SET 'sql-client.execution.result-mode' = 'tableau';
+SET 'table.display.max-column-width' = '100000';
 SET 'execution.runtime-mode' = 'batch';
 
 CREATE CATALOG paimon_catalog WITH (

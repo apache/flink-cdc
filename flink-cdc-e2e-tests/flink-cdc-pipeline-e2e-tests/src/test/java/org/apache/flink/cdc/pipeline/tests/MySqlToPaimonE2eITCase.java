@@ -92,8 +92,9 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
         super.before();
         inventoryDatabase.createAndInitialize();
         jobManager.copyFileToContainer(
-                MountableFile.forHostPath(TestUtils.getResource("paimon-sql-connector.jar")),
-                sharedVolume.toString() + "/paimon-sql-connector.jar");
+                MountableFile.forHostPath(
+                        TestUtils.getResource(getPaimonSQLConnectorResourceName())),
+                sharedVolume.toString() + "/" + getPaimonSQLConnectorResourceName());
     }
 
     @After
@@ -278,9 +279,9 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
 
         Container.ExecResult result =
                 jobManager.execInContainer(
-                        "/flink/bin/sql-client.sh",
+                        "/opt/flink/bin/sql-client.sh",
                         "--jar",
-                        sharedVolume.toString() + "/paimon-sql-connector.jar",
+                        sharedVolume.toString() + "/" + getPaimonSQLConnectorResourceName(),
                         "-f",
                         containerSqlPath);
         if (result.getExitCode() != 0) {
@@ -335,5 +336,9 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
             Thread.sleep(1000L);
         }
         Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    protected String getPaimonSQLConnectorResourceName() {
+        return String.format("paimon-sql-connector-%s.jar", flinkVersion);
     }
 }
