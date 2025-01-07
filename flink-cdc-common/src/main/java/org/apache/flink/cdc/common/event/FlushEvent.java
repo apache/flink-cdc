@@ -35,8 +35,8 @@ public class FlushEvent implements Event {
     /** Flag indicating whether the FlushEvent is sent before a create table event. */
     private final SchemaChangeEventType schemaChangeEventType;
 
-    public FlushEvent(int sourceSubTaskId) {
-        this(sourceSubTaskId, Collections.emptyList(), null);
+    public FlushEvent(int sourceSubTaskId, SchemaChangeEventType schemaChangeEventType) {
+        this(sourceSubTaskId, Collections.emptyList(), schemaChangeEventType);
     }
 
     public FlushEvent(

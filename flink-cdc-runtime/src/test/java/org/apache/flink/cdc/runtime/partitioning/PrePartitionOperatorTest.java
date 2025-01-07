@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DefaultDataChangeEventHashFunctionProvider;
@@ -80,7 +81,7 @@ class PrePartitionOperatorTest {
 
             // FlushEvent
             RegularPrePartitionOperator operator = testHarness.getOperator();
-            FlushEvent flushEvent = new FlushEvent(0);
+            FlushEvent flushEvent = new FlushEvent(0, SchemaChangeEventType.CREATE_TABLE);
             operator.processElement(new StreamRecord<>(flushEvent));
             assertThat(testHarness.getOutputRecords()).hasSize(DOWNSTREAM_PARALLELISM);
             for (int i = 0; i < DOWNSTREAM_PARALLELISM; i++) {
