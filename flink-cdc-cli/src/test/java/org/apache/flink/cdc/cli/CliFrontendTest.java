@@ -27,6 +27,7 @@ import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
+import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -148,6 +149,7 @@ class CliFrontendTest {
 
     @Test
     void testPipelineExecutingWithFlinkConfig() throws Exception {
+        // the command line arguments to submit job to exists remote host on yarn session
         CliExecutor executor =
                 createExecutor(
                         pipelineDef(),
@@ -155,20 +157,74 @@ class CliFrontendTest {
                         flinkHome(),
                         "--global-config",
                         globalPipelineConfig(),
-                        "--flink-conf",
-                        "execution.target=yarn-session",
-                        "--flink-conf",
-                        "rest.bind-port=42689",
-                        "-fc",
+                        "-D",
+                        "execution.target= yarn-session",
+                        "-D",
+                        "rest.bind-port =42689",
+                        "-D",
                         "yarn.application.id=application_1714009558476_3563",
-                        "-fc",
+                        "-D",
                         "rest.bind-address=10.1.140.140");
         Map<String, String> configMap = executor.getFlinkConfig().toMap();
-        assertThat(configMap.get("execution.target")).isEqualTo("yarn-session");
-        assertThat(configMap.get("rest.bind-port")).isEqualTo("42689");
-        assertThat(configMap.get("yarn.application.id"))
-                .isEqualTo("application_1714009558476_3563");
-        assertThat(configMap.get("rest.bind-address")).isEqualTo("10.1.140.140");
+        assertThat(configMap)
+                .containsEntry("execution.target", "yarn-session")
+                .containsEntry("rest.bind-port", "42689")
+                .containsEntry("yarn.application.id", "application_1714009558476_3563")
+                .containsEntry("rest.bind-address", "10.1.140.140");
+    }
+
+    @Test
+    void testPipelineExecutingWithUnValidFlinkConfig() throws Exception {
+        IllegalArgumentException exception =
+                Assert.assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                createExecutor(
+                                        pipelineDef(),
+                                        "--flink-home",
+                                        flinkHome(),
+                                        "-D",
+                                        "execution.target"));
+        String expectedMessage =
+                String.format(
+                        "Unexpected param [%s], dynamic flink config should be formated as \"-D property=value\"",
+                        "execution.target");
+        String actualMessage = exception.getMessage();
+        Assert.assertEquals(expectedMessage, actualMessage);
+
+        exception =
+                Assert.assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                createExecutor(
+                                        pipelineDef(),
+                                        "--flink-home",
+                                        flinkHome(),
+                                        "-D",
+                                        "execution.target="));
+        expectedMessage =
+                String.format(
+                        "Unexpected param [%s], dynamic flink config should be formated as \"-D property=value\"",
+                        "execution.target=");
+        actualMessage = exception.getMessage();
+        Assert.assertEquals(expectedMessage, actualMessage);
+
+        exception =
+                Assert.assertThrows(
+                        IllegalArgumentException.class,
+                        () ->
+                                createExecutor(
+                                        pipelineDef(),
+                                        "--flink-home",
+                                        flinkHome(),
+                                        "-D",
+                                        "execution.target=="));
+        expectedMessage =
+                String.format(
+                        "Unexpected param [%s], dynamic flink config should be formated as \"-D property=value\"",
+                        "execution.target==");
+        actualMessage = exception.getMessage();
+        Assert.assertEquals(expectedMessage, actualMessage);
     }
 
     private CliExecutor createExecutor(String... args) throws Exception {

@@ -124,10 +124,17 @@ public class CliFrontend {
             Configuration flinkConfig, CommandLine commandLine) {
         String[] flinkConfigs = commandLine.getOptionValues(FLINK_CONFIG);
         if (flinkConfigs != null) {
-            LOG.info("Find flink config items: {}", String.join(",", flinkConfigs));
+            LOG.info("Dynamic flink config items found: [{}]", String.join(",", flinkConfigs));
             for (String config : flinkConfigs) {
-                String key = config.split("=")[0].trim();
-                String value = config.split("=")[1].trim();
+                String[] keyValuePair = config.split("=");
+                if (keyValuePair.length != 2) {
+                    throw new IllegalArgumentException(
+                            String.format(
+                                    "Unexpected param [%s], dynamic flink config should be formated as \"-D property=value\"",
+                                    config));
+                }
+                String key = keyValuePair[0].trim();
+                String value = keyValuePair[1].trim();
                 ConfigOption<String> configOption =
                         ConfigOptions.key(key).stringType().defaultValue(value);
                 flinkConfig.set(configOption, value);

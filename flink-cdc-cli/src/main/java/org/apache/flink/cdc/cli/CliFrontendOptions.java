@@ -95,7 +95,7 @@ public class CliFrontendOptions {
                     .build();
 
     public static final Option FLINK_CONFIG =
-            Option.builder("fc")
+            Option.builder("D")
                     .longOpt("flink-config")
                     .hasArg()
                     .desc(
