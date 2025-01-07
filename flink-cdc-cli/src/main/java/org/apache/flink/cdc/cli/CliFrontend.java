@@ -130,7 +130,10 @@ public class CliFrontend {
             String value = properties.getProperty(key);
             if (StringUtils.isNullOrWhitespaceOnly(key)
                     || StringUtils.isNullOrWhitespaceOnly(value)) {
-                throw new IllegalArgumentException("Illegal argument for key or value");
+                throw new IllegalArgumentException(
+                        String.format(
+                                "null or white space argument for key or value: %s=%s",
+                                key, value));
             }
             ConfigOption<String> configOption =
                     ConfigOptions.key(key.trim()).stringType().defaultValue(value.trim());

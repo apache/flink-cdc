@@ -184,7 +184,10 @@ class CliFrontendTest {
                                         "-D",
                                         "=execution.target"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Illegal argument for key or value");
+                .hasMessage(
+                        String.format(
+                                "null or white space argument for key or value: %s=%s",
+                                "", "execution.target"));
 
         Assertions.assertThatThrownBy(
                         () ->
@@ -195,12 +198,17 @@ class CliFrontendTest {
                                         "-D",
                                         "execution.target="))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Illegal argument for key or value");
+                .hasMessage(
+                        String.format(
+                                "null or white space argument for key or value: %s=%s",
+                                "execution.target", ""));
 
         Assertions.assertThatThrownBy(
                         () -> createExecutor(pipelineDef(), "--flink-home", flinkHome(), "-D", "="))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Illegal argument for key or value");
+                .hasMessage(
+                        String.format(
+                                "null or white space argument for key or value: %s=%s", "", ""));
     }
 
     private CliExecutor createExecutor(String... args) throws Exception {
