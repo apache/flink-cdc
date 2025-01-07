@@ -265,7 +265,7 @@ public class MySqlSourceOptions {
 
     @Experimental
     public static final ConfigOption<Boolean> PARSE_ONLINE_SCHEMA_CHANGES =
-            ConfigOptions.key("scan.parse.online.schema.changes")
+            ConfigOptions.key("scan.parse.online.schema.changes.enabled")
                     .booleanType()
                     .defaultValue(false)
                     .withDescription(
