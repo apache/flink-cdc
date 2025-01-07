@@ -224,6 +224,9 @@ public class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase 
                     () -> Arrays.stream(expected).allMatch(outCaptor.toString()::contains));
         }
 
+        // Wait for a little while until we're in Binlog streaming mode.
+        Thread.sleep(5_000);
+
         {
             LOG.info("Step 3: Evolve schema with gh-ost - ADD COLUMN");
             execInContainer(
@@ -380,6 +383,9 @@ public class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase 
             TestCaseUtils.repeatedCheck(
                     () -> Arrays.stream(expected).allMatch(outCaptor.toString()::contains));
         }
+
+        // Wait for a little while until we're in Binlog streaming mode.
+        Thread.sleep(5000L);
 
         LOG.info("Step 2: Evolve schema with pt-osc - ADD COLUMN");
         execInContainer(
