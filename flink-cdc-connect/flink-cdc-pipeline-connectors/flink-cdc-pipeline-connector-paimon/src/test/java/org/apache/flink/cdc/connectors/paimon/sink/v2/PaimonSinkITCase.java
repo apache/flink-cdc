@@ -72,11 +72,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -184,7 +182,8 @@ public class PaimonSinkITCase {
         Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
 
         // insert
-        writeAndCommit(writer, committer, createTestEvents(enableDeleteVector).toArray(new Event[0]));
+        writeAndCommit(
+                writer, committer, createTestEvents(enableDeleteVector).toArray(new Event[0]));
         Assertions.assertThat(fetchResults(table1))
                 .isEqualTo(
                         Arrays.asList(
@@ -242,7 +241,8 @@ public class PaimonSinkITCase {
         Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
 
         // 1. receive only DataChangeEvents during one checkpoint
-        writeAndCommit(writer, committer, createTestEvents(enableDeleteVector).toArray(new Event[0]));
+        writeAndCommit(
+                writer, committer, createTestEvents(enableDeleteVector).toArray(new Event[0]));
         Assertions.assertThat(fetchResults(table1))
                 .isEqualTo(
                         Arrays.asList(
@@ -380,7 +380,7 @@ public class PaimonSinkITCase {
             throws IOException, InterruptedException {
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
-                        .map(this::correctCheckpointId)
+                        .map(PaimonSinkITCase::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -453,7 +453,7 @@ public class PaimonSinkITCase {
         writer.flush(false);
         Collection<Committer.CommitRequest<MultiTableCommittable>> commitRequests =
                 writer.prepareCommit().stream()
-                        .map(this::correctCheckpointId)
+                        .map(PaimonSinkITCase::correctCheckpointId)
                         .map(MockCommitRequestImpl::new)
                         .collect(Collectors.toList());
         committer.commit(commitRequests);
@@ -468,25 +468,25 @@ public class PaimonSinkITCase {
             // CommitterOperator will try to re-commit recovered transactions.
             committer.commit(commitRequests);
             List<DataChangeEvent> events =
-                    Arrays.asList(
+                    Collections.singletonList(
                             DataChangeEvent.insertEvent(
                                     table1,
-                                    generator.generate(
-                                            new Object[] {
-                                                BinaryStringData.fromString(Integer.toString(i)),
-                                                BinaryStringData.fromString(Integer.toString(i))
-                                            })));
-            Assertions.assertDoesNotThrow(
-                    () -> {
-                        for (Event event : events) {
-                            writer.write(event, null);
-                        }
-                    });
+                                    generate(
+                                            Arrays.asList(
+                                                    Tuple2.of(STRING(), String.valueOf(i)),
+                                                    Tuple2.of(STRING(), String.valueOf(i))))));
+            Assertions.assertThatCode(
+                            () -> {
+                                for (Event event : events) {
+                                    writer.write(event, null);
+                                }
+                            })
+                    .doesNotThrowAnyException();
             writer.flush(false);
             // Checkpoint id start from 1
             committer.commit(
                     writer.prepareCommit().stream()
-                            .map(this::correctCheckpointId)
+                            .map(PaimonSinkITCase::correctCheckpointId)
                             .map(MockCommitRequestImpl::new)
                             .collect(Collectors.toList()));
         }
@@ -498,10 +498,10 @@ public class PaimonSinkITCase {
                 .forEachRemaining(result::add);
         if (enableDeleteVector) {
             // Each APPEND will trigger COMPACT once enable deletion-vectors.
-            Assertions.assertEquals(16, result.size());
+            Assertions.assertThat(result).hasSize(16);
         } else {
             // 8 APPEND and 1 COMPACT
-            Assertions.assertEquals(9, result.size());
+            Assertions.assertThat(result).hasSize(9);
         }
         result.clear();
 
@@ -509,8 +509,8 @@ public class PaimonSinkITCase {
                 .execute()
                 .collect()
                 .forEachRemaining(result::add);
-        Assertions.assertEquals(
-                Arrays.asList(
+        Assertions.assertThat(result)
+                .containsExactly(
                         Row.ofKind(RowKind.INSERT, "1", "1"),
                         Row.ofKind(RowKind.INSERT, "2", "2"),
                         Row.ofKind(RowKind.INSERT, "3", "3"),
@@ -518,11 +518,10 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "5", "5"),
                         Row.ofKind(RowKind.INSERT, "6", "6"),
                         Row.ofKind(RowKind.INSERT, "7", "7"),
-                        Row.ofKind(RowKind.INSERT, "8", "8")),
-                result);
+                        Row.ofKind(RowKind.INSERT, "8", "8"));
     }
 
-    private MultiTableCommittable correctCheckpointId(MultiTableCommittable committable) {
+    private static MultiTableCommittable correctCheckpointId(MultiTableCommittable committable) {
         // update the right checkpointId for MultiTableCommittable
         return new MultiTableCommittable(
                 committable.getDatabase(),
