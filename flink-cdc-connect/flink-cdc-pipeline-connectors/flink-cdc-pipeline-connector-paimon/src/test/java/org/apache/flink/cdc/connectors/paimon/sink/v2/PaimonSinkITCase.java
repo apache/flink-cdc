@@ -72,9 +72,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -263,6 +265,7 @@ public class PaimonSinkITCase {
                 new AddColumnEvent(table1, Collections.singletonList(columnWithPosition));
         PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
         metadataApplier.applySchemaChange(addColumnEvent);
+        writer.write(addColumnEvent, null);
 
         writeAndCommit(
                 writer,
@@ -305,6 +308,10 @@ public class PaimonSinkITCase {
                 generateInsert(
                         table1, Arrays.asList(Tuple2.of(STRING(), "6"), Tuple2.of(STRING(), "6"))));
 
+        List<Row> result = fetchResults(TableId.tableId("test", "`table1$files`"));
+        Set<Row> deduplicated = new HashSet<>(result);
+        Assertions.assertThat(result).hasSameSizeAs(deduplicated);
+
         Assertions.assertThat(fetchResults(table1))
                 .isEqualTo(
                         Arrays.asList(
@@ -317,7 +324,9 @@ public class PaimonSinkITCase {
 
         TruncateTableEvent truncateTableEvent = new TruncateTableEvent(table1);
         metadataApplier.applySchemaChange(truncateTableEvent);
+        Assertions.assertThat(fetchResults(table1)).isEmpty();
 
+        // FIXME: This check will fail when deleteVector is true
         writeAndCommit(
                 writer,
                 committer,
@@ -469,12 +478,11 @@ public class PaimonSinkITCase {
             committer.commit(commitRequests);
             List<DataChangeEvent> events =
                     Collections.singletonList(
-                            DataChangeEvent.insertEvent(
+                            generateInsert(
                                     table1,
-                                    generate(
-                                            Arrays.asList(
-                                                    Tuple2.of(STRING(), String.valueOf(i)),
-                                                    Tuple2.of(STRING(), String.valueOf(i))))));
+                                    Arrays.asList(
+                                            Tuple2.of(STRING(), String.valueOf(i)),
+                                            Tuple2.of(STRING(), String.valueOf(i)))));
             Assertions.assertThatCode(
                             () -> {
                                 for (Event event : events) {
