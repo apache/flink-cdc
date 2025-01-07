@@ -24,8 +24,8 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.runtime.serializer.BooleanSerializer;
 import org.apache.flink.cdc.runtime.serializer.EnumSerializer;
 import org.apache.flink.cdc.runtime.serializer.ListSerializer;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
@@ -51,7 +51,8 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
             new EnumSerializer<>(EventClass.class);
     private final TypeSerializer<DataChangeEvent> dataChangeEventSerializer =
             DataChangeEventSerializer.INSTANCE;
-    private final BooleanSerializer booleanSerializer = BooleanSerializer.INSTANCE;
+    private final EnumSerializer<SchemaChangeEventType> schemaChangeEventTypeEnumSerializer =
+            new EnumSerializer<>(SchemaChangeEventType.class);
 
     @Override
     public boolean isImmutableType() {
@@ -70,7 +71,8 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
             return new FlushEvent(
                     flushEvent.getSourceSubTaskId(),
                     listSerializer.copy(((FlushEvent) from).getTableIds()),
-                    booleanSerializer.copy(flushEvent.getIsForCreateTableEvent()));
+                    schemaChangeEventTypeEnumSerializer.copy(
+                            flushEvent.getSchemaChangeEventType()));
         } else if (from instanceof SchemaChangeEvent) {
             return schemaChangeEventSerializer.copy((SchemaChangeEvent) from);
         } else if (from instanceof DataChangeEvent) {
@@ -95,7 +97,8 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
             enumSerializer.serialize(EventClass.FLUSH_EVENT, target);
             target.writeInt(((FlushEvent) record).getSourceSubTaskId());
             listSerializer.serialize(((FlushEvent) record).getTableIds(), target);
-            booleanSerializer.serialize(((FlushEvent) record).getIsForCreateTableEvent(), target);
+            schemaChangeEventTypeEnumSerializer.serialize(
+                    ((FlushEvent) record).getSchemaChangeEventType(), target);
         } else if (record instanceof SchemaChangeEvent) {
             enumSerializer.serialize(EventClass.SCHEME_CHANGE_EVENT, target);
             schemaChangeEventSerializer.serialize((SchemaChangeEvent) record, target);
@@ -115,7 +118,7 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
                 return new FlushEvent(
                         source.readInt(),
                         listSerializer.deserialize(source),
-                        booleanSerializer.deserialize(source));
+                        schemaChangeEventTypeEnumSerializer.deserialize(source));
             case DATA_CHANGE_EVENT:
                 return dataChangeEventSerializer.deserialize(source);
             case SCHEME_CHANGE_EVENT:

@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -133,7 +134,7 @@ public class DataSinkOperatorAdapter extends AbstractStreamOperator<Event>
 
     private void handleFlushEvent(FlushEvent event) throws Exception {
         // omit copySinkWriter/userFunction flush from testing
-        if (!event.getIsForCreateTableEvent()) {
+        if (event.getSchemaChangeEventType() != SchemaChangeEventType.CREATE_TABLE) {
             event.getTableIds().stream()
                     .filter(tableId -> !processedTableIds.contains(tableId))
                     .forEach(

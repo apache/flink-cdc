@@ -24,7 +24,6 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
-import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -76,10 +75,7 @@ public class DataSinkOperatorWithSchemaEvolveTest {
     }
 
     private FlushEvent createFlushEvent(TableId tableId, SchemaChangeEvent postEvent) {
-        return new FlushEvent(
-                0,
-                Collections.singletonList(tableId),
-                postEvent.getType() == SchemaChangeEventType.CREATE_TABLE);
+        return new FlushEvent(0, Collections.singletonList(tableId), postEvent.getType());
     }
 
     private void processSchemaChangeEvent(

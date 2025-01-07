@@ -22,7 +22,6 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
-import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
@@ -198,8 +197,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                         new FlushEvent(
                                 subTaskId,
                                 tableIdRouter.route(sourceTableId),
-                                schemaChangeRequest.getSchemaChangeEvent().getType()
-                                        == SchemaChangeEventType.CREATE_TABLE)));
+                                schemaChangeRequest.getSchemaChangeEvent().getType())));
 
         LOG.info("{}> Sending evolve request...", subTaskId);
         SchemaChangeResponse response = sendRequestToCoordinator(schemaChangeRequest);

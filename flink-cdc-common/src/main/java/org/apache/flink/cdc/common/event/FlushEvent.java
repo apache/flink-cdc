@@ -33,16 +33,19 @@ public class FlushEvent implements Event {
     private final int sourceSubTaskId;
 
     /** Flag indicating whether the FlushEvent is sent before a create table event. */
-    private final Boolean isForCreateTableEvent;
+    private final SchemaChangeEventType schemaChangeEventType;
 
     public FlushEvent(int sourceSubTaskId) {
-        this(sourceSubTaskId, Collections.emptyList(), false);
+        this(sourceSubTaskId, Collections.emptyList(), null);
     }
 
-    public FlushEvent(int sourceSubTaskId, List<TableId> tableIds, boolean isForCreateTableEvent) {
+    public FlushEvent(
+            int sourceSubTaskId,
+            List<TableId> tableIds,
+            SchemaChangeEventType schemaChangeEventType) {
         this.tableIds = tableIds;
         this.sourceSubTaskId = sourceSubTaskId;
-        this.isForCreateTableEvent = isForCreateTableEvent;
+        this.schemaChangeEventType = schemaChangeEventType;
     }
 
     public List<TableId> getTableIds() {
@@ -53,8 +56,8 @@ public class FlushEvent implements Event {
         return sourceSubTaskId;
     }
 
-    public Boolean getIsForCreateTableEvent() {
-        return isForCreateTableEvent;
+    public SchemaChangeEventType getSchemaChangeEventType() {
+        return schemaChangeEventType;
     }
 
     @Override
@@ -68,7 +71,7 @@ public class FlushEvent implements Event {
         FlushEvent that = (FlushEvent) o;
         return sourceSubTaskId == that.sourceSubTaskId
                 && Objects.equals(tableIds, that.tableIds)
-                && Objects.equals(isForCreateTableEvent, that.isForCreateTableEvent);
+                && Objects.equals(schemaChangeEventType, that.schemaChangeEventType);
     }
 
     @Override

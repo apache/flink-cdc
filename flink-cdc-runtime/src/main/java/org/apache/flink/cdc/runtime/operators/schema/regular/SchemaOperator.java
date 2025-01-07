@@ -23,7 +23,6 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
-import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
@@ -168,11 +167,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         List<TableId> sinkTables = router.route(tableId);
         LOG.info("{}> Sending the FlushEvent.", subTaskId);
         output.collect(
-                new StreamRecord<>(
-                        new FlushEvent(
-                                subTaskId,
-                                sinkTables,
-                                originalEvent.getType() == SchemaChangeEventType.CREATE_TABLE)));
+                new StreamRecord<>(new FlushEvent(subTaskId, sinkTables, originalEvent.getType())));
 
         // Then, queue to request schema change to SchemaCoordinator.
         SchemaChangeResponse response = requestSchemaChange(tableId, originalEvent);
