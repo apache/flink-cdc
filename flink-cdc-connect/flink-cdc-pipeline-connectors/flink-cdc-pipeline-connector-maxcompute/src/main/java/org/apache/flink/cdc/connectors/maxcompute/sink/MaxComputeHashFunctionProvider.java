@@ -44,7 +44,7 @@ public class MaxComputeHashFunctionProvider implements HashFunctionProvider<Data
     private final int bucketSize;
 
     public MaxComputeHashFunctionProvider(MaxComputeOptions options) {
-        this.bucketSize = options.getBucketSize();
+        this.bucketSize = options.getBucketsNum();
     }
 
     @Override

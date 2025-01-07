@@ -19,7 +19,6 @@
 package org.apache.flink.cdc.connectors.maxcompute.utils;
 
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.maxcompute.common.Constant;
 import org.apache.flink.cdc.connectors.maxcompute.common.SessionIdentifier;
 import org.apache.flink.cdc.connectors.maxcompute.common.UncheckedOdpsException;
@@ -38,6 +37,7 @@ import com.aliyun.odps.account.StsAccount;
 import com.aliyun.odps.tunnel.Configuration;
 import com.aliyun.odps.tunnel.TableTunnel;
 import com.aliyun.odps.tunnel.io.CompressOption;
+import com.aliyun.odps.utils.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +50,7 @@ public class MaxComputeUtils {
 
     public static Odps getOdps(MaxComputeOptions maxComputeOptions) {
         Account account;
-        if (StringUtils.isNullOrWhitespaceOnly(maxComputeOptions.getStsToken())) {
+        if (StringUtils.isNullOrEmpty(maxComputeOptions.getStsToken())) {
             account =
                     new AliyunAccount(
                             maxComputeOptions.getAccessId(), maxComputeOptions.getAccessKey());
@@ -65,6 +65,8 @@ public class MaxComputeUtils {
         odps.setEndpoint(maxComputeOptions.getEndpoint());
         odps.setTunnelEndpoint(maxComputeOptions.getTunnelEndpoint());
         odps.setDefaultProject(maxComputeOptions.getProject());
+        odps.getRestClient().setReadTimeout(60);
+        odps.getRestClient().setConnectTimeout(60);
         odps.setUserAgent("Flink CDC");
         return odps;
     }
@@ -82,7 +84,7 @@ public class MaxComputeUtils {
                         .withQuotaName(maxComputeOptions.getQuotaName())
                         .build();
         TableTunnel tunnel = new TableTunnel(odps, configuration);
-        if (!StringUtils.isNullOrWhitespaceOnly(maxComputeOptions.getTunnelEndpoint())) {
+        if (!StringUtils.isNullOrEmpty(maxComputeOptions.getTunnelEndpoint())) {
             tunnel.setEndpoint(maxComputeOptions.getTunnelEndpoint());
         }
         return tunnel;
@@ -205,7 +207,7 @@ public class MaxComputeUtils {
             throws OdpsException {
         Odps odps = getOdps(options);
         if (options.isSupportSchema()) {
-            if (StringUtils.isNullOrWhitespaceOnly(schema)) {
+            if (StringUtils.isNullOrEmpty(schema)) {
                 LOG.info(
                         "create partition {} in {}.default.{}",
                         partitionName,

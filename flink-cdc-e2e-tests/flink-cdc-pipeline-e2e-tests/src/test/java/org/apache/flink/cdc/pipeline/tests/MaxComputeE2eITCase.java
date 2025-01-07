@@ -56,7 +56,7 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MaxComputeE2eITCase.class);
 
     public static final DockerImageName MAXCOMPUTE_IMAGE =
-            DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.4");
+            DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.7");
 
     @ClassRule
     public static GenericContainer<?> maxcompute =
@@ -117,9 +117,8 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
                         + getEndpoint()
                         + "\n"
                         + "   project: mocked_mc\n"
-                        + "   bucketSize: 8\n"
+                        + "   bucketsNum: 8\n"
                         + "   compressAlgorithm: raw\n"
-                        + "   maxSessionParallelism: 2\n"
                         + "\n"
                         + "pipeline:\n"
                         + "   parallelism: 4";
@@ -127,6 +126,7 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         submitPipelineJob(pipelineJob, maxcomputeCdcJar, valuesCdcJar);
         waitUntilJobFinished(Duration.ofMinutes(10));
+        LOG.info("Pipeline job is running");
     }
 
     private String getEndpoint() {

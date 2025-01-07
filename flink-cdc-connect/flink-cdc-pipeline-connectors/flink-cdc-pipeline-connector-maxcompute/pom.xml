@@ -49,9 +49,15 @@ limitations under the License.
         </dependency>
 
         <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.15</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.aliyun.odps</groupId>
             <artifactId>odps-sdk-core</artifactId>
-            <version>0.51.2-public</version>
+            <version>0.50.6-public</version>
             <exclusions>
                 <exclusion>
                     <groupId>com.fasterxml.jackson.core</groupId>
@@ -60,14 +66,6 @@ limitations under the License.
                 <exclusion>
                     <artifactId>aliyun-java-auth</artifactId>
                     <groupId>com.aliyun</groupId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.aliyun</groupId>
-                    <artifactId>credential-java</artifactId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>commons-codec</artifactId>
-                    <groupId>commons-codec</groupId>
                 </exclusion>
                 <exclusion>
                     <artifactId>guava</artifactId>

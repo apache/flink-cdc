@@ -276,6 +276,16 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-maxcompute</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>maxcompute-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-cdc-pipeline-udf-examples</artifactId>
                             <version>${project.version}</version>
                             <destFileName>udf-examples.jar</destFileName>
@@ -289,16 +299,6 @@ limitations under the License.
                             <artifactId>scala-library</artifactId>
                             <version>${scala.version}</version>
                             <destFileName>scala-library.jar</destFileName>
-                            <type>jar</type>
-                            <outputDirectory>${project.build.directory}/dependencies
-                            </outputDirectory>
-                        </artifactItem>
-
-                        <artifactItem>
-                            <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-cdc-pipeline-connector-maxcompute</artifactId>
-                            <version>${project.version}</version>
-                            <destFileName>maxcompute-cdc-pipeline-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

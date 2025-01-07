@@ -54,7 +54,7 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
         String tunnelEndpoint = factoryConfiguration.get(MaxComputeDataSinkOptions.TUNNEL_ENDPOINT);
         String quotaName = factoryConfiguration.get(MaxComputeDataSinkOptions.QUOTA_NAME);
         String stsToken = factoryConfiguration.get(MaxComputeDataSinkOptions.STS_TOKEN);
-        int bucketSize = factoryConfiguration.get(MaxComputeDataSinkOptions.BUCKETS_NUM);
+        int bucketsNum = factoryConfiguration.get(MaxComputeDataSinkOptions.BUCKETS_NUM);
 
         String schemaOperatorUid =
                 pipelineConfiguration.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
@@ -62,7 +62,7 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
                 .withTunnelEndpoint(tunnelEndpoint)
                 .withQuotaName(quotaName)
                 .withStsToken(stsToken)
-                .withBucketSize(bucketSize)
+                .withBucketsNum(bucketsNum)
                 .withSchemaOperatorUid(schemaOperatorUid)
                 .build();
     }

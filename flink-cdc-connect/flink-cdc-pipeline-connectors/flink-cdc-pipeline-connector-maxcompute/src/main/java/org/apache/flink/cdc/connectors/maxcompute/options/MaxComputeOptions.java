@@ -34,7 +34,7 @@ public class MaxComputeOptions implements Serializable {
     private final boolean supportSchema;
     private final String quotaName;
     private final String stsToken;
-    private final int bucketSize;
+    private final int bucketsNum;
     private final String schemaOperatorUid;
 
     private MaxComputeOptions(Builder builder) {
@@ -45,7 +45,7 @@ public class MaxComputeOptions implements Serializable {
         this.tunnelEndpoint = builder.tunnelEndpoint;
         this.quotaName = builder.quotaName;
         this.stsToken = builder.stsToken;
-        this.bucketSize = builder.bucketSize;
+        this.bucketsNum = builder.bucketsNum;
         this.supportSchema = MaxComputeUtils.supportSchema(this);
         this.schemaOperatorUid = builder.schemaOperatorUid;
     }
@@ -87,8 +87,8 @@ public class MaxComputeOptions implements Serializable {
         return supportSchema;
     }
 
-    public int getBucketSize() {
-        return bucketSize;
+    public int getBucketsNum() {
+        return bucketsNum;
     }
 
     public String getSchemaOperatorUid() {
@@ -106,7 +106,7 @@ public class MaxComputeOptions implements Serializable {
         private String quotaName;
         private String stsToken;
         private String schemaOperatorUid;
-        private int bucketSize = 16;
+        private int bucketsNum = 16;
 
         public Builder(String accessId, String accessKey, String endpoint, String project) {
             this.accessId = accessId;
@@ -130,8 +130,8 @@ public class MaxComputeOptions implements Serializable {
             return this;
         }
 
-        public Builder withBucketSize(int bucketSize) {
-            this.bucketSize = bucketSize;
+        public Builder withBucketsNum(int bucketsNum) {
+            this.bucketsNum = bucketsNum;
             return this;
         }
 

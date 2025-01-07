@@ -88,7 +88,7 @@ public class SchemaEvolutionUtils {
         if (!CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
             tableCreator
                     .transactionTable()
-                    .withDeltaTableBucketNum(options.getBucketSize())
+                    .withBucketNum(options.getBucketsNum())
                     .withPrimaryKeys(schema.primaryKeys());
         }
         if (options.isSupportSchema()) {
