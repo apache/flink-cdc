@@ -37,7 +37,7 @@ You will need to have a working Docker and Docker compose environment to use it.
 
 1. Run `git clone https://github.com/apache/flink-cdc.git --depth=1` to retrieve a copy of Flink CDC source code.
 2. Run `cd tools/cdcup/ && ./cdcup.sh init` to use the CdcUp tool to start a playground environment.
-3. Run `./cdcup.sh up` to initialize docker containers, and `./cdcup.sh pipeline` to submit a pipeline job.
+3. Run `./cdcup.sh up` to initialize docker containers, and `./cdcup.sh pipeline <YAML pipeline file>` to submit a pipeline job.
 4. See [CdcUp Manual](tools/cdcup/README.md) for more details.
 
 ### Getting Started
