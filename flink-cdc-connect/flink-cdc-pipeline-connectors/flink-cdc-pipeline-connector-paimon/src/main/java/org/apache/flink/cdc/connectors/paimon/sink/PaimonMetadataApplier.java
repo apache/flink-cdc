@@ -35,6 +35,7 @@ import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.FlinkCatalogFactory;
@@ -61,8 +62,6 @@ import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
  */
 public class PaimonMetadataApplier implements MetadataApplier {
 
-    private static final Logger LOG = LoggerFactory.getLogger(PaimonMetadataApplier.class);
-
     // Catalog is unSerializable.
     private transient Catalog catalog;
 
@@ -74,10 +73,6 @@ public class PaimonMetadataApplier implements MetadataApplier {
     private final Map<TableId, List<String>> partitionMaps;
 
     private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
-
-    private static final String OPTION_DEFAULT_VALUE_PREFIX = "FIELDS";
-
-    private static final String OPTION_DEFAULT_VALUE_SUFFIX = "default-value";
 
     public PaimonMetadataApplier(Options catalogOptions) {
         this.catalogOptions = catalogOptions;
@@ -225,9 +220,9 @@ public class PaimonMetadataApplier implements MetadataApplier {
                                     String key =
                                             String.format(
                                                     "%s.%s.%s",
-                                                    OPTION_DEFAULT_VALUE_PREFIX,
+                                                    CoreOptions.FIELDS_PREFIX,
                                                     column.getName(),
-                                                    OPTION_DEFAULT_VALUE_SUFFIX);
+                                                    CoreOptions.DEFAULT_VALUE_SUFFIX);
                                     tableChangeList.add(SchemaChangeProvider.setOption(key, value));
                                 });
 
