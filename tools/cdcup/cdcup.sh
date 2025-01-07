@@ -62,7 +62,7 @@ elif [ "$1" == 'pipeline' ]; then
   docker compose exec jobmanager bash -c "$startup_script"
 elif [ "$1" == 'flink' ]; then
   port_info="$(docker compose port jobmanager 8081)"
-  printf "-> Visit Flink Dashboard at: http://localhost:%s\n" "${port_info##*:}"
+  printf "➡️ Visit Flink Dashboard at: http://localhost:%s\n" "${port_info##*:}"
 elif [ "$1" == 'mysql' ]; then
   docker compose exec -it mysql bash -c "mysql -uroot" || echo "❌ Unable to find MySQL container."
 elif [ "$1" == 'stop' ]; then
