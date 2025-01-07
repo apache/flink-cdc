@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
@@ -41,6 +42,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.cli.CliFrontendOptions.FLINK_CONFIG;
@@ -122,23 +124,17 @@ public class CliFrontend {
 
     private static void overrideFlinkConfiguration(
             Configuration flinkConfig, CommandLine commandLine) {
-        String[] flinkConfigs = commandLine.getOptionValues(FLINK_CONFIG);
-        if (flinkConfigs != null) {
-            LOG.info("Dynamic flink config items found: [{}]", String.join(",", flinkConfigs));
-            for (String config : flinkConfigs) {
-                String[] keyValuePair = config.split("=");
-                if (keyValuePair.length != 2) {
-                    throw new IllegalArgumentException(
-                            String.format(
-                                    "Unexpected param [%s], dynamic flink config should be formated as \"-D property=value\"",
-                                    config));
-                }
-                String key = keyValuePair[0].trim();
-                String value = keyValuePair[1].trim();
-                ConfigOption<String> configOption =
-                        ConfigOptions.key(key).stringType().defaultValue(value);
-                flinkConfig.set(configOption, value);
+        Properties properties = commandLine.getOptionProperties(FLINK_CONFIG.getOpt());
+        LOG.info("Dynamic flink config items found: {}", properties);
+        for (String key : properties.stringPropertyNames()) {
+            String value = properties.getProperty(key);
+            if (StringUtils.isNullOrWhitespaceOnly(key)
+                    || StringUtils.isNullOrWhitespaceOnly(value)) {
+                throw new IllegalArgumentException("Illegal argument for key or value");
             }
+            ConfigOption<String> configOption =
+                    ConfigOptions.key(key.trim()).stringType().defaultValue(value.trim());
+            flinkConfig.set(configOption, value.trim());
         }
     }
 

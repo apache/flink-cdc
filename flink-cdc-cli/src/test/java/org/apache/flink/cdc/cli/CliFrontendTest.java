@@ -27,7 +27,7 @@ import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
-import org.junit.Assert;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -175,56 +175,32 @@ class CliFrontendTest {
 
     @Test
     void testPipelineExecutingWithUnValidFlinkConfig() throws Exception {
-        IllegalArgumentException exception =
-                Assert.assertThrows(
-                        IllegalArgumentException.class,
+        Assertions.assertThatThrownBy(
                         () ->
                                 createExecutor(
                                         pipelineDef(),
                                         "--flink-home",
                                         flinkHome(),
                                         "-D",
-                                        "execution.target"));
-        String expectedMessage =
-                String.format(
-                        "Unexpected param [%s], dynamic flink config should be formated as \"-D property=value\"",
-                        "execution.target");
-        String actualMessage = exception.getMessage();
-        Assert.assertEquals(expectedMessage, actualMessage);
+                                        "=execution.target"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Illegal argument for key or value");
 
-        exception =
-                Assert.assertThrows(
-                        IllegalArgumentException.class,
+        Assertions.assertThatThrownBy(
                         () ->
                                 createExecutor(
                                         pipelineDef(),
                                         "--flink-home",
                                         flinkHome(),
                                         "-D",
-                                        "execution.target="));
-        expectedMessage =
-                String.format(
-                        "Unexpected param [%s], dynamic flink config should be formated as \"-D property=value\"",
-                        "execution.target=");
-        actualMessage = exception.getMessage();
-        Assert.assertEquals(expectedMessage, actualMessage);
+                                        "execution.target="))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Illegal argument for key or value");
 
-        exception =
-                Assert.assertThrows(
-                        IllegalArgumentException.class,
-                        () ->
-                                createExecutor(
-                                        pipelineDef(),
-                                        "--flink-home",
-                                        flinkHome(),
-                                        "-D",
-                                        "execution.target=="));
-        expectedMessage =
-                String.format(
-                        "Unexpected param [%s], dynamic flink config should be formated as \"-D property=value\"",
-                        "execution.target==");
-        actualMessage = exception.getMessage();
-        Assert.assertEquals(expectedMessage, actualMessage);
+        Assertions.assertThatThrownBy(
+                        () -> createExecutor(pipelineDef(), "--flink-home", flinkHome(), "-D", "="))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Illegal argument for key or value");
     }
 
     private CliExecutor createExecutor(String... args) throws Exception {

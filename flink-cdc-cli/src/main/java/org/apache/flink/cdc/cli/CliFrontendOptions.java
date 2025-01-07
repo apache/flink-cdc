@@ -96,10 +96,12 @@ public class CliFrontendOptions {
 
     public static final Option FLINK_CONFIG =
             Option.builder("D")
-                    .longOpt("flink-config")
-                    .hasArg()
+                    .required(false)
+                    .numberOfArgs(2)
+                    .valueSeparator('=')
+                    .argName("Session dynamic flink config key=val")
                     .desc(
-                            "<property=value>. Allows specifying multiple flink generic configuration options. The available"
+                            "Allows specifying multiple flink generic configuration options. The available"
                                     + "options can be found at https://nightlies.apache.org/flink/flink-docs-stable/ops/config.html")
                     .build();
 
