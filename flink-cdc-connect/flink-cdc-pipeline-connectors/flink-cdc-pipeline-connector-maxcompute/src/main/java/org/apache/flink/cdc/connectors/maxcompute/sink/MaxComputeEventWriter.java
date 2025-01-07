@@ -56,7 +56,7 @@ import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.TypeConvertUtils;
 import org.apache.flink.cdc.connectors.maxcompute.writer.MaxComputeWriter;
-import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
+import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.util.Preconditions;
 

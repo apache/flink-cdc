@@ -32,7 +32,7 @@ import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.RetryUtils;
 import org.apache.flink.cdc.connectors.maxcompute.utils.SessionCommitCoordinateHelper;
 import org.apache.flink.cdc.connectors.maxcompute.writer.MaxComputeWriter;
-import org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils;
+import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequestHandler;
