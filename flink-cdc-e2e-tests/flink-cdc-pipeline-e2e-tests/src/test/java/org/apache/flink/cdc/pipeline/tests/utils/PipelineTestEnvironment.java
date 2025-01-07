@@ -150,7 +150,6 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         String preCmd = String.join(" && ", cmds);
         jobManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
-                        .withCommand("bash", "-c", preCmd + " && jobmanager.sh start-foreground")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
@@ -164,7 +163,6 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         taskManagerConsumer = new ToStringConsumer();
         taskManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
-                        .withCommand("bash", "-c", preCmd + " && taskmanager.sh start-foreground")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
                         .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
