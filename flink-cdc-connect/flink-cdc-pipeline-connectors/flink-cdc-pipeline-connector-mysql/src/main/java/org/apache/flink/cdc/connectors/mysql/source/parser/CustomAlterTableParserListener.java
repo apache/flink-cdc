@@ -34,6 +34,7 @@ import io.debezium.ddl.parser.mysql.generated.MySqlParser;
 import io.debezium.ddl.parser.mysql.generated.MySqlParserBaseListener;
 import io.debezium.relational.Column;
 import io.debezium.relational.ColumnEditor;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
@@ -74,6 +75,29 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         this.parser = parser;
         this.listeners = listeners;
         this.changes = changes;
+    }
+
+    @Override
+    public void exitCopyCreateTable(MySqlParser.CopyCreateTableContext ctx) {
+        TableId tableId = parser.parseQualifiedTableId(ctx.tableName(0).fullId());
+        TableId originalTableId = parser.parseQualifiedTableId(ctx.tableName(1).fullId());
+        Table original = parser.databaseTables().forTable(originalTableId);
+        if (original != null) {
+            parser.databaseTables()
+                    .overwriteTable(
+                            tableId,
+                            original.columns(),
+                            original.primaryKeyColumnNames(),
+                            original.defaultCharsetName());
+            parser.signalCreateTable(tableId, ctx);
+            Schema.Builder builder = Schema.newBuilder();
+            original.columns().forEach(column -> builder.column(toCdcColumn(column)));
+            if (!original.primaryKeyColumnNames().isEmpty()) {
+                builder.primaryKey(original.primaryKeyColumnNames());
+            }
+            changes.add(new CreateTableEvent(toCdcTableId(tableId), builder.build()));
+        }
+        super.exitCopyCreateTable(ctx);
     }
 
     @Override
