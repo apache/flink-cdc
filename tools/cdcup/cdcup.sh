@@ -4,7 +4,7 @@
 set -e
 
 display_help() {
-  echo "Usage: ./cdcup.sh { init | up | pipeline <yaml> | flink | stop | down | help }"
+  echo "Usage: ./cdcup.sh { init | up | pipeline <yaml> | flink | mysql | stop | down | help }"
   echo
   echo "Commands:"
   echo "    * init:"
