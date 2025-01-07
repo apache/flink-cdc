@@ -83,7 +83,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
     private static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
 
-    private static final String PERCONA_TOOLKIT = "perconalab/percona-toolkit";
+    private static final String PERCONA_TOOLKIT = "perconalab/percona-toolkit:3.5.7";
 
     protected static final GenericContainer<?> PERCONA_TOOLKIT_CONTAINER =
             createPerconaToolkitContainer();
