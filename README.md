@@ -37,8 +37,24 @@ You will need to have a working Docker and Docker compose environment to use it.
 
 1. Run `git clone https://github.com/apache/flink-cdc.git --depth=1` to retrieve a copy of Flink CDC source code.
 2. Run `cd tools/cdcup/ && ./cdcup.sh init` to use the CdcUp tool to start a playground environment.
-3. Run `./cdcup.sh up` to initialize docker containers, and `./cdcup.sh pipeline <YAML pipeline file>` to submit a pipeline job.
-4. See [CdcUp Manual](tools/cdcup/README.md) for more details.
+3. Run `./cdcup.sh up` to boot-up docker containers, and wait for them to be ready.
+4. Run `./cdcup.sh mysql` to open a MySQL session, and create at least one table.
+
+```sql
+-- initialize db and table
+CREATE DATABASE cdc_playground;
+USE cdc_playground;
+CREATE TABLE test_table (id INT PRIMARY KEY, name VARCHAR(32));
+
+-- insert test data
+INSERT INTO test_table VALUES (1, 'alice'), (2, 'bob'), (3, 'cicada'), (4, 'derrida');
+
+-- verify if it has been successfully inserted
+SELECT * FROM test_table;
+```
+
+5. Run `./cdcup.sh pipeline pipeline-definition.yaml` to submit the pipeline job. You may also edit the pipeline definition file for further configurations.
+6. Run `./cdcup.sh flink` to access the Flink Web UI.
 
 ### Getting Started
 
