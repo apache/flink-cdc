@@ -578,7 +578,7 @@ public class RecordUtils {
                             .get("ddl")
                             .asText()
                             .toLowerCase();
-            if (ddl.toLowerCase().startsWith("alter")) {
+            if (ddl.startsWith("alter")) {
                 String tableName =
                         value.getStruct(Envelope.FieldName.SOURCE).getString(TABLE_NAME_KEY);
                 return OSC_TABLE_ID_PATTERN.matcher(tableName).matches();
