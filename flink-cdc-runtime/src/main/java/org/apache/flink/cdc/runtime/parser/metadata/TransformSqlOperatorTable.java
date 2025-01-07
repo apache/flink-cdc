@@ -248,9 +248,7 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
             new SqlFunction(
                     "TIMESTAMPADD",
                     SqlKind.OTHER_FUNCTION,
-                    ReturnTypes.cascade(
-                            ReturnTypes.explicit(SqlTypeName.TIMESTAMP),
-                            SqlTypeTransforms.FORCE_NULLABLE),
+                    TransformSqlReturnTypes.ARG2_TIMESTAMP_FORCE_NULLABLE,
                     null,
                     OperandTypes.family(
                             SqlTypeFamily.ANY, SqlTypeFamily.INTEGER, SqlTypeFamily.TIMESTAMP),

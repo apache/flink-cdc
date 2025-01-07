@@ -165,7 +165,9 @@ public class TransformParser {
                         SqlOperatorTables.chain(transformSqlOperatorTable, udfOperatorTable),
                         calciteCatalogReader,
                         factory,
-                        SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
+                        SqlValidator.Config.DEFAULT
+                                .withIdentifierExpansion(true)
+                                .withConformance(SqlConformanceEnum.MYSQL_5));
         SqlNode validateSqlNode = validator.validate(sqlNode);
         SqlToRelConverter sqlToRelConverter =
                 new SqlToRelConverter(

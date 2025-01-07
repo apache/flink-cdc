@@ -108,124 +108,234 @@ public class SystemFunctionUtils {
         }
     }
 
-    public static int timestampDiff(
-            String symbol,
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
             LocalZonedTimestampData fromTimestamp,
             LocalZonedTimestampData toTimestamp) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
         return timestampDiff(
-                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getEpochMillisecond());
+                timeIntervalUnit,
+                fromTimestamp.getEpochMillisecond(),
+                ZoneId.systemDefault().getId(),
+                toTimestamp.getEpochMillisecond(),
+                ZoneId.systemDefault().getId());
     }
 
-    public static int timestampdiff(
-            String symbol,
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
             LocalZonedTimestampData fromTimestamp,
             LocalZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp, toTimestamp);
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp);
     }
 
-    public static int timestampDiff(
-            String symbol, TimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampdiff(
-            String symbol, TimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp, toTimestamp);
-    }
-
-    public static int timestampDiff(
-            String symbol, TimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
+    public static Integer timestampDiff(
+            String timeIntervalUnit, TimestampData fromTimestamp, TimestampData toTimestamp) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
         return timestampDiff(
-                symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
+                timeIntervalUnit,
+                fromTimestamp.getMillisecond(),
+                null,
+                toTimestamp.getMillisecond(),
+                null);
     }
 
-    public static int timestampdiff(
-            String symbol, TimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp, toTimestamp);
+    public static Integer timestampdiff(
+            String timeIntervalUnit, TimestampData fromTimestamp, TimestampData toTimestamp) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp);
     }
 
-    public static int timestampDiff(
-            String symbol, LocalZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
         return timestampDiff(
-                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
+                timeIntervalUnit,
+                fromTimestamp.getMillisecond(),
+                null,
+                toTimestamp.getEpochMillisecond(),
+                ZoneId.systemDefault().getId());
     }
 
-    public static int timestampdiff(
-            String symbol, LocalZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp, toTimestamp);
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp);
     }
 
-    public static int timestampDiff(
-            String symbol, ZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampdiff(
-            String symbol, ZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp, toTimestamp);
-    }
-
-    public static int timestampDiff(
-            String symbol, LocalZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            TimestampData toTimestamp) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
         return timestampDiff(
-                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
+                timeIntervalUnit,
+                fromTimestamp.getEpochMillisecond(),
+                ZoneId.systemDefault().getId(),
+                toTimestamp.getMillisecond(),
+                null);
     }
 
-    public static int timestampdiff(
-            String symbol, LocalZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp, toTimestamp);
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            TimestampData toTimestamp) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp);
     }
 
-    public static int timestampDiff(
-            String symbol, ZonedTimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            ZonedTimestampData fromTimestamp,
+            ZonedTimestampData toTimestamp) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
         return timestampDiff(
-                symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
+                timeIntervalUnit,
+                fromTimestamp.getMillisecond(),
+                fromTimestamp.getZoneId(),
+                toTimestamp.getMillisecond(),
+                toTimestamp.getZoneId());
     }
 
-    public static int timestampdiff(
-            String symbol, ZonedTimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp, toTimestamp);
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            ZonedTimestampData fromTimestamp,
+            ZonedTimestampData toTimestamp) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp);
     }
 
-    public static int timestampDiff(
-            String symbol, TimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            ZonedTimestampData toTimestamp) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getEpochMillisecond(),
+                ZoneId.systemDefault().getId(),
+                toTimestamp.getMillisecond(),
+                toTimestamp.getZoneId());
     }
 
-    public static int timestampdiff(
-            String symbol, TimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp, toTimestamp);
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            ZonedTimestampData toTimestamp) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp);
     }
 
-    public static int timestampDiff(
-            String symbol, ZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            ZonedTimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getMillisecond(),
+                fromTimestamp.getZoneId(),
+                toTimestamp.getEpochMillisecond(),
+                ZoneId.systemDefault().getId());
     }
 
-    public static int timestampdiff(
-            String symbol, ZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp, toTimestamp);
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            ZonedTimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp);
     }
 
-    public static int timestampDiff(String timeIntervalUnit, long fromDate, long toDate) {
-        Calendar from = Calendar.getInstance();
+    public static Integer timestampDiff(
+            String timeIntervalUnit, TimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getMillisecond(),
+                null,
+                toTimestamp.getMillisecond(),
+                toTimestamp.getZoneId());
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit, TimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp);
+    }
+
+    public static Integer timestampDiff(
+            String timeIntervalUnit, ZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getMillisecond(),
+                fromTimestamp.getZoneId(),
+                toTimestamp.getMillisecond(),
+                null);
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit, ZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp);
+    }
+
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            long fromDate,
+            String fromDateZoneId,
+            long toDate,
+            String toDateZoneId) {
+        if (fromDateZoneId == null || fromDateZoneId.isEmpty()) {
+            fromDateZoneId = "UTC";
+        }
+        if (toDateZoneId == null || toDateZoneId.isEmpty()) {
+            toDateZoneId = "UTC";
+        }
+        Calendar from = Calendar.getInstance(TimeZone.getTimeZone(fromDateZoneId));
         from.setTime(new Date(fromDate));
-        Calendar to = Calendar.getInstance();
+        Calendar to = Calendar.getInstance(TimeZone.getTimeZone(toDateZoneId));
         to.setTime(new Date(toDate));
-        Long second = (to.getTimeInMillis() - from.getTimeInMillis()) / 1000;
+        long second = (to.getTimeInMillis() - from.getTimeInMillis()) / 1000;
         switch (timeIntervalUnit) {
             case "SECOND":
-                return second.intValue();
+                if (second > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return (int) second;
             case "MINUTE":
-                return second.intValue() / 60;
+                if (second > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return (int) second / 60;
             case "HOUR":
-                return second.intValue() / 3600;
+                if (second > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return (int) second / 3600;
             case "DAY":
-                return second.intValue() / (24 * 3600);
+                if (second > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return (int) second / (24 * 3600);
             case "MONTH":
                 return to.get(Calendar.YEAR) * 12
-                        + to.get(Calendar.MONDAY)
-                        - (from.get(Calendar.YEAR) * 12 + from.get(Calendar.MONDAY));
+                        + to.get(Calendar.MONTH)
+                        - (from.get(Calendar.YEAR) * 12 + from.get(Calendar.MONTH));
             case "YEAR":
                 return to.get(Calendar.YEAR) - from.get(Calendar.YEAR);
             default:
@@ -236,24 +346,38 @@ public class SystemFunctionUtils {
         }
     }
 
-    public static TimestampData timestampadd(
-            String timeIntervalUnit, int interval, LocalZonedTimestampData timePoint) {
-        return timestampadd(timeIntervalUnit, interval, timePoint.getEpochMillisecond());
+    public static LocalZonedTimestampData timestampadd(
+            String timeIntervalUnit, Integer interval, LocalZonedTimestampData timePoint) {
+        if (interval == null || timePoint == null) {
+            return null;
+        }
+        return LocalZonedTimestampData.fromEpochMillis(
+                timestampadd(timeIntervalUnit, interval, timePoint.getEpochMillisecond()));
+    }
+
+    public static ZonedTimestampData timestampadd(
+            String timeIntervalUnit, Integer interval, ZonedTimestampData timePoint) {
+        if (interval == null || timePoint == null) {
+            return null;
+        }
+        return ZonedTimestampData.of(
+                timestampadd(timeIntervalUnit, interval, timePoint.getMillisecond()),
+                0,
+                timePoint.getZoneId());
     }
 
     public static TimestampData timestampadd(
-            String timeIntervalUnit, int interval, ZonedTimestampData timePoint) {
-        return timestampadd(timeIntervalUnit, interval, timePoint.getMillisecond());
+            String timeIntervalUnit, Integer interval, TimestampData timePoint) {
+        if (interval == null || timePoint == null) {
+            return null;
+        }
+        return TimestampData.fromMillis(
+                timestampadd(timeIntervalUnit, interval, timePoint.getMillisecond()));
     }
 
-    public static TimestampData timestampadd(
-            String timeIntervalUnit, int interval, TimestampData timePoint) {
-        return timestampadd(timeIntervalUnit, interval, timePoint.getMillisecond());
-    }
-
-    public static TimestampData timestampadd(
-            String timeIntervalUnit, int interval, long timePoint) {
+    private static long timestampadd(String timeIntervalUnit, int interval, long timePoint) {
         Calendar calendar = Calendar.getInstance();
+        calendar.setTimeZone(TimeZone.getTimeZone("UTC"));
         calendar.setTime(new Date(timePoint));
         int field;
         switch (timeIntervalUnit) {
@@ -282,7 +406,7 @@ public class SystemFunctionUtils {
                                 timeIntervalUnit));
         }
         calendar.add(field, interval);
-        return TimestampData.fromMillis(calendar.getTimeInMillis());
+        return calendar.getTimeInMillis();
     }
 
     public static boolean betweenAsymmetric(String value, String minValue, String maxValue) {
