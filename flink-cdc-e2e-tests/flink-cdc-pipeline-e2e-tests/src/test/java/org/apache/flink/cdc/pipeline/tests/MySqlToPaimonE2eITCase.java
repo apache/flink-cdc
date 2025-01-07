@@ -95,6 +95,9 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                 MountableFile.forHostPath(
                         TestUtils.getResource(getPaimonSQLConnectorResourceName())),
                 sharedVolume.toString() + "/" + getPaimonSQLConnectorResourceName());
+        jobManager.copyFileToContainer(
+                MountableFile.forHostPath(TestUtils.getResource("flink-shade-hadoop.jar")),
+                sharedVolume.toString() + "/flink-shade-hadoop.jar");
     }
 
     @After
@@ -141,11 +144,11 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                 database,
                 "products",
                 Arrays.asList(
-                        "101, One, Alice, 3.202, red, {\"key1\":\"value1\"}, null",
-                        "102, Two, Bob, 1.703, white, {\"key2\":\"value2\"}, null",
-                        "103, Three, Cecily, 4.105, red, {\"key3\":\"value3\"}, null",
-                        "104, Four, Derrida, 1.857, white, {\"key4\":\"value4\"}, null",
-                        "105, Five, Evelyn, 5.211, red, {\"K\":\"V\",\"k\":\"v\"}, null",
+                        "101, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null",
+                        "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null",
+                        "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null",
+                        "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null",
+                        "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null",
                         "106, Six, Ferris, 9.813, null, null, null",
                         "107, Seven, Grace, 2.117, null, null, null",
                         "108, Eight, Hesse, 6.819, null, null, null",
@@ -194,10 +197,10 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
         List<String> recordsInSnapshotPhase =
                 new ArrayList<>(
                         Arrays.asList(
-                                "102, Two, Bob, 1.703, white, {\"key2\":\"value2\"}, null, null, null, null, null, null, null, null, null, null",
-                                "103, Three, Cecily, 4.105, red, {\"key3\":\"value3\"}, null, null, null, null, null, null, null, null, null, null",
-                                "104, Four, Derrida, 1.857, white, {\"key4\":\"value4\"}, null, null, null, null, null, null, null, null, null, null",
-                                "105, Five, Evelyn, 5.211, red, {\"K\":\"V\",\"k\":\"v\"}, null, null, null, null, null, null, null, null, null, null",
+                                "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, null, null, null, null, null, null, null, null, null",
+                                "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, null, null, null, null, null, null, null, null, null",
+                                "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null, null, null, null, null, null, null, null, null, null",
+                                "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null, null, null, null, null, null, null, null, null, null",
                                 "106, Six, Fay, 9.813, null, null, null, null, null, null, null, null, null, null, null, null",
                                 "107, Seven, Grace, 5.125, null, null, null, null, null, null, null, null, null, null, null, null",
                                 "108, Eight, Hesse, 6.819, null, null, null, null, null, null, null, null, null, null, null, null",
@@ -282,6 +285,8 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                         "/opt/flink/bin/sql-client.sh",
                         "--jar",
                         sharedVolume.toString() + "/" + getPaimonSQLConnectorResourceName(),
+                        "--jar",
+                        sharedVolume.toString() + "/flink-shade-hadoop.jar",
                         "-f",
                         containerSqlPath);
         if (result.getExitCode() != 0) {

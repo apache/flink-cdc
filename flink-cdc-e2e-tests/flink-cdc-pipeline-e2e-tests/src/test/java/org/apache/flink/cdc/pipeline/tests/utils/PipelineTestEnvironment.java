@@ -60,7 +60,6 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -142,14 +141,9 @@ public abstract class PipelineTestEnvironment extends TestLogger {
     public void before() throws Exception {
         LOG.info("Starting containers...");
         jobManagerConsumer = new ToStringConsumer();
-        List<String> cmds = new ArrayList<>();
-        for (String prop : EXTERNAL_PROPS) {
-            cmds.add(String.format("echo '%s' >> /opt/flink/conf/flink-conf.yaml.tmp", prop));
-        }
-        cmds.add("mv /opt/flink/conf/flink-conf.yaml.tmp /opt/flink/conf/flink-conf.yaml");
-        String preCmd = String.join(" && ", cmds);
         jobManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
+                        .withCommand("jobmanager")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
@@ -163,6 +157,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         taskManagerConsumer = new ToStringConsumer();
         taskManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
+                        .withCommand("taskmanager")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
                         .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)

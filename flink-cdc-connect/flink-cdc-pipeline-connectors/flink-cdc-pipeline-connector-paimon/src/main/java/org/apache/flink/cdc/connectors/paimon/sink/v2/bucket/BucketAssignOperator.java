@@ -189,7 +189,9 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             Schema schema =
                     SchemaUtils.applySchemaChangeEvent(
-                            schemaMaps.get(schemaChangeEvent.tableId()).getSchema(),
+                            Optional.ofNullable(schemaMaps.get(schemaChangeEvent.tableId()))
+                                    .map(TableSchemaInfo::getSchema)
+                                    .orElse(null),
                             schemaChangeEvent);
             schemaMaps.put(schemaChangeEvent.tableId(), new TableSchemaInfo(schema, zoneId));
             // Broadcast SchemachangeEvent.
