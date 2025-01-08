@@ -107,6 +107,12 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-connector-maxcompute</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-test-util</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
@@ -119,6 +125,12 @@ limitations under the License.
         </dependency>
 
         <!-- testcontainers -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>mysql</artifactId>
@@ -257,6 +269,16 @@ limitations under the License.
                             <artifactId>flink-cdc-pipeline-connector-oceanbase</artifactId>
                             <version>${project.version}</version>
                             <destFileName>oceanbase-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-maxcompute</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>maxcompute-cdc-pipeline-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
