@@ -91,3 +91,5 @@ elasticsearch-pipeline-connector:
   - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-elasticsearch/**/*
 oceanbase-pipeline-connector:
   - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oceanbase/**/*
+maxcompute-pipeline-connector:
+  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute/**/*
