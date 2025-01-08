@@ -381,6 +381,42 @@ public class TransformParserTest {
     }
 
     @Test
+    public void testGenerateProjectionColumnsWithPrecision() {
+        List<Column> testColumns =
+                Arrays.asList(
+                        Column.physicalColumn("id", DataTypes.INT(), "id"),
+                        Column.physicalColumn("name", DataTypes.VARCHAR(50), "name"),
+                        Column.physicalColumn("sex", DataTypes.CHAR(1), "sex"),
+                        Column.physicalColumn("address", DataTypes.BINARY(50), "address"),
+                        Column.physicalColumn("phone", DataTypes.VARBINARY(50), "phone"),
+                        Column.physicalColumn("deposit", DataTypes.DECIMAL(10, 2), "deposit"),
+                        Column.physicalColumn("birthday", DataTypes.TIMESTAMP(3), "birthday"),
+                        Column.physicalColumn(
+                                "birthday_ltz", DataTypes.TIMESTAMP_LTZ(3), "birthday_ltz"),
+                        Column.physicalColumn("update_time", DataTypes.TIME(3), "update_time"));
+
+        List<ProjectionColumn> result =
+                TransformParser.generateProjectionColumns(
+                        "id, UPPER(name) as name2, UPPER(sex) as sex2, COALESCE(address,address) as address2, COALESCE(phone,phone) as phone2, COALESCE(deposit,deposit) as deposit2, COALESCE(birthday,birthday) as birthday2, COALESCE(birthday_ltz,birthday_ltz) as birthday_ltz2, COALESCE(update_time,update_time) as update_time2",
+                        testColumns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
+
+        List<String> expected =
+                Arrays.asList(
+                        "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='id', originalColumnNames=[id], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`name2` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper(name)', originalColumnNames=[name], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`sex2` STRING, expression='UPPER(`TB`.`sex`)', scriptExpression='upper(sex)', originalColumnNames=[sex], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`address2` BINARY(50), expression='CASE WHEN `TB`.`address` IS NOT NULL THEN `TB`.`address` ELSE `TB`.`address` END', scriptExpression='(null != address ? address : address)', originalColumnNames=[address, address, address], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`phone2` VARBINARY(50), expression='CASE WHEN `TB`.`phone` IS NOT NULL THEN `TB`.`phone` ELSE `TB`.`phone` END', scriptExpression='(null != phone ? phone : phone)', originalColumnNames=[phone, phone, phone], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`deposit2` DECIMAL(10, 2), expression='CASE WHEN `TB`.`deposit` IS NOT NULL THEN `TB`.`deposit` ELSE `TB`.`deposit` END', scriptExpression='(null != deposit ? deposit : deposit)', originalColumnNames=[deposit, deposit, deposit], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`birthday2` TIMESTAMP(3), expression='CASE WHEN `TB`.`birthday` IS NOT NULL THEN `TB`.`birthday` ELSE `TB`.`birthday` END', scriptExpression='(null != birthday ? birthday : birthday)', originalColumnNames=[birthday, birthday, birthday], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='(null != birthday_ltz ? birthday_ltz : birthday_ltz)', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='(null != update_time ? update_time : update_time)', originalColumnNames=[update_time, update_time, update_time], transformExpressionKey=null}");
+        Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
+    }
+
+    @Test
     public void testGenerateReferencedColumns() {
         List<Column> testColumns =
                 Arrays.asList(
