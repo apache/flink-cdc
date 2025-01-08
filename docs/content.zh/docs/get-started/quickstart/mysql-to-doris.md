@@ -208,6 +208,7 @@ MacOS 由于内部实现容器的方式不同，在部署时宿主机直接修�
      tables: app_db.\.*
      server-id: 5400-5404
      server-time-zone: UTC
+     scan.startup.mode: earliest-offset
    
    sink:
      type: doris
