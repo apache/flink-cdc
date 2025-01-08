@@ -508,7 +508,7 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                         execResult.getExitCode(),
                         execResult.getStdout(),
                         execResult.getStderr());
-                throw new IOException("Failed to execute commands: " + Arrays.toString(commands));
+                throw new IOException("Failed to execute commands: " + String.join(" ", commands));
             }
         }
     }
