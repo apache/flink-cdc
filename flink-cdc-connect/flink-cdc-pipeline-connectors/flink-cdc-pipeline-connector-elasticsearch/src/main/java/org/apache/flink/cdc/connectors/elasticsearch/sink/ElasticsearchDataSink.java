@@ -78,7 +78,8 @@ public class ElasticsearchDataSink<InputT> implements DataSink, Serializable {
     }
 
     private EventSinkProvider getElasticsearch6SinkProvider() {
-        ElasticsearchEventSerializer serializer = new ElasticsearchEventSerializer(zoneId);
+        ElasticsearchEventSerializer serializer =
+                new ElasticsearchEventSerializer(zoneId, elasticsearchOptions.getShardingKey());
         org.apache.flink.elasticsearch6.shaded.org.apache.http.HttpHost[] hosts =
                 elasticsearchOptions.getHosts().stream()
                         .map(
@@ -115,7 +116,8 @@ public class ElasticsearchDataSink<InputT> implements DataSink, Serializable {
     }
 
     private EventSinkProvider getElasticsearch7SinkProvider() {
-        ElasticsearchEventSerializer serializer = new ElasticsearchEventSerializer(zoneId);
+        ElasticsearchEventSerializer serializer =
+                new ElasticsearchEventSerializer(zoneId, elasticsearchOptions.getShardingKey());
         org.apache.flink.elasticsearch6.shaded.org.apache.http.HttpHost[] hosts =
                 elasticsearchOptions.getHosts().stream()
                         .map(
@@ -158,7 +160,9 @@ public class ElasticsearchDataSink<InputT> implements DataSink, Serializable {
                                 elasticsearchOptions
                                         .getHosts()
                                         .toArray(new org.apache.http.HttpHost[0]))
-                        .setElementConverter(new ElasticsearchEventSerializer(zoneId))
+                        .setElementConverter(
+                                new ElasticsearchEventSerializer(
+                                        zoneId, elasticsearchOptions.getShardingKey()))
                         .setMaxBatchSize(elasticsearchOptions.getMaxBatchSize())
                         .setMaxInFlightRequests(elasticsearchOptions.getMaxInFlightRequests())
                         .setMaxBufferedRequests(elasticsearchOptions.getMaxBufferedRequests())
