@@ -311,7 +311,6 @@ public class SchemaDerivator {
 
         List<RecordData.FieldGetter> upstreamSchemaReader =
                 upstreamRecordGetterCache.getUnchecked(upstreamSchema);
-        SchemaUtils.createFieldGetters(upstreamSchema);
         BinaryRecordDataGenerator evolvedSchemaWriter =
                 evolvedRecordWriterCache.getUnchecked(evolvedSchema);
 
