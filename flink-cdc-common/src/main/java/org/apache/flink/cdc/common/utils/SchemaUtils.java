@@ -37,6 +37,7 @@ import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 
+import javax.annotation.CheckReturnValue;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
@@ -56,6 +57,7 @@ public class SchemaUtils {
      * create a list of {@link RecordData.FieldGetter} from given {@link Schema} to get Object from
      * RecordData.
      */
+    @CheckReturnValue
     public static List<RecordData.FieldGetter> createFieldGetters(Schema schema) {
         return createFieldGetters(schema.getColumns());
     }
@@ -64,6 +66,7 @@ public class SchemaUtils {
      * create a list of {@link RecordData.FieldGetter} from given {@link Column} to get Object from
      * RecordData.
      */
+    @CheckReturnValue
     public static List<RecordData.FieldGetter> createFieldGetters(List<Column> columns) {
         List<RecordData.FieldGetter> fieldGetters = new ArrayList<>(columns.size());
         for (int i = 0; i < columns.size(); i++) {
@@ -73,6 +76,7 @@ public class SchemaUtils {
     }
 
     /** Restore original data fields from RecordData structure. */
+    @CheckReturnValue
     public static List<Object> restoreOriginalData(
             @Nullable RecordData recordData, List<RecordData.FieldGetter> fieldGetters) {
         if (recordData == null) {
@@ -86,6 +90,7 @@ public class SchemaUtils {
     }
 
     /** apply SchemaChangeEvent to the old schema and return the schema after changing. */
+    @CheckReturnValue
     public static Schema applySchemaChangeEvent(Schema schema, SchemaChangeEvent event) {
         return SchemaChangeEventVisitor.visit(
                 event,
@@ -210,6 +215,7 @@ public class SchemaUtils {
      * position indicators. This is necessary since extra calculated columns might be added, and
      * `FIRST` / `LAST` position might differ.
      */
+    @CheckReturnValue
     public static Optional<SchemaChangeEvent> transformSchemaChangeEvent(
             boolean hasAsterisk, List<String> referencedColumns, SchemaChangeEvent event) {
         Optional<SchemaChangeEvent> evolvedSchemaChangeEvent = Optional.empty();
