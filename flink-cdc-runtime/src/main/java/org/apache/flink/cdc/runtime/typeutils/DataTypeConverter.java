@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.ArrayType;
@@ -85,6 +86,8 @@ public class DataTypeConverter {
                 return Integer.class;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return TimestampData.class;
+            case TIMESTAMP_WITH_TIME_ZONE:
+                return ZonedTimestampData.class;
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return LocalZonedTimestampData.class;
             case FLOAT:
@@ -129,6 +132,8 @@ public class DataTypeConverter {
                 return typeFactory.createSqlType(SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE);
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
+            case TIMESTAMP_WITH_TIME_ZONE:
+                return typeFactory.createSqlType(SqlTypeName.TIMESTAMP_TZ);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return typeFactory.createSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
             case FLOAT:
@@ -187,6 +192,8 @@ public class DataTypeConverter {
                 return DataTypes.TIME(relDataType.getPrecision());
             case TIMESTAMP:
                 return DataTypes.TIMESTAMP(relDataType.getPrecision());
+            case TIMESTAMP_TZ:
+                return DataTypes.TIMESTAMP_TZ(relDataType.getPrecision());
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return DataTypes.TIMESTAMP_LTZ(relDataType.getPrecision());
             case FLOAT:
@@ -239,6 +246,8 @@ public class DataTypeConverter {
                 return convertToTime(value);
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return convertToTimestamp(value);
+            case TIMESTAMP_WITH_TIME_ZONE:
+                return convertToZonedTimestampData(value);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return convertToLocalTimeZoneTimestamp(value);
             case FLOAT:
@@ -285,6 +294,8 @@ public class DataTypeConverter {
                 return convertToTime(value);
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return convertToTimestamp(value);
+            case TIMESTAMP_WITH_TIME_ZONE:
+                return convertToZonedTimestampData(value);
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return convertToLocalTimeZoneTimestamp(value);
             case FLOAT:
@@ -575,6 +586,17 @@ public class DataTypeConverter {
         }
         throw new IllegalArgumentException(
                 "Unable to convert to TIMESTAMP from unexpected value '"
+                        + obj
+                        + "' of type "
+                        + obj.getClass().getName());
+    }
+
+    private static Object convertToZonedTimestampData(Object obj) {
+        if (obj instanceof ZonedTimestampData) {
+            return obj;
+        }
+        throw new IllegalArgumentException(
+                "Unable to convert to TIMESTAMP_TZ from unexpected value '"
                         + obj
                         + "' of type "
                         + obj.getClass().getName());
