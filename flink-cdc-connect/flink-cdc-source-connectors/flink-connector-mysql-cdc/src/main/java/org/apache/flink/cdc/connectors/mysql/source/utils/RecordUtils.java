@@ -402,9 +402,9 @@ public class RecordUtils {
         HistoryRecord newHistoryRecord =
                 new HistoryRecord(
                         historyRecordDocument.set(
-                                "ddl",
+                                HistoryRecord.Fields.DDL_STATEMENTS,
                                 historyRecordDocument
-                                        .get("ddl")
+                                        .get(HistoryRecord.Fields.DDL_STATEMENTS)
                                         .asString()
                                         .replace(originalTableId.table(), tableId.table())));
 
@@ -575,7 +575,7 @@ public class RecordUtils {
             // table.
             String ddl =
                     mapper.readTree(value.getString(HISTORY_RECORD_FIELD))
-                            .get("ddl")
+                            .get(HistoryRecord.Fields.DDL_STATEMENTS)
                             .asText()
                             .toLowerCase();
             if (ddl.startsWith("alter")) {
