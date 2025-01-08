@@ -89,7 +89,7 @@ public class SystemFunctionUtils {
     }
 
     public static long unixTimestamp(long epochTime, String timezone) {
-        return DateTimeUtils.unixTimestamp(epochTime);
+        return epochTime / 1000;
     }
 
     public static long unixTimestamp(String dateTimeStr, long epochTime, String timezone) {
