@@ -42,7 +42,9 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -140,9 +142,11 @@ public class MySqlParallelizedPipelineITCase extends MySqlSourceTestBase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, PARALLELISM);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.emptyList(),

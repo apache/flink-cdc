@@ -51,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
@@ -148,9 +149,11 @@ public class FlinkPipelineUdfITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
@@ -219,9 +222,11 @@ public class FlinkPipelineUdfITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
@@ -288,9 +293,11 @@ public class FlinkPipelineUdfITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
@@ -359,9 +366,11 @@ public class FlinkPipelineUdfITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
@@ -432,9 +441,11 @@ public class FlinkPipelineUdfITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
@@ -496,9 +507,11 @@ public class FlinkPipelineUdfITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
@@ -592,9 +605,11 @@ public class FlinkPipelineUdfITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
@@ -662,9 +677,11 @@ public class FlinkPipelineUdfITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
@@ -730,9 +747,11 @@ public class FlinkPipelineUdfITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
@@ -794,9 +813,11 @@ public class FlinkPipelineUdfITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
@@ -873,9 +894,11 @@ public class FlinkPipelineUdfITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.singletonList(transformDef),
