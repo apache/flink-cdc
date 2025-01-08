@@ -871,10 +871,9 @@ public class SystemFunctionUtils {
     private static int universalCompares(Object lhs, Object rhs) {
         Class<?> leftClass = lhs.getClass();
         Class<?> rightClass = rhs.getClass();
-        if (leftClass.equals(rightClass) && Comparable.class.isAssignableFrom(leftClass)) {
+        if (leftClass.equals(rightClass) && lhs instanceof Comparable) {
             return ((Comparable) lhs).compareTo(rhs);
-        } else if (Number.class.isAssignableFrom(leftClass)
-                && Number.class.isAssignableFrom(rightClass)) {
+        } else if (lhs instanceof Number && rhs instanceof Number) {
             return Double.compare(((Number) lhs).doubleValue(), ((Number) rhs).doubleValue());
         } else {
             throw new RuntimeException(
