@@ -26,13 +26,13 @@ import java.util.Objects;
  * start flushing.
  */
 public class FlushEvent implements Event {
-    /** The schema changes from which table. */
+    /** The schema changes from which table(s). */
     private final List<TableId> tableIds;
 
     /** Which subTask ID this FlushEvent was initiated from. */
     private final int sourceSubTaskId;
 
-    /** Flag indicating whether the FlushEvent is sent before a create table event. */
+    /** Which type of schema change event caused this FlushEvent. */
     private final SchemaChangeEventType schemaChangeEventType;
 
     public FlushEvent(int sourceSubTaskId, SchemaChangeEventType schemaChangeEventType) {
@@ -81,6 +81,13 @@ public class FlushEvent implements Event {
 
     @Override
     public String toString() {
-        return "FlushEvent{" + "sourceSubTaskId=" + sourceSubTaskId + '}';
+        return "FlushEvent{"
+                + "sourceSubTaskId="
+                + sourceSubTaskId
+                + ", tableIds="
+                + tableIds
+                + ", schemaChangeEventType="
+                + schemaChangeEventType
+                + '}';
     }
 }
