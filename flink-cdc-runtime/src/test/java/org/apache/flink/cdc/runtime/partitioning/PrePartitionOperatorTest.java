@@ -34,6 +34,8 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit test for {@link RegularPrePartitionOperator}. */
@@ -81,7 +83,11 @@ class PrePartitionOperatorTest {
 
             // FlushEvent
             RegularPrePartitionOperator operator = testHarness.getOperator();
-            FlushEvent flushEvent = new FlushEvent(0, SchemaChangeEventType.CREATE_TABLE);
+            FlushEvent flushEvent =
+                    new FlushEvent(
+                            0,
+                            Collections.singletonList(CUSTOMERS),
+                            SchemaChangeEventType.CREATE_TABLE);
             operator.processElement(new StreamRecord<>(flushEvent));
             assertThat(testHarness.getOutputRecords()).hasSize(DOWNSTREAM_PARALLELISM);
             for (int i = 0; i < DOWNSTREAM_PARALLELISM; i++) {

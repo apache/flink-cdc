@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.common.event;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -26,7 +25,7 @@ import java.util.Objects;
  * start flushing.
  */
 public class FlushEvent implements Event {
-    /** The schema changes from which table(s). */
+    /** The sink table(s) that need to be flushed. */
     private final List<TableId> tableIds;
 
     /** Which subTask ID this FlushEvent was initiated from. */
@@ -34,10 +33,6 @@ public class FlushEvent implements Event {
 
     /** Which type of schema change event caused this FlushEvent. */
     private final SchemaChangeEventType schemaChangeEventType;
-
-    public FlushEvent(int sourceSubTaskId, SchemaChangeEventType schemaChangeEventType) {
-        this(sourceSubTaskId, Collections.emptyList(), schemaChangeEventType);
-    }
 
     public FlushEvent(
             int sourceSubTaskId,
