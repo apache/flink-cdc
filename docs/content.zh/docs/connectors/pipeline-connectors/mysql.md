@@ -50,9 +50,9 @@ MySQL CDC Pipeline 连接器允许从 MySQL 数据库读取快照数据和增量
 </table>
 </div>
 
-## 示例
+## 单数据源示例
 
-从 MySQL 读取数据同步到 Doris 的 Pipeline 可以定义如下：
+单数据源，从单个 MySQL 读取数据同步到 Doris 的 Pipeline 可以定义如下：
 
 ```yaml
 source:
@@ -64,6 +64,44 @@ source:
    password: pass
    tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
    server-id: 5401-5404
+
+sink:
+  type: doris
+  name: Doris Sink
+  fenodes: 127.0.0.1:8030
+  username: root
+  password: pass
+
+pipeline:
+   name: MySQL to Doris Pipeline
+   parallelism: 4
+```
+
+## 多数据源示例
+
+多数据源，从多个mysql数据源读取数据同步到 Doris 的 Pipeline 可以定义如下：
+
+```yaml
+sources:
+   - type: mysql
+     name: MySQL multiple Source1
+     hostname: 127.0.0.1
+     port: 3306
+     username: admin
+     password: pass
+     tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
+     server-id: 5400-5404
+     server-time-zone: Asia/Shanghai
+
+   - type: mysql
+       name: MySQL multiple Source2
+     hostname: 127.0.0.2
+     port: 3307
+     username: admin
+     password: pass
+     tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
+     server-id: 5405-5409
+     server-time-zone: Asia/Shanghai   
 
 sink:
   type: doris
