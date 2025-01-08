@@ -263,9 +263,9 @@ public class TransformParserTest {
                 "TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\", __time_zone__)");
         testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt, __time_zone__)");
         testFilterExpression("TIMESTAMP_DIFF('DAY', dt1, dt2)", "timestampDiff(\"DAY\", dt1, dt2)");
-        testFilterExpression("IF(a>b, a, b)", "a > b ? a : b");
-        testFilterExpression("NULLIF(a, b)", "nullif(a, b)");
-        testFilterExpression("COALESCE(a, b, c)", "coalesce(a, b, c)");
+        testFilterExpression("IF(a>b,a,b)", "a > b ? a : b");
+        testFilterExpression("NULLIF(a,b)", "nullif(a, b)");
+        testFilterExpression("COALESCE(a,b,c)", "coalesce(a, b, c)");
         testFilterExpression("id + 2", "id + 2");
         testFilterExpression("id - 2", "id - 2");
         testFilterExpression("id * 2", "id * 2");

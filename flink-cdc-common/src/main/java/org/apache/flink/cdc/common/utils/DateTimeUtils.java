@@ -146,18 +146,18 @@ public class DateTimeUtils {
      * Convert unix timestamp (seconds since '1970-01-01 00:00:00' UTC) to datetime string in the
      * "yyyy-MM-dd HH:mm:ss" format.
      */
-    public static String formatUnixTimestamp(long unixtime, TimeZone tz) {
-        return formatUnixTimestamp(unixtime, TIMESTAMP_FORMAT_STRING, tz);
+    public static String formatUnixTimestamp(long unixTime, TimeZone timeZone) {
+        return formatUnixTimestamp(unixTime, TIMESTAMP_FORMAT_STRING, timeZone);
     }
 
     /**
      * Convert unix timestamp (seconds since '1970-01-01 00:00:00' UTC) to datetime string in the
      * given format.
      */
-    public static String formatUnixTimestamp(long unixtime, String format, TimeZone tz) {
+    public static String formatUnixTimestamp(long unixTime, String format, TimeZone timeZone) {
         SimpleDateFormat formatter = FORMATTER_CACHE.get(format);
-        formatter.setTimeZone(tz);
-        Date date = new Date(unixtime * 1000);
+        formatter.setTimeZone(timeZone);
+        Date date = new Date(unixTime * 1000);
         try {
             return formatter.format(date);
         } catch (Exception e) {
@@ -166,25 +166,20 @@ public class DateTimeUtils {
         }
     }
 
-    /** Returns the value of the timestamp to seconds since '1970-01-01 00:00:00' UTC. */
-    public static long unixTimestamp(long ts) {
-        return ts / 1000;
+    /**
+     * Returns the value of the argument as an unsigned integer in seconds since '1970-01-01
+     * 00:00:00' UTC.
+     */
+    public static long unixTimestamp(String dateStr, TimeZone timeZone) {
+        return unixTimestamp(dateStr, TIMESTAMP_FORMAT_STRING, timeZone);
     }
 
     /**
      * Returns the value of the argument as an unsigned integer in seconds since '1970-01-01
      * 00:00:00' UTC.
      */
-    public static long unixTimestamp(String dateStr, TimeZone tz) {
-        return unixTimestamp(dateStr, TIMESTAMP_FORMAT_STRING, tz);
-    }
-
-    /**
-     * Returns the value of the argument as an unsigned integer in seconds since '1970-01-01
-     * 00:00:00' UTC.
-     */
-    public static long unixTimestamp(String dateStr, String format, TimeZone tz) {
-        long ts = internalParseTimestampMillis(dateStr, format, tz);
+    public static long unixTimestamp(String dateStr, String format, TimeZone timeZone) {
+        long ts = internalParseTimestampMillis(dateStr, format, timeZone);
         if (ts == Long.MIN_VALUE) {
             return Long.MIN_VALUE;
         } else {
