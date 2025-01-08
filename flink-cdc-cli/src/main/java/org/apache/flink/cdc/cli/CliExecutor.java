@@ -74,10 +74,10 @@ public class CliExecutor {
             ComposeDeploymentFactory composeDeploymentFactory = new ComposeDeploymentFactory();
             PipelineDeploymentExecutor composeExecutor =
                     composeDeploymentFactory.getFlinkComposeExecutor(commandLine);
-            return composeExecutor.deploy(
-                    commandLine,
-                    org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap()),
-                    additionalJars);
+            org.apache.flink.configuration.Configuration configuration =
+                    org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap());
+            SavepointRestoreSettings.toConfiguration(savepointSettings, configuration);
+            return composeExecutor.deploy(commandLine, configuration, additionalJars);
         } else {
             // Run CDC Job And Parse pipeline definition file
             PipelineDefinitionParser pipelineDefinitionParser = new YamlPipelineDefinitionParser();
