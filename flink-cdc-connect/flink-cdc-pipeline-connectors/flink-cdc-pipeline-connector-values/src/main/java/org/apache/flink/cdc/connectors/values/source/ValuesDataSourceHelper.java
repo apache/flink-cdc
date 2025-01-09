@@ -550,7 +550,12 @@ public class ValuesDataSourceHelper {
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
-                                }));
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("op_ts", "1");
+                            }
+                        });
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
@@ -559,7 +564,12 @@ public class ValuesDataSourceHelper {
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("2")
-                                }));
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("op_ts", "2");
+                            }
+                        });
         split1.add(insertEvent2);
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
@@ -568,7 +578,12 @@ public class ValuesDataSourceHelper {
                                 new Object[] {
                                     BinaryStringData.fromString("3"),
                                     BinaryStringData.fromString("3")
-                                }));
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("op_ts", "3");
+                            }
+                        });
         split1.add(insertEvent3);
 
         // add column
@@ -599,7 +614,12 @@ public class ValuesDataSourceHelper {
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
-                                })));
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("op_ts", "4");
+                            }
+                        }));
 
         // update
         split1.add(
@@ -614,7 +634,12 @@ public class ValuesDataSourceHelper {
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("x")
-                                })));
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("op_ts", "5");
+                            }
+                        }));
 
         eventOfSplits.add(split1);
         return eventOfSplits;

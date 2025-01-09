@@ -25,15 +25,15 @@ import java.util.Objects;
  */
 public class FlushEvent implements Event {
 
-    /** The schema changes from which table. */
-    private final TableId tableId;
+    /** Which subTask ID this FlushEvent was initiated from. */
+    private final int sourceSubTaskId;
 
-    public FlushEvent(TableId tableId) {
-        this.tableId = tableId;
+    public FlushEvent(int sourceSubTaskId) {
+        this.sourceSubTaskId = sourceSubTaskId;
     }
 
-    public TableId getTableId() {
-        return tableId;
+    public int getSourceSubTaskId() {
+        return sourceSubTaskId;
     }
 
     @Override
@@ -45,11 +45,16 @@ public class FlushEvent implements Event {
             return false;
         }
         FlushEvent that = (FlushEvent) o;
-        return Objects.equals(tableId, that.tableId);
+        return sourceSubTaskId == that.sourceSubTaskId;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId);
+        return Objects.hash(sourceSubTaskId);
+    }
+
+    @Override
+    public String toString() {
+        return "FlushEvent{" + "sourceSubTaskId=" + sourceSubTaskId + '}';
     }
 }

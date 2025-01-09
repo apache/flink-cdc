@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.oracle.table;
 
+import org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -139,8 +140,10 @@ public class OracleConnectorITCase {
                                 + ")",
                         ORACLE_CONTAINER.getHost(),
                         ORACLE_CONTAINER.getOraclePort(),
-                        CONNECTOR_USER,
-                        CONNECTOR_PWD,
+                        // To analyze table for approximate rowCnt computation, use admin user
+                        // before chunk splitting.
+                        parallelismSnapshot ? OracleSourceTestBase.TOP_USER : CONNECTOR_USER,
+                        parallelismSnapshot ? OracleSourceTestBase.TOP_SECRET : CONNECTOR_PWD,
                         parallelismSnapshot,
                         "debezium",
                         "products");
@@ -274,8 +277,10 @@ public class OracleConnectorITCase {
                                 + ")",
                         ORACLE_CONTAINER.getHost(),
                         ORACLE_CONTAINER.getOraclePort(),
-                        CONNECTOR_USER,
-                        CONNECTOR_PWD,
+                        // To analyze table for approximate rowCnt computation, use admin user
+                        // before chunk splitting.
+                        parallelismSnapshot ? OracleSourceTestBase.TOP_USER : CONNECTOR_USER,
+                        parallelismSnapshot ? OracleSourceTestBase.TOP_SECRET : CONNECTOR_PWD,
                         parallelismSnapshot,
                         "debezium",
                         "(products|products_nested_table)");
@@ -484,8 +489,10 @@ public class OracleConnectorITCase {
                                 + ")",
                         ORACLE_CONTAINER.getHost(),
                         ORACLE_CONTAINER.getOraclePort(),
-                        "dbzuser",
-                        "dbz",
+                        // To analyze table for approximate rowCnt computation, use admin user
+                        // before chunk splitting.
+                        parallelismSnapshot ? OracleSourceTestBase.TOP_USER : "dbzuser",
+                        parallelismSnapshot ? OracleSourceTestBase.TOP_SECRET : "dbz",
                         parallelismSnapshot,
                         "debezium",
                         "products");
@@ -679,8 +686,10 @@ public class OracleConnectorITCase {
                                 + ")",
                         ORACLE_CONTAINER.getHost(),
                         ORACLE_CONTAINER.getOraclePort(),
-                        "dbzuser",
-                        "dbz",
+                        // To analyze table for approximate rowCnt computation, use admin user
+                        // before chunk splitting.
+                        parallelismSnapshot ? OracleSourceTestBase.TOP_USER : "dbzuser",
+                        parallelismSnapshot ? OracleSourceTestBase.TOP_SECRET : "dbz",
                         parallelismSnapshot,
                         "debezium",
                         "test_numeric_table");
@@ -791,8 +800,10 @@ public class OracleConnectorITCase {
                                 + ")",
                         ORACLE_CONTAINER.getHost(),
                         ORACLE_CONTAINER.getOraclePort(),
-                        CONNECTOR_USER,
-                        CONNECTOR_PWD,
+                        // To analyze table for approximate rowCnt computation, use admin user
+                        // before chunk splitting.
+                        parallelismSnapshot ? OracleSourceTestBase.TOP_USER : CONNECTOR_USER,
+                        parallelismSnapshot ? OracleSourceTestBase.TOP_SECRET : CONNECTOR_PWD,
                         parallelismSnapshot,
                         "debezium",
                         "full_types");

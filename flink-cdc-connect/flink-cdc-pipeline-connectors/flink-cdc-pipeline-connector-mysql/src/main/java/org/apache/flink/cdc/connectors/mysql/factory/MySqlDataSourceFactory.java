@@ -26,12 +26,14 @@ import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
+import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSource;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.ServerIdRange;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetBuilder;
+import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 import org.apache.flink.cdc.connectors.mysql.utils.OptionUtils;
@@ -46,6 +48,8 @@ import javax.annotation.Nullable;
 
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -62,6 +66,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.CONNECT_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.METADATA_LIST;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
@@ -234,8 +239,33 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
             LOG.info("Add chunkKeyColumn {}.", chunkKeyColumnMap);
             configFactory.chunkKeyColumn(chunkKeyColumnMap);
         }
+        String metadataList = config.get(METADATA_LIST);
+        List<MySqlReadableMetadata> readableMetadataList = listReadableMetadata(metadataList);
+        return new MySqlDataSource(configFactory, readableMetadataList);
+    }
 
-        return new MySqlDataSource(configFactory);
+    private List<MySqlReadableMetadata> listReadableMetadata(String metadataList) {
+        if (StringUtils.isNullOrWhitespaceOnly(metadataList)) {
+            return new ArrayList<>();
+        }
+        Set<String> readableMetadataList =
+                Arrays.stream(metadataList.split(","))
+                        .map(String::trim)
+                        .collect(Collectors.toSet());
+        List<MySqlReadableMetadata> foundMetadata = new ArrayList<>();
+        for (MySqlReadableMetadata metadata : MySqlReadableMetadata.values()) {
+            if (readableMetadataList.contains(metadata.getKey())) {
+                foundMetadata.add(metadata);
+                readableMetadataList.remove(metadata.getKey());
+            }
+        }
+        if (readableMetadataList.isEmpty()) {
+            return foundMetadata;
+        }
+        throw new IllegalArgumentException(
+                String.format(
+                        "[%s] cannot be found in mysql metadata.",
+                        String.join(", ", readableMetadataList)));
     }
 
     @Override
@@ -276,6 +306,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
+        options.add(METADATA_LIST);
         return options;
     }
 

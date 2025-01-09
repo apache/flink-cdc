@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2.bucket;
 
 import org.apache.flink.cdc.common.event.FlushEvent;
-import org.apache.flink.cdc.common.event.TableId;
 
 import java.util.Objects;
 
@@ -27,8 +26,8 @@ public class BucketWrapperFlushEvent extends FlushEvent implements BucketWrapper
 
     private final int bucket;
 
-    public BucketWrapperFlushEvent(int bucket, TableId tableId) {
-        super(tableId);
+    public BucketWrapperFlushEvent(int bucket, int subTaskId) {
+        super(subTaskId);
         this.bucket = bucket;
     }
 
@@ -59,6 +58,10 @@ public class BucketWrapperFlushEvent extends FlushEvent implements BucketWrapper
 
     @Override
     public String toString() {
-        return "BucketWrapperFlushEvent{tableId=" + getTableId() + ", bucket=" + bucket + '}';
+        return "BucketWrapperFlushEvent{subTaskId="
+                + getSourceSubTaskId()
+                + ", bucket="
+                + bucket
+                + '}';
     }
 }

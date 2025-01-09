@@ -169,8 +169,9 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                             .getSerializationSchema()
                             .serialize(reuseGenericRowData);
                 case DELETE:
+                    reuseGenericRowData.setField(0, null);
                     reuseGenericRowData.setField(
-                            0,
+                            1,
                             new GenericArrayData(
                                     new RowData[] {
                                         jsonSerializers
@@ -178,7 +179,6 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                                 .getRowDataFromRecordData(
                                                         dataChangeEvent.before(), false)
                                     }));
-                    reuseGenericRowData.setField(1, null);
                     reuseGenericRowData.setField(2, OP_DELETE);
                     return jsonSerializers
                             .get(dataChangeEvent.tableId())

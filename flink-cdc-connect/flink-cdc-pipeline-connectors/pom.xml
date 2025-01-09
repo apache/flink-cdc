@@ -35,6 +35,8 @@ limitations under the License.
         <module>flink-cdc-pipeline-connector-kafka</module>
         <module>flink-cdc-pipeline-connector-paimon</module>
         <module>flink-cdc-pipeline-connector-elasticsearch</module>
+        <module>flink-cdc-pipeline-connector-oceanbase</module>
+        <module>flink-cdc-pipeline-connector-maxcompute</module>
     </modules>
 
     <dependencies>

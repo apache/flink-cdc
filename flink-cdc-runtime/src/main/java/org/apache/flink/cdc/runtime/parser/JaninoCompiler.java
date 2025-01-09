@@ -31,6 +31,7 @@ import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
+import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.codehaus.commons.compiler.CompileException;
@@ -138,6 +139,13 @@ public class JaninoCompiler {
         if (sqlLiteral instanceof SqlCharStringLiteral) {
             // Double quotation marks represent strings in Janino.
             value = "\"" + value.substring(1, value.length() - 1) + "\"";
+        } else if (sqlLiteral instanceof SqlNumericLiteral) {
+            if (((SqlNumericLiteral) sqlLiteral).isInteger()) {
+                long longValue = sqlLiteral.longValue(true);
+                if (longValue > Integer.MAX_VALUE || longValue < Integer.MIN_VALUE) {
+                    value += "L";
+                }
+            }
         }
         if (SQL_TYPE_NAME_IGNORE.contains(sqlLiteral.getTypeName())) {
             value = "\"" + value + "\"";

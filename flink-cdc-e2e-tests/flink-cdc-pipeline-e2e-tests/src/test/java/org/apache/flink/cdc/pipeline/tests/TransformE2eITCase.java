@@ -49,6 +49,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /** E2e tests for the {@link PreTransformOperator} and {@link PostTransformOperator}. */
@@ -442,13 +443,14 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
+                                + "  metadata.list: op_ts\n"
                                 + "sink:\n"
                                 + "  type: values\n"
                                 + "transform:\n"
                                 + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type\n"
+                                + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type, op_ts AS opts\n"
                                 + "  - source-table: %s.TABLEBETA\n"
-                                + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type\n"
+                                + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type, op_ts AS opts\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
@@ -467,25 +469,25 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`identifier_name` STRING,`type` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`identifier_name` STRING,`type` STRING NOT NULL,`opts` BIGINT NOT NULL}, primaryKeys=ID, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`identifier_name` STRING,`type` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`identifier_name` STRING,`type` STRING NOT NULL,`opts` BIGINT NOT NULL}, primaryKeys=ID, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
         validateEvents(
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8, 199, 17, Alice, null.%s.TABLEALPHA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 99, 19, Carol, null.%s.TABLEALPHA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 0, 18, Bob, null.%s.TABLEALPHA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 59, 20, Dave, null.%s.TABLEALPHA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Monterey, 22, Fred, null.%s.TABLEBETA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Big Sur, 21, Eva, null.%s.TABLEBETA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Sonoma, 24, Henry, null.%s.TABLEBETA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Ventura, 23, Gus, null.%s.TABLEBETA, +I], op=INSERT, meta=()}");
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8, 199, 17, Alice, null.%s.TABLEALPHA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 99, 19, Carol, null.%s.TABLEALPHA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 0, 18, Bob, null.%s.TABLEALPHA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 59, 20, Dave, null.%s.TABLEALPHA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Monterey, 22, Fred, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Big Sur, 21, Eva, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Sonoma, 24, Henry, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Ventura, 23, Gus, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}");
 
         // generate binlogs
         String mysqlJdbcUrl =
@@ -496,10 +498,10 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName());
         insertBinlogEvents(mysqlJdbcUrl);
 
-        validateEvents(
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, 8.1, 0, 18, Bob, null.%s.TABLEALPHA, -U], after=[1009, 100, 0, 18, Bob, null.%s.TABLEALPHA, +U], op=UPDATE, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7, 79, 16, IINA, null.%s.TABLEALPHA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Big Sur, 21, Eva, null.%s.TABLEBETA, -D], after=[], op=DELETE, meta=()}");
+        validateEventsWithPattern(
+                "DataChangeEvent\\{tableId=%s.TABLEALPHA, before=\\[1009, 8.1, 0, 18, Bob, null.%s.TABLEALPHA, -U, \\d+\\], after=\\[1009, 100, 0, 18, Bob, null.%s.TABLEALPHA, \\+U, \\d+\\], op=UPDATE, meta=\\(\\{op_ts=\\d+\\}\\)\\}",
+                "DataChangeEvent\\{tableId=%s.TABLEALPHA, before=\\[\\], after=\\[3007, 7, 79, 16, IINA, null.%s.TABLEALPHA, \\+I, \\d+\\], op=INSERT, meta=\\(\\{op_ts=\\d+\\}\\)\\}",
+                "DataChangeEvent\\{tableId=%s.TABLEBETA, before=\\[2011, 11, Big Sur, 21, Eva, null.%s.TABLEBETA, -D, \\d+\\], after=\\[\\], op=DELETE, meta=\\(\\{op_ts=\\d+\\}\\)\\}");
     }
 
     private static void insertBinlogEvents(String mysqlJdbcUrl) throws SQLException {
@@ -551,13 +553,13 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`UID` INT,`NEWVERSION` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`UID` INT,`NEWVERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`UID` INT,`NEWVERSION` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`UID` INT,`NEWVERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
@@ -1121,9 +1123,43 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         }
     }
 
+    private void validateEventsWithPattern(String... patterns) throws Exception {
+        for (String pattern : patterns) {
+            waitUntilSpecificEventWithPattern(
+                    String.format(
+                            pattern,
+                            transformTestDatabase.getDatabaseName(),
+                            transformTestDatabase.getDatabaseName(),
+                            transformTestDatabase.getDatabaseName()),
+                    20000L);
+        }
+    }
+
     private void validateResult(List<String> expectedEvents) throws Exception {
         for (String event : expectedEvents) {
             waitUntilSpecificEvent(event, 6000L);
+        }
+    }
+
+    private void waitUntilSpecificEventWithPattern(String patternStr, long timeout)
+            throws Exception {
+        boolean result = false;
+        long endTimeout = System.currentTimeMillis() + timeout;
+        while (System.currentTimeMillis() < endTimeout) {
+            String stdout = taskManagerConsumer.toUtf8String();
+            Pattern pattern = Pattern.compile(patternStr);
+            if (pattern.matcher(stdout).find()) {
+                result = true;
+                break;
+            }
+            Thread.sleep(1000);
+        }
+        if (!result) {
+            throw new TimeoutException(
+                    "failed to get events with pattern: "
+                            + patternStr
+                            + " from stdout: "
+                            + taskManagerConsumer.toUtf8String());
         }
     }
 
@@ -1179,8 +1215,14 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     boolean extractDataLines(String line) {
         // In multiple parallelism mode, a prefix with subTaskId (like '1> ') will be appended.
         // Should trim it before extracting data fields.
-        if (!line.startsWith("DataChangeEvent{", 3)) {
-            return false;
+        if (parallelism > 1) {
+            if (!line.startsWith("DataChangeEvent{", 3)) {
+                return false;
+            }
+        } else {
+            if (!line.startsWith("DataChangeEvent{")) {
+                return false;
+            }
         }
         Stream.of("before", "after")
                 .forEach(

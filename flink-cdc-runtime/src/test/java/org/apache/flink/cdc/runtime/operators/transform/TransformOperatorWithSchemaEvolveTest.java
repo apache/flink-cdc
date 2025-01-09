@@ -29,7 +29,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
+import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
@@ -72,8 +72,10 @@ public class TransformOperatorWithSchemaEvolveTest {
         private PreTransformOperator preTransformOperator;
         private PostTransformOperator postTransformOperator;
 
-        private EventOperatorTestHarness<PreTransformOperator, Event> preTransformOperatorHarness;
-        private EventOperatorTestHarness<PostTransformOperator, Event> postTransformOperatorHarness;
+        private RegularEventOperatorTestHarness<PreTransformOperator, Event>
+                preTransformOperatorHarness;
+        private RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                postTransformOperatorHarness;
 
         public static TransformWithSchemaEvolveTestCase of(
                 TableId tableId,
@@ -152,7 +154,8 @@ public class TransformOperatorWithSchemaEvolveTest {
                             .addTransform(
                                     tableId.identifier(), projectionExpression, filterExpression)
                             .build();
-            preTransformOperatorHarness = new EventOperatorTestHarness<>(preTransformOperator, 1);
+            preTransformOperatorHarness =
+                    RegularEventOperatorTestHarness.with(preTransformOperator, 1);
             preTransformOperatorHarness.open();
 
             postTransformOperator =
@@ -160,7 +163,8 @@ public class TransformOperatorWithSchemaEvolveTest {
                             .addTransform(
                                     tableId.identifier(), projectionExpression, filterExpression)
                             .build();
-            postTransformOperatorHarness = new EventOperatorTestHarness<>(postTransformOperator, 1);
+            postTransformOperatorHarness =
+                    RegularEventOperatorTestHarness.with(postTransformOperator, 1);
             postTransformOperatorHarness.open();
             return this;
         }
@@ -241,7 +245,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
                                 .primaryKey("id")
@@ -298,7 +302,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
                                 .primaryKey("id")
@@ -358,7 +362,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -408,7 +412,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -543,7 +547,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("computed1", DataTypes.INT())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed2", DataTypes.INT())
@@ -678,7 +682,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("computed", DataTypes.INT())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .primaryKey("id")

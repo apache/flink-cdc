@@ -96,7 +96,7 @@ public class PaimonWriter<InputT>
         for (Map.Entry<Identifier, StoreSinkWrite> entry : writes.entrySet()) {
             Identifier key = entry.getKey();
             StoreSinkWrite write = entry.getValue();
-            boolean waitCompaction = false;
+            boolean waitCompaction = true;
             committables.addAll(
                     // here we set it to lastCheckpointId+1 to
                     // avoid prepareCommit the same checkpointId with the first round.
