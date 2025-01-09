@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.oracle.source.reader.fetch;
 
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
@@ -74,7 +73,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                         sourceFetchContext.getSnapshotChangeEventSourceMetrics(),
                         sourceFetchContext.getDatabaseSchema(),
                         sourceFetchContext.getConnection(),
-                        sourceFetchContext.getDispatcher(),
+                        sourceFetchContext.getEventDispatcher(),
                         snapshotSplit);
         StoppableChangeEventSourceContext changeEventSourceContext =
                 new StoppableChangeEventSourceContext();
@@ -136,7 +135,8 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
         return new RedoLogSplitReadTask(
                 new OracleConnectorConfig(dezConf),
                 context.getConnection(),
-                context.getDispatcher(),
+                context.getEventDispatcher(),
+                context.getWaterMarkDispatcher(),
                 context.getErrorHandler(),
                 context.getDatabaseSchema(),
                 context.getSourceConfig().getOriginDbzConnectorConfig(),
@@ -157,7 +157,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
         private final OracleConnectorConfig connectorConfig;
         private final OracleDatabaseSchema databaseSchema;
         private final OracleConnection jdbcConnection;
-        private final JdbcSourceEventDispatcher<OraclePartition> dispatcher;
+        private final EventDispatcher<OraclePartition, TableId> eventDispatcher;
         private final Clock clock;
         private final SnapshotSplit snapshotSplit;
         private final OracleOffsetContext offsetContext;
@@ -169,14 +169,14 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                 SnapshotProgressListener<OraclePartition> snapshotProgressListener,
                 OracleDatabaseSchema databaseSchema,
                 OracleConnection jdbcConnection,
-                JdbcSourceEventDispatcher<OraclePartition> dispatcher,
+                EventDispatcher<OraclePartition, TableId> eventDispatcher,
                 SnapshotSplit snapshotSplit) {
             super(connectorConfig, snapshotProgressListener);
             this.offsetContext = previousOffset;
             this.connectorConfig = connectorConfig;
             this.databaseSchema = databaseSchema;
             this.jdbcConnection = jdbcConnection;
-            this.dispatcher = dispatcher;
+            this.eventDispatcher = eventDispatcher;
             this.clock = Clock.SYSTEM;
             this.snapshotSplit = snapshotSplit;
             this.snapshotProgressListener = snapshotProgressListener;
@@ -243,7 +243,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
         private void createDataEvents(OracleSnapshotContext snapshotContext, TableId tableId)
                 throws Exception {
             EventDispatcher.SnapshotReceiver<OraclePartition> snapshotReceiver =
-                    dispatcher.getSnapshotChangeEventReceiver();
+                    eventDispatcher.getSnapshotChangeEventReceiver();
             LOG.debug("Snapshotting table {}", tableId);
             createDataEventsForTable(
                     snapshotContext, snapshotReceiver, databaseSchema.tableFor(tableId));
@@ -306,7 +306,7 @@ public class OracleScanFetchTask extends AbstractScanFetchTask {
                                 snapshotContext.partition, table.id(), rows);
                         logTimer = getTableScanLogTimer();
                     }
-                    dispatcher.dispatchSnapshotEvent(
+                    eventDispatcher.dispatchSnapshotEvent(
                             snapshotContext.partition,
                             table.id(),
                             getChangeRecordEmitter(snapshotContext, table.id(), row),

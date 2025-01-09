@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.connectors.postgres.source.fetch;
 
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
+import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
@@ -84,8 +84,8 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getSnapShotter(),
                         sourceFetchContext.getConnection(),
-                        sourceFetchContext.getDispatcher(),
-                        sourceFetchContext.getPostgresDispatcher(),
+                        sourceFetchContext.getEventDispatcher(),
+                        sourceFetchContext.getWaterMarkDispatcher(),
                         sourceFetchContext.getErrorHandler(),
                         sourceFetchContext.getTaskContext().getClock(),
                         sourceFetchContext.getDatabaseSchema(),
@@ -166,7 +166,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
     public static class StreamSplitReadTask extends PostgresStreamingChangeEventSource {
         private static final Logger LOG = LoggerFactory.getLogger(StreamSplitReadTask.class);
         private final StreamSplit streamSplit;
-        private final JdbcSourceEventDispatcher<PostgresPartition> dispatcher;
+        private final WatermarkDispatcher watermarkDispatcher;
         private final ErrorHandler errorHandler;
 
         public ChangeEventSourceContext context;
@@ -176,8 +176,8 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                 PostgresConnectorConfig connectorConfig,
                 Snapshotter snapshotter,
                 PostgresConnection connection,
-                JdbcSourceEventDispatcher<PostgresPartition> dispatcher,
-                PostgresEventDispatcher<TableId> postgresEventDispatcher,
+                PostgresEventDispatcher<TableId> eventDispatcher,
+                WatermarkDispatcher watermarkDispatcher,
                 ErrorHandler errorHandler,
                 Clock clock,
                 PostgresSchema schema,
@@ -189,14 +189,14 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                     connectorConfig,
                     snapshotter,
                     connection,
-                    postgresEventDispatcher,
+                    eventDispatcher,
                     errorHandler,
                     clock,
                     schema,
                     taskContext,
                     replicationConnection);
             this.streamSplit = streamSplit;
-            this.dispatcher = dispatcher;
+            this.watermarkDispatcher = watermarkDispatcher;
             this.errorHandler = errorHandler;
         }
 
@@ -218,7 +218,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                 LOG.debug("StreamSplit is bounded read: {}", streamSplit);
                 final PostgresOffset currentOffset = PostgresOffset.of(offsetContext.getOffset());
                 try {
-                    dispatcher.dispatchWatermarkEvent(
+                    watermarkDispatcher.dispatchWatermarkEvent(
                             partition.getSourcePartition(),
                             streamSplit,
                             currentOffset,
