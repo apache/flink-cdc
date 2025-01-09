@@ -30,9 +30,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -77,6 +79,10 @@ public class TransformProjectionProcessor {
 
     public boolean hasTableInfo() {
         return this.postTransformChangeInfo != null;
+    }
+
+    public TransformProjection getTransformProjection() {
+        return transformProjection;
     }
 
     public static TransformProjectionProcessor of(
@@ -124,8 +130,7 @@ public class TransformProjectionProcessor {
                 supportedMetadataColumns);
     }
 
-    public Schema processSchemaChangeEvent(
-            Schema schema, SupportedMetadataColumn[] supportedMetadataColumns) {
+    public Schema processSchema(Schema schema, SupportedMetadataColumn[] supportedMetadataColumns) {
         List<ProjectionColumn> projectionColumns =
                 TransformParser.generateProjectionColumns(
                         transformProjection.getProjection(),
@@ -133,10 +138,20 @@ public class TransformProjectionProcessor {
                         udfDescriptors,
                         supportedMetadataColumns);
         transformProjection.setProjectionColumns(projectionColumns);
+        Set<String> primaryKeys = new HashSet<>(schema.primaryKeys());
         return schema.copy(
                 projectionColumns.stream()
                         .map(ProjectionColumn::getColumn)
+                        .map(column -> setPkNonNull(primaryKeys, column))
                         .collect(Collectors.toList()));
+    }
+
+    private static Column setPkNonNull(Set<String> primaryKeys, Column column) {
+        if (primaryKeys.contains(column.getName())) {
+            return column.copy(column.getType().notNull());
+        } else {
+            return column;
+        }
     }
 
     public BinaryRecordData processData(
