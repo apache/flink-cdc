@@ -81,6 +81,10 @@ public class TransformProjectionProcessor {
         return this.postTransformChangeInfo != null;
     }
 
+    public TransformProjection getTransformProjection() {
+        return transformProjection;
+    }
+
     public static TransformProjectionProcessor of(
             PostTransformChangeInfo tableInfo,
             TransformProjection transformProjection,
