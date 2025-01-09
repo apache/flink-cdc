@@ -373,7 +373,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                     Tuple2.of(tableId, transformProjection));
                     // update the columns of projection and add the column of projection into Schema
                     newSchemas.add(
-                            postTransformProcessor.processSchemaChangeEvent(
+                            postTransformProcessor.processSchema(
                                     schema, transform.getSupportedMetadataColumns()));
                 }
             }

@@ -263,6 +263,8 @@ transform:
     description: reassign composite primary keys example
 ```
 
+Notice that primary key columns will be attributed as NOT NULL in the downstream table, so you should ensure that no NULL value will be assigned to these columns.
+
 ## Reassign partition key
 We can reassign the partition key in transform rules. For example, given a table web_order in the database mydb, we may define a transform rule as follows:
 
