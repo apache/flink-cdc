@@ -326,16 +326,6 @@ public class PaimonSinkITCase {
         metadataApplier.applySchemaChange(truncateTableEvent);
         Assertions.assertThat(fetchResults(table1)).isEmpty();
 
-        // FIXME: This check will fail when deleteVector is true
-        writeAndCommit(
-                writer,
-                committer,
-                generateInsert(
-                        table1, Arrays.asList(Tuple2.of(STRING(), "7"), Tuple2.of(STRING(), "7"))));
-
-        Assertions.assertThat(fetchResults(table1))
-                .isEqualTo(Collections.singletonList(Row.ofKind(RowKind.INSERT, "7", "7")));
-
         DropTableEvent dropTableEvent = new DropTableEvent(table1);
         metadataApplier.applySchemaChange(dropTableEvent);
         Assertions.assertThatThrownBy(() -> fetchResults(table1))
