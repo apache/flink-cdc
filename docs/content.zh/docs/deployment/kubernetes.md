@@ -244,7 +244,7 @@ spec:
       - '--use-mini-cluster'
       - /opt/flink/flink-cdc-{{< param Version >}}/conf/mysql-to-doris.yaml
     entryClass: org.apache.flink.cdc.cli.CliFrontend
-    jarURI: 'local:///opt/flink/flink-cdc-{{< param Version >}}/lib/flink-cdc-dist-{{< param Version >}}.jar'
+    jarURI: 'local:///opt/flink/lib/flink-cdc-dist-{{< param Version >}}.jar'
     parallelism: 1
     state: running
     upgradeMode: savepoint
