@@ -382,6 +382,7 @@ class FlinkPipelineTransformITCase {
                         null,
                         null,
                         null,
+                        null,
                         null);
 
         TransformDef emptyProjection =
@@ -392,6 +393,7 @@ class FlinkPipelineTransformITCase {
                         null,
                         null,
                         null,
+                        null,
                         null);
 
         TransformDef asteriskProjection =
@@ -399,6 +401,7 @@ class FlinkPipelineTransformITCase {
                         "default_namespace.default_schema.mytable2",
                         "*",
                         "age < 18",
+                        null,
                         null,
                         null,
                         null,
@@ -422,9 +425,11 @@ class FlinkPipelineTransformITCase {
                                                             null,
                                                             null,
                                                             null,
+                                                            null,
                                                             null)),
                                             Collections.emptyList()))
                     .rootCause()
+                    .isExactlyInstanceOf(IllegalStateException.class)
                     .hasMessage(
                             "Unable to merge schema columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=() "
                                     + "and columns={`id` BIGINT,`name` STRING}, primaryKeys=id, options=() with different column counts.");
@@ -442,6 +447,7 @@ class FlinkPipelineTransformITCase {
                                                     // reference all column
                                                     "id,UPPER(name) AS name,age,description",
                                                     "age >= 18",
+                                                    null,
                                                     null,
                                                     null,
                                                     null,
