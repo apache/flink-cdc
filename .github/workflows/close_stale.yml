@@ -54,3 +54,6 @@ jobs:
           # and will result in Stale label missing.
           remove-pr-stale-when-updated: false
           remove-issue-stale-when-updated: false
+          # Allow pinning issues and PRs that is not meant to be closed automatically
+          exempt-issue-labels: "pinned"
+          exempt-pr-labels: "pinned"

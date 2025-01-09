@@ -24,6 +24,8 @@ import org.apache.flink.cdc.common.udf.UserDefinedFunction;
 import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -38,9 +40,16 @@ public class UserDefinedFunctionDescriptor implements Serializable {
     private final String className;
     private final DataType returnTypeHint;
     private final boolean isCdcPipelineUdf;
+    private final Map<String, String> parameters;
 
     public UserDefinedFunctionDescriptor(String name, String classpath) {
+        this(name, classpath, new HashMap<>());
+    }
+
+    public UserDefinedFunctionDescriptor(
+            String name, String classpath, Map<String, String> parameters) {
         this.name = name;
+        this.parameters = parameters;
         this.classpath = classpath;
         this.className = classpath.substring(classpath.lastIndexOf('.') + 1);
         try {
@@ -107,6 +116,10 @@ public class UserDefinedFunctionDescriptor implements Serializable {
         return className;
     }
 
+    public Map<String, String> getParameters() {
+        return parameters;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -115,13 +128,19 @@ public class UserDefinedFunctionDescriptor implements Serializable {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        UserDefinedFunctionDescriptor context = (UserDefinedFunctionDescriptor) o;
-        return Objects.equals(name, context.name) && Objects.equals(classpath, context.classpath);
+        UserDefinedFunctionDescriptor that = (UserDefinedFunctionDescriptor) o;
+        return isCdcPipelineUdf == that.isCdcPipelineUdf
+                && Objects.equals(name, that.name)
+                && Objects.equals(classpath, that.classpath)
+                && Objects.equals(className, that.className)
+                && Objects.equals(returnTypeHint, that.returnTypeHint)
+                && Objects.equals(parameters, that.parameters);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, classpath);
+        return Objects.hash(
+                name, classpath, className, returnTypeHint, isCdcPipelineUdf, parameters);
     }
 
     @Override
@@ -133,6 +152,15 @@ public class UserDefinedFunctionDescriptor implements Serializable {
                 + ", classpath='"
                 + classpath
                 + '\''
+                + ", className='"
+                + className
+                + '\''
+                + ", returnTypeHint="
+                + returnTypeHint
+                + ", isCdcPipelineUdf="
+                + isCdcPipelineUdf
+                + ", parameters="
+                + parameters
                 + '}';
     }
 }

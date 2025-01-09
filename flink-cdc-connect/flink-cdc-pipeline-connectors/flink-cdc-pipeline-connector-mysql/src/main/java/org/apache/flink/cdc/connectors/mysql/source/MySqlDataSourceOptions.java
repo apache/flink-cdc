@@ -126,8 +126,8 @@ public class MySqlDataSourceOptions {
                     .defaultValue("initial")
                     .withDescription(
                             "Optional startup mode for MySQL CDC consumer, valid enumerations are "
-                                    + "\"initial\", \"earliest-offset\", \"latest-offset\", \"timestamp\"\n"
-                                    + "or \"specific-offset\"");
+                                    + "\"initial\", \"earliest-offset\", \"latest-offset\", \"timestamp\", "
+                                    + "\"specific-offset\" or \"snapshot\".");
 
     public static final ConfigOption<String> SCAN_STARTUP_SPECIFIC_OFFSET_FILE =
             ConfigOptions.key("scan.startup.specific-offset.file")
@@ -272,4 +272,13 @@ public class MySqlDataSourceOptions {
                                     + "The difference between scan.newly-added-table.enabled and scan.binlog.newly-added-table.enabled options is: \n"
                                     + "scan.newly-added-table.enabled: do re-snapshot & binlog-reading for newly added table when restored; \n"
                                     + "scan.binlog.newly-added-table.enabled: only do binlog-reading for newly added table during binlog reading phase.");
+
+    @Experimental
+    public static final ConfigOption<String> METADATA_LIST =
+            ConfigOptions.key("metadata.list")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "List of readable metadata from SourceRecord to be passed to downstream, split by `,`. "
+                                    + "Available readable metadata are: op_ts.");
 }

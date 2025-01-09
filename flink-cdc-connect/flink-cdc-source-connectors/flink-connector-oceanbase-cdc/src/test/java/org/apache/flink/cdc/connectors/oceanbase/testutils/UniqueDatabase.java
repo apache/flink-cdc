@@ -91,9 +91,16 @@ public class UniqueDatabase {
         return String.format("%s.%s", databaseName, tableName);
     }
 
-    /** Creates the database and populates it with initialization SQL script. */
     public void createAndInitialize() {
-        final String ddlFile = String.format("ddl/%s.sql", templateName);
+        createAndInitializeWithDdlFile(String.format("ddl/%s.sql", templateName));
+    }
+
+    public void createAndInitialize(String variant) {
+        createAndInitializeWithDdlFile(String.format("ddl/%s/%s.sql", variant, templateName));
+    }
+
+    /** Creates the database and populates it with initialization SQL script. */
+    public void createAndInitializeWithDdlFile(String ddlFile) {
         final URL ddlTestFile = UniqueDatabase.class.getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
         try {

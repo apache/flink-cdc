@@ -20,6 +20,7 @@ package org.apache.flink.cdc.cli.parser;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
@@ -39,6 +40,7 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Set;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
@@ -157,7 +159,7 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
-    void testInvalidTimeZone() throws Exception {
+    void testInvalidTimeZone() {
         URL resource = Resources.getResource("definitions/pipeline-definition-minimized.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         assertThatThrownBy(
@@ -334,7 +336,8 @@ class YamlPipelineDefinitionParserTest {
                                     "id",
                                     "product_name",
                                     "comment=app order",
-                                    "project fields from source table"),
+                                    "project fields from source table",
+                                    "SOFT_DELETE"),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
@@ -342,8 +345,21 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    "add new uniq_id for each row")),
+                                    "add new uniq_id for each row",
+                                    null)),
                     Collections.emptyList(),
+                    Collections.singletonList(
+                            new ModelDef(
+                                    "GET_EMBEDDING",
+                                    "OpenAIEmbeddingModel",
+                                    new LinkedHashMap<>(
+                                            ImmutableMap.<String, String>builder()
+                                                    .put("model-name", "GET_EMBEDDING")
+                                                    .put("class-name", "OpenAIEmbeddingModel")
+                                                    .put("openai.model", "text-embedding-3-small")
+                                                    .put("openai.host", "https://xxxx")
+                                                    .put("openai.apikey", "abcd1234")
+                                                    .build()))),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -388,6 +404,7 @@ class YamlPipelineDefinitionParserTest {
                         + "    partition-keys: product_name\n"
                         + "    table-options: comment=app order\n"
                         + "    description: project fields from source table\n"
+                        + "    converter-after-transform: SOFT_DELETE\n"
                         + "  - source-table: mydb.web_order_.*\n"
                         + "    projection: CONCAT(id, order_id) as uniq_id, *\n"
                         + "    filter: uniq_id > 10\n"
@@ -397,7 +414,13 @@ class YamlPipelineDefinitionParserTest {
                         + "  name: source-database-sync-pipe\n"
                         + "  parallelism: 4\n"
                         + "  schema.change.behavior: evolve\n"
-                        + "  schema-operator.rpc-timeout: 1 h";
+                        + "  schema-operator.rpc-timeout: 1 h\n"
+                        + "  model:\n"
+                        + "    - model-name: GET_EMBEDDING\n"
+                        + "      class-name: OpenAIEmbeddingModel\n"
+                        + "      openai.model: text-embedding-3-small\n"
+                        + "      openai.host: https://xxxx\n"
+                        + "      openai.apikey: abcd1234";
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef = parser.parse(pipelineDefText, new Configuration());
         assertThat(pipelineDef).isEqualTo(fullDef);
@@ -449,7 +472,8 @@ class YamlPipelineDefinitionParserTest {
                                     "id",
                                     "product_name",
                                     "comment=app order",
-                                    "project fields from source table"),
+                                    "project fields from source table",
+                                    "SOFT_DELETE"),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
@@ -457,8 +481,21 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    "add new uniq_id for each row")),
+                                    "add new uniq_id for each row",
+                                    null)),
                     Collections.emptyList(),
+                    Collections.singletonList(
+                            new ModelDef(
+                                    "GET_EMBEDDING",
+                                    "OpenAIEmbeddingModel",
+                                    new LinkedHashMap<>(
+                                            ImmutableMap.<String, String>builder()
+                                                    .put("model-name", "GET_EMBEDDING")
+                                                    .put("class-name", "OpenAIEmbeddingModel")
+                                                    .put("openai.model", "text-embedding-3-small")
+                                                    .put("openai.host", "https://xxxx")
+                                                    .put("openai.apikey", "abcd1234")
+                                                    .build()))),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -574,7 +611,8 @@ class YamlPipelineDefinitionParserTest {
                                     "id",
                                     "product_name",
                                     "comment=app order",
-                                    "project fields from source table"),
+                                    "project fields from source table",
+                                    "SOFT_DELETE"),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
@@ -582,7 +620,8 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    "add new uniq_id for each row")),
+                                    "add new uniq_id for each row",
+                                    null)),
                     Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
@@ -611,6 +650,7 @@ class YamlPipelineDefinitionParserTest {
                                     "mydb.web_order",
                                     "*, inc(inc(inc(id))) as inc_id, format(id, 'id -> %d') as formatted_id",
                                     "inc(id) < 100",
+                                    null,
                                     null,
                                     null,
                                     null,

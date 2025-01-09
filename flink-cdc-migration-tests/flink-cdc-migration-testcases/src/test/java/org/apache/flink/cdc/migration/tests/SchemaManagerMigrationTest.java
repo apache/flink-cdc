@@ -19,20 +19,16 @@ package org.apache.flink.cdc.migration.tests;
 
 import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaManager;
 
-import org.junit.Test;
-
-import static org.apache.flink.cdc.migration.tests.MigrationTestBase.FlinkCdcVersion.v3_1_0;
+import org.junit.jupiter.api.Test;
 
 /** Migration test cases for {@link SchemaManager}. */
-public class SchemaManagerMigrationTest extends MigrationTestBase {
+class SchemaManagerMigrationTest extends MigrationTestBase {
 
     public static String mockCaseName = "SchemaManagerMigrationMock";
 
     @Test
-    public void testMigration() throws Exception {
-        // It is known that 3.1.0 that breaks backwards compatibility.
-        // No state compatibility is guaranteed.
-        for (FlinkCdcVersion version : getAllVersionExcept(v3_1_0)) {
+    void testMigration() throws Exception {
+        for (FlinkCdcVersion version : getAllVersions()) {
             testMigrationFromTo(version, getSnapshotVersion(), mockCaseName);
         }
     }

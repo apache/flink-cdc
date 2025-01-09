@@ -8,8 +8,11 @@
 <a href="https://github.com/apache/flink-cdc/releases" target="_blank">
     <img src="https://img.shields.io/github/v/release/apache/flink-cdc?color=yellow" alt="Release">
 </a>
-<a href="https://github.com/apache/flink-cdc/actions/workflows/flink_cdc.yml" target="_blank">
-    <img src="https://img.shields.io/github/actions/workflow/status/apache/flink-cdc/flink_cdc.yml?branch=master" alt="Build">
+<a href="https://github.com/apache/flink-cdc/actions/workflows/flink_cdc_ci.yml" target="_blank">
+    <img src="https://img.shields.io/github/actions/workflow/status/apache/flink-cdc/flink_cdc_ci.yml?branch=master" alt="Build">
+</a>
+<a href="https://github.com/apache/flink-cdc/actions/workflows/flink_cdc_ci_nightly.yml" target="_blank">
+    <img src="https://img.shields.io/github/actions/workflow/status/apache/flink-cdc/flink_cdc_ci_nightly.yml?branch=master&label=nightly" alt="Nightly Build">
 </a>
 <a href="https://github.com/apache/flink-cdc/tree/master/LICENSE" target="_blank">
     <img src="https://img.shields.io/static/v1?label=license&message=Apache License 2.0&color=white" alt="License">

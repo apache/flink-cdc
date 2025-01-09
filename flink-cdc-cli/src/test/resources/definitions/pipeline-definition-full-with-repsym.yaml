@@ -49,6 +49,7 @@ transform:
     partition-keys: product_name
     table-options: comment=app order
     description: project fields from source table
+    converter-after-transform: SOFT_DELETE
   - source-table: mydb.web_order_.*
     projection: CONCAT(id, order_id) as uniq_id, *
     filter: uniq_id > 10

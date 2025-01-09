@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.split;
 
+import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.table.types.logical.RowType;
 
@@ -44,6 +45,35 @@ public class MySqlSnapshotSplit extends MySqlSplit {
 
     @Nullable transient byte[] serializedFormCache;
 
+    /**
+     * Create a SnapshotSplit with generating splitId with the given tableId and chunkId.
+     *
+     * @see #generateSplitId(TableId, int)
+     */
+    public MySqlSnapshotSplit(
+            TableId tableId,
+            int chunkId,
+            RowType splitKeyType,
+            Object[] splitStart,
+            Object[] splitEnd,
+            BinlogOffset highWatermark,
+            Map<TableId, TableChange> tableSchemas) {
+        super(generateSplitId(tableId, chunkId));
+        this.tableId = tableId;
+        this.splitKeyType = splitKeyType;
+        this.splitStart = splitStart;
+        this.splitEnd = splitEnd;
+        this.highWatermark = highWatermark;
+        this.tableSchemas = tableSchemas;
+    }
+
+    /**
+     * This constructor should not be used directly. Please use the other constructor. If this
+     * constructor must be invoked, please use the same format for the splitId as {@link
+     * #generateSplitId(TableId, int)}. Or else the parsing method will fail. See more in {@link
+     * #extractTableId(String)} and {@link #extractChunkId(String)}.
+     */
+    @Internal
     public MySqlSnapshotSplit(
             TableId tableId,
             String splitId,
@@ -93,6 +123,18 @@ public class MySqlSnapshotSplit extends MySqlSplit {
     public final MySqlSchemalessSnapshotSplit toSchemalessSnapshotSplit() {
         return new MySqlSchemalessSnapshotSplit(
                 tableId, splitId, splitKeyType, splitStart, splitEnd, highWatermark);
+    }
+
+    public static String generateSplitId(TableId tableId, int chunkId) {
+        return tableId.toString() + ":" + chunkId;
+    }
+
+    public static TableId extractTableId(String splitId) {
+        return TableId.parse(splitId.substring(0, splitId.lastIndexOf(":")));
+    }
+
+    public static int extractChunkId(String splitId) {
+        return Integer.parseInt(splitId.substring(splitId.lastIndexOf(":") + 1));
     }
 
     @Override

@@ -1,0 +1,92 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Flink CDC CI
+on:
+  push:
+    branches:
+      - master
+      - release-*
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+  pull_request:
+    branches:
+      - master
+      - release-*
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  license_check:
+    name: License Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Set up Ruby environment
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Set JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Compiling jar packages
+        run: mvn --no-snapshot-updates -B package -DskipTests
+      - name: Run license check
+        run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
+  ut:
+    strategy:
+      matrix:
+        module: [ 'core', 'pipeline_connectors', 'mysql', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase', 'db2', 'vitess' ]
+    name: Unit Tests
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-version: "[8]"
+      module: ${{ matrix.module }}
+  pipeline_e2e:
+    strategy:
+      matrix:
+        parallelism: [ 1, 4 ]
+    name: Pipeline E2E Tests (${{ matrix.parallelism }}-Parallelism)
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-version: "[8]"
+      flink-version: "['1.19.1', '1.20.0']"
+      module: pipeline_e2e
+      parallelism: ${{ matrix.parallelism }}
+  source_e2e:
+    name: Source E2E Tests
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-version: "[8]"
+      flink-version: "['1.19.1', '1.20.0']"
+      module: source_e2e
+  migration_test:
+    name: Migration Tests
+    uses: ./.github/workflows/flink_cdc_migration_test_base.yml
+    with:
+      java-version: "[8]"
+      flink-version: "['1.19.1', '1.20.0']"

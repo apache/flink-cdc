@@ -25,9 +25,10 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
-import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
+import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.math.BigDecimal;
+import java.time.format.DateTimeParseException;
 
 /** Unit tests for the {@link PostTransformOperator}. */
 public class PostTransformOperatorTest {
@@ -92,7 +94,7 @@ public class PostTransformOperatorTest {
                     .physicalColumn("sid", DataTypes.INT())
                     .physicalColumn("name", DataTypes.STRING())
                     .physicalColumn("name_upper", DataTypes.STRING())
-                    .physicalColumn("tbname", DataTypes.STRING())
+                    .physicalColumn("tbname", DataTypes.STRING().notNull())
                     .primaryKey("sid")
                     .build();
 
@@ -245,9 +247,9 @@ public class PostTransformOperatorTest {
                                 "*, concat(col1,col2) col12",
                                 "col1 = '1'")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -322,6 +324,7 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -337,9 +340,9 @@ public class PostTransformOperatorTest {
                                 "*, concat(col1, '2') col12",
                                 "col1 = '2'")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -427,17 +430,26 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
     void testDataChangeEventTransformProjectionDataTypeConvert() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
-                        .addTransform(DATATYPE_TABLEID.identifier(), "*", null, null, null, null)
+                        .addTransform(
+                                DATATYPE_TABLEID.identifier(),
+                                "*",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -473,6 +485,7 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEvent));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -484,9 +497,9 @@ public class PostTransformOperatorTest {
                                 "*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ identifier_name, __namespace_name__, __schema_name__, __table_name__",
                                 " __table_name__ = 'metadata_table' ")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -521,6 +534,7 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -532,9 +546,9 @@ public class PostTransformOperatorTest {
                                 "sid, name, UPPER(name) as name_upper, __table_name__ as tbname",
                                 "sid < 3")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -568,6 +582,94 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testSoftDeleteTransform() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                METADATA_TABLEID.identifier(),
+                                "*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ identifier_name, __namespace_name__, __schema_name__, __table_name__, __data_event_type__",
+                                " __table_name__ = 'metadata_table' ",
+                                "",
+                                "",
+                                "",
+                                "SOFT_DELETE",
+                                new SupportedMetadataColumn[0])
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("identifier_name", DataTypes.STRING())
+                        .physicalColumn("__namespace_name__", DataTypes.STRING().notNull())
+                        .physicalColumn("__schema_name__", DataTypes.STRING().notNull())
+                        .physicalColumn("__table_name__", DataTypes.STRING().notNull())
+                        .physicalColumn("__data_event_type__", DataTypes.STRING().notNull())
+                        .primaryKey("col1")
+                        .build();
+
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent = new CreateTableEvent(METADATA_TABLEID, METADATA_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) METADATA_SCHEMA.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) expectedSchema.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        METADATA_TABLEID,
+                        recordDataGenerator.generate(new Object[] {new BinaryStringData("1")}));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        METADATA_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    new BinaryStringData("my_company.my_branch.metadata_table"),
+                                    new BinaryStringData("my_company"),
+                                    new BinaryStringData("my_branch"),
+                                    new BinaryStringData("metadata_table"),
+                                    new BinaryStringData("+I")
+                                }));
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(new CreateTableEvent(METADATA_TABLEID, expectedSchema)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+
+        // Delete
+        DataChangeEvent deleteEvent =
+                DataChangeEvent.deleteEvent(
+                        METADATA_TABLEID,
+                        recordDataGenerator.generate(new Object[] {new BinaryStringData("1")}));
+        DataChangeEvent deleteEventExpect =
+                DataChangeEvent.insertEvent(
+                        METADATA_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    new BinaryStringData("1"),
+                                    new BinaryStringData("my_company.my_branch.metadata_table"),
+                                    new BinaryStringData("my_company"),
+                                    new BinaryStringData("my_branch"),
+                                    new BinaryStringData("metadata_table"),
+                                    new BinaryStringData("-D")
+                                }));
+        transform.processElement(new StreamRecord<>(deleteEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(deleteEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -579,9 +681,9 @@ public class PostTransformOperatorTest {
                                 "col1, col2, col2 * col2 as square_col2",
                                 "col2 < 3 OR col2 > 5")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -629,6 +731,7 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isNull();
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -643,9 +746,9 @@ public class PostTransformOperatorTest {
                                 "LOCALTIMESTAMP = CAST(CURRENT_TIMESTAMP AS TIMESTAMP)")
                         .addTimezone("UTC")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -674,6 +777,7 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -696,9 +800,9 @@ public class PostTransformOperatorTest {
                                 "col1='2'")
                         .addTimezone("Asia/Shanghai")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -743,6 +847,7 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect2));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -755,9 +860,9 @@ public class PostTransformOperatorTest {
                                 null)
                         .addTimezone("UTC")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -788,6 +893,7 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -811,9 +917,9 @@ public class PostTransformOperatorTest {
                                         + ",cast(colString as TIMESTAMP(3)) as nullTimestamp",
                                 null)
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -848,6 +954,7 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEvent));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -1005,9 +1112,9 @@ public class PostTransformOperatorTest {
                                         + ",cast('1970-01-01T00:00:01.234' as TIMESTAMP(3)) as castTimestamp",
                                 "col1 = '10'")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -1420,6 +1527,7 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect10));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -1442,9 +1550,9 @@ public class PostTransformOperatorTest {
                                         + ",cast(castFloat as TIMESTAMP(3)) as castTimestamp",
                                 "col1 = '1'")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -1479,8 +1587,9 @@ public class PostTransformOperatorTest {
                             transform.processElement(new StreamRecord<>(insertEvent1));
                         })
                 .isExactlyInstanceOf(RuntimeException.class)
-                .hasRootCauseInstanceOf(NumberFormatException.class)
-                .hasRootCauseMessage("For input string: \"1.0\"");
+                .hasRootCauseInstanceOf(DateTimeParseException.class)
+                .hasRootCauseMessage("Text '1.0' could not be parsed at index 0");
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -1569,9 +1678,9 @@ public class PostTransformOperatorTest {
                                 expression)
                         .addTimezone("UTC")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -1600,6 +1709,7 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -1612,9 +1722,9 @@ public class PostTransformOperatorTest {
                                 "newage > 17 and ref2 > 17")
                         .addTimezone("GMT")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -1702,6 +1812,7 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -1714,9 +1825,9 @@ public class PostTransformOperatorTest {
                                 "newage > 17")
                         .addTimezone("GMT")
                         .build();
-        EventOperatorTestHarness<PostTransformOperator, Event>
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -1798,5 +1909,6 @@ public class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 }

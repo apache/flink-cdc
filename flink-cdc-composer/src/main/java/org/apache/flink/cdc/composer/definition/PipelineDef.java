@@ -24,6 +24,7 @@ import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
 
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.TimeZone;
@@ -55,6 +56,7 @@ public class PipelineDef {
     private final List<RouteDef> routes;
     private final List<TransformDef> transforms;
     private final List<UdfDef> udfs;
+    private final List<ModelDef> models;
     private final Configuration config;
 
     public PipelineDef(
@@ -63,13 +65,25 @@ public class PipelineDef {
             List<RouteDef> routes,
             List<TransformDef> transforms,
             List<UdfDef> udfs,
+            List<ModelDef> models,
             Configuration config) {
         this.source = source;
         this.sink = sink;
         this.routes = routes;
         this.transforms = transforms;
         this.udfs = udfs;
+        this.models = models;
         this.config = evaluatePipelineTimeZone(config);
+    }
+
+    public PipelineDef(
+            SourceDef source,
+            SinkDef sink,
+            List<RouteDef> routes,
+            List<TransformDef> transforms,
+            List<UdfDef> udfs,
+            Configuration config) {
+        this(source, sink, routes, transforms, udfs, new ArrayList<>(), config);
     }
 
     public SourceDef getSource() {
@@ -92,6 +106,10 @@ public class PipelineDef {
         return udfs;
     }
 
+    public List<ModelDef> getModels() {
+        return models;
+    }
+
     public Configuration getConfig() {
         return config;
     }
@@ -109,6 +127,8 @@ public class PipelineDef {
                 + transforms
                 + ", udfs="
                 + udfs
+                + ", models="
+                + models
                 + ", config="
                 + config
                 + '}';
@@ -128,12 +148,13 @@ public class PipelineDef {
                 && Objects.equals(routes, that.routes)
                 && Objects.equals(transforms, that.transforms)
                 && Objects.equals(udfs, that.udfs)
+                && Objects.equals(models, that.models)
                 && Objects.equals(config, that.config);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(source, sink, routes, transforms, udfs, config);
+        return Objects.hash(source, sink, routes, transforms, udfs, models, config);
     }
 
     // ------------------------------------------------------------------------

@@ -40,7 +40,7 @@ In order to setup the Vitess CDC connector, the following table provides depende
 
 ### SQL Client JAR
 
-Download [flink-sql-connector-vitess-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-vitess-cdc/3.1.0/flink-sql-connector-vitess-cdc-3.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-vitess-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-vitess-cdc/{{< param Version >}}/flink-sql-connector-vitess-cdc-{{< param Version >}}.jar) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to
 [flink-sql-connector-vitess-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-vitess-cdc),

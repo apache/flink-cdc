@@ -35,6 +35,8 @@ public class TransformRule implements Serializable {
     private final String primaryKey;
     private final String partitionKey;
     private final String tableOption;
+    private final @Nullable String postTransformConverter;
+    private final SupportedMetadataColumn[] supportedMetadataColumns;
 
     public TransformRule(
             String tableInclusions,
@@ -42,13 +44,17 @@ public class TransformRule implements Serializable {
             @Nullable String filter,
             String primaryKey,
             String partitionKey,
-            String tableOption) {
+            String tableOption,
+            @Nullable String postTransformConverter,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         this.tableInclusions = tableInclusions;
         this.projection = StringUtils.isNullOrWhitespaceOnly(projection) ? "*" : projection;
         this.filter = normalizeFilter(projection, filter);
         this.primaryKey = primaryKey;
         this.partitionKey = partitionKey;
         this.tableOption = tableOption;
+        this.postTransformConverter = postTransformConverter;
+        this.supportedMetadataColumns = supportedMetadataColumns;
     }
 
     public String getTableInclusions() {
@@ -75,5 +81,14 @@ public class TransformRule implements Serializable {
 
     public String getTableOption() {
         return tableOption;
+    }
+
+    @Nullable
+    public String getPostTransformConverter() {
+        return postTransformConverter;
+    }
+
+    public SupportedMetadataColumn[] getSupportedMetadataColumns() {
+        return supportedMetadataColumns;
     }
 }

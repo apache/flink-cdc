@@ -77,4 +77,9 @@ public class CreateTableEvent implements SchemaChangeEvent {
     public SchemaChangeEventType getType() {
         return SchemaChangeEventType.CREATE_TABLE;
     }
+
+    @Override
+    public SchemaChangeEvent copy(TableId newTableId) {
+        return new CreateTableEvent(newTableId, schema);
+    }
 }

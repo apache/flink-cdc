@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.migration.tests;
 
-import org.junit.Assert;
+import org.assertj.core.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,22 +32,16 @@ public class MigrationTestBase {
 
     /** Flink CDC versions since 3.0. */
     public enum FlinkCdcVersion {
-        v3_0_0,
-        v3_0_1,
-        v3_1_0,
-        v3_1_1,
+        v3_2_0,
+        v3_2_1,
         SNAPSHOT;
 
         public String getShadedClassPrefix() {
             switch (this) {
-                case v3_0_0:
-                    return "com.ververica.cdc.v3_0_0";
-                case v3_0_1:
-                    return "com.ververica.cdc.v3_0_1";
-                case v3_1_0:
-                    return "org.apache.flink.cdc.v3_1_0";
-                case v3_1_1:
-                    return "org.apache.flink.cdc.v3_1_1";
+                case v3_2_0:
+                    return "org.apache.flink.cdc.v3_2_0";
+                case v3_2_1:
+                    return "org.apache.flink.cdc.v3_2_1";
                 case SNAPSHOT:
                     return "org.apache.flink.cdc.snapshot";
                 default:
@@ -57,12 +51,7 @@ public class MigrationTestBase {
     }
 
     private static final List<FlinkCdcVersion> versions =
-            Arrays.asList(
-                    FlinkCdcVersion.v3_0_0,
-                    FlinkCdcVersion.v3_0_1,
-                    FlinkCdcVersion.v3_1_0,
-                    FlinkCdcVersion.v3_1_1,
-                    FlinkCdcVersion.SNAPSHOT);
+            Arrays.asList(FlinkCdcVersion.v3_2_0, FlinkCdcVersion.v3_2_1, FlinkCdcVersion.SNAPSHOT);
 
     public static List<FlinkCdcVersion> getAllVersions() {
         return versions.subList(0, versions.size());
@@ -111,11 +100,17 @@ public class MigrationTestBase {
         Class<?> toVersionMockClass = getMockClass(toVersion, caseName);
         Object toVersionMockObject = toVersionMockClass.newInstance();
 
-        Assert.assertTrue(
-                (boolean)
-                        toVersionMockClass
-                                .getDeclaredMethod(
-                                        "deserializeAndCheckObject", int.class, byte[].class)
-                                .invoke(toVersionMockObject, serializerVersion, serializedObject));
+        Assertions.assertThat(
+                        (boolean)
+                                toVersionMockClass
+                                        .getDeclaredMethod(
+                                                "deserializeAndCheckObject",
+                                                int.class,
+                                                byte[].class)
+                                        .invoke(
+                                                toVersionMockObject,
+                                                serializerVersion,
+                                                serializedObject))
+                .isTrue();
     }
 }

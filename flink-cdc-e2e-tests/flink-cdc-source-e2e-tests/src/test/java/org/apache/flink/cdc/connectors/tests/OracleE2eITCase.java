@@ -61,6 +61,8 @@ import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase
 import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.ORACLE_DATABASE;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.TEST_PWD;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.TEST_USER;
+import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.TOP_SECRET;
+import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.TOP_USER;
 import static org.junit.Assert.assertNotNull;
 
 /** End-to-end tests for oracle-cdc connector uber jar. */
@@ -130,8 +132,10 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         " 'connector' = 'oracle-cdc',",
                         " 'hostname' = '" + oracle.getNetworkAliases().get(0) + "',",
                         " 'port' = '" + oracle.getExposedPorts().get(0) + "',",
-                        " 'username' = '" + CONNECTOR_USER + "',",
-                        " 'password' = '" + CONNECTOR_PWD + "',",
+                        // To analyze table for approximate rowCnt computation, use admin user
+                        // before chunk splitting.
+                        " 'username' = '" + TOP_USER + "',",
+                        " 'password' = '" + TOP_SECRET + "',",
                         " 'database-name' = 'ORCLCDB',",
                         " 'schema-name' = 'DEBEZIUM',",
                         " 'scan.incremental.snapshot.enabled' = 'true',",
