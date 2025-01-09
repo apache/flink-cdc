@@ -181,16 +181,24 @@ public class SchemaEvolveTest extends SchemaTestBase {
                                 }))
                 .map(StreamRecord::getValue)
                 .containsExactly(
-                        new FlushEvent(0),
+                        new FlushEvent(
+                                0, Collections.singletonList(TABLE_ID), createTableEvent.getType()),
                         createTableEvent,
                         genInsert(TABLE_ID, "ISFS", 1, "Alice", 17.1828f, "Hello"),
-                        new FlushEvent(0),
+                        new FlushEvent(
+                                0, Collections.singletonList(TABLE_ID), addColumnEvent.getType()),
                         addColumnEventAtLast,
                         genInsert(TABLE_ID, "ISFSB", 2, "Bob", 31.415926f, "Bye-bye", false),
-                        new FlushEvent(0),
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(TABLE_ID),
+                                renameColumnEvent.getType()),
                         appendRenamedColumnAtLast,
                         genInsert(TABLE_ID, "ISFSBS", 3, "Cicada", 123.456f, null, true, "Ok"),
-                        new FlushEvent(0),
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(TABLE_ID),
+                                alterColumnTypeEvent.getType()),
                         alterColumnTypeEventWithBackfill,
                         genInsert(
                                 TABLE_ID,
@@ -201,11 +209,16 @@ public class SchemaEvolveTest extends SchemaTestBase {
                                 null,
                                 false,
                                 "Nah"),
-                        new FlushEvent(0),
+                        new FlushEvent(
+                                0, Collections.singletonList(TABLE_ID), dropColumnEvent.getType()),
                         genInsert(TABLE_ID, "ISDSBS", 5, "Eve", 1.414, null, true, null),
-                        new FlushEvent(0),
+                        new FlushEvent(
+                                0,
+                                Collections.singletonList(TABLE_ID),
+                                truncateTableEvent.getType()),
                         genInsert(TABLE_ID, "ISDSBS", 6, "Ferris", 0.001, null, false, null),
-                        new FlushEvent(0));
+                        new FlushEvent(
+                                0, Collections.singletonList(TABLE_ID), dropTableEvent.getType()));
     }
 
     @Test
@@ -308,7 +321,8 @@ public class SchemaEvolveTest extends SchemaTestBase {
                                 }))
                 .map(StreamRecord::getValue)
                 .containsExactly(
-                        new FlushEvent(0),
+                        new FlushEvent(
+                                0, Collections.singletonList(TABLE_ID), createTableEvent.getType()),
                         createTableEvent,
                         genInsert(TABLE_ID, "ISFS", 1, "Alice", 17.1828f, "Hello"),
                         genInsert(TABLE_ID, "ISFS", 2, "Bob", 31.415926f, "Bye-bye"),

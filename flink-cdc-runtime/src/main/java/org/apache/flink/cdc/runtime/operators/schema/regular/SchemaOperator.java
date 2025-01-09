@@ -164,8 +164,10 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         schemaOperatorMetrics.increaseSchemaChangeEvents(1);
 
         // First, send FlushEvent or it might be blocked later
+        List<TableId> sinkTables = router.route(tableId);
         LOG.info("{}> Sending the FlushEvent.", subTaskId);
-        output.collect(new StreamRecord<>(new FlushEvent(subTaskId)));
+        output.collect(
+                new StreamRecord<>(new FlushEvent(subTaskId, sinkTables, originalEvent.getType())));
 
         // Then, queue to request schema change to SchemaCoordinator.
         SchemaChangeResponse response = requestSchemaChange(tableId, originalEvent);

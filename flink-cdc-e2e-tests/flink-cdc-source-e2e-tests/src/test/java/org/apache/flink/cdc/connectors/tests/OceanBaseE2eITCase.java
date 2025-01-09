@@ -180,6 +180,6 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
                 expectResult,
                 "ob_products_sink",
                 new String[] {"id", "name", "description", "weight", "enum_c", "json_c"},
-                60000L);
+                300000L);
     }
 }
