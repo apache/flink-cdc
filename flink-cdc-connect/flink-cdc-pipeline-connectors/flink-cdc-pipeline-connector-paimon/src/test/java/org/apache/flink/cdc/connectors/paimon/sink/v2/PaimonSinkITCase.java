@@ -127,7 +127,7 @@ public class PaimonSinkITCase {
                                     + "'metastore'='hive', "
                                     + "'hadoop-conf-dir'='%s', "
                                     + "'hive-conf-dir'='%s', "
-                                    + "'cache-enabled'='false' "
+                                    + "'cache-enabled'='false'"
                                     + ")",
                             warehouse, HADOOP_CONF_DIR, HIVE_CONF_DIR));
         } else {
