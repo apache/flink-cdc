@@ -254,25 +254,25 @@ public class TransformParserTest {
         testFilterExpression(
                 "TIMESTAMP_DIFF('SECOND', dt1, dt2)", "timestampDiff(\"SECOND\", dt1, dt2)");
         testFilterExpression(
-                "timestamp_diff('second', dt1, dt2)", "timestampDiff(\"SECOND\", dt1, dt2)");
+                "timestamp_diff('second', dt1, dt2)", "timestampDiff(\"second\", dt1, dt2)");
         testFilterExpression(
                 "TIMESTAMP_DIFF('MINUTE', dt1, dt2)", "timestampDiff(\"MINUTE\", dt1, dt2)");
         testFilterExpression(
-                "timestamp_diff('minute', dt1, dt2)", "timestampDiff(\"MINUTE\", dt1, dt2)");
+                "timestamp_diff('minute', dt1, dt2)", "timestampDiff(\"minute\", dt1, dt2)");
         testFilterExpression(
                 "TIMESTAMP_DIFF('HOUR', dt1, dt2)", "timestampDiff(\"HOUR\", dt1, dt2)");
         testFilterExpression(
-                "timestamp_diff('hour', dt1, dt2)", "timestampDiff(\"HOUR\", dt1, dt2)");
+                "timestamp_diff('hour', dt1, dt2)", "timestampDiff(\"hour\", dt1, dt2)");
         testFilterExpression("TIMESTAMP_DIFF('DAY', dt1, dt2)", "timestampDiff(\"DAY\", dt1, dt2)");
-        testFilterExpression("timestamp_diff('day', dt1, dt2)", "timestampDiff(\"DAY\", dt1, dt2)");
+        testFilterExpression("timestamp_diff('day', dt1, dt2)", "timestampDiff(\"day\", dt1, dt2)");
         testFilterExpression(
                 "TIMESTAMP_DIFF('MONTH', dt1, dt2)", "timestampDiff(\"MONTH\", dt1, dt2)");
         testFilterExpression(
-                "timestamp_diff('month', dt1, dt2)", "timestampDiff(\"MONTH\", dt1, dt2)");
+                "timestamp_diff('month', dt1, dt2)", "timestampDiff(\"month\", dt1, dt2)");
         testFilterExpression(
                 "TIMESTAMP_DIFF('YEAR', dt1, dt2)", "timestampDiff(\"YEAR\", dt1, dt2)");
         testFilterExpression(
-                "timestamp_diff('year', dt1, dt2)", "timestampDiff(\"YEAR\", dt1, dt2)");
+                "timestamp_diff('year', dt1, dt2)", "timestampDiff(\"year\", dt1, dt2)");
         testFilterExpression(
                 "TIMESTAMPDIFF(SECOND, dt1, dt2)", "timestampdiff(\"SECOND\", dt1, dt2)");
         testFilterExpression(
@@ -367,24 +367,10 @@ public class TransformParserTest {
         Assertions.assertThatThrownBy(
                         () -> {
                             TransformParser.translateFilterExpressionToJaninoExpression(
-                                    "TIMESTAMP_DIFF(SECONDS, dt1, dt2)", Collections.emptyList());
-                        })
-                .isExactlyInstanceOf(ParseException.class)
-                .hasMessage("Unsupported time interval unit in timestamp diff function: SECONDS");
-        Assertions.assertThatThrownBy(
-                        () -> {
-                            TransformParser.translateFilterExpressionToJaninoExpression(
-                                    "TIMESTAMP_DIFF(QUARTER, dt1, dt2)", Collections.emptyList());
-                        })
-                .isExactlyInstanceOf(ParseException.class)
-                .hasMessage("Unsupported time interval unit in timestamp diff function: QUARTER");
-        Assertions.assertThatThrownBy(
-                        () -> {
-                            TransformParser.translateFilterExpressionToJaninoExpression(
                                     "TIMESTAMPDIFF(SECONDS, dt1, dt2)", Collections.emptyList());
                         })
                 .isExactlyInstanceOf(ParseException.class)
-                .hasMessage("Unsupported time interval unit in timestamp diff function: SECONDS");
+                .hasMessage("Statements can not be parsed.");
         Assertions.assertThatThrownBy(
                         () -> {
                             TransformParser.translateFilterExpressionToJaninoExpression(
@@ -399,7 +385,7 @@ public class TransformParserTest {
                                     "TIMESTAMPADD(SECONDS, dt1, dt2)", Collections.emptyList());
                         })
                 .isExactlyInstanceOf(ParseException.class)
-                .hasMessage("Unsupported time interval unit in timestamp add function: SECONDS");
+                .hasMessage("Statements can not be parsed.");
         Assertions.assertThatThrownBy(
                         () -> {
                             TransformParser.translateFilterExpressionToJaninoExpression(

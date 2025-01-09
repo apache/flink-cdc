@@ -133,7 +133,7 @@ public class DataTypeConverter {
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
             case TIMESTAMP_WITH_TIME_ZONE:
-                return typeFactory.createSqlType(SqlTypeName.TIMESTAMP_TZ);
+                throw new UnsupportedOperationException("Unsupported type: TIMESTAMP_TZ");
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return typeFactory.createSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
             case FLOAT:
@@ -192,8 +192,6 @@ public class DataTypeConverter {
                 return DataTypes.TIME(relDataType.getPrecision());
             case TIMESTAMP:
                 return DataTypes.TIMESTAMP(relDataType.getPrecision());
-            case TIMESTAMP_TZ:
-                return DataTypes.TIMESTAMP_TZ(relDataType.getPrecision());
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return DataTypes.TIMESTAMP_LTZ(relDataType.getPrecision());
             case FLOAT:

@@ -164,7 +164,6 @@ public class PostTransformOperatorTest {
                     .physicalColumn("interval_value", DataTypes.INT())
                     .physicalColumn("time_point_timestamp", DataTypes.TIMESTAMP(0))
                     .physicalColumn("time_point_timestamp_ltz", DataTypes.TIMESTAMP_LTZ(0))
-                    .physicalColumn("time_point_timestamp_tz", DataTypes.TIMESTAMP_TZ(0))
                     .primaryKey("col1")
                     .build();
 
@@ -1454,43 +1453,37 @@ public class PostTransformOperatorTest {
                                 TIMESTAMPADD_DATA_TABLEID.identifier(),
                                 "col1, time_interval_unit, interval_value,"
                                         + " TIMESTAMPADD(SECOND, interval_value, time_point_timestamp) as time_point_timestamp,"
-                                        + " TIMESTAMPADD(SECOND, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz,"
-                                        + " TIMESTAMPADD(SECOND, interval_value, time_point_timestamp_tz) as time_point_timestamp_tz",
+                                        + " TIMESTAMPADD(SECOND, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz",
                                 "time_interval_unit='SECOND'")
                         .addTransform(
                                 TIMESTAMPADD_DATA_TABLEID.identifier(),
                                 "col1, time_interval_unit, interval_value,"
                                         + " TIMESTAMPADD(MINUTE, interval_value, time_point_timestamp) as time_point_timestamp,"
-                                        + " TIMESTAMPADD(MINUTE, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz,"
-                                        + " TIMESTAMPADD(MINUTE, interval_value, time_point_timestamp_tz) as time_point_timestamp_tz",
+                                        + " TIMESTAMPADD(MINUTE, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz",
                                 "time_interval_unit='MINUTE'")
                         .addTransform(
                                 TIMESTAMPADD_DATA_TABLEID.identifier(),
                                 "col1, time_interval_unit, interval_value,"
                                         + " TIMESTAMPADD(HOUR, interval_value, time_point_timestamp) as time_point_timestamp,"
-                                        + " TIMESTAMPADD(HOUR, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz,"
-                                        + " TIMESTAMPADD(HOUR, interval_value, time_point_timestamp_tz) as time_point_timestamp_tz",
+                                        + " TIMESTAMPADD(HOUR, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz",
                                 "time_interval_unit='HOUR'")
                         .addTransform(
                                 TIMESTAMPADD_DATA_TABLEID.identifier(),
                                 "col1, time_interval_unit, interval_value,"
                                         + " TIMESTAMPADD(DAY, interval_value, time_point_timestamp) as time_point_timestamp,"
-                                        + " TIMESTAMPADD(DAY, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz,"
-                                        + " TIMESTAMPADD(DAY, interval_value, time_point_timestamp_tz) as time_point_timestamp_tz",
+                                        + " TIMESTAMPADD(DAY, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz",
                                 "time_interval_unit='DAY'")
                         .addTransform(
                                 TIMESTAMPADD_DATA_TABLEID.identifier(),
                                 "col1, time_interval_unit, interval_value,"
                                         + " TIMESTAMPADD(MONTH, interval_value, time_point_timestamp) as time_point_timestamp,"
-                                        + " TIMESTAMPADD(MONTH, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz,"
-                                        + " TIMESTAMPADD(MONTH, interval_value, time_point_timestamp_tz) as time_point_timestamp_tz",
+                                        + " TIMESTAMPADD(MONTH, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz",
                                 "time_interval_unit='MONTH'")
                         .addTransform(
                                 TIMESTAMPADD_DATA_TABLEID.identifier(),
                                 "col1, time_interval_unit, interval_value,"
                                         + " TIMESTAMPADD(YEAR, interval_value, time_point_timestamp) as time_point_timestamp,"
-                                        + " TIMESTAMPADD(YEAR, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz,"
-                                        + " TIMESTAMPADD(YEAR, interval_value, time_point_timestamp_tz) as time_point_timestamp_tz",
+                                        + " TIMESTAMPADD(YEAR, interval_value, time_point_timestamp_ltz) as time_point_timestamp_ltz",
                                 "time_interval_unit='YEAR'")
                         .addTimezone("UTC")
                         .build();
@@ -1523,7 +1516,6 @@ public class PostTransformOperatorTest {
                                     1735689600,
                                     TimestampData.fromMillis(0, 0),
                                     LocalZonedTimestampData.fromEpochMillis(0, 0),
-                                    ZonedTimestampData.of(0, 0, "UTC"),
                                 }));
         DataChangeEvent insertEventExpect1 =
                 DataChangeEvent.insertEvent(
@@ -1535,7 +1527,6 @@ public class PostTransformOperatorTest {
                                     1735689600,
                                     TimestampData.fromMillis(1735689600000L, 0),
                                     LocalZonedTimestampData.fromEpochMillis(1735689600000L, 0),
-                                    ZonedTimestampData.of(1735689600000L, 0, "UTC"),
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent1));
         Assertions.assertThat(
@@ -1553,7 +1544,6 @@ public class PostTransformOperatorTest {
                                     28928160,
                                     TimestampData.fromMillis(0, 0),
                                     LocalZonedTimestampData.fromEpochMillis(0, 0),
-                                    ZonedTimestampData.of(0, 0, "UTC"),
                                 }));
         DataChangeEvent insertEventExpect2 =
                 DataChangeEvent.insertEvent(
@@ -1565,7 +1555,6 @@ public class PostTransformOperatorTest {
                                     28928160,
                                     TimestampData.fromMillis(1735689600000L, 0),
                                     LocalZonedTimestampData.fromEpochMillis(1735689600000L, 0),
-                                    ZonedTimestampData.of(1735689600000L, 0, "UTC"),
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent2));
         Assertions.assertThat(
@@ -1583,7 +1572,6 @@ public class PostTransformOperatorTest {
                                     482136,
                                     TimestampData.fromMillis(0, 0),
                                     LocalZonedTimestampData.fromEpochMillis(0, 0),
-                                    ZonedTimestampData.of(0, 0, "UTC"),
                                 }));
         DataChangeEvent insertEventExpect3 =
                 DataChangeEvent.insertEvent(
@@ -1595,7 +1583,6 @@ public class PostTransformOperatorTest {
                                     482136,
                                     TimestampData.fromMillis(1735689600000L, 0),
                                     LocalZonedTimestampData.fromEpochMillis(1735689600000L, 0),
-                                    ZonedTimestampData.of(1735689600000L, 0, "UTC"),
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent3));
         Assertions.assertThat(
@@ -1613,7 +1600,6 @@ public class PostTransformOperatorTest {
                                     20089,
                                     TimestampData.fromMillis(0, 0),
                                     LocalZonedTimestampData.fromEpochMillis(0, 0),
-                                    ZonedTimestampData.of(0, 0, "UTC"),
                                 }));
         DataChangeEvent insertEventExpect4 =
                 DataChangeEvent.insertEvent(
@@ -1625,7 +1611,6 @@ public class PostTransformOperatorTest {
                                     20089,
                                     TimestampData.fromMillis(1735689600000L, 0),
                                     LocalZonedTimestampData.fromEpochMillis(1735689600000L, 0),
-                                    ZonedTimestampData.of(1735689600000L, 0, "UTC"),
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent4));
         Assertions.assertThat(
@@ -1643,7 +1628,6 @@ public class PostTransformOperatorTest {
                                     660,
                                     TimestampData.fromMillis(0, 0),
                                     LocalZonedTimestampData.fromEpochMillis(0, 0),
-                                    ZonedTimestampData.of(0, 0, "UTC"),
                                 }));
         DataChangeEvent insertEventExpect5 =
                 DataChangeEvent.insertEvent(
@@ -1655,7 +1639,6 @@ public class PostTransformOperatorTest {
                                     660,
                                     TimestampData.fromMillis(1735689600000L, 0),
                                     LocalZonedTimestampData.fromEpochMillis(1735689600000L, 0),
-                                    ZonedTimestampData.of(1735689600000L, 0, "UTC"),
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent5));
         Assertions.assertThat(
@@ -1673,7 +1656,6 @@ public class PostTransformOperatorTest {
                                     55,
                                     TimestampData.fromMillis(0, 0),
                                     LocalZonedTimestampData.fromEpochMillis(0, 0),
-                                    ZonedTimestampData.of(0, 0, "UTC"),
                                 }));
         DataChangeEvent insertEventExpect6 =
                 DataChangeEvent.insertEvent(
@@ -1685,7 +1667,6 @@ public class PostTransformOperatorTest {
                                     55,
                                     TimestampData.fromMillis(1735689600000L, 0),
                                     LocalZonedTimestampData.fromEpochMillis(1735689600000L, 0),
-                                    ZonedTimestampData.of(1735689600000L, 0, "UTC"),
                                 }));
         transform.processElement(new StreamRecord<>(insertEvent6));
         Assertions.assertThat(
@@ -1703,7 +1684,6 @@ public class PostTransformOperatorTest {
                                     null,
                                     TimestampData.fromMillis(0, 0),
                                     LocalZonedTimestampData.fromEpochMillis(0, 0),
-                                    ZonedTimestampData.of(0, 0, "UTC"),
                                 }));
         DataChangeEvent insertEventExpect7 =
                 DataChangeEvent.insertEvent(
@@ -1712,7 +1692,6 @@ public class PostTransformOperatorTest {
                                 new Object[] {
                                     new BinaryStringData("7"),
                                     new BinaryStringData("YEAR"),
-                                    null,
                                     null,
                                     null,
                                     null,
