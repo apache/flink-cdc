@@ -27,14 +27,14 @@ for ((i=0; i < ${#args[@]}; i++)); do
             # Check if the value is not empty
             if [[ -n "$FLINK_HOME_VALUE" ]]; then
                 FLINK_HOME="$FLINK_HOME_VALUE"
-                echo "set FLINK_HOME to ${FLINK_HOME_VALUE}"
+                echo "[INFO] Set FLINK_HOME to ${FLINK_HOME_VALUE}."
                 break
             fi
             ;;
         --flink-home)
             if [[ -n "${args[i+1]}" ]]; then
                 FLINK_HOME="${args[i+1]}"
-                echo "set FLINK_HOME to ${FLINK_HOME}"
+                echo "[INFO] Set FLINK_HOME to ${FLINK_HOME}."
                 break
             fi
             ;;
