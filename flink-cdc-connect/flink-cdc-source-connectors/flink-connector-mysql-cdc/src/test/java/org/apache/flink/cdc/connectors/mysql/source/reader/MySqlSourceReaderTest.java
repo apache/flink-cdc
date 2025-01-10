@@ -99,6 +99,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isH
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isSchemaChangeEvent;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isWatermarkEvent;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MetricsUtils.getMySqlSplitEnumeratorContext;
 import static org.apache.flink.core.io.InputStatus.MORE_AVAILABLE;
 import static org.apache.flink.util.Preconditions.checkState;
 import static org.junit.Assert.assertEquals;
@@ -404,7 +405,8 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         sourceConfig,
                         DEFAULT_PARALLELISM,
                         tableNames.stream().map(TableId::parse).collect(Collectors.toList()),
-                        false);
+                        false,
+                        getMySqlSplitEnumeratorContext());
         assigner.open();
         List<MySqlSplit> splits = new ArrayList<>();
         MySqlSnapshotSplit split = (MySqlSnapshotSplit) assigner.getNext().get();
@@ -459,7 +461,8 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         sourceConfig,
                         DEFAULT_PARALLELISM,
                         Collections.singletonList(TableId.parse(tableName)),
-                        false);
+                        false,
+                        getMySqlSplitEnumeratorContext());
         assigner.open();
         MySqlSnapshotSplit snapshotSplit = (MySqlSnapshotSplit) assigner.getNext().get();
         // should contain only one split
