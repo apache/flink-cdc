@@ -94,7 +94,10 @@ public class PaimonSink<InputT> implements WithPreCommitTopology<InputT, MultiTa
 
         // add correct checkpointId to MultiTableCommittable and recreate CommittableSummary.
         return partitioned
-                .transform("preCommit", typeInformation, new PreCommitOperator())
+                .transform(
+                        "preCommit",
+                        typeInformation,
+                        new PreCommitOperator(catalogOptions, commitUser))
                 .setParallelism(committables.getParallelism());
     }
 }
