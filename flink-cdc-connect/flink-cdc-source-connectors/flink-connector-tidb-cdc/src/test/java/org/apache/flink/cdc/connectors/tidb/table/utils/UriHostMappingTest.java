@@ -34,8 +34,9 @@ class UriHostMappingTest {
                 TDBSourceOptions.getTiConfiguration(
                         "http://0.0.0.0:2347", "host1:1;host2:2;host3:3", new HashMap<>());
         UriHostMapping uriHostMapping = (UriHostMapping) tiConf.getHostMapping();
-        Assertions.assertThat(uriHostMapping.getHostMapping()).hasSize(3);
-        Assertions.assertThat(uriHostMapping.getHostMapping().get("host1")).isEqualTo("1");
+        Assertions.assertThat(uriHostMapping.getHostMapping())
+                .hasSize(3)
+                .containsEntry("host1", "1");
     }
 
     @Test

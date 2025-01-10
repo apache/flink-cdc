@@ -79,6 +79,7 @@ import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 class PostgreSQLSourceTest extends PostgresTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(PostgreSQLSourceTest.class);
     private static final String SLOT_NAME = "flink";
+
     // These tests only passes at the docker postgres:9.6
     private static final PostgreSQLContainer<?> POSTGRES_CONTAINER_OLD =
             new PostgreSQLContainer<>(
@@ -235,13 +236,13 @@ class PostgreSQLSourceTest extends PostgresTestBase {
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
             Assertions.assertThat((JsonPath.read(state, "$.sourcePartition.server").toString()))
                     .isEqualTo("postgres_cdc_source");
-            Assertions.assertThat(JsonPath.read(state, "$.sourceOffset.txId").toString())
-                    .isEqualTo("557");
+            Assertions.assertThat(JsonPath.<Integer>read(state, "$.sourceOffset.txId"))
+                    .isEqualTo(557);
             Assertions.assertThat(
-                            JsonPath.read(state, "$.sourceOffset.last_snapshot_record").toString())
-                    .isEqualTo("true");
-            Assertions.assertThat(JsonPath.read(state, "$.sourceOffset.snapshot").toString())
-                    .isEqualTo("true");
+                            JsonPath.<Boolean>read(state, "$.sourceOffset.last_snapshot_record"))
+                    .isTrue();
+            Assertions.assertThat(JsonPath.<Boolean>read(state, "$.sourceOffset.snapshot"))
+                    .isTrue();
             Assertions.assertThat(state).contains("ts_usec");
             int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
             Assertions.assertThat(lsn).isGreaterThan(prevLsn);
@@ -291,12 +292,11 @@ class PostgreSQLSourceTest extends PostgresTestBase {
 
                 Assertions.assertThat(offsetState.list).hasSize(1);
                 String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-                Assertions.assertThat(JsonPath.read(state, "$.sourcePartition.server").toString())
+                Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
                         .isEqualTo("postgres_cdc_source");
-                Assertions.assertThat(JsonPath.read(state, "$.sourceOffset.txId").toString())
-                        .isEqualTo("558");
-                Assertions.assertThat(state).contains("ts_usec");
-                Assertions.assertThat(state).doesNotContain("snapshot");
+                Assertions.assertThat(JsonPath.<Integer>read(state, "$.sourceOffset.txId"))
+                        .isEqualTo(558);
+                Assertions.assertThat(state).contains("ts_usec").doesNotContain("snapshot");
                 int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
                 Assertions.assertThat(lsn).isGreaterThan(prevLsn);
                 prevLsn = lsn;
@@ -357,12 +357,11 @@ class PostgreSQLSourceTest extends PostgresTestBase {
             }
             Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            Assertions.assertThat(JsonPath.read(state, "$.sourcePartition.server").toString())
+            Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
                     .isEqualTo("postgres_cdc_source");
-            Assertions.assertThat(JsonPath.read(state, "$.sourceOffset.txId").toString())
-                    .isEqualTo("561");
-            Assertions.assertThat(state).contains("ts_usec");
-            Assertions.assertThat(state).doesNotContain("snapshot");
+            Assertions.assertThat(JsonPath.<Integer>read(state, "$.sourceOffset.txId"))
+                    .isEqualTo(561);
+            Assertions.assertThat(state).contains("ts_usec").doesNotContain("snapshot");
             int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
             Assertions.assertThat(lsn).isGreaterThan(prevLsn);
 
@@ -402,12 +401,11 @@ class PostgreSQLSourceTest extends PostgresTestBase {
             }
             Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            Assertions.assertThat(JsonPath.read(state, "$.sourcePartition.server").toString())
+            Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
                     .isEqualTo("postgres_cdc_source");
-            Assertions.assertThat(JsonPath.read(state, "$.sourceOffset.txId").toString())
-                    .isEqualTo("561");
-            Assertions.assertThat(state).contains("ts_usec");
-            Assertions.assertThat(state).doesNotContain("snapshot");
+            Assertions.assertThat(JsonPath.<Integer>read(state, "$.sourceOffset.txId"))
+                    .isEqualTo(561);
+            Assertions.assertThat(state).contains("ts_usec").doesNotContain("snapshot");
             int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
             Assertions.assertThat(lsn).isGreaterThan(prevLsn);
             prevLsn = lsn;
@@ -455,12 +453,11 @@ class PostgreSQLSourceTest extends PostgresTestBase {
             }
             Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            Assertions.assertThat(JsonPath.read(state, "$.sourcePartition.server").toString())
+            Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
                     .isEqualTo("postgres_cdc_source");
-            Assertions.assertThat(JsonPath.read(state, "$.sourceOffset.txId").toString())
-                    .isEqualTo("562");
-            Assertions.assertThat(state).contains("ts_usec");
-            Assertions.assertThat(state).doesNotContain("snapshot");
+            Assertions.assertThat(JsonPath.<Integer>read(state, "$.sourceOffset.txId"))
+                    .isEqualTo(562);
+            Assertions.assertThat(state).contains("ts_usec").doesNotContain("snapshot");
             int pos = JsonPath.read(state, "$.sourceOffset.lsn");
             Assertions.assertThat(pos).isGreaterThan(prevLsn);
 

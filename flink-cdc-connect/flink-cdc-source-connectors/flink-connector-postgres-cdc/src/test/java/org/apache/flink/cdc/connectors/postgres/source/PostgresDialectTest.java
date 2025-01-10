@@ -62,8 +62,7 @@ class PostgresDialectTest extends PostgresTestBase {
         List<TableId> tableIdsOfcustomDatabase =
                 dialectOfcustomDatabase.discoverDataCollections(
                         configFactoryOfCustomDatabase.create(0));
-        Assertions.assertThat(tableIdsOfcustomDatabase.get(0).toString())
-                .isEqualTo("customer.customers");
+        Assertions.assertThat(tableIdsOfcustomDatabase.get(0)).hasToString("customer.customers");
 
         // get table named 'inventory.products' from customDatabase which is actual in
         // inventoryDatabase
@@ -75,8 +74,7 @@ class PostgresDialectTest extends PostgresTestBase {
         List<TableId> tableIdsOfInventoryDatabase =
                 dialectOfInventoryDatabase.discoverDataCollections(
                         configFactoryOfInventoryDatabase.create(0));
-        Assertions.assertThat(tableIdsOfInventoryDatabase.get(0).toString())
-                .isEqualTo("inventory.products");
+        Assertions.assertThat(tableIdsOfInventoryDatabase.get(0)).hasToString("inventory.products");
 
         // get table named 'customer.customers' from customDatabase which is actual not in
         // customDatabase

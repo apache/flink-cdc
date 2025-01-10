@@ -29,12 +29,12 @@ import java.io.IOException;
 import java.util.Map;
 
 /** Tests for {@link PendingSplitsStateSerializer}. */
-public class PendingSplitsStateSerializerTest {
+class PendingSplitsStateSerializerTest {
 
     private final TableId tableId = TableId.parse("catalog.schema.table1");
 
     @Test
-    public void testOutputIsFinallyCleared() throws Exception {
+    void testOutputIsFinallyCleared() throws Exception {
         PendingSplitsStateSerializer serializer =
                 new PendingSplitsStateSerializer(constructSourceSplitSerializer());
         StreamPendingSplitsState state = new StreamPendingSplitsState(true);

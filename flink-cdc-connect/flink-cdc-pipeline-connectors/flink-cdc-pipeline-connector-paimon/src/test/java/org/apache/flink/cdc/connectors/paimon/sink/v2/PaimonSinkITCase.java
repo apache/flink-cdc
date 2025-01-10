@@ -283,7 +283,7 @@ class PaimonSinkITCase {
                                 Row.ofKind(RowKind.INSERT, 1L),
                                 Row.ofKind(RowKind.INSERT, 2L),
                                 Row.ofKind(RowKind.INSERT, 3L));
-        Assertions.assertEquals(expected, result);
+        Assertions.assertThat(result).isEqualTo(expected);
     }
 
     @ParameterizedTest
@@ -563,10 +563,10 @@ class PaimonSinkITCase {
                 .forEachRemaining(result::add);
         if (enableDeleteVector) {
             // Each APPEND will trigger COMPACT once enable deletion-vectors.
-            Assertions.assertEquals(16, result.size());
+            Assertions.assertThat(result).hasSize(16);
         } else {
             // 8 APPEND and 1 COMPACT
-            Assertions.assertEquals(9, result.size());
+            Assertions.assertThat(result).hasSize(9);
         }
         result.clear();
 

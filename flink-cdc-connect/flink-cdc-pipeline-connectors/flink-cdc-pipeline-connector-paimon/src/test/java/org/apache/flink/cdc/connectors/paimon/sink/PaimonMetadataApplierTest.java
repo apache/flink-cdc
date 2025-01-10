@@ -229,9 +229,10 @@ class PaimonMetadataApplierTest {
                         Arrays.asList(
                                 new DataField(0, "COL1", DataTypes.STRING().notNull()),
                                 new DataField(1, "col2", DataTypes.INT())));
-        Assertions.assertEquals(
-                tableSchema,
-                catalog.getTable(Identifier.fromString("test.table_with_upper_case")).rowType());
+        Assertions.assertThat(
+                        catalog.getTable(Identifier.fromString("test.table_with_upper_case"))
+                                .rowType())
+                .isEqualTo(tableSchema);
     }
 
     @ParameterizedTest

@@ -131,7 +131,6 @@ class PaimonHashFunctionTest {
                                 }));
         int key3 = hashFunction.hashcode(dataChangeEvent3);
 
-        assertThat(key1).isEqualTo(key2);
-        assertThat(key1).isEqualTo(key3);
+        assertThat(key1).isEqualTo(key2).isEqualTo(key3);
     }
 }

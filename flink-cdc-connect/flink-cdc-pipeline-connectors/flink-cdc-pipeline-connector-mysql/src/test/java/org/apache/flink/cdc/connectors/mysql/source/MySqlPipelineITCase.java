@@ -265,7 +265,7 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testInitialStartupModeWithOpTs() throws Exception {
+    void testInitialStartupModeWithOpTs() throws Exception {
         inventoryDatabase.createAndInitialize();
         Configuration sourceConfiguration = new Configuration();
         sourceConfiguration.set(MySqlDataSourceOptions.HOSTNAME, MYSQL8_CONTAINER.getHost());

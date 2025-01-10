@@ -180,7 +180,7 @@ class PaimonWriterHelperTest {
     }
 
     @Test
-    public void testConvertEventToGenericRowWithNestedRow() {
+    void testConvertEventToGenericRowWithNestedRow() {
         // Define the inner row type with an integer and a map
         RowType innerRowType =
                 RowType.of(DataTypes.INT(), DataTypes.MAP(DataTypes.STRING(), DataTypes.STRING()));
@@ -231,16 +231,14 @@ class PaimonWriterHelperTest {
         NestedRow innerRow = (NestedRow) genericRow.getField(0);
         NestedRow nestedRow = (NestedRow) innerRow.getRow(0, 2);
         int actual = nestedRow.getRow(0, 2).getInt(0); // 42
-        Assertions.assertEquals(42, actual);
+        Assertions.assertThat(actual).isEqualTo(42);
         Map<BinaryString, BinaryString> expectedMap = new HashMap<>();
         expectedMap.put(BinaryString.fromString("key1"), BinaryString.fromString("value1"));
         expectedMap.put(BinaryString.fromString("key2"), BinaryString.fromString("value2"));
         InternalMap internalMap = nestedRow.getMap(1);
         Map<BinaryString, BinaryString> extractedMap = extractMap(internalMap);
 
-        for (Map.Entry<BinaryString, BinaryString> entry : expectedMap.entrySet()) {
-            Assertions.assertEquals(entry.getValue(), extractedMap.get(entry.getKey()));
-        }
+        Assertions.assertThat(extractedMap).containsAllEntriesOf(expectedMap);
     }
 
     private static Map<BinaryString, BinaryString> extractMap(InternalMap internalMap) {

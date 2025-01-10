@@ -21,9 +21,11 @@ import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 
 import com.aliyun.odps.Odps;
-import org.junit.ClassRule;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.OutputStream;
@@ -31,39 +33,47 @@ import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 
-/** init maxcompute-emulator use for e2e test. */
+/** Initialize MaxCompute Emulator for E2e test. */
 public class EmulatorTestBase {
     public static final DockerImageName MAXCOMPUTE_IMAGE =
             DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.4");
 
-    @ClassRule
-    public static GenericContainer<?> maxcompute =
+    public static final GenericContainer<?> MAXCOMPUTE_CONTAINER =
             new GenericContainer<>(MAXCOMPUTE_IMAGE)
                     .withExposedPorts(8080)
                     .waitingFor(
                             Wait.forLogMessage(".*Started MaxcomputeEmulatorApplication.*\\n", 1))
                     .withLogConsumer(frame -> System.out.print(frame.getUtf8String()));
 
+    @BeforeAll
+    static void createContainer() {
+        Startables.deepStart(MAXCOMPUTE_CONTAINER).join();
+    }
+
+    @AfterAll
+    static void destroyContainer() {
+        MAXCOMPUTE_CONTAINER.stop();
+    }
+
     public final MaxComputeOptions testOptions =
             MaxComputeOptions.builder("ak", "sk", getEndpoint(), "mocked_mc").build();
 
-    public final Odps odps = MaxComputeUtils.getOdps(testOptions);
+    public final Odps odpsInstance = MaxComputeUtils.getOdps(testOptions);
 
     private String getEndpoint() {
-        maxcompute.start();
-
         String ip;
-        if (maxcompute.getHost().equals("localhost")) {
+        if (MAXCOMPUTE_CONTAINER.getHost().equals("localhost")) {
             try {
                 ip = InetAddress.getLocalHost().getHostAddress();
             } catch (UnknownHostException e) {
                 ip = "127.0.0.1";
             }
         } else {
-            ip = maxcompute.getHost();
+            ip = MAXCOMPUTE_CONTAINER.getHost();
         }
-        String endpoint = "http://" + ip + ":" + maxcompute.getFirstMappedPort();
+        String endpoint = "http://" + ip + ":" + MAXCOMPUTE_CONTAINER.getFirstMappedPort();
         sendPOST(endpoint + "/init", endpoint);
         return endpoint;
     }
@@ -80,7 +90,7 @@ public class EmulatorTestBase {
                     "Content-Length", String.valueOf(postData.length()));
 
             try (OutputStream outputStream = httpURLConnection.getOutputStream()) {
-                outputStream.write(postData.getBytes("UTF-8"));
+                outputStream.write(postData.getBytes(StandardCharsets.UTF_8));
                 outputStream.flush();
             }
             int responseCode = httpURLConnection.getResponseCode();

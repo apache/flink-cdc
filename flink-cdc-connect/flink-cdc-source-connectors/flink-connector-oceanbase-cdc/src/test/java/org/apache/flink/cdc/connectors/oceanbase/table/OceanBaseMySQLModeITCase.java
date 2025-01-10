@@ -58,14 +58,14 @@ class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    public static final Network NETWORK = Network.newNetwork();
+    private static final Network NETWORK = Network.newNetwork();
 
     @Container
-    public static final OceanBaseContainer OB_SERVER =
+    private static final OceanBaseContainer OB_SERVER =
             createOceanBaseContainerForCDC().withNetwork(NETWORK);
 
     @Container
-    public static final LogProxyContainer LOG_PROXY =
+    private static final LogProxyContainer LOG_PROXY =
             createLogProxyContainer().withNetwork(NETWORK);
 
     private static final OceanBaseCdcMetadata METADATA =

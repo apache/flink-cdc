@@ -129,7 +129,7 @@ class JaninoCompilerTest {
     }
 
     @Test
-    public void testLargeNumericLiterals() {
+    void testLargeNumericLiterals() {
         // Test parsing integer literals
         Stream.of(
                         Tuple2.of("0", 0),

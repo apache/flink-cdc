@@ -55,7 +55,7 @@ import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOA
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Parallelized Integration test for MySQL connector. */
-public class MySqlParallelizedPipelineITCase extends MySqlSourceTestBase {
+class MySqlParallelizedPipelineITCase extends MySqlSourceTestBase {
 
     private static final int PARALLELISM = 4;
     private static final int TEST_TABLE_NUMBER = 100;
@@ -93,7 +93,7 @@ public class MySqlParallelizedPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testExtremeParallelizedSchemaChange() throws Exception {
+    void testExtremeParallelizedSchemaChange() throws Exception {
         final String databaseName = parallelismDatabase.getDatabaseName();
         try (Connection conn =
                         DriverManager.getConnection(

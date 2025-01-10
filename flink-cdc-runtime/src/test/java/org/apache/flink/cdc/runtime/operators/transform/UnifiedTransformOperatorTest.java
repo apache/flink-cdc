@@ -1041,7 +1041,7 @@ class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testTransformWithCommentsAndExpressions() throws Exception {
+    void testTransformWithCommentsAndExpressions() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         UnifiedTransformTestCase.of(
                         tableId,

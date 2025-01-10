@@ -817,7 +817,7 @@ class RouteE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testExtremeMergeTableRoute() throws Exception {
+    void testExtremeMergeTableRoute() throws Exception {
         final String databaseName = extremeRouteTestDatabase.getDatabaseName();
         try (Connection conn =
                         DriverManager.getConnection(

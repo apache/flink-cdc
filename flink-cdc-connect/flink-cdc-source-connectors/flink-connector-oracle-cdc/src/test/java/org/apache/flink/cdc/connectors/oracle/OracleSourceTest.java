@@ -203,7 +203,7 @@ class OracleSourceTest extends OracleSourceTestBase {
             assertHistoryState(historyState);
             Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            Assertions.assertThat(JsonPath.read(state, "$.sourcePartition.server").toString())
+            Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
                     .isEqualTo("oracle_logminer");
 
             Assertions.assertThat(state)
@@ -255,7 +255,7 @@ class OracleSourceTest extends OracleSourceTestBase {
                 assertHistoryState(historyState); // assert the DDL is stored in the history state
                 Assertions.assertThat(offsetState.list).hasSize(1);
                 String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-                Assertions.assertThat(JsonPath.read(state, "$.sourcePartition.server").toString())
+                Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
                         .isEqualTo("oracle_logminer");
 
                 // execute 2 more DMLs to have more redo log
@@ -314,7 +314,7 @@ class OracleSourceTest extends OracleSourceTestBase {
             assertHistoryState(historyState); // assert the DDL is stored in the history state
             Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            Assertions.assertThat(JsonPath.read(state, "$.sourcePartition.server").toString())
+            Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
                     .isEqualTo("oracle_logminer");
 
             source3.close();
@@ -353,7 +353,7 @@ class OracleSourceTest extends OracleSourceTestBase {
             assertHistoryState(historyState); // assert the DDL is stored in the history state
             Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            Assertions.assertThat(JsonPath.read(state, "$.sourcePartition.server").toString())
+            Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
                     .isEqualTo("oracle_logminer");
 
             source4.close();
@@ -527,7 +527,7 @@ class OracleSourceTest extends OracleSourceTestBase {
                 assertHistoryState(historyState); // assert the DDL is stored in the history state
                 Assertions.assertThat(offsetState.list).hasSize(1);
                 String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-                Assertions.assertThat(JsonPath.read(state, "$.sourcePartition.server").toString())
+                Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
                         .isEqualTo("oracle_logminer");
             }
 

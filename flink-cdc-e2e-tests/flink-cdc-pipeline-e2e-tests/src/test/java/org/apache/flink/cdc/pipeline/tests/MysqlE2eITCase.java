@@ -332,7 +332,7 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testSoftDelete() throws Exception {
+    void testSoftDelete() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"

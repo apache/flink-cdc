@@ -108,7 +108,7 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     private final ScheduledExecutorService mockBinlogExecutor = Executors.newScheduledThreadPool(1);
 
     @BeforeEach
-    public void before() throws SQLException {
+    void before() throws SQLException {
         TestValuesTableFactory.clearAllData();
         customDatabase.createAndInitialize();
 
@@ -139,7 +139,7 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @AfterEach
-    public void after() {
+    void after() {
         mockBinlogExecutor.shutdown();
     }
 
@@ -191,7 +191,7 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
                         .filter((event) -> event instanceof CreateTableEvent)
                         .map((event) -> ((SchemaChangeEvent) event).tableId().getTableName())
                         .collect(Collectors.toList());
-        assertThat(tableNames.size()).isEqualTo(2);
+        assertThat(tableNames).hasSize(2);
         assertThat(tableNames.get(0)).isEqualTo("address_beijing");
         assertThat(tableNames.get(1)).isEqualTo("address_shanghai");
     }
@@ -233,7 +233,7 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
                         .filter((event) -> event instanceof CreateTableEvent)
                         .map((event) -> ((SchemaChangeEvent) event).tableId().getTableName())
                         .collect(Collectors.toList());
-        assertThat(tableNames.size()).isEqualTo(1);
+        assertThat(tableNames).hasSize(1);
         assertThat(tableNames.get(0)).isEqualTo("address_shanghai");
     }
 
