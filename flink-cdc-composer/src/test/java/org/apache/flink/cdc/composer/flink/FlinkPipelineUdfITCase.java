@@ -40,6 +40,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -54,9 +55,7 @@ import java.util.LinkedHashMap;
 import java.util.stream.Stream;
 
 import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
-import static org.apache.flink.core.testutils.FlinkAssertions.anyCauseMatches;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /** Integration test for UDFs. */
@@ -841,6 +840,7 @@ public class FlinkPipelineUdfITCase {
 
     @ParameterizedTest
     @MethodSource("testParams")
+    @Disabled("For manual test as there is a limit for quota.")
     void testTransformWithModel(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
@@ -898,18 +898,14 @@ public class FlinkPipelineUdfITCase {
 
         // Execute the pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
-        assertThatThrownBy(
-                        () -> {
-                            execution.execute();
-                            // Check the order and content of all received events
-                            String[] outputEvents = outCaptor.toString().trim().split("\n");
-                            assertThat(outputEvents)
-                                    .contains(
-                                            "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING NOT NULL,`col2` STRING,`emb` STRING}, primaryKeys=col1, options=({key1=value1})}")
-                                    // The result of transform by model is not fixed.
-                                    .hasSize(9);
-                        })
-                .satisfies(anyCauseMatches("quota"));
+        execution.execute();
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents)
+                .contains(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING NOT NULL,`col2` STRING,`emb` STRING}, primaryKeys=col1, options=({key1=value1})}")
+                // The result of transform by model is not fixed.
+                .hasSize(9);
     }
 
     private static Stream<Arguments> testParams() {

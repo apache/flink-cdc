@@ -21,14 +21,13 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-
-import static org.apache.flink.core.testutils.FlinkAssertions.anyCauseMatches;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** A test for {@link OpenAIChatModel}. */
 public class TestOpenAIChatModel {
     @Test
+    @Disabled("For manual test as there is a limit for quota.")
     public void testEval() {
         OpenAIChatModel openAIChatModel = new OpenAIChatModel();
         Configuration configuration = new Configuration();
@@ -37,12 +36,7 @@ public class TestOpenAIChatModel {
         configuration.set(ModelOptions.OPENAI_MODEL_NAME, "gpt-4o-mini");
         UserDefinedFunctionContext userDefinedFunctionContext = () -> configuration;
         openAIChatModel.open(userDefinedFunctionContext);
-        assertThatThrownBy(
-                        () -> {
-                            String response =
-                                    openAIChatModel.eval("Who invented the electric light?");
-                            Assertions.assertFalse(response.isEmpty());
-                        })
-                .satisfies(anyCauseMatches("quota"));
+        String response = openAIChatModel.eval("Who invented the electric light?");
+        Assertions.assertFalse(response.isEmpty());
     }
 }
