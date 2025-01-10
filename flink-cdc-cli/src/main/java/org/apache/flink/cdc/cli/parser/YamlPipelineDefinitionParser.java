@@ -63,6 +63,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     // Source / sink keys
     private static final String TYPE_KEY = "type";
+    private static final String SOURCES = "sources";
     private static final String NAME_KEY = "name";
     private static final String INCLUDE_SCHEMA_EVOLUTION_TYPES = "include.schema.changes";
     private static final String EXCLUDE_SCHEMA_EVOLUTION_TYPES = "exclude.schema.changes";
@@ -96,6 +97,13 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     public static final String TRANSFORM_PARTITION_KEY_KEY = "partition-keys";
 
     public static final String TRANSFORM_TABLE_OPTION_KEY = "table-options";
+
+    private static final String HOST_LIST = "host_list";
+    private static final String COMMA = ",";
+    private static final String HOST_NAME = "hostname";
+    private static final String PORT = "port";
+    private static final String COLON = ":";
+    private static final String MULTIPLE = "multiple";
 
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
@@ -135,13 +143,28 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         SchemaChangeBehavior schemaChangeBehavior =
                 userPipelineConfig.get(PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
 
-        // Source is required
-        SourceDef sourceDef =
-                toSourceDef(
-                        checkNotNull(
-                                pipelineDefJsonNode.get(SOURCE_KEY),
-                                "Missing required field \"%s\" in pipeline definition",
-                                SOURCE_KEY));
+        JsonNode sourceNode = pipelineDefJsonNode.get(SOURCE_KEY);
+        JsonNode hostList = sourceNode.get(HOST_LIST);
+        String type = sourceNode.get(TYPE_KEY).asText();
+        JsonNode sources = sourceNode.get(SOURCES);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        if (sources != null && sources.asText().equals(MULTIPLE) && hostList != null) {
+            String hostString = hostList.asText();
+            String[] hosts = hostString.split(COMMA);
+            Arrays.stream(hosts)
+                    .forEach(
+                            e -> {
+                                ((ObjectNode) sourceNode)
+                                        .put(TYPE_KEY, type.substring(0, type.indexOf("_")));
+                                ((ObjectNode) sourceNode).put(HOST_NAME, e.split(COLON)[0]);
+                                ((ObjectNode) sourceNode).put(PORT, e.split(COLON)[1]);
+                                ((ObjectNode) sourceNode).remove(HOST_LIST);
+                                getSourceDefs(sourceNode, sourceDefs);
+                            });
+        } else {
+            // Source is required
+            getSourceDefs(sourceNode, sourceDefs);
+        }
 
         // Sink is required
         SinkDef sinkDef =
@@ -171,7 +194,17 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         pipelineConfig.addAll(userPipelineConfig);
 
         return new PipelineDef(
-                sourceDef, sinkDef, routeDefs, transformDefs, udfDefs, modelDefs, pipelineConfig);
+                sourceDefs, sinkDef, routeDefs, transformDefs, udfDefs, modelDefs, pipelineConfig);
+    }
+
+    private void getSourceDefs(JsonNode root, List<SourceDef> sourceDefs) {
+        SourceDef sourceDef =
+                toSourceDef(
+                        checkNotNull(
+                                root,
+                                "Missing required field \"%s\" in pipeline definition",
+                                SOURCE_KEY));
+        sourceDefs.add(sourceDef);
     }
 
     private SourceDef toSourceDef(JsonNode sourceNode) {

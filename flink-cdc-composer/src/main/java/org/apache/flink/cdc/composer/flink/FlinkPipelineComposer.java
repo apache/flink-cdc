@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
+import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
 import org.apache.flink.cdc.composer.flink.translator.DataSourceTranslator;
@@ -126,16 +127,28 @@ public class FlinkPipelineComposer implements PipelineComposer {
         // And required constructors
         OperatorIDGenerator schemaOperatorIDGenerator =
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
-        DataSource dataSource =
-                sourceTranslator.createDataSource(pipelineDef.getSource(), pipelineDefConfig, env);
+        List<SourceDef> sourceDefs = pipelineDef.getSources();
         DataSink dataSink =
                 sinkTranslator.createDataSink(pipelineDef.getSink(), pipelineDefConfig, env);
-
-        boolean isParallelMetadataSource = dataSource.isParallelMetadataSource();
-
         // O ---> Source
-        DataStream<Event> stream =
-                sourceTranslator.translate(pipelineDef.getSource(), dataSource, env, parallelism);
+        DataStream<Event> stream = null;
+        DataSource dataSource = null;
+        for (SourceDef sourceDef : sourceDefs) {
+            dataSource = sourceTranslator.createDataSource(sourceDef, pipelineDefConfig, env);
+            DataStream<Event> streamBranch =
+                    sourceTranslator.translate(sourceDef, dataSource, env, parallelism);
+            if (stream == null) {
+                stream = streamBranch;
+            } else {
+                stream = stream.union(streamBranch);
+            }
+        }
+        boolean isParallelMetadataSource;
+        if (sourceDefs.size() > 1) {
+            isParallelMetadataSource = true;
+        } else {
+            isParallelMetadataSource = dataSource.isParallelMetadataSource();
+        }
 
         // Source ---> PreTransform
         stream =

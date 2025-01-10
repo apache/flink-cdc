@@ -53,6 +53,7 @@ import java.io.PrintStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -978,9 +979,11 @@ class FlinkParallelizedPipelineITCase {
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, parallelism);
         pipelineConfig.set(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, exception);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         traits == SourceTraits.MERGING ? ROUTING_RULES : Collections.emptyList(),
                         Collections.emptyList(),

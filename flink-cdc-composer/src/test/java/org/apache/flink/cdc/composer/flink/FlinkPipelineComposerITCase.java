@@ -148,9 +148,11 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.emptyList(),
@@ -185,6 +187,89 @@ class FlinkPipelineComposerITCase {
 
     @ParameterizedTest
     @EnumSource
+    void testSingleSplitMultipleSources(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig1 = new Configuration();
+        sourceConfig1.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_SINGLE_TABLE);
+        Configuration sourceConfig2 = new Configuration();
+        sourceConfig2.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_MULTI_TABLES);
+        SourceDef sourceDef1 =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source1", sourceConfig1);
+        SourceDef sourceDef2 =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source2", sourceConfig2);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef1);
+        sourceDefs.add(sourceDef2);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDefs,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check result in ValuesDatabase
+        List<String> table1Results = ValuesDatabase.getResults(TABLE_1);
+        assertThat(table1Results)
+                .containsExactly(
+                        "default_namespace.default_schema.table1:col1=2;newCol3=x",
+                        "default_namespace.default_schema.table1:col1=3;newCol3=");
+        List<String> table2Results = ValuesDatabase.getResults(TABLE_2);
+        assertThat(table2Results)
+                .contains(
+                        "default_namespace.default_schema.table2:col1=1;col2=1",
+                        "default_namespace.default_schema.table2:col1=2;col2=2",
+                        "default_namespace.default_schema.table2:col1=3;col2=3");
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents)
+                .containsExactlyInAnyOrder(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table2, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[3, 3], op=INSERT, meta=()}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=LAST, existedColumnName=null}]}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table2, before=[], after=[1, 1], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table2, before=[], after=[2, 2], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table2, before=[], after=[3, 3], op=INSERT, meta=()}",
+                        "RenameColumnEvent{tableId=default_namespace.default_schema.table1, nameMapping={col2=newCol2, col3=newCol3}}",
+                        "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[newCol2]}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, 1], after=[], op=DELETE, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, 2], after=[2, x], op=UPDATE, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[3, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, 1, 1], after=[], op=DELETE, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, 2, 2], after=[2, x, x], op=UPDATE, meta=()}");
+    }
+
+    @ParameterizedTest
+    @EnumSource
     void testSingleSplitMultipleTables(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
@@ -207,9 +292,11 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.emptyList(),
@@ -274,9 +361,11 @@ class FlinkPipelineComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, MAX_PARALLELISM);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         Collections.emptyList(),
@@ -332,9 +421,11 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         new ArrayList<>(Arrays.asList(transformDef)),
@@ -395,9 +486,11 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         new ArrayList<>(Collections.singletonList(transformDef)),
@@ -467,9 +560,11 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.emptyList(),
                         new ArrayList<>(Arrays.asList(transformDef1, transformDef2)),
@@ -526,9 +621,11 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         routeDef,
                         Collections.emptyList(),
@@ -603,9 +700,11 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         routeDef,
                         Collections.emptyList(),
@@ -804,9 +903,11 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         routeDef,
                         Collections.emptyList(),
@@ -1015,9 +1116,11 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         routeDef,
                         transformDef,
@@ -1290,9 +1393,11 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.singletonList(
                                 new RouteDef(
@@ -1356,9 +1461,11 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         pipelineConfig.set(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE, "America/New_York");
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Arrays.asList(
                                 new RouteDef(
@@ -1468,9 +1575,11 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        List<SourceDef> sourceDefs = new ArrayList<>();
+        sourceDefs.add(sourceDef);
         PipelineDef pipelineDef =
                 new PipelineDef(
-                        sourceDef,
+                        sourceDefs,
                         sinkDef,
                         Collections.singletonList(
                                 new RouteDef(
