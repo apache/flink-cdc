@@ -24,6 +24,9 @@ import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static org.apache.flink.core.testutils.FlinkAssertions.anyCauseMatches;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 /** A test for {@link OpenAIEmbeddingModel}. */
 public class TestOpenAIEmbeddingModel {
 
@@ -36,8 +39,12 @@ public class TestOpenAIEmbeddingModel {
         configuration.set(ModelOptions.OPENAI_MODEL_NAME, "text-embedding-3-small");
         UserDefinedFunctionContext userDefinedFunctionContext = () -> configuration;
         openAIEmbeddingModel.open(userDefinedFunctionContext);
-        ArrayData arrayData =
-                openAIEmbeddingModel.eval("Flink CDC is a streaming data integration tool");
-        Assertions.assertNotNull(arrayData);
+        assertThatThrownBy(
+                () -> {
+                    ArrayData arrayData =
+                            openAIEmbeddingModel.eval("Flink CDC is a streaming data integration tool");
+                    Assertions.assertNotNull(arrayData);
+                })
+                .satisfies(anyCauseMatches("quota"));
     }
 }

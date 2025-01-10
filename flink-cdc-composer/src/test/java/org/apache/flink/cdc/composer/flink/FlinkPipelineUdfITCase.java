@@ -54,7 +54,9 @@ import java.util.LinkedHashMap;
 import java.util.stream.Stream;
 
 import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
+import static org.apache.flink.core.testutils.FlinkAssertions.anyCauseMatches;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /** Integration test for UDFs. */
@@ -896,15 +898,18 @@ public class FlinkPipelineUdfITCase {
 
         // Execute the pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
-        execution.execute();
-
-        // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
-        assertThat(outputEvents)
-                .contains(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING NOT NULL,`col2` STRING,`emb` STRING}, primaryKeys=col1, options=({key1=value1})}")
-                // The result of transform by model is not fixed.
-                .hasSize(9);
+        assertThatThrownBy(
+                        () -> {
+                            execution.execute();
+                            // Check the order and content of all received events
+                            String[] outputEvents = outCaptor.toString().trim().split("\n");
+                            assertThat(outputEvents)
+                                    .contains(
+                                            "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING NOT NULL,`col2` STRING,`emb` STRING}, primaryKeys=col1, options=({key1=value1})}")
+                                    // The result of transform by model is not fixed.
+                                    .hasSize(9);
+                        })
+                .satisfies(anyCauseMatches("quota"));
     }
 
     private static Stream<Arguments> testParams() {

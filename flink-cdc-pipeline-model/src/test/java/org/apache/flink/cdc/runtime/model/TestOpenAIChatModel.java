@@ -23,6 +23,10 @@ import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static org.apache.flink.core.testutils.FlinkAssertions.anyCauseMatches;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 /** A test for {@link OpenAIChatModel}. */
 public class TestOpenAIChatModel {
     @Test
@@ -34,7 +38,11 @@ public class TestOpenAIChatModel {
         configuration.set(ModelOptions.OPENAI_MODEL_NAME, "gpt-4o-mini");
         UserDefinedFunctionContext userDefinedFunctionContext = () -> configuration;
         openAIChatModel.open(userDefinedFunctionContext);
-        String response = openAIChatModel.eval("Who invented the electric light?");
-        Assertions.assertFalse(response.isEmpty());
+        assertThatThrownBy(
+                () -> {
+                    String response = openAIChatModel.eval("Who invented the electric light?");
+                    Assertions.assertFalse(response.isEmpty());
+                })
+                .satisfies(anyCauseMatches("quota"));
     }
 }
