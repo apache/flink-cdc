@@ -20,9 +20,12 @@ package org.apache.flink.cdc.runtime.serializer.event;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.stream.Stream;
 
 /** A test for the {@link EventSerializer}. */
@@ -44,7 +47,20 @@ public class EventSerializerTest extends SerializerTestBase<Event> {
 
     @Override
     protected Event[] getTestData() {
-        Event[] flushEvents = new Event[] {new FlushEvent(1), new FlushEvent(2), new FlushEvent(3)};
+        Event[] flushEvents =
+                new Event[] {
+                    new FlushEvent(1, Collections.emptyList(), SchemaChangeEventType.CREATE_TABLE),
+                    new FlushEvent(
+                            2,
+                            Collections.singletonList(TableId.tableId("schema", "table")),
+                            SchemaChangeEventType.CREATE_TABLE),
+                    new FlushEvent(
+                            3,
+                            Arrays.asList(
+                                    TableId.tableId("schema", "table"),
+                                    TableId.tableId("namespace", "schema", "table")),
+                            SchemaChangeEventType.CREATE_TABLE)
+                };
         Event[] dataChangeEvents = new DataChangeEventSerializerTest().getTestData();
         Event[] schemaChangeEvents = new SchemaChangeEventSerializerTest().getTestData();
         return Stream.concat(

@@ -18,7 +18,10 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2.bucket;
 
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.TableId;
 
+import java.util.List;
 import java.util.Objects;
 
 /** A wrapper class for {@link FlushEvent} to attach bucket id. */
@@ -26,8 +29,12 @@ public class BucketWrapperFlushEvent extends FlushEvent implements BucketWrapper
 
     private final int bucket;
 
-    public BucketWrapperFlushEvent(int bucket, int subTaskId) {
-        super(subTaskId);
+    public BucketWrapperFlushEvent(
+            int bucket,
+            int subTaskId,
+            List<TableId> tableIds,
+            SchemaChangeEventType schemaChangeEventType) {
+        super(subTaskId, tableIds, schemaChangeEventType);
         this.bucket = bucket;
     }
 
