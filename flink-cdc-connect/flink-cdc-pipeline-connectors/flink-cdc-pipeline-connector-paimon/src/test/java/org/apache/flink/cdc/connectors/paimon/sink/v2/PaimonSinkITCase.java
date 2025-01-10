@@ -187,10 +187,8 @@ public class PaimonSinkITCase {
         writeAndCommit(
                 writer, committer, createTestEvents(enableDeleteVector).toArray(new Event[0]));
         Assertions.assertThat(fetchResults(table1))
-                .isEqualTo(
-                        Arrays.asList(
-                                Row.ofKind(RowKind.INSERT, "1", "1"),
-                                Row.ofKind(RowKind.INSERT, "2", "2")));
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, "1", "1"), Row.ofKind(RowKind.INSERT, "2", "2"));
 
         // delete
         writeAndCommit(
@@ -200,7 +198,7 @@ public class PaimonSinkITCase {
                         table1, Arrays.asList(Tuple2.of(STRING(), "1"), Tuple2.of(STRING(), "1"))));
 
         Assertions.assertThat(fetchResults(table1))
-                .isEqualTo(Collections.singletonList(Row.ofKind(RowKind.INSERT, "2", "2")));
+                .containsExactlyInAnyOrder(Row.ofKind(RowKind.INSERT, "2", "2"));
 
         // update
         writeAndCommit(
@@ -211,22 +209,18 @@ public class PaimonSinkITCase {
                         Arrays.asList(Tuple2.of(STRING(), "2"), Tuple2.of(STRING(), "2")),
                         Arrays.asList(Tuple2.of(STRING(), "2"), Tuple2.of(STRING(), "x"))));
         Assertions.assertThat(fetchResults(table1))
-                .isEqualTo(Collections.singletonList(Row.ofKind(RowKind.INSERT, "2", "x")));
+                .containsExactlyInAnyOrder(Row.ofKind(RowKind.INSERT, "2", "x"));
 
         if (enableDeleteVector) {
-        Assertions.assertThat(fetchResults(
-                TableId.tableId("test", "`table1$files`")
-        )).containsExactly(
-                Row.ofKind(RowKind.INSERT, 1L), Row.ofKind(RowKind.INSERT, 3L)
-        );
+            Assertions.assertThat(fetchMaxSequenceNumber(table1.getTableName()))
+                    .containsExactlyInAnyOrder(
+                            Row.ofKind(RowKind.INSERT, 1L), Row.ofKind(RowKind.INSERT, 3L));
         } else {
-            Assertions.assertThat(fetchResults(
-                    TableId.tableId("test", "`table1$files`")
-            )).containsExactly(
-                    Row.ofKind(RowKind.INSERT, 1L),
-                    Row.ofKind(RowKind.INSERT, 2L),
-                    Row.ofKind(RowKind.INSERT, 3L)
-            );
+            Assertions.assertThat(fetchMaxSequenceNumber(table1.getTableName()))
+                    .containsExactlyInAnyOrder(
+                            Row.ofKind(RowKind.INSERT, 1L),
+                            Row.ofKind(RowKind.INSERT, 2L),
+                            Row.ofKind(RowKind.INSERT, 3L));
         }
     }
 
@@ -246,10 +240,8 @@ public class PaimonSinkITCase {
         writeAndCommit(
                 writer, committer, createTestEvents(enableDeleteVector).toArray(new Event[0]));
         Assertions.assertThat(fetchResults(table1))
-                .isEqualTo(
-                        Arrays.asList(
-                                Row.ofKind(RowKind.INSERT, "1", "1"),
-                                Row.ofKind(RowKind.INSERT, "2", "2")));
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, "1", "1"), Row.ofKind(RowKind.INSERT, "2", "2"));
 
         // 2. receive DataChangeEvents and SchemaChangeEvents during one checkpoint
         writeAndCommit(
@@ -278,12 +270,11 @@ public class PaimonSinkITCase {
                                 Tuple2.of(STRING(), "4"))));
 
         Assertions.assertThat(fetchResults(table1))
-                .isEqualTo(
-                        Arrays.asList(
-                                Row.ofKind(RowKind.INSERT, "1", "1", null),
-                                Row.ofKind(RowKind.INSERT, "2", "2", null),
-                                Row.ofKind(RowKind.INSERT, "3", "3", null),
-                                Row.ofKind(RowKind.INSERT, "4", "4", "4")));
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, "1", "1", null),
+                        Row.ofKind(RowKind.INSERT, "2", "2", null),
+                        Row.ofKind(RowKind.INSERT, "3", "3", null),
+                        Row.ofKind(RowKind.INSERT, "4", "4", "4"));
 
         // 2. receive DataChangeEvents and SchemaChangeEvents during one checkpoint
         writeAndCommit(
@@ -313,14 +304,13 @@ public class PaimonSinkITCase {
         Assertions.assertThat(result).hasSameSizeAs(deduplicated);
 
         Assertions.assertThat(fetchResults(table1))
-                .isEqualTo(
-                        Arrays.asList(
-                                Row.ofKind(RowKind.INSERT, "1", null),
-                                Row.ofKind(RowKind.INSERT, "2", null),
-                                Row.ofKind(RowKind.INSERT, "3", null),
-                                Row.ofKind(RowKind.INSERT, "4", "4"),
-                                Row.ofKind(RowKind.INSERT, "5", "5"),
-                                Row.ofKind(RowKind.INSERT, "6", "6")));
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, "1", null),
+                        Row.ofKind(RowKind.INSERT, "2", null),
+                        Row.ofKind(RowKind.INSERT, "3", null),
+                        Row.ofKind(RowKind.INSERT, "4", "4"),
+                        Row.ofKind(RowKind.INSERT, "5", "5"),
+                        Row.ofKind(RowKind.INSERT, "6", "6"));
 
         TruncateTableEvent truncateTableEvent = new TruncateTableEvent(table1);
         metadataApplier.applySchemaChange(truncateTableEvent);
@@ -366,12 +356,10 @@ public class PaimonSinkITCase {
         writeAndCommit(writer, committer, testEvents.toArray(new Event[0]));
 
         Assertions.assertThat(fetchResults(table1))
-                .isEqualTo(
-                        Arrays.asList(
-                                Row.ofKind(RowKind.INSERT, "1", "1"),
-                                Row.ofKind(RowKind.INSERT, "2", "2")));
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, "1", "1"), Row.ofKind(RowKind.INSERT, "2", "2"));
         Assertions.assertThat(fetchResults(table2))
-                .isEqualTo(Collections.singletonList(Row.ofKind(RowKind.INSERT, "1", "1")));
+                .containsExactlyInAnyOrder(Row.ofKind(RowKind.INSERT, "1", "1"));
     }
 
     private static void commit(
@@ -398,6 +386,18 @@ public class PaimonSinkITCase {
     private List<Row> fetchResults(TableId tableId) {
         List<Row> results = new ArrayList<>();
         tEnv.sqlQuery("select * from paimon_catalog." + tableId.toString())
+                .execute()
+                .collect()
+                .forEachRemaining(results::add);
+        return results;
+    }
+
+    private List<Row> fetchMaxSequenceNumber(String tableName) {
+        List<Row> results = new ArrayList<>();
+        tEnv.sqlQuery(
+                        "select max_sequence_number from paimon_catalog.test.`"
+                                + tableName
+                                + "$files`")
                 .execute()
                 .collect()
                 .forEachRemaining(results::add);
@@ -508,7 +508,7 @@ public class PaimonSinkITCase {
                 .collect()
                 .forEachRemaining(result::add);
         Assertions.assertThat(result)
-                .containsExactly(
+                .containsExactlyInAnyOrder(
                         Row.ofKind(RowKind.INSERT, "1", "1"),
                         Row.ofKind(RowKind.INSERT, "2", "2"),
                         Row.ofKind(RowKind.INSERT, "3", "3"),
