@@ -27,6 +27,7 @@ import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +35,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -143,6 +145,70 @@ class CliFrontendTest {
         PipelineExecution.ExecutionInfo executionInfo = executor.run();
         assertThat(executionInfo.getId()).isEqualTo("fake-id");
         assertThat(executionInfo.getDescription()).isEqualTo("fake-description");
+    }
+
+    @Test
+    void testPipelineExecutingWithFlinkConfig() throws Exception {
+        // the command line arguments to submit job to exists remote host on yarn session
+        CliExecutor executor =
+                createExecutor(
+                        pipelineDef(),
+                        "--flink-home",
+                        flinkHome(),
+                        "--global-config",
+                        globalPipelineConfig(),
+                        "-D",
+                        "execution.target= yarn-session",
+                        "-D",
+                        "rest.bind-port =42689",
+                        "-D",
+                        "yarn.application.id=application_1714009558476_3563",
+                        "-D",
+                        "rest.bind-address=10.1.140.140");
+        Map<String, String> configMap = executor.getFlinkConfig().toMap();
+        assertThat(configMap)
+                .containsEntry("execution.target", "yarn-session")
+                .containsEntry("rest.bind-port", "42689")
+                .containsEntry("yarn.application.id", "application_1714009558476_3563")
+                .containsEntry("rest.bind-address", "10.1.140.140");
+    }
+
+    @Test
+    void testPipelineExecutingWithUnValidFlinkConfig() throws Exception {
+        Assertions.assertThatThrownBy(
+                        () ->
+                                createExecutor(
+                                        pipelineDef(),
+                                        "--flink-home",
+                                        flinkHome(),
+                                        "-D",
+                                        "=execution.target"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        String.format(
+                                "null or white space argument for key or value: %s=%s",
+                                "", "execution.target"));
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                createExecutor(
+                                        pipelineDef(),
+                                        "--flink-home",
+                                        flinkHome(),
+                                        "-D",
+                                        "execution.target="))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        String.format(
+                                "null or white space argument for key or value: %s=%s",
+                                "execution.target", ""));
+
+        Assertions.assertThatThrownBy(
+                        () -> createExecutor(pipelineDef(), "--flink-home", flinkHome(), "-D", "="))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        String.format(
+                                "null or white space argument for key or value: %s=%s", "", ""));
     }
 
     private CliExecutor createExecutor(String... args) throws Exception {
