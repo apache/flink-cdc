@@ -20,18 +20,19 @@ package org.apache.flink.cdc.connectors.maxcompute;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
+import org.apache.flink.cdc.connectors.maxcompute.options.CompressAlgorithm;
 
 /** Options for MaxCompute Data Sink. */
 public class MaxComputeDataSinkOptions {
     // basic options.
     public static final ConfigOption<String> ACCESS_ID =
-            ConfigOptions.key("accessId")
+            ConfigOptions.key("access-id")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("MaxCompute user access id.");
 
     public static final ConfigOption<String> ACCESS_KEY =
-            ConfigOptions.key("accessKey")
+            ConfigOptions.key("access-key")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("MaxCompute user access key.");
@@ -49,59 +50,60 @@ public class MaxComputeDataSinkOptions {
                     .withDescription("MaxCompute project.");
 
     public static final ConfigOption<String> TUNNEL_ENDPOINT =
-            ConfigOptions.key("tunnelEndpoint")
+            ConfigOptions.key("tunnel.endpoint")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("MaxCompute tunnel end point.");
+
     public static final ConfigOption<String> QUOTA_NAME =
-            ConfigOptions.key("quotaName")
+            ConfigOptions.key("quota.name")
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
                             "MaxCompute tunnel quota name, note that not quota nick-name.");
 
     public static final ConfigOption<String> STS_TOKEN =
-            ConfigOptions.key("stsToken")
+            ConfigOptions.key("sts-token")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("MaxCompute sts token.");
 
     public static final ConfigOption<Integer> BUCKETS_NUM =
-            ConfigOptions.key("bucketsNum")
+            ConfigOptions.key("buckets-num")
                     .intType()
                     .defaultValue(16)
                     .withDescription(
                             "The batch size of MaxCompute table when automatically create table.");
 
     // write options.
-    public static final ConfigOption<String> COMPRESS_ALGORITHM =
-            ConfigOptions.key("compressAlgorithm")
-                    .stringType()
-                    .defaultValue("zlib")
+    public static final ConfigOption<CompressAlgorithm> COMPRESS_ALGORITHM =
+            ConfigOptions.key("compress.algorithm")
+                    .enumType(CompressAlgorithm.class)
+                    .defaultValue(CompressAlgorithm.ZLIB)
                     .withDescription(
-                            "The compress algorithm of data upload to MaxCompute, support 'zlib', 'snappy', 'raw'.");
+                            "The compress algorithm of data upload to MaxCompute, support 'zlib', 'snappy', 'lz4', 'raw'.");
 
-    public static final ConfigOption<String> TOTAL_BATCH_SIZE =
-            ConfigOptions.key("totalBatchSize")
-                    .stringType()
-                    .defaultValue("64MB")
-                    .withDescription("The max batch size of data upload to MaxCompute.");
-
-    public static final ConfigOption<String> BUCKET_BATCH_SIZE =
-            ConfigOptions.key("bucketBatchSize")
+    public static final ConfigOption<String> BUCKET_BUFFER_SIZE =
+            ConfigOptions.key("bucket.buffer-size")
                     .stringType()
                     .defaultValue("4MB")
                     .withDescription(
                             "The max batch size of data per bucket when upload to MaxCompute");
 
-    public static final ConfigOption<Integer> NUM_COMMIT_THREADS =
-            ConfigOptions.key("numCommitThreads")
+    public static final ConfigOption<String> TOTAL_BUFFER_SIZE =
+            ConfigOptions.key("total.buffer-size")
+                    .stringType()
+                    .defaultValue("64MB")
+                    .withDescription("The max batch size of data upload to MaxCompute.");
+
+    public static final ConfigOption<Integer> COMMIT_THREAD_NUM =
+            ConfigOptions.key("commit.thread-num")
                     .intType()
                     .defaultValue(16)
                     .withDescription("The number of threads used to commit data to MaxCompute.");
 
-    public static final ConfigOption<Integer> NUM_FLUSH_CONCURRENT =
-            ConfigOptions.key("numFlushConcurrent")
+    public static final ConfigOption<Integer> FLUSH_CONCURRENT_NUM =
+            ConfigOptions.key("flush.concurrent-num")
                     .intType()
                     .defaultValue(4)
                     .withDescription("The number of concurrent with flush bucket data.");
