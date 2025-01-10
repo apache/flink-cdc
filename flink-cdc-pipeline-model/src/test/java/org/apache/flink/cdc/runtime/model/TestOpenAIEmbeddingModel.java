@@ -22,12 +22,14 @@ import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /** A test for {@link OpenAIEmbeddingModel}. */
 public class TestOpenAIEmbeddingModel {
 
     @Test
+    @Disabled("For manual test as there is a limit for quota.")
     public void testEval() {
         OpenAIEmbeddingModel openAIEmbeddingModel = new OpenAIEmbeddingModel();
         Configuration configuration = new Configuration();
