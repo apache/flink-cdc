@@ -437,7 +437,7 @@ public class JaninoCompiler {
                 return new Java.MethodInvocation(
                         Location.NOWHERE,
                         null,
-                        "castToBigDecimal",
+                        "castToDecimalData",
                         newAtoms.toArray(new Java.Rvalue[0]));
             case "CHAR":
             case "VARCHAR":
@@ -463,7 +463,7 @@ public class JaninoCompiler {
             return String.format(
                     "(%s) __instanceOf%s.eval",
                     DataTypeConverter.convertOriginalClass(udfFunction.getReturnTypeHint())
-                            .getName(),
+                            .getCanonicalName(),
                     udfFunction.getClassName());
         } else {
             return String.format("__instanceOf%s.eval", udfFunction.getClassName());
