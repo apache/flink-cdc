@@ -243,6 +243,17 @@ public class TransformParserTest {
         testFilterExpression(
                 "id = CURRENT_TIMESTAMP", "valueEquals(id, currentTimestamp(__epoch_time__))");
         testFilterExpression("NOW()", "now(__epoch_time__)");
+        testFilterExpression("FROM_UNIXTIME(44)", "fromUnixtime(44, __time_zone__)");
+        testFilterExpression(
+                "FROM_UNIXTIME(44, 'yyyy/MM/dd HH:mm:ss')",
+                "fromUnixtime(44, \"yyyy/MM/dd HH:mm:ss\", __time_zone__)");
+        testFilterExpression("UNIX_TIMESTAMP()", "unixTimestamp(__epoch_time__, __time_zone__)");
+        testFilterExpression(
+                "UNIX_TIMESTAMP('1970-01-01 08:00:01')",
+                "unixTimestamp(\"1970-01-01 08:00:01\", __epoch_time__, __time_zone__)");
+        testFilterExpression(
+                "UNIX_TIMESTAMP('1970-01-01 08:00:01.001 +0800', 'yyyy-MM-dd HH:mm:ss.SSS X')",
+                "unixTimestamp(\"1970-01-01 08:00:01.001 +0800\", \"yyyy-MM-dd HH:mm:ss.SSS X\", __epoch_time__, __time_zone__)");
         testFilterExpression("YEAR(dt)", "year(dt)");
         testFilterExpression("QUARTER(dt)", "quarter(dt)");
         testFilterExpression("MONTH(dt)", "month(dt)");
