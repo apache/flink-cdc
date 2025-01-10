@@ -20,6 +20,7 @@ package org.apache.flink.cdc.cli.parser;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.shade.utils.ConfigShadeUtils;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
@@ -32,6 +33,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.net.URL;
@@ -57,6 +59,10 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 /** Unit test for {@link org.apache.flink.cdc.cli.parser.YamlPipelineDefinitionParser}. */
 class YamlPipelineDefinitionParserTest {
 
+    private static final String USERNAME = "flinkcdc";
+
+    private static final String PASSWORD = "flinkcdc_password";
+
     @Test
     void testParsingFullDefinition() throws Exception {
         URL resource = Resources.getResource("definitions/pipeline-definition-full.yaml");
@@ -79,6 +85,25 @@ class YamlPipelineDefinitionParserTest {
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
         assertThat(pipelineDef).isEqualTo(minimizedDef);
+    }
+
+    @Test
+    public void testDecryptOptions() {
+        String encryptUsername = "ZmxpbmtjZGM=";
+        String encryptPassword = "ZmxpbmtjZGNfcGFzc3dvcmQ=";
+        String decryptUsername = ConfigShadeUtils.decryptOption("base64", encryptUsername);
+        String decryptPassword = ConfigShadeUtils.decryptOption("base64", encryptPassword);
+        Assertions.assertEquals(decryptUsername, USERNAME);
+        Assertions.assertEquals(decryptPassword, PASSWORD);
+    }
+
+    @Test
+    void testParsingBase64EncodedDefinition() throws Exception {
+        URL resource =
+                Resources.getResource("definitions/pipeline-definition-with-base64-encoded.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(decryptedDefWithBase64Encode);
     }
 
     @Test
@@ -366,6 +391,41 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "4")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
+                                    .build()));
+
+    private final PipelineDef decryptedDefWithBase64Encode =
+            new PipelineDef(
+                    new SourceDef(
+                            "mysql",
+                            "source-database",
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("host", "localhost")
+                                            .put("port", "3306")
+                                            .put("username", "admin")
+                                            .put("password", "password1")
+                                            .put("tables", "replication.cluster")
+                                            .build())),
+                    new SinkDef(
+                            "doris",
+                            "sink-queue",
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("fenodes", "localhost:8035")
+                                            .put("username", "root")
+                                            .put("password", "password2")
+                                            .build())),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("name", "source-database-sync-pipe")
+                                    .put("parallelism", "4")
+                                    .put("schema.change.behavior", "evolve")
+                                    .put("schema-operator.rpc-timeout", "1 h")
+                                    .put("shade.identifier", "base64")
+                                    .put("shade.sensitive.keywords", "password;username")
                                     .build()));
 
     @Test
