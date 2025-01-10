@@ -28,12 +28,14 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.FlinkCatalogFactory;
@@ -41,13 +43,12 @@ import org.apache.paimon.flink.LogicalTypeConversion;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.SchemaChange;
 import org.apache.paimon.table.Table;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
@@ -58,8 +59,6 @@ import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
  * only.
  */
 public class PaimonMetadataApplier implements MetadataApplier {
-
-    private static final Logger LOG = LoggerFactory.getLogger(PaimonMetadataApplier.class);
 
     // Catalog is unSerializable.
     private transient Catalog catalog;
@@ -210,6 +209,21 @@ public class PaimonMetadataApplier implements MetadataApplier {
         try {
             List<SchemaChange> tableChangeList = new ArrayList<>();
             for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
+                // if default value express exists, we need to set the default value to the table
+                // option
+                Column column = columnWithPosition.getAddColumn();
+                Optional.ofNullable(column.getDefaultValueExpression())
+                        .ifPresent(
+                                value -> {
+                                    String key =
+                                            String.format(
+                                                    "%s.%s.%s",
+                                                    CoreOptions.FIELDS_PREFIX,
+                                                    column.getName(),
+                                                    CoreOptions.DEFAULT_VALUE_SUFFIX);
+                                    tableChangeList.add(SchemaChangeProvider.setOption(key, value));
+                                });
+
                 SchemaChange tableChange;
                 switch (columnWithPosition.getPosition()) {
                     case FIRST:
