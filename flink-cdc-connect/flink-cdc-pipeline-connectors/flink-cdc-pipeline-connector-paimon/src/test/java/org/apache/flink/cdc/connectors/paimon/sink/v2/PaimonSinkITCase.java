@@ -38,6 +38,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
@@ -313,8 +314,14 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "6", "6"));
 
         TruncateTableEvent truncateTableEvent = new TruncateTableEvent(table1);
-        metadataApplier.applySchemaChange(truncateTableEvent);
-        Assertions.assertThat(fetchResults(table1)).isEmpty();
+        if (enableDeleteVector) {
+            Assertions.assertThatThrownBy(
+                            () -> metadataApplier.applySchemaChange(truncateTableEvent))
+                    .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class);
+        } else {
+            metadataApplier.applySchemaChange(truncateTableEvent);
+            Assertions.assertThat(fetchResults(table1)).isEmpty();
+        }
 
         DropTableEvent dropTableEvent = new DropTableEvent(table1);
         metadataApplier.applySchemaChange(dropTableEvent);
