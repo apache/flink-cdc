@@ -48,6 +48,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
+import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
 import static org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner.BINLOG_SPLIT_ID;
 
 /** The {@link SplitReader} implementation for the {@link MySqlSource}. */
@@ -236,7 +237,8 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
             final MySqlConnection jdbcConnection =
                     DebeziumUtils.createMySqlConnection(sourceConfig);
             final BinaryLogClient binaryLogClient =
-                    DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+                    createBinaryClient(sourceConfig.getDbzConfiguration());
+            createBinaryClient(sourceConfig.getDbzConfiguration(), jdbcConnection.isMariaDB());
             final StatefulTaskContext statefulTaskContext =
                     new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
             reusedSnapshotReader =
@@ -250,7 +252,8 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
             final MySqlConnection jdbcConnection =
                     DebeziumUtils.createMySqlConnection(sourceConfig);
             final BinaryLogClient binaryLogClient =
-                    DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+                    createBinaryClient(sourceConfig.getDbzConfiguration());
+            createBinaryClient(sourceConfig.getDbzConfiguration(), jdbcConnection.isMariaDB());
             final StatefulTaskContext statefulTaskContext =
                     new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
             reusedBinlogReader = new BinlogSplitReader(statefulTaskContext, subtaskId);
