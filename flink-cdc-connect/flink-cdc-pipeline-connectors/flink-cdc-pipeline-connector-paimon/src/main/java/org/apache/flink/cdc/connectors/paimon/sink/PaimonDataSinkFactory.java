@@ -68,12 +68,6 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
         Options options = Options.fromMap(catalogOptions);
         // Avoid using previous table schema.
         options.setString("cache-enabled", "false");
-        try (Catalog catalog = FlinkCatalogFactory.createPaimonCatalog(options)) {
-            Preconditions.checkNotNull(
-                    catalog.listDatabases(), "catalog option of Paimon is invalid.");
-        } catch (Exception e) {
-            throw new RuntimeException("failed to create or use paimon catalog", e);
-        }
         ZoneId zoneId = ZoneId.systemDefault();
         if (!Objects.equals(
                 context.getPipelineConfiguration().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),

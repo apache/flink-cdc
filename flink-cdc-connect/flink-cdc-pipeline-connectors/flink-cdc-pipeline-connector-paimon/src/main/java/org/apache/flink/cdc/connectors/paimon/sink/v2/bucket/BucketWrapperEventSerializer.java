@@ -99,8 +99,7 @@ public class BucketWrapperEventSerializer extends TypeSerializerSingleton<Event>
         EventClass eventClass = enumSerializer.deserialize(source);
         if (eventClass.equals(EventClass.BUCKET_WRAPPER_FLUSH_EVENT)) {
             return new BucketWrapperFlushEvent(
-                    source.readInt(), source.readInt(), source.readInt());
-            return new BucketWrapperFlushEvent(
+                    source.readInt(),
                     source.readInt(),
                     source.readInt(),
                     tableIdListSerializer.deserialize(source),

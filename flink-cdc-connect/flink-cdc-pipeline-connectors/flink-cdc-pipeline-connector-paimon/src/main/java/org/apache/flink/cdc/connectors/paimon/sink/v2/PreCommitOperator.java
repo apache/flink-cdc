@@ -26,6 +26,7 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
+import org.apache.paimon.flink.sink.Committer;
 import org.apache.paimon.flink.sink.MultiTableCommittable;
 import org.apache.paimon.flink.sink.StoreMultiCommitter;
 import org.apache.paimon.manifest.WrappedManifestCommittable;
@@ -74,8 +75,8 @@ public class PreCommitOperator
             this.storeMultiCommitter =
                     new StoreMultiCommitter(
                             () -> FlinkCatalogFactory.createPaimonCatalog(catalogOptions),
-                            commitUser,
-                            getMetricGroup());
+                            Committer.createContext(
+                                    commitUser, getMetricGroup(), true, false, null));
         }
         if (element.getValue() instanceof CommittableWithLineage) {
             multiTableCommittables.add(

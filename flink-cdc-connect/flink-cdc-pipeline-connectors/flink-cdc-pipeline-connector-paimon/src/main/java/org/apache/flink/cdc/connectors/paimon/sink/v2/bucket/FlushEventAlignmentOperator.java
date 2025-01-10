@@ -70,7 +70,12 @@ public class FlushEventAlignmentOperator extends AbstractStreamOperator<Event>
             subTaskIds.add(subtaskId);
             if (subTaskIds.size() == totalTasksNumber) {
                 LOG.info("{} send FlushEvent of {}", currentSubTaskId, sourceSubTaskId);
-                output.collect(new StreamRecord<>(new FlushEvent(sourceSubTaskId)));
+                output.collect(
+                        new StreamRecord<>(
+                                new FlushEvent(
+                                        sourceSubTaskId,
+                                        bucketWrapperFlushEvent.getTableIds(),
+                                        bucketWrapperFlushEvent.getSchemaChangeEventType())));
                 sourceTaskIdToAssignBucketSubTaskIds.remove(sourceSubTaskId);
             } else {
                 LOG.info(

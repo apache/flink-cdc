@@ -130,7 +130,9 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                                 new BucketWrapperFlushEvent(
                                         i,
                                         ((FlushEvent) event).getSourceSubTaskId(),
-                                        currentTaskNumber)));
+                                        currentTaskNumber,
+                                        ((FlushEvent) event).getTableIds(),
+                                        ((FlushEvent) event).getSchemaChangeEventType())));
             }
             return;
         }
