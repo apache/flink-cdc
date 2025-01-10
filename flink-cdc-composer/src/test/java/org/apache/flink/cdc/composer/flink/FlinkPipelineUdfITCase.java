@@ -899,6 +899,7 @@ public class FlinkPipelineUdfITCase {
         // Execute the pipeline
         PipelineExecution execution = composer.compose(pipelineDef);
         execution.execute();
+
         // Check the order and content of all received events
         String[] outputEvents = outCaptor.toString().trim().split("\n");
         assertThat(outputEvents)
