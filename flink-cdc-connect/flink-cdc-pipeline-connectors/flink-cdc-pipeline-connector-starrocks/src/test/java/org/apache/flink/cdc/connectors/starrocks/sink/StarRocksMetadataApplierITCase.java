@@ -20,18 +20,24 @@ package org.apache.flink.cdc.connectors.starrocks.sink;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
+import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
@@ -39,11 +45,14 @@ import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksContainer;
 import org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksSinkTestBase;
+import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
+import com.mysql.jdbc.exceptions.jdbc4.MySQLSyntaxErrorException;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -350,8 +359,70 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
         runJobWithEvents(generateNarrowingAlterColumnTypeEvents(tableId));
     }
 
+    @Test
+    public void testStarRocksTruncateTable() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .primaryKey("id")
+                        .build();
+
+        List<Event> truncateTableTestingEvents =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schema),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 1, 2.3, "Alice")),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 2, 3.4, "Bob")),
+                        new TruncateTableEvent(tableId),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 3, 4.5, "Cecily")),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 4, 5.6, "Derrida")));
+        runJobWithEvents(truncateTableTestingEvents);
+
+        assertEqualsInAnyOrder(
+                Arrays.asList("3 | 4.5 | Cecily", "4 | 5.6 | Derrida"),
+                fetchTableContent(tableId, 3));
+    }
+
+    @Test
+    public void testStarRocksDropTable() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .primaryKey("id")
+                        .build();
+
+        List<Event> dropTableTestingEvents =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schema),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 1, 2.3, "Alice")),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 2, 3.4, "Bob")),
+                        new DropTableEvent(tableId));
+        runJobWithEvents(dropTableTestingEvents);
+
+        Assert.assertThrows(
+                String.format(
+                        "Getting analyzing error. Detail message: Unknown table '%s.%s'.",
+                        tableId.getSchemaName(), tableId.getTableName()),
+                MySQLSyntaxErrorException.class,
+                () -> fetchTableContent(tableId, 3));
+    }
+
     private void runJobWithEvents(List<Event> events) throws Exception {
-        DataStream<Event> stream = env.fromCollection(events, TypeInformation.of(Event.class));
+        DataStream<Event> stream =
+                env.fromCollection(events, TypeInformation.of(Event.class)).setParallelism(1);
 
         Configuration config =
                 new Configuration()
@@ -391,5 +462,17 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 schemaOperatorIDGenerator.generate());
 
         env.execute("StarRocks Schema Evolution Test");
+    }
+
+    BinaryRecordData generate(Schema schema, Object... fields) {
+        return (new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0])))
+                .generate(
+                        Arrays.stream(fields)
+                                .map(
+                                        e ->
+                                                (e instanceof String)
+                                                        ? BinaryStringData.fromString((String) e)
+                                                        : e)
+                                .toArray());
     }
 }
